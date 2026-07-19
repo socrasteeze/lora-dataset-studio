@@ -203,6 +203,7 @@ def _image_dict(row: BankImage, th: dict) -> dict:
         'face_state': row.face_state, 'face_cluster': row.face_cluster,
         'status': row.status, 'reject_reason': row.reject_reason,
         'promoted_dataset_id': row.promoted_dataset_id,
+        'caption': row.caption,
     }
 
 
@@ -331,8 +332,22 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'clusters': clusters, 'faces_scanned': faces_scanned,
         'style_clusters': style_clusters,
         'activity': bank_jobs.get(bank_id),
+        'pipeline_report': _load_pipeline_report(bank),
         'thresholds': th,
     }
+
+
+def _load_pipeline_report(bank: ImageBank):
+    """The persisted 'Launch all' summary (parsed), or None. A corrupt blob is
+    swallowed — a broken report must never 500 the whole bank payload."""
+    import json as _json
+    raw = getattr(bank, 'pipeline_report', None)
+    if not raw:
+        return None
+    try:
+        return _json.loads(raw)
+    except (ValueError, TypeError):
+        return None
 
 
 def list_banks(user_id) -> list:
@@ -353,12 +368,14 @@ def list_banks(user_id) -> list:
 
 
 def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
-                group=None, style=None, subfolder=None,
+                group=None, style=None, subfolder=None, search=None,
                 offset=0, limit=200) -> dict | None:
     """One PAGE of the bank grid (a 9 000-image bank must never ship whole).
-    Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder.
-    Flag filters sort by the relevant score (worst first) so the review reads
-    top-down."""
+    Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ search.
+    ``search`` is a plain full-text term matched (case-insensitive LIKE) against the
+    caption AND the relpath — so captions double as searchable tags for a big dump
+    ("red dress"), combinable with every other filter. Flag filters sort by the
+    relevant score (worst first) so the review reads top-down."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         return None
@@ -379,8 +396,11 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         q = q.filter(BankImage.dup_group.isnot(None))
         order = (BankImage.dup_group.asc(), BankImage.id.asc())
     elif flag == 'no_face':
-        q = q.filter(BankImage.face_state.isnot(None),
-                     BankImage.face_state != 'scorable')
+        # Literally "no face was found" — ONLY face_state == 'no_face'. The other
+        # non-scorable states (low_det / too_small / extreme_pose) DID detect a
+        # face; lumping them in here surfaced photos with visible faces under a
+        # "No face" chip. 'unreadable'/'error' are read failures, not "no face".
+        q = q.filter(BankImage.face_state == 'no_face')
     elif flag in _QUALITY_FLAGS:
         crit = _flag_filter(flag, th)
         if crit is not None:
@@ -411,6 +431,14 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
             q = q.filter(~BankImage.relpath.contains(os.sep))
         else:
             q = q.filter(BankImage.relpath.startswith(subfolder + os.sep))
+    term = (search or '').strip()
+    if term:
+        # Full-text over caption + relpath. Escape LIKE metacharacters so a literal
+        # '%'/'_' in the query matches itself, then wrap in wildcards.
+        esc = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        like = f'%{esc}%'
+        q = q.filter(or_(BankImage.caption.ilike(like, escape='\\'),
+                         BankImage.relpath.ilike(like, escape='\\')))
     total = q.count()
     order_by = order if isinstance(order, tuple) else (order,)
     rows = q.order_by(*order_by).offset(max(0, int(offset))) \
@@ -743,6 +771,19 @@ _EMBED_SCRIPT = str(cfg.BACKEND_DIR / 'infer' / 'face_embed_infer.py')
 _PROGRESS_RE = re.compile(r'\[embed\] (\d+)/(\d+)')
 
 
+def _resolve_face_device():
+    """(device, use_gpu) for the face pass. 'cpu' is the safe default and never
+    touches the GPU; GPU is used ONLY when the face interpreter truly exposes
+    CUDA (onnxruntime-gpu installed) and the config allows it. Config
+    face_scoring.device: 'auto' (default — GPU if available) | 'cpu' | 'cuda'.
+    A 'cuda' request without CUDA available still degrades to CPU here, so the
+    parent never opens the GPU-exclusive window for a pass that will run on CPU."""
+    from .. import capabilities
+    pref = str(cfg.get('face_scoring.device') or 'auto').lower()
+    use_gpu = pref in ('auto', 'cuda') and capabilities.face_gpu_available()
+    return ('cuda' if use_gpu else 'cpu'), use_gpu
+
+
 def start_faces(app, user_id, bank_id):
     """Launch the face embedding + person clustering pass over the bank's
     non-rejected images. Needs the face-scoring extra (Setup ▸ Quality tools)."""
@@ -779,42 +820,54 @@ def _faces_job(bank_id):
             return
         _bank_dir(bank_id).mkdir(parents=True, exist_ok=True)
         th = thresholds()
+        # Device: 'cpu' (default, never touches the GPU/ComfyUI) or 'cuda'.
+        # 'auto' = GPU when the face interpreter actually exposes CUDA
+        # (onnxruntime-gpu installed), else CPU. The GPU path is used ONLY when
+        # CUDA is truly available AND must run inside the GPU-exclusive window so
+        # it never competes with a training / scoring pass; a CPU pass stays out
+        # of the window (it can run alongside GPU work).
+        from ..gpu_window import gpu_exclusive_vision_window
+        from contextlib import nullcontext
+        device, use_gpu = _resolve_face_device()
         payload = _json.dumps({
             'images': paths,
             'models_root': cfg.get('face_scoring.models_root') or None,
             'cache': str(_face_cache_path(bank_id)),
             'threshold': th['face_threshold'],
+            'device': device,
         })
         python = cfg.get('face_scoring.python') or sys.executable
-        proc = subprocess.Popen(
-            [python, _EMBED_SCRIPT], stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding='utf-8', errors='replace',
-            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-        bank_jobs.set_cancel_hook(job, proc.kill)
-        stderr_tail = deque(maxlen=5)
+        window = gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu else nullcontext()
+        with window:
+            proc = subprocess.Popen(
+                [python, _EMBED_SCRIPT], stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, encoding='utf-8', errors='replace',
+                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            bank_jobs.set_cancel_hook(job, proc.kill)
+            stderr_tail = deque(maxlen=5)
 
-        def _drain_stderr():
-            for line in proc.stderr:
-                line = line.strip()
-                if line:
-                    stderr_tail.append(line)
-                m = _PROGRESS_RE.search(line)
-                if m:
-                    bank_jobs.progress(job, done=int(m.group(1)),
-                                       total=int(m.group(2)))
+            def _drain_stderr():
+                for line in proc.stderr:
+                    line = line.strip()
+                    if line:
+                        stderr_tail.append(line)
+                    m = _PROGRESS_RE.search(line)
+                    if m:
+                        bank_jobs.progress(job, done=int(m.group(1)),
+                                           total=int(m.group(2)))
 
-        import threading
-        t = threading.Thread(target=_drain_stderr, daemon=True)
-        t.start()
-        try:
-            proc.stdin.write(payload)
-            proc.stdin.close()
-        except OSError:
-            pass  # process died early — surfaced through the exit path below
-        stdout = proc.stdout.read()
-        proc.wait()
-        t.join(timeout=5)
+            import threading
+            t = threading.Thread(target=_drain_stderr, daemon=True)
+            t.start()
+            try:
+                proc.stdin.write(payload)
+                proc.stdin.close()
+            except OSError:
+                pass  # process died early — surfaced through the exit path below
+            stdout = proc.stdout.read()
+            proc.wait()
+            t.join(timeout=5)
         if bank_jobs.cancelled(job):
             return
         line = next((ln for ln in reversed(stdout.splitlines())
@@ -1085,6 +1138,349 @@ def _watermark_job(bank_id, rescan):
     return run
 
 
+# --- caption pass (reuses the dataset caption engines) ----------------------
+def start_caption(app, user_id, bank_id, ids=None, force=False):
+    """Launch the caption pass over a selection (``ids``) or, when empty, every
+    non-rejected readable image. Reuses the dataset caption engines (JoyCaption /
+    Ollama per Settings) through a dataset-free descriptive brick; the captions
+    double as the bank's search text and ride along on promotion. Serialized
+    against training/vision like the score/watermark passes (503 when the GPU is
+    held). BankJobBusy when a job is already live, ValueError on a bad bank/config."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    backend = (cfg.get('captioning.backend') or 'auto').lower()
+    if backend == 'none':
+        raise ValueError('no captioning backend configured (Settings ▸ Captioning & quality)')
+    reason = _gpu_busy_reason()
+    if reason:
+        raise RuntimeError(reason)
+    ids = [int(i) for i in ids] if ids else None
+    q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+    if ids is not None:
+        q = q.filter(BankImage.id.in_(ids[:_SQL_IN_CHUNK]))
+    if not force:
+        q = q.filter(or_(BankImage.caption.is_(None), BankImage.caption == ''))
+    total = q.count()
+    return bank_jobs.start(app, bank_id, 'caption',
+                           _caption_job(bank_id, ids, force), total=total)
+
+
+def _caption_job(bank_id, ids, force):
+    def run(job):
+        from .face_dataset_service import caption_paths
+        from ..gpu_window import gpu_exclusive_vision_window
+        bank = db.session.get(ImageBank, bank_id)
+        if not bank:
+            return
+        q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+        if ids is not None:
+            rows = []
+            for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+                rows.extend(q.filter(BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all())
+            rows.sort(key=lambda r: r.id)
+        else:
+            rows = q.order_by(BankImage.id.asc()).all()
+        if not force:
+            rows = [r for r in rows if not (r.caption or '').strip()]
+        by_path = {}
+        for r in rows:
+            p = abs_image_path(bank, r)
+            if p and os.path.isfile(p):
+                by_path[p] = r.id
+        paths = list(by_path)
+        bank_jobs.progress(job, done=0, total=len(paths), detail='captioning')
+        if not paths:
+            return
+        captioned = 0
+
+        def _on_caption(path, caption):
+            nonlocal captioned
+            row = db.session.get(BankImage, by_path.get(path))
+            if row is not None:
+                row.caption = caption
+                db.session.commit()
+                captioned += 1
+
+        # GPU-exclusive for the whole pass, exactly like the score/watermark passes:
+        # frees ComfyUI VRAM and blocks a training start for the duration.
+        with gpu_exclusive_vision_window(flag_ttl=1800):
+            caption_paths(
+                paths,
+                should_cancel=lambda: bank_jobs.cancelled(job),
+                on_caption=_on_caption,
+                progress=lambda d, t: bank_jobs.progress(job, done=d, total=t))
+        if bank_jobs.cancelled(job):
+            bank_jobs.progress(job, detail=f'cancelled — {captioned} captioned so far')
+            return
+        bank_jobs.progress(job, detail=f'done — {captioned} captioned')
+    return run
+
+
+# --- "Launch all" pipeline --------------------------------------------------
+# The overnight funnel: the user configures it once, hits Launch all, and comes
+# back to a triaged, optionally pre-captioned bank. It chains the EXISTING passes
+# in the order Jeremy validated. Each pass already filters status != 'reject', so
+# running auto-reject BEFORE the heavy passes means score/watermark/person only
+# ever touch the SURVIVORS — the costly work never pays for images we just
+# dropped (the deliberate cost/quality trade-off: duplicate "keep best" therefore
+# ranks on sharpness/size, not the aesthetic score that isn't computed yet).
+PIPELINE_STEPS = ('scan', 'auto_reject', 'score', 'watermark', 'faces', 'caption')
+# Auto-reject inside the pipeline runs right after the quality scan, so it can
+# only act on the CPU-scan flags (and duplicates). The score-derived flags
+# (low_aesthetic/nsfw/watermark) have no data yet at that point.
+PIPELINE_REJECT_FLAGS = _QUALITY_FLAGS
+
+
+def _sanitize_pipeline_steps(steps) -> list:
+    """Keep only known steps, in the canonical pipeline order (the client can't
+    reorder or invent a pass)."""
+    want = set(steps or [])
+    return [s for s in PIPELINE_STEPS if s in want]
+
+
+def _score_prereq() -> str | None:
+    from ..capabilities import probe_bank_scoring
+    if not probe_bank_scoring().get('ok'):
+        return 'bank scoring extra not installed (Setup ▸ Quality tools)'
+    return None
+
+
+def _watermark_prereq() -> str | None:
+    from ..capabilities import probe_ollama_model
+    if not probe_ollama_model().get('ok'):
+        return 'vision model not available (Settings ▸ Captioning & quality)'
+    return None
+
+
+def _faces_prereq() -> str | None:
+    from .face_similarity import is_available
+    if not is_available():
+        return 'face scoring extra not installed (Setup ▸ Quality tools)'
+    return None
+
+
+def _caption_prereq() -> str | None:
+    if (cfg.get('captioning.backend') or 'auto').lower() == 'none':
+        return 'no captioning backend configured (Settings ▸ Captioning & quality)'
+    return None
+
+
+def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
+                   resolve_dups=False):
+    """Launch the chained triage pipeline. ``steps`` selects which passes run
+    (canonical order enforced); ``reject_flags`` + ``resolve_dups`` configure the
+    auto-reject step. One background job like every other pass — BankJobBusy when
+    one is already live, ValueError on a bad bank / empty step list."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    steps = _sanitize_pipeline_steps(steps)
+    if not steps:
+        raise ValueError('no pipeline steps selected')
+    reject_flags = [f for f in (reject_flags or []) if f in PIPELINE_REJECT_FLAGS]
+    return bank_jobs.start(
+        app, bank_id, 'pipeline',
+        _pipeline_job(user_id, bank_id, steps, reject_flags, bool(resolve_dups)),
+        total=0)
+
+
+def _bank_counts(bank_id) -> dict:
+    """Live headline counts used for the per-step tallies and the final report."""
+    base = BankImage.query.filter_by(bank_id=bank_id)
+    dup_groups = (db.session.query(BankImage.dup_group)
+                  .filter(BankImage.bank_id == bank_id,
+                          BankImage.dup_group.isnot(None))
+                  .distinct().count())
+    style_groups = (db.session.query(BankImage.style_cluster)
+                    .filter(BankImage.bank_id == bank_id,
+                            BankImage.style_cluster.isnot(None))
+                    .distinct().count())
+    person_groups = (db.session.query(BankImage.face_cluster)
+                     .filter(BankImage.bank_id == bank_id,
+                             BankImage.face_cluster.isnot(None))
+                     .distinct().count())
+    return {
+        'total': base.count(),
+        'scanned': base.filter(BankImage.quality_state.isnot(None)).count(),
+        'reject': base.filter_by(status='reject').count(),
+        'scored': base.filter(or_(BankImage.aesthetic_score.isnot(None),
+                                  BankImage.nsfw_score.isnot(None))).count(),
+        'watermark_detected': base.filter(BankImage.watermark_state == 'detected').count(),
+        'captioned': base.filter(and_(BankImage.caption.isnot(None),
+                                       BankImage.caption != '')).count(),
+        'dup_groups': dup_groups,
+        'style_groups': style_groups,
+        'person_groups': person_groups,
+    }
+
+
+def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups):
+    def run(job):
+        import json as _json
+        import time as _time
+        from ..gpu_window import GpuBusyError
+        bank = db.session.get(ImageBank, bank_id)
+        if not bank:
+            return
+        results = []
+        pipe = {'steps': list(steps), 'total_steps': len(steps),
+                'index': 0, 'current': steps[0], 'results': results}
+
+        def _sync(current=None, index=None):
+            if index is not None:
+                pipe['index'] = index
+            if current is not None:
+                pipe['current'] = current
+            pipe['results'] = list(results)
+            bank_jobs.set_pipeline(job, pipe)
+
+        _sync()
+        # Each entry closes with a status: 'done' | 'skipped' (reason) | 'error'.
+        for i, step in enumerate(steps):
+            if bank_jobs.cancelled(job):
+                break
+            _sync(current=step, index=i)
+            bank_jobs.progress(job, done=0, total=0,
+                               detail=f'step {i + 1}/{len(steps)}: {step}')
+            entry = {'step': step, 'status': 'done', 'reason': None,
+                     'detail': None, 'counts': {}}
+            try:
+                _run_pipeline_step(job, user_id, bank_id, step,
+                                   reject_flags, resolve_dups, entry)
+            except GpuBusyError as e:
+                # A vision/training job grabbed the GPU mid-pipeline — skip this
+                # pass and keep going (never wake the user for a transient clash).
+                entry['status'] = 'skipped'
+                entry['reason'] = f'GPU busy — {e}'
+            except Exception as e:  # noqa: BLE001 — one bad pass never sinks the rest
+                entry['status'] = 'error'
+                entry['reason'] = f'{type(e).__name__}: {e}'
+                db.session.rollback()
+            # A step that executed stays 'done' even if a cancel landed at its
+            # tail (its inner run already returned early); only steps we never
+            # reach are recorded as cancelled, below.
+            results.append(entry)
+            _sync()
+
+        cancelled = bank_jobs.cancelled(job)
+        # Any step never reached (cancel, or a hard earlier break) is recorded so
+        # the morning-after report has a row for every requested pass.
+        reached = {e['step'] for e in results}
+        for step in steps:
+            if step not in reached:
+                results.append({'step': step, 'status': 'cancelled' if cancelled
+                                else 'skipped',
+                                'reason': 'cancelled before it ran' if cancelled
+                                else 'not reached', 'detail': None, 'counts': {}})
+        _sync()
+
+        report = {
+            'started_at': job.get('started_at'),
+            'finished_at': _time.time(),
+            'cancelled': cancelled,
+            'requested_steps': list(steps),
+            'reject_flags': list(reject_flags),
+            'resolve_dups': resolve_dups,
+            'steps': results,
+            'counts': _bank_counts(bank_id),
+        }
+        bank = db.session.get(ImageBank, bank_id)
+        if bank is not None:
+            bank.pipeline_report = _json.dumps(report)
+            db.session.commit()
+        done_n = sum(1 for e in results if e['status'] == 'done')
+        skipped_n = sum(1 for e in results if e['status'] in ('skipped', 'cancelled'))
+        err_n = sum(1 for e in results if e['status'] == 'error')
+        tail = f'done — {done_n}/{len(steps)} steps ran'
+        if skipped_n:
+            tail += f', {skipped_n} skipped'
+        if err_n:
+            tail += f', {err_n} errored'
+        if cancelled:
+            tail = f'cancelled — {done_n}/{len(steps)} steps ran'
+        bank_jobs.progress(job, detail=tail)
+    return run
+
+
+def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, entry):
+    """Run ONE pipeline pass into ``entry``, reusing the standalone pass work.
+    Prerequisite missing → entry marked 'skipped' with a reason, pipeline
+    continues. Reuses each pass's inner ``run(job)`` so progress, cancellation
+    and the GPU-exclusive window behave exactly as the standalone buttons."""
+    if step == 'scan':
+        _scan_job(bank_id, rescan=False)(job)
+        c = _bank_counts(bank_id)
+        entry['counts'] = {'scanned': c['scanned'], 'dup_groups': c['dup_groups']}
+        entry['detail'] = (job.get('detail')
+                           or f"scanned {c['scanned']}, {c['dup_groups']} duplicate group(s)")
+        return
+    if step == 'auto_reject':
+        rejected = apply_flags(user_id, bank_id, reject_flags) if reject_flags else {}
+        dup_rejected = 0
+        if resolve_dups:
+            dup_rejected = resolve_dups_keep_best(user_id, bank_id)
+        n = sum(rejected.values()) + dup_rejected
+        entry['counts'] = {'rejected': n, 'by_flag': rejected,
+                           'duplicates': dup_rejected}
+        parts = [f'{v} {k}' for k, v in rejected.items() if v]
+        if dup_rejected:
+            parts.append(f'{dup_rejected} duplicate')
+        entry['detail'] = (f"rejected {n} image(s)"
+                           + (f" ({', '.join(parts)})" if parts else '')
+                           + ' — manual ✓/✕ untouched')
+        return
+    if step == 'score':
+        reason = _score_prereq() or _gpu_busy_reason()
+        if reason:
+            entry['status'], entry['reason'] = 'skipped', reason
+            return
+        _score_job(bank_id)(job)
+        c = _bank_counts(bank_id)
+        entry['counts'] = {'scored': c['scored'], 'style_groups': c['style_groups']}
+        entry['detail'] = job.get('detail') or f"scored {c['scored']} image(s)"
+        return
+    if step == 'watermark':
+        reason = _watermark_prereq() or _gpu_busy_reason()
+        if reason:
+            entry['status'], entry['reason'] = 'skipped', reason
+            return
+        _watermark_job(bank_id, rescan=False)(job)
+        c = _bank_counts(bank_id)
+        entry['counts'] = {'watermarks': c['watermark_detected']}
+        entry['detail'] = job.get('detail') or f"{c['watermark_detected']} with a watermark"
+        return
+    if step == 'faces':
+        reason = _faces_prereq()
+        if reason:
+            entry['status'], entry['reason'] = 'skipped', reason
+            return
+        _faces_job(bank_id)(job)
+        c = _bank_counts(bank_id)
+        entry['counts'] = {'person_groups': c['person_groups']}
+        entry['detail'] = job.get('detail') or f"{c['person_groups']} person cluster(s)"
+        return
+    if step == 'caption':
+        reason = _caption_prereq() or _gpu_busy_reason()
+        if reason:
+            entry['status'], entry['reason'] = 'skipped', reason
+            return
+        before = _bank_counts(bank_id)['captioned']
+        _caption_job(bank_id, None, False)(job)
+        after = _bank_counts(bank_id)['captioned']
+        entry['counts'] = {'captioned': max(0, after - before), 'total_captioned': after}
+        entry['detail'] = job.get('detail') or f"{after} captioned"
+        return
+    entry['status'], entry['reason'] = 'skipped', 'unknown step'
+
+
+def resolve_dups_keep_best(user_id, bank_id) -> int:
+    """Auto-resolve every unresolved duplicate group keeping the best member,
+    for the pipeline's auto-reject step. Returns the number REJECTED."""
+    out = resolve_dups(user_id, bank_id, strategy='best')
+    return out.get('rejected', 0)
+
+
 # --- subfolders (scoping facet) ---------------------------------------------
 def subfolders_payload(user_id, bank_id) -> dict | None:
     """Top-level subfolders of the bank's source folder with image counts, for
@@ -1147,18 +1543,21 @@ def _promote_job(user_id, bank_id, ids, dataset_id):
             if bank_jobs.cancelled(job):
                 break
             chunk = rows[c0:c0 + _PROMOTE_CHUNK]
-            blobs, chunk_rows = [], []
+            blobs, chunk_rows, caps = [], [], []
             for r in chunk:
                 p = abs_image_path(bank, r)
                 try:
                     with open(p, 'rb') as fh:
                         blobs.append(fh.read())
                     chunk_rows.append(r)
+                    # Carry the bank caption onto the dataset image (parallel to blobs),
+                    # so a captioned selection lands already captioned.
+                    caps.append(r.caption)
                 except (OSError, TypeError):
                     failed += 1
             if blobs:
                 new_ids, bad = import_images(user_id, dataset_id, blobs,
-                                             dedupe=True, stats=stats)
+                                             dedupe=True, stats=stats, captions=caps)
                 imported += len(new_ids)
                 failed += bad
                 # 'Promoted' = handed to the dataset — a dedupe skip means the
