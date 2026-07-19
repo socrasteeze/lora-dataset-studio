@@ -50,6 +50,12 @@ npm run build    # writes frontend/dist/
 
 **If you change anything under `frontend/src`, run `npm run build` and commit the regenerated `frontend/dist/` in the same PR** — otherwise people running from source won't see your change. There's no TypeScript/ESLint step; a clean `npm run build` is the bar.
 
+**This fork is local-only for image generation** (no Nano Banana / OpenAI Setup
+keys). After merging upstream, rebuild `frontend/dist` even if you only took
+upstream's dist commit — Flask serves the bundle, and upstream's can resurrect
+removed UI. See `FORK_NOTES.md` and run
+`node --test tests/local-only-engines-contract.test.mjs` from `frontend/`.
+
 ## Tests
 
 The backend has a large test suite (950+ tests) and it must stay green:

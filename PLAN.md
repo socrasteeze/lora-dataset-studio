@@ -59,11 +59,16 @@ The four repos:
 ### Phase 0 — LDS goes local-only (shipped 2026-07-19)
 
 - Nano Banana (Gemini) and ChatGPT (`gpt-image-2`) engines removed end to end;
-  Klein (ComfyUI) is the sole generation engine. See `FORK_NOTES.md`.
+  Klein (ComfyUI) is the sole generation engine. See `FORK_NOTES.md`
+  **Divergence 1** (includes the `frontend/dist` trap: upstream's served
+  bundle can resurrect the old Setup "Image generation" step — always rebuild
+  dist after merging upstream, and keep
+  `frontend/tests/local-only-engines-contract.test.mjs` green).
 - **Klein model-file pins** : `klein.unet` / `klein.text_encoder` /
   `klein.vae` in Settings → Image engine name the exact loader files (including
   files outside `klein`-named folders and `extra_model_paths.yaml` roots), with
-  honest ⚠ badges when a pin isn't on disk.
+  honest ⚠ badges when a pin isn't on disk. Absolute paths from anywhere are
+  staged into `lds-pinned/` (see FORK_NOTES Divergence 2).
 
 ### Phase 1 — one model tree (config only)
 
