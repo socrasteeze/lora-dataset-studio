@@ -2363,7 +2363,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           checkpoints={checkpoints}
           bestStep={bestEpoch?.available ? bestEpoch.best_step : null}
           settings={{ save_every: advSave, sample_every: advSampleEvery,
-            sample_prompts: adv?.sample_prompts }}
+            sample_prompts: adv?.sample_prompts,
+            optimizer: adv?.optimizer, learning_rate: adv?.learning_rate }}
           busy={status.in_progress}
           onResolve={runContinue} />
       )}
@@ -2372,8 +2373,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           hub opens, in a modal. Read-first: each checkpoint pill offers ⬇
           download (self-contained links); continue stays on the Runs hub where
           the cloud-continue flow lives.
+          Portaled to <body>: the button opens from the Checkpoints & LoRAs
+          manager, which portals into its OWN sidebar section — so when that
+          section is active, TrainingPanel's home container carries `hidden`
+          (display:none, DatasetWorkspace.sectionCls). A modal rendered inline
+          here would inherit that display:none (fixed positioning does NOT escape
+          an ancestor's display:none) and never appear — the button would look
+          dead. document.body keeps it visible whichever section opened it.
           TODO(lineage): a fuller Test-Studio-embedded graph will land here too. */}
-      {datasetGraph && (
+      {datasetGraph && createPortal((
         <div role="dialog" aria-modal="true" aria-label="Dataset run graph"
           className="fixed inset-0 z-[9990] bg-black/80 flex items-center justify-center p-3"
           onClick={(e) => { if (e.target === e.currentTarget) setDatasetGraph(null); }}>
@@ -2400,7 +2408,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             )}
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
