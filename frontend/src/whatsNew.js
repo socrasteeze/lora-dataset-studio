@@ -50,6 +50,30 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-19-bank-semantic-dedup',
+    date: '2026-07-19',
+    title: 'Catch the same shot in a dozen crops',
+    blurb:
+      "The Image bank already grouped exact and resized copies with a perceptual hash. Now a second pass catches what that misses: the same photo re-cropped, re-compressed or lightly re-touched — the \"same shot, different crop\" that fills a Telegram export. After you run Score, hit Find crops & variants (it reuses Score's embeddings, so it costs no extra GPU time) and the near-duplicate variants group up under their own chip, with the same keep-best / keep-first / pick-one resolution you already know — losers are rejected, never deleted. It also rides along in Launch all, right after Score. Tune how close counts as a match in Settings ▸ Captioning & quality; re-running re-sorts instantly from the cached embeddings.",
+    to: '/bank',
+  },
+  {
+    id: '2026-07-19-runs-lineage-tree',
+    date: '2026-07-19',
+    title: 'See how your runs descend from each other — down to every checkpoint',
+    blurb:
+      "When you continue a training — from its last checkpoint or an earlier, less-cooked epoch — a lineage is born: the original run, its continuation, the re-continuation, and any branch you forked off. The Runs page draws it, two ways: a compact List and a Graph — a left-to-right family tree with flowing connectors, the path to the run you're looking at lit up, and forks branching off. Now the graph also shows each run's checkpoints as sober pills beneath it — one run can hold a dozen epochs, all worth a look — and a continuation's connector starts from the exact checkpoint it resumed, so you can see at a glance that \"this run began from THAT save\". Click any checkpoint for its actions: download it, or continue from here (the resume dialog opens already set to that step). The graph now opens for a single run too, the moment it has one saved checkpoint — and you can open it straight from a dataset's Checkpoints & LoRAs panel with the new Graph button. Either view still shows family, steps, dataset version and whether a LoRA is on disk, highlights the current run, and greys a branch resumed from an earlier step (its later saves were set aside, never deleted). Older continuations are reconnected automatically — chains you trained before this shipped now show as one lineage instead of scattered roots, and anything too ambiguous to be sure of is left as a root, never invented.",
+    to: '/cloud',
+  },
+  {
+    id: '2026-07-19-training-recipe-tuning',
+    date: '2026-07-19',
+    title: 'Sharper training recipes from verified community research',
+    blurb:
+      "Two training defaults were re-tuned from a fact-checked sweep of recent community results. A FLUX.2 Klein STYLE LoRA now trains the winning 128/64/64/32 network (a linear + Conv2d LoRA) that a 64-run sweep and Black Forest Labs' own example converge on — noticeably better at capturing a look. And Slider LoRAs now default to alpha 4 (scale 0.5), matching the Ostris slider notebook (\"bigger is not always better, especially for sliders\") for a cleaner ± sweep. Both are just smarter defaults: your other Klein LoRAs are unchanged, existing runs aren't touched, and Advanced options still lets you set the network alpha back to 8 if you're reproducing an older slider.",
+    to: '/datasets?section=training&panel=advanced',
+  },
+  {
     id: '2026-07-19-bank-scoring-settings-save',
     date: '2026-07-19',
     title: 'Saving generation-LoRA presets no longer fails after Bank Score install',

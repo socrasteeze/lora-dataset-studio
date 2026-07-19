@@ -204,8 +204,16 @@ class BankImage(db.Model):
     uniformity_score = db.Column(Float, nullable=True)   # grayscale std (low = flat)
     dhash = db.Column(String(16), nullable=True)         # 64-bit hex, same dHash as imports
     # Duplicate group id (bank-local, rebuilt at the end of every quality scan).
-    # NULL = no near-duplicate found.
+    # NULL = no near-duplicate found. This is the EXACT/resized dedup (stage 1):
+    # same 64-bit dHash family (Hamming <= dup_distance).
     dup_group = db.Column(Integer, nullable=True, index=True)
+    # Semantic near-duplicate group id (stage 2 — "same shot, different crop"):
+    # cosine of the CLIP embeddings the ✨ Score pass cached >= semantic_dup_threshold.
+    # Catches crops / re-compressed variants a dHash misses. Assigned by the
+    # semantic-dedup pass over the scored images; NULL = no semantic near-dup /
+    # the pass hasn't run. Distinct column from dup_group so the two stages
+    # co-exist (an image can belong to both).
+    semantic_dup_group = db.Column(Integer, nullable=True, index=True)
     # Subject pass (InsightFace subprocess). face_state mirrors the dataset
     # vocabulary (scorable|no_face|low_det|too_small|extreme_pose|unreadable|error);
     # face_cluster is a bank-local person-cluster id (1 = biggest cluster),
@@ -498,6 +506,19 @@ class TrainingRunRecord(db.Model):
     # unified Runs page. NULL on pre-feature rows.
     settings = db.Column(db.Text)
     version = db.Column(db.Integer, nullable=False)
+    # Lineage (genealogy tree). A CONTINUATION stamps the record it resumed from
+    # (parent_record_id) and the step it resumed AT (resumed_from) — the durable,
+    # unambiguous edge the Runs-hub tree draws, instead of parsing `_superseded`
+    # folder names. Both NULL on a fresh launch and on every pre-feature row: a
+    # record with no parent is a lineage ROOT. No auto-invention for legacy runs
+    # (the resume link was never persisted before) — added idempotently at boot.
+    parent_record_id = db.Column(db.Integer, index=True)
+    resumed_from = db.Column(db.Integer)
+    # How the parent edge above came to exist. NULL = persisted natively by the
+    # continuation that drew it; 'backfill' = reconstructed at boot for a
+    # continuation that ran before the edge was persisted (see lineage_backfill).
+    # Kept distinct so a reconstructed edge stays auditable and reversible.
+    lineage_origin = db.Column(db.String(16))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

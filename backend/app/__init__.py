@@ -81,6 +81,9 @@ _SCHEMA_ADDITIONS = (
     ('face_dataset_image', 'watermark_regions', 'TEXT'),
     ('face_dataset_image', 'source_metadata', 'TEXT'),
     ('training_run_record', 'settings', 'TEXT'),
+    ('training_run_record', 'parent_record_id', 'INTEGER'),
+    ('training_run_record', 'resumed_from', 'INTEGER'),
+    ('training_run_record', 'lineage_origin', 'VARCHAR(16)'),
     ('training_preset', 'dataset_kind', 'VARCHAR(16)'),
     ('training_preset', 'variants', 'TEXT'),
     ('lora_test_image', 'error', 'TEXT'),
@@ -92,6 +95,7 @@ _SCHEMA_ADDITIONS = (
     ('bank_image', 'style_cluster', 'INTEGER'),
     ('bank_image', 'watermark_state', 'VARCHAR(16)'),
     ('bank_image', 'caption', 'TEXT'),
+    ('bank_image', 'semantic_dup_group', 'INTEGER'),
     ('image_bank', 'pipeline_report', 'TEXT'),
 )
 
@@ -237,6 +241,10 @@ def create_app(config_object=None):
         db.create_all()
         _apply_additive_migrations()
         _cleanup_orphaned_lora_test_images()
+        # Reconnect continuations that ran before their lineage edge was persisted
+        # — once, best-effort, never blocks boot (see services.lineage_backfill).
+        from .services.lineage_backfill import run_if_needed as _lineage_backfill
+        _lineage_backfill()
         # Vision requests are process-local, while their mutual-exclusion flag is
         # persisted in SQLite. A killed captioning request therefore cannot still
         # be running after boot; clear its stale flag immediately instead of

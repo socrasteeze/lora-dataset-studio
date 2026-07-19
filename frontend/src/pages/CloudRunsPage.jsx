@@ -4,6 +4,7 @@ import { postJson } from '../api/fetchClient';
 import { useToast } from '../components/common/Toast';
 import TrainingProgress from '../components/dataset/TrainingProgress';
 import ContinueDialog from '../components/dataset/ContinueDialog';
+import RunLineageTree from '../components/dataset/RunLineageTree';
 import { BaseModelChip, DatasetVersionChip, RunIdChip } from '../components/dataset/RunIdentityBadges';
 import { HelpBadge } from '../help/HelpMode';
 import { requestHelpTip } from '../help/helpTips';
@@ -229,6 +230,41 @@ export default function CloudRunsPage() {
   // tile instead of a broken-image glyph. Keyed by the run's share_key.
   const [brokenThumbs, setBrokenThumbs] = useState({});
 
+  // 🌳 Lineage: which run cards have their genealogy tree expanded, and the
+  // fetched tree per record id (loaded lazily on first expand; refetched only
+  // if forced). Keyed by record_id — the universal run node key.
+  const [lineageOpen, setLineageOpen] = useState({});   // record_id -> bool
+  const [lineageData, setLineageData] = useState({});    // record_id -> {tree|error|loading}
+  const loadLineage = useCallback(async (recordId) => {
+    setLineageData((m) => ({ ...m, [recordId]: { loading: true } }));
+    try {
+      const r = await fetch(`/api/dataset/train/runs/${recordId}/lineage`, { credentials: 'include' });
+      if (!r.ok) throw new Error('unavailable');
+      const tree = await r.json();
+      setLineageData((m) => ({ ...m, [recordId]: { tree } }));
+    } catch {
+      setLineageData((m) => ({ ...m, [recordId]: { error: 'Could not load this run’s lineage.' } }));
+    }
+  }, []);
+  const toggleLineage = useCallback((recordId) => {
+    setLineageOpen((m) => {
+      const next = { ...m, [recordId]: !m[recordId] };
+      if (next[recordId] && !lineageData[recordId]) loadLineage(recordId);
+      return next;
+    });
+  }, [lineageData, loadLineage]);
+  // Jump from a tree node to that run's card (same page): scroll + brief flash,
+  // reusing the deep-link highlight the Checkpoints panel already uses.
+  const jumpToRun = useCallback((node) => {
+    const id = runRowDomId(node.source, node.source === 'cloud' ? node.run_id : node.record_id);
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('lds-run-flash');
+    setTimeout(() => el.classList.remove('lds-run-flash'), 2200);
+  }, []);
+
   const poll = useCallback(async () => {
     try {
       const r = await fetch('/api/dataset/train/cloud/runs?limit=15', { credentials: 'include' });
@@ -376,16 +412,21 @@ export default function CloudRunsPage() {
   // auto-resume — the monitor seeds the checkpoint onto the pod before start).
   const [continuing, setContinuing] = useState({});   // run_id -> bool
   const [continueRunTarget, setContinueRunTarget] = useState(null);   // run being continued | null
+  // A specific checkpoint to open the Continue dialog on, when it was launched
+  // from a ◉ Graph pill ("continue from here"); null = the dialog's own default.
+  const [continueInitialStep, setContinueInitialStep] = useState(null);
   const continueRun = (run) => {
     if (isTrainingRecipeReplayBlocked(run)) {
       toast.error('This checkpoint uses an incompatible legacy Z-Image recipe and cannot be continued safely.');
       return;
     }
+    setContinueInitialStep(null);
     setContinueRunTarget(run);
   };
   const submitContinue = async (payload) => {
     const run = continueRunTarget;
     setContinueRunTarget(null);
+    setContinueInitialStep(null);
     if (!run || !payload) return;
     setContinuing((m) => ({ ...m, [run.run_id]: true }));
     try {
@@ -424,6 +465,26 @@ export default function CloudRunsPage() {
 
   // Fork is local-only: ignore remote actives/history (backend may still return them).
   const recent = (data?.recent || []).filter((r) => r.source !== 'cloud');
+
+  // ▶ Continue from a ◉ Graph checkpoint pill: open the Continue dialog on THAT
+  // step. Cloud-only, mirroring the per-run Continue button (a local run has no
+  // cloud-continue path). Prefer the live run row (full recipe/settings/steps);
+  // fall back to a node-derived target when the run sits outside the window.
+  const continueFromCheckpoint = (node, pill) => {
+    if (!node || node.source !== 'cloud' || node.run_id == null) return;
+    const row = [...actives, ...recent].find((r) => r.run_id === node.run_id);
+    const target = row || {
+      run_id: node.run_id, train_type: node.train_type, variant: node.variant,
+      steps: node.steps,
+      resume_steps: (node.checkpoints || []).map((c) => c.step),
+    };
+    if (isTrainingRecipeReplayBlocked(target)) {
+      toast.error('This checkpoint uses an incompatible legacy Z-Image recipe and cannot be continued safely.');
+      return;
+    }
+    setContinueInitialStep(pill?.step ?? null);
+    setContinueRunTarget(target);
+  };
 
   /* One HISTORY card. Visual hierarchy: rank 1 = thumbnail + identity chip +
      name + a strong status pill; rank 2 = the metrics that matter (duration,
@@ -472,6 +533,14 @@ export default function CloudRunsPage() {
                 only a CUSTOM base adds new info here (which checkpoint file). */}
             {baseLabel?.custom && <BaseModelChip label={baseLabel} />}
             <DatasetVersionChip version={run.version} />
+            {run.resumed_from != null && (
+              <button type="button"
+                onClick={() => run.record_id != null && toggleLineage(run.record_id)}
+                title="This run resumed from an earlier checkpoint — open its lineage"
+                className="rounded border border-border px-1 py-0.5 text-content-subtle text-[0.5625rem] hover:text-content">
+                ↳ from step {run.resumed_from}
+              </button>
+            )}
             {duration && (
               <span className="tabular-nums" title="Wall-clock run duration (launch → finish)">
                 ⏱ {duration}
@@ -533,6 +602,21 @@ export default function CloudRunsPage() {
                 LoRA
               </a>
             )}
+            {/* The graph opens for ANY run with saved checkpoints (a single run
+                already shows its epochs), and labels as Lineage once it has a
+                parent or a branch. */}
+            {run.record_id != null && (run.lineage || run.checkpoint_ready) && (
+              <button type="button" onClick={() => toggleLineage(run.record_id)}
+                aria-expanded={!!lineageOpen[run.record_id]}
+                title={run.lineage
+                  ? "Show this run's lineage — the runs it continued from or that branched off it"
+                  : "Show this run's checkpoints as a graph — download or continue from any of them"}
+                className="rounded-lg border border-transparent px-2 py-1 text-content-muted hover:border-border hover:text-content text-xs font-medium">
+                {lineageOpen[run.record_id]
+                  ? (run.lineage ? '🌳 Hide lineage' : '◉ Hide graph')
+                  : (run.lineage ? '🌳 Lineage' : '◉ Graph')}
+              </button>
+            )}
             {run.share_key && (
               <button type="button" onClick={() => shareConfig(run)}
                 title="Download this run's full settings as a paste-safe text file (recipe / help thread)"
@@ -541,6 +625,14 @@ export default function CloudRunsPage() {
               </button>
             )}
           </div>
+          {run.record_id != null && (run.lineage || run.checkpoint_ready) && lineageOpen[run.record_id] && (
+            <RunLineageTree
+              tree={lineageData[run.record_id]?.tree}
+              loading={lineageData[run.record_id]?.loading}
+              error={lineageData[run.record_id]?.error}
+              onSelect={jumpToRun}
+              onContinueCheckpoint={continueFromCheckpoint} />
+          )}
         </div>
       </div>
     );
@@ -709,6 +801,7 @@ export default function CloudRunsPage() {
           checkpoints={((continueRunTarget.resume_steps?.length
             ? continueRunTarget.resume_steps
             : [continueRunTarget.steps]).filter(Boolean)).map((step) => ({ step }))}
+          initialFromStep={continueInitialStep}
           busy={!!continuing[continueRunTarget.run_id]}
           onResolve={submitContinue} />
       )}
