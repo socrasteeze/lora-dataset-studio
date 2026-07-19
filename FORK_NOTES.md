@@ -3,8 +3,9 @@
 This is a personal fork of
 [perfectgf/lora-dataset-studio](https://github.com/perfectgf/lora-dataset-studio).
 This file is the always-current list of where the fork diverges from upstream —
-read it before merging upstream and update it in the same commit as any change
-that adds a new divergence (same convention as the sibling ai-toolkit fork).
+read it **before every** `git merge upstream/main` and update it in the same
+commit as any change that adds a new divergence (same convention as the sibling
+ai-toolkit fork).
 
 ## Fork changelog (enhancements shipped on this fork)
 
@@ -14,6 +15,8 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-07-19 | (this wave) | **Local-only dist guard** — contract test + merge routine so an upstream `frontend/dist` rebuild cannot resurrect Nano Banana / OpenAI Setup UI. |
+| 2026-07-19 | `610b499` / merge `fe76cb8` | **Klein paths from anywhere** — absolute pins outside Comfy roots hardlink/symlink into `lds-pinned/`; bf16 UNETs use `weight_dtype: default`; Training Settings drop vast.ai cards (Runs/backend left). |
 | 2026-07-19 | `aecc839` + dist `c4b4274` | **Configurable model paths everywhere** — every Klein model reference (UNET/TE/VAE pins, the consistency LoRA — now editable in Settings — and generation-LoRA preset rows) accepts a full absolute path as well as a ComfyUI-relative name; paths under any registered root auto-convert to loader names, with a three-state badge (found / not found / outside ComfyUI's folders). |
 | 2026-07-19 | `1ca80bc` + dist `1398e56` | **Emoji-free UI** — stripped ~700 decorative emoji across the app, docs and comments; plain-text labels, monochrome state glyphs kept, real text where an emoji was a button's only content. The `🔞` label prefix is kept as a functional NSFW data marker. |
 | 2026-07-19 | `59f0529`, `1b74d5b` | **PLAN.md** — the phased integration plan for the whole local stack (ComfyUI + SwarmUI + ai-toolkit + TagGUI) with LDS as the hub. |
@@ -22,13 +25,23 @@ merge map.
 
 ## Divergence 1: local-only generation (API engines removed)
 
-The fork generates exclusively on the local Klein engine (ComfyUI). The two
-cloud API engines — **Nano Banana (Gemini)** and **ChatGPT (`gpt-image-2`)**,
-including the experimental ChatGPT-subscription OAuth lane — were removed
-end to end (2026-07-19).
+**Non-negotiable.** The fork generates exclusively on the local Klein engine
+(ComfyUI). The two cloud API engines — **Nano Banana (Gemini)** and **ChatGPT
+(`gpt-image-2`)**, including the experimental ChatGPT-subscription OAuth lane —
+were removed end to end (2026-07-19) and must **never** return via an upstream
+merge.
 
-Deleted files (upstream has them, the fork doesn't — an upstream merge will
-try to resurrect them; delete them again unless re-adopting the engines):
+### What "back" looks like (real regression, 2026-07-19)
+
+Upstream still has a Setup step **"Image generation"** with Gemini / OpenAI key
+fields ("Powers Nano Banana", "Powers ChatGPT"). The fork's **source** removed
+that step (`useSetupSteps` is `comfyui → ollama → quality → training` only), but
+**`frontend/dist` is what Flask serves**. Taking upstream's `build(frontend):`
+commit during a merge silently reintroduces the cloud UI until you rebuild dist
+from this fork's `frontend/src`. Always treat a dirty/upstream `frontend/dist`
+as hostile until `npm run build` and the local-only contract test pass.
+
+### Deleted files (upstream has them — re-delete after merge)
 
 - `backend/app/services/nanobanana.py`
 - `backend/app/services/chatgpt_image.py`
@@ -36,8 +49,7 @@ try to resurrect them; delete them again unless re-adopting the engines):
 - `backend/tests/test_engines.py`
 - `backend/tests/test_chatgpt_oauth.py`
 
-Upstream files with fork edits (merge conflicts will concentrate here; the
-fork side is almost always "the API-engine half of this file is gone"):
+### Upstream files with fork edits (prefer fork side for engine UI)
 
 - `backend/app/config.py` — `SECRET_KEYS` without GEMINI/OPENAI;
   `engines` defaults are `{default: 'klein', enabled: ['klein']}`.
@@ -53,13 +65,25 @@ fork side is almost always "the API-engine half of this file is gone"):
 - `backend/app/services/face_variations.py` — API identity-guard wrappers
   (`wrap_variation`, `IDENTITY_GUARD*`) removed; Klein wrapper untouched.
 - Frontend: `VariationCatalog.jsx` (single Klein card), `EnginesSection.jsx`
-  (Klein LoRA presets only), `SetupPage.jsx`/`useSetupSteps.js` (no API-keys
+  (Klein LoRA presets only — **no** Gemini/OpenAI secret fields),
+  `SetupPage.jsx` / `useSetupSteps.js` (**no** API-keys / "Image generation"
   step), `CapabilitiesContext.jsx`, `settings/registry.js`,
   `OverviewSection.jsx`, `helpRegistry.js`, `diagnosticFormat.js`,
   `DatasetWorkspace.jsx`, `ReferencePanel.jsx` + their tests.
 - Docs: `README.md`, `docs/guide/settings-reference.md`,
-  `docs/guide/getting-started.md`, `docs/guide/using-the-app.md`
-  ("API-only" run mode is described as "curation-only").
+  `docs/guide/getting-started.md`, `docs/guide/using-the-app.md`,
+  `docs/guide/getting-help.md` (say **curation-only**, never "API-only").
+
+### Guardrails (do not skip)
+
+1. **Contract test:** `frontend/tests/local-only-engines-contract.test.mjs`
+   fails if Setup/Settings source or **served `frontend/dist`** contain the
+   cloud-engine UI strings, or if `SETUP_STEP_IDS` regains an `engines` step.
+2. After every upstream merge that touches `frontend/**`, run
+   `cd frontend && npm run build` and commit dist in a separate
+   `build(frontend):` commit (see CLAUDE.md).
+3. Do **not** re-add `GEMINI_API_KEY` / `OPENAI_API_KEY` to Settings, Setup,
+   `.env.example`, or help registry.
 
 Compatibility notes:
 
@@ -68,19 +92,16 @@ Compatibility notes:
 - Stale `engines.*` keys and GEMINI/OPENAI entries in an existing
   `config.json`/`.env` are ignored — nothing needs manual cleanup.
 
-## Divergence 2: Klein model-file pins
+## Divergence 2: Klein model-file pins (+ paths from anywhere)
 
 Optional `klein.unet` / `klein.text_encoder` / `klein.vae` config keys pin the
-exact loader files, ahead of the auto-detection. All model references — the
-pins, `klein.consistency_lora` (now a Settings field) and generation-LoRA
-preset rows — also accept absolute paths, auto-converted to ComfyUI-relative
-loader names when the file sits under a registered root
-(`resolve_model_ref` in klein_edit_helper). Touched upstream files:
-`backend/app/config.py` (defaults), `backend/app/services/klein_edit_helper.py`
-(`_configured_model`, `klein_override_status`, resolver priority),
-`backend/app/capabilities.py` (`comfyui.klein_overrides` payload),
-`frontend/src/components/settings/EnginesSection.jsx` (the card),
-`frontend/src/help/helpRegistry.js`, `docs/guide/settings-reference.md`,
+exact loader files, ahead of the auto-detection. Absolute paths outside every
+ComfyUI root are hardlinked/symlinked into `<models>/<type>/lds-pinned/` so
+stock loaders can open them (`_stage_external_model` in klein_edit_helper).
+Native / bf16 UNETs (filename without `fp8`) enqueue with `weight_dtype:
+default`. Touched: `backend/app/config.py`, `klein_edit_helper.py`,
+`watermark_klein.py`, `capabilities.py`, `EnginesSection.jsx`,
+`helpRegistry.js`, `docs/guide/settings-reference.md`,
 `backend/tests/test_klein_models.py`.
 
 ## Divergence 3: emoji-free UI (repo-wide, cosmetic)
@@ -92,13 +113,30 @@ conflict trivially — take upstream's content, then re-strip the emoji from the
 merged result (a line-safe strip: never let a removal eat the newline of a line
 that ends with an emoji).
 
-## Merge routine
+## Divergence 4: Training Settings without Cloud GPU cards
+
+Settings → Training keeps **Defaults** only. The vast.ai API key card and
+Cloud training guardrails were removed from the Settings UI (Runs page /
+backend cloud code remain for local run history). Upstream merges that restore
+`TrainingSection.jsx` cloud cards: delete them again and prune the matching
+`helpRegistry.js` topics + `docs/guide/settings-reference.md` subsections.
+
+## Merge routine (every upstream sync)
 
 ```
-git remote add upstream https://github.com/perfectgf/lora-dataset-studio  # once
-git fetch upstream && git merge upstream/main
-# re-delete any resurrected API-engine files, re-run:
-#   backend:  python -m pytest
-#   frontend: node --test   (from frontend/)
-# then rebuild dist in a separate build(frontend): commit.
+git fetch upstream
+git merge upstream/main
+# 1. Re-delete any resurrected API-engine files (list above).
+# 2. Resolve conflicts — for engine/Setup/EnginesSection, prefer THIS fork.
+# 3. If frontend/dist or Setup/engines UI came from upstream, wipe their effect:
+cd frontend && npm run build
+# 4. Prove local-only did not regress:
+cd frontend && node --test tests/local-only-engines-contract.test.mjs
+python -m pytest
+cd frontend && node --test
+# 5. Commit sources, then a separate build(frontend): commit for dist.
+# 6. Ask before push; never force-push without confirmation.
 ```
+
+**Hard stop:** if Setup shows "Image generation" with Gemini/OpenAI key fields,
+`frontend/dist` is stale — rebuild; do not "fix" by re-adding the engines.

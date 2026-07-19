@@ -40,11 +40,9 @@ const STATUS_META = {
 // useSetupSteps.js) back to the wizard step that installs/configures it, so clicking a
 // row jumps straight to that step. Most entries match a step's own `unlocks` wording
 // 1:1 (Captioning, Face-similarity scoring, Person masks, LoRA training, Test Studio).
-// Two don't, and are set by where the control actually lives: "Klein (local)" is
-// downloaded from the comfyui step's body (toolBody('comfyui') has the one-click
-// installers), not the image step — the image step only has the API-key fields and a
-// note pointing at ComfyUI. "Auto-framing & head-crop" is the ollama step's other two
-// unlocks (Auto-classify framing / Auto head-crop), just phrased differently here.
+// "Klein (local)" and "Test Studio" both live on the comfyui step (toolBody installs
+// the weights). "Auto-framing & head-crop" is the ollama step's other two unlocks
+// (Auto-classify framing / Auto head-crop), just phrased differently here.
 const CAPABILITY_STEP_ID = {
   'Klein (local)': 'comfyui',
   'Captioning': 'ollama',
@@ -299,12 +297,13 @@ export default function SetupPage() {
                 <p className="text-amber-300">
                   Klein still needs the <span className="text-content font-medium">{missingSummary}</span> — grab
                   {missingLabels.length > 1 ? ' them' : ' it'} below. Local generation is
-                  <span className="text-content font-medium"> optional</span>: the API engines and your own photos work without it.
+                  <span className="text-content font-medium"> optional</span>: you can still import or scrape
+                  your own photos and train without it.
                 </p>
               )}
               <p>
                 Running. The Klein model is <span className="text-content font-medium">optional</span> — add it only if you want
-                local generation (you can also use the API engines or your own photos, then export to train elsewhere).
+                local generation (you can also use your own photos, then export to train elsewhere).
                 To enable it, download <span className="font-mono">flux-2-klein-9b-kv-fp8.safetensors</span> ({KLEIN_MODEL_VRAM}) into
                 <span className="font-mono"> &lt;ComfyUI&gt;/models/unet/klein/</span> — the <span className="text-content font-medium">KV build</span>,
                 up to 2.5× faster on multi-reference edits at the same quality, and a public download (no token).
@@ -815,8 +814,8 @@ export default function SetupPage() {
     // key piece is missing), missing (✗). Ollama keys on the MODEL, not just being
     // reachable — a running Ollama with no vision model is only "partial".
     // `optional: true` rows (local generation) never look like a problem when not
-    // ready — you can build a dataset from your own photos + API engines and export
-    // to train elsewhere. They render neutral (grey ○ + "optional"), not amber/✗.
+    // ready — you can build a dataset from your own photos and export to train
+    // elsewhere. They render neutral (grey ○ + "optional"), not amber/✗.
     const triState = (reachable, complete) => reachable ? (complete ? 'ready' : 'partial') : 'missing'
     // Ollama now has THREE scan outcomes: running (ready, or amber "pull the model"),
     // installed-but-STOPPED (amber "installed — not running" → the ollama step's ▶ Start

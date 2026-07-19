@@ -20,8 +20,9 @@ pipeline behind one UI.
 | **Needs** | Python 3.10–3.12 | ComfyUI and/or ai-toolkit + an NVIDIA GPU (12 GB+ for local generation) |
 | **Good for** | Laptops, first try, cloud training | The full pipeline on a training rig |
 
-You can start API-only and add the local tools later — features light up
-automatically when their tool is detected.
+You can start **curation-only** (import/scrape your own photos) and add the
+local tools later — features light up automatically when their tool is
+detected. This fork has no cloud image-generation API engines.
 
 ## First launch
 
@@ -41,7 +42,9 @@ pip install -r backend/requirements.txt
 python backend/run.py
 ```
 
-**Docker (API-only):** `cp .env.example .env`, then `docker compose up --build`.
+**Docker (curation-only):** `cp .env.example .env`, then `docker compose up --build`.
+Image *generation* on this fork always needs ComfyUI locally — there are no
+Gemini/OpenAI generation keys.
 
 The full install matrix (Windows release ZIP, GPU requirements, external tools)
 lives in the README on GitHub.

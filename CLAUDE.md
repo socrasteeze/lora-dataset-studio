@@ -18,8 +18,9 @@ Public repo — everything here is visible; keep it free of personal data.
 Run through this before calling a wave done:
 
 1. **Tests green before commit.** Backend: `python -m pytest` (system Python).
-   Frontend: `node --test` from `frontend/` — includes the help-registry and
-   what's-new contract tests, which WILL fail if you skip steps 3-4.
+   Frontend: `node --test` from `frontend/` — includes the help-registry,
+   what's-new, and **local-only-engines** contract tests (the last one fails if
+   Nano Banana / OpenAI Setup UI reappears in `src` or stale `frontend/dist`).
 2. **Source-only commits.** Never commit `frontend/dist/**` alongside sources;
    the dist rebuild is a separate consolidated `build(frontend):` commit at the
    end of the wave.
@@ -30,11 +31,22 @@ Run through this before calling a wave done:
    section, page or big button needs a topic (and its Guide anchor), or the
    contract test fails.
 5. **Docs**: update `docs/guide/settings-reference.md` when a setting is added
-   or changes meaning; README only at milestones.
+   or changes meaning; README only at milestones. After an **upstream merge**,
+   also update `FORK_NOTES.md` if a divergence changed, and **rebuild
+   `frontend/dist`** — Flask serves dist; taking upstream's bundle can
+   resurrect removed cloud engines even when `frontend/src` is clean.
 6. **Credits.** Community-sourced ideas and fixes name their author in the
    commit message (and in-app where the feature surfaces, when appropriate).
 7. **Never rename catalog labels, config keys or What's-new ids** without an
    alias path — several of them are stored in user databases and localStorage.
+
+## Fork sync (upstream)
+
+This repo is a fork. Before/after `git merge upstream/main`, follow
+`FORK_NOTES.md` — especially **Divergence 1 (local-only generation)**. Never
+re-add Gemini/OpenAI/Nano Banana generation engines. After any merge that
+touches `frontend/`, run `cd frontend && npm run build` and the local-only
+contract test before calling the sync done.
 
 ## Releases
 
