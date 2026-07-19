@@ -1,5 +1,5 @@
 /**
- * 💾 Back up everything — the library-level control: one button that archives
+ * Back up everything — the library-level control: one button that archives
  * EVERY dataset plus the app config (secrets excluded) into a single master
  * file, produced by a background job with visible progress, then a download +
  * "open folder". The restore overlay is the other half: when the library's
@@ -55,7 +55,7 @@ function BackupOverlay({ job, onDownload, onOpenFolder, onDismiss }) {
   return (
     <Overlay label="Back up everything">
       <h2 className="text-base font-semibold text-content">
-        {done ? '✅ ' : error ? '⚠️ ' : '💾 '}
+        {done ? '' : error ? '⚠ ' : ''}
         {done ? summary.headline : error ? 'Backup failed' : 'Backing up your library'}
       </h2>
       {job.state === 'running' && (
@@ -73,11 +73,11 @@ function BackupOverlay({ job, onDownload, onOpenFolder, onDismiss }) {
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <button type="button" onClick={onOpenFolder}
               className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface-raised">
-              📂 Open folder
+              Open folder
             </button>
             <button type="button" onClick={() => onDownload(job.result?.name)}
               className="rounded-lg bg-gradient-primary px-3.5 py-1.5 text-sm font-semibold text-white">
-              ⬇ Download
+              Download
             </button>
             <button type="button" onClick={onDismiss}
               className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content-muted hover:bg-surface-raised">
@@ -109,7 +109,7 @@ function RestoreOverlay({ job, onDismiss }) {
   return (
     <Overlay label="Restore everything">
       <h2 className="text-base font-semibold text-content">
-        {done ? '✅ ' : error ? '⚠️ ' : '♻️ '}
+        {done ? '' : error ? '⚠ ' : '♻ '}
         {done ? report.headline : error ? 'Restore failed' : 'Restoring your backup'}
       </h2>
       {job.state === 'running' && (
@@ -145,7 +145,7 @@ export default function FullBackupControls({ backup }) {
           title="Archive every dataset, its training history + your settings (API keys excluded) into one file"
           aria-label="Back up everything"
           className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-content transition-colors hover:border-primary/40 hover:bg-surface-raised disabled:opacity-50">
-          💾<span className="hidden sm:inline"> Back up everything</span>
+          <span className="hidden sm:inline"> Back up everything</span>
         </button>
         <label className="hidden items-center gap-1 text-xs text-content-muted sm:inline-flex"
           title="Also bundle the trained LoRA files (larger backup). Training history is always included regardless.">

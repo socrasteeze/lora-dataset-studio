@@ -1972,7 +1972,7 @@ def _custom_combo_hash(ds, base_model=_PERSISTED, family=None) -> str:
 # (the overwrite report: importing step 2500 of run A, then step 2500 of run B,
 # silently replaced A's LoRA). Cloud runs tag with their CloudTrainingRun id
 # (`_rc49`), local runs with their TrainingRunRecord id (`_rl12`) — matching the
-# ☁/💻 #N chips on the Runs page. Parsed back out (parse_deployed_run) so the
+# /#N chips on the Runs page. Parsed back out (parse_deployed_run) so the
 # "in ComfyUI" list can show each file's source run. It is stripped from display
 # labels (comfyui._parse_trained_stem) so it reads as a chip, not name noise.
 _DEPLOYED_RUN_TAG_RE = re.compile(r'_r([cl])(\d+)(?:_v\d+)?(?:\.[^.]+)?$')
@@ -2443,7 +2443,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
     - TURBO (opt-in, VRAM-friendly) : name_or_path='krea/Krea-2-Turbo' + l'adapter de
       training Ostris (retiré à l'inférence, comme Z-Image), previews CFG 1 / 8 steps.
 
-    Commun : quantize qfloat8 + low_vram pour tenir sur 24 Go. ⚠️ Requiert ai-toolkit
+    Commun : quantize qfloat8 + low_vram pour tenir sur 24 Go. ⚠ Requiert ai-toolkit
     À JOUR (commit « Add support for Krea2 », arch 'krea2') sinon l'arch est inconnue
     (garde _aitoolkit_supports_krea). Réseau = 'lora' : VÉRIFIÉ canonique 2026-06-26.
     Résolution KREA_TRAIN_RESOLUTION (1024, TE déchargé) car 768 seul tenait sinon."""
@@ -2617,7 +2617,7 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
 
     Les deux name_or_path sont des modèles GATED sur Hugging Face : accepter la
     licence + HF_TOKEN avant le 1er run, même mécanique que FLUX.1-dev et Krea.
-    ⚠️ Contrairement à 'flux' (arch CŒUR), flux2_klein_* sont des EXTENSIONS →
+    ⚠ Contrairement à 'flux' (arch CŒUR), flux2_klein_* sont des EXTENSIONS →
     garde de version obligatoire (_aitoolkit_supports_flux2klein) sinon
     get_model_class retombe en silence sur le loader SD legacy (LoRA corrompu).
     quantize/low_vram/qfloat8 comme les autres familles ; curseur basse-VRAM =
@@ -2788,7 +2788,7 @@ def open_training_folder(user_id, dataset_id, target='loras', family=None,
     le navigateur tourne sur la même machine) le dossier demandé :
     'loras' → dossier d'import ComfyUI de la famille (loras/krea, loras/sdxl,
     loras/z image) ; 'run' → dossier de checkpoints du run courant (base+famille) ;
-    'dataset' → dossier des images du dataset (data/datasets/<id>/ — où « 💾 Write
+    'dataset' → dossier des images du dataset (data/datasets/<id>/ — où « Write
     .txt files » dépose les captions sidecar ; aucune dépendance ai-toolkit).
     Cibles FIXES résolues côté serveur — le client n'envoie jamais de chemin.
     Crée le dossier au besoin (avant un premier import il n'existe pas encore).
@@ -2853,7 +2853,7 @@ def list_checkpoints(user_id, dataset_id, base_model=_PERSISTED, family=None,
             c['version'] = rec.version
             c['source'] = rec.source
             c['trained_at'] = rec.created_at.isoformat() if rec.created_at else None
-            # Run identity for the ☁/💻 #N chip + deep-link on the local group
+            # Run identity for the /#N chip + deep-link on the local group
             # header — the same run the deployed file will be tagged with.
             if rec.source == 'cloud' and rec.cloud_run_id:
                 c['run_id'], c['run_source'] = rec.cloud_run_id, 'cloud'
@@ -2951,7 +2951,7 @@ def import_checkpoint(user_id, dataset_id, filename, base_model=_PERSISTED, fami
             version = rec.version
             if run_tag_id is None:
                 # A cloud launch recorded locally addresses by its pod-run id
-                # (matches the cloud import path AND the ☁ #N chip); everything
+                # (matches the cloud import path AND the #N chip); everything
                 # else is a local record -> its TrainingRunRecord id.
                 if rec.source == 'cloud' and rec.cloud_run_id:
                     run_tag_source, run_tag_id = 'cloud', rec.cloud_run_id
@@ -3075,7 +3075,7 @@ def list_imported_checkpoints(user_id, dataset_id, family=None) -> list[dict]:
         entry = {'filename': os.path.join(subfolder, fn),
                  'label': format_trained_lora_label(
                      fn, fam, trigger=getattr(ds, 'trigger_word', None)) or fn}
-        # Source run of this deployed file (☁/💻 #N chip). Files imported before
+        # Source run of this deployed file (/#N chip). Files imported before
         # run tagging carry no tag -> (None, None): shown as "run unknown", never
         # renamed retroactively (they stay listed and deletable exactly as-is).
         rsrc, rid = parse_deployed_run(fn)
@@ -3778,7 +3778,7 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
     except Exception:
         pass
 
-    # Verdict agrégé pour la pastille : un fail = 🔴, sinon un warn = 🟡, sinon 🟢.
+    # Verdict agrégé pour la pastille : un fail = , sinon un warn = , sinon .
     statuses = {c['status'] for c in checks}
     verdict = ('blocked' if 'fail' in statuses
                else 'warnings' if 'warn' in statuses else 'ready')

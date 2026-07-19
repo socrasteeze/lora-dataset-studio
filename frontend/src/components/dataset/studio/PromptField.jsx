@@ -2,7 +2,7 @@ import { useState } from 'react';
 import RecentPrompts from './RecentPrompts';
 import DescribeImageModal from './DescribeImageModal';
 
-// Champ prompt de test : textarea + bouton « ↺ défaut » + « 🔎 Describe » + prompts récents.
+// Champ prompt de test : textarea + bouton « ↺ défaut » + « Describe » + prompts récents.
 // Extrait behavior-preserving de LoraTestStudio.jsx (bloc « Prompt de test »).
 // `value` = effectivePrompt, `placeholder` = d.prompt, `isCustom` = prompt édité ≠ défaut.
 // Le rendu de <RecentPrompts> reste conditionné à la présence de d.recent_prompts :
@@ -23,7 +23,7 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
         <button type="button" onClick={() => setDescribeOpen(true)}
           title="Describe an image into a test prompt (vision model)"
           className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-[0.625rem] hover:text-content">
-          🔎 Describe
+          Describe
         </button>
       </div>
       <textarea

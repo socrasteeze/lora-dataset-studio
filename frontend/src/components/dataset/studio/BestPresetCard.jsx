@@ -7,12 +7,12 @@ export default function BestPresetCard({ preset, onMemorize, fmt }) {
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-emerald-400/50 bg-emerald-400/10 px-3 py-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span aria-hidden>🏆</span>
+        <span aria-hidden></span>
         <span className="text-content text-sm font-semibold">Best setting (based on your votes)</span>
         <span className="text-emerald-300 text-[0.6875rem] tabular-nums"
           title={`+${preset.likes} / −${preset.dislikes} on ${preset.images} image(s)`}>
-          score +{preset.score} (👍{preset.likes} 👎{preset.dislikes})
-          {preset.like_rate != null ? ` · ${Math.round(preset.like_rate * 100)}% 👍 on ${preset.voted} vote(s)` : ''}
+          score +{preset.score} ({preset.likes} {preset.dislikes})
+          {preset.like_rate != null ? ` · ${Math.round(preset.like_rate * 100)}% on ${preset.voted} vote(s)` : ''}
         </span>
         {preset.low_confidence && (
           <span className="text-amber-300 text-[0.625rem] inline-flex items-center gap-1"

@@ -24,7 +24,7 @@ def start_ollama():
 
 @bp.get('/models')
 def list_models():
-    """Installed Ollama models for the Captions ⚙️ Options model picker.
+    """Installed Ollama models for the Captions Options model picker.
     Always 200 — {ok, reachable, models:[...]}; an unreachable server is a handled
     outcome (reachable:False, empty list), not a server fault."""
     return jsonify(ollama_control.list_models()), 200

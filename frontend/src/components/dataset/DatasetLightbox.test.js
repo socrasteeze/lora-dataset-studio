@@ -9,8 +9,8 @@ const settings = readFileSync(new URL('../settings/ScrapingSection.jsx', import.
 const attribution = readFileSync(new URL('./PexelsAttribution.jsx', import.meta.url), 'utf8');
 
 test('lightbox exposes an accessible responsive image improvement action', () => {
-  assert.match(lightbox, /✨ Upscale & improve/);
-  assert.match(lightbox, /✨ Improving…/);
+  assert.match(lightbox, /Upscale & improve/);
+  assert.match(lightbox, /Improving…/);
   assert.match(lightbox, /Review improvement first/);
   assert.match(lightbox, /aria-busy=\{improvementActive\}/);
   assert.match(lightbox, /w-full sm:w-auto/);

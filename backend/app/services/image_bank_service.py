@@ -1,4 +1,4 @@
-"""🗃️ Image bank service — triage a big unsorted folder into dataset-ready
+"""Image bank service — triage a big unsorted folder into dataset-ready
 selections.
 
 The founding use case: "I exported 9 000 images from Telegram — now what?".

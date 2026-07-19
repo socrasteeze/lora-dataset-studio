@@ -666,7 +666,7 @@ def free_comfyui_vram(worker_url=None):
 _TRAINED_STEP_RE = re.compile(r'^\d{4,}$')
 # Source-run tag token: `rc<id>` (cloud CloudTrainingRun id) / `rl<id>` (local
 # TrainingRunRecord id) appended by lora_training.import_checkpoint. It carries
-# run identity for the ☁/💻 #N chips, so it is stripped from display labels.
+# run identity for the /#N chips, so it is stripped from display labels.
 _RUN_TAG_TOKEN_RE = re.compile(r'^r[cl]\d+$')
 
 # Familles d'entraînement (= pipeline). La clé interne ('zimage'/'sdxl'/'krea') et
@@ -723,7 +723,7 @@ def family_of_lora(filename: str) -> str | None:
 def _finish_parse(trigger: str, rest_tokens):
     """Partage final du parse : depuis un trigger déjà isolé et les tokens qui le
     SUIVENT, extrait le step (1er token tout-chiffres 4+) et le reste (base/merge),
-    en jetant le tag de run `rc<id>`/`rl<id>` (surfacé en chip ☁/💻 #N, pas du bruit
+    en jetant le tag de run `rc<id>`/`rl<id>` (surfacé en chip /#N, pas du bruit
     de label)."""
     step, rest = None, []
     for t in rest_tokens:
@@ -742,7 +742,7 @@ def _parse_trained_stem(filename: str, trigger: str | None = None):
     convention (le caller retombe alors sur un label générique). Source UNIQUE du
     parse, partagée par le libellé lisible ET la clé de regroupement des checkpoints.
 
-    ⚠️ Le trigger peut LUI-MÊME contenir des underscores (ex. ``leg_behind``) : il
+    ⚠ Le trigger peut LUI-MÊME contenir des underscores (ex. ``leg_behind``) : il
     s'étale alors sur plusieurs tokens. Prendre bêtement ``tokens[0]`` le tronquait
     (« leg ») et poussait le reste (« behind ») dans la base — d'où un label
     « leg · behind » et un chip d'auto-injection erroné (bug rapporté 2026-07-17).

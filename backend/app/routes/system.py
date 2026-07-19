@@ -1,4 +1,4 @@
-"""🖥️ System pickers — server-side folder selection for the Browse… field.
+"""System pickers — server-side folder selection for the Browse… field.
 
 The folders the app works on live on the machine RUNNING the server (not the
 browser's), so these two endpoints do the selecting there:

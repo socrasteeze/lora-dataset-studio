@@ -1,6 +1,6 @@
 // react-frontend/src/components/dataset/studio/ResultsArea.jsx
 /**
- * Zone « 📊 Résultats » du Studio de test LoRA. Possède l'état d'affichage
+ * Zone « Résultats » du Studio de test LoRA. Possède l'état d'affichage
  * (repli `showResults`) et le run sélectionné (`selRun`), recalcule tout le
  * regroupement par run / config / variante à partir de `d.cells` et `d.scores`
  * (extraction behavior-preserving depuis l'ancien LoraTestStudio.jsx), puis rend
@@ -127,10 +127,10 @@ export default function ResultsArea({ datasetId, d, studio, vote, onOpen }) {
     [displayedCells]);
   const canExport = displayedCells.some((c) => c.status === 'done' && c.filename);
 
-  // --- Mode vote rapide : enchaîne les images non votées (swipe / 👍 / 👎) ----
+  // --- Mode vote rapide : enchaîne les images non votées (swipe / / ) ----
   const unvoted = displayedCells.filter((c) => c.status === 'done' && c.filename && !c.rating);
-  // 2e passe : revoter UNIQUEMENT les 👍 pour resserrer (un 👎 les bascule rouge,
-  // un 👍 les reconfirme, passer les laisse vertes).
+  // 2e passe : revoter UNIQUEMENT les pour resserrer (un les bascule rouge,
+  // un les reconfirme, passer les laisse vertes).
   const greens = displayedCells.filter((c) => c.status === 'done' && c.filename && c.rating === 1);
 
   if (gridRows.length === 0) return null;
@@ -144,7 +144,7 @@ export default function ResultsArea({ datasetId, d, studio, vote, onOpen }) {
         unvotedCount={unvoted.length}
         onStartVote={() => vote.startVoting(unvoted)}
         greenCount={greens.length}
-        onStartReVote={() => vote.startVoting(greens, '♻️ Reconfirm the 👍')}
+        onStartReVote={() => vote.startVoting(greens, '♻ Reconfirm the ')}
         displayedCount={displayedCells.length}
         showResults={showResults}
         onToggleResults={() => setShowResults((v) => !v)}

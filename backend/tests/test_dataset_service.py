@@ -691,7 +691,7 @@ def _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER, engine='nanoba
 
 
 def test_regenerate_with_edited_prompt_persists_and_reaches_engine(app, monkeypatch):
-    """✏️ edit-prompt regenerate: the edited core prompt is persisted into
+    """✏ edit-prompt regenerate: the edited core prompt is persisted into
     variation_prompt AND reaches the Klein engine wrapped by the identity-guard
     instructions (the face lock stays applied on top of the user's edit)."""
     from app.services import face_dataset_service as svc
@@ -746,7 +746,7 @@ def test_regeneration_clears_all_watermark_metadata(app, monkeypatch):
 
 def test_regenerate_without_prompt_keeps_existing(app, monkeypatch):
     """Empty/omitted prompt = current behaviour: variation_prompt is unchanged
-    and the stored prompt is what feeds the engine (plain 🔄 / reject path)."""
+    and the stored prompt is what feeds the engine (plain / reject path)."""
     from app.services import face_dataset_service as svc
     from app.services import klein_edit_helper
     from app.models import FaceDatasetImage
@@ -815,7 +815,7 @@ def test_regenerate_prompt_truncated_to_column_limit(app, monkeypatch):
 
 
 def test_regenerate_edited_prompt_exposed_in_payload(app, monkeypatch):
-    """After an edit, dataset_payload carries variation_prompt so the ✏️ bubble
+    """After an edit, dataset_payload carries variation_prompt so the ✏ bubble
     reopens seeded with the current prompt (not blank)."""
     from app.services import face_dataset_service as svc
     from app.models import FaceDatasetImage
@@ -903,7 +903,7 @@ def test_link_completed_dataset_image_without_comfyui_configured(app, monkeypatc
         assert refreshed.status == 'failed'
 
 
-# --- 'generate' activity indicator (blocks ⚡ Generate for the whole batch) ----
+# --- 'generate' activity indicator (blocks Generate for the whole batch) ----
 
 def test_klein_generate_activity_from_enqueue_to_last_completion(app, monkeypatch):
     """Klein: enqueue advertises 'generate' with the batch total (pending-count

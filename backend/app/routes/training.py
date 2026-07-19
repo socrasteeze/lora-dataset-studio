@@ -832,8 +832,8 @@ def train_presets_list():
 @bp.post('/train/presets')
 def train_presets_save():
     """Create or overwrite (by name). Two sources: `dataset_id` snapshots that
-    dataset's current explicit settings (the 💾 Save-current path); `settings`
-    stores an explicit dict (the ⬆ import path)."""
+    dataset's current explicit settings (the Save-current path); `settings`
+    stores an explicit dict (the import path)."""
     import json
     from ..extensions import db
     from ..models import TrainingPreset
@@ -1150,7 +1150,7 @@ def dataset_train_import(dataset_id):
             return jsonify({'error': 'unknown cloud run'}), 404
         kw['src_dir'] = crun.staging_dir
         kw['version'] = ct._run_param(crun, 'version')
-        # Tag the deployed name with THIS cloud run's id (☁ #N) so importing the
+        # Tag the deployed name with THIS cloud run's id (#N) so importing the
         # same step from two different runs never overwrites one with the other.
         kw['run_id'] = crun.id
         kw['run_source'] = 'cloud'

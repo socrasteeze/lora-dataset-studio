@@ -83,7 +83,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant, 
   // exactly the kind of silent failure worth surfacing.
   const masksWarn = prog?.masks_skipped ? (
     <p className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-200 text-[0.625rem]">
-      ⚠️ Training <b>UNMASKED</b> — masks were requested but couldn&apos;t be generated (rembg missing or the mask pass failed), so the background isn&apos;t down-weighted for this run. Install the ML extras from the Setup tab, then re-run to train masked.
+      ⚠ Training <b>UNMASKED</b> — masks were requested but couldn&apos;t be generated (rembg missing or the mask pass failed), so the background isn&apos;t down-weighted for this run. Install the ML extras from the Setup tab, then re-run to train masked.
     </p>
   ) : null;
 
@@ -93,7 +93,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant, 
         {masksWarn}
         {cloud && prog?.phase ? (
           <p className="m-0 text-sky-300 text-[0.625rem]">
-            ☁ {prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}
+            {prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}
           </p>
         ) : (
           <p className="m-0 text-content-subtle text-[0.625rem]">

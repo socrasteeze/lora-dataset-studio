@@ -32,7 +32,7 @@ import time
 
 # Kinds the UI knows how to restore. Kept as a documented allow-list so a typo in a
 # begin() call is easy to spot (nothing enforces it — it's documentation + a guard
-# for tests). 'generate' covers the ⚡ Generate-variations batch (Klein) — it
+# for tests). 'generate' covers the Generate-variations batch (Klein) — it
 # keeps the Generate button (and every concurrent action) disabled for the
 # WHOLE batch, not just the launch request.
 KINDS = ('watermark_detect', 'watermark_clean', 'caption', 'recaption',

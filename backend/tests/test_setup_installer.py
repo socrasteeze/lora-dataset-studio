@@ -477,7 +477,7 @@ def test_execute_klein_success_clears_model_caches(monkeypatch):
 # Installs JUST simple-lama-inpainting (the version floor read from
 # requirements-ml.txt) into the SAME interpreter the LaMa wrapper resolves, so a
 # user who already has the ML extras doesn't redo the whole step. Shown next to
-# the Curate 🧽 tools; a success drops the probe import-cache (no restart).
+# the Curate tools; a success drops the probe import-cache (no restart).
 
 
 def test_install_actions_include_watermark_inpaint(app):

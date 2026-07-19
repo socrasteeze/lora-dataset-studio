@@ -1,6 +1,6 @@
 // Comparaison ÉQUITABLE des modèles de base (z_model) selon les votes.
 // Classé par Wilson lower bound (taux × confiance) côté backend → ne favorise PAS
-// le modèle le plus testé (biais de volume). Affiche taux 👍 + n (générées/votées).
+// le modèle le plus testé (biais de volume). Affiche taux + n (générées/votées).
 // Repliable, masqué s'il y a moins de 2 bases (rien à comparer).
 import { useState } from 'react';
 
@@ -20,7 +20,7 @@ export default function ModelComparison({ items }) {
           <thead>
             <tr className="text-content-subtle text-left">
               <th className="font-normal py-0.5">Model</th>
-              <th className="font-normal text-right">👍 rate</th>
+              <th className="font-normal text-right">rate</th>
               <th className="font-normal text-right">Voted</th>
               <th className="font-normal text-right">Generated</th>
               <th className="font-normal text-right">Net</th>

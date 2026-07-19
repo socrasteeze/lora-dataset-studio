@@ -134,7 +134,7 @@ class FaceDatasetImage(db.Model):
     # (logo de site, URL, pseudo, texte de studio ajouté PAR-DESSUS la photo scrapée) —
     # sinon le LoRA les apprend. watermark_state : NULL (jamais scanné) | 'none' (propre)
     # | 'detected' (trouvé, pas encore traité / à revoir manuellement) | 'dismissed'
-    # (l'utilisateur a jugé en review que c'est un FAUX positif → plus de 🚩, et les
+    # (l'utilisateur a jugé en review que c'est un FAUX positif → plus de , et les
     # prochains scans le sautent) | 'cleaned' (crop ou inpaint LaMa appliqué) | 'failed'.
     # watermark_bbox : JSON [x1,y1,x2,y2] normalisé
     # [0,1] du watermark (NULL si aucun). Les bbox VLM sont GROSSIÈRES → déjà élargies
@@ -490,7 +490,7 @@ class TrainingRunRecord(db.Model):
 
 
 class TrainingPreset(db.Model):
-    """Named, shareable snapshot of the ⚙️ advanced training settings.
+    """Named, shareable snapshot of the advanced training settings.
 
     `settings` stores the RAW explicit keys (the same blob shape as
     face_dataset.train_settings) — validation happens at APPLY time through

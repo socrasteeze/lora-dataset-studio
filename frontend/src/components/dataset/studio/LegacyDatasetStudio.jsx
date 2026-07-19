@@ -53,7 +53,7 @@ function StudioBody({ datasetId, family, onFamilyChange }) {
   const openLightbox = (cell, items) => { setLbImg(cell); setLbItems(items || []); };
 
   // La lightbox délègue le vote ici ; on met à jour l'image affichée ET l'instantané
-  // du set pour que le bouton 👍/👎 reflète l'état immédiatement, même en revenant
+  // du set pour que le bouton /reflète l'état immédiatement, même en revenant
   // sur une image déjà notée pendant le feuilletage (comme l'ancien setLbImg local).
   const rateLightbox = (id, nv) => {
     studio.rate(id, nv);
@@ -94,7 +94,7 @@ function StudioBody({ datasetId, family, onFamilyChange }) {
         </aside>
         <main id="st-results" className="flex flex-col gap-3 min-w-0 scroll-mt-16">
           {/* « Best epoch » OBJECTIF : classement InsightFace des checkpoints
-              (complète le best_preset issu des votes 👍/👎 juste en dessous). */}
+              (complète le best_preset issu des votes /juste en dessous). */}
           <FaceRankingPanel ranking={d.face_ranking} onScore={studio.scoreFaces}
             scoring={studio.scoring}
             hasCells={(d.cells || []).some((c) => c.status === 'done')} />

@@ -1,4 +1,4 @@
-"""🗃️ Image bank API — triage a big unsorted folder before it becomes datasets.
+"""Image bank API — triage a big unsorted folder before it becomes datasets.
 
 All heavy passes (quality scan, face clustering, promotion) return 202 and run
 in ONE background thread per bank; the UI polls GET /bank/<id> whose payload

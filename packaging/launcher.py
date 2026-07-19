@@ -127,7 +127,7 @@ def main() -> int:
 
     frame = ttk.Frame(root, padding=20)
     frame.grid()
-    ttk.Label(frame, text="🧬 " + APP_NAME, font=("Segoe UI", 12, "bold")).grid(
+    ttk.Label(frame, text="" + APP_NAME, font=("Segoe UI", 12, "bold")).grid(
         row=0, column=0, columnspan=2, pady=(0, 8))
     status = tk.StringVar(value="Starting the server…")
     ttk.Label(frame, textvariable=status, justify="center", font=("Segoe UI", 10)).grid(
@@ -152,11 +152,11 @@ def main() -> int:
 
         def apply():
             if up:
-                status.set(f"✅ Running\n{url}")
+                status.set(f"Running\n{url}")
                 open_btn.state(["!disabled"])
                 webbrowser.open(url)
             else:
-                status.set("⚠️ The server failed to start.\nSee data\\server.log for details.")
+                status.set("⚠ The server failed to start.\nSee data\\server.log for details.")
         try:
             root.after(0, apply)
         except Exception:

@@ -68,7 +68,7 @@ you immediately whether the app can see it.
   dataset, grouped by model family, with a search box and a badge for each
   family you've already trained. Create one and work it through the guided
   flow (source → curate → caption → train).
-- **🏋️ Runs** — every training in one place, cloud *and* local: live progress,
+- **Runs** — every training in one place, cloud *and* local: live progress,
   the settings each launch used, retry a failed run (↻), continue a finished
   one (▶), and download the LoRA (appears once ai-toolkit or a vast.ai key is set).
 - **Test Studio** — grid-test a trained LoRA across checkpoints and strengths,

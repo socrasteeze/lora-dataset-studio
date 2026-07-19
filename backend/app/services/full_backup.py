@@ -69,7 +69,7 @@ _LORAS_PREFIX = 'loras/'
 # deliberately NOT carried: it points at a CloudTrainingRun row that does not
 # exist on the destination, and re-using the number would risk cross-linking a
 # future cloud run on the new machine. Restore nulls it (the run still shows as a
-# ☁ cloud launch via `source`, with its settings snapshot intact).
+# cloud launch via `source`, with its settings snapshot intact).
 _RUN_FIELDS = ('dataset_id', 'family', 'source', 'base_model', 'variant',
                'masked', 'steps', 'fingerprint', 'manifest', 'settings', 'version')
 

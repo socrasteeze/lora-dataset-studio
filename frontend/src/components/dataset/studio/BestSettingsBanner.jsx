@@ -15,7 +15,7 @@ export default function BestSettingsBanner({ best, onClear, fmt }) {
         title="Delete this saved setting"
         aria-label="Delete the saved setting"
         className="ml-auto px-2 py-1.5 rounded-lg bg-red-500/15 border border-red-500/40 text-red-300 text-xs hover:bg-red-500/25">
-        🗑
+
       </button>
     </div>
   );

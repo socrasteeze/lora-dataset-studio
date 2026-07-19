@@ -71,7 +71,7 @@ export async function postJson(url, body, isForm) {
 }
 
 /**
- * Compose the 🧽 Clean summary toast from the server's counts — PURE (no React,
+ * Compose the Clean summary toast from the server's counts — PURE (no React,
  * no toast) so the honest-message logic is testable on its own.
  * Response shape: {cropped, inpainted, inpainted_klein, needs_review, failed, skipped, error}.
  *
@@ -100,7 +100,7 @@ export function summarizeClean(d) {
   const parts = [];
   if (cropped) parts.push(`${cropped} cropped`);
   if (inpainted) parts.push(`${inpainted} inpainted`);
-  if (skipped) parts.push(`${skipped} waiting for inpainting (⬇ install it)`);
+  if (skipped) parts.push(`${skipped} waiting for inpainting (install it)`);
   if (needsReview) parts.push(`${needsReview} need manual review`);
   if (failed) parts.push(`${failed} failed`);
   return { severity: skipped ? 'warning' : 'success', message: parts.join(' · ') };
@@ -138,7 +138,7 @@ export function useDataset() {
   // has rendered the disabled button.
   const [mirroringIds, setMirroringIds] = useState(() => new Set());
   const mirroringRef = useRef(new Set());
-  // Per-image re-caption in flight (Identity-leak panel's targeted 🔄): keep the busy
+  // Per-image re-caption in flight (Identity-leak panel's targeted ): keep the busy
   // state scoped to the offending row so the rest of the panel stays usable, with a
   // synchronous ref guard against a double-click enqueuing the same image twice.
   const [recaptioningIds, setRecaptioningIds] = useState(() => new Set());
@@ -571,7 +571,7 @@ export function useDataset() {
   }), [wrap, currentId, refresh, toast]);
 
   // Watermark scan (Qwen3-VL, GPU window). Marks kept images with an overlaid
-  // watermark → 🚩 badges + a "Clean (N)" button. Deletes nothing.
+  // watermark → badges + a "Clean (N)" button. Deletes nothing.
   const findWatermarks = useCallback(() => wrap(async () => {
     setWatermarking(true);
     try {
@@ -600,7 +600,7 @@ export function useDataset() {
       // A LaMa inpaint that was attempted and failed surfaces WHY (never silent).
       if (d.error) {
         toast.error(d.error.kind === 'unavailable'
-          ? 'Watermark inpainting is not installed — use ⬇ Install inpainting next to the watermark tools.'
+          ? 'Watermark inpainting is not installed — use Install inpainting next to the watermark tools.'
           : `Watermark inpainting failed: ${d.error.detail}`);
       }
       // ONE honest summary toast (no more "Nothing to clean" alongside "N skipped").
@@ -659,7 +659,7 @@ export function useDataset() {
   }, [currentId, refresh]);
 
   // Mark flagged image(s) as NOT a watermark (false positive) — badge clears and
-  // future 🧽 Find passes skip them.
+  // future Find passes skip them.
   const dismissWatermarks = useCallback(async (ids) => {
     const list = (ids || []).filter((v) => v != null);
     if (!list.length) return { ok: true, dismissed: 0 };
@@ -773,7 +773,7 @@ export function useDataset() {
   }, [currentId, toast]);
 
   // Open the dataset folder (images + .txt sidecars) in the OS file explorer —
-  // same server-resolved open-folder route as the training panel's 📂 buttons.
+  // same server-resolved open-folder route as the training panel's buttons.
   const openDatasetFolder = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/train/open-folder`, { target: 'dataset' });
     if (!d.ok) toast.error(d.error || 'Unexpected error');
@@ -799,8 +799,8 @@ export function useDataset() {
 
   // Re-roll one generated variation with a fresh seed (F2). Works on finished
   // AND failed tiles — it is the recovery path for failures. `prompt` (optional)
-  // is the user-edited core prompt from the tile's ✏️ bubble; omitted → the
-  // server reuses the row's / label's prompt (plain 🔄 and reject→regenerate).
+  // is the user-edited core prompt from the tile's ✏ bubble; omitted → the
+  // server reuses the row's / label's prompt (plain and reject→regenerate).
   // The generator CURRENTLY selected in the workspace (persisted by
   // VariationCatalog) is sent along so the regenerate follows the user's
   // selection instead of being pinned to the engine that made the tile;

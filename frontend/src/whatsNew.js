@@ -1,5 +1,5 @@
 // ============================================================================
-//  🎁 What's new — in-app changelog feed (source of truth)
+//  What's new — in-app changelog feed (source of truth)
 // ============================================================================
 //
 //  WHY THIS FILE EXISTS
@@ -50,6 +50,13 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-19-emoji-free-ui',
+    date: '2026-07-19',
+    title: 'A calmer, emoji-free interface',
+    blurb:
+      'The decorative emoji are gone from buttons, headers, banners and the docs — labels are plain text now, with monochrome glyphs where an icon genuinely helps. The 🔞 marker stays: it is how NSFW custom shots are recognized in stored data.',
+  },
+  {
     id: '2026-07-19-klein-model-file-pins',
     date: '2026-07-19',
     title: 'Point Klein at the exact model files you want',
@@ -70,15 +77,15 @@ export const WHATS_NEW = [
     date: '2026-07-19',
     title: 'Browse for a folder instead of typing its path',
     blurb:
-      "Pointing the Image bank (or a dataset folder-import) at a folder no longer means typing a path by hand. Hit “📂 Browse…” and the app opens your computer's own folder dialog — pick the folder and the field fills itself in. On a phone or a remote/Linux server where that native dialog can't show, a built-in folder browser opens instead. Pasting a path still works too.",
+      "Pointing the Image bank (or a dataset folder-import) at a folder no longer means typing a path by hand. Hit “Browse…” and the app opens your computer's own folder dialog — pick the folder and the field fills itself in. On a phone or a remote/Linux server where that native dialog can't show, a built-in folder browser opens instead. Pasting a path still works too.",
     to: '/bank',
   },
   {
     id: '2026-07-19-bank-scoring-passes',
     date: '2026-07-19',
-    title: '🗃️ Image bank now rates looks, flags NSFW, groups by style and finds watermarks',
+    title: 'Image bank now rates looks, flags NSFW, groups by style and finds watermarks',
     blurb:
-      "The Bank gains three new triage passes for a big mixed dump. “✨ Score” rates every image for aesthetics (1–10) with the LAION predictor, flags NSFW, and groups shots by visual STYLE (screenshots and memes cluster apart from photoreal) — and “keep best” on a duplicate group now keeps the nicest-looking copy, not just the biggest. “🚩 Find watermarks” reuses the same Qwen3-VL detector the datasets use to flag overlaid logos/URLs (detection only — your files are never touched). New filter chips, style groups and a per-subfolder scope let you slice a Telegram export by chat; every threshold lives in Settings → Captioning & quality and re-sorts the bank with no rescan. The scoring model installs on demand from Setup ▸ Quality tools; without it the button explains what to install rather than failing silently.",
+      "The Bank gains three new triage passes for a big mixed dump. “Score” rates every image for aesthetics (1–10) with the LAION predictor, flags NSFW, and groups shots by visual STYLE (screenshots and memes cluster apart from photoreal) — and “keep best” on a duplicate group now keeps the nicest-looking copy, not just the biggest. “Find watermarks” reuses the same Qwen3-VL detector the datasets use to flag overlaid logos/URLs (detection only — your files are never touched). New filter chips, style groups and a per-subfolder scope let you slice a Telegram export by chat; every threshold lives in Settings → Captioning & quality and re-sorts the bank with no rescan. The scoring model installs on demand from Setup ▸ Quality tools; without it the button explains what to install rather than failing silently.",
     to: '/bank',
   },
   {
@@ -86,7 +93,7 @@ export const WHATS_NEW = [
     date: '2026-07-19',
     title: 'Stop a captioning batch mid-run',
     blurb:
-      "Launched a big caption pass and realized it's captioning badly, or you mis-set an option? A ⏹ Stop button now sits in the captioning progress banner. It finishes the image currently being written — never cuts an inference off mid-way — then stops cleanly: everything captioned so far is kept, the rest is left untouched, and the GPU is freed exactly as on a normal finish. You get an honest \"stopped — X captioned\" summary. No more waiting out a 100-image run you already know is wrong.",
+      "Launched a big caption pass and realized it's captioning badly, or you mis-set an option? A Stop button now sits in the captioning progress banner. It finishes the image currently being written — never cuts an inference off mid-way — then stops cleanly: everything captioned so far is kept, the rest is left untouched, and the GPU is freed exactly as on a normal finish. You get an honest \"stopped — X captioned\" summary. No more waiting out a 100-image run you already know is wrong.",
     to: '/datasets?section=captions',
   },
   {
@@ -94,7 +101,7 @@ export const WHATS_NEW = [
     date: '2026-07-19',
     title: 'Choose your caption engine, model and instructions — per dataset',
     blurb:
-      "The Captions area has a new ⚙️ Options button. Pick which engine writes this dataset's captions (Auto, JoyCaption, or Ollama vision), choose which pulled Ollama vision model runs — or pull a new one by name right there, with a live progress readout. A Vocabulary preset sets how the model names nude or sexual content — Explicit (crude, uncensored — pair it with an abliterated vision model), Clinical, or Safe — and you can still add your own extra instructions to steer the wording (e.g. “always name the visible clothing colors”). Presets and instructions ride on top of the built-in prompt, so the identity / concept / style guardrails and the leak cleaners still apply — they change wording, never what binds to the trigger. Everything is remembered on the dataset and used by the next caption or re-caption run; leave any field on “default” to keep following Settings.",
+      "The Captions area has a new Options button. Pick which engine writes this dataset's captions (Auto, JoyCaption, or Ollama vision), choose which pulled Ollama vision model runs — or pull a new one by name right there, with a live progress readout. A Vocabulary preset sets how the model names nude or sexual content — Explicit (crude, uncensored — pair it with an abliterated vision model), Clinical, or Safe — and you can still add your own extra instructions to steer the wording (e.g. “always name the visible clothing colors”). Presets and instructions ride on top of the built-in prompt, so the identity / concept / style guardrails and the leak cleaners still apply — they change wording, never what binds to the trigger. Everything is remembered on the dataset and used by the next caption or re-caption run; leave any field on “default” to keep following Settings.",
     to: '/datasets?section=captions',
   },
   {
@@ -134,7 +141,7 @@ export const WHATS_NEW = [
     date: '2026-07-18',
     title: 'Back up your whole library — datasets, training history and settings — in one click',
     blurb:
-      "A new “💾 Back up everything” button on the Datasets library packs every dataset (images, captions, statuses, references), its training history, plus your settings into a single file, so you can move to a new machine or recover from one without losing anything. It runs in the background with a live progress bar — a big library can be gigabytes — then hands you a download and an “Open folder”. Your API keys and tokens are deliberately left out, so the file is safe to keep around; re-enter them once on the new install. Restoring is the same “📦 Import backup” button: it now accepts the master archive too, rebuilds every dataset without ever overwriting one (name clashes get a “(restored)” suffix), and — new — brings back each dataset’s training runs so it lands under “Trained” again instead of “Not trained yet”, with its history in the Runs hub. Tick “Include trained LoRAs” before backing up to bundle the trained .safetensors themselves (a much larger file); leave it off and the light training history still restores your “Trained” status. You always get an honest report of exactly what came back and what was skipped.",
+      "A new “Back up everything” button on the Datasets library packs every dataset (images, captions, statuses, references), its training history, plus your settings into a single file, so you can move to a new machine or recover from one without losing anything. It runs in the background with a live progress bar — a big library can be gigabytes — then hands you a download and an “Open folder”. Your API keys and tokens are deliberately left out, so the file is safe to keep around; re-enter them once on the new install. Restoring is the same “Import backup” button: it now accepts the master archive too, rebuilds every dataset without ever overwriting one (name clashes get a “(restored)” suffix), and — new — brings back each dataset’s training runs so it lands under “Trained” again instead of “Not trained yet”, with its history in the Runs hub. Tick “Include trained LoRAs” before backing up to bundle the trained .safetensors themselves (a much larger file); leave it off and the light training history still restores your “Trained” status. You always get an honest report of exactly what came back and what was skipped.",
     to: '/datasets',
   },
   {
@@ -148,7 +155,7 @@ export const WHATS_NEW = [
   {
     id: '2026-07-18-image-bank-triage',
     date: '2026-07-18',
-    title: 'New (Beta): 🗃️ Image bank — turn a 9 000-image dump into a dataset',
+    title: 'New (Beta): Image bank — turn a 9 000-image dump into a dataset',
     blurb:
       "Exported thousands of unsorted images from Telegram (or anywhere)? Point the new Bank tab at the folder: a background quality scan flags the blurry, noisy, flat and too-small shots and groups near-duplicates (resolve a whole bank with one “keep best” click); the face pass then sorts everything by PERSON — no reference photo needed. Keep the good ones and promote them straight into a dataset. Your folder is never modified, rejections are just reversible statuses, and the thresholds are tunable in Settings → Captioning & quality without rescanning.",
     to: '/bank',
@@ -198,7 +205,7 @@ export const WHATS_NEW = [
     date: '2026-07-18',
     title: 'Change a dataset from Character, Concept or Style — after creation',
     blurb:
-      "Picked the wrong kind when you started, or want to repurpose a set you already built? The ⚙ Dataset settings modal now lets you switch a dataset between Character, Concept and Style at any time. It's honest, not magic: a confirmation spells out exactly what changes (caption strategy, which panels show, the trigger's role) and what's kept — your images, captions, face scores and training history are never touched. Existing captions keep their old style until you Re-caption.",
+      "Picked the wrong kind when you started, or want to repurpose a set you already built? The Dataset settings modal now lets you switch a dataset between Character, Concept and Style at any time. It's honest, not magic: a confirmation spells out exactly what changes (caption strategy, which panels show, the trigger's role) and what's kept — your images, captions, face scores and training history are never touched. Existing captions keep their old style until you Re-caption.",
     to: '/datasets',
   },
   {
@@ -230,7 +237,7 @@ export const WHATS_NEW = [
     date: '2026-07-17',
     title: 'Tweak prompt suffixes between batches, right in the panel',
     blurb:
-      'The generation panel now has a ✨ Prompt suffixes accordion — same per-dataset suffixes as the ⚙ Settings modal, editable without leaving the workspace. Adjust the mood, hit Generate, adjust again.',
+      'The generation panel now has a Prompt suffixes accordion — same per-dataset suffixes as the Settings modal, editable without leaving the workspace. Adjust the mood, hit Generate, adjust again.',
     to: '/datasets?section=add',
   },
   {
@@ -289,7 +296,7 @@ export const WHATS_NEW = [
   {
     id: '2026-07-17-scrape-section',
     date: '2026-07-17',
-    title: 'A dedicated 🕸 Scrape section',
+    title: 'A dedicated Scrape section',
     blurb:
       'Scanning a gallery is now its own step in every dataset. Paste a gallery URL, pick the images you want, and import them full-frame — then crop each one afterwards right on its tile.',
     to: '/datasets?section=scrape&panel=scan',
@@ -307,7 +314,7 @@ export const WHATS_NEW = [
     date: '2026-07-17',
     title: 'Steer generation with prompt suffixes',
     blurb:
-      "Add a reusable creative suffix to every generated variation — globally or per framing — from a dataset's ⚙ Settings. Great for locking in a lighting mood or a lens look across a whole dataset.",
+      "Add a reusable creative suffix to every generated variation — globally or per framing — from a dataset's Settings. Great for locking in a lighting mood or a lens look across a whole dataset.",
     to: '/datasets?section=add',
   },
   {

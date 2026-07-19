@@ -46,7 +46,7 @@ export default function DupGroupsPanel({ bankId, live, onChanged }) {
     return (
       <p className="text-sm text-content-muted">
         No unresolved duplicate group — either the bank is clean, or every group has been resolved.
-        (Groups appear after a 🔎 quality scan.)
+        (Groups appear after a quality scan.)
       </p>
     )
   }

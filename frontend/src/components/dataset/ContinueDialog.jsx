@@ -109,7 +109,7 @@ export default function ContinueDialog({
           </div>
           <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
             <b className="text-content-muted font-medium">Why:</b> a later epoch can be over-cooked — resume from the
-            one that held up best (the 🏆 <b>best</b> tag, when scored).
+            one that held up best (the <b>best</b> tag, when scored).
           </span>
         </div>
 

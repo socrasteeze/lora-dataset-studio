@@ -152,7 +152,7 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
                     aria-pressed={!!c.locked}
                     title={c.locked ? 'Strength locked — click to unlock' : 'Lock the strength (prevents accidental changes)'}
                     className={`px-1 py-0.5 rounded text-[0.75rem] border leading-none ${c.locked ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : 'border-border bg-surface text-content-muted hover:text-content'}`}>
-                    {c.locked ? '🔒' : '🔓'}
+                    {c.locked ? '●' : '○'}
                   </button>
                 </>
               )}
@@ -183,7 +183,7 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
                   aria-label={`Test ${l.displayName} as a batch axis (with/without)`}
                   className="accent-amber-400 w-3.5 h-3.5" />
                 <span className={c.batch ? 'text-amber-300 font-semibold' : ''}>
-                  ⚖ Batch axis (compare with / without)
+                  Batch axis (compare with / without)
                 </span>
               </label>
             )}

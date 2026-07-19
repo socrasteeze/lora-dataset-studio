@@ -21,7 +21,7 @@ always the same four things:
 3. **What you did → what you expected → what happened** — three short lines
    beat three paragraphs.
 4. **The log** — the last lines of the server log usually name the real error.
-   Settings → Maintenance → 🪵 Server log → **Copy all**.
+   Settings → Maintenance → Server log → **Copy all**.
 
 ## Or let the app write it for you
 
