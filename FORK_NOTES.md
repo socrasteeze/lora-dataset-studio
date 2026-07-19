@@ -6,6 +6,19 @@ This file is the always-current list of where the fork diverges from upstream �
 read it before merging upstream and update it in the same commit as any change
 that adds a new divergence (same convention as the sibling ai-toolkit fork).
 
+## Fork changelog (enhancements shipped on this fork)
+
+Newest first. Add a row per shipped wave — this is the "what have I actually
+done on this fork" ledger; the divergence sections below stay the *file-level*
+merge map.
+
+| Date | Commits | Enhancement |
+|---|---|---|
+| 2026-07-19 | `1ca80bc` + dist `1398e56` | **Emoji-free UI** — stripped ~700 decorative emoji across the app, docs and comments; plain-text labels, monochrome state glyphs kept, real text where an emoji was a button's only content. The `🔞` label prefix is kept as a functional NSFW data marker. |
+| 2026-07-19 | `59f0529`, `1b74d5b` | **PLAN.md** — the phased integration plan for the whole local stack (ComfyUI + SwarmUI + ai-toolkit + TagGUI) with LDS as the hub. |
+| 2026-07-19 | `c56790d` + dist `6677553` | **Klein model-file pins** — Settings ▸ Image engine fields (`klein.unet` / `klein.text_encoder` / `klein.vae`) to name the exact loader files, incl. files outside `klein`-named folders and `extra_model_paths.yaml` roots; missing pins fall back to auto-detect with a visible "not found" badge. |
+| 2026-07-19 | `738f2ec` + dist `035056a`, notes `b115182` | **Local-only generation** — removed the Nano Banana (Gemini) and ChatGPT (`gpt-image-2`) API engines end to end; Klein (ComfyUI) is the sole engine. Legacy API-generated rows regenerate through Klein. Divergence details in the sections below. |
+
 ## Divergence 1: local-only generation (API engines removed)
 
 The fork generates exclusively on the local Klein engine (ComfyUI). The two
@@ -53,6 +66,26 @@ Compatibility notes:
   regenerate through Klein (see `LEGACY_API_ENGINE_TAGS`).
 - Stale `engines.*` keys and GEMINI/OPENAI entries in an existing
   `config.json`/`.env` are ignored — nothing needs manual cleanup.
+
+## Divergence 2: Klein model-file pins
+
+Optional `klein.unet` / `klein.text_encoder` / `klein.vae` config keys pin the
+exact loader files, ahead of the auto-detection. Touched upstream files:
+`backend/app/config.py` (defaults), `backend/app/services/klein_edit_helper.py`
+(`_configured_model`, `klein_override_status`, resolver priority),
+`backend/app/capabilities.py` (`comfyui.klein_overrides` payload),
+`frontend/src/components/settings/EnginesSection.jsx` (the card),
+`frontend/src/help/helpRegistry.js`, `docs/guide/settings-reference.md`,
+`backend/tests/test_klein_models.py`.
+
+## Divergence 3: emoji-free UI (repo-wide, cosmetic)
+
+All decorative pictographic emoji were stripped from UI strings, docs and
+comments (~700 across 130 files); `🔞` is kept everywhere as the functional
+NSFW label marker. Merge guidance: upstream hunks touching emoji-bearing lines
+conflict trivially — take upstream's content, then re-strip the emoji from the
+merged result (a line-safe strip: never let a removal eat the newline of a line
+that ends with an emoji).
 
 ## Merge routine
 
