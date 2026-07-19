@@ -55,20 +55,6 @@ function CompositionMiniBar({ counts, total }) {
   );
 }
 
-/** Minimal ChatGPT pictogram — hexagonal knot silhouette, currentColor. */
-function ChatGptIcon({ className }) {
-  return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true" focusable="false">
-      {[0, 60, 120, 180, 240, 300].map((a) => (
-        <path key={a} transform={`rotate(${a} 16 16)`}
-          d="M16 4.5 a 6.2 6.2 0 0 1 6.2 6.2 v 4 l -3.4 -2 v -2 a 2.8 2.8 0 0 0 -2.8 -2.8 z"
-          fill="currentColor" />
-      ))}
-      <circle cx="16" cy="16" r="3.1" fill="none" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
 /** Small inline GPU-chip pictogram for the local Klein engine card. */
 function GpuIcon({ className }) {
   return (
@@ -126,7 +112,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   const addCustomShot = () => {
     const p = customPrompt.trim();
     if (!p) return;
-    const hot = nsfwMode && isKlein;
+    const hot = nsfwMode;
     const shot = { id: `custom_${Date.now()}`, label: `${hot ? '🔞' : '✨'} ${p.slice(0, 40)}`,
                    prompt: p, framing: customFraming, nsfw: hot };
     setCustomShots((s) => [...s, shot]);
@@ -152,60 +138,22 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   const [loraPresets, setLoraPresets] = useState([]);   // [{name, loras:[{file, strength}]}]
   const [loraPresetName, setLoraPresetName] = useState('');   // '' = None
   const activeLoraPreset = loraPresets.find((p) => p.name === loraPresetName) || null;
-  // Generator backend: Nano Banana Pro (Gemini API, ~0,15 $/image, zero GPU,
-  // best face fidelity — user-validated default) or local Klein (GPU, free).
-  const [generator, setGenerator] = useState(() => {
-    try { return localStorage.getItem('datasetGenerator') || 'nanobanana'; } catch { return 'nanobanana'; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('datasetGenerator', generator); } catch { /* ignore */ }
-  }, [generator]);
-  const isNB = generator === 'nanobanana';
-  const isGPT = generator === 'chatgpt';
-  const isKlein = !isNB && !isGPT;
-
-  // Which engines the user actually enabled in Settings (config.engines.enabled),
-  // on top of the live reachability probe in `caps.engines`.
-  const [enabledEngines, setEnabledEngines] = useState(['nanobanana', 'chatgpt', 'klein']);
-  // ChatGPT auth lane (auto|api|subscription) — decides whether the card shows a
-  // per-image API price or "uses your ChatGPT subscription quota".
-  const [chatgptAuth, setChatgptAuth] = useState('auto');
+  // Local-only fork: Klein (ComfyUI) is the sole generation engine.
   useEffect(() => {
     let cancelled = false;
     apiFetch('/api/settings')
       .then((d) => {
         if (cancelled) return;
-        setEnabledEngines(d.config?.engines?.enabled || []);
-        setChatgptAuth(d.config?.engines?.chatgpt_auth || 'auto');
         // Optional generation-LoRA presets: names + chains for the picker.
         setLoraPresets(sanitizeGenerationLoraPresets(d.config?.klein?.generation_lora_presets));
       })
       .catch(() => { /* keep the permissive default on a transient failure */ });
     return () => { cancelled = true; };
   }, []);
-  const nbAvailable = enabledEngines.includes('nanobanana') && caps.engines.nanobanana;
-  const gptAvailable = enabledEngines.includes('chatgpt') && caps.engines.chatgpt;
-  const klAvailable = enabledEngines.includes('klein') && caps.engines.klein;
-  const currentAvailable = isKlein ? klAvailable : isNB ? nbAvailable : gptAvailable;
+  const klAvailable = caps.engines.klein;
+  const currentAvailable = klAvailable;
 
-  // The persisted generator can point at an engine that has since been
-  // disabled in Settings (or lost its key/backend): auto-switch to the first
-  // usable card instead of staying stuck on a dead one. This also feeds
-  // regenerate, which follows the persisted selection.
-  useEffect(() => {
-    if (currentAvailable) return;
-    const first = nbAvailable ? 'nanobanana' : gptAvailable ? 'chatgpt' : klAvailable ? 'klein' : null;
-    if (first && first !== generator) setGenerator(first);
-  }, [currentAvailable, nbAvailable, gptAvailable, klAvailable, generator]);
-  // Effective ChatGPT lane: the subscription (ChatGPT Plus/Pro image quota) vs the
-  // pay-per-use API key. Mirrors the backend "auto = subscription when connected".
-  const gptSub = caps.chatgpt_subscription || {};
-  const gptViaSub = chatgptAuth === 'subscription'
-    || (chatgptAuth === 'auto' && !!gptSub.connected);
-  const gptPlanLabel = gptSub.plan && gptSub.plan !== 'free'
-    ? gptSub.plan.charAt(0).toUpperCase() + gptSub.plan.slice(1)
-    : 'Plus/Pro';
-  // Klein unavailable has THREE distinct causes — the hint must name the right
+  // Klein unavailable has TWO distinct causes — the hint must name the right
   // one (a reachable ComfyUI with no Klein model used to show "Configure
   // ComfyUI", sending the user to re-check a step that was already green). When
   // ComfyUI IS reachable, name the exact missing weight(s) (model / text encoder /
@@ -216,7 +164,6 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
     ? `⚠ Klein ${kleinMissingWords.join(' + ')} missing — download it in the Setup step`
     : '⚠ Klein model missing — download it in the Setup step (models/unet/klein/)';
   const kleinHint = klAvailable ? null
-    : !enabledEngines.includes('klein') ? '⚠ Klein is disabled in Settings (engines)'
     : !caps.comfyui?.reachable ? '⚠ Configure ComfyUI in Settings'
     : kleinAssetHint;
 
@@ -248,17 +195,6 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
     catalog.forEach((e) => g[e.framing]?.push(e));
     return g;
   }, [catalog]);
-
-  // Switching to an API engine drops any selected NSFW shots (Klein-only) —
-  // catalog nsfw_ entries AND 🔞 custom cards alike.
-  useEffect(() => {
-    if (isKlein) return;
-    const hotCustom = new Set(customShots.filter((c) => c.nsfw).map((c) => c.id));
-    setSelected((s) => {
-      const n = new Set([...s].filter((id) => !id.startsWith('nsfw_') && !hotCustom.has(id)));
-      return n.size === s.size ? s : n;
-    });
-  }, [isKlein, customShots]);
 
   // "Already in the dataset" per variation label: live images (kept, pending or
   // still generating — not failed/rejected) → the green ✓×N state on the cards.
@@ -391,16 +327,15 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   const go = async () => {
     const variations = catalog.filter((e) => selected.has(e.id))
       .map((e) => ({ label: e.label, prompt: e.prompt, framing: e.framing }));
-    // NSFW shots: local Klein only (the toggle is gated on the Klein engine,
-    // and the backend refuses them on API engines).
-    if (nsfwMode && isKlein) {
+    // NSFW shots: gated behind the 🔞 toggle.
+    if (nsfwMode) {
       variations.push(...nsfwCatalog.filter((e) => selected.has(e.id))
         .map((e) => ({ label: e.label, prompt: e.prompt, framing: e.framing, nsfw: true })));
     }
-    // Custom cards: selectable like catalog shots; 🔞 ones only ride with Klein
-    // (the label prefix is what regenerate uses to re-pick the uncensored wrapper).
+    // Custom cards: selectable like catalog shots (the 🔞 label prefix is what
+    // regenerate uses to re-pick the uncensored wrapper).
     variations.push(...customShots
-      .filter((c) => selected.has(c.id) && (isKlein || !c.nsfw))
+      .filter((c) => selected.has(c.id))
       .map((c) => ({ label: c.label, prompt: c.prompt, framing: c.framing,
                      ...(c.nsfw ? { nsfw: true } : {}) })));
     if (!variations.length) return;
@@ -423,14 +358,6 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
       }
     }
     if (!toGen.length) return;
-    // Guard-rail: pay-per-use API engines bill per image — above $5 estimated,
-    // confirm with the amount (silent for the free local Klein AND for the
-    // ChatGPT subscription lane, which spends plan quota, not dollars).
-    const rate = isNB ? 0.15 : (isGPT && !gptViaSub) ? 0.17 : 0;
-    const cost = toGen.length * multiplier * rate;
-    if (cost > 5 && !window.confirm(
-      `This will launch ${toGen.length * multiplier} API generation(s) `
-      + `≈ $${cost.toFixed(2)} (${isNB ? 'Nano Banana' : 'ChatGPT'}).\n\nProceed?`)) return;
     // Persist any per-batch suffix edit BEFORE enqueueing: the backend applies
     // the dataset's CURRENT suffix at wrap time, so the save must land first or
     // the batch would generate with the old creative direction (Idea by vvilams).
@@ -440,8 +367,8 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
     }
     // Optional generation-LoRA preset (Klein only): only the NAME rides — the
     // backend resolves the chain from its own config (fail-closed).
-    onGenerate(toGen, multiplier, klein, loraStrength, generator,
-      generationLoraPresetPayload({ isKlein, presetName: loraPresetName, presets: loraPresets }));
+    onGenerate(toGen, multiplier, klein, loraStrength, 'klein',
+      generationLoraPresetPayload({ isKlein: true, presetName: loraPresetName, presets: loraPresets }));
   };
 
   return (
@@ -454,25 +381,21 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         </span>
       </div>
 
-      {/* Engine cards — Klein (local GPU) vs Nano Banana Pro vs ChatGPT (APIs).
-          Each card disables itself with an actionable hint when its engine
-          isn't configured/reachable or was turned off in Settings. */}
+      {/* Engine — local Klein (ComfyUI) only on this fork. The card disables
+          itself with an actionable hint when ComfyUI/the Klein models are not
+          ready. */}
       <div className="flex items-center gap-2">
         <span className="text-content-muted text-[0.6875rem] uppercase">Engine</span>
         <span className="text-content-subtle text-[0.625rem]">
-          where the images are made — Klein runs free on your GPU · APIs bill per image (or use your ChatGPT subscription)
+          images are made locally on your GPU via ComfyUI — free, NSFW-capable
         </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <button type="button" onClick={() => setGenerator('klein')} aria-pressed={isKlein}
-          disabled={!klAvailable || !!generating}
-          title={generating ? 'A generation batch is running — wait for it to finish before switching engine' : undefined}
-          className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isKlein
-            ? 'border-primary/60 bg-primary/15 ring-1 ring-primary/40'
-            : 'border-border bg-app/40 hover:enabled:bg-surface-raised'}`}>
-          <GpuIcon className={`w-9 h-9 shrink-0 ${isKlein ? 'text-indigo-300' : 'text-content-subtle'}`} />
+        <div aria-disabled={!klAvailable}
+          className={`flex items-start gap-3 rounded-xl border p-3 text-left border-primary/60 bg-primary/15 ring-1 ring-primary/40 ${klAvailable ? '' : 'opacity-50'}`}>
+          <GpuIcon className="w-9 h-9 shrink-0 text-indigo-300" />
           <span className="flex flex-col gap-1 min-w-0">
-            <span className={`text-[0.8125rem] font-semibold ${isKlein ? 'text-white' : 'text-content-muted'}`}>
+            <span className="text-[0.8125rem] font-semibold text-white">
               Klein <span className="font-normal text-content-subtle">· local</span>
             </span>
             <span className="flex flex-wrap gap-1">
@@ -481,67 +404,15 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
               <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">NSFW OK</span>
             </span>
             {klAvailable ? (
-              <span className="text-content-subtle text-[0.625rem]">Runs on this machine — slower, tunable face fidelity.</span>
+              <span className="text-content-subtle text-[0.625rem]">Runs on this machine — tunable face fidelity.</span>
             ) : (
-              <a href="#/setup" onClick={(e) => e.stopPropagation()}
+              <a href="#/setup"
                 className="text-amber-300 text-[0.625rem] underline decoration-amber-300/50">
                 {kleinHint}
               </a>
             )}
           </span>
-        </button>
-        <button type="button" onClick={() => setGenerator('nanobanana')} aria-pressed={isNB}
-          disabled={!nbAvailable || !!generating}
-          title={generating ? 'A generation batch is running — wait for it to finish before switching engine' : undefined}
-          className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isNB
-            ? 'border-amber-400/60 bg-amber-500/15 ring-1 ring-amber-400/40'
-            : 'border-border bg-app/40 hover:enabled:bg-surface-raised'}`}>
-          <span className="w-9 h-9 shrink-0 grid place-items-center text-2xl" aria-hidden="true">🍌</span>
-          <span className="flex flex-col gap-1 min-w-0">
-            <span className={`text-[0.8125rem] font-semibold ${isNB ? 'text-amber-200' : 'text-content-muted'}`}>
-              Nano Banana Pro <span className="font-normal text-content-subtle">· API</span>
-            </span>
-            <span className="flex flex-wrap gap-1">
-              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">No GPU</span>
-              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">~$0.15/image</span>
-              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">SFW</span>
-            </span>
-            {nbAvailable ? (
-              <span className={`text-[0.625rem] ${isNB ? 'text-amber-300' : 'text-content-subtle'}`}>
-                Best face fidelity · estimated cost ≈ ${(selected.size * multiplier * 0.15).toFixed(2)}
-              </span>
-            ) : (
-              <span className="text-amber-300 text-[0.625rem]">⚠ Add GEMINI_API_KEY in Settings</span>
-            )}
-          </span>
-        </button>
-        <button type="button" onClick={() => setGenerator('chatgpt')} aria-pressed={isGPT}
-          disabled={!gptAvailable || !!generating}
-          title={generating ? 'A generation batch is running — wait for it to finish before switching engine' : undefined}
-          className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isGPT
-            ? 'border-emerald-400/60 bg-emerald-500/15 ring-1 ring-emerald-400/40'
-            : 'border-border bg-app/40 hover:enabled:bg-surface-raised'}`}>
-          <ChatGptIcon className={`w-9 h-9 shrink-0 ${isGPT ? 'text-emerald-300' : 'text-content-subtle'}`} />
-          <span className="flex flex-col gap-1 min-w-0">
-            <span className={`text-[0.8125rem] font-semibold ${isGPT ? 'text-emerald-200' : 'text-content-muted'}`}>
-              ChatGPT <span className="font-normal text-content-subtle">{gptViaSub ? '· subscription' : '· API'}</span>
-            </span>
-            <span className="flex flex-wrap gap-1">
-              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">No GPU</span>
-              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">{gptViaSub ? 'Plan quota' : '~$0.17/image'}</span>
-              <span className="px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]">SFW</span>
-            </span>
-            {gptAvailable ? (
-              <span className={`text-[0.625rem] ${isGPT ? 'text-emerald-300' : 'text-content-subtle'}`}>
-                {gptViaSub
-                  ? `gpt-image-2 · uses your ChatGPT ${gptPlanLabel} quota`
-                  : `gpt-image-2 · estimated cost ≈ $${(selected.size * multiplier * 0.17).toFixed(2)}`}
-              </span>
-            ) : (
-              <span className="text-amber-300 text-[0.625rem]">⚠ Add an API key or connect a subscription in Settings</span>
-            )}
-          </span>
-        </button>
+        </div>
       </div>
 
       {/* Preset cards with their framing-mix bar. */}
@@ -719,18 +590,16 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
               {customShots.map((c) => {
                 const on = selected.has(c.id);
                 const done = doneByLabel.get(c.label) || 0;
-                const blocked = c.nsfw && !isKlein;   // 🔞 card while an API engine is active
                 const cls = on
                   ? 'bg-primary/20 border-primary/50 text-white ring-1 ring-primary/30'
                   : done > 0
                     ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100/90 hover:bg-emerald-500/15'
                     : 'border-border bg-app/40 text-content-muted hover:bg-surface-raised';
                 return (
-                  <div key={c.id} className={`relative flex items-center gap-1.5 px-1.5 py-1 rounded-lg text-[0.625rem] border transition-colors ${cls} ${blocked ? 'opacity-40' : ''}`}>
-                    <button type="button" onClick={() => !blocked && toggle(c.id)} aria-pressed={on}
-                      disabled={blocked}
-                      title={blocked ? '🔞 shot — switch the generator to Klein' : c.prompt}
-                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left disabled:cursor-not-allowed">
+                  <div key={c.id} className={`relative flex items-center gap-1.5 px-1.5 py-1 rounded-lg text-[0.625rem] border transition-colors ${cls}`}>
+                    <button type="button" onClick={() => toggle(c.id)} aria-pressed={on}
+                      title={c.prompt}
+                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left">
                       <ShotIllustration framing={c.framing} label={c.label} className="w-7 h-7 shrink-0" />
                       <span className="min-w-0 leading-tight truncate">{c.label}</span>
                       <span className="ml-auto shrink-0 flex items-center gap-1">
@@ -751,9 +620,8 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         )}
       </div>
 
-      {/* 🔞 NSFW — local Klein only. Uncensored body catalog + free prompt.
-          Never offered on the API engines (and the backend refuses them there). */}
-      {isKlein && klAvailable && (
+      {/* 🔞 NSFW — uncensored body catalog + free prompt (local Klein). */}
+      {klAvailable && (
         <div className={`rounded-lg border p-2 flex flex-col gap-2 ${nsfwMode
           ? 'border-rose-500/40 bg-rose-500/5' : 'border-border bg-app/30'}`}>
           <button type="button" onClick={() => setNsfwMode((v) => !v)} aria-pressed={nsfwMode}
@@ -813,7 +681,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
           ✨ Custom shot
           <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
-            write your own prompt — it becomes a reusable card in the Custom group above{nsfwMode && isKlein ? ' — 🔞 register active' : ''}
+            write your own prompt — it becomes a reusable card in the Custom group above{nsfwMode ? ' — 🔞 register active' : ''}
           </span>
         </summary>
         <div className="px-2.5 pt-1 flex flex-col gap-1">
@@ -884,7 +752,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
       {/* Klein-only tuning, grouped: model file + consistency-LoRA strength.
           A <details> so the defaults stay out of a newcomer's way — children
           remain mounted, so the model picker still reports its choice. */}
-      {isKlein && klAvailable && (
+      {klAvailable && (
         <details className="rounded-lg border border-border bg-app/30 open:pb-2"
           onToggle={(e) => { if (e.currentTarget.open) requestHelpTip('klein-tuning-open'); }}>
           <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
@@ -983,8 +851,8 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         )}
         {/* Disabled for the WHOLE batch, not just the launch request: `busy` is the
             hook's busyLive (local flag OR any server-side activity, restored on
-            reload), so a generation already in flight — Nano Banana / ChatGPT /
-            Klein alike — keeps this locked with a visible reason. */}
+            reload), so a generation already in flight keeps this locked with a
+            visible reason. */}
         <button type="button" onClick={go} disabled={busy || !selected.size || !hasRef || !currentAvailable}
           title={generating ? 'A generation batch is already running' : undefined}
           className="ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">

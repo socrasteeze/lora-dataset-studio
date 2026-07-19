@@ -334,35 +334,23 @@ def test_export_no_kept_images_400(client):
     assert resp.status_code == 400
 
 
-def test_generate_chatgpt_no_key_accepts_and_creates_pending_rows(client, monkeypatch):
-    """The service doesn't validate the API key up front — rows go pending and
-    the background batch (which we don't wait for) will fail them later.
-
-    The batch's Thread is stubbed out (same technique as the brief's
-    test_api_fanout_creates_pending_rows) so this test only exercises the route
-    contract and never races a real background thread against a real HTTP call:
-    test_config.py's test_secrets_roundtrip leaks a fake OPENAI_API_KEY into
-    process-wide os.environ via a bare `os.environ[...] = ...` (no monkeypatch),
-    so an un-stubbed batch could otherwise fire a REAL (401) OpenAI request in
-    a background thread racing this test's teardown. See task-8-report.md."""
-    calls = []
-    monkeypatch.setattr('app.services.face_dataset_service.threading.Thread',
-                        lambda target, args=(), daemon=True: type('T', (), {'start': lambda s: calls.append(args)})())
+def test_generate_rejects_removed_api_engines(client):
+    """Local-only fork: a stale client still sending a removed API engine gets
+    one clear 400 naming the Klein-only policy — no rows are created."""
     ds_id = _create(client, 'Nyx', 'nyx').get_json()['id']
     data = {'file': (io.BytesIO(_png_bytes()), 'ref.png')}
     client.post(f'/api/dataset/{ds_id}/ref', data=data, content_type='multipart/form-data')
-    resp = client.post(f'/api/dataset/{ds_id}/generate', json={
-        'generator': 'chatgpt',
-        'variations': [{'label': 'Visage face, neutre', 'framing': 'face',
-                        'prompt': 'close-up portrait, front view, neutral expression'}],
-        'multiplier': 1,
-    })
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body['ok'] is True and body['created'] == 1
-    assert calls  # background batch was dispatched (never actually run)
+    for generator in ('chatgpt', 'nanobanana', 'bogus'):
+        resp = client.post(f'/api/dataset/{ds_id}/generate', json={
+            'generator': generator,
+            'variations': [{'label': 'Visage face, neutre', 'framing': 'face',
+                            'prompt': 'close-up portrait, front view, neutral expression'}],
+            'multiplier': 1,
+        })
+        assert resp.status_code == 400
+        assert 'Klein' in resp.get_json()['error']
     payload = client.get(f'/api/dataset/{ds_id}').get_json()
-    assert len(payload['images']) == 1
+    assert payload['images'] == []
 
 
 def test_generate_klein_without_comfyui_returns_409(client):

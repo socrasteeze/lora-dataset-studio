@@ -340,7 +340,7 @@ export function useDataset() {
     await refresh();
   }), [wrap, currentId, refresh, toast]);
 
-  // Références ADDITIONNELLES (Nano Banana multi-références). Pas de fenêtre GPU
+  // Références ADDITIONNELLES (multi-références Klein). Pas de fenêtre GPU
   // côté backend (normalisation WEBP simple) mais on garde wrap() pour l'anti-
   // double-clic pendant l'upload.
   const addExtraRef = useCallback((file) => wrap(async () => {

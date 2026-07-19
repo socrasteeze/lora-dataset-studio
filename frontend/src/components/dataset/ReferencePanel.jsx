@@ -44,14 +44,13 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
         </div>
       </div>
 
-      {/* Références additionnelles — identité multi-angles, consommées par TOUS
-          les moteurs : Nano Banana & ChatGPT (jointes à l'appel API) et Klein
-          (chaînées en ReferenceLatent natifs). Crop/scoring restent sur la
+      {/* Références additionnelles — identité multi-angles, chaînées en
+          ReferenceLatent natifs côté Klein. Crop/scoring restent sur la
           principale. */}
       {refFilename && (
         <div className="flex items-center gap-2 flex-wrap border-t border-border pt-2">
           <span className="text-content-subtle text-[0.6875rem]">
-            Extra refs <span className="opacity-70">(all engines — stronger identity lock)</span>
+            Extra refs <span className="opacity-70">(stronger identity lock)</span>
           </span>
           {extraRefs.map((fn) => (
             <div key={fn} className="relative w-12 h-12 rounded-lg overflow-hidden bg-black shrink-0">
@@ -67,7 +66,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
           {extraRefs.length < MAX_EXTRA_REFS && (
             <button type="button" onClick={() => inpExtra.current?.click()} disabled={importBusy}
               aria-label="Add an extra reference photo (other angles of the same face)"
-              title="Add an extra reference photo — every engine (Nano Banana, ChatGPT, Klein) uses them together to lock the identity"
+              title="Add an extra reference photo — Klein chains them together to lock the identity"
               className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-lg leading-none disabled:opacity-40">
               +
             </button>

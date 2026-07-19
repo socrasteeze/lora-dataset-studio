@@ -12,13 +12,12 @@ function fullPayload() {
     python_ml: { version: '3.12.4', ml_supported: true, ml_range: '3.10–3.12' },
     pillow: { version: '12.2.0', healthy: true, incompatible_plugins: [] },
     disk: { free_gb: 45.2, total_gb: 931.0 },
-    secrets_present: { GEMINI_API_KEY: true, OPENAI_API_KEY: false, HF_TOKEN: true },
+    secrets_present: { VAST_API_KEY: true, PEXELS_API_KEY: false, HF_TOKEN: true },
     capabilities: {
-      engines: { nanobanana: true, chatgpt: true, klein: false },
+      engines: { klein: false },
       comfyui_reachable: true,
       klein_model: false,
       klein_missing: ['klein_vae', 'klein_text_encoder'],
-      chatgpt_subscription: true,
       ollama_reachable: true,
       vision_model_ready: false,
       face_scoring: false,
@@ -38,8 +37,8 @@ function fullPayload() {
     },
     config: {
       captioning_backend: 'auto',
-      default_engine: 'chatgpt',
-      enabled_engines: ['nanobanana', 'chatgpt', 'klein'],
+      default_engine: 'klein',
+      enabled_engines: ['klein'],
       training_default_family: 'zimage',
       comfyui_base_dir_set: true,
       aitoolkit_dir_set: false,
@@ -53,7 +52,7 @@ function fullPayload() {
     generation_errors: {
       engines: {
         klein: 'klein: ComfyUI 409 — klein_vae missing (auto-download queued)',
-        chatgpt: 'chatgpt: 429 quota exceeded',
+        other: 'chatgpt: 429 quota exceeded',
       },
       studio: 'node error: KSampler received an invalid model',
     },
@@ -70,7 +69,7 @@ function fullPayload() {
 
 test('renders every section header, most-discriminating first', () => {
   const out = formatDiagnostic(fullPayload());
-  const headers = ['── Engines ──', '── ComfyUI ──', '── Captioning (Ollama) ──',
+  const headers = ['── Engine ──', '── ComfyUI ──', '── Captioning (Ollama) ──',
     '── Environment ──', '── Recent generation failures ──',
     '── Last errors (with traceback) ──', '── Last log lines ──'];
   let last = -1;
@@ -99,7 +98,7 @@ test('surfaces the discriminating fields the support cases needed', () => {
   // the new member's real cause: per-engine failure + traceback.
   assert.match(out, /klein: ComfyUI 409 — klein_vae missing/);
   // fail_reason already names its engine — it must not be double-prefixed.
-  assert.ok(!out.includes('klein: klein:') && !out.includes('chatgpt: chatgpt:'));
+  assert.ok(!out.includes('klein: klein:'));
   assert.match(out, /studio: node error: KSampler/);
   assert.match(out, /Traceback \(most recent call last\):/);
   assert.match(out, /ValueError: boom/);
@@ -107,8 +106,8 @@ test('surfaces the discriminating fields the support cases needed', () => {
 
 test('keys are listed by NAME only — a set key is named, an unset one is not', () => {
   const out = formatDiagnostic(fullPayload());
-  assert.match(out, /Keys set: GEMINI_API_KEY, HF_TOKEN/);
-  assert.ok(!out.includes('OPENAI_API_KEY'), 'unset key must not be listed');
+  assert.match(out, /Keys set: VAST_API_KEY, HF_TOKEN/);
+  assert.ok(!out.includes('PEXELS_API_KEY'), 'unset key must not be listed');
 });
 
 test('outside-ML-range Python gets a visible warning; in-range does not', () => {
@@ -136,7 +135,7 @@ test('empty optional sections are dropped so the healthy case stays short', () =
   assert.ok(!out.includes('── Recent generation failures ──'));
   assert.ok(!out.includes('── Last errors (with traceback) ──'));
   // core sections still render.
-  assert.ok(out.includes('── Engines ──') && out.includes('── ComfyUI ──'));
+  assert.ok(out.includes('── Engine ──') && out.includes('── ComfyUI ──'));
   // no git sha -> no trailing parenthesis on the header line.
   assert.match(out, /diagnostic — v2026\.07\.17\.1\n/);
   // Keys set line degrades to 'none' rather than blowing up.

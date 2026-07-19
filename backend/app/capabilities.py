@@ -71,21 +71,6 @@ def _cached_import(key: str, python: str, module_expr: str) -> bool:
     return ok
 
 
-def probe_gemini() -> dict:
-    ok = bool(cfg.secret('GEMINI_API_KEY'))
-    return {'ok': ok, 'detail': 'key set' if ok else 'key missing'}
-
-
-def probe_openai() -> dict:
-    """ChatGPT engine readiness: a pay-per-use API key OR a connected ChatGPT
-    subscription (Codex OAuth) both light the engine up."""
-    from .services import chatgpt_oauth
-    key = bool(cfg.secret('OPENAI_API_KEY'))
-    sub = chatgpt_oauth.status()['connected']
-    parts = (['key set'] if key else []) + (['subscription connected'] if sub else [])
-    return {'ok': key or sub, 'detail': ' + '.join(parts) if parts else 'key missing'}
-
-
 def probe_comfyui() -> dict:
     api_url = (cfg.get('comfyui.api_url') or '').rstrip('/')
     if not api_url:
@@ -736,8 +721,6 @@ def probe(force=False) -> dict:
     ollama = probe_ollama()
     ollama_installed = probe_ollama_installed()
     aitoolkit = probe_aitoolkit()
-    gemini = probe_gemini()
-    openai_ = probe_openai()
     face_scoring = probe_face_scoring()
     masks = probe_masks()
     bank_scoring = probe_bank_scoring()
@@ -786,21 +769,12 @@ def probe(force=False) -> dict:
     # the source of truth; `skipped` only lets the Setup step render neutral.
     comfy_skipped = bool(cfg.get('comfyui.setup_skipped')) and not base_dir
 
-    from .services import chatgpt_oauth
-    sub_status = chatgpt_oauth.status()
-
     caps = {
         'configured': cfg.is_configured(),
+        # Local-only fork: Klein (ComfyUI) is the sole generation engine — the
+        # Nano Banana / ChatGPT API engines were removed.
         'engines': {
-            'nanobanana': gemini['ok'],
-            'chatgpt': openai_['ok'],
             'klein': klein_ready,
-        },
-        'chatgpt_subscription': {
-            'connected': sub_status['connected'],
-            'email': sub_status['email'],
-            'plan': sub_status['plan'],
-            'codex_cli_detected': chatgpt_oauth.codex_auth_path().is_file(),
         },
         'comfyui': {
             'reachable': comfy['ok'],

@@ -4,8 +4,7 @@ Community feature request (waltm, Discord). The dataset carries a global suffix 
 an optional per-framing map {face,bust,body,back}; both ride on every GENERATED
 variation at WRAP time only:
   - never baked into the stored variation_prompt (a regenerate would double-apply),
-  - never ahead of / inside the identity lock (guard-first Nano Banana wrapper) nor
-    inside the restage/identity constraints (instruction-first Klein wrapper),
+  - never inside the restage/identity constraints (instruction-first Klein wrapper),
   - composition: per-framing FIRST (most specific, closest to the shot description),
     then the global suffix,
   - empty suffix -> byte-identical prompts (regression invariant).
@@ -18,8 +17,7 @@ from PIL import Image
 
 from app.config import LOCAL_USER
 from app.services.face_variations import (
-    IDENTITY_GUARD, IDENTITY_GUARD_MULTI, compose_prompt_suffix,
-    wrap_variation, wrap_variation_klein)
+    compose_prompt_suffix, wrap_variation_klein)
 
 
 def _png(color=(255, 0, 0)):
@@ -57,15 +55,7 @@ def test_compose_prompt_suffix_order_and_sources():
         'film grain, warm tones'
 
 
-# --- 2) Wrappers --------------------------------------------------------------
-def test_wrap_variation_guard_stays_first_suffix_extends_tail():
-    out = wrap_variation('upper body portrait', suffix='shot on 35mm film')
-    assert out.startswith(IDENTITY_GUARD)          # guard-first, lock untouched
-    assert out.endswith('upper body portrait, shot on 35mm film')
-    multi = wrap_variation('p', ref_count=3, suffix='s')
-    assert multi.startswith(IDENTITY_GUARD_MULTI) and multi.endswith('p, s')
-
-
+# --- 2) Wrapper ---------------------------------------------------------------
 def test_wrap_variation_klein_suffix_in_descriptive_portion():
     out = wrap_variation_klein('close-up portrait', framing='face', suffix='warm film look')
     # In the DESCRIPTIVE portion: after the instruction opener, before the
@@ -81,8 +71,6 @@ def test_wrap_variation_klein_suffix_in_descriptive_portion():
 
 def test_empty_suffix_is_byte_identical():
     """The no-suffix regression invariant: '' and absent produce the same bytes."""
-    assert wrap_variation('p q r') == wrap_variation('p q r', suffix='')
-    assert wrap_variation('p', ref_count=2) == wrap_variation('p', ref_count=2, suffix='  ')
     assert wrap_variation_klein('p', framing='body') == \
         wrap_variation_klein('p', framing='body', suffix='')
     assert wrap_variation_klein('p', nsfw=True) == wrap_variation_klein('p', nsfw=True, suffix='')
@@ -216,79 +204,46 @@ def test_klein_regenerate_applies_current_suffix_exactly_once(app, monkeypatch):
         assert captured[-1]['edit_prompt'] == wk('close-up portrait', framing='face')
 
 
-# --- 5) Application at generation time (API engines) --------------------------
-def test_api_fanout_items_carry_composed_suffix(app, monkeypatch):
+# --- 5) Legacy API-engine rows (engines removed) -------------------------------
+def test_legacy_api_row_regenerates_via_klein(app, monkeypatch):
+    """A row created by a removed API engine (klein_model holds the old engine
+    TAG) regenerates on the Klein path, swapping in the workspace's real Klein
+    model instead of the stale tag — and applies the suffix exactly once."""
     from app.models import FaceDatasetImage
     from app.services import face_dataset_service as svc
-    calls = []
-    monkeypatch.setattr(
-        'app.services.face_dataset_service.threading.Thread',
-        lambda target, args=(), daemon=True: type('T', (), {'start': lambda s: calls.append(args)})())
+    from app.services import klein_edit_helper as keh
+    import app.job_queue as jq
+    monkeypatch.setattr(keh, 'klein_missing_assets', lambda *a, **k: set())
+    captured = []
+    monkeypatch.setattr(keh, 'enqueue_klein_edit',
+                        lambda **k: captured.append(k) or f'job-{len(captured)}')
     with app.app_context():
-        ds = _ds_with_ref(svc, prompt_suffix='golden hour',
-                          prompt_suffixes={'bust': 'soft light'})
-        svc.generate_variations_nanobanana(
-            app, LOCAL_USER, ds.id,
-            [{'label': 'a', 'framing': 'bust', 'prompt': 'upper body portrait'},
-             {'label': 'b', 'framing': 'face', 'prompt': 'close-up portrait'}],
-            1, engine='nanobanana')
-        items = calls[0][1]
-        assert [i[3] for i in items] == ['soft light, golden hour', 'golden hour']
-        # rows keep the raw prompt (regenerate-safe)
-        rows = FaceDatasetImage.query.filter_by(dataset_id=ds.id).all()
-        assert sorted(r.variation_prompt for r in rows) == \
-            ['close-up portrait', 'upper body portrait']
-
-
-def test_api_batch_wraps_with_suffix_and_legacy_items_unchanged(app, monkeypatch):
-    import concurrent.futures
-    from app.models import FaceDatasetImage
-    from app.services import face_dataset_service as svc
-
-    class _SerialPool:
-        def __init__(self, *a, **k): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def map(self, fn, items): return [fn(i) for i in items]
-
-    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _SerialPool)
-    prompts = []
-    monkeypatch.setattr(svc, '_api_generate_fn',
-                        lambda engine: (lambda refs, prompt, **k: prompts.append(prompt) or _png()))
-    with app.app_context():
-        ds = _ds_with_ref(svc, name='NB', trigger='nb')
-        a = FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='nanobanana')
-        b = FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='nanobanana')
-        svc.db.session.add_all([a, b]); svc.db.session.commit()
-        svc._run_nanobanana_batch(
-            app,
-            [(a.id, 'upper body portrait', '3:4', 'soft light, golden hour'),
-             (b.id, 'close-up portrait', '1:1')],          # legacy 3-tuple
-            [_png()], engine='nanobanana')
-        assert prompts[0].startswith(IDENTITY_GUARD)       # guard still first
-        assert prompts[0].endswith('upper body portrait, soft light, golden hour')
-        assert prompts[1] == wrap_variation('close-up portrait')   # legacy = unchanged
-
-
-def test_api_regenerate_sync_path_applies_suffix_once(app, monkeypatch):
-    """regenerate_image on an API-engine row (app=None -> synchronous path) wraps
-    with the dataset suffix, exactly once, and keeps the stored prompt raw."""
-    from app.models import FaceDatasetImage
-    from app.services import face_dataset_service as svc
-    prompts = []
-    monkeypatch.setattr(svc, '_api_generate_fn',
-                        lambda engine: (lambda refs, prompt, **k: prompts.append(prompt) or _png()))
-    with app.app_context():
+        monkeypatch.setattr(jq.queue_manager, 'cancel_job', lambda *a, **k: None)
         ds = _ds_with_ref(svc, name='NBr', trigger='nbr', prompt_suffix='golden hour')
         img = FaceDatasetImage(dataset_id=ds.id, source='generated', status='keep',
                                framing='bust', variation_label='Buste face',
                                variation_prompt='upper body portrait',
                                klein_model='nanobanana')
         svc.db.session.add(img); svc.db.session.commit()
-        svc.regenerate_image(LOCAL_USER, img.id, engine='nanobanana')
-        assert len(prompts) == 1
-        assert prompts[0].count('golden hour') == 1
-        assert prompts[0].endswith('upper body portrait, golden hour')
+        svc.regenerate_image(LOCAL_USER, img.id, klein_model='m.safetensors')
+        assert len(captured) == 1
+        assert captured[0]['klein_model'] == 'm.safetensors'   # tag replaced
+        assert captured[0]['edit_prompt'].count('golden hour') == 1
         svc.db.session.expire_all()
-        assert svc.db.session.get(FaceDatasetImage, img.id).variation_prompt == \
-            'upper body portrait'
+        row = svc.db.session.get(FaceDatasetImage, img.id)
+        assert row.variation_prompt == 'upper body portrait'   # still raw
+        assert row.klein_model == 'm.safetensors'
+
+
+def test_regenerate_rejects_removed_engines(app, monkeypatch):
+    import pytest
+    from app.models import FaceDatasetImage
+    from app.services import face_dataset_service as svc
+    with app.app_context():
+        ds = _ds_with_ref(svc, name='X', trigger='x')
+        img = FaceDatasetImage(dataset_id=ds.id, source='generated', status='keep',
+                               variation_prompt='p', klein_model='nanobanana')
+        svc.db.session.add(img); svc.db.session.commit()
+        for engine in ('nanobanana', 'chatgpt', 'bogus'):
+            with pytest.raises(ValueError):
+                svc.regenerate_image(LOCAL_USER, img.id, engine=engine)

@@ -113,7 +113,7 @@ The app is a **guided flow**: each stage stays folded until the one before it is
 
 1. **Create a dataset** — pick Character, Concept or Style and its target model. Character/Concept use an activation trigger; Style is always-on and keeps only an internal run identifier.
 2. **Upload a reference photo** (+ up to 3 extra angles for multi-view consistency).
-3. **Generate variations** via Nano Banana Pro (Gemini), ChatGPT (`gpt-image-2`), or Klein (local ComfyUI).
+3. **Generate variations** via Klein (local ComfyUI) — this fork is local-only.
 4. **Import** full-frame or with optional head-crop for Character datasets.
 5. **Auto-classify framing** (face / bust / body / back) via a local vision model.
 6. **Curate** — keep/reject, crop, mirror, auto-triage by face score, or act on a multi-selection; Character sets get a live **12 face · 6 bust · 6 body · 1 back** meter.
@@ -145,19 +145,9 @@ Character and Concept LoRAs use an activation trigger: captions keep variable de
 
 ### 2. Three ways to source images
 
-- **Generate** — from one or more reference photos, through Nano Banana Pro, ChatGPT (`gpt-image-2`), or a local Klein/ComfyUI model. Each request includes identity-preservation instructions and the selected references; generated results still need human review.
+- **Generate** — from one or more reference photos, through the local Klein/ComfyUI engine. Each request includes identity-preservation instructions and the selected references; generated results still need human review.
 - **Import** — drag in your own photos. Concept/Style keep the full frame; Character can optionally auto-crop around the head (or use a centered/manual crop when local vision is unavailable).
 - **Scrape** — collect real images from supported web sources into any dataset. This is its own panel, covered next.
-
-#### Using a ChatGPT subscription instead of an API key (experimental)
-
-If you have a ChatGPT Plus/Pro subscription you can run the ChatGPT engine on your plan's image quota instead of a pay-per-use API key: **Settings → ChatGPT subscription → Connect with ChatGPT** (or **Import from Codex CLI** if you already use `codex login`).
-
-Good to know:
-
-- **Experimental.** This uses the same subscription lane as OpenAI's Codex sign-in. It is not a documented API and may stop working at any time; you connect your own account at your own risk. The API-key mode is unaffected.
-- **Limits vs API mode:** up to 5 reference images per generation (instead of 16), and your plan's image cap applies. When the quota runs out mid-batch, the remaining rows fail with a clear message — the app never silently switches to your paid API key.
-- Auth mode is configurable (**Settings → ChatGPT engine auth**): Auto (subscription when connected, otherwise API key), API key only, or Subscription only.
 
 #### Built-in web scraper
 
@@ -274,7 +264,7 @@ Nothing here locks your data in:
 
 | Stage of the job | ai-toolkit alone | LoRA Dataset Studio |
 |---|---|---|
-| Build the dataset from one photo | ❌ none — you arrive with your images | ✅ 3-engine fan-out, 45-shot variation catalog, 12/6/6/1 composition target |
+| Build the dataset from one photo | ❌ none — you arrive with your images | ✅ Klein fan-out, 45-shot variation catalog, 12/6/6/1 composition target |
 | Build the dataset from the web | ❌ none | ✅ Reddit search and supported gallery/search URLs into any dataset (dedup + quality filters) |
 | Curate | ❌ your file explorer | ✅ keep/reject, crop/mirror, auto-triage, multi-select, Klein candidates, composition meter and **InsightFace scoring** |
 | Captions | ❌ write them yourself | ✅ JoyCaption/Ollama, prose vs booru by family, Concept leak checks and content-only Style rules |
@@ -293,8 +283,6 @@ Not every feature needs every backend. The app degrades gracefully — API keys 
 
 | Feature | Requires |
 |---|---|
-| API image generation (Nano Banana Pro) | `GEMINI_API_KEY` |
-| API image generation (ChatGPT / `gpt-image-2`) | `OPENAI_API_KEY` |
 | Klein image generation / single or bulk 2 MP improvement | ComfyUI reachable + Klein model installed |
 | Captioning | Ollama **or** ai-toolkit (JoyCaption) |
 | Auto-classify framing / auto head-crop | Ollama (vision model) |
@@ -311,7 +299,7 @@ Not every feature needs every backend. The app degrades gracefully — API keys 
 
 ## Two run modes
 
-**API-only** — dataset creation, generation via Gemini/ChatGPT, import/scrape, manual curation/captions, backup and export. Runs on any machine with Python and no GPU; this is what the Docker image ships. No ComfyUI, ai-toolkit or local ML extras required.
+**Curation-only** — dataset creation, import/scrape, manual curation/captions, backup and export. Runs on any machine with Python and no GPU; this is what the Docker image ships. No ComfyUI, ai-toolkit or local ML extras required. (This fork removed the cloud API engines — image *generation* always runs locally via ComfyUI.)
 
 **Full local** — everything above plus Klein/Z-Image generation, captioning via JoyCaption, face scoring, masks, training, and Test Studio. Requires ComfyUI and/or ai-toolkit running on the same host (or reachable over the network) and an NVIDIA GPU with 12 GB+ VRAM for Klein/Z-Image inference. Training VRAM depends on the model family (Z-Image, SDXL, Krea 2, FLUX.1 and FLUX.2 Klein have different footprints) — check the family's ai-toolkit preset before queuing a run. The face-scoring and masking helpers (`requirements-ml.txt`) run fine on CPU; they don't need the GPU.
 
@@ -405,7 +393,7 @@ npm install
 npm run build
 ```
 
-### Option 3 — Docker (API-only)
+### Option 3 — Docker (curation-only)
 
 Copy `.env.example` to `.env` first — the compose file bind-mounts `./.env`, and Docker will otherwise create an empty directory in its place:
 
@@ -419,7 +407,7 @@ Then build and run:
 docker compose up --build
 ```
 
-This builds and runs the API-only mode (see `Dockerfile` / `docker-compose.yml`) — ComfyUI and ai-toolkit are host-native tools and out of scope for the container. Data persists to `./data-docker` on the host, and your API keys are mounted in from `.env`.
+This builds and runs the curation-only mode (see `Dockerfile` / `docker-compose.yml`) — ComfyUI and ai-toolkit are host-native tools and out of scope for the container. Data persists to `./data-docker` on the host, and your keys (Hugging Face, vast.ai, scraper credentials) are mounted in from `.env`.
 
 ### External tools (install once, connect in Settings)
 
@@ -449,8 +437,6 @@ Trained LoRAs land in `models/loras/<family>` automatically after training. Gene
 
 ### Getting API keys
 
-- **Gemini** (for Nano Banana Pro): go to [aistudio.google.com](https://aistudio.google.com), click **Get API key**, and paste it into the app's Settings page.
-- **OpenAI** (for ChatGPT / `gpt-image-2`): go to [platform.openai.com](https://platform.openai.com) → **API keys**, create a key, and paste it into Settings.
 - **Hugging Face** (gated model downloads and dataset publishing): create a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). Read access is enough for accepted gated models; publishing requires a write-enabled token.
 - **vast.ai** (optional cloud training): create/copy your key from [cloud.vast.ai](https://cloud.vast.ai/) and save it as `VAST_API_KEY` in Settings.
 
@@ -464,7 +450,7 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 
 | Mode / capability | GPU (NVIDIA) | Disk | Notes |
 |---|---|---|---|
-| **API-only** (generate via Gemini/ChatGPT, import/scrape, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10–3.12; Docker image available |
+| **Curation-only** (import/scrape, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10–3.12; Docker image available |
 | **Auto-captioning & framing** (Ollama vision, 8B model) | ~8 GB VRAM | ~7 GB | Runs alongside generation, not concurrently |
 | **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality, and downloads publicly (no HF token) |
 | **LoRA training — Z-Image / SDXL** (ai-toolkit) | 16 GB+ recommended | 10 GB+ free enforced per run | Quantized (qfloat8) + low-VRAM mode |
@@ -472,7 +458,7 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 | **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** (cloud lane) | base download + 10 GB+ free | Both bases gated on Hugging Face (HF token required). Train the 9B via ☁️ cloud |
 | **Face scoring / person masks / watermark inpaint** (ML extras) | none (CPU) | ~3 GB (+ a CPU torch for LaMa inpaint) | Python **3.10–3.12 required** (no wheels beyond); installable per capability from Setup |
 
-- **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux/macOS work for API-only + manual venv.
+- **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux/macOS work for curation-only + manual venv.
 - **Python**: 3.10–3.12 — but not required up front: `start.bat` fetches a self-contained CPython 3.12 if your machine has none. 3.13+ (already installed) runs the core app but can't install the ML extras.
 - **RAM**: 16 GB+ recommended when training locally.
 - Reference rig used for development: RTX 4090 (24 GB) — every number above was measured or enforced there.
@@ -502,10 +488,8 @@ Copy `config.example.json` to `config.json` (git-ignored) and adjust. Main keys:
 | `aitoolkit.output_dir` | Override for ai-toolkit's output folder (defaults to `<aitoolkit.dir>/output`). |
 | `aitoolkit.hf_home` | Override for the Hugging Face cache directory ai-toolkit uses. |
 | `aitoolkit.python` | Full path to the Python interpreter to run ai-toolkit with. Empty = auto-detect a `venv/`/`.venv/` next to `run.py`; set it for conda/uv/system-Python installs that have no venv folder. |
-| `engines.default` | Default image-generation engine selected in the UI (`nanobanana`, `chatgpt`, or `klein`). |
+| `engines.default` | Image-generation engine (`klein` — the only engine on this fork). |
 | `engines.enabled` | List of engines shown as options in the UI. |
-| `engines.chatgpt_auth` | Which credential the ChatGPT engine uses: `auto` (subscription when connected, else API key), `api`, or `subscription`. |
-| `engines.chatgpt_subscription_model` | Codex **router** model for the subscription lane (default `gpt-5.4-mini`); the image model stays `gpt-image-2` regardless. |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
 | `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, or `flux2klein`). |
 | `cloud.max_concurrent_runs` | Simultaneous cloud pods allowed (default `1`, 1–10). Also in Settings → Training. |
@@ -529,7 +513,7 @@ Copy `config.example.json` to `config.json` (git-ignored) and adjust. Main keys:
 | `klein.small_image_prompt` | Optional shared instruction for scraper rescue and single/bulk image improvement (empty = reference image only). |
 | `updates.repo` | GitHub repo the update checker reads its release feed from (default `perfectgf/lora-dataset-studio`). |
 
-Secrets such as `GEMINI_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`, `VAST_API_KEY` and optional scraper credentials live in `.env`, not `config.json` — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them for you.
+Secrets such as `HF_TOKEN`, `VAST_API_KEY` and optional scraper credentials live in `.env`, not `config.json` — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them for you.
 
 A few environment variables override paths for advanced/containerized setups: `LDS_DATA_DIR` (runtime data directory), `LDS_CONFIG` (path to `config.json`), `LDS_ENV` (path to `.env`), `LDS_HOST` (bind host, takes priority over `server.host`), `FLASK_DEBUG` (`1` to enable Flask debug mode).
 
@@ -543,7 +527,6 @@ Under the hood: the app has **no user accounts**, so on `127.0.0.1` (the default
 
 - Krea 2's img2img workflow (`backend/workflows/krea2_turbo_img2img.json`) ships in the repo but isn't wired into a Test Studio mode yet — only the text-to-image Krea 2 workflow is currently reachable from the UI.
 - ComfyUI-dependent code paths (Klein generation, Test Studio, the consistency-LoRA path normalization for Windows ComfyUI) are covered by unit tests against a mocked ComfyUI API; they haven't all been exercised against a live ComfyUI instance yet. If something looks wrong when wiring up your own ComfyUI, check Settings → the "Test" button next to each endpoint.
-- The dataset workspace remembers your last-used generator (`localStorage`) and defaults to Nano Banana Pro on a first visit. If you've only configured an OpenAI key, the Nano Banana card shows disabled and the Generate button stays greyed out until you explicitly click the ChatGPT card — a one-click step that's easy to miss right after onboarding.
 
 ## Troubleshooting
 

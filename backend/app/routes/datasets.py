@@ -22,7 +22,7 @@ from ..services.dataset_storage import dataset_path, ensure_dataset_dir
 from ..services import lora_test_studio as lts
 from ..services import studio_grid_export as sge
 from ..services.face_variations import (NSFW_VARIATION_CATALOG, VARIATION_CATALOG,
-                                        is_nsfw_label, select_preset)
+                                        select_preset)
 from ..utils.comfyui import KREA_ALLOWED_SAMPLERS, KREA_ALLOWED_SCHEDULERS, get_krea_loras
 from ._common import (_map_error, _require_comfyui, _studio_arch_mismatch_response,
                       _studio_missing_response)
@@ -393,45 +393,33 @@ def _autostart_optional_klein():
 def dataset_generate(dataset_id):
     data = request.get_json(silent=True) or {}
     generator = data.get('generator') or 'klein'
-    variations = data.get('variations') or []
-    # Route-level fail-closed: NSFW variations never reach an API engine — they
-    # exist only on the local Klein path (the service re-checks, defense in depth).
-    if generator in svc.API_ENGINES and any(
-            v.get('nsfw') or is_nsfw_label(v.get('label')) for v in variations):
+    # Local-only fork: Klein (ComfyUI) is the sole generation engine. A stale
+    # client still sending 'nanobanana'/'chatgpt' gets one clear answer.
+    if generator != 'klein':
         return jsonify({'ok': False,
-                        'error': 'NSFW variations run on the local Klein engine only — '
-                                 'switch the generator to Klein.'}), 400
+                        'error': 'The API engines were removed from this fork — '
+                                 'generation runs on the local Klein engine only.'}), 400
     try:
-        if generator in svc.API_ENGINES:
-            # API path (Gemini Nano Banana Pro or OpenAI ChatGPT gpt-image-2):
-            # no GPU, rows filled by a background thread — the existing polling
-            # UI tracks them.
-            from flask import current_app
-            ids = svc.generate_variations_nanobanana(
-                current_app._get_current_object(), LOCAL_USER, dataset_id,
-                data.get('variations') or [], data.get('multiplier', 1),
-                engine=generator)
-        else:
-            # Klein node preflight (once per request — /object_info is large, so
-            # never per-tile): if the workflow needs a custom node this ComfyUI
-            # lacks, answer one actionable 409 instead of a grid of tiles each
-            # failing ComfyUI validation. Fail-open when /object_info is
-            # unreachable. Combined with the model scan so a fresh install gets
-            # ONE 409 covering both (and the model downloads start in parallel
-            # with the user's node-pack install).
-            from ..services import klein_edit_helper as keh
-            missing_nodes = keh.klein_missing_nodes()
-            if missing_nodes:
-                return _klein_missing_response(keh.klein_missing_assets(), missing_nodes)
-            ids = svc.generate_variations(LOCAL_USER, dataset_id,
-                                          data.get('variations') or [], data.get('multiplier', 1),
-                                          data.get('klein_model'),
-                                          lora_strength=data.get('lora_strength'),
-                                          # Optional generation-LoRA preset
-                                          # (Idea by @waltm): a NAME resolved
-                                          # from config — absent/'' = none.
-                                          generation_lora_preset=data.get('generation_lora_preset'))
-            _autostart_optional_klein()  # bg-fetch the consistency LoRA if it's absent
+        # Klein node preflight (once per request — /object_info is large, so
+        # never per-tile): if the workflow needs a custom node this ComfyUI
+        # lacks, answer one actionable 409 instead of a grid of tiles each
+        # failing ComfyUI validation. Fail-open when /object_info is
+        # unreachable. Combined with the model scan so a fresh install gets
+        # ONE 409 covering both (and the model downloads start in parallel
+        # with the user's node-pack install).
+        from ..services import klein_edit_helper as keh
+        missing_nodes = keh.klein_missing_nodes()
+        if missing_nodes:
+            return _klein_missing_response(keh.klein_missing_assets(), missing_nodes)
+        ids = svc.generate_variations(LOCAL_USER, dataset_id,
+                                      data.get('variations') or [], data.get('multiplier', 1),
+                                      data.get('klein_model'),
+                                      lora_strength=data.get('lora_strength'),
+                                      # Optional generation-LoRA preset
+                                      # (Idea by @waltm): a NAME resolved
+                                      # from config — absent/'' = none.
+                                      generation_lora_preset=data.get('generation_lora_preset'))
+        _autostart_optional_klein()  # bg-fetch the consistency LoRA if it's absent
     except Exception as e:
         from ..services.klein_edit_helper import KleinModelsMissing
         if isinstance(e, KleinModelsMissing):  # a required Klein model isn't installed
@@ -826,21 +814,19 @@ def dataset_image_regenerate(image_id):
     # current behaviour (recover from the row / label); the identity guard is
     # re-applied on top either way (see regenerate_image).
     edited_prompt = (data.get('prompt') or '').strip() or None
-    # Optional engine override: the generator currently selected in the
-    # workspace (absent = legacy behaviour, reuse the row's origin engine).
+    # `engine` stays accepted for client compatibility, but Klein is the sole
+    # engine now — the service rejects anything else with a clear ValueError.
     engine = (data.get('engine') or '').strip() or None
     klein_model = (data.get('klein_model') or '').strip() or None
     try:
         from flask import current_app
-        # Klein node preflight (skip when the user explicitly picked an API engine,
-        # which doesn't touch ComfyUI): surface a missing custom node as one 409
+        # Klein node preflight: surface a missing custom node as one 409
         # instead of a silent failed re-roll. Fail-open if /object_info is down;
         # combined with the model scan (same rationale as the batch generate).
-        if engine not in svc.API_ENGINES:
-            from ..services import klein_edit_helper as keh
-            missing_nodes = keh.klein_missing_nodes()
-            if missing_nodes:
-                return _klein_missing_response(keh.klein_missing_assets(), missing_nodes)
+        from ..services import klein_edit_helper as keh
+        missing_nodes = keh.klein_missing_nodes()
+        if missing_nodes:
+            return _klein_missing_response(keh.klein_missing_assets(), missing_nodes)
         job_id = svc.regenerate_image(LOCAL_USER, image_id,
                                       lora_strength=data.get('lora_strength'),
                                       prompt=edited_prompt,

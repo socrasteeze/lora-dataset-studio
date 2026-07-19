@@ -85,8 +85,8 @@ def _stop_event_for(run_id):
 def _staging_root() -> Path:
     # face_dataset_service has no DATA_DIR of its own (its image root is
     # cfg.dataset_images_root() = DATA_DIR/datasets); the actual data root
-    # lives in config.py as the private _data_dir() (same convention already
-    # used by services.chatgpt_oauth). cloud_runs is a sibling of datasets/.
+    # lives in config.py as the private _data_dir(). cloud_runs is a sibling
+    # of datasets/.
     root = cfg._data_dir() / 'cloud_runs'
     root.mkdir(parents=True, exist_ok=True)
     return root

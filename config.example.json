@@ -25,10 +25,8 @@
     "hf_home": ""
   },
   "engines": {
-    "default": "chatgpt",
+    "default": "klein",
     "enabled": [
-      "nanobanana",
-      "chatgpt",
       "klein"
     ]
   },

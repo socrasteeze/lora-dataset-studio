@@ -1,11 +1,11 @@
-"""Phase-1 end-to-end acceptance path: create -> upload ref -> generate (API
-engine, mocked) -> curate (keep + caption) -> export ZIP. Exercises the same
-HTTP surface the lifted frontend (Task 11) drives, with the fan-out's
-background thread stubbed the same way test_dataset_service.py does (never
-race a real thread against test teardown)."""
+"""Phase-1 end-to-end acceptance path: create -> upload ref -> generate (Klein,
+enqueue mocked) -> curate (keep + caption) -> export ZIP. Exercises the same
+HTTP surface the frontend drives; the ComfyUI queue is stubbed at the
+enqueue_klein_edit seam and completion is materialised on disk directly (the
+queue-side completion linking has its own tests)."""
 import io
+import os
 import zipfile
-from unittest.mock import patch
 
 from PIL import Image
 
@@ -15,32 +15,7 @@ def _png():
     return buf.getvalue()
 
 
-class _SyncExecutor:
-    """Drop-in for ThreadPoolExecutor that runs `map` inline, same thread.
-
-    `_run_nanobanana_batch` fans its per-image work out over a real
-    ThreadPoolExecutor; each worker thread would open its own connection to
-    the test's sqlite `:memory:` database, which (absent a StaticPool, not
-    configured here) is a SEPARATE, empty database per connection -- rows
-    committed by the test's thread would be invisible to it. Running inline
-    keeps everything on the one connection the test set up.
-    """
-    def __init__(self, *a, **k):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-    def map(self, fn, iterable):
-        return [fn(x) for x in iterable]
-
-
-def test_api_only_end_to_end(client, app, monkeypatch):
-    monkeypatch.setenv('OPENAI_API_KEY', 'sk-x')
-
+def test_local_klein_end_to_end(client, app, monkeypatch):
     ds = client.post('/api/dataset/create',
                      json={'name': 'E2E', 'trigger_word': 'e2e'}).get_json()
     did = ds['id']
@@ -51,39 +26,38 @@ def test_api_only_end_to_end(client, app, monkeypatch):
     assert r.status_code == 200
 
     from app.services import face_dataset_service as svc
+    from app.services import klein_edit_helper as keh
     from app.services.face_variations import select_preset
-    from app.config import LOCAL_USER
 
-    # Stub the background Thread (same technique as test_dataset_service.py's
-    # test_api_fanout_creates_pending_rows) so the batch dispatch is captured
-    # instead of actually starting a background thread. This monkeypatch is
-    # NOT scoped to the dispatch call -- monkeypatch.setattr stays active for
-    # the rest of the test, including the manual `_run_nanobanana_batch` call
-    # below. What actually prevents a TypeError there is the `_SyncExecutor`
-    # patch over `concurrent.futures.ThreadPoolExecutor`: without it,
-    # `_run_nanobanana_batch`'s real ThreadPoolExecutor would call
-    # `threading.Thread(..., name=...)` internally, which collides with this
-    # stub's lambda signature. Removing the `_SyncExecutor` patch would
-    # reintroduce that Thread-stub collision.
-    calls = []
-    monkeypatch.setattr(
-        'app.services.face_dataset_service.threading.Thread',
-        lambda target, args=(), daemon=True: type('T', (), {'start': lambda s: calls.append(args)})())
+    monkeypatch.setattr(keh, 'klein_missing_assets', lambda *a, **k: set())
+    monkeypatch.setattr(keh, 'klein_missing_nodes', lambda *a, **k: [])
+    jobs = []
+    monkeypatch.setattr(keh, 'enqueue_klein_edit',
+                        lambda **k: jobs.append(k) or f'job-{len(jobs)}')
 
-    with patch('app.services.chatgpt_image.generate_variation', return_value=_png()), \
-         patch('concurrent.futures.ThreadPoolExecutor', _SyncExecutor):
-        with app.app_context():
-            ids = svc.generate_variations_nanobanana(app, LOCAL_USER, did,
-                                                      select_preset('zimage_12')[:2], 1,
-                                                      engine='chatgpt')
-            assert len(ids) == 2
-            assert calls  # background batch was dispatched (Thread stubbed)
-            # Emulate thread completion synchronously: run the captured worker
-            # body (its internal ThreadPoolExecutor is stubbed inline above).
-            svc._run_nanobanana_batch(*calls[0])
-            rows = svc.FaceDatasetImage.query.filter_by(dataset_id=did).all()
-            assert len(rows) == 2
-            assert all(row.filename for row in rows)  # generation actually "completed"
+    r = client.post(f'/api/dataset/{did}/generate', json={
+        'generator': 'klein',
+        'variations': select_preset('zimage_12')[:2],
+        'multiplier': 1,
+        'klein_model': 'm.safetensors',
+    })
+    assert r.status_code == 200
+    assert r.get_json()['created'] == 2
+    assert len(jobs) == 2
+
+    # Materialise the "completed" Klein outputs directly (queue linking has its
+    # own tests) so the curation/export surface sees finished tiles.
+    with app.app_context():
+        rows = svc.FaceDatasetImage.query.filter_by(dataset_id=did).all()
+        assert len(rows) == 2 and all(row.job_id for row in rows)
+        d = svc._dataset_dir(did)
+        for i, row in enumerate(rows):
+            fn = f'gen_{i}.webp'
+            with open(os.path.join(d, fn), 'wb') as fh:
+                fh.write(svc.normalize_to_webp(_png()))
+            row.filename = fn
+            row.job_id = None
+        svc.db.session.commit()
 
     payload = client.get(f'/api/dataset/{did}').get_json()
     assert len(payload['images']) == 2

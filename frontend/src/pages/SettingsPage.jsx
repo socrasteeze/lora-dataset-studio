@@ -90,14 +90,6 @@ export default function SettingsPage() {
     setTestResults((prev) => ({ ...prev, [target]: result }))
   }
 
-  const toggleEngine = (id) => {
-    setConfig((prev) => {
-      const enabled = prev.engines.enabled || []
-      const next = enabled.includes(id) ? enabled.filter((e) => e !== id) : [...enabled, id]
-      return { ...prev, engines: { ...prev.engines, enabled: next } }
-    })
-  }
-
   // Clear a saved API key. Explicit action — the write-only field can't wipe a key
   // by going blank — so confirm, delete server-side, then refresh presence + caps
   // so any engine that depended on it flips to unavailable right away.
@@ -254,7 +246,7 @@ export default function SettingsPage() {
   const sectionProps = {
     config, setField, secretsPresence, secretInputs, setSecretInputs,
     testResults, recordTestResult, saveSecretIfPending, saveConfigSection, handleDeleteSecret,
-    toggleEngine, handleSave, saving, runtime, caps, refreshCaps: refresh, toast,
+    handleSave, saving, runtime, caps, refreshCaps: refresh, toast,
   }
 
   const activeId = SECTION_COMPONENTS[section] ? section : 'overview'

@@ -39,12 +39,12 @@ from .face_variations import (CAPTION_PROMPT, CAPTION_PROMPT_BOORU,
                               CAPTION_REFINE_CONCEPT_PROMPT, CAPTION_LEAK_FIX_PROMPT,
                               EXPAND_CONCEPT_TERMS_PROMPT,
                               CLASSIFY_PROMPT, HEAD_BBOX_PROMPT, WATERMARK_BBOX_PROMPT,
-                              JOYCAPTION_PROMPT, aspect_for_label, caption_prompt_for,
+                              JOYCAPTION_PROMPT, caption_prompt_for,
                               caption_prompt_for_style, caption_prompt_for_concept,
                               caption_has_identity_leak, caption_has_concept_leak,
                               compose_prompt_suffix, concept_lexical_field,
                               drop_identity_sentences, drop_identity_tags,
-                              is_nsfw_label, prompt_by_label, wrap_variation,
+                              is_nsfw_label, prompt_by_label,
                               wrap_variation_klein)
 
 logger = logging.getLogger(__name__)
@@ -171,9 +171,9 @@ class KleinNodesMissing(Exception):
         super().__init__('Klein custom nodes are missing')
 
 
-# Références ADDITIONNELLES par dataset (au-delà de la principale) : servent
-# UNIQUEMENT Nano Banana (multi-images d'entrée) - Klein/crop/scoring restent
-# sur la principale. Cap bas pour garder des payloads API légers.
+# Références ADDITIONNELLES par dataset (au-delà de la principale) : chaînées
+# en ReferenceLatent natifs sur le chemin Klein multi-références - crop/scoring
+# restent sur la principale.
 MAX_EXTRA_REFS = 3
 
 
@@ -186,27 +186,11 @@ def extra_ref_filenames(ds) -> list:
     return [f for f in v if isinstance(f, str)] if isinstance(v, list) else []
 
 
-def _all_ref_bytes(ds) -> list:
-    """Bytes de la référence principale puis des extras présents sur disque
-    (ordre stable, principale d'abord - c'est elle que Gemini doit prioriser).
-    Un extra au fichier manquant est ignoré silencieusement (jamais bloquant)."""
-    with open(_ref_path(ds), 'rb') as fh:
-        out = [fh.read()]
-    for fn in extra_ref_filenames(ds):
-        p = os.path.join(_dataset_dir(ds.id), fn)
-        try:
-            with open(p, 'rb') as fh:
-                out.append(fh.read())
-        except OSError:
-            logger.warning(f"dataset {ds.id}: extra ref missing on disk: {fn}")
-    return out
-
-
 def add_extra_ref(user_id, dataset_id, image_bytes) -> str:
     """Ajoute une référence additionnelle. Normalisée WEBP ratio conservé, SANS
-    head-crop GPU : un plan buste/corps est une bonne réf d'identité pour Nano
-    Banana, et l'upload ne doit pas dépendre de la fenêtre GPU. Retourne le nom
-    de fichier ; ValueError si dataset absent, réf principale manquante ou cap."""
+    head-crop GPU : un plan buste/corps est une bonne réf d'identité, et
+    l'upload ne doit pas dépendre de la fenêtre GPU. Retourne le nom de
+    fichier ; ValueError si dataset absent, réf principale manquante ou cap."""
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
@@ -2077,8 +2061,8 @@ def dataset_payload(user_id, dataset_id):
 # --- Image normalization ---------------------------------------------------
 def normalize_to_webp(image_bytes: bytes, size: int = 1024) -> bytes:
     """Resize so the longest side ≤ `size`, KEEP the aspect ratio (no square pad),
-    return WEBP. Pour les variations Nano Banana : un plan corps reste en portrait
-    (pas de bandes noires que le LoRA apprendrait). ai-toolkit gère le bucketing."""
+    return WEBP. Un plan corps reste en portrait (pas de bandes noires que le
+    LoRA apprendrait). ai-toolkit gère le bucketing."""
     im = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     im.thumbnail((size, size), Image.LANCZOS)
     out = io.BytesIO()
@@ -4034,8 +4018,8 @@ def _sync_generate_activity(dataset_id):
     only a job_id — no batch handle — so we track the honest pending COUNT rather
     than a per-batch job set (duplicated/cancelled completions would corrupt one).
     Called on enqueue, on each completion, and on cancel; the registry TTL is the
-    last-resort net. API rows (job_id is NULL) are excluded — those batches own a
-    separate begin()/end() 'generate' entry from _run_nanobanana_batch."""
+    last-resort net. Legacy API rows (job_id is NULL) are excluded — the removed
+    API engines owned their own begin()/end() 'generate' entries."""
     pending = (FaceDatasetImage.query
                .filter_by(dataset_id=dataset_id, status='pending')
                .filter(FaceDatasetImage.filename.is_(None))
@@ -4087,7 +4071,7 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
     if in_flight + total > MAX_FANOUT:
         raise ValueError(f'too many generations in flight ({in_flight}), wait or cancel')
     # Extra identity refs (multi-references) : chaînées en ReferenceLatent natifs
-    # côté Klein — mêmes fichiers que le chemin Nano Banana multi-réfs.
+    # côté Klein.
     extra_paths = [os.path.join(_dataset_dir(ds.id), fn) for fn in extra_ref_filenames(ds)]
     # Optional generation LoRAs: resolve the picked preset from the config ONCE
     # (fail-closed — unknown name -> [] with a log). Same chain for every job.
@@ -4107,8 +4091,7 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                 db.session.add(img)
                 db.session.commit()
                 # NSFW (flag explicite OU label du catalogue NSFW) : wrapper sans le
-                # clamp SFW — chemin Klein local uniquement, les moteurs API sont
-                # refusés en amont (route + generate_variations_nanobanana).
+                # clamp SFW — chemin Klein local uniquement.
                 nsfw = bool(v.get('nsfw')) or is_nsfw_label(v.get('label'))
                 try:
                     job_id = enqueue_klein_edit(
@@ -4263,19 +4246,14 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     applied on top, the user only steers the creative half. Empty/None = the
     current behaviour (recover the prompt from the row or the label).
 
-    `engine` (optional, 'nanobanana'/'chatgpt'/'klein') is the generator
-    CURRENTLY selected in the workspace — it wins over the engine that
-    originally produced the row, so a tile born on Klein doesn't pin every
-    regenerate to Klein after the user switched to Nano Banana (and vice
-    versa). None = legacy behaviour (reuse the row's origin). Exception:
-    an NSFW-labelled tile always stays on the local Klein path (fail-closed —
-    NSFW never goes to third-party APIs, mirroring the batch generate rule).
+    `engine` (optional): local-only fork — Klein is the sole engine, so only
+    'klein' (or None) is accepted; anything else raises ValueError.
     `klein_model` (optional) is the workspace's Klein model pick, used when a
-    row born on an API engine switches to Klein (its klein_model column holds
-    an engine TAG, not a real model file).
+    legacy row born on a removed API engine regenerates via Klein (its
+    klein_model column holds an old engine TAG, not a real model file).
     `generation_lora_preset` (optional): NAME of the generation-LoRA preset
-    picked in the workspace (Idea by @waltm), Klein path only — resolved from
-    the CONFIG only (fail-closed; unknown name degrades to no extra LoRAs)."""
+    picked in the workspace (Idea by @waltm) — resolved from the CONFIG only
+    (fail-closed; unknown name degrades to no extra LoRAs)."""
     img = _owned_image(user_id, image_id)
     if not img or img.source != 'generated':
         return None
@@ -4292,24 +4270,11 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     if prompt is None:
         raise ValueError('variation prompt unknown')
     requested = (engine or '').strip() or None
-    if requested is not None and requested != 'klein' and requested not in API_ENGINES:
+    if requested is not None and requested != 'klein':
         raise ValueError(f'unknown engine: {requested}')
-    target = requested or (img.klein_model if img.klein_model in API_ENGINES else 'klein')
-    if is_nsfw_label(img.variation_label):
-        target = 'klein'              # fail-closed: NSFW never reaches an API engine
-    else:
-        # Engines disabled in Settings must not be used even when the row (or a
-        # stale workspace selection) points at them: fall back to the default
-        # engine, then to the first enabled one. An empty list means "all
-        # enabled" (legacy configs); NSFW above already forced local Klein.
-        enabled = [e for e in (cfg.get('engines.enabled') or [])
-                   if e == 'klein' or e in API_ENGINES]
-        if enabled and target not in enabled:
-            default = cfg.get('engines.default')
-            target = default if default in enabled else enabled[0]
-    # Complete every fallible target-specific preflight before changing either
-    # the row or its current file. Klein enqueue is itself part of preparation:
-    # if the later DB transition fails, that exact new job is cancelled below.
+    # Complete every fallible preflight before changing either the row or its
+    # current file. Klein enqueue is itself part of preparation: if the later
+    # DB transition fails, that exact new job is cancelled below.
     from ..job_queue import queue_manager
     old_state = {
         field: getattr(img, field) for field in (
@@ -4319,46 +4284,32 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     }
     old_path = (os.path.join(_dataset_path(img.dataset_id), img.filename)
                 if img.filename else None)
-    new_job_id = None
-    api_generate = None
-    aspect = None
-    ref_bytes = None
-    model = None
-    if target in API_ENGINES:
-        engine = target
-        api_generate = _api_generate_fn(engine)
-        ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
-        if not os.path.exists(ref_path):
-            raise ValueError('reference image file missing')
-        aspect = aspect_for_label(img.variation_label, img.framing)
-        ref_bytes = _all_ref_bytes(ds)  # principale + extras (multi-références)
-    else:
-        try:
-            from .klein_edit_helper import enqueue_klein_edit, resolve_generation_lora_preset
-        except ImportError:
-            raise RuntimeError('ComfyUI is not configured')
-        # Klein target: keep the row's real model file when it has one; a row born
-        # on an API engine holds an engine TAG here, not a model — use the
-        # workspace's Klein pick instead (None = enqueue's default model).
-        model = (img.klein_model if img.klein_model not in API_ENGINES
-                 else ((klein_model or '').strip() or None))
-        ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
-        extra_paths = [os.path.join(_dataset_path(ds.id), fn)
-                       for fn in extra_ref_filenames(ds)]
-        new_job_id = enqueue_klein_edit(
-            user_id=str(user_id), source_filename=ds.ref_filename,
-            source_path=ref_path,
-            edit_prompt=wrap_variation_klein(
-                prompt, nsfw=is_nsfw_label(img.variation_label),
-                framing=img.framing,
-                # CURRENT dataset suffix, applied at wrap: `prompt` is the raw
-                # stored/edited creative prompt, so this is the ONLY application.
-                suffix=dataset_prompt_suffix(ds, img.framing)),
-            klein_model=model,
-            lora_strength=lora_strength, extra_ref_paths=extra_paths,
-            generation_loras=resolve_generation_lora_preset(generation_lora_preset),
-            extra_metadata={'is_dataset': True, 'dataset_id': img.dataset_id,
-                            'variation_label': img.variation_label})
+    try:
+        from .klein_edit_helper import enqueue_klein_edit, resolve_generation_lora_preset
+    except ImportError:
+        raise RuntimeError('ComfyUI is not configured')
+    # Keep the row's real model file when it has one; a legacy row born on a
+    # removed API engine holds an engine TAG here, not a model — use the
+    # workspace's Klein pick instead (None = enqueue's default model).
+    model = (img.klein_model if img.klein_model not in LEGACY_API_ENGINE_TAGS
+             else ((klein_model or '').strip() or None))
+    ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
+    extra_paths = [os.path.join(_dataset_path(ds.id), fn)
+                   for fn in extra_ref_filenames(ds)]
+    new_job_id = enqueue_klein_edit(
+        user_id=str(user_id), source_filename=ds.ref_filename,
+        source_path=ref_path,
+        edit_prompt=wrap_variation_klein(
+            prompt, nsfw=is_nsfw_label(img.variation_label),
+            framing=img.framing,
+            # CURRENT dataset suffix, applied at wrap: `prompt` is the raw
+            # stored/edited creative prompt, so this is the ONLY application.
+            suffix=dataset_prompt_suffix(ds, img.framing)),
+        klein_model=model,
+        lora_strength=lora_strength, extra_ref_paths=extra_paths,
+        generation_loras=resolve_generation_lora_preset(generation_lora_preset),
+        extra_metadata={'is_dataset': True, 'dataset_id': img.dataset_id,
+                        'variation_label': img.variation_label})
 
     # Persist the replacement state first. The old file remains in place until
     # this commit succeeds, eliminating rows that reference an already-moved file.
@@ -4370,7 +4321,7 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
         if edited:
             img.variation_prompt = stored_prompt
         _clear_watermark_metadata(img)
-        img.klein_model = engine if target in API_ENGINES else model
+        img.klein_model = model
         img.filename = None
         img.caption = None
         img.status = 'pending'
@@ -4407,286 +4358,17 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
                              image_id)
         raise
 
-    # API target ('nanobanana'/'chatgpt' — requested, or the row's origin when
-    # no engine was given): the row's klein_model column carries the engine tag.
-    # With an `app` handle the call runs in a background thread (the row flips
-    # to in-flight IMMEDIATELY so the tile shows "…" and the polling/banner UI
-    # reacts at once); without it the call is synchronous (test path / legacy
-    # callers).
-    if target in API_ENGINES:
-        if app is not None:
-            # Threaded path: _run_nanobanana_batch owns the 'generate' indicator
-            # (begin/bump/end) so a single API regenerate takes the same lock as a
-            # batch — every concurrent action stays disabled until it finishes.
-            try:
-                threading.Thread(target=_run_nanobanana_batch,
-                                 args=(app, [(img.id, prompt, aspect,
-                                              dataset_prompt_suffix(ds, img.framing))],
-                                       ref_bytes, engine, img.dataset_id),
-                                 daemon=True).start()
-            except Exception as e:
-                img.status = 'failed'
-                img.fail_reason = f'{engine}: failed to start generation: {e}'[:500]
-                db.session.commit()
-                raise
-            return engine
-        # Synchronous path (legacy / no-app callers): guard the same 'generate'
-        # indicator directly so the payload advertises the regenerate too, and a
-        # raise never leaks the entry (finally end()).
-        token = None
-        try:
-            token = dataset_activity.begin(
-                img.dataset_id, 'generate', total=1, engine=engine)
-            gen_kwargs = {'aspect_ratio': aspect}
-            if engine == 'chatgpt':
-                from .chatgpt_image import _use_subscription
-                gen_kwargs['force_lane'] = 'subscription' if _use_subscription() else 'api'
-            try:
-                out = api_generate(
-                    ref_bytes,
-                    wrap_variation(prompt, ref_count=len(ref_bytes),
-                                   suffix=dataset_prompt_suffix(ds, img.framing)),
-                    **gen_kwargs)
-            except SubscriptionQuotaExceeded:
-                out = None
-                img.status = 'failed'
-                img.fail_reason = _QUOTA_MSG
-                db.session.commit()
-                return engine
-            except SubscriptionUnavailable as e:
-                out = None
-                img.status = 'failed'
-                img.fail_reason = f'chatgpt: {e}'
-                db.session.commit()
-                return engine
-            if out:
-                fn = f"{user_id}_{_ENGINE_FILE_TAG[engine]}_{uuid.uuid4().hex[:8]}.webp"
-                with open(os.path.join(_dataset_dir(img.dataset_id), fn), 'wb') as fh:
-                    fh.write(normalize_to_webp(out))
-                img.filename = fn
-            else:
-                img.status = 'failed'
-                img.fail_reason = f'{engine}: empty response (often a content-policy refusal or a transient API error - retry usually works)'
-            db.session.commit()
-            return engine
-        except Exception as e:
-            db.session.rollback()
-            current = db.session.get(FaceDatasetImage, image_id)
-            if current and current.filename is None:
-                current.status = 'failed'
-                current.fail_reason = f'{engine}: {e}'[:500]
-                db.session.commit()
-            raise
-        finally:
-            if token is not None:
-                dataset_activity.end(token)
-
     # Advertise the in-flight Klein job so a single regenerate takes the same lock
     # as a batch; link_completed_dataset_image clears it on completion.
     _sync_generate_activity(img.dataset_id)
     return new_job_id
 
 
-# --- Fan-out generation (API engines: Nano Banana / ChatGPT) ---------------
-# Both engines share the exact generate_variation contract (refs + prompt +
-# aspect -> bytes|None), so the whole fan-out below is engine-parametric. The
-# filename tag keeps the provenance readable in the dataset folder.
-API_ENGINES = ('nanobanana', 'chatgpt')
-_ENGINE_FILE_TAG = {'nanobanana': 'NBFace', 'chatgpt': 'GPTFace'}
-
-from .chatgpt_image import SubscriptionQuotaExceeded, SubscriptionUnavailable
-
-_QUOTA_MSG = ('chatgpt: subscription image quota reached — remaining rows were '
-              'stopped; rerun in API-key mode or wait for your plan quota to reset')
-_LOST_MSG = ('chatgpt: subscription connection lost — remaining rows stopped; '
-             'reconnect in Settings, then regenerate')
-
-
-def _api_generate_fn(engine):
-    if engine == 'chatgpt':
-        from .chatgpt_image import generate_variation
-    else:
-        from .nanobanana import generate_variation
-    return generate_variation
-
-
-def _run_nanobanana_batch(app, items, ref_bytes, engine='nanobanana', dataset_id=None):
-    """Worker body: generate each (image_id, prompt) via the selected API engine
-    and link the result. Runs in a background thread (factored out so tests can
-    call it synchronously). Each row commits independently; an API failure marks
-    that row 'failed' (visible + regenerable) without stopping the batch.
-
-    ``dataset_id`` (when known) drives the 'generate' activity indicator: one
-    begin() with total=len(items), a bump() per item handled (success OR fail),
-    and end() in a finally — so the ⚡ Generate button (and every concurrent
-    action) stays disabled for the WHOLE batch, and the indicator can never leak
-    even if a row raises. Also used for single-image API regenerate (items=1),
-    which therefore takes the same lock. ``None`` = no indicator (legacy callers)."""
-    api_generate = _api_generate_fn(engine)
-    from concurrent.futures import ThreadPoolExecutor
-    # Guard d'identité adapté au nombre de références (multi = « use EVERY ref »).
-    n_refs = len(ref_bytes) if isinstance(ref_bytes, (list, tuple)) else 1
-    tag = _ENGINE_FILE_TAG.get(engine, 'NBFace')
-    # Pin the ChatGPT auth lane ONCE for the whole batch. Without this, a
-    # mid-batch token refresh failure (auth.openai.com non-200 -> logout())
-    # would make every later row's OWN _use_subscription() call see
-    # connected=False and silently reroute onto the paid API key — breaking
-    # the feature's headline invariant. Pinning + stopping the batch instead
-    # (via SubscriptionUnavailable below) closes that hole.
-    force_lane = None
-    if engine == 'chatgpt':
-        from .chatgpt_image import _use_subscription
-        force_lane = 'subscription' if _use_subscription() else 'api'
-    # Set the moment ANY row hits the plan quota (or the pinned subscription
-    # lane loses its token) — every later row would fail too, so the rest of
-    # the batch fails fast instead of burning one call each.
-    quota_exhausted = threading.Event()
-    stop_msg = {'text': _QUOTA_MSG}   # set to the actual stop reason when it fires
-    token = dataset_activity.begin(dataset_id, 'generate', total=len(items), engine=engine) \
-        if dataset_id is not None else None
-
-    def _run_one(item):
-        # item = (image_id, prompt, aspect, suffix) ; aspect optionnel (rétro-compat
-        # → '1:1'), suffix optionnel (direction créative du dataset, déjà composée
-        # par cadrage au call-site — rétro-compat → '').
-        image_id, prompt = item[0], item[1]
-        aspect = item[2] if len(item) > 2 else '1:1'
-        suffix = item[3] if len(item) > 3 else ''
-        # Stop AVANT l'appel API : cancel_pending supprime les lignes en vol — si
-        # celle-ci a disparu, ne pas payer une génération qui sera jetée (le bouton
-        # Stop doit économiser le RESTE du batch, pas seulement masquer les tuiles).
-        with app.app_context():
-            row = db.session.get(FaceDatasetImage, image_id)
-            if row is None or row.status != 'pending':
-                logger.info(f"{engine} batch: row {image_id} cancelled - API call skipped")
-                return
-        if quota_exhausted.is_set():
-            # A previous row hit the plan quota: skip the API for every row not
-            # yet started (later calls would 429 too). Up to max_workers rows may
-            # already be in flight past this check when the event trips — each is
-            # still failed via the dedicated except below, so the batch wastes at
-            # most ~max_workers calls, not all.
-            with app.app_context():
-                img = db.session.get(FaceDatasetImage, image_id)
-                if img is not None:
-                    img.status = 'failed'
-                    img.fail_reason = stop_msg['text']
-                    db.session.commit()
-            return
-        out = None
-        fail_reason = None
-        gen_kwargs = {'aspect_ratio': aspect}
-        if engine == 'chatgpt':
-            gen_kwargs['force_lane'] = force_lane
-        try:
-            out = api_generate(ref_bytes,
-                               wrap_variation(prompt, ref_count=n_refs, suffix=suffix),
-                               **gen_kwargs)
-            if not out:
-                # api_generate signale certains refus/vides par un retour falsy
-                # sans lever — sans raison, la tuile "failed" resterait muette.
-                fail_reason = f'{engine}: empty response (often a content-policy refusal or a transient API error - retry usually works)'
-        except SubscriptionQuotaExceeded as e:
-            quota_exhausted.set(); stop_msg['text'] = _QUOTA_MSG
-            logger.warning(f"{engine} batch: quota exhausted at row {image_id}: {e}")
-            fail_reason = _QUOTA_MSG
-        except SubscriptionUnavailable as e:
-            quota_exhausted.set(); stop_msg['text'] = _LOST_MSG
-            logger.warning(f"{engine} batch: subscription lost at row {image_id}: {e}")
-            fail_reason = _LOST_MSG
-        except Exception as e:
-            logger.warning(f"{engine} batch: generation error for row {image_id}: {e}")
-            fail_reason = f'{engine}: {str(e)[:400]}'
-        with app.app_context():
-            img = db.session.get(FaceDatasetImage, image_id)
-            if img is None:
-                return
-            if out:
-                ds = db.session.get(FaceDataset, img.dataset_id)
-                fn = f"{ds.user_id}_{tag}_{uuid.uuid4().hex[:8]}.webp"
-                try:
-                    # Conserve le ratio demandé (pas de letterbox carré sur les corps).
-                    with open(os.path.join(_dataset_dir(img.dataset_id), fn), 'wb') as fh:
-                        fh.write(normalize_to_webp(out))
-                    img.filename = fn
-                except Exception as e:
-                    logger.warning(f"{engine} batch: save failed for row {image_id}: {e}")
-                    img.status = 'failed'
-                    img.fail_reason = f'saving the image failed: {str(e)[:400]}'
-            else:
-                img.status = 'failed'
-                img.fail_reason = fail_reason
-            db.session.commit()
-
-    def _one(item):
-        # Progress-tracking wrapper: bump the indicator once per item handled,
-        # whatever the outcome (a raised _run_one still counts as one handled and
-        # never strands the counter). No-op when token is None (bump(None)).
-        try:
-            return _run_one(item)
-        finally:
-            dataset_activity.bump(token)
-
-    logger.info(f"{engine} batch: start ({len(items)} variation(s))")
-    try:
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            list(pool.map(_one, items))
-    finally:
-        dataset_activity.end(token)   # idempotent; end(None) is a no-op
-    logger.info(f"{engine} batch: done ({len(items)} variation(s))")
-
-
-def generate_variations_nanobanana(app, user_id, dataset_id, variations, multiplier,
-                                   engine='nanobanana'):
-    """API fan-out (Nano Banana or ChatGPT, per `engine`): pre-create pending
-    rows (job_id stays None - that is the marker for API-generated rows), then
-    fill them from a background thread. The existing polling/banner/cancel UI
-    works unchanged (pending + no file = in flight). Returns the created ids."""
-    if engine not in API_ENGINES:
-        raise ValueError(f'unknown API engine: {engine}')
-    # Fail-closed : les variations NSFW ne partent JAMAIS vers un moteur API
-    # (comptes/API tiers) — elles n'existent que sur le chemin Klein local.
-    if any(v.get('nsfw') or is_nsfw_label(v.get('label')) for v in variations):
-        raise ValueError('NSFW variations run on the local Klein engine only')
-    ds = get_dataset(user_id, dataset_id)
-    if not ds:
-        raise ValueError('dataset not found')
-    if not ds.ref_filename:
-        raise ValueError('reference image required')
-    ref_path = _ref_path(ds)
-    if not os.path.exists(ref_path):
-        raise ValueError('reference image file missing')
-    mult = max(1, int(multiplier))
-    total = len(variations) * mult
-    if total == 0:
-        raise ValueError('no variations selected')
-    if total > MAX_FANOUT:
-        raise ValueError(f'fan-out too large ({total} > {MAX_FANOUT})')
-    # Principale + refs additionnelles : Nano Banana s'appuie sur toutes les
-    # images pour la cohérence d'identité (une seule = comportement historique).
-    ref_bytes = _all_ref_bytes(ds)
-
-    ids, items = [], []
-    for v in variations:
-        for _ in range(mult):
-            # klein_model=<engine> marks API-generated rows (the regenerate
-            # path dispatches on it; never collides with real .safetensors names).
-            img = FaceDatasetImage(dataset_id=dataset_id, source='generated', status='pending',
-                                   variation_label=v.get('label'), framing=v.get('framing'),
-                                   variation_prompt=v['prompt'], klein_model=engine, job_id=None)
-            db.session.add(img)
-            db.session.commit()
-            ids.append(img.id)
-            # Suffix composed HERE (per-framing) and carried by the work item: the
-            # row keeps the raw prompt, the batch worker applies it at wrap time.
-            items.append((img.id, v['prompt'],
-                          aspect_for_label(v.get('label'), v.get('framing')),
-                          dataset_prompt_suffix(ds, v.get('framing'))))
-
-    threading.Thread(target=_run_nanobanana_batch,
-                     args=(app, items, ref_bytes, engine, dataset_id),
-                     daemon=True).start()
-    return ids
+# Local-only fork: the Nano Banana / ChatGPT API engines were removed. Rows
+# created by them still exist in user databases with these TAGS stored in the
+# klein_model column (never real .safetensors names) — regenerate_image uses
+# this to swap in a real Klein model instead of a stale tag.
+LEGACY_API_ENGINE_TAGS = ('nanobanana', 'chatgpt')
 
 
 # --- Completion linking (called from the job queue) -------------------------

@@ -235,7 +235,7 @@ def test_regenerate_preflight_failure_keeps_current_file_out_of_trash(
     from app.extensions import db
     from app.models import FaceDatasetImage
     from app.services import face_dataset_service as svc
-    from app.services import trash
+    from app.services import klein_edit_helper, trash
 
     with app.app_context():
         ds = svc.create_dataset('local', 'Preflight', 'preflight')
@@ -251,13 +251,17 @@ def test_regenerate_preflight_failure_keeps_current_file_out_of_trash(
         db.session.commit()
         image_id = image.id
         calls = []
-        monkeypatch.setattr(svc, '_api_generate_fn', lambda _engine: lambda *_a, **_k: b'new')
+
+        def _enqueue_boom(**_kwargs):
+            raise RuntimeError('ComfyUI is down')
+
+        monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit', _enqueue_boom)
         monkeypatch.setattr(
             trash, 'send_to_trash',
             lambda *args, **kwargs: calls.append((args, kwargs)))
 
-        with pytest.raises(ValueError, match='reference image file missing'):
-            svc.regenerate_image('local', image_id, engine='nanobanana')
+        with pytest.raises(RuntimeError, match='ComfyUI is down'):
+            svc.regenerate_image('local', image_id)
 
         row = db.session.get(FaceDatasetImage, image_id)
         assert row.filename == 'old.webp' and row.status == 'keep'

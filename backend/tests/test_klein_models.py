@@ -473,7 +473,7 @@ def test_prompt_and_aspect_lookup_cover_nsfw_labels(app):
         assert aspect_for_label('Corps, nu douche') == '9:16'
 
 
-def test_generate_route_refuses_nsfw_on_api_engines(client):
+def test_generate_route_refuses_removed_api_engines(client):
     resp = client.post('/api/dataset/1/generate', json={
         'generator': 'nanobanana', 'multiplier': 1,
         'variations': [{'label': 'Corps, nu debout', 'framing': 'body',
@@ -481,18 +481,6 @@ def test_generate_route_refuses_nsfw_on_api_engines(client):
     })
     assert resp.status_code == 400
     assert 'Klein' in resp.get_json()['error']
-
-
-def test_service_fanout_refuses_nsfw_on_api_engines(app):
-    import pytest
-    from app.services import face_dataset_service as svc
-    from app.config import LOCAL_USER
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'NoApi', 'noapi')
-        with pytest.raises(ValueError, match='Klein engine only'):
-            svc.generate_variations_nanobanana(
-                None, LOCAL_USER, ds.id,
-                [{'label': 'x', 'framing': 'body', 'prompt': 'p', 'nsfw': True}], 1)
 
 
 def test_klein_fanout_nsfw_uses_uncensored_wrapper(app, tmp_path, monkeypatch):
@@ -536,9 +524,9 @@ def test_variations_route_ships_nsfw_catalog_separately(client):
 
 def test_wrap_klein_framing_detail_enriches_local_prompts():
     """Klein prompt study (fal.ai/BFL guides): Klein under-fills terse tag
-    prompts (unlike the API engines which embellish on their own) — each framing
-    injects a concrete full-intended-result description. API wrapper untouched."""
-    from app.services.face_variations import wrap_variation, wrap_variation_klein
+    prompts — each framing injects a concrete full-intended-result
+    description."""
+    from app.services.face_variations import wrap_variation_klein
     body = wrap_variation_klein('full body shot, standing in a cafe', framing='body')
     assert 'head to toe' in body and '35mm' in body
     face = wrap_variation_klein('close-up portrait, smiling', framing='face')
@@ -547,7 +535,6 @@ def test_wrap_klein_framing_detail_enriches_local_prompts():
     assert '85mm' not in none and 'head to toe' not in none
     # The photographic tail is Klein-only steering (negatives are dead at CFG 1).
     assert 'natural skin texture' in body
-    assert 'natural skin texture' not in wrap_variation('full body shot')
 
 
 def test_wrap_variation_klein_is_instruction_first(app):

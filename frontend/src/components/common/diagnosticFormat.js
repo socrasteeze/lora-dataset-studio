@@ -25,10 +25,9 @@ export function formatDiagnostic(d) {
   L.push(`LoRA Dataset Studio diagnostic — v${d.app_version}${d.git_sha ? ` (${d.git_sha})` : ''}`)
   L.push(`OS: ${d.os} · Python ${d.python}${pml.ml_supported === false ? ` (⚠ outside ML wheel range ${pml.ml_range})` : ''}`)
 
-  L.push('── Engines ──')
-  L.push(`default=${cf.default_engine} · nanobanana=${yn(e.nanobanana)} chatgpt=${yn(e.chatgpt)} klein=${yn(e.klein)}`)
+  L.push('── Engine ──')
+  L.push(`klein=${yn(e.klein)}`)
   if ((c.klein_missing || []).length) L.push(`  klein missing assets: ${c.klein_missing.join(', ')}`)
-  if (c.chatgpt_subscription) L.push('  chatgpt: subscription connected')
   L.push(`Keys set: ${Object.entries(d.secrets_present || {}).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}`)
 
   L.push('── ComfyUI ──')
@@ -58,7 +57,7 @@ export function formatDiagnostic(d) {
   if (engErrs.length || ge.studio) {
     L.push('── Recent generation failures ──')
     // fail_reason is stored as 'engine: …' on the generation path, so it already
-    // names its engine — print it verbatim (re-prefixing gave 'chatgpt: chatgpt:').
+    // names its engine — print it verbatim (re-prefixing gave 'klein: klein:').
     for (const [, reason] of engErrs) L.push(reason)
     if (ge.studio) L.push(`studio: ${ge.studio}`)
   }

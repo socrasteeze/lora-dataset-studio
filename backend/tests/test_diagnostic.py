@@ -21,11 +21,11 @@ def test_diagnostic_ok_and_shape(client):
 
 
 def test_diagnostic_never_leaks_secret_values(client, monkeypatch):
-    monkeypatch.setenv('GEMINI_API_KEY', 'sk-SUPERSECRET-42')
+    monkeypatch.setenv('HF_TOKEN', 'sk-SUPERSECRET-42')
     r = client.get('/api/diagnostic')
     body = r.get_data(as_text=True)
     assert 'sk-SUPERSECRET-42' not in body
-    assert r.get_json()['secrets_present']['GEMINI_API_KEY'] is True
+    assert r.get_json()['secrets_present']['HF_TOKEN'] is True
 
 
 def test_diagnostic_has_no_absolute_paths(client):
@@ -76,7 +76,6 @@ def test_diagnostic_new_sections_shape(client):
     assert isinstance(j['error_log'], list)
     caps = j['capabilities']
     assert isinstance(caps['klein_missing'], list)
-    assert isinstance(caps['chatgpt_subscription'], bool)
     assert 'watermark_allow_crop' in j['config']
 
 
@@ -121,8 +120,9 @@ def test_error_log_redacts_home_paths(client, app):
 
 
 def test_generation_errors_report_most_recent_per_engine(client, app):
-    """The last failed-generation reason PER engine (klein/chatgpt/nanobanana),
-    newest wins — the 'it fails at every generation' cause instead of a guess."""
+    """The last failed-generation reason for Klein, newest wins — the 'it fails
+    at every generation' cause instead of a guess. Legacy rows from the removed
+    API engines land under 'other'."""
     from app.extensions import db
     from app.models import FaceDataset, FaceDatasetImage
     with app.app_context():
@@ -131,15 +131,13 @@ def test_generation_errors_report_most_recent_per_engine(client, app):
         db.session.commit()
         for reason in ('klein: an older klein failure',
                        'klein: ComfyUI 409 klein_vae missing',    # newest klein
-                       'chatgpt: 429 quota exceeded',
-                       'nanobanana: 400 content policy'):
+                       'chatgpt: 429 quota exceeded'):            # legacy row
             db.session.add(FaceDatasetImage(dataset_id=ds.id, status='failed',
                                             fail_reason=reason))
         db.session.commit()
     ge = client.get('/api/diagnostic').get_json()['generation_errors']['engines']
     assert ge['klein'] == 'klein: ComfyUI 409 klein_vae missing'
-    assert ge['chatgpt'] == 'chatgpt: 429 quota exceeded'
-    assert ge['nanobanana'] == 'nanobanana: 400 content policy'
+    assert ge['other'] == 'chatgpt: 429 quota exceeded'
 
 
 def test_generation_errors_redact_paths_and_studio_failure(client, app):
