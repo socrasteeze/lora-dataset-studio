@@ -140,17 +140,30 @@ function KleinLorasCard({ config, setField }) {
   )
 }
 
-/* The three overridable Klein model slots. `key` is the DOM id the help
+/* The overridable Klein model slots. `key` is the DOM id the help
    registry focuses (the contract test scans these literals); `cfg` is the
    klein.* config key; `slot` matches caps.comfyui.klein_overrides. */
 const KLEIN_MODEL_SLOTS = [
   { key: 'klein-model-unet', cfg: 'unet', slot: 'unet', label: 'Diffusion model (UNET)',
-    hint: "Relative to a diffusion-model folder — e.g. klein/flux-2-klein-9b-fp8.safetensors under models/unet, or a bare filename for a file at a folder root." },
+    hint: "Full path, or relative to a diffusion-model folder — e.g. klein/flux-2-klein-9b-fp8.safetensors under models/unet (bare filename for a file at a folder root)." },
   { key: 'klein-model-text_encoder', cfg: 'text_encoder', slot: 'text_encoder', label: 'Text encoder',
-    hint: 'Relative to models/text_encoders — e.g. qwen_3_8b_fp8mixed.safetensors.' },
+    hint: 'Full path, or relative to models/text_encoders — e.g. qwen_3_8b_fp8mixed.safetensors.' },
   { key: 'klein-model-vae', cfg: 'vae', slot: 'vae', label: 'VAE',
-    hint: 'Relative to models/vae — e.g. flux2-vae.safetensors.' },
+    hint: 'Full path, or relative to models/vae — e.g. flux2-vae.safetensors.' },
+  { key: 'klein-model-consistency_lora', cfg: 'consistency_lora', slot: 'consistency_lora', label: 'Consistency LoRA',
+    hint: 'Full path, or relative to models/loras — the structure-anchoring LoRA chained onto the Klein edit graph. Clearing this disables it entirely.' },
 ]
+
+/* Badge per resolve status from caps.comfyui.klein_overrides. */
+function overrideBadge(st) {
+  if (!st) return null
+  if (st.found) return { cls: 'text-emerald-400', text: '✓ found' }
+  if (st.status === 'outside_roots') {
+    return { cls: 'text-amber-400',
+             text: "⚠ outside ComfyUI's model folders — register the folder in extra_model_paths.yaml" }
+  }
+  return { cls: 'text-amber-400', text: '⚠ not found — auto-detection is used' }
+}
 
 function KleinModelFilesCard({ config, setField, caps }) {
   const overrides = caps?.comfyui?.klein_overrides || {}
@@ -158,18 +171,16 @@ function KleinModelFilesCard({ config, setField, caps }) {
     <Card
       id="klein-model-files"
       title="Klein model files (optional)"
-      help="Pin the exact files the Klein graph loads instead of relying on auto-detection (canonical download names, then a narrow token scan). Paths are ComfyUI-relative loader names, so they can point anywhere ComfyUI itself can load from — including folders registered via extra_model_paths.yaml. Leave a field empty to keep auto-detection for that slot. A pinned file that is not found on disk falls back to auto-detection and shows a ⚠ badge here."
+      help="Pin the exact files the Klein graph loads instead of relying on auto-detection (canonical download names, then a narrow token scan). Each field takes a full absolute path OR a ComfyUI-relative loader name; a full path under any of ComfyUI's model folders (including extra_model_paths.yaml roots) is converted automatically to what the loader needs. Leave a field empty to keep auto-detection for that slot. A pinned file that can't be resolved falls back to auto-detection and shows a badge here; a file genuinely outside every ComfyUI folder can't be loaded by ComfyUI at all — register its folder in extra_model_paths.yaml."
     >
       {KLEIN_MODEL_SLOTS.map(({ key, cfg, slot, label, hint }) => {
-        const st = overrides[slot]
+        const badge = overrideBadge(overrides[slot])
         return (
           <div key={key}>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <label htmlFor={key} className="block text-sm font-medium text-content">{label}</label>
-              {st && (
-                <span className={`text-xs ${st.found ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {st.found ? '✓ found' : '⚠ not found — auto-detection is used'}
-                </span>
+              {badge && (
+                <span className={`text-xs text-right ${badge.cls}`}>{badge.text}</span>
               )}
             </div>
             <input

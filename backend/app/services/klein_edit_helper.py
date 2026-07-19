@@ -102,47 +102,85 @@ def _find_model_file(comfy_type, canonical, tokens):
     return None
 
 
+def resolve_model_ref(comfy_type, value):
+    """(relative_loader_name, status) for a user-entered model reference — either
+    a ComfyUI-relative loader name OR an absolute path (~ and env vars expanded).
+    status ∈ 'ok' | 'missing' | 'outside_roots' | 'empty'.
+
+    Stock ComfyUI loader nodes can ONLY load names relative to a registered
+    model folder (base models/<type> plus extra_model_paths.yaml roots), so an
+    absolute path is CONVERTED to that relative name when the file sits under
+    one of the <comfy_type> search roots. An absolute path outside every root is
+    a file ComfyUI itself could never load → 'outside_roots' (the UI turns that
+    into "register the folder in extra_model_paths.yaml"), deliberately distinct
+    from 'missing' (no such file at all / relative name not found)."""
+    raw = (value or '').strip()
+    if not raw:
+        return None, 'empty'
+    # Accept both separators regardless of OS (users paste Windows paths).
+    v = os.path.expandvars(os.path.expanduser(raw)).replace('\\', '/').replace('/', os.sep)
+    if os.path.isabs(v):
+        if not os.path.isfile(v):
+            return None, 'missing'
+        ab = os.path.normpath(v)
+        for root in comfy_model_paths.search_roots(comfy_type):
+            try:
+                rel = os.path.relpath(ab, os.path.normpath(root))
+            except ValueError:      # different drive (Windows)
+                continue
+            if rel != os.pardir and not rel.startswith(os.pardir + os.sep):
+                return rel, 'ok'
+        return None, 'outside_roots'
+    if _abs_under_roots(comfy_type, v):
+        return v, 'ok'
+    return None, 'missing'
+
+
 def _configured_model(comfy_type, cfg_key):
     """User-pinned model file for a Klein slot (Settings ▸ Image engine ▸ Klein
-    model files): the value of `cfg_key` normalized to a ComfyUI-relative loader
-    name, IF the file actually exists under one of the <comfy_type> search roots
-    (base models/<type> plus extra_model_paths roots). '' / unset / not-found →
-    None, and the caller falls back to auto-detection — a stale override must
-    degrade to the scan (and its auto-download path), never brick generation.
-    klein_override_status() is what surfaces a configured-but-missing file to
-    the UI, so the fallback is visible rather than silent."""
-    name = (cfg.get(cfg_key) or '').strip().replace('/', os.sep)
-    if not name:
-        return None
-    if _abs_under_roots(comfy_type, name):
-        return name
-    logger.warning('%s: configured file %r not found under any %s root — '
-                   'falling back to auto-detection', cfg_key, name, comfy_type)
+    model files): the value of `cfg_key` — a relative loader name or an absolute
+    path — resolved to a ComfyUI-relative loader name via resolve_model_ref.
+    '' / unset / unresolvable → None, and the caller falls back to
+    auto-detection — a stale override must degrade to the scan (and its
+    auto-download path), never brick generation. klein_override_status() is what
+    surfaces a configured-but-unresolvable file to the UI, so the fallback is
+    visible rather than silent."""
+    rel, status = resolve_model_ref(comfy_type, cfg.get(cfg_key))
+    if status == 'ok':
+        return rel
+    if status != 'empty':
+        logger.warning('%s: configured file %r is %s (%s roots) — '
+                       'falling back to auto-detection',
+                       cfg_key, cfg.get(cfg_key), status, comfy_type)
     return None
 
 
-# Config key + ComfyUI folder type per overridable Klein slot. The consistency
-# LoRA already has its own key (klein.consistency_lora) and stays as-is.
+# Config key + ComfyUI folder type per overridable Klein model slot. The
+# consistency LoRA rides along for the STATUS payload (its resolution lives in
+# _configured_lora, but the Settings badge logic is identical).
 KLEIN_OVERRIDE_KEYS = {
     'unet': ('klein.unet', 'diffusion_models'),
     'text_encoder': ('klein.text_encoder', 'text_encoders'),
     'vae': ('klein.vae', 'vae'),
+    'consistency_lora': ('klein.consistency_lora', 'loras'),
 }
 
 
 def klein_override_status():
-    """{slot: {'configured': str, 'found': bool}} for each user-pinned Klein model
-    file that is SET (empty overrides are omitted). Read by capabilities.probe()
-    so the Settings fields can show an honest ✓ found / ⚠ not found badge —
-    without this, a typo'd override silently falls back to auto-detection and the
-    user has no way to see their pin isn't in effect."""
+    """{slot: {'configured': str, 'found': bool, 'status': str}} for each
+    user-pinned Klein model file that is SET (empty overrides are omitted;
+    consistency_lora has a non-empty default so it is always reported). Read by
+    capabilities.probe() so the Settings fields can show an honest badge —
+    found / not found / outside ComfyUI's model folders — without it, a typo'd
+    override silently falls back to auto-detection and the user has no way to
+    see their pin isn't in effect."""
     out = {}
     for slot, (key, comfy_type) in KLEIN_OVERRIDE_KEYS.items():
         raw = (cfg.get(key) or '').strip()
         if not raw:
             continue
-        rel = raw.replace('/', os.sep)
-        out[slot] = {'configured': raw, 'found': bool(_abs_under_roots(comfy_type, rel))}
+        rel, status = resolve_model_ref(comfy_type, raw)
+        out[slot] = {'configured': raw, 'found': status == 'ok', 'status': status}
     return out
 
 
@@ -248,19 +286,26 @@ def _lora_abs(rel_name):
 
 
 def _configured_lora(cfg_key):
-    """(relative_name, absolute_path) of a loras-relative LoRA named by config key
-    `cfg_key`. The path is where it was FOUND (base or an extra_model_paths loras
-    root); when absent it is the base-expected path (for a stable log message), or
-    None when no loras root exists. The relative name is unchanged (e.g.
-    'klein\\Flux2-...safetensors') — it carries 'klein/' when the file lives under
-    loras/klein/, which is exactly the string a LoraLoader wants regardless of
-    which registered loras root holds it."""
-    name = (cfg.get(cfg_key) or '').replace('/', os.sep)
-    if not name:
+    """(relative_name, absolute_path) of the LoRA named by config key `cfg_key` —
+    a loras-relative name OR an absolute path (resolve_model_ref converts a path
+    under any registered loras root into the relative name a LoraLoader wants).
+    When unresolvable, the relative name is kept as typed and the path is the
+    base-expected location (for a stable "not found at <path>" log message), or
+    None when no loras root exists."""
+    raw = (cfg.get(cfg_key) or '').strip()
+    if not raw:
         return None, None
-    found = _lora_abs(name)
-    if found:
-        return name, found
+    rel, status = resolve_model_ref('loras', raw)
+    if status == 'ok':
+        return rel, _lora_abs(rel)
+    name = raw.replace('\\', '/').replace('/', os.sep)
+    if status == 'outside_roots':
+        # The file EXISTS but no registered loras root reaches it — a LoraLoader
+        # could never load it, so report it as absent (path None) rather than
+        # handing ComfyUI an unloadable name. The Settings badge names the fix.
+        logger.warning('%s: %r exists but is outside every ComfyUI loras root — '
+                       'register its folder in extra_model_paths.yaml', cfg_key, raw)
+        return name, None
     roots = comfy_model_paths.search_roots('loras')
     return name, (os.path.join(roots[0], name) if roots else None)
 
@@ -691,15 +736,20 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     # strength <= 0 -> skip that row with a log line (the rest of the chain
     # still links up), never a doomed ComfyUI validation error.
     for i, entry in enumerate((generation_loras or [])[:MAX_GENERATION_LORAS], start=1):
-        slot_lora = (entry.get('file') or '').replace('/', os.sep)
+        # A preset row may hold a loras-relative name OR an absolute path —
+        # resolve_model_ref converts a path under a registered loras root into
+        # the relative name a LoraLoader wants (outside-roots/missing → skip).
+        slot_lora, slot_status = resolve_model_ref('loras', entry.get('file'))
         slot_strength = entry.get('strength')
         slot_strength = max(0.0, min(1.5, float(slot_strength))) \
             if isinstance(slot_strength, (int, float)) else 0.0
-        slot_path = _lora_abs(slot_lora)
+        slot_path = _lora_abs(slot_lora) if slot_lora else None
         if "139" not in workflow:
-            logger.warning("workflow node 139 missing — generation LoRA %r skipped", slot_lora)
+            logger.warning("workflow node 139 missing — generation LoRA %r skipped",
+                           entry.get('file'))
         elif not slot_lora or not slot_path:
-            logger.warning("generation LoRA %r not found under any loras root — skipped", slot_lora)
+            logger.warning("generation LoRA %r is %s (loras roots) — skipped",
+                           entry.get('file'), slot_status)
         elif slot_strength <= 0:
             logger.info("generation LoRA %r strength 0 — skipped (row off)", slot_lora)
         else:
