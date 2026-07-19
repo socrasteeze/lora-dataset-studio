@@ -50,6 +50,46 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-19-graph-modal-visible-from-checkpoints',
+    date: '2026-07-19',
+    title: '◉ Graph now opens from the Checkpoints panel',
+    blurb:
+      "Opening ◉ Graph from the Checkpoints & LoRAs section did nothing — no window, no error. The run-and-checkpoints graph was being drawn inside the hidden Training section, so it never showed. It now pops up over the page from wherever you open it, with your dataset's runs and their saved checkpoints.",
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-19-continue-lr-factor',
+    date: '2026-07-19',
+    title: 'Finish a run gentler with a lower learning rate',
+    blurb:
+      "The ▶ Continue training dialog gains one more safe knob under “Adjust settings”: the learning rate. Resume the epoch that held up best, then finish at half (polish) or a tenth (gentle finish) of the current rate — a smaller rate polishes fine texture without moving the identity, the learning-rate pendant of the low-noise timestep recipe. The values are factors of this run's rate, and the dialog shows the resulting number (a 1e-4 run → 5e-5 or 1e-5). Works for local and cloud runs; hidden for Prodigy, which adapts its own rate.",
+    to: '/cloud',
+  },
+  {
+    id: '2026-07-19-bank-stop-keeps-progress',
+    date: '2026-07-19',
+    title: '⏹ Stopping a Bank face or score pass no longer loses your progress',
+    blurb:
+      "Stopping the Image bank's 👥 Group by person or ✨ Score pass mid-run used to feel like it threw everything away and left the bar blank. It never actually lost the finished work — the embeddings were cached — but nothing said so. Now Stop asks the pass to finish the image it's on, flush its cache and bow out cleanly, then tells you exactly where it landed: “Stopped — 1 240 face embeddings cached (760 remaining); relaunch to finish and cluster.” Relaunch and it picks up from the cache — the detail even reads “resuming — 1 240 of 2 000 already cached” so you can see it's continuing, not starting over. Same for the passes inside 🚀 Launch all.",
+    to: '/bank',
+  },
+  {
+    id: '2026-07-19-caption-stop-actually-stops',
+    date: '2026-07-19',
+    title: '⏹ Stop now stops captioning right away',
+    blurb:
+      "Hitting Stop during a caption run used to flip the button to “Stopping…” but the JoyCaption pass kept churning through every remaining image before it actually halted. Now Stop is honoured the moment the current image finishes: what's already captioned is kept, the rest is left untouched, and the GPU is handed straight back to ComfyUI — on character and concept datasets alike.",
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-19-explicit-vocabulary-on-concepts',
+    date: '2026-07-19',
+    title: '🔞 Explicit captions now work on concept datasets too',
+    blurb:
+      "The Captions ⚙️ Options “Explicit” vocabulary preset was reaching the first captioning pass but not the refine step that concept datasets rely on, so crude terms got quietly smoothed back out. That path now carries your chosen register end to end — pick Explicit (with an uncensored vision model) and the words stay in, while the recurring concept is still left unspoken so it binds to your trigger.",
+    to: '/datasets',
+  },
+  {
     id: '2026-07-19-bank-semantic-dedup',
     date: '2026-07-19',
     title: 'Catch the same shot in a dozen crops',
