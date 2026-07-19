@@ -67,8 +67,8 @@ the first logged step is expected, and Krea-2-Raw runs are *hours* long by
 design.
 
 **Fix:** nothing to fix — check GPU utilization or watch the ai-toolkit output
-folder for new files if you want proof of life. The cloud runs page has a
-stall watchdog that kills genuinely stuck runs.
+folder for new files if you want proof of life. Open **Runs** to watch live
+progress for the current local training.
 
 ## ai-toolkit isn't detected (conda / uv / no venv)
 
@@ -126,10 +126,3 @@ The app itself is unaffected.
 Only relevant if you rebuild the frontend yourself (the repo ships `dist/`
 prebuilt). It's a known npm bug: delete `frontend/node_modules` +
 `frontend/package-lock.json` and run `npm install` again on this machine.
-
-## A cloud run seems stuck
-
-Open the **Cloud** tab: every run shows its live phase, and the stall watchdog
-(Settings → Training → stall timeout) rescues logs and kills the pod if no step
-progress happens for too long. Orphaned pods are also destroyed automatically
-at every app start — you never pay for a forgotten GPU.

@@ -63,9 +63,12 @@ test('Pexels key and attribution markup stay wired without nested controls', () 
     'Pexels credit links must remain siblings of the selection button');
 });
 
-test('Vast offer filter terms find Training', () => {
+test('Training section search finds local training defaults', () => {
   const training = SETTINGS_SECTIONS.find((section) => section.id === 'training');
-  for (const query of ['verified', 'secure cloud', 'community cloud', 'offer filter']) {
+  for (const query of ['default', 'training', 'family', 'zimage']) {
     assert.equal(matchesQuery(training, query), true, query);
+  }
+  for (const query of ['verified', 'secure cloud', 'community cloud', 'offer filter', 'vast']) {
+    assert.equal(matchesQuery(training, query), false, query);
   }
 });

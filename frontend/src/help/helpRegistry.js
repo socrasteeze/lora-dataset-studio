@@ -187,9 +187,9 @@ const TOPICS = [
     keywords: ['studio', 'test', 'lora', 'checkpoint', 'generate', 'compare'],
     guide: { chapter: 'dataset-guide', anchor: '6-after-training-pick-the-right-checkpoint' },
     app: { route: '/studio' } },
-  { id: 'page-cloud', kind: 'page', title: 'Runs (cloud & local)',
-    keywords: ['runs', 'cloud', 'vast', 'stuck', 'history', 'training', 'gpu'],
-    guide: { chapter: 'troubleshooting', anchor: 'a-cloud-run-seems-stuck' },
+  { id: 'page-cloud', kind: 'page', title: 'Runs (local training history)',
+    keywords: ['runs', 'history', 'training', 'local', 'progress', 'stop'],
+    guide: { chapter: 'troubleshooting', anchor: 'training-log-looks-frozen-for-several-minutes' },
     app: { route: '/cloud' } },
 
   // ---- Settings: per-field topics (kind 'setting') -----------------------

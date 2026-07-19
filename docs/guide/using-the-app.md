@@ -44,10 +44,9 @@ hide.
    are computed automatically; Advanced options exposes every knob (each with
    its own why/how) and a **Presets** row — apply a shipped ★ recipe (*Krea
    character*, *Concept*, *Style*) or save/import/export your own as a JSON.
-   No GPU? **Train in cloud** rents one per run. Watch this run — and every
-   other, cloud or local — from the **Runs** tab, where you can retry a
-   failed run (↻), continue a finished cloud run for more steps (▶), and download
-   the LoRA.
+   Training runs on your local GPU via ai-toolkit. Watch this run — and every
+   other — from the **Runs** tab, where you can retry a failed run (↻),
+   continue a finished run for more steps (▶), and download the LoRA.
 10. **Pick the best checkpoint** — open the **Test Studio** from the dataset:
     grid-test checkpoint × strength, vote, rank by face similarity, and star ★
     the winning settings. The last checkpoint is almost never the best one.

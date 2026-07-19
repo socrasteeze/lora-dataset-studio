@@ -183,7 +183,7 @@ Defaults for new local training runs.
 
 These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. One is worth calling out because of a caveat:
 
-- **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Local training only for now:** the cloud pod's dataset upload doesn't carry the JSON caption file the short is read from, so cloud runs train on the long caption alone.
+- **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor.
 
 ## Server & access
 
@@ -240,24 +240,6 @@ These have no UI control — they're for advanced users editing `config.json` by
 | `comfyui.models_dir` | `''` | Override the models folder scanned for checkpoints/UNETs. |
 | `comfyui.loras_dir` | `''` | Override the LoRA folder. |
 
-**Cloud (vast.ai) internals** — knobs for after the real-world smoke test; the UI-exposed cloud settings above are the ones you'll normally want:
-
-| Key | Default | Role |
-|---|---|---|
-| `cloud.template_hash` | `471ed5903d8cdb8e63b0d0e50f6cd519` | The official vast.ai "Ostris AI Toolkit" template. Clearing it falls back to a raw-image launch. |
-| `cloud.ui_port` | `18675` | Container port the pod UI is proxied on. |
-| `cloud.image` | `vastai/ostris-ai-toolkit:…` | Raw-image fallback (used only when the template is cleared). |
-| `cloud.offer_scan_limit` | `100` | How many offers are fetched when listing GPU speed tiers. |
-| `cloud.pod_overhead_minutes` | `35` | Boot + model download + quantize time built into cost estimates. |
-| `cloud.min_inet_down_mbps` | `400` | Skip hosts too slow to pull the image. |
-| `cloud.min_disk_bw_mbps` | `500` | Skip hosts too slow to extract it. |
-| `cloud.host_blacklist_days` | `3` | How long to skip a host whose pod never became ready. |
-| `cloud.ready_timeout_minutes` | `25` | Boot budget: image pull + services up. |
-| `cloud.max_runtime_minutes` | `480` | Hard stop past this (the stall watchdog is the first line of defence). |
-| `cloud.disk_gb` | `60` | Instance disk (base model + dataset + checkpoints). |
-| `cloud.min_vram_gb` | `{zimage:24, sdxl:16, krea:24, flux2klein:32}` | Minimum VRAM **per family**. flux2klein uses 32 (the 9B is the cloud-first lane; a 32 GB pod also trains the 4B). |
-| `cloud.onstart` | `''` | Optional startup command for the raw-image fallback. |
-
 **Quality-tool interpreters and models:**
 
 | Key | Default | Role |
@@ -265,6 +247,8 @@ These have no UI control — they're for advanced users editing `config.json` by
 | `face_scoring.python` | `''` | Interpreter for the InsightFace subprocess (empty = current interpreter). |
 | `face_scoring.models_root` | `''` | Where InsightFace weights are stored/downloaded. |
 | `face_scoring.device` | `'auto'` | Device for the Image-bank face pass. `auto` uses the GPU when the face interpreter exposes CUDA (needs `onnxruntime-gpu` installed in it) and falls back to CPU otherwise; `cpu` forces CPU (never touches the GPU); `cuda` requests the GPU but still falls back to CPU when unavailable. A GPU run is serialized through the GPU-exclusive window so it never competes with a training/scoring pass. |
+| `bank_scoring.python` | `''` | Interpreter for the Image-bank Score pass (aesthetic / NSFW / style). Empty = current interpreter until Setup installs the managed `data/envs/bank_scoring` venv and records its path here. |
+| `bank_scoring.models_root` | `''` | Optional cache root for Score-pass model weights. |
 | `masks.python` | `''` | Interpreter for the rembg (person-mask) subprocess. |
 | `watermark.python` | `''` | Interpreter for the LaMa watermark subprocess. **Auto-managed:** leave it empty and the **Install inpainting** button builds a dedicated Python 3.10-3.12 environment for you (`simple-lama-inpainting` needs Pillow&lt;10, so it can't share the app's own Python) and fills this in automatically. Set it yourself only to point at an environment you already have — a manual value is always respected and never overwritten. |
 

@@ -16,7 +16,7 @@ export async function pickNativeFolder(initial) {
 }
 
 /** Read-only in-app folder browser (drives → subfolders), the fallback when the
- * server has no native dialog — used from the LAN/tablet or a Linux/vast.ai box.
+ * server has no native dialog — used from the LAN/tablet or a headless Linux box.
  * Nothing is written; only directories are listed. onPick(path) then onClose. */
 export function FolderBrowserModal({ initial, onPick, onClose }) {
   const [path, setPath] = useState(initial || null)

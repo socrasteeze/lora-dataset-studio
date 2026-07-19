@@ -25,7 +25,7 @@ The whole pipeline, grouped by stage — every item links to the section that de
 | :-- | :-- |
 | **Build** | **[3 dataset types](#1-three-dataset-types-character--concept--style)** — character, concept or style; each rewires captioning, masking and step-scaling to match.<br>**[3 image sources](#2-three-ways-to-source-images)** — generate from references, import your own, or scrape supported web sources.<br>**[Image bank (Beta)](docs/guide/using-the-app.md#the-image-bank-triage-a-big-folder)** — triage a giant unsorted dump in place: quality scan, duplicate groups with keep-best, sort **by person** or by style, aesthetic/NSFW scores, watermark flags, captions with full-text search — or run the whole chain overnight with **Launch all**, then promote the keepers into a dataset.<br>**[Guided workspace](#3-the-guided-workspace)** — a progress rail maps each stage and shows what's blocking Train.<br>**[Edit & regenerate](#8-edit-the-prompt-regenerate-the-shot)** — tweak any generated tile's prompt in place and re-shoot it. |
 | **Curate & caption** | **[Auto-framing + meter](#5-auto-framing-classification)** — auto-tags character shots face/bust/body/back and scores the set against a 12/6/6/1 target.<br>**[Face scoring + auto-triage](#4-face-similarity-scoring)** — InsightFace flags off-identity shots and can sort undecided scored images while preserving later manual status changes.<br>**[Bulk curation](#3-the-guided-workspace)** — Keep, Reject, Undecide, clear captions, delete, or create Klein candidates for a selection.<br>**[Model-matched captions](#6-captioning-that-matches-the-model)** — prose or booru tags, picked for the model and written by JoyCaption or Ollama.<br>**[Watermark cleanup](#7-auto-clean-scraped-watermarks)** — finds overlaid logos/URLs, then crops or inpaints them with two engines (fast LaMa or Klein quality) and a review step. |
-| **Train** | **[Guided training with advanced controls](#9-guided-training-advanced-when-you-need-it)** — adaptive defaults plus rank/alpha, resolution, LoRA/LoKr, optimizer, scheduler, timestep, EMA and save/sample controls.<br>**[5 model families](#9-guided-training-advanced-when-you-need-it)** — Z-Image, SDXL, Krea 2, FLUX.1 and FLUX.2 Klein, with distinct variants and safety checks.<br>**[Training presets](#9-guided-training-advanced-when-you-need-it)** — fifteen researched read-only recipes ship, one Character, Style and Concept preset per family, every value sourced; custom presets import/export as JSON.<br>**[Slider LoRAs (Beta)](#9-guided-training-advanced-when-you-need-it)** — learn one bipolar LoRA from a prompt pair; all five families, local or cloud, expect to iterate.<br>**[Cloud training](#cloud-training-vastai--experimental)** — rent a vast.ai pod with price/runtime caps, retry and continue, on an official *or* your own custom base.<br>**[Runs hub](#9-guided-training-advanced-when-you-need-it)** — local and cloud progress, Stop, retry/continue, downloads and paste-safe config sharing. |
+| **Train** | **[Guided training with advanced controls](#9-guided-training-advanced-when-you-need-it)** — adaptive defaults plus rank/alpha, resolution, LoRA/LoKr, optimizer, scheduler, timestep, EMA and save/sample controls.<br>**[5 model families](#9-guided-training-advanced-when-you-need-it)** — Z-Image, SDXL, Krea 2, FLUX.1 and FLUX.2 Klein, with distinct variants and safety checks.<br>**[Training presets](#9-guided-training-advanced-when-you-need-it)** — fifteen researched read-only recipes ship, one Character, Style and Concept preset per family, every value sourced; custom presets import/export as JSON.<br>**[Slider LoRAs (Beta)](#9-guided-training-advanced-when-you-need-it)** — learn one bipolar LoRA from a prompt pair; all five families, local GPU, expect to iterate.<br>**[Runs hub](#9-guided-training-advanced-when-you-need-it)** — local progress, Stop, retry/continue, downloads and paste-safe config sharing. |
 | **Test & ship** | **[Test Studio](#10-test-studio--pick-the-best-checkpoint)** — compare checkpoint/LoRA × strength (−2.0 → 4.0) within one supported family, vote, rank, and export the grid as a shareable image.<br>**[Export, backup and publish](#11-export-backup-and-publish)** — training ZIPs, full portable backups, merges from existing datasets and private-by-default Hugging Face publishing. |
 | **Comfort & access** | **[Phone access](#exposing-the-app-beyond-localhost)** — scan a QR to open the app on your phone over LAN or Tailscale.<br>**[Setup wizard](#setup--install)** — scans your machine and installs only what's missing.<br>**[Guide + diagnostics](#troubleshooting)** — a 5-chapter in-app manual and a one-click, paste-safe diagnostic report. |
 
@@ -77,7 +77,6 @@ Directions, not dates. These are discussed openly on the project's Discord, and 
 - [Why this instead of driving ai-toolkit directly?](#why-this-instead-of-driving-ai-toolkit-directly)
 - [Feature matrix by backend](#feature-matrix-by-backend)
 - [Two run modes](#two-run-modes)
-- [Cloud training (vast.ai)](#cloud-training-vastai--experimental)
 - [Setup & install](#setup--install)
 - [Minimum requirements](#minimum-requirements)
 - [Configuration reference](#configuration-reference)
@@ -291,31 +290,7 @@ Not every feature needs every backend. The app degrades gracefully — API keys 
 
 **Full local** — everything above plus Klein/Z-Image generation, captioning via JoyCaption, face scoring, masks, training, and Test Studio. Requires ComfyUI and/or ai-toolkit running on the same host (or reachable over the network) and an NVIDIA GPU with 12 GB+ VRAM for Klein/Z-Image inference. Training VRAM depends on the model family (Z-Image, SDXL, Krea 2, FLUX.1 and FLUX.2 Klein have different footprints) — check the family's ai-toolkit preset before queuing a run. The face-scoring and masking helpers (`requirements-ml.txt`) run fine on CPU; they don't need the GPU.
 
-## Cloud training (vast.ai) — experimental
-
-No local GPU? Add a **vast.ai API key** (Settings → Secrets, or the setup
-wizard) and use **Train in cloud** in the Training panel. The app rents a
-verified-datacenter GPU, uploads your dataset, trains with the exact same
-ai-toolkit configuration as a local run, downloads the resulting
-`.safetensors`, and terminates the pod automatically.
-
-- Cost: you pay vast.ai directly and offer prices vary over time. A price cap
-  (`cloud.max_price_per_hour`) and a hard runtime cap
-  (`cloud.max_runtime_minutes`, default 4 h) are enforced before launch.
-- Supported families: **Z-Image, Krea 2 and FLUX.2 Klein** — an official Hugging
-  Face base, or **your own custom base** pushed one-time to a private repo on your
-  HF account (private enforced, cached by combo hash so the same base never
-  uploads twice; the pod pulls it with your token). The launch verifies the repo,
-  files and sizes before renting anything. Klein 9B — 32-48 GB VRAM — is the
-  cloud-first lane of its family. SDXL and FLUX.1 require local training.
-- Manage it from the **Runs** tab (top nav): retry a failed cloud run (↻),
-  continue it for more steps (▶), stop a cloud or identified local run, and download
-  the LoRA — both lanes appear side by side with the exact settings they used.
-- Safety: pods are labeled `lds-<run-id>`; on every app start, orphaned pods
-  are destroyed automatically. If the app is closed mid-run, the pod keeps
-  training and the app resumes monitoring on restart.
-- Privacy note: the pod belongs to your vast.ai account; dataset images and
-  checkpoints transit through it and are destroyed with the pod.
+This fork is **local-only for training and image generation** — there is no remote GPU rental UI (upstream's experimental cloud-training lane is disabled).
 
 ---
 
@@ -395,7 +370,7 @@ Then build and run:
 docker compose up --build
 ```
 
-This builds and runs the curation-only mode (see `Dockerfile` / `docker-compose.yml`) — ComfyUI and ai-toolkit are host-native tools and out of scope for the container. Data persists to `./data-docker` on the host, and your keys (Hugging Face, vast.ai, scraper credentials) are mounted in from `.env`.
+This builds and runs the curation-only mode (see `Dockerfile` / `docker-compose.yml`) — ComfyUI and ai-toolkit are host-native tools and out of scope for the container. Data persists to `./data-docker` on the host, and your keys (Hugging Face, scraper credentials) are mounted in from `.env`.
 
 ### External tools (install once, connect in Settings)
 
@@ -426,7 +401,6 @@ Trained LoRAs land in `models/loras/<family>` automatically after training. Gene
 ### Getting API keys
 
 - **Hugging Face** (gated model downloads and dataset publishing): create a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). Read access is enough for accepted gated models; publishing requires a write-enabled token.
-- **vast.ai** (optional cloud training): create/copy your key from [cloud.vast.ai](https://cloud.vast.ai/) and save it as `VAST_API_KEY` in Settings.
 
 Secrets entered through Settings are stored in a git-ignored `.env` file (see `.env.example`) — they are never written to `config.json` or committed.
 
@@ -480,13 +454,6 @@ Copy `config.example.json` to `config.json` (git-ignored) and adjust. Main keys:
 | `engines.enabled` | List of engines shown as options in the UI. |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
 | `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, or `flux2klein`). |
-| `cloud.max_concurrent_runs` | Simultaneous cloud pods allowed (default `1`, 1–10). Also in Settings → Training. |
-| `cloud.max_price_per_hour` | Safety cap on the hourly offer price in $ (default `0.80`); pricier hosts are skipped before launch. |
-| `cloud.monthly_budget_usd` | Hard monthly spend ceiling in $ (default `0` = unlimited); launches are blocked past it. |
-| `cloud.stall_timeout_minutes` | Kill + rescue a cloud run after this many minutes without step progress (default `30`, 5–240). |
-| `cloud.min_reliability` | vast.ai host-reliability floor (default `0.98`, 0.9–0.999); lower surfaces cheaper, riskier hosts. |
-| `cloud.verified_only` | Restrict to vast.ai verified hosts (default `true`). |
-| `cloud.secure_cloud_only` | Restrict to vast.ai's Secure Cloud (datacenter) tier (default `false`; narrows the market, raises price). |
 | `face_scoring.python` | Python interpreter used to run the InsightFace subprocess (empty = current interpreter). |
 | `face_scoring.models_root` | Directory where InsightFace model weights are stored/downloaded. |
 | `face_scoring.green` | Similarity score threshold (0–1) above which an image is flagged "green" (strong match). |
@@ -501,7 +468,7 @@ Copy `config.example.json` to `config.json` (git-ignored) and adjust. Main keys:
 | `klein.small_image_prompt` | Optional shared instruction for scraper rescue and single/bulk image improvement (empty = reference image only). |
 | `updates.repo` | GitHub repo the update checker reads its release feed from (default `perfectgf/lora-dataset-studio`). |
 
-Secrets such as `HF_TOKEN`, `VAST_API_KEY` and optional scraper credentials live in `.env`, not `config.json` — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them for you.
+Secrets such as `HF_TOKEN` and optional scraper credentials live in `.env`, not `config.json` — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them for you.
 
 A few environment variables override paths for advanced/containerized setups: `LDS_DATA_DIR` (runtime data directory), `LDS_CONFIG` (path to `config.json`), `LDS_ENV` (path to `.env`), `LDS_HOST` (bind host, takes priority over `server.host`), `FLASK_DEBUG` (`1` to enable Flask debug mode).
 

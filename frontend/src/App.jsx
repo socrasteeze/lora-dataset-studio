@@ -138,9 +138,7 @@ function NavBar() {
           <span className="rounded border border-amber-400/50 bg-amber-500/10 px-1 text-[0.5625rem] font-semibold uppercase tracking-wide leading-none text-amber-300">Beta</span>
         </span>
       </NavLink>
-      {/* Unified runs hub (cloud + local history) — useful as soon as ANY
-          training path exists, not just the cloud one. */}
-      {(caps.cloud_training || caps.training_visible) && (
+      {caps.training_visible && (
         <NavLink to="/cloud" className={navItemClass} onClick={() => setOpen(false)}>
           Runs
         </NavLink>

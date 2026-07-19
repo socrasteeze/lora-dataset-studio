@@ -4,7 +4,7 @@ import { deriveCapabilitySummary } from '../../hooks/useSetupSteps'
 const FIX_LINKS = [
   { to: '/settings/engines', label: 'Image engine', hint: 'Local Klein engine and generation LoRA presets' },
   { to: '/settings/local-tools', label: 'Local tools', hint: 'ComfyUI, Ollama, ai-toolkit' },
-  { to: '/settings/training', label: 'Training', hint: 'Default family, cloud GPU' },
+  { to: '/settings/training', label: 'Training', hint: 'Default training family' },
   { to: '/setup', label: 'Setup wizard', hint: 'Guided scan + install of everything above' },
 ]
 
@@ -19,9 +19,9 @@ export default function OverviewSection({ caps }) {
         <div role="status" className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm text-content">
           <p className="font-medium">Let's get you set up.</p>
           <p className="mt-1 text-content-muted">
-            Add at least one image API key to start, or let the{' '}
+            Point the{' '}
             <Link to="/setup" className="font-medium text-sky-300 underline hover:text-sky-200">Setup wizard</Link>
-            {' '}scan your machine and walk you through it.
+            {' '}at ComfyUI, Ollama and ai-toolkit — this fork generates and trains locally only.
           </p>
         </div>
       )}

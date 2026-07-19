@@ -53,7 +53,7 @@ export function sectionStatus(id, caps) {
       return (cap.joycaption || cap.ollama) ? 'ready' : 'off'
     }
     case 'training':
-      return c.training_visible ? (c.cloud_training ? 'ready' : 'partial') : 'off'
+      return c.training_visible ? 'ready' : 'off'
     default:
       return null
   }

@@ -165,6 +165,25 @@ def test_put_settings_full_config_save_keeps_autoprovisioned_watermark_python(cl
     assert r.get_json()['config']['watermark']['allow_crop'] is True
 
 
+def test_put_settings_accepts_bank_scoring_and_keeps_autoprovisioned_python(client):
+    """Bank scoring's installer writes bank_scoring.python into config.json. A later
+    Settings Save (e.g. editing a Klein generation-LoRA preset) echoes the whole
+    config — including that section. It must be a known DEFAULTS key, and a blank
+    python echo must not wipe the managed venv path."""
+    from app import config
+    config.save_config({'bank_scoring': {'python': '/data/envs/bank_scoring/py.exe'}})
+    r = client.put('/api/settings', json={'config': {
+        'bank_scoring': {'python': '', 'models_root': ''},
+        'klein': {'generation_lora_presets': [
+            {'name': 'My preset', 'loras': [{'file': 'foo.safetensors', 'strength': 0.8}]},
+        ]},
+    }})
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()['config']
+    assert body['bank_scoring']['python'] == '/data/envs/bank_scoring/py.exe'
+    assert body['klein']['generation_lora_presets'][0]['name'] == 'My preset'
+
+
 def test_capabilities_endpoint(client):
     caps = client.get('/api/capabilities').get_json()
     assert 'engines' in caps and 'studio_visible' in caps

@@ -614,9 +614,8 @@ export default function SetupPage() {
         {guidedField('ai-toolkit directory', 'aitoolkit', 'dir', 'C:\\ai-toolkit')}
         {saveRecheckBtn}
         <p className="mt-2 text-content-muted text-xs">
-          No GPU? You can skip this step: add a <strong>vast.ai API key</strong> in
-          Settings instead and train in the cloud (the app rents a GPU per run,
-          ~$1-2, and shuts it down automatically).
+          Training on this fork is local only — you need ai-toolkit and a GPU on
+          this machine (or skip training and export a dataset ZIP to train elsewhere).
         </p>
       </>
     )

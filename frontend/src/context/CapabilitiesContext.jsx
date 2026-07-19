@@ -31,7 +31,9 @@ export function CapabilitiesProvider({ children }) {
   const refresh = useCallback(async (force = false) => {
     try {
       const data = await apiFetch(`/api/capabilities${force ? '?force=1' : ''}`)
-      setCaps(data)
+      // Fork is local-only: never surface remote-rental / cloud-training UI even if a
+      // leftover rental API key exists in .env (FORK_NOTES Divergence 4).
+      setCaps({ ...data, cloud_training: false })
     } catch {
       // Keep the last-known caps on a transient network error rather than
       // resetting to EMPTY_CAPS — that would bounce the user into onboarding.
