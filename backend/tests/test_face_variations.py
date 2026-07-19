@@ -3,7 +3,7 @@ import re
 from app.services.face_variations import (VARIATION_CATALOG, NSFW_VARIATION_CATALOG,
     select_preset, aspect_for_framing, composition_counts, drop_identity_tags,
     OUTFIT_VARY, EXPRESSION_NEUTRAL, _HAS_OUTFIT, _HAS_EXPRESSION,
-    wrap_variation, wrap_variation_klein,
+    wrap_variation_klein,
     LEGACY_LABEL_ALIASES, canonical_label, is_nsfw_label, prompt_by_label,
     aspect_for_label)
 
@@ -35,15 +35,15 @@ def test_presets():
 
 def test_body_emphasis_preset():
     """Body-fidelity preset: every id resolves, composition is 8/8/8/1, and the
-    figure-visible outfits stay in the API-accepted register (swimwear/fitted —
-    the SFW identity guard is prepended by wrap_variation at generation time)."""
+    figure-visible outfits stay in the SFW register (swimwear/fitted) — explicit
+    content lives in the separate NSFW catalog only."""
     entries = select_preset('body_emphasis')
     assert len(entries) == 25
     c = composition_counts(entries)
     assert c == {'face': 8, 'bust': 8, 'body': 8, 'back': 1}
     prompts = ' '.join(e['prompt'] for e in entries)
     assert 'bikini' in prompts and 'bodycon' in prompts and 'sportswear' in prompts
-    # no explicit terms — these prompts must pass API-provider policy as-is
+    # no explicit terms — the SFW catalog stays SFW as-is
     for banned in ('nude', 'naked', 'topless', 'nsfw'):
         assert banned not in prompts.lower()
 
@@ -115,13 +115,9 @@ def test_catalog_prompts_are_english():
         assert not french.search(e['prompt']), f"French in prompt {e['id']}: {e['prompt']}"
 
 
-def test_wrappers_scope_reference_to_face_identity():
-    """Both assembly wrappers must tell the model the reference is for FACE identity
+def test_wrapper_scopes_reference_to_face_identity():
+    """The Klein wrapper must tell the model the reference is for FACE identity
     only, and that outfit + expression come from the description (not the reference)."""
-    api = wrap_variation('upper body portrait, front view')
-    assert 'do NOT copy the outfit' in api and 'facial expression' in api
-    api_multi = wrap_variation('upper body portrait', ref_count=3)
-    assert 'do NOT copy the outfit' in api_multi
     kl = wrap_variation_klein('upper body portrait', framing='bust')
     assert 'do not copy' in kl and 'outfit' in kl and 'facial expression' in kl
 

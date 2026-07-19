@@ -19,29 +19,6 @@ def test_create_and_payload(app):
         assert p['name'] == 'Lola' and p['composition'] == {'face': 0, 'bust': 0, 'body': 0, 'back': 0}
 
 
-def test_api_fanout_creates_pending_rows(app, monkeypatch):
-    from app.services import face_dataset_service as svc
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    from app.services.face_variations import select_preset
-    calls = []
-    monkeypatch.setattr('app.services.face_dataset_service.threading.Thread',
-                        lambda target, args=(), daemon=True: type('T', (), {'start': lambda s: calls.append(args)})())
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'A', 'a')
-        # give it a reference so _all_ref_bytes works
-        import os
-        os.makedirs(svc._dataset_dir(ds.id), exist_ok=True)
-        open(os.path.join(svc._dataset_dir(ds.id), 'ref.webp'), 'wb').write(_png())
-        ds.ref_filename = 'ref.webp'
-        svc.db.session.commit()
-        svc.generate_variations_nanobanana(app, LOCAL_USER, ds.id,
-                                           select_preset('zimage_12')[:2], 1, engine='chatgpt')
-        rows = FaceDatasetImage.query.filter_by(dataset_id=ds.id).all()
-        assert len(rows) == 2 and all(r.status == 'pending' and r.klein_model == 'chatgpt' for r in rows)
-        assert calls  # background batch was dispatched
-
-
 def test_export_zip_layout(app):
     from app.services import face_dataset_service as svc
     from app.models import FaceDatasetImage
@@ -693,76 +670,10 @@ def test_import_dedupe_off_by_default(app):
         assert len(ids1) == 1 and len(ids2) == 1
 
 
-class _SerialPool:
-    """Deterministic stand-in for ThreadPoolExecutor: the real 3-worker pool on the
-    test's shared in-memory sqlite is flaky (thread-scoped sessions racing on one
-    connection). Prod runs a WAL file DB — the concurrency isn't what's under test."""
-    def __init__(self, *a, **k): pass
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
-    def map(self, fn, items): return [fn(i) for i in items]
-
-
-def test_api_batch_skips_cancelled_rows(app, monkeypatch):
-    """Stop during a Nano Banana batch: cancel_pending deletes the pending rows —
-    the worker must then SKIP the API call for those items (each call is billed),
-    not generate-then-discard."""
-    import concurrent.futures
-    from app.services import face_dataset_service as svc
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _SerialPool)
-    calls = []
-    monkeypatch.setattr(svc, '_api_generate_fn',
-                        lambda engine: (lambda *a, **k: calls.append(1) or _png()))
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'Stop', 'stop')
-        import os
-        os.makedirs(svc._dataset_dir(ds.id), exist_ok=True)
-        live = FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='nanobanana')
-        gone = FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='nanobanana')
-        svc.db.session.add_all([live, gone]); svc.db.session.commit()
-        live_id, gone_id = live.id, gone.id
-        svc.db.session.delete(gone); svc.db.session.commit()   # = cancel_pending
-        svc._run_nanobanana_batch(app, [(live_id, 'p', '1:1'), (gone_id, 'p', '1:1')],
-                                  [_png()], engine='nanobanana')
-        assert len(calls) == 1                                  # only the live row hit the API
-        # The worker committed in ITS OWN app context — drop this session's stale
-        # snapshot before re-reading (same phenomenon link_completed_dataset_image
-        # documents for the queue monitor thread).
-        svc.db.session.expire_all()
-        assert svc.db.session.get(FaceDatasetImage, live_id).filename
-
-
-def test_api_batch_failure_stores_reason(app, monkeypatch):
-    """A failed API generation must persist WHY (fail_reason) — the tile shows it
-    instead of a mute 'failed'. Exposed in the payload; cleared on regenerate."""
-    import concurrent.futures
-    from app.services import face_dataset_service as svc
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _SerialPool)
-    def boom(*a, **k):
-        raise RuntimeError('quota exceeded (429)')
-    monkeypatch.setattr(svc, '_api_generate_fn', lambda engine: boom)
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'Fr', 'fr')
-        import os
-        os.makedirs(svc._dataset_dir(ds.id), exist_ok=True)
-        img = FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='nanobanana')
-        svc.db.session.add(img); svc.db.session.commit()
-        svc._run_nanobanana_batch(app, [(img.id, 'p', '1:1')], [_png()], engine='nanobanana')
-        svc.db.session.expire_all()
-        row = svc.db.session.get(FaceDatasetImage, img.id)
-        assert row.status == 'failed'
-        assert 'nanobanana' in row.fail_reason and 'quota exceeded' in row.fail_reason
-        payload = svc.dataset_payload(LOCAL_USER, ds.id)
-        assert payload['images'][0]['fail_reason'] == row.fail_reason
-
-
 def _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER, engine='nanobanana'):
-    """A dataset with a reference file on disk + one finished generated tile
-    (engine-tagged so regenerate_image re-dispatches through the API path)."""
+    """A dataset with a reference file on disk + one finished generated tile.
+    The default engine tag is a LEGACY API tag (rows like this still exist in
+    user databases) — regenerate_image swaps it for a real Klein model."""
     import os
     ds = svc.create_dataset(LOCAL_USER, 'R', 'r')
     d = svc._dataset_dir(ds.id)
@@ -781,26 +692,27 @@ def _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER, engine='nanoba
 
 def test_regenerate_with_edited_prompt_persists_and_reaches_engine(app, monkeypatch):
     """✏️ edit-prompt regenerate: the edited core prompt is persisted into
-    variation_prompt AND reaches the API engine wrapped by the identity guard
-    (the face lock stays applied on top of the user's creative edit)."""
+    variation_prompt AND reaches the Klein engine wrapped by the identity-guard
+    instructions (the face lock stays applied on top of the user's edit)."""
     from app.services import face_dataset_service as svc
-    from app.services.face_variations import IDENTITY_GUARD
+    from app.services import klein_edit_helper
     from app.models import FaceDatasetImage
     from app.config import LOCAL_USER
     seen = {}
-    def fake_generate(refs, prompt, aspect_ratio=None):
-        seen['prompt'] = prompt
-        return _png()
-    monkeypatch.setattr(svc, '_api_generate_fn', lambda engine: fake_generate)
+    def fake_enqueue(**kwargs):
+        seen.update(kwargs)
+        return 'job-edit'
+    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit', fake_enqueue)
     with app.app_context():
         ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER)
-        svc.regenerate_image(LOCAL_USER, img.id, prompt='a candid mirror selfie')  # app=None -> sync
+        job = svc.regenerate_image(LOCAL_USER, img.id, prompt='a candid mirror selfie')
+        assert job == 'job-edit'
         svc.db.session.expire_all()
         row = svc.db.session.get(FaceDatasetImage, img.id)
         assert row.variation_prompt == 'a candid mirror selfie'   # edit persisted
-        assert 'a candid mirror selfie' in seen['prompt']         # reached the engine
-        assert IDENTITY_GUARD in seen['prompt']                   # face lock still applied
-        assert row.filename                                        # a new file was written
+        assert 'a candid mirror selfie' in seen['edit_prompt']    # reached the engine
+        assert 'Keep the facial identity exactly the same' in seen['edit_prompt']
+        assert row.status == 'pending' and row.job_id == 'job-edit'  # in flight
 
 
 def test_regeneration_clears_all_watermark_metadata(app, monkeypatch):
@@ -809,10 +721,9 @@ def test_regeneration_clears_all_watermark_metadata(app, monkeypatch):
     from app.models import FaceDatasetImage
     from app.config import LOCAL_USER
 
-    monkeypatch.setattr(
-        svc, '_api_generate_fn',
-        lambda engine: (lambda refs, prompt, aspect_ratio=None: _png((0, 200, 0))),
-    )
+    from app.services import klein_edit_helper
+    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit',
+                        lambda **k: 'job-wm')
     with app.app_context():
         ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER)
         old_path = os.path.join(svc._dataset_dir(ds.id), 'old.webp')
@@ -826,8 +737,8 @@ def test_regeneration_clears_all_watermark_metadata(app, monkeypatch):
         svc.regenerate_image(LOCAL_USER, img.id)
 
         row = svc.db.session.get(FaceDatasetImage, img.id)
-        assert row.filename and row.filename != 'old.webp'
-        assert not os.path.exists(old_path)
+        assert row.filename is None and row.status == 'pending'   # reset, in flight
+        assert not os.path.exists(old_path)                       # old file trashed
         assert (row.watermark_state, row.watermark_bbox, row.watermark_regions) == (
             None, None, None,
         )
@@ -837,43 +748,22 @@ def test_regenerate_without_prompt_keeps_existing(app, monkeypatch):
     """Empty/omitted prompt = current behaviour: variation_prompt is unchanged
     and the stored prompt is what feeds the engine (plain 🔄 / reject path)."""
     from app.services import face_dataset_service as svc
+    from app.services import klein_edit_helper
     from app.models import FaceDatasetImage
     from app.config import LOCAL_USER
     seen = {}
-    monkeypatch.setattr(svc, '_api_generate_fn',
-                        lambda engine: (lambda refs, prompt, aspect_ratio=None: (seen.update(prompt=prompt) or _png())))
+    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit',
+                        lambda **k: seen.update(k) or 'job-keep')
     with app.app_context():
         ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER)
         svc.regenerate_image(LOCAL_USER, img.id)              # no prompt
         svc.db.session.expire_all()
         row = svc.db.session.get(FaceDatasetImage, img.id)
         assert row.variation_prompt == 'old prompt'           # unchanged
-        assert 'old prompt' in seen['prompt']
+        assert 'old prompt' in seen['edit_prompt']
         svc.regenerate_image(LOCAL_USER, img.id, prompt='   ')  # whitespace-only = no edit
         svc.db.session.expire_all()
         assert svc.db.session.get(FaceDatasetImage, img.id).variation_prompt == 'old prompt'
-
-
-def test_regenerate_honors_currently_selected_api_engine(app, monkeypatch):
-    """A tile born on Klein regenerates through the CURRENTLY selected engine
-    when the workspace sends one — the row's origin no longer pins it."""
-    from app.services import face_dataset_service as svc
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    seen = {}
-    def make(engine):
-        seen['engine'] = engine
-        return lambda refs, prompt, aspect_ratio=None: _png()
-    monkeypatch.setattr(svc, '_api_generate_fn', make)
-    with app.app_context():
-        ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER,
-                                             engine='flux-2-klein.safetensors')  # Klein-born
-        svc.regenerate_image(LOCAL_USER, img.id, engine='nanobanana')  # app=None -> sync
-        svc.db.session.expire_all()
-        row = svc.db.session.get(FaceDatasetImage, img.id)
-        assert seen['engine'] == 'nanobanana'
-        assert row.klein_model == 'nanobanana'    # the row's engine tag follows the switch
-        assert row.filename                        # generated through the API path
 
 
 def test_regenerate_switch_to_klein_uses_picker_model(app, monkeypatch):
@@ -899,55 +789,6 @@ def test_regenerate_switch_to_klein_uses_picker_model(app, monkeypatch):
                 == 'flux-2-klein.safetensors')
 
 
-def test_regenerate_nsfw_stays_local_despite_api_engine(app, monkeypatch):
-    """Fail-closed: an NSFW-labelled tile regenerates on the LOCAL Klein path
-    even when the workspace's selected engine is an API one (mirrors the batch
-    rule — NSFW never reaches a third-party API)."""
-    from app.services import face_dataset_service as svc
-    from app.services import klein_edit_helper
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    seen = {}
-    def fake_enqueue(**kwargs):
-        seen.update(kwargs)
-        return 'job-nsfw'
-    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit', fake_enqueue)
-    monkeypatch.setattr(svc, '_api_generate_fn',
-                        lambda engine: (_ for _ in ()).throw(AssertionError('API engine must not be called')))
-    with app.app_context():
-        ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER,
-                                             engine='flux-2-klein.safetensors')
-        img.variation_label = '🔞 custom shot'    # is_nsfw_label() -> True
-        svc.db.session.commit()
-        job = svc.regenerate_image(LOCAL_USER, img.id, engine='nanobanana')
-        assert job == 'job-nsfw'                   # Klein path, not the API one
-        assert seen['klein_model'] == 'flux-2-klein.safetensors'
-
-
-def test_regenerate_skips_engines_disabled_in_settings(app, monkeypatch):
-    """A Klein-born tile must not regenerate through Klein once Klein is
-    disabled in Settings (engines.enabled) — it falls back to the default
-    enabled engine, even when the client sends no engine at all."""
-    from app.services import face_dataset_service as svc
-    from app import config as cfg
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    seen = {}
-    def make(engine):
-        seen['engine'] = engine
-        return lambda refs, prompt, aspect_ratio=None: _png()
-    monkeypatch.setattr(svc, '_api_generate_fn', make)
-    with app.app_context():
-        cfg.save_config({'engines': {'enabled': ['nanobanana', 'chatgpt'],
-                                     'default': 'nanobanana'}})
-        ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER,
-                                             engine='flux-2-klein.safetensors')  # Klein-born
-        svc.regenerate_image(LOCAL_USER, img.id)          # legacy client: no engine sent
-        assert seen['engine'] == 'nanobanana'
-        svc.db.session.expire_all()
-        assert svc.db.session.get(FaceDatasetImage, img.id).klein_model == 'nanobanana'
-
-
 def test_regenerate_rejects_unknown_engine(app):
     import pytest
     from app.services import face_dataset_service as svc
@@ -964,8 +805,8 @@ def test_regenerate_prompt_truncated_to_column_limit(app, monkeypatch):
     from app.services import face_dataset_service as svc
     from app.models import FaceDatasetImage
     from app.config import LOCAL_USER
-    monkeypatch.setattr(svc, '_api_generate_fn',
-                        lambda engine: (lambda refs, prompt, aspect_ratio=None: _png()))
+    from app.services import klein_edit_helper
+    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit', lambda **k: 'job-t')
     with app.app_context():
         ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER)
         svc.regenerate_image(LOCAL_USER, img.id, prompt='x' * 800)
@@ -979,8 +820,8 @@ def test_regenerate_edited_prompt_exposed_in_payload(app, monkeypatch):
     from app.services import face_dataset_service as svc
     from app.models import FaceDatasetImage
     from app.config import LOCAL_USER
-    monkeypatch.setattr(svc, '_api_generate_fn',
-                        lambda engine: (lambda refs, prompt, aspect_ratio=None: _png()))
+    from app.services import klein_edit_helper
+    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit', lambda **k: 'job-p')
     with app.app_context():
         ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER)
         svc.regenerate_image(LOCAL_USER, img.id, prompt='new scene, golden hour')
@@ -1063,67 +904,6 @@ def test_link_completed_dataset_image_without_comfyui_configured(app, monkeypatc
 
 
 # --- 'generate' activity indicator (blocks ⚡ Generate for the whole batch) ----
-
-def test_api_batch_advertises_generate_activity_then_clears(app, monkeypatch):
-    """The API fan-out (Nano Banana / ChatGPT) advertises a 'generate' activity for
-    the WHOLE batch — kind + total up front, done growing per image — and clears it
-    when the pool drains (finally end()). This is what keeps ⚡ Generate disabled
-    past the launch request (busyLive = busy OR activity)."""
-    import concurrent.futures, os
-    from app.services import face_dataset_service as svc
-    from app.services import dataset_activity as da
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _SerialPool)
-    da.reset()
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'Act', 'act')
-        os.makedirs(svc._dataset_dir(ds.id), exist_ok=True)
-        rows = [FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='nanobanana')
-                for _ in range(3)]
-        svc.db.session.add_all(rows); svc.db.session.commit()
-        items = [(r.id, 'p', '1:1') for r in rows]
-        seen = []
-        def gen(*a, **k):
-            seen.append(da.get(ds.id))   # live indicator captured MID-batch
-            return _png()
-        monkeypatch.setattr(svc, '_api_generate_fn', lambda engine: gen)
-        svc._run_nanobanana_batch(app, items, [_png()], engine='nanobanana', dataset_id=ds.id)
-        assert seen and seen[0]['kind'] == 'generate' and seen[0]['total'] == 3
-        assert seen[0]['engine'] == 'nanobanana'
-        assert seen[-1]['done'] >= 1                       # bumped per handled item
-        # After the batch: cleared (finally end()) — both directly and in the payload.
-        assert da.get(ds.id) is None
-        assert svc.dataset_payload(LOCAL_USER, ds.id)['activity'] is None
-
-
-def test_api_batch_generate_activity_cleared_on_pool_exception(app, monkeypatch):
-    """end() is guaranteed even if the pool itself raises — the indicator must never
-    strand a phantom 'in progress' that would keep Generate disabled forever."""
-    import concurrent.futures, os, pytest
-    from app.services import face_dataset_service as svc
-    from app.services import dataset_activity as da
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-
-    class _BoomPool:
-        def __init__(self, *a, **k): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def map(self, fn, items): raise RuntimeError('pool crashed')
-
-    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _BoomPool)
-    da.reset()
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'Boom', 'boom')
-        os.makedirs(svc._dataset_dir(ds.id), exist_ok=True)
-        img = FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='nanobanana')
-        svc.db.session.add(img); svc.db.session.commit()
-        with pytest.raises(RuntimeError):
-            svc._run_nanobanana_batch(app, [(img.id, 'p', '1:1')], [_png()],
-                                      engine='nanobanana', dataset_id=ds.id)
-        assert da.get(ds.id) is None                       # finally end() ran anyway
-
 
 def test_klein_generate_activity_from_enqueue_to_last_completion(app, monkeypatch):
     """Klein: enqueue advertises 'generate' with the batch total (pending-count
@@ -1268,75 +1048,3 @@ def test_import_zip_route(client, app):
     body = resp.get_json()
     assert body['imported'] == 1 and body['captions'] == 1
     assert client.post(f'/api/dataset/{did}/import-zip').status_code == 400  # no file
-
-
-def test_subscription_quota_fails_remaining_rows_fast(app, monkeypatch):
-    """Quota-429 mid-batch: the current row AND all remaining rows fail with a
-    clear quota message, without burning more API calls. Never a silent switch
-    to the paid API key."""
-    import concurrent.futures
-    from app.services import face_dataset_service as svc
-    from app.services.chatgpt_image import SubscriptionQuotaExceeded
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _SerialPool)
-    calls = []
-    def boom(*a, **k):
-        calls.append(1)
-        raise SubscriptionQuotaExceeded('quota reached')
-    monkeypatch.setattr(svc, '_api_generate_fn', lambda engine: boom)
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'Q', 'q')
-        import os
-        os.makedirs(svc._dataset_dir(ds.id), exist_ok=True)
-        rows = [FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='chatgpt')
-                for _ in range(3)]
-        svc.db.session.add_all(rows); svc.db.session.commit()
-        items = [(r.id, 'p', '1:1') for r in rows]
-        svc._run_nanobanana_batch(app, items, [_png()], engine='chatgpt')
-        assert len(calls) == 1                      # rows 2-3 never hit the API
-        svc.db.session.expire_all()
-        for r in rows:
-            row = svc.db.session.get(FaceDatasetImage, r.id)
-            assert row.status == 'failed'
-            assert 'quota' in row.fail_reason
-
-
-def test_subscription_disconnect_never_falls_back_to_api_key(app, monkeypatch):
-    """INVARIANT: a mid-batch disconnect on the pinned subscription lane must
-    stop the batch, never reroute the remaining rows onto the paid API key.
-    The lane is pinned ONCE before the loop (force_lane='subscription'), so
-    even though _use_subscription() would report False after a disconnect
-    (token gone), rows 2-3 must still fail with the 'connection lost' message
-    instead of silently calling the API-key path."""
-    import concurrent.futures
-    from app.services import face_dataset_service as svc
-    from app.services import chatgpt_image
-    from app.services.chatgpt_image import SubscriptionUnavailable
-    from app.models import FaceDatasetImage
-    from app.config import LOCAL_USER
-    monkeypatch.setattr(concurrent.futures, 'ThreadPoolExecutor', _SerialPool)
-    # Pin decides 'subscription' at batch start.
-    monkeypatch.setattr(chatgpt_image, '_use_subscription', lambda: True)
-    calls = []
-    def boom(*a, **k):
-        calls.append(1)
-        raise SubscriptionUnavailable('ChatGPT connection lost — reconnect in Settings')
-    monkeypatch.setattr(svc, '_api_generate_fn', lambda engine: boom)
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'L', 'l')
-        import os
-        os.makedirs(svc._dataset_dir(ds.id), exist_ok=True)
-        rows = [FaceDatasetImage(dataset_id=ds.id, status='pending', klein_model='chatgpt')
-                for _ in range(3)]
-        svc.db.session.add_all(rows); svc.db.session.commit()
-        items = [(r.id, 'p', '1:1') for r in rows]
-        svc._run_nanobanana_batch(app, items, [_png()], engine='chatgpt')
-        # Exactly 1 call: the FIRST row hits the disconnected subscription lane,
-        # rows 2-3 are stopped BEFORE any call — never routed to the API key.
-        assert len(calls) == 1
-        svc.db.session.expire_all()
-        for r in rows:
-            row = svc.db.session.get(FaceDatasetImage, r.id)
-            assert row.status == 'failed'
-            assert 'connection lost' in row.fail_reason

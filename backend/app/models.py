@@ -15,9 +15,10 @@ class FaceDataset(db.Model):
     # que le recadrage manuel puisse RÉÉLARGIR au lieu de seulement resserrer le crop
     # déjà fait. ref_filename = le carré dérivé (auto head-crop ou recadrage manuel).
     ref_original_filename = db.Column(String(255), nullable=True)
-    # Références ADDITIONNELLES (JSON list de filenames, cap côté service) : envoyées
-    # en plus à Nano Banana pour renforcer la cohérence d'identité. La principale
-    # (ref_filename) reste la seule source de Klein, du crop et du scoring InsightFace.
+    # Références ADDITIONNELLES (JSON list de filenames, cap côté service) :
+    # chaînées en ReferenceLatent sur le chemin Klein multi-références pour
+    # renforcer la cohérence d'identité. La principale (ref_filename) reste la
+    # seule source du crop et du scoring InsightFace.
     ref_extra_filenames = db.Column(Text, nullable=True)
     # Réglages gagnants du Studio de test LoRA (JSON: {lora_filename, strength,
     # z_model, seed, decided_at}). Écrit par l'humain via « ★ Définir comme

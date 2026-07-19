@@ -8,32 +8,6 @@ from __future__ import annotations
 import json
 import re
 
-# Verrou d'identité renforcé (deep-research 2026-06-14, source primaire Google AI) :
-# nommer les traits + interdire l'embellissement améliore la cohérence du visage.
-# NB : la qualité de la photo de référence reste le facteur déterminant.
-IDENTITY_GUARD = (
-    "This is the SAME person as the reference image. Preserve their facial identity "
-    "EXACTLY: same eye shape and color, nose, jawline, lips, skin tone and texture, "
-    "and face proportions. Do NOT beautify, slim, age, or alter the face. Use the "
-    "reference ONLY to lock the facial identity: take the clothing/outfit and the "
-    "facial expression from the description below, and do NOT copy the outfit or the "
-    "expression shown in the reference image. "
-    "SFW, realistic photographic portrait.")
-
-# Variante multi-références (Nano Banana) : avec un guard au singulier le modèle
-# peut s'ancrer sur une seule image ; on lui dit EXPLICITEMENT que toutes les refs
-# montrent la même personne et qu'il doit s'appuyer sur chacune d'elles.
-IDENTITY_GUARD_MULTI = (
-    "ALL the reference images show the SAME person (different angles, expressions or "
-    "framings). Use EVERY reference image together to lock the identity. Preserve their "
-    "facial identity EXACTLY: same eye shape and color, nose, jawline, lips, skin tone "
-    "and texture, and face proportions. Do NOT beautify, slim, age, or alter the face. "
-    "Use the reference images ONLY to lock the facial identity: take the clothing/outfit "
-    "and the facial expression from the description below, and do NOT copy the outfit or "
-    "the expression shown in the reference images. "
-    "SFW, realistic photographic portrait.")
-
-
 # --- Prompt suffixes (community feature request) -----------------------------
 # A FREE creative direction the user attaches to the DATASET (global text and/or a
 # per-framing map {face,bust,body,back}) that rides on every generated variation.
@@ -78,19 +52,11 @@ def compose_prompt_suffix(global_suffix, framing_suffixes=None, framing=None) ->
     return ', '.join(parts)
 
 
-def wrap_variation(prompt: str, ref_count: int = 1, suffix: str = '') -> str:
-    """Guard-FIRST wrapper (API engines). The identity guard stays the very first
-    thing the model reads; the dataset suffix extends the descriptive tail AFTER
-    it (appended to the creative prompt), so the lock is never diluted."""
-    guard = IDENTITY_GUARD_MULTI if ref_count > 1 else IDENTITY_GUARD
-    return f"{guard} {_append_suffix(prompt, suffix)}"
-
-
 # Enrichissement PAR CADRAGE pour Klein (étude prompts 2026-07-10, sources :
 # guide fal.ai Flux2-klein + guide BFL FLUX.2) : Klein veut des descriptions
 # CONCRÈTES et détaillées (hiérarchie sujet → cadre → technique) — les tags
-# télégraphiques du catalogue suffisent aux moteurs API (qui brodent seuls)
-# mais SOUS-spécifient Klein, qui comble les trous arbitrairement.
+# télégraphiques du catalogue SOUS-spécifient Klein, qui comble les trous
+# arbitrairement.
 _KLEIN_FRAMING_DETAIL = {
     'face': ('Close-up head-and-shoulders portrait: the face fills most of the frame, '
              'both eyes in crisp focus, 85mm portrait lens look with gentle background '
@@ -109,20 +75,20 @@ def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = 
                          suffix: str = '') -> str:
     """Klein (FLUX.2, Kontext-lineage) is an INSTRUCTION-edit model: it follows
     imperative edit commands (the consistency LoRA's own usage example is "Turn
-    this cat into a dog"). The API-engine wrapper above — preservation order
+    this cat into a dog"). A preservation-first wrapper — preservation order
     FIRST, descriptive tags after — reads as "change nothing", so Klein returned
     a near-copy of the reference (live repro 2026-07-10: every variation looked
     like a plain upscale). Structure follows the fal.ai/BFL edit guidance:
       1. direct command first (the change),
       2. the FULL intended result (framing-specific detail — Klein under-fills
-         terse tag prompts, unlike the API engines which embellish on their own),
+         terse tag prompts),
       3. restage + identity constraints,
       4. photographic/technical tail.
     NEGATIVE PROMPTS: dead end at CFG 1 (guidance-distilled model — the sampler
     ignores the negative conditioning entirely; ComfyUI-NAG would be needed to
     restore them). All steering therefore lives in the POSITIVE prompt.
-    `nsfw=True` (local Klein only — the route refuses NSFW on API engines) drops
-    the SFW clamp and allows explicit nudity with natural anatomy.
+    `nsfw=True` drops the SFW clamp and allows explicit nudity with natural
+    anatomy.
     `suffix` (dataset prompt-suffix) joins the DESCRIPTIVE portion (2. — appended
     to the creative prompt, before the framing detail): instruction-first means
     the description IS the command, so the suffix steers the intended result and
@@ -146,20 +112,20 @@ def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = 
 
 
 # --- Anti-fuite tenue / expression (constat terrain 2026-07-14) ---------------
-# Les moteurs d'édition (Nano Banana, ChatGPT-image, Klein) PRÉSERVENT ce qu'on ne
-# contredit pas explicitement. Symptômes réels rapportés par le propriétaire :
+# Les moteurs d'édition (Klein) PRÉSERVENT ce qu'on ne contredit pas
+# explicitement. Symptômes réels rapportés par le propriétaire :
 #   1) sur les plans buste, le modèle reprend la MÊME tenue que la réf → la tenue se
 #      lie à l'identité dans le LoRA ;
 #   2) l'expression de la réf (sourire, grimace) se propage à TOUS les plans.
 # Deux corrections complémentaires, au bon niveau :
-#   • WRAPPERS (IDENTITY_GUARD / IDENTITY_GUARD_MULTI / wrap_variation_klein) : la réf
-#     ne sert QU'À l'identité du visage ; tenue + expression viennent de la description,
-#     jamais copiées de la réf. Directive GÉNÉRALE → couvre aussi les prompts édités /
-#     custom, les deux familles de moteurs et la régénération.
+#   • WRAPPER (wrap_variation_klein) : la réf ne sert QU'À l'identité du visage ;
+#     tenue + expression viennent de la description, jamais copiées de la réf.
+#     Directive GÉNÉRALE → couvre aussi les prompts édités / custom et la
+#     régénération.
 #   • CATALOGUE : chaque entrée SANS tenue / expression explicite reçoit une cible
 #     CONCRÈTE mais variée (les modèles d'édition suivent mieux une consigne « porte X »
 #     qu'un vide qu'ils comblent par la réf). Baker la directive dans le TEXTE du prompt
-#     la propage partout (API + Klein + persistance variation_prompt + régénération).
+#     la propage partout (Klein + persistance variation_prompt + régénération).
 OUTFIT_VARY = ('wearing a different casual everyday outfit, varied in style and colour '
                '(not the outfit from the reference image)')
 EXPRESSION_NEUTRAL = ('a calm neutral facial expression, not copying the expression from '
@@ -580,8 +546,8 @@ def prompt_by_label(label):
 
 
 # Aspect ratio par cadrage (deep-research 2026-06-14) : forcer tout en carré
-# letterboxe les plans corps (bandes noires apprises par le LoRA). On demande à
-# Nano Banana un ratio adapté ; ai-toolkit gère le bucketing non-carré.
+# letterboxe les plans corps (bandes noires apprises par le LoRA) ; ai-toolkit
+# gère le bucketing non-carré.
 ASPECT_BY_FRAMING = {'face': '1:1', 'bust': '3:4', 'body': '3:4', 'back': '3:4'}
 
 

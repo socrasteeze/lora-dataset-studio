@@ -12,8 +12,6 @@ bp = Blueprint('settings', __name__, url_prefix='/api')
 
 
 _TEST_TARGETS = {
-    'gemini': capabilities.probe_gemini,
-    'openai': capabilities.probe_openai,
     'comfyui': capabilities.probe_comfyui,
     # End-to-end (reachable + vision model pulled), NOT reachability alone: the old
     # reachability-only target returned a green check while the Setup/diagnostic model
@@ -480,8 +478,9 @@ def _recent_generation_errors(scan=40) -> dict:
             low = reason.lower()
             # fail_reason is written as f'{engine}: …' on the generation path, so the
             # engine is the prefix; anything else lands in 'other' (save/queue errors).
-            eng = next((e for e in ('klein', 'chatgpt', 'nanobanana')
-                        if low.startswith(e)), 'other')
+            # Legacy rows may still carry 'chatgpt:'/'nanobanana:' prefixes from
+            # before the API engines were removed — they land in 'other'.
+            eng = 'klein' if low.startswith('klein') else 'other'
             engines.setdefault(eng, reason)  # first hit == most recent for that engine
     except Exception:
         pass
@@ -532,7 +531,6 @@ def diagnostic():
     e = caps.get('engines') or {}
     comfy = caps.get('comfyui') or {}
     oll = caps.get('ollama') or {}
-    sub = caps.get('chatgpt_subscription') or {}
     # Redact ONLY in this paste-safe payload — /api/logs/tail (the in-app log
     # viewer) keeps the raw lines, they're local-only and never meant to be
     # copy-pasted into a public thread.
@@ -555,18 +553,13 @@ def diagnostic():
         'disk': _disk_free(),
         'secrets_present': _secret_presence(),
         'capabilities': {
-            'engines': {'nanobanana': bool(e.get('nanobanana')),
-                        'chatgpt': bool(e.get('chatgpt')),
-                        'klein': bool(e.get('klein'))},
+            'engines': {'klein': bool(e.get('klein'))},
             'comfyui_reachable': bool(comfy.get('reachable')),
             'klein_model': bool((comfy.get('models') or {}).get('klein')),
             # setup_installer action names for the Klein assets NOT yet on disk — the
             # exact gap antonp's report couldn't name (issue: missing Klein assets not
             # listed). Empty required-trio => the engine is asset-ready.
             'klein_missing': list(comfy.get('klein_missing') or []),
-            # ChatGPT engine can be lit by an API key OR a connected subscription — a
-            # report that shows neither key nor subscription explains a dark engine.
-            'chatgpt_subscription': bool(sub.get('connected')),
             'ollama_reachable': bool(oll.get('reachable')),
             'vision_model_ready': bool(oll.get('vision_model_ready')),
             'face_scoring': bool(caps.get('face_scoring')),
@@ -608,34 +601,3 @@ def diagnostic():
         'log_tail': log_lines,
         'generated_at': int(time.time()),
     })
-
-
-# --- ChatGPT subscription (Codex OAuth) --------------------------------------
-# Device-code login for the ChatGPT engine's subscription lane. One upstream
-# check per poll call — the SPA polls every few seconds, no server thread.
-
-@bp.post('/settings/chatgpt-oauth/start')
-def chatgpt_oauth_start():
-    from ..services import chatgpt_oauth
-    out = chatgpt_oauth.login_start()
-    return jsonify(out), (200 if out.get('ok') else 502)
-
-
-@bp.get('/settings/chatgpt-oauth/poll')
-def chatgpt_oauth_poll():
-    from ..services import chatgpt_oauth
-    return jsonify(chatgpt_oauth.login_poll())
-
-
-@bp.post('/settings/chatgpt-oauth/import-codex')
-def chatgpt_oauth_import_codex():
-    from ..services import chatgpt_oauth
-    out = chatgpt_oauth.import_codex_cli()
-    return jsonify(out), (200 if out.get('ok') else 404)
-
-
-@bp.post('/settings/chatgpt-oauth/logout')
-def chatgpt_oauth_logout():
-    from ..services import chatgpt_oauth
-    chatgpt_oauth.logout()
-    return jsonify({'ok': True})

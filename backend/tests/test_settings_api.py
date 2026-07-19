@@ -20,18 +20,18 @@ def _no_real_network(monkeypatch):
 
 
 def test_get_settings_masks_secrets(client, monkeypatch):
-    monkeypatch.setenv('OPENAI_API_KEY', 'sk-secret')
+    monkeypatch.setenv('HF_TOKEN', 'hf-secret')
     data = client.get('/api/settings').get_json()
-    assert data['secrets']['OPENAI_API_KEY'] is True
-    assert 'sk-secret' not in str(data)
+    assert data['secrets']['HF_TOKEN'] is True
+    assert 'hf-secret' not in str(data)
 
 def test_put_settings_persists_config_and_secret(client, tmp_path):
     r = client.put('/api/settings', json={
         'config': {'ollama': {'url': 'http://127.0.0.1:11500'}},
-        'secrets': {'GEMINI_API_KEY': 'g-123'}})
+        'secrets': {'HF_TOKEN': 'hf-123'}})
     assert r.status_code == 200
     assert r.get_json()['config']['ollama']['url'] == 'http://127.0.0.1:11500'
-    assert r.get_json()['secrets']['GEMINI_API_KEY'] is True
+    assert r.get_json()['secrets']['HF_TOKEN'] is True
 
 def test_put_settings_clears_skip_when_dir_provided(client, tmp_path):
     """Entering a ComfyUI directory annuls a prior "continue without ComfyUI" skip —
@@ -355,37 +355,6 @@ def test_logs_tail_reads_app_log(client, tmp_path, monkeypatch):
 def test_logs_tail_empty_when_no_log(client):
     d = client.get('/api/logs/tail').get_json()
     assert d == {'ok': True, 'file': None, 'lines': []}
-
-
-def test_chatgpt_oauth_routes(client, monkeypatch):
-    from unittest.mock import patch
-    from app.services import chatgpt_oauth
-    with patch.object(chatgpt_oauth, 'login_start',
-                      return_value={'ok': True, 'verification_url': 'https://x/device',
-                                    'user_code': 'AB-12'}):
-        r = client.post('/api/settings/chatgpt-oauth/start')
-        assert r.status_code == 200 and r.get_json()['user_code'] == 'AB-12'
-    with patch.object(chatgpt_oauth, 'login_start',
-                      return_value={'ok': False, 'detail': 'network error'}):
-        assert client.post('/api/settings/chatgpt-oauth/start').status_code == 502
-    with patch.object(chatgpt_oauth, 'login_poll', return_value={'status': 'pending',
-                                                                 'detail': None}):
-        r = client.get('/api/settings/chatgpt-oauth/poll')
-        assert r.status_code == 200 and r.get_json()['status'] == 'pending'
-    with patch.object(chatgpt_oauth, 'import_codex_cli',
-                      return_value={'ok': False, 'detail': 'no session'}):
-        assert client.post('/api/settings/chatgpt-oauth/import-codex').status_code == 404
-    with patch.object(chatgpt_oauth, 'import_codex_cli',
-                      return_value={'ok': True, 'detail': 'imported'}):
-        assert client.post('/api/settings/chatgpt-oauth/import-codex').status_code == 200
-    r = client.post('/api/settings/chatgpt-oauth/logout')
-    assert r.status_code == 200 and r.get_json()['ok'] is True
-
-
-def test_put_settings_saves_chatgpt_auth_mode(client):
-    r = client.put('/api/settings', json={'config': {'engines': {'chatgpt_auth': 'subscription'}}})
-    assert r.status_code == 200
-    assert r.get_json()['config']['engines']['chatgpt_auth'] == 'subscription'
 
 
 # --- Server settings (host/port/LAN/access token) ----------------------------

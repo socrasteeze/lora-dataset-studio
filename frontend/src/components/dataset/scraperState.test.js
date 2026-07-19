@@ -8,9 +8,9 @@ function memoryStorage() {
     setItem: (key, value) => values.set(key, String(value)), removeItem: (key) => values.delete(key) };
 }
 
-test('dataset image imports stay available during every generation engine', () => {
+test('dataset image imports stay available during a generation batch', () => {
   assert.equal(isDatasetImportBlocked({ localBusy: false, activity: null }), false);
-  for (const engine of ['klein', 'nanobanana', 'chatgpt', undefined])
+  for (const engine of ['klein', undefined])
     assert.equal(isDatasetImportBlocked({
       localBusy: false, activity: { kind: 'generate', engine },
     }), false);
@@ -18,7 +18,7 @@ test('dataset image imports stay available during every generation engine', () =
 
 test('dataset image imports still block local overlap and non-generation activity', () => {
   assert.equal(isDatasetImportBlocked({
-    localBusy: true, activity: { kind: 'generate', engine: 'chatgpt' },
+    localBusy: true, activity: { kind: 'generate', engine: 'klein' },
   }), true);
   for (const activity of [{ kind: 'caption' }, { kind: 'classify' }, { kind: 'watermark_clean' }])
     assert.equal(isDatasetImportBlocked({ localBusy: false, activity }), true);

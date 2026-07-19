@@ -14,13 +14,6 @@ const INPUT_CLASS =
   'mt-1 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 text-sm text-content ' +
   'placeholder:text-content-subtle focus:border-primary focus:outline-none'
 
-const KEY_FIELDS = [
-  { key: 'GEMINI_API_KEY', label: 'Gemini API key', engine: 'nanobanana',
-    href: 'https://aistudio.google.com/apikey', help: 'Powers Nano Banana.' },
-  { key: 'OPENAI_API_KEY', label: 'OpenAI API key', engine: 'chatgpt',
-    href: 'https://platform.openai.com/api-keys', help: 'Powers ChatGPT (gpt-image-2).' },
-]
-
 // Default local vision model + rough VRAM notes surfaced in the wizard. The
 // ABLITERATED Qwen3-VL is required — vanilla qwen3-vl refuses to caption the NSFW
 // concept datasets this app targets. VRAM figures are approximate minimums for the
@@ -53,8 +46,6 @@ const STATUS_META = {
 // note pointing at ComfyUI. "Auto-framing & head-crop" is the ollama step's other two
 // unlocks (Auto-classify framing / Auto head-crop), just phrased differently here.
 const CAPABILITY_STEP_ID = {
-  'Nano Banana (Gemini)': 'image',
-  'ChatGPT (gpt-image-2)': 'image',
   'Klein (local)': 'comfyui',
   'Captioning': 'ollama',
   'Auto-framing & head-crop': 'ollama',
@@ -196,28 +187,11 @@ export default function SetupPage() {
     finally { setBusy(false) }
   }
 
-  // Test the key the user JUST typed. The probe reads the SAVED secret, so save
-  // that one key first (no need to fill anything else), then test + re-probe so
-  // the step flips to Ready. With no typed value, test whatever is already saved.
-  const saveSecretThenTest = async (key, target) => {
-    const typed = (secretInputs[key] || '').trim()
-    try {
-      if (typed) {
-        const data = await putJson('/api/settings', { secrets: { [key]: typed } })
-        setSecretsPresence(data.secrets); setSecretInputs((p) => ({ ...p, [key]: '' }))
-      }
-      const r = await postJson(`/api/settings/test/${target}`, {})
-      r.ok ? toast.success(r.detail) : toast.warning(r.detail)
-      await refresh(true)
-    } catch (e) { toast.error(e.message) }
-  }
-
   // One-click start for an ALREADY-INSTALLED Ollama that just isn't running
   // (caps.ollama.installed true, reachable false). The backend starts `ollama
   // serve` detached and polls readiness (~15s); refresh(true) then flips the step
   // to ready with no app restart. A failure returns 502 -> apiFetch throws (and
-  // auto-toasts the generic 5xx notice); the catch adds the specific reason,
-  // matching the existing saveSecretThenTest pattern.
+  // auto-toasts the generic 5xx notice); the catch adds the specific reason.
   const startOllama = async () => {
     setStartingOllama(true)
     try {
@@ -270,34 +244,6 @@ export default function SetupPage() {
   // --- Per-tool step body (reuses the existing controls, one tool per screen) ---
   const toolBody = (id) => {
     const step = stepById[id]
-    if (id === 'image') {
-      return (
-        <div className="space-y-4">
-          {KEY_FIELDS.map((f) => (
-            <div key={f.key}>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-content">{f.label}</span>
-                <span className={`text-xs ${step.engines[f.engine] ? 'text-emerald-400' : 'text-content-subtle'}`}>
-                  {step.engines[f.engine] ? '✓ Ready' : '○ Not set'}
-                </span>
-              </div>
-              <p className="text-xs text-content-muted">{f.help}</p>
-              <input type="password" autoComplete="off" className={INPUT_CLASS}
-                value={secretInputs[f.key] ?? ''}
-                placeholder={secretsPresence[f.key] ? 'Already set — enter a new value to replace it' : 'Paste your key'}
-                onChange={(e) => setSecretInputs((p) => ({ ...p, [f.key]: e.target.value }))} />
-              <div className="mt-1 flex items-center gap-3">
-                <a href={f.href} target="_blank" rel="noreferrer" className="text-xs text-primary underline">Get a key</a>
-                <button type="button" onClick={() => saveSecretThenTest(f.key, f.engine === 'nanobanana' ? 'gemini' : 'openai')}
-                  className="text-xs text-content-muted underline">Save &amp; test</button>
-              </div>
-            </div>
-          ))}
-          <p className="text-xs text-content-subtle">Klein (local) needs ComfyUI — the next step.</p>
-          {saveRecheckBtn}
-        </div>
-      )
-    }
     if (id === 'comfyui') {
       // Klein needs three weights; the backend tells us which are still absent
       // (step.kleinMissing). Each download button greys to "✓ Installed" on its own,

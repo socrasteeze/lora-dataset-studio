@@ -28,7 +28,7 @@ load_dotenv(ENV_PATH)
 # REDDIT_CLIENT_ID / CIVITAI_API_KEY / PEXELS_API_KEY: scraping credentials
 # (Settings > Scraping & sources). Sources read their env var at request time,
 # and set_secrets() stamps os.environ on save, so changes apply without restart.
-SECRET_KEYS = ('GEMINI_API_KEY', 'OPENAI_API_KEY', 'HF_TOKEN', 'VAST_API_KEY',
+SECRET_KEYS = ('HF_TOKEN', 'VAST_API_KEY',
                'REDDIT_CLIENT_ID', 'CIVITAI_API_KEY', 'PEXELS_API_KEY')
 
 DEFAULTS = {
@@ -56,10 +56,10 @@ DEFAULTS = {
                   # Explicit interpreter for installs without venv/.venv
                   # (conda, uv, system python). Empty = auto-detect.
                   'python': ''},
-    'engines': {'default': 'chatgpt', 'enabled': ['nanobanana', 'chatgpt', 'klein'],
-                # chatgpt_auth: 'auto' = subscription when connected, else API key.
-                'chatgpt_auth': 'auto',            # auto|api|subscription
-                'chatgpt_subscription_model': 'gpt-5.4-mini'},   # Codex router model (image model is gpt-image-2 regardless)
+    # Local-only fork: Klein (ComfyUI) is the sole generation engine. The API
+    # engines (Nano Banana / ChatGPT) were removed; stale engines.* keys in an
+    # existing config.json are simply ignored.
+    'engines': {'default': 'klein', 'enabled': ['klein']},
     'captioning': {'backend': 'auto'},                         # auto|joycaption|ollama|none
     'training': {'default_family': 'zimage'},
     # Cloud GPU training (vast.ai). Everything has a sane default: the only

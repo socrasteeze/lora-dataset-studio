@@ -561,7 +561,7 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     # primary ref stays first and strongest (2 MP, node 92); extras add identity
     # signal from other angles at 1 MP. cfg=1 → the negative chain (110) is
     # ignored by the sampler, so it is left untouched. A missing extra file is
-    # skipped silently (same tolerance as the Nano Banana multi-ref path).
+    # skipped silently (never blocking).
     prev = "92"
     for i, ref_path in enumerate(extra_ref_paths or [], start=1):
         if not ref_path or not os.path.exists(ref_path):

@@ -22,7 +22,7 @@
 // settings-reference H2 anchor for each Settings section id.
 const SETTINGS_ANCHOR = {
   overview: 'overview',
-  engines: 'image-engines',
+  engines: 'image-engine',
   scraping: 'scraping-sources',
   'local-tools': 'local-tools',
   captioning: 'captioning-quality',
@@ -57,9 +57,9 @@ const TOPICS = [
     keywords: ['overview', 'status', 'summary', 'capabilities', 'ready', 'configured'],
     guide: { chapter: 'settings-reference', anchor: 'overview' },
     app: { route: '/settings/overview' } },
-  { id: 'settings-engines', kind: 'section', title: 'Settings · Image engines',
-    keywords: ['engine', 'engines', 'generation', 'gemini', 'openai', 'chatgpt', 'klein', 'nano banana', 'api key', 'lora', 'preset'],
-    guide: { chapter: 'settings-reference', anchor: 'image-engines' },
+  { id: 'settings-engines', kind: 'section', title: 'Settings · Image engine',
+    keywords: ['engine', 'engines', 'generation', 'klein', 'comfyui', 'local', 'lora', 'preset'],
+    guide: { chapter: 'settings-reference', anchor: 'image-engine' },
     app: { route: '/settings/engines' } },
   { id: 'settings-scraping', kind: 'section', title: 'Settings · Scraping & sources',
     keywords: ['scraping', 'sources', 'reddit', 'civitai', 'pexels', 'scrape', 'import', 'rate limit', '429'],
@@ -191,20 +191,10 @@ const TOPICS = [
 
   // ---- Settings: per-field topics (kind 'setting') -----------------------
   // engines
-  setting('engines.default', 'engines', 'engine-default', 'Default engine',
-    ['default engine', 'engine', 'preselect', 'nanobanana', 'nano banana', 'chatgpt', 'klein', 'gpt-image']),
-  setting('engines.enabled', 'engines', 'engines-enabled', 'Enabled engines',
-    ['enabled engines', 'engine', 'engines', 'show', 'hide', 'generate panel', 'nanobanana', 'chatgpt', 'klein']),
-  setting('engines.chatgpt_auth', 'engines', 'chatgpt-auth-mode', 'ChatGPT engine auth',
-    ['chatgpt', 'auth', 'subscription', 'api key', 'codex', 'oauth', 'openai']),
   setting('klein.generation_lora_presets', 'engines', 'klein-generation-lora-presets', 'Klein generation LoRA presets',
     ['lora', 'preset', 'presets', 'klein', 'generation', 'texture', 'anatomy', 'style', 'chain', 'nsfw'],
     { trigger: 'klein-tuning-open',
       text: 'Build named generation-LoRA presets in Settings → Image engines, then pick one per run.' }),
-  setting('GEMINI_API_KEY', 'engines', 'GEMINI_API_KEY', 'Gemini API key',
-    ['gemini', 'api key', 'nano banana', 'nanobanana', 'google', 'key']),
-  setting('OPENAI_API_KEY', 'engines', 'OPENAI_API_KEY', 'OpenAI API key',
-    ['openai', 'api key', 'chatgpt', 'gpt-image', 'gpt', 'key']),
   // scraping
   setting('REDDIT_CLIENT_ID', 'scraping', 'REDDIT_CLIENT_ID', 'Reddit client ID',
     ['reddit', 'client id', 'scrape', '429', 'rate limit', 'quota', 'key']),

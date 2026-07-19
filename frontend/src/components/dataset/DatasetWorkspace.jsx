@@ -528,18 +528,16 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // clean) don't pause ComfyUI, so their note omits that claim.
   const act = ds.activity;
   const importBusy = isDatasetImportBlocked({ localBusy: ds.localBusy, activity: act });
-  // Unknown / legacy engine values fail safe as local: only these two API
-  // engines are guaranteed not to share ComfyUI VRAM with vision auto-crop.
-  const visionImportBusy = act?.kind === 'generate'
-    && !['nanobanana', 'chatgpt'].includes(String(act?.engine || '').toLowerCase());
+  // Klein is the sole engine: any running generate batch shares ComfyUI VRAM
+  // with the vision auto-crop, so imports wait for it.
+  const visionImportBusy = act?.kind === 'generate';
   const activityBanner = ds.captioning
     ? `${act?.detail || `Captioning in progress — ${keptCaptioned}/${kept} captioned…`} ComfyUI is paused.`
     : (() => {
         if (act) {
           const prog = act.total ? ` ${act.done}/${act.total}` : '';
           // Passes that DON'T claim "ComfyUI is paused": the CPU ones, plus
-          // 'generate' (engine-dependent — Nano Banana / ChatGPT don't touch
-          // ComfyUI, and the Klein case is obvious from the tiles appearing).
+          // 'generate' (the Klein case is obvious from the tiles appearing).
           const cpu = act.kind === 'analyze_faces'
             || (act.kind === 'watermark_clean' && !String(act.detail || '').includes('GPU'))
             || act.kind === 'generate';

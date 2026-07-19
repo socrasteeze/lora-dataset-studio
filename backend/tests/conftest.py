@@ -8,7 +8,7 @@ def _restore_secret_env():
 
     Also CLEAR them at setup: config.py runs load_dotenv(ENV_PATH) at import, and at
     collection time (before LDS_ENV is pointed at a tmp file) ENV_PATH is the real
-    repo .env — so a developer who saved a real Gemini/OpenAI key via the app would
+    repo .env — so a developer who saved a real API key via the app would
     leak it into os.environ and make "unconfigured" probes see a key. Starting each
     test with the keys unset makes the suite independent of the local .env; tests
     that need a key set it themselves via monkeypatch.setenv."""

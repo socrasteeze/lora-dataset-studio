@@ -34,7 +34,7 @@ def test_probe_all_off_when_unconfigured(app):
         from app import capabilities
         with patch('app.capabilities._http_ok', return_value=False):
             caps = capabilities.probe(force=True)
-    assert caps['engines'] == {'nanobanana': False, 'chatgpt': False, 'klein': False}
+    assert caps['engines'] == {'klein': False}
     assert caps['training_visible'] is False and caps['studio_visible'] is False
 
 def test_python_ml_status_reports_version_and_range(app):
@@ -65,16 +65,7 @@ def test_python_ml_status_boundaries(app, info, ok):
     assert st['version'] == f'{info[0]}.{info[1]}.{info[2]}'
 
 
-def test_chatgpt_on_with_key(app, monkeypatch):
-    monkeypatch.setenv('OPENAI_API_KEY', 'sk-x')
-    with app.app_context():
-        from app import capabilities
-        with patch('app.capabilities._http_ok', return_value=False):
-            caps = capabilities.probe(force=True)
-    assert caps['engines']['chatgpt'] is True
-
 def test_comfyui_reachable_lights_studio_and_klein(app, monkeypatch, tmp_path):
-    monkeypatch.setenv('OPENAI_API_KEY', '')
     with app.app_context():
         from app import capabilities, config
         base = tmp_path / 'Comfy'
@@ -106,7 +97,6 @@ def test_klein_engine_stays_dark_until_all_three_assets_present(app, monkeypatch
     """Honest readiness: a reachable ComfyUI with ONLY the unet (no vae / no
     text-encoder) must NOT light the Klein engine — the generate would 409 for the
     missing assets (which the 409 then names + auto-downloads)."""
-    monkeypatch.setenv('OPENAI_API_KEY', '')
     with app.app_context():
         from app import capabilities, config
         base = tmp_path / 'Comfy'
@@ -131,7 +121,6 @@ def test_klein_engine_lights_for_flat_root_layout_unet(app, monkeypatch, tmp_pat
     resolve_klein_unet() (symmetric with the vae/te resolvers), so a root-level
     model that the picker lists and the resolver can build ALSO lights the engine —
     picker == probe == resolver at the readiness gate too."""
-    monkeypatch.setenv('OPENAI_API_KEY', '')
     with app.app_context():
         from app import capabilities, config
         base = tmp_path / 'Comfy'
@@ -158,7 +147,6 @@ def test_klein_engine_dark_when_unet_is_html_gate_page(app, monkeypatch, tmp_pat
     generate time on 'Expecting value: line 1 column 1'. The engine must now stay
     dark, and the payload must report the file as present-but-INVALID (distinct from
     missing) so the Setup step can say 'delete it and re-download'."""
-    monkeypatch.setenv('OPENAI_API_KEY', '')
     with app.app_context():
         from app import capabilities, config
         from app.services import model_integrity
@@ -191,7 +179,6 @@ def test_klein_invalid_too_small_is_advisory_and_does_not_gate(app, monkeypatch,
     """A tiny-but-structurally-valid stub (a download that stopped right after the
     header) is reported in klein_invalid as an advisory `too_small` — but being
     non-blocking it does NOT darken the engine; only a hard-invalid file does."""
-    monkeypatch.setenv('OPENAI_API_KEY', '')
     with app.app_context():
         from app import capabilities, config
         from app.services import model_integrity
@@ -213,27 +200,6 @@ def test_klein_invalid_too_small_is_advisory_and_does_not_gate(app, monkeypatch,
 
 
 # --- extra coverage: individual probe_* ok/detail contract --------------
-
-def test_probe_gemini_missing_key(app, monkeypatch):
-    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
-    with app.app_context():
-        from app import capabilities
-        result = capabilities.probe_gemini()
-    assert result == {'ok': False, 'detail': 'key missing'}
-
-def test_probe_gemini_with_key(app, monkeypatch):
-    monkeypatch.setenv('GEMINI_API_KEY', 'g-x')
-    with app.app_context():
-        from app import capabilities
-        result = capabilities.probe_gemini()
-    assert result == {'ok': True, 'detail': 'key set'}
-
-def test_probe_openai_missing_key(app, monkeypatch):
-    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-    with app.app_context():
-        from app import capabilities
-        result = capabilities.probe_openai()
-    assert result == {'ok': False, 'detail': 'key missing'}
 
 def test_probe_aitoolkit_invalid_when_unconfigured(app):
     with app.app_context():
@@ -501,19 +467,19 @@ def test_probe_caches_for_30s_without_force(app, monkeypatch):
         capabilities._cache_ts = 0.0
         with patch('app.capabilities._http_ok', return_value=False):
             first = capabilities.probe(force=True)
-            monkeypatch.setenv('OPENAI_API_KEY', 'sk-new')
+            monkeypatch.setenv('VAST_API_KEY', 'vk-new')
             second = capabilities.probe()  # stale cache, ignores the new key
     assert second == first
-    assert second['engines']['chatgpt'] is False
+    assert second['cloud_training'] is False
 
 def test_probe_force_bypasses_cache(app, monkeypatch):
     with app.app_context():
         from app import capabilities
         with patch('app.capabilities._http_ok', return_value=False):
             capabilities.probe(force=True)
-            monkeypatch.setenv('OPENAI_API_KEY', 'sk-new')
+            monkeypatch.setenv('VAST_API_KEY', 'vk-new')
             refreshed = capabilities.probe(force=True)
-    assert refreshed['engines']['chatgpt'] is True
+    assert refreshed['cloud_training'] is True
 
 
 # --- ollama vision-model presence + import-cache clear --------------------
@@ -694,51 +660,6 @@ def test_ollama_diagnostic_exposes_configured_and_seen_tags(app, monkeypatch):
         diag = capabilities.ollama_diagnostic()
     assert diag['vision_model'] == _ABLIT
     assert _ABLIT in diag['tags_seen']
-
-
-# --- Task 5: probe_openai() matrix + chatgpt_subscription payload ---------
-
-def _sub(connected, email=None):
-    return {'connected': connected, 'email': email, 'plan': 'plus' if connected else None}
-
-
-def test_probe_openai_matrix(app, monkeypatch):
-    from unittest.mock import patch
-    from app import capabilities
-    from app.services import chatgpt_oauth
-    # neither
-    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-    with patch.object(chatgpt_oauth, 'status', return_value=_sub(False)):
-        r = capabilities.probe_openai()
-        assert r['ok'] is False and r['detail'] == 'key missing'
-    # key only
-    monkeypatch.setenv('OPENAI_API_KEY', 'sk-x')
-    with patch.object(chatgpt_oauth, 'status', return_value=_sub(False)):
-        r = capabilities.probe_openai()
-        assert r['ok'] is True and r['detail'] == 'key set'
-    # subscription only
-    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-    with patch.object(chatgpt_oauth, 'status', return_value=_sub(True, 'u@x.io')):
-        r = capabilities.probe_openai()
-        assert r['ok'] is True and r['detail'] == 'subscription connected'
-    # both
-    monkeypatch.setenv('OPENAI_API_KEY', 'sk-x')
-    with patch.object(chatgpt_oauth, 'status', return_value=_sub(True, 'u@x.io')):
-        r = capabilities.probe_openai()
-        assert r['ok'] is True and r['detail'] == 'key set + subscription connected'
-
-
-def test_probe_exposes_chatgpt_subscription_block(app, monkeypatch):
-    from unittest.mock import patch
-    from app import capabilities
-    from app.services import chatgpt_oauth
-    with patch.object(chatgpt_oauth, 'status', return_value=_sub(True, 'u@x.io')):
-        caps = capabilities.probe(force=True)
-    sub = caps['chatgpt_subscription']
-    assert sub['connected'] is True
-    assert sub['email'] == 'u@x.io'
-    assert isinstance(sub['codex_cli_detected'], bool)
-    assert caps['engines']['chatgpt'] is True     # subscription alone enables the engine
 
 
 def test_probe_aitoolkit_accepts_dot_venv_and_explicit_python(app, tmp_path, monkeypatch):

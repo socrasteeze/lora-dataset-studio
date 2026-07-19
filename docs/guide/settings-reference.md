@@ -31,38 +31,9 @@ For containerized or scripted setups, a handful of environment variables overrid
 
 The Overview section has **no settings of its own** — it's the at-a-glance dashboard for the rest of the page. If nothing is configured yet, it opens with a *Let's get you set up* banner. Below that, a **Capabilities** grid marks each feature ✓ or ✗ depending on what the app can currently see (a key, a reachable tool, an installed extra), and a **Where to fix it** list links straight to the section that turns each one on. Use it as your first stop to answer "why is this feature greyed out?" — then follow the link to the section that fixes it.
 
-## Image engines
+## Image engine
 
-This is where you connect the services that *generate* dataset images. The app has three engines: **Nano Banana** (Google Gemini), **ChatGPT** (`gpt-image-2`), and **Klein** (local, via ComfyUI). Klein is configured under **Local tools**; the two API engines are configured here.
-
-### API keys
-
-- **Gemini API key** — powers the Nano Banana engine. Paste it here and hit **Test** to confirm the key works. Get one from [aistudio.google.com](https://aistudio.google.com) → *Get API key*.
-- **OpenAI API key** — powers the ChatGPT engine (`gpt-image-2`). **Test** confirms it. This key is **optional if you connect a ChatGPT subscription** below — the subscription lane can run the ChatGPT engine on your plan's image quota instead.
-
-Both are write-only secrets: blank once saved, replaced by typing a new value, cleared only via **Remove**.
-
-### ChatGPT subscription (experimental)
-
-If you have a ChatGPT Plus/Pro plan, you can run the ChatGPT engine on your subscription's image quota instead of a pay-per-use API key. This uses the same sign-in lane as OpenAI's Codex CLI — it is **not a documented API and may stop working at any time**; you connect your own account at your own risk.
-
-- **Connect with ChatGPT** — starts an OAuth device-code sign-in; the badge then shows the connected account's email.
-- **Import from Codex CLI** — appears only if the app detects an existing `codex login` on this machine, and reuses that session.
-- **Disconnect** — signs out of the subscription lane.
-- **ChatGPT engine auth** → `engines.chatgpt_auth`. Chooses which credential the ChatGPT engine uses. Default **`auto`**.
-
-| Value | Behaviour |
-|---|---|
-| `auto` *(default)* | Use the subscription when connected, otherwise fall back to the API key. |
-| `api` | API key only — ignore the subscription. |
-| `subscription` | Subscription only — never touch the API key. |
-
-Good to know: in subscription mode you get up to **5 reference images** per generation (versus 16 on the API), your plan's image cap applies, and when the quota runs out mid-batch the remaining rows fail with a clear message — **the app never silently switches to your paid API key**.
-
-### Engines
-
-- **Default engine** → `engines.default`. Which engine is preselected in the workspace. One of `nanobanana`, `chatgpt`, `klein`. Default **`chatgpt`**.
-- **Enabled engines** → `engines.enabled`. Checkboxes deciding which engines appear as options at all. Default: **all three** enabled. Untick an engine you never use to declutter the generator picker.
+This fork generates exclusively on the local **Klein** engine (via ComfyUI) — free, private, NSFW-capable. The former cloud API engines (Nano Banana / ChatGPT) were removed; there are no engine API keys, no default/enabled-engine pickers, and no subscription login. ComfyUI itself is configured under **Local tools**; the Klein model weights install from the **Setup** page.
 
 ### Klein generation LoRA presets (optional)
 
@@ -268,12 +239,6 @@ These have no UI control — they're for advanced users editing `config.json` by
 | `comfyui.input_dir` | `''` | Override ComfyUI's input folder. |
 | `comfyui.models_dir` | `''` | Override the models folder scanned for checkpoints/UNETs. |
 | `comfyui.loras_dir` | `''` | Override the LoRA folder. |
-
-**Engines:**
-
-| Key | Default | Role |
-|---|---|---|
-| `engines.chatgpt_subscription_model` | `gpt-5.4-mini` | The Codex **router** model used by the subscription lane. The image model stays `gpt-image-2` regardless — this is not the image model. |
 
 **Cloud (vast.ai) internals** — knobs for after the real-world smoke test; the UI-exposed cloud settings above are the ones you'll normally want:
 

@@ -11,7 +11,7 @@ def _fresh(monkeypatch, tmp_path):
 def test_defaults_when_no_file(tmp_path, monkeypatch):
     config = _fresh(monkeypatch, tmp_path)
     assert config.get('server.port') == 5050
-    assert config.get('engines.default') == 'chatgpt'
+    assert config.get('engines.default') == 'klein'
     assert config.is_configured() is False
 
 def test_save_and_reload_deep_merge(tmp_path, monkeypatch):
@@ -34,20 +34,20 @@ def test_comfyui_dir_derivation(tmp_path, monkeypatch):
 
 def test_secrets_roundtrip(tmp_path, monkeypatch):
     config = _fresh(monkeypatch, tmp_path)
-    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-    assert config.secret('OPENAI_API_KEY') is None
-    config.set_secrets({'OPENAI_API_KEY': 'sk-test-123'})
-    assert config.secret('OPENAI_API_KEY') == 'sk-test-123'
+    monkeypatch.delenv('VAST_API_KEY', raising=False)
+    assert config.secret('VAST_API_KEY') is None
+    config.set_secrets({'VAST_API_KEY': 'sk-test-123'})
+    assert config.secret('VAST_API_KEY') == 'sk-test-123'
     env_text = (config.ENV_PATH).read_text(encoding='utf-8')
     assert 'sk-test-123' in env_text
 
 def test_secret_strips_trailing_whitespace(tmp_path, monkeypatch):
     """A pasted key with a trailing newline/space must not corrupt the Bearer header."""
     config = _fresh(monkeypatch, tmp_path)
-    monkeypatch.setenv('OPENAI_API_KEY', 'sk-test-123\n')
-    assert config.secret('OPENAI_API_KEY') == 'sk-test-123'
-    monkeypatch.setenv('OPENAI_API_KEY', '  sk-test-456  ')
-    assert config.secret('OPENAI_API_KEY') == 'sk-test-456'
+    monkeypatch.setenv('VAST_API_KEY', 'sk-test-123\n')
+    assert config.secret('VAST_API_KEY') == 'sk-test-123'
+    monkeypatch.setenv('VAST_API_KEY', '  sk-test-456  ')
+    assert config.secret('VAST_API_KEY') == 'sk-test-456'
 
 def test_local_user_constant(tmp_path, monkeypatch):
     config = _fresh(monkeypatch, tmp_path)

@@ -1,24 +1,13 @@
 // Pure derivation of the guided Setup wizard state from live capabilities.
 // No I/O — deterministic, so it is the single source of truth for card status.
 
-export const SETUP_STEP_IDS = ['image', 'comfyui', 'ollama', 'quality', 'training']
+export const SETUP_STEP_IDS = ['comfyui', 'ollama', 'quality', 'training']
 
 // Tool reachable + its extra piece present -> ready; reachable only -> partial.
 function gateStatus(reachable, complete) {
   if (reachable && complete) return 'ready'
   if (reachable) return 'partial'
   return 'available'
-}
-
-function imageStep(caps) {
-  const e = caps.engines || {}
-  const ready = e.nanobanana || e.chatgpt || e.klein
-  return {
-    id: 'image', title: 'Image generation', recommended: true,
-    unlocks: ['Nano Banana (Gemini)', 'ChatGPT (gpt-image-2)', 'Klein (local)'],
-    status: ready ? 'ready' : 'available',
-    engines: { nanobanana: !!e.nanobanana, chatgpt: !!e.chatgpt, klein: !!e.klein },
-  }
 }
 
 // The Klein engine needs three weights on disk (UNET + text-encoder + VAE); the
@@ -81,8 +70,8 @@ function comfyuiStep(caps) {
   const skipped = !!c.skipped && !c.reachable
   const status = skipped ? 'skipped' : gateStatus(c.reachable, hasKlein)
   return {
-    id: 'comfyui', title: 'ComfyUI — local generation & Test Studio', recommended: false,
-    unlocks: ['Klein engine', 'Test Studio'],
+    id: 'comfyui', title: 'ComfyUI — local generation & Test Studio', recommended: true,
+    unlocks: ['Klein engine (image generation)', 'Test Studio'],
     status, reachable: !!c.reachable, hasKlein, kleinMissing, kleinInvalid, apiUrl: c.api_url || '',
     skipped,
     // Whether comfyui.base_dir actually points at a ComfyUI install (main.py + models/):
@@ -108,8 +97,7 @@ export const COMFYUI_SKIP_LOST = [
 ]
 export const COMFYUI_SKIP_KEPT = [
   'Scraping and dataset curation',
-  'Captioning (Ollama vision model or the API engines)',
-  'Nano Banana and ChatGPT image engines',
+  'Captioning (Ollama vision model or JoyCaption)',
   'LoRA training — local ai-toolkit and cloud (vast.ai)',
   'Publishing datasets and LoRAs to Hugging Face',
 ]
@@ -190,7 +178,7 @@ function trainingStep(caps) {
 
 export function deriveSetupSteps(caps) {
   const c = caps || {}
-  return [imageStep(c), comfyuiStep(c), ollamaStep(c), qualityStep(c), trainingStep(c)]
+  return [comfyuiStep(c), ollamaStep(c), qualityStep(c), trainingStep(c)]
 }
 
 // The user's live capability checklist (Summary card). Watermark inpainting is a
@@ -202,8 +190,6 @@ export function deriveCapabilitySummary(caps) {
   const o = c.ollama || {}
   const cap = c.captioners || {}
   return [
-    { label: 'Nano Banana (Gemini)', ok: !!e.nanobanana },
-    { label: 'ChatGPT (gpt-image-2)', ok: !!e.chatgpt },
     { label: 'Klein (local)', ok: !!e.klein },
     { label: 'Captioning', ok: !!(cap.joycaption || cap.ollama) },
     { label: 'Auto-framing & head-crop', ok: !!(o.reachable && o.vision_model_ready) },
@@ -217,7 +203,7 @@ export function deriveCapabilitySummary(caps) {
 
 export function recommendedMet(caps) {
   const e = (caps && caps.engines) || {}
-  return !!(e.nanobanana || e.chatgpt || e.klein)
+  return !!e.klein
 }
 
 // --- "Install everything" plan -------------------------------------------------
