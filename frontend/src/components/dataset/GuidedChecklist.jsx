@@ -14,7 +14,7 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
       </p>
       <ol className="flex flex-col gap-0.5">
         {steps.map((s, i) => {
-          const glyph = s.done ? '✓' : s.busy ? '⏳' : s.id === currentId ? '◉' : '○';
+          const glyph = s.done ? '✓' : s.busy ? '…' : s.id === currentId ? '◉' : '○';
           const tone = s.unavailable ? 'text-content-subtle opacity-60'
             : s.done ? 'text-emerald-400'
             : s.id === currentId ? 'text-content font-semibold'
@@ -38,7 +38,7 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
               {s.unavailable ? (
                 <Link to="/settings" title={s.hint} className={cls}>
                   {body}
-                  <span aria-hidden className="shrink-0 pl-0.5">⚙</span>
+                  <span aria-hidden className="shrink-0 pl-0.5"></span>
                   <span className="sr-only"> — {s.hint}</span>
                 </Link>
               ) : (

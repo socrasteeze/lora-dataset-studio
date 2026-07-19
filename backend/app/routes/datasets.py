@@ -583,7 +583,7 @@ def dataset_caption_cancel(dataset_id):
 @bp.get('/dataset/<int:dataset_id>/caption/options')
 def dataset_caption_options_get(dataset_id):
     """Per-dataset caption method overrides {backend, ollama_model, instructions} for the
-    ⚙️ Options popover. Empty values mean "follow the global default"."""
+    Options popover. Empty values mean "follow the global default"."""
     ds = svc.get_dataset(LOCAL_USER, dataset_id)
     if not ds:
         return jsonify({'error': 'not found'}), 404
@@ -663,7 +663,7 @@ def dataset_watermarks_clean(dataset_id):
     through the serialized ComfyUI queue (no vision window — that would deadlock the
     worker). Returns counts + the inpaint error. Optional {image_ids:[...]} scopes the
     pass to a subset (the review lightbox cleans one image at a time); omitted → every
-    detected image (the bulk 🧽 Clean button). Optional {allow_crop:bool} overrides the
+    detected image (the bulk Clean button). Optional {allow_crop:bool} overrides the
     persisted crop preference: omitted → Settings' watermark.allow_crop; True/False →
     force crop / force inpaint (the lightbox's per-image crop-vs-inpaint choice)."""
     if not svc.get_dataset(LOCAL_USER, dataset_id):
@@ -710,7 +710,7 @@ def dataset_watermarks_clean(dataset_id):
 @bp.post('/dataset/<int:dataset_id>/watermarks/dismiss')
 def dataset_watermarks_dismiss(dataset_id):
     """Mark flagged images as NOT a watermark (a false positive ruled out in the review
-    lightbox). Body: {image_ids:[...]}. Dismissed images drop the 🚩 badge and are
+    lightbox). Body: {image_ids:[...]}. Dismissed images drop the badge and are
     skipped by future detect passes. CPU only, no GPU window."""
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
@@ -810,7 +810,7 @@ def dataset_image_improve(image_id):
 @bp.post('/dataset/image/<int:image_id>/regenerate')
 def dataset_image_regenerate(image_id):
     data = request.get_json(silent=True) or {}
-    # Optional edited core prompt from the tile's ✏️ bubble — None keeps the
+    # Optional edited core prompt from the tile's ✏ bubble — None keeps the
     # current behaviour (recover from the row / label); the identity guard is
     # re-applied on top either way (see regenerate_image).
     edited_prompt = (data.get('prompt') or '').strip() or None

@@ -29,7 +29,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve }) {
       onClick={(e) => { if (e.target === e.currentTarget) onResolve(false); }}>
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-amber-400/40 bg-app p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-amber-300 font-semibold"><span aria-hidden>⚠️</span> Before training</span>
+          <span className="text-amber-300 font-semibold"><span aria-hidden>⚠</span> Before training</span>
           <button type="button" onClick={() => onResolve(false)}
             className="ml-auto text-content-subtle hover:text-content" aria-label="Cancel">✕</button>
         </div>

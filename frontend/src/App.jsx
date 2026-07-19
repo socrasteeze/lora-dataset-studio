@@ -83,7 +83,7 @@ function CheckUpdatesButton() {
       className={`${NAV_ITEM_BASE} relative ${available
         ? 'text-emerald-300 hover:text-emerald-200'
         : 'text-content-muted hover:text-content'} hover:bg-surface-raised disabled:opacity-50`}>
-      <span aria-hidden>{busy ? '⏳' : '⬆'}</span>
+      <span aria-hidden>{busy ? '…' : '↻'}</span>
       {available && (
         <span aria-hidden className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400" />
       )}
@@ -133,7 +133,7 @@ function NavBar() {
       {/* Bank sits right after Datasets: it FEEDS them (triage a big unsorted
           folder, then promote the keepers into a dataset). */}
       <NavLink to="/bank" className={navItemClass} onClick={() => setOpen(false)}>
-        <span className="inline-flex items-center gap-1"><span aria-hidden>🗃️</span> Bank
+        <span className="inline-flex items-center gap-1"><span aria-hidden></span> Bank
           <span className="px-1 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.5625rem] font-semibold uppercase tracking-wide leading-none">Beta</span>
         </span>
       </NavLink>
@@ -141,7 +141,7 @@ function NavBar() {
           training path exists, not just the cloud one. */}
       {(caps.cloud_training || caps.training_visible) && (
         <NavLink to="/cloud" className={navItemClass} onClick={() => setOpen(false)}>
-          <span className="inline-flex items-center gap-1"><span aria-hidden>🏋️</span> Runs</span>
+          <span className="inline-flex items-center gap-1"><span aria-hidden></span> Runs</span>
         </NavLink>
       )}
       {caps.studio_visible && (
@@ -254,12 +254,12 @@ function UpdateBanner() {
     <div className="mx-auto max-w-5xl px-4 pt-3">
       <div role="status"
         className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm">
-        <span aria-hidden>⬆</span>
+        <span aria-hidden></span>
         {applying ? (
           <span className="text-content">
             {phase === 'restarting'
               ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back…'
-              : '⬇ Pulling the latest version…'}
+              : 'Pulling the latest version…'}
           </span>
         ) : (
           <>

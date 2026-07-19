@@ -140,8 +140,8 @@ function UpdatesCard() {
             {phase === 'restarting'
               ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back…'
               : progressLabel(progress) || (mode === 'zip'
-                ? '⬇ Downloading and installing the latest release…'
-                : '⬇ Pulling the latest version…')}
+                ? 'Downloading and installing the latest release…'
+                : 'Pulling the latest version…')}
           </p>
           {/* Real progress bar while downloading a release ZIP (indeterminate when
               the server reported no Content-Length). Git pulls stay text-only. */}
@@ -159,7 +159,7 @@ function UpdatesCard() {
           {canPull ? (
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-content">
-                <span aria-hidden>⬆</span>{' '}
+                <span aria-hidden></span>{' '}
                 {typeof s.behind === 'number'
                   ? `${s.behind} commit${s.behind === 1 ? '' : 's'} behind${s.current_sha && s.remote_sha ? ` (${s.current_sha} → ${s.remote_sha})` : ''}.`
                   : `${zipUpdateHeadline(s)}.`}
@@ -211,7 +211,7 @@ function LogViewer() {
     <section className="rounded-xl border border-border bg-surface p-5">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full items-center gap-2 text-left">
-        <h2 className="text-base font-semibold text-content">🪵 Server log</h2>
+        <h2 className="text-base font-semibold text-content">Server log</h2>
         <span className="text-xs text-content-subtle">
           {open ? (file ? `data/${file} — last ${lines.length} lines, refreshes every 5 s` : 'no log file yet')
             : 'something failed? open this and copy the log into your bug report'}
@@ -227,7 +227,7 @@ function LogViewer() {
             </button>
             <button type="button" onClick={copy} disabled={!lines.length}
               className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs text-content disabled:opacity-40">
-              📋 Copy all
+              Copy all
             </button>
           </div>
           <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-app/60 p-2 text-[11px] leading-snug text-content-muted">
@@ -281,13 +281,13 @@ function TrashCard() {
     <Card title="Trash" help="Everything the app deletes (checkpoints, cloud staging, deployed LoRAs) is moved here first — emptying it is the only action that actually destroys files.">
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm text-content">
-          <span aria-hidden>🗑</span> Trash size:{' '}
+          <span aria-hidden></span> Trash size:{' '}
           <span className="font-semibold tabular-nums">{size == null ? '…' : fmt(size)}</span>
         </span>
         <button type="button" onClick={openFolder} disabled={opening}
           title="Open the trash folder in the file explorer"
           className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-medium text-content disabled:opacity-40">
-          {opening ? 'Opening…' : '📂 Open folder'}
+          {opening ? 'Opening…' : 'Open folder'}
         </button>
         <button type="button" onClick={empty} disabled={busy || !size}
           className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-300 disabled:opacity-40">

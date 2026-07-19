@@ -1,6 +1,6 @@
 // react-frontend/src/components/dataset/studio/ResultLightbox.jsx
 /**
- * Aperçu plein écran d'UN résultat + notation 👍/👎 (toggle) + NAVIGATION dans le
+ * Aperçu plein écran d'UN résultat + notation /(toggle) + NAVIGATION dans le
  * set courant (feuilleter d'une image à l'autre sans fermer). Extrait 1:1 du bloc
  * `{lbImg && (...)}` de l'ancien LoraTestStudio (behavior-preserving) pour le rating,
  * avec les correctifs a11y déjà actés : focus-trap (useFocusTrap), fermeture sur Échap,
@@ -104,12 +104,12 @@ export default function ResultLightbox({ img, items = [], datasetId, onRate, onN
           <button type="button" aria-pressed={img.rating === 1}
             onClick={() => onRate(img.id, img.rating === 1 ? 0 : 1)}
             className={`px-3 py-1 rounded-lg text-sm border ${img.rating === 1 ? 'border-green-400/60 bg-green-500/20 text-green-200' : 'border-border bg-surface text-content'}`}>
-            👍 {img.rating === 1 ? 'Liked ✓' : 'Like'}
+            {img.rating === 1 ? 'Liked ✓' : 'Like'}
           </button>
           <button type="button" aria-pressed={img.rating === -1}
             onClick={() => onRate(img.id, img.rating === -1 ? 0 : -1)}
             className={`px-3 py-1 rounded-lg text-sm border ${img.rating === -1 ? 'border-red-400/60 bg-red-500/20 text-red-200' : 'border-border bg-surface text-content'}`}>
-            👎 {img.rating === -1 ? 'Not a fan ✓' : 'Not a fan'}
+            {img.rating === -1 ? 'Not a fan ✓' : 'Not a fan'}
           </button>
         </div>
       </div>

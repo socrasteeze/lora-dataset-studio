@@ -9,9 +9,9 @@ import { useEffect, useRef, useState } from 'react';
 export function useQuickVote(rate) {
   const [voteQueue, setVoteQueue] = useState(null);
   const [voteIdx, setVoteIdx] = useState(0);
-  // Titre de mode optionnel (ex. « Reconfirmer les 👍 ») : distingue visuellement
+  // Titre de mode optionnel (ex. « Reconfirmer les ») : distingue visuellement
   // une 2e passe sur les votés d'une 1re passe sur les non-votés (sinon le modal
-  // est identique et on risque de 👎 par erreur en croyant voter des nouvelles).
+  // est identique et on risque de par erreur en croyant voter des nouvelles).
   const [voteTitle, setVoteTitle] = useState(null);
   const touchRef = useRef(null);
 
@@ -38,7 +38,7 @@ export function useQuickVote(rate) {
     if (!st || !t) return;
     const dx = t.clientX - st.x; const dy = t.clientY - st.y;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    voteCurrent(dx > 0 ? 1 : -1); // droite = 👍, gauche = 👎
+    voteCurrent(dx > 0 ? 1 : -1); // droite = , gauche =
   };
 
   useEffect(() => {

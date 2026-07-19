@@ -241,7 +241,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy }) {
   return (
     <section className="bg-surface rounded-xl border border-border p-3 flex flex-col gap-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-content font-semibold text-sm">🕷️ Build from scraped images</h2>
+        <h2 className="text-content font-semibold text-sm">Build from scraped images</h2>
         <span className="text-content-subtle text-[0.6875rem]"
           title="Research-backed: 20-50 curated images beat hundreds of mixed ones; keep at most ~10 per gallery (one gallery ≈ one shoot).">
           aim for 20-50 varied images
@@ -278,7 +278,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy }) {
             cloudscraper…). Install them for image previews and imports. Pexels uses
             its official API for listing, but still needs curl_cffi to fetch images.
           </p>
-          <InstallRunner action="scrape_extras" buttonLabel="⬇ Install scraper extras"
+          <InstallRunner action="scrape_extras" buttonLabel="Install scraper extras"
             onDone={() => refresh(true)} />
         </div>
       )}
@@ -300,14 +300,14 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy }) {
         </div>
         <button type="button" onClick={handleImport} disabled={busy || importing || selected.size === 0}
           className="ml-auto px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
-          {importing ? 'Importing…' : `⬇ Import ${selected.size || ''}`}
+          {importing ? 'Importing…' : `Import ${selected.size || ''}`}
         </button>
       </div>
 
       {sourceMode === 'reddit' && (
         <div className="rounded-lg border border-border bg-white/5 px-2 py-2 flex flex-col gap-1.5">
           <span className="text-content-subtle text-[0.6875rem] flex items-center gap-1">
-            <span aria-hidden>🔎</span> Search Reddit
+            <span aria-hidden></span> Search Reddit
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -462,7 +462,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy }) {
             </button>
             {deadCount > 0 && (
               <span title="Images whose source link is dead/expired — hidden from the grid.">
-                🚫 {deadCount} dead hidden
+                {deadCount} dead hidden
               </span>
             )}
             {selected.size > 0 && (
@@ -472,7 +472,7 @@ export default function ConceptSourcesPanel({ datasetId, onImport, busy }) {
               </button>
             )}
             <label className="flex items-center gap-1.5" title="Preview size — enlarge to judge images faster">
-              <span aria-hidden>🔍</span>
+              <span aria-hidden></span>
               <input type="range" min="72" max="300" step="4" value={tile}
                 onChange={(e) => changeTile(Number(e.target.value))}
                 aria-label="Preview size"

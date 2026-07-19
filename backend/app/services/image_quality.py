@@ -1,4 +1,4 @@
-"""Pure-PIL technical quality metrics for the 🗃️ image bank (CPU, no GPU, no
+"""Pure-PIL technical quality metrics for the image bank (CPU, no GPU, no
 numpy/cv2 — the Flask venv is deliberately light, and the quality pass must
 work out of the box on every install, extras or not).
 

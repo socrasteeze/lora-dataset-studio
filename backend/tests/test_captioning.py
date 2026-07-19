@@ -456,7 +456,7 @@ def _dataset_with_two_kept_images(svc, LOCAL_USER):
 
 
 def test_caption_images_scopes_to_image_ids_subset(app, monkeypatch):
-    """The Identity-leak panel's targeted 🔄 Re-caption re-writes ONE image, leaving the
+    """The Identity-leak panel's targeted Re-caption re-writes ONE image, leaving the
     rest of the dataset untouched — even though both already have captions."""
     from app.services import face_dataset_service as svc
     from app.services import vision_ollama

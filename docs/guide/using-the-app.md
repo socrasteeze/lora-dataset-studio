@@ -32,20 +32,20 @@ hide.
 7. **Caption** — one click captions the kept set (prose or booru tags,
    matched to the target model). The **identity-leak check** flags any caption
    that describes hair/face/skin — fix every flagged one. A find/replace +
-   tag-frequency panel sweeps the whole set at once; its **💾 Write .txt
+   tag-frequency panel sweeps the whole set at once; its **Write .txt
    files** button drops a kohya-style `<image>.txt` next to each kept image
    in the dataset folder (same format as the export ZIP) for external tools.
-8. **Fix individual shots** — every generated tile has a ✏️ button: edit the
+8. **Fix individual shots** — every generated tile has a ✏ button: edit the
    exact prompt that made it and regenerate in place, without losing the rest.
 9. **Train** — the pre-flight check runs the full checklist (count, balance,
    captions, leaks, duplicates). It no longer *blocks*: leaking captions and
    near-duplicates are editable right inside the confirm, and missing captions
    just ask you to **Start anyway** (captions stay strongly recommended). Steps
-   are computed automatically; ⚙️ Advanced options exposes every knob (each with
+   are computed automatically; Advanced options exposes every knob (each with
    its own why/how) and a **Presets** row — apply a shipped ★ recipe (*Krea
    character*, *Concept*, *Style*) or save/import/export your own as a JSON.
-   No GPU? **☁️ Train in cloud** rents one per run. Watch this run — and every
-   other, cloud or local — from the **🏋️ Runs** tab, where you can retry a
+   No GPU? **Train in cloud** rents one per run. Watch this run — and every
+   other, cloud or local — from the **Runs** tab, where you can retry a
    failed run (↻), continue a finished cloud run for more steps (▶), and download
    the LoRA.
 10. **Pick the best checkpoint** — open the **Test Studio** from the dataset:
@@ -63,9 +63,9 @@ the captioner needs to know exactly *what to omit*. What changes vs character:
   **scraper** (paste a gallery URL or run a Reddit keyword search, tick the
   frames you want, they land straight in the dataset — deduplicated and
   quality-filtered). Already have a kohya-style dataset on disk (images +
-  same-name `.txt` captions)? **⋯ More → 📂 Import from folder…** merges it in
+  same-name `.txt` captions)? **⋯ More → Import from folder…** merges it in
   from a pasted folder path — captions attach, duplicates are skipped (a ZIP
-  works too, via **📦 Import dataset**). On gallery sites (PornPics), a category/tag/search scan
+  works too, via **Import dataset**). On gallery sites (PornPics), a category/tag/search scan
   shows **the same previews the listing page does** — one per gallery, the shot
   that actually matches your keyword. Tick **Scan full albums** to pull every
   photo of each matched gallery instead, or paste a single `/galleries/…` URL
@@ -98,7 +98,7 @@ Pick **Style** at creation. What changes:
 
 ## Back up everything
 
-The **💾 Back up everything** button on the Datasets library packs your whole
+The **Back up everything** button on the Datasets library packs your whole
 setup into a single file so you can move to a new machine — or recover from one
 — without losing anything.
 
@@ -117,8 +117,8 @@ setup into a single file so you can move to a new machine — or recover from on
   around; re-enter them once on the new install.
 - **How it runs**: in the background. A library can be gigabytes, so you get a
   live "X / N datasets" progress bar and can keep working. When it's done, use
-  **⬇ Download** to save the archive, or **📂 Open folder** to find it on disk.
-- **Restoring**: hand the master archive to the same **📦 Import backup** button.
+  **Download** to save the archive, or **Open folder** to find it on disk.
+- **Restoring**: hand the master archive to the same **Import backup** button.
   It restores your settings (without overwriting keys you've already entered),
   rebuilds each dataset **and its training history** — so it lands back under
   **Trained** instead of "Not trained yet", with its runs in the Runs hub.
@@ -133,36 +133,36 @@ setup into a single file so you can move to a new machine — or recover from on
 
 You exported 9 000 unsorted images from Telegram (or a scraper dumped a
 mountain of files) and a dataset only needs the best 30–150 of them. The
-**🗃️ Bank** tab is the triage funnel that gets you there — without ever
+**Bank** tab is the triage funnel that gets you there — without ever
 touching the folder itself:
 
 1. **Create a bank** — give it a name and paste the folder path. The app
    inventories every image in place (subfolders included). Nothing is copied,
    nothing is modified; rejecting an image is a reversible status, never a file
    deletion.
-2. **🔎 Scan quality** — a background pass (CPU only, a few minutes even on
+2. **Scan quality** — a background pass (CPU only, a few minutes even on
    thousands of images) scores every file: sharpness, noise, flat/empty
    frames, resolution — and groups **near-duplicates**. The flags follow the
    thresholds in *Settings → Captioning & quality*; because the raw scores are
    stored, tuning a threshold re-sorts the bank instantly, no rescan.
-3. **Cull** — use the filter chips (🌫 Blurry, 📺 Noisy, ⬜ Flat, 📐 Small,
-   ≈ Duplicates) to review the worst offenders first. **🧹 Auto-reject
+3. **Cull** — use the filter chips (Blurry, Noisy, ⬜ Flat, Small,
+   ≈ Duplicates) to review the worst offenders first. **Auto-reject
    flagged…** clears whole categories in one click (your manual ✓/✕ are never
    flipped). In the Duplicates view, resolve every group at once with **keep
    best** (highest resolution, then sharpest) or **keep first**, or pick the
    keeper by eye.
-4. **👥 Group by person** — the face pass (needs the Quality tools from Setup)
+4. **Group by person** — the face pass (needs the Quality tools from Setup)
    detects the dominant face of every remaining image and clusters the bank by
    person, *no reference photo needed*. Click a person card to see only them,
    select all, keep or reject. Embeddings are cached, so re-running after a
    cull is much faster.
-5. **⬆ Promote** — the kept images are **copied** into the dataset you choose
+5. **Promote** — the kept images are **copied** into the dataset you choose
    through the normal import path: normalized to webp, near-duplicates already
    in the dataset skipped. From there they get everything datasets have —
    captions, watermark cleaning, face scoring against a reference, training.
 
 Work the funnel in that order: quality first (cheap, catches the trash), then
-subject, then selection. A promoted image keeps its ⬆ badge in the bank so you
+subject, then selection. A promoted image keeps its badge in the bank so you
 always know what's been used where.
 
 ## Tips that save runs

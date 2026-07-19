@@ -1,6 +1,6 @@
 // react-frontend/src/components/dataset/studio/LoraRankingPanel.jsx
 /**
- * Panneau « 🏆 Classement LoRA » : alimenté par `data.lora_ranking` (déjà trié
+ * Panneau « Classement LoRA » : alimenté par `data.lora_ranking` (déjà trié
  * côté backend). Affiche, par LoRA, likes/dislikes/net/score Wilson. Repliable,
  * style calqué sur BestPerModelList (bg-surface-raised, header uppercase).
  *
@@ -18,7 +18,7 @@ export default function LoraRankingPanel({ ranking }) {
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
         className="flex items-center gap-2 text-left text-content-muted text-[0.625rem] uppercase">
         <span aria-hidden>{open ? '▾' : '▸'}</span>
-        🏆 LoRA Ranking ({ranking.length})
+        LoRA Ranking ({ranking.length})
       </button>
       {open && (
         <ol className="flex flex-col gap-1 m-0 p-0 list-none">
@@ -31,8 +31,8 @@ export default function LoraRankingPanel({ ranking }) {
                 <span className="text-content font-medium truncate max-w-[160px]" title={`${r.lora_label} — ${r.dataset_name || ''}`}>
                   {r.lora_label}
                 </span>
-                <span className="text-green-300 tabular-nums" aria-label={`${r.likes || 0} likes`}>👍 {r.likes || 0}</span>
-                <span className="text-red-300 tabular-nums" aria-label={`${r.dislikes || 0} dislikes`}>👎 {r.dislikes || 0}</span>
+                <span className="text-green-300 tabular-nums" aria-label={`${r.likes || 0} likes`}>{r.likes || 0}</span>
+                <span className="text-red-300 tabular-nums" aria-label={`${r.dislikes || 0} dislikes`}>{r.dislikes || 0}</span>
                 <span className="text-content-subtle tabular-nums" title="Likes minus dislikes">
                   net {net > 0 ? `+${net}` : net}
                 </span>

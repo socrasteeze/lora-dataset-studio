@@ -138,7 +138,7 @@ def record_for_mtime(dataset_id, family, mtime_ts):
     created BEFORE the file was written (records are created at launch, files
     after). A file older than EVERY record predates the registry — its most
     plausible owner is the OLDEST record (the legacy baseline), not the
-    newest (live sighting: yesterday's local checkpoints wore a ☁ chip
+    newest (live sighting: yesterday's local checkpoints wore a chip
     because a cloud launch happened to be the latest record). None when
     nothing is registered."""
     from datetime import datetime

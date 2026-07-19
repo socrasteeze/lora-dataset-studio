@@ -71,7 +71,7 @@ export default function LockableSlider({
                 : 'bg-white/5 border border-white/10 text-content-muted'
             }`}
           >
-            {locked ? '🔒' : '🔓'}
+            {locked ? '●' : '○'}
           </button>
         </div>
       </div>

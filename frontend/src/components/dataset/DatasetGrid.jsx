@@ -10,7 +10,7 @@ import { useToast } from '../common/Toast';
 
 const DEFAULT_GREEN = 0.50;
 
-// 3-4 line plain-language explanation for the 🎯 panel's "?" button.
+// 3-4 line plain-language explanation for the panel's "?" button.
 const AUTO_TRIAGE_HELP = [
   'Marks the UNDECIDED, face-scored images: keep when the face similarity is ≥ the threshold, reject below it.',
   'It never deletes anything and never touches your manual ✓/✕ — those are left as-is and drop out of a Re-apply.',
@@ -106,7 +106,7 @@ function AutoTriageBar({ images, datasetId, faceThresholds, onBatch, busy }) {
 
   return (
     <div className="relative flex items-center gap-3 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
-      <span className="text-content text-sm font-semibold shrink-0">🎯 Auto-triage</span>
+      <span className="text-content text-sm font-semibold shrink-0">Auto-triage</span>
       <button type="button" onClick={() => setShowHelp((v) => !v)}
         aria-expanded={showHelp} aria-label="What does auto-triage do?"
         title="What does auto-triage do?"
@@ -302,7 +302,7 @@ export default function DatasetGrid({ images, datasetId, onStatus, onCaption, on
                 title="Back to undecided" className={`${batchBtn} bg-surface text-content border border-border`}>↺ Undecide</button>
               <button type="button" disabled={bulkBusy} onClick={() => act('clear_caption')}
                 title="Delete the selected images' captions (the Caption button then regenerates them)"
-                className={`${batchBtn} bg-surface text-content border border-border`}>🧹 Clear captions</button>
+                className={`${batchBtn} bg-surface text-content border border-border`}>Clear captions</button>
               {onImprove && (
                 <button type="button" onClick={improveSelected}
                   disabled={bulkBusy || !kleinAvailable || !improveSelection.eligible.length}
@@ -313,8 +313,8 @@ export default function DatasetGrid({ images, datasetId, onStatus, onCaption, on
                       : `No selected image is eligible.${exclusionSummary ? ` ${exclusionSummary}.` : ''}`}
                   className={`${batchBtn} border border-indigo-400/50 bg-indigo-500/20 text-indigo-100`}>
                   {bulkImprove?.running
-                    ? `✨ Improving ${bulkImprove.done}/${bulkImprove.total}`
-                    : `✨ Improve via Klein (${improveSelection.eligible.length})`}
+                    ? `Improving ${bulkImprove.done}/${bulkImprove.total}`
+                    : `Improve via Klein (${improveSelection.eligible.length})`}
                 </button>
               )}
               {onImprove && improveSelection.excluded.length > 0 && (
@@ -323,7 +323,7 @@ export default function DatasetGrid({ images, datasetId, onStatus, onCaption, on
                 </span>
               )}
               <button type="button" disabled={bulkBusy} onClick={() => act('delete')}
-                className={`${batchBtn} bg-red-500/15 border border-red-500/40 text-red-300`}>🗑 Delete</button>
+                className={`${batchBtn} bg-red-500/15 border border-red-500/40 text-red-300`}>Delete</button>
               <span className="ml-auto flex gap-2">
                 <button type="button" disabled={bulkBusy}
                   onClick={() => setSelected(new Set(selectable.map((i) => i.id)))}

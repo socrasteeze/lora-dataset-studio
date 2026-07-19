@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiFetch, postJson } from '../../api/fetchClient';
 import { useToast } from '../common/Toast';
 
-/* ⚙️ Caption method options (per-dataset). Lets the user override, for THIS dataset:
+/* Caption method options (per-dataset). Lets the user override, for THIS dataset:
    - the caption engine (or leave it on the global default);
    - which pulled Ollama vision model runs — and pull a new one by name, with progress;
    - extra instructions APPENDED to the caption prompt (the kind omission rules and the
@@ -133,7 +133,7 @@ export default function CaptionOptionsPopover({ datasetId, onClose, onSaved }) {
         className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 shadow-2xl flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h3 className="text-content font-semibold text-sm">⚙️ Caption method — this dataset</h3>
+          <h3 className="text-content font-semibold text-sm">Caption method — this dataset</h3>
           <button type="button" onClick={onClose} aria-label="Close"
             className="text-content-subtle hover:text-content text-lg leading-none">×</button>
         </div>

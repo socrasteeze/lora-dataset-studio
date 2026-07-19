@@ -1,9 +1,9 @@
 """
 SAFE ComfyUI Service
 ===================
-✅ Flask-safe (no process scanning)
-✅ PID-based restart only
-✅ Windows compatible
+Flask-safe (no process scanning)
+PID-based restart only
+Windows compatible
 
 Lifted from the parent project's app/services/comfyui_service.py for LoRA
 Dataset Studio: SRC's module-level COMFYUI_API_ADDRESS constant becomes a live
@@ -75,7 +75,7 @@ class ComfyUIService:
         if self.check_connection():
             return True, "Running (External)"
 
-        logger.warning("⚠️ ComfyUI n'est pas accessible, mais le démarrage automatique est désactivé.")
+        logger.warning("⚠ ComfyUI n'est pas accessible, mais le démarrage automatique est désactivé.")
         return False, "ComfyUI not running (External management required)"
 
     def ensure_comfyui_running(self) -> Tuple[bool, str]:
@@ -89,18 +89,18 @@ class ComfyUIService:
         """
         DEPRECATED: Le redémarrage est géré par le superviseur externe ou le watchdog.
         """
-        logger.warning("⚠️ Demande de redémarrage ignorée (gestion externe).")
+        logger.warning("⚠ Demande de redémarrage ignorée (gestion externe).")
         pass
 
-    # ✅ API publique unifiée utilisée par queue_manager
+    # API publique unifiée utilisée par queue_manager
     def stop_comfyui_process(self):
         """Arrêt désactivé."""
-        logger.warning("⚠️ stop_comfyui_process ignoré.")
+        logger.warning("⚠ stop_comfyui_process ignoré.")
         return True
 
     def start_comfyui_process(self):
         """Démarrage désactivé."""
-        logger.warning("⚠️ start_comfyui_process ignoré.")
+        logger.warning("⚠ start_comfyui_process ignoré.")
         return self.check_connection()
 
     # ---------------- Prompt ----------------

@@ -12,7 +12,7 @@ function VastKeyGuide() {
   return (
     <details className="mb-2 rounded-lg border border-border bg-surface px-3 py-2 open:pb-3">
       <summary className="cursor-pointer select-none text-xs font-medium text-content">
-        <span aria-hidden>📖</span> How to get a vast.ai API key (≈2 minutes)
+        <span aria-hidden></span> How to get a vast.ai API key (≈2 minutes)
       </summary>
       <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs text-content-muted">
         <li>
@@ -215,7 +215,7 @@ export default function TrainingSection(props) {
         </div>
       </Card>
 
-      <Card title="Cloud GPU (vast.ai)" help="No local GPU? The app can rent one per run — the key below unlocks the ☁️ Train in cloud button.">
+      <Card title="Cloud GPU (vast.ai)" help="No local GPU? The app can rent one per run — the key below unlocks the Train in cloud button.">
         <SecretField field={VAST_SECRET} {...props} />
       </Card>
 

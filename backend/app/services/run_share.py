@@ -1,6 +1,6 @@
 """'Share configuration' for a training run — a paste-safe text recipe.
 
-Every card on the 🏋️ Runs hub (cloud AND local) can produce a downloadable
+Every card on the Runs hub (cloud AND local) can produce a downloadable
 `.txt` listing EVERYTHING that launch sent to ai-toolkit (family/variant/base,
 rank/alpha/lr/optimizer/resolution/steps/save_every/timestep/masked/…) plus the
 run's outcome, so it can be shared as a recipe or pasted verbatim into a

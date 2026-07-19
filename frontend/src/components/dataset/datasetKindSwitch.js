@@ -5,9 +5,9 @@
 // so the switch is honest, not magic (see backend update_dataset_settings).
 
 export const KIND_LABELS = {
-  character: '🧑 Character',
-  concept: '💡 Concept',
-  style: '🎨 Style',
+  character: 'Character',
+  concept: 'Concept',
+  style: 'Style',
 };
 
 // Mirrors the server rule (normalize_kind): only 'concept'/'style' are real

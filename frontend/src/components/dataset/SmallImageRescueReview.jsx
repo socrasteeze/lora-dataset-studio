@@ -33,7 +33,7 @@ function ImagePane({ datasetId, image, nonce, label, tone, fallback, onPreview }
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center">
             {image?.status === 'failed' ? (
-              <span aria-hidden className="text-2xl">⚠️</span>
+              <span aria-hidden className="text-2xl">⚠</span>
             ) : (
               <span aria-hidden className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-300/30 border-t-indigo-300" />
             )}
@@ -84,7 +84,7 @@ export default function SmallImageRescueReview({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 id="small-image-rescue-title" className="m-0 text-sm font-semibold text-content">
-            ✨ Small-image rescue review
+            Small-image rescue review
           </h3>
           <p className="m-0 mt-0.5 max-w-3xl text-[0.6875rem] leading-relaxed text-content-subtle">
             Klein is generative: compare identity, textures and small details. Both versions stay out
@@ -113,7 +113,7 @@ export default function SmallImageRescueReview({
                 <span className="text-xs font-semibold text-content">Pair {index + 1}</span>
                 <span className={`min-w-0 break-words text-[0.6875rem] ${
                   phase === 'failed' ? 'text-rose-300' : phase === 'queued' ? 'text-indigo-200' : 'text-emerald-300'}`}>
-                  {phase === 'failed' ? '⚠ ' : phase === 'queued' ? '⏳ ' : '✓ '}{detail}
+                  {phase === 'failed' ? '⚠ ' : phase === 'queued' ? '… ' : '✓ '}{detail}
                 </span>
                 {resolving && (
                   <span role="status" className="ml-auto text-[0.6875rem] text-content-subtle">

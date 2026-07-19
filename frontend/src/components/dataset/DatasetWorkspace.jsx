@@ -88,7 +88,7 @@ function GridFilterBar({ excludes, includes, shown, total, onRemoveExclude, onRe
   return (
     <div role="status"
       className="flex items-center gap-2 flex-wrap rounded-lg border-2 border-amber-400/50 bg-amber-400/10 px-3 py-2">
-      <span className="text-amber-200 text-sm font-semibold shrink-0">🔎 Filtered view</span>
+      <span className="text-amber-200 text-sm font-semibold shrink-0">Filtered view</span>
       <span className="text-content-muted text-xs tabular-nums shrink-0">
         showing {shown} of {total}
       </span>
@@ -402,9 +402,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const keptUncaptioned = images.filter((i) => i.status === 'keep' && !i.caption).length;
   const keptCaptioned = kept - keptUncaptioned;
   // Captions that still leak identity/concept — the Identity-leak panel lists them for
-  // in-place edit AND targeted 🔄 Re-caption (per row + a "Re-caption all leaking" header).
+  // in-place edit AND targeted Re-caption (per row + a "Re-caption all leaking" header).
   const leakingImages = images.filter((i) => i.leak);
-  // Overlaid watermarks still awaiting removal → drives the "🧽 Clean (N)" button.
+  // Overlaid watermarks still awaiting removal → drives the "Clean (N)" button.
   const watermarkDetected = images.filter((i) => i.watermark_state === 'detected').length;
   // Style de caption : défaut AUTO (SDXL booru-native → booru tags ; sinon prose), surchargé par le sélecteur.
   const effCaptionMode = captionMode || (d.train_type === 'sdxl' ? 'booru' : 'prose');
@@ -469,10 +469,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
     jumpTo(nextStep);
   };
   const nextActionLabel = !nextStep ? '' : {
-    reference: '📸 Go to reference', generate: '⚡ Go to generation', curate: '🖼️ Review the grid',
-    caption: '✨ Caption the kept ones',
-    finish: caps.training_visible ? '🎓 Go to training' : `⬇ Export ZIP (${kept})`,
-    studio: '🎛️ Open Studio',
+    reference: 'Go to reference', generate: 'Go to generation', curate: 'Review the grid',
+    caption: 'Caption the kept ones',
+    finish: caps.training_visible ? 'Go to training' : `Export ZIP (${kept})`,
+    studio: 'Open Studio',
   }[nextStep.id];
   // Keep the inspected image in sync with poll refreshes (label/status updates).
   const viewImgLive = viewImg ? {
@@ -652,12 +652,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const sectionCls = (id) => (section === id ? 'flex flex-col gap-3' : 'hidden');
 
   // Discreet entry point kept in "Add images" after the scraper moved to its own
-  // 🕸 Scrape destination — preserves the build-flow's discoverability without the
+  // Scrape destination — preserves the build-flow's discoverability without the
   // long accordion. Navigates to the Scrape section and focuses its gallery-URL input.
   const scrapeLink = (
     <button type="button" onClick={() => navigateToPanel('scrape', 'scan')}
       className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-content-muted hover:text-content hover:bg-surface-raised transition-colors">
-      <span aria-hidden>🕸</span>
+      <span aria-hidden></span>
       <span className="text-sm font-medium">Scrape images from the web</span>
       <span className="text-content-subtle text-[0.6875rem]">scan a gallery URL, pick images, import full-frame</span>
       <span aria-hidden className="ml-auto text-content-subtle">→</span>
@@ -696,7 +696,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
         <div className="ml-auto flex items-center gap-2">
           <button type="button" disabled={!kept} onClick={exportZipGuarded}
             className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
-            ⬇ Export ZIP ({kept})
+            Export ZIP ({kept})
           </button>
           {/* summary en display:flex → pas de marqueur natif ; les items restent
               montés en permanence (details ne fait que masquer l'affichage). */}
@@ -710,7 +710,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               <button type="button" onClick={() => setSettingsOpen(true)}
                 title={isStyle ? 'Edit the Style dataset name and review its always-on behavior.' : 'Edit the dataset name, trigger word, and (for concept datasets) the concept description that drives the caption avoid-list.'}
                 className={MENU_ITEM}>
-                ⚙️ Edit settings
+                Edit settings
                 <span className="ml-auto text-content-subtle text-[0.625rem]">
                   {isStyle ? 'name · always-on' : `name · trigger${isConcept ? ' · concept' : ''}`}
                 </span>
@@ -722,7 +722,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     ? 'Body fidelity ON: captions also omit tattoos/scars/marks (they bind to the trigger), composition targets more bust/body shots, imports keep the full frame by default. Click to go back to face-only.'
                     : 'Face-only fidelity (default): the LoRA learns the face; body shape follows the prompt. Click for FULL-BODY fidelity (body shape & marks bind to the trigger too).'}
                   className={`${MENU_ITEM} ${bodyFid ? 'text-emerald-300' : ''}`}>
-                  🧍 Body fidelity
+                  Body fidelity
                   <span className={`ml-auto text-[0.625rem] ${bodyFid ? 'text-emerald-300 font-semibold' : 'text-content-subtle'}`}>
                     {bodyFid ? '✓ on' : 'off'}
                   </span>
@@ -801,7 +801,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <button type="button" onClick={ds.cancelCaption} disabled={!!act?.cancelling}
                   title="Stops after the current image finishes — captions already written are kept; the rest stays uncaptioned."
                   className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                  {act?.cancelling ? 'Stopping…' : '⏹ Stop'}
+                  {act?.cancelling ? 'Stopping…' : 'Stop'}
                 </button>
               )}
             </div>
@@ -809,7 +809,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
 
           {pending > 0 && (
             <div className="flex items-center gap-3 rounded-lg border-2 border-indigo-400/60 bg-indigo-500/15 px-3 py-2.5">
-              <span className="animate-pulse text-lg" aria-hidden>⏳</span>
+              <span className="animate-pulse text-lg" aria-hidden></span>
               <div className="flex flex-col">
                 <span className="text-content text-sm font-semibold">
                   {pending} generation(s) in progress…
@@ -821,12 +821,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
               <button type="button" onClick={ds.cancelPending} disabled={ds.busy}
                 title="Cancels every generation still in flight; finished images stay."
                 className="ml-auto shrink-0 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold disabled:opacity-40">
-                ⏹ Stop generation
+                Stop generation
               </button>
             </div>
           )}
 
-          {/* ============ 🖼️ Images — la grille : triage ✓/✕, filtres, tri auto. */}
+          {/* ============ Images — la grille : triage ✓/✕, filtres, tri auto. */}
           <div className={sectionCls('images')}>
             {heading('images')}
             <p className="m-0 text-content-subtle text-[0.75rem] tabular-nums">
@@ -868,14 +868,14 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </div>
           </div>
 
-          {/* ============ 📸 Add images — constituer le dataset. Concept : sources
+          {/* ============ Add images — constituer le dataset. Concept : sources
                scrapées + import brut. Personnage : référence puis génération/import. */}
           <div className={sectionCls('add')}>
             {heading('add')}
             {isConceptual ? (
               // Concept : pas de photo de référence ni de générateur — on peuple le
               // dataset par upload manuel et/ou via le scraper, qui vit désormais dans
-              // sa propre section 🕸 Scrape (lien discret ci-dessous).
+              // sa propre section Scrape (lien discret ci-dessous).
               <div id="gf-reference" className="scroll-mt-20 flex flex-col gap-2">
                 {scrapeLink}
                 <div id="ds-add-import" tabIndex={-1} className="scroll-mt-20">
@@ -922,7 +922,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <ImportDropzone key={`${d.id}-${bodyFid}`} onImport={(f, o) => ds.importFiles(f, o)}
                       busy={importBusy} visionBusy={visionImportBusy} cropOption defaultCrop={!bodyFid} />
                   </div>
-                  {/* Scraper moved to its own 🕸 Scrape destination — keep a discreet
+                  {/* Scraper moved to its own Scrape destination — keep a discreet
                       link here so the build flow still surfaces it without burying the
                       reference/generate flow under a long accordion. */}
                   {scrapeLink}
@@ -931,7 +931,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             )}
           </div>
 
-          {/* ============ 🕸 Scrape — its own destination now (moved out of "Add
+          {/* ============ Scrape — its own destination now (moved out of "Add
                images"): scan a gallery URL → pick thumbnails → import full-frame, then
                crop each tile manually (✂ on the card). One ConceptSourcesPanel serves
                every dataset kind. */}
@@ -943,7 +943,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </div>
           </div>
 
-          {/* ============ 🧹 Curation — passes de qualité sur les images gardées :
+          {/* ============ Curation — passes de qualité sur les images gardées :
                ressemblance faciale, watermarks (find → clean → review), purge. */}
           <div className={sectionCls('curation')}>
             {heading('curation')}
@@ -959,8 +959,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     title={d.ref_filename ? "Scores each image's facial resemblance vs the reference (deletes nothing)" : "Set a reference photo first"}
                     className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border scroll-mt-20">
                     {ds.analyzing
-                      ? `🎭 Analyzing…${act?.kind === 'analyze_faces' && act.total ? ` ${act.done}/${act.total}` : ''}`
-                      : '🎭 Analyze faces'}
+                      ? `Analyzing…${act?.kind === 'analyze_faces' && act.total ? ` ${act.done}/${act.total}` : ''}`
+                      : 'Analyze faces'}
                   </button>
                 )}
                 <div id="ds-curation-watermarks" tabIndex={-1}
@@ -972,8 +972,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   title="Scans the kept images for overlaid watermarks/logos/URLs added on top of the photo (deletes nothing)"
                   className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
                   {ds.watermarking
-                    ? `🧽 Scanning…${act?.kind === 'watermark_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
-                    : '🧽 Find watermarks'}
+                    ? `Scanning…${act?.kind === 'watermark_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
+                    : 'Find watermarks'}
                 </button>
                 <HelpBadge topic="action-watermark-clean" />
                 {watermarkDetected > 0 && (
@@ -1026,9 +1026,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       ? (allowAutoCrop
                         ? 'Removes them: border marks are cropped, small off-center marks are inpainted (LaMa), on-subject marks are flagged for manual review'
                         : 'Auto-crop off: border marks are repainted (LaMa) instead of cropped; large/on-subject marks are flagged for manual review')
-                      : 'Removes border marks by cropping. Inpainting (LaMa) needs a one-time install — use ⬇ Install inpainting next to this button; off-center marks are skipped until then'}
+                      : 'Removes border marks by cropping. Inpainting (LaMa) needs a one-time install — use Install inpainting next to this button; off-center marks are skipped until then'}
                     className="px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-sm font-semibold disabled:opacity-40">
-                    🧽 Clean ({watermarkDetected})
+                    Clean ({watermarkDetected})
                   </button>
                   </>
                 )}
@@ -1042,7 +1042,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     onClick={() => setReviewQueue(images.filter((i) => i.watermark_state === 'detected'))}
                     title="Step through the flagged images one by one — see each detected box and Clean, dismiss a false positive, or reject"
                     className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40 scroll-mt-20">
-                    🔍 Review flagged ({watermarkDetected})
+                    Review flagged ({watermarkDetected})
                   </button>
                 )}
                 {/* Watermark inpainting (LaMa) needs one extra ML package (simple-lama-
@@ -1056,7 +1056,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     aria-expanded={installInpaintOpen}
                     title="Install the watermark-inpainting package (LaMa) so off-center marks can be repainted instead of only cropped. One-time download (~hundreds of MB)."
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-amber-400/50 bg-amber-500/5 text-amber-200/90 text-sm hover:bg-amber-500/10">
-                    ⬇ Install inpainting
+                    Install inpainting
                     <span className="text-content-subtle text-[0.625rem] font-normal">one-time · ~hundreds of MB</span>
                     <span aria-hidden className="text-content-subtle text-xs">{installInpaintOpen ? '▴' : '▾'}</span>
                   </button>
@@ -1072,20 +1072,20 @@ export default function DatasetWorkspace({ ds, onBack }) {
               {installInpaintOpen && !caps.watermark_inpaint && (
                 <div className="rounded-lg border border-amber-400/40 bg-amber-500/5 p-3 flex flex-col gap-2">
                   <div className="flex items-start gap-2">
-                    <span aria-hidden className="text-lg leading-none">🧽</span>
+                    <span aria-hidden className="text-lg leading-none"></span>
                     <div className="flex flex-col">
                       <span className="text-amber-200 text-sm font-semibold">Install watermark inpainting (LaMa)</span>
                       <span className="text-content-subtle text-[0.6875rem]">
                         Adds the <code className="text-amber-200/90">simple-lama-inpainting</code> package
                         (pulls a CPU torch — one-time download, ~hundreds of MB). No restart, no GPU:
-                        once done, ⬇ inpaints small off-center marks instead of skipping them.
+                        once done, inpaints small off-center marks instead of skipping them.
                       </span>
                     </div>
                     <button type="button" onClick={() => setInstallInpaintOpen(false)}
                       className="ml-auto shrink-0 text-content-subtle hover:text-content text-sm"
                       aria-label="Close the inpainting installer">✕</button>
                   </div>
-                  <InstallRunner action="watermark_inpaint" buttonLabel="⬇ Download & install"
+                  <InstallRunner action="watermark_inpaint" buttonLabel="Download & install"
                     onDone={() => refreshCaps(true)} />
                 </div>
               )}
@@ -1101,7 +1101,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     }}
                     title="Permanently delete rejected and failed images"
                     className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm disabled:opacity-40">
-                    🧹 Purge rejected/failed ({unused})
+                    Purge rejected/failed ({unused})
                   </button>
                   <span className="text-content-subtle text-[0.6875rem]">
                     frees disk space — rejected images never train either way
@@ -1111,7 +1111,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </div>
           </div>
 
-          {/* ============ ✍️ Captions — générer/regénérer les captions, surveiller
+          {/* ============ ✍ Captions — générer/regénérer les captions, surveiller
                les fuites (identité/concept), outils de masse (find/replace, tags). */}
           <div className={sectionCls('captions')}>
             {heading('captions')}
@@ -1122,14 +1122,14 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <select value={effCaptionMode} onChange={(e) => setCaptionMode(e.target.value)} disabled={ds.busy}
                     title="Caption style — Prose (Z-Image) or Booru tags (SDXL booru-native, e.g. bigLove). Defaults to auto based on the dataset's type."
                     className="px-2 py-1.5 rounded-lg bg-surface border border-border text-content text-[0.8125rem] disabled:opacity-40">
-                    <option value="prose">📝 Prose</option>
-                    <option value="booru">🏷️ Booru tags</option>
+                    <option value="prose">Prose</option>
+                    <option value="booru">Booru tags</option>
                   </select>
                 )}
                 <button type="button" data-workspace-focus
                   onClick={() => ds.caption(effCaptionMode)} disabled={ds.busy}
                   className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
-                  {ds.captioning ? `✨ ${keptCaptioned}/${kept} captioned…` : '✨ Caption the kept ones'}
+                  {ds.captioning ? `${keptCaptioned}/${kept} captioned…` : 'Caption the kept ones'}
                 </button>
                 <HelpBadge topic="action-caption-generate" />
                 <button type="button" disabled={ds.busy || !keptCaptioned}
@@ -1142,13 +1142,13 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       ? "Re-generates every caption as content-only text without naming the aesthetic"
                       : "Re-generates every caption without describing identity (face/hair)"}
                   className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
-                  🔄 Re-caption
+                  Re-caption
                 </button>
                 <button type="button" data-workspace-focus
                   onClick={() => setCaptionOptionsOpen(true)} disabled={ds.busy}
                   title="Choose the caption engine, Ollama model and vocabulary, pull a new model, and add custom instructions — for this dataset"
                   className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
-                  ⚙️ Options
+                  Options
                 </button>
                 <HelpBadge topic="action-caption-options" />
                 {/* Caption-leak badge — KIND-aware. character: identity words
@@ -1162,7 +1162,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     title="Every Style image needs a content-only caption: describe subject, action and setting, but do not name the aesthetic, medium or artist. No activation trigger is added.">
                     {keptUncaptioned
                       ? `⚠ ${keptUncaptioned} missing · content-only captions required · no trigger`
-                      : `✅ ${keptCaptioned}/${kept} content-only captions · no trigger`}
+                      : `${keptCaptioned}/${kept} content-only captions · no trigger`}
                   </span>
                 ) : d.caption_leak && (
                   d.caption_leak.captioned > 0 ? (
@@ -1181,8 +1181,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                           ? 'text-emerald-400 decoration-emerald-400/40'
                           : 'text-amber-400 decoration-amber-400/50'}`}>
                       {d.caption_leak.leaking === 0
-                        ? `✅ 0 ${isConcept ? 'concept' : 'identity'} leaks · ${d.caption_leak.captioned} captions checked`
-                        : `⚠️ ${d.caption_leak.leaking}/${d.caption_leak.captioned} captions leak ${isConcept ? 'the concept' : 'identity'}`}
+                        ? `0 ${isConcept ? 'concept' : 'identity'} leaks · ${d.caption_leak.captioned} captions checked`
+                        : `⚠ ${d.caption_leak.leaking}/${d.caption_leak.captioned} captions leak ${isConcept ? 'the concept' : 'identity'}`}
                       {' '}{showLeaks ? '▴' : '▾'}
                     </button>
                   ) : kept > 0 ? (
@@ -1206,7 +1206,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               {showLeaks && !isStyle && (
                 <div className="rounded-lg border border-border bg-surface-raised p-3 flex flex-col gap-3 text-[0.75rem]">
                   <div className="flex items-start gap-2">
-                    <span aria-hidden className="text-base leading-none">🎭</span>
+                    <span aria-hidden className="text-base leading-none"></span>
                     <div className="flex flex-col gap-1">
                       <span className="text-content font-semibold text-sm">{isConcept ? 'Concept-leak check' : 'Identity-leak check'}</span>
                       {isConcept ? (
@@ -1274,10 +1274,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   ) : d.caption_leak?.leaking === 0 ? (
                     <p className="m-0 text-emerald-400/90 leading-relaxed">
                       {isConcept
-                        ? <>✅ All clear — every caption describes the scene while leaving the concept
+                        ? <>All clear — every caption describes the scene while leaving the concept
                           unspoken, so it will bind to your trigger. It’s a real result on {d.caption_leak?.captioned} caption(s),
                           not a check that didn’t run.</>
-                        : <>✅ All clear — and this is expected. The app’s captioner is built to describe pose,
+                        : <>All clear — and this is expected. The app’s captioner is built to describe pose,
                           clothing, setting and framing but never the person’s identity, so a clean character
                           set genuinely reads 0. It’s a real result on {d.caption_leak?.captioned} caption(s),
                           not a check that didn’t run.</>}
@@ -1293,8 +1293,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                           <div className="flex items-start justify-between gap-2 flex-wrap">
                             <span className="text-amber-300 text-[0.8125rem] font-semibold">
                               {isConcept
-                                ? <>Captions naming the concept ({d.caption_leak?.leaking}) — remove the concept words, or 🔄 Re-caption. Edits save when you click away.</>
-                                : <>Captions leaking identity ({d.caption_leak?.leaking}) — remove the highlighted words, or 🔄 Re-caption. Edits save when you click away.</>}
+                                ? <>Captions naming the concept ({d.caption_leak?.leaking}) — remove the concept words, or Re-caption. Edits save when you click away.</>
+                                : <>Captions leaking identity ({d.caption_leak?.leaking}) — remove the highlighted words, or Re-caption. Edits save when you click away.</>}
                               <HelpBadge topic="action-recaption-targeted" className="ml-1" />
                             </span>
                             {leakingImages.length > 1 && (
@@ -1305,7 +1305,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                   ? 'Re-generate every leaking caption while keeping the concept unspoken'
                                   : 'Re-generate every leaking caption without describing identity (face/hair)'}
                                 className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-200 text-[0.75rem] font-semibold border border-amber-400/40 hover:bg-amber-500/25 disabled:opacity-40">
-                                🔄 Re-caption all leaking ({leakingImages.length})
+                                Re-caption all leaking ({leakingImages.length})
                               </button>
                             )}
                           </div>
@@ -1334,14 +1334,14 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                   ? 'Re-generate this caption while keeping the concept unspoken'
                                   : 'Re-generate this caption without describing identity (face/hair)'}
                                 className="self-start px-2 py-0.5 rounded-lg bg-surface text-content text-[0.6875rem] border border-border hover:bg-surface-raised disabled:opacity-40">
-                                {rowBusy ? '⏳ Re-captioning…' : '🔄 Re-caption'}
+                                {rowBusy ? 'Re-captioning…' : 'Re-caption'}
                               </button>
                             </div>
                           </div>
                         );
                       })}
                       {leakingImages.length === 0 && (
-                        <p className="m-0 text-emerald-400 text-[0.8125rem]">✅ All clear — no leaking caption left.</p>
+                        <p className="m-0 text-emerald-400 text-[0.8125rem]">All clear — no leaking caption left.</p>
                       )}
                     </div>
                   )}
@@ -1360,7 +1360,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
               </div>
               {filtersActive && (
                 <p className="m-0 text-content-subtle text-[0.6875rem]">
-                  🔎 A tag filter is active — the filtered grid lives in{' '}
+                  A tag filter is active — the filtered grid lives in{' '}
                   <button type="button" onClick={() => setSection('images')}
                     className="underline hover:text-content">Images</button>
                   {' '}(showing {gridImages.length} of {images.length}).
@@ -1369,7 +1369,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </div>
           </div>
 
-          {/* ============ 📦 Import & export — fusionner un dataset existant ;
+          {/* ============ Import & export — fusionner un dataset existant ;
                sortir celui-ci (ZIP d'entraînement, backup portable, HF Hub). */}
           <div className={sectionCls('export')}>
             {heading('export')}
@@ -1381,12 +1381,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onClick={() => zipInput.current?.click()} disabled={importBusy}
                   title="Merge an existing training dataset into this one: a ZIP of images with kohya-style same-name .txt captions (any folder layout). Aspect kept, perceptual duplicates skipped."
                   className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
-                  📦 Import dataset (ZIP)
+                  Import dataset (ZIP)
                 </button>
                 <button type="button" disabled={importBusy} onClick={importFolderPrompt}
                   title="Merge an existing training dataset already on this machine's disk: a folder of images with kohya-style same-name .txt captions (subfolders included). Aspect kept, perceptual duplicates skipped."
                   className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
-                  📂 Import from folder…
+                  Import from folder…
                 </button>
                 <span className="text-content-subtle text-[0.6875rem]">
                   merges images + same-name .txt captions in — duplicates are skipped
@@ -1406,7 +1406,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <button type="button" data-workspace-focus={kept ? '' : undefined}
                     disabled={!kept} onClick={exportZipGuarded}
                     className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
-                    ⬇ Export ZIP ({kept})
+                    Export ZIP ({kept})
                   </button>
                   <span className="text-content-subtle text-[0.6875rem]">
                     kept images + captions, training-ready (kohya layout)
@@ -1417,7 +1417,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <button type="button" data-workspace-focus onClick={ds.exportBackup}
                     title="Full portable backup: all images with statuses, captions, scores and settings — restore it on any machine from the Datasets page."
                     className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm">
-                    💾 Backup
+                    Backup
                   </button>
                   <span className="text-content-subtle text-[0.6875rem]">
                     portable copy — restore it on any machine from the Datasets page
@@ -1430,7 +1430,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       onClick={() => setPublishHfOpen(true)}
                       title="Publish this dataset (kept images + captions) as a dataset repo on the Hugging Face Hub. Private by default; you choose the license and confirm you have the right to share."
                       className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm">
-                      🤗 Publish to Hugging Face
+                      Publish to Hugging Face
                     </button>
                     <span className="text-content-subtle text-[0.6875rem]">
                       dataset repo on the Hub — private by default
@@ -1441,7 +1441,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </div>
           </div>
 
-          {/* ============ 🎓 Training — readiness, launch, progress and options. */}
+          {/* ============ Training — readiness, launch, progress and options. */}
           <div className={sectionCls('training')}>
             {heading('training')}
             <div id="gf-training" className="scroll-mt-20 flex flex-col gap-2">
@@ -1477,7 +1477,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </div>
           </div>
 
-          {/* ============ 🎛️ Studio — final stage and dedicated-page launcher. */}
+          {/* ============ Studio — final stage and dedicated-page launcher. */}
           <div className={sectionCls('studio')}>
             {heading('studio')}
             <div id="gf-studio" className="scroll-mt-20 flex flex-col gap-2">
@@ -1485,7 +1485,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <button id="ds-studio-launcher" type="button" data-workspace-focus
                   onClick={() => navigate(`/studio?dataset=${d.id}`)}
                   className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/5 px-3 py-2.5 text-left hover:bg-purple-500/10 transition-colors scroll-mt-20">
-                  <span aria-hidden>🎛️</span>
+                  <span aria-hidden></span>
                   <span className="text-content font-semibold text-sm">LoRA testing studio</span>
                   {d.best_settings && (
                     <span className="text-amber-300 text-[0.6875rem]" title="Saved winning settings">

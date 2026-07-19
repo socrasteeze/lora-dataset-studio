@@ -56,11 +56,11 @@ The four repos:
 
 ## Phases
 
-### Phase 0 — LDS goes local-only ✅ (shipped 2026-07-19)
+### Phase 0 — LDS goes local-only (shipped 2026-07-19)
 
 - Nano Banana (Gemini) and ChatGPT (`gpt-image-2`) engines removed end to end;
   Klein (ComfyUI) is the sole generation engine. See `FORK_NOTES.md`.
-- **Klein model-file pins** ✅: `klein.unet` / `klein.text_encoder` /
+- **Klein model-file pins** : `klein.unet` / `klein.text_encoder` /
   `klein.vae` in Settings → Image engine name the exact loader files (including
   files outside `klein`-named folders and `extra_model_paths.yaml` roots), with
   honest ⚠ badges when a pin isn't on disk.

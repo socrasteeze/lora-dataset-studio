@@ -62,7 +62,7 @@ Use **＋ New preset**, **Duplicate**, **Delete** and rename to manage them, and
 
 How presets are used matters:
 
-- A preset is **chosen per run** in the **🖥️ Klein tuning** panel of the workspace, and it **defaults to *None* every visit** — presets never apply on their own.
+- A preset is **chosen per run** in the **Klein tuning** panel of the workspace, and it **defaults to *None* every visit** — presets never apply on their own.
 - Resolution happens **by name** on the server, and it's **fail-closed**: if a run references a preset name that no longer exists, it runs **with no extra LoRAs** rather than erroring.
 - **Trap:** *renaming* a preset does **not** follow a run that referenced it by the old name — that run silently falls back to no extra LoRAs. Rename before you queue, or re-pick the preset on the run.
 - There is deliberately **no automatic NSFW gating** on individual LoRAs — the preset you pick carries the intent. If you want an "NSFW full" stack, make it a preset.
@@ -150,22 +150,22 @@ Raise them for a stricter set, lower them if good shots are being flagged too ha
 
 ### Image bank triage
 
-Thresholds for the **🗃️ Bank** quality flags. Every scanned image stores its
+Thresholds for the **Bank** quality flags. Every scanned image stores its
 **raw scores**, and the flags are recomputed against these values on every
 read — so changing a threshold re-sorts an already-scanned bank instantly,
 with **no rescan**. (The two exceptions are noted below.)
 
-- **Sharpness minimum** → `bank.sharpness_min`. Variance of the Laplacian (the classic focus measure) under this = flagged **🌫 blurry**. Default **`100`**. Raise it to be stricter about focus, lower it if artistic soft shots get flagged.
-- **Noise maximum** → `bank.noise_max`. High-frequency residual (RMS vs a Gaussian blur) over this = flagged **📺 noisy**. Default **`15`**. Heavily textured images (foliage, fabric) score high by nature — this is a flag to review, not a verdict.
+- **Sharpness minimum** → `bank.sharpness_min`. Variance of the Laplacian (the classic focus measure) under this = flagged **blurry**. Default **`100`**. Raise it to be stricter about focus, lower it if artistic soft shots get flagged.
+- **Noise maximum** → `bank.noise_max`. High-frequency residual (RMS vs a Gaussian blur) over this = flagged **noisy**. Default **`15`**. Heavily textured images (foliage, fabric) score high by nature — this is a flag to review, not a verdict.
 - **Uniformity minimum** → `bank.uniformity_min`. Grayscale spread under this = flagged **⬜ flat** (solid colors, black frames, empty screenshots). Default **`12`**.
-- **Minimum side (px)** → `bank.min_side`. Smaller image side under this = flagged **📐 small**. Default **`768`** — the same bar as the dataset import guard, because trainers only ever *downscale*.
+- **Minimum side (px)** → `bank.min_side`. Smaller image side under this = flagged **small**. Default **`768`** — the same bar as the dataset import guard, because trainers only ever *downscale*.
 - **Duplicate distance** → `bank.dup_distance`. How many of the 64 perceptual-hash bits two images may differ by and still be grouped as **≈ near-duplicates**. Default **`8`** (the same hash and distance the dataset import dedup uses). *Applies at the next quality scan* (groups are rebuilt then).
-- **Same-person similarity** → `bank.face_threshold`. Cosine similarity at or above which two faces cluster as the same person in **👥 Group by person**. Default **`0.45`**. Raise it if different people get merged into one cluster; lower it if the same person splits into several. *Applies at the next face pass* (embeddings are cached, so re-clustering is fast).
-- **Aesthetic minimum** → `bank.aesthetic_min`. LAION aesthetic score (~1–10) under which an image is flagged **💔 low aesthetic** — the "keep the nice ones" cut. Default **`5`**. Only images the **✨ Score** pass reached carry a score; an unscored image is never flagged. The score also drives "keep best" on duplicate groups (the nicest-looking copy wins).
-- **NSFW maximum** → `bank.nsfw_max`. NSFW probability (0–1) over which an image is flagged **🔞 NSFW**, to split a mixed SFW/NSFW dump. Default **`0.5`**. Set by the **✨ Score** pass; a review flag, not a verdict.
-- **Same-style similarity** → `bank.style_threshold`. Cosine similarity on the CLIP image embeddings at or above which two images share a visual **🎨 style** (screenshots/memes cluster apart from photoreal) in the **✨ Score** pass. Default **`0.6`**. *Applies at the next scoring pass* (embeddings are cached, so re-clustering at another threshold is fast).
+- **Same-person similarity** → `bank.face_threshold`. Cosine similarity at or above which two faces cluster as the same person in **Group by person**. Default **`0.45`**. Raise it if different people get merged into one cluster; lower it if the same person splits into several. *Applies at the next face pass* (embeddings are cached, so re-clustering is fast).
+- **Aesthetic minimum** → `bank.aesthetic_min`. LAION aesthetic score (~1–10) under which an image is flagged **low aesthetic** — the "keep the nice ones" cut. Default **`5`**. Only images the **Score** pass reached carry a score; an unscored image is never flagged. The score also drives "keep best" on duplicate groups (the nicest-looking copy wins).
+- **NSFW maximum** → `bank.nsfw_max`. NSFW probability (0–1) over which an image is flagged **🔞 NSFW**, to split a mixed SFW/NSFW dump. Default **`0.5`**. Set by the **Score** pass; a review flag, not a verdict.
+- **Same-style similarity** → `bank.style_threshold`. Cosine similarity on the CLIP image embeddings at or above which two images share a visual **style** (screenshots/memes cluster apart from photoreal) in the **Score** pass. Default **`0.6`**. *Applies at the next scoring pass* (embeddings are cached, so re-clustering at another threshold is fast).
 
-The **✨ Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** extra (Setup ▸ Quality tools); **🚩 Find watermarks** reuses the vision model from **Captioning**. Both are GPU passes, serialized against training and captioning, and detection-only — the bank never edits your source files.
+The **Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** extra (Setup ▸ Quality tools); **Find watermarks** reuses the vision model from **Captioning**. Both are GPU passes, serialized against training and captioning, and detection-only — the bank never edits your source files.
 
 ## Training
 
@@ -177,7 +177,7 @@ Defaults for new runs, plus everything about the optional cloud training lane.
 
 ### Cloud GPU (vast.ai)
 
-- **vast.ai API key** → `VAST_API_KEY` (secret). Add it to unlock **☁️ Train in cloud**. **Test** validates it (and auto-saves it first). The card includes a step-by-step guide to getting the key from [cloud.vast.ai](https://cloud.vast.ai/).
+- **vast.ai API key** → `VAST_API_KEY` (secret). Add it to unlock **Train in cloud**. **Test** validates it (and auto-saves it first). The card includes a step-by-step guide to getting the key from [cloud.vast.ai](https://cloud.vast.ai/).
 
 ### Cloud training
 
@@ -195,7 +195,7 @@ Guard-rails on cost and host quality for rented pods. The card also shows a live
 
 ### Advanced options (per run)
 
-These live under **⚙️ Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. One is worth calling out because of a caveat:
+These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. One is worth calling out because of a caveat:
 
 - **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Local training only for now:** the cloud pod's dataset upload doesn't carry the JSON caption file the short is read from, so cloud runs train on the long caption alone.
 
@@ -217,20 +217,20 @@ Housekeeping and diagnostics. Only one true setting lives here; the rest are act
 
 - **Updates** — **Check for updates** and **Update & restart**, plus a *see what's in this update* compare link. **The button adapts to how you installed.** A **git checkout** fast-forwards to the latest commits. A **packaged (ZIP) install** announces the release and its size (*Update to vX — download ~XX MB*) and shows a **live progress bar** while it downloads and installs (a release ZIP is far larger than a git pull), then backs up the current files and swaps in the new ones — keeping `data/`, `config.json`, `.env` and your `.venv` untouched — and restarts. A mid-way failure rolls back automatically, so a broken download never leaves you with a half-updated install. If the app can't identify a downloadable release (no ZIP asset, or offline), the button steps aside and links to the releases page instead of promising an update it can't perform.
 - **Trash** — **Open folder** and **Empty trash**. Everything the app deletes goes here first; emptying is the one destructive action, and it asks for confirmation.
-- **Back up everything** — not on this page but on the **Datasets library**: one button archives every dataset, its **training history** and your settings into a single file (⬇ download or 📂 open folder), and the library's **Import backup** restores it — datasets come back under **Trained**, not "Not trained yet". Tick **Include trained LoRAs** to bundle the (large) trained `.safetensors` too. **API keys and tokens are never included** — re-enter them on the new install. See *Using the app → Back up everything*.
+- **Back up everything** — not on this page but on the **Datasets library**: one button archives every dataset, its **training history** and your settings into a single file (download or open folder), and the library's **Import backup** restores it — datasets come back under **Trained**, not "Not trained yet". Tick **Include trained LoRAs** to bundle the (large) trained `.safetensors` too. **API keys and tokens are never included** — re-enter them on the new install. See *Using the app → Back up everything*.
 - **Dataset images root** → `paths.dataset_images_root`. Where dataset images are stored. Default **empty → `<data dir>/datasets`**. Point it at a bigger or faster drive if your default data directory is tight on space.
 - **Diagnostic report** — a one-click, **paste-safe** report for bug reports: it carries the version, capability status and a log tail, with **no secrets** and file paths reduced to booleans (present/absent). Safe to drop into Discord or a GitHub issue.
 - **Server log** — a live tail of the server log, with **Copy all**, for when you need to see what just happened.
 
 ## Per-dataset settings
 
-Separate from everything above: these live **per dataset**, in the **⚙ Dataset settings** modal you open from the workspace. They travel with that one dataset and don't touch the global Settings page.
+Separate from everything above: these live **per dataset**, in the **Dataset settings** modal you open from the workspace. They travel with that one dataset and don't touch the global Settings page.
 
 - **Name** — the dataset's display name.
-- **Dataset kind** *(🧑 Character / 💡 Concept / 🎨 Style)* — the nature of the LoRA, chosen at creation but changeable here. It is the disruptive setting, so picking a different pill reveals a confirmation block that spells out **what changes** and **what is kept** before you save:
+- **Dataset kind** *(Character / Concept / Style)* — the nature of the LoRA, chosen at creation but changeable here. It is the disruptive setting, so picking a different pill reveals a confirmation block that spells out **what changes** and **what is kept** before you save:
   - *What changes* — the **caption strategy** (Character leaves out identity; Concept leaves out the recurring concept; Style leaves out the aesthetic), which **panels show** (Reference photo, Generate variations and Face analysis are Character-only — they appear when you become a Character and are hidden otherwise), the **trigger's role** (Style has none; switching to Character/Concept brings the field back, prefilled), and Character-only settings such as **face/body fidelity**. Switching **to Concept** requires a concept description.
   - *What is kept* — **nothing is deleted.** Every image, its caption text, keep/reject status, face scores, watermark work and **training history** stay exactly as they are (past runs are named by the model family and trigger, never the kind). A concept description is remembered so switching back restores it.
-  - Existing captions were written for the **old** kind and are **not** rewritten automatically — use **🔄 Re-caption** in the Captions section to apply the new strategy. The switch is refused while the dataset has work in progress (generation, captioning or a quality pass) — wait for it to finish.
+  - Existing captions were written for the **old** kind and are **not** rewritten automatically — use **Re-caption** in the Captions section to apply the new strategy. The switch is refused while the dataset has work in progress (generation, captioning or a quality pass) — wait for it to finish.
 - **Trigger word** — the word you put in prompts to summon this LoRA (Character and Concept datasets). Safe to change anytime — it's added at export, so existing captions don't need redoing. **Style datasets don't have one**: Style is always-on, and the modal shows a note reminding you to control the effect with the LoRA weight instead.
 - **Concept description** *(Concept datasets only)* — the thing the LoRA learns, i.e. exactly what captions must **omit**. Editing it rebuilds the caption avoid-list, so **re-caption** afterwards to apply the new list to images already captioned.
 - **Prompt suffixes** *(collapsible — optional creative direction)* — free text appended to **generated** variations at generation time, to steer a global look without rewriting anything:
@@ -239,7 +239,7 @@ Separate from everything above: these live **per dataset**, in the **⚙ Dataset
 
   Key behaviours: these are **applied at generation time and never stored into a tile's own prompt** (so a regenerate can't double-apply them), the **identity lock always comes first** — a suffix can't override it, clearing a field removes that suffix, and existing images stay as they are until you **regenerate** to apply.
 
-  You can also edit the very same suffixes **inline in the generation panel** (the collapsible *✨ Prompt suffixes* row under the shot picker), which is handy for tuning them **per batch** without opening this modal — both surfaces read and write the one dataset value, and an edit made there is saved the moment you press **Generate**.
+  You can also edit the very same suffixes **inline in the generation panel** (the collapsible *Prompt suffixes* row under the shot picker), which is handy for tuning them **per batch** without opening this modal — both surfaces read and write the one dataset value, and an edit made there is saved the moment you press **Generate**.
 
 ## Config-file-only settings
 

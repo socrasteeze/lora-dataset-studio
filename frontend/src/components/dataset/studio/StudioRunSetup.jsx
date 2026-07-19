@@ -3,7 +3,7 @@
  * Panneau de réglage d'un run du Studio autonome : strengths à balayer, prompt
  * libre, seed (+ relance aléatoire), nombre d'images par config. Affiche le COÛT
  * GPU (nombre de cellules = LoRA × strengths × count) AVANT lancement, puis le
- * bouton « 🚀 Lancer le test ».
+ * bouton « Lancer le test ».
  *
  * État local minimal (inspiré de RunSetupPanel/useStudioForm mais autonome — pas
  * lié à un dataset précis puisqu'on teste plusieurs LoRA). Le parent (StudioShell)
@@ -22,7 +22,7 @@ export default function StudioRunSetup({
   prompt, onPrompt, seed, onReroll, count, onCount,
   onLaunch, launching, gpuBusy, batchMult = 1,
 }) {
-  // batchMult = 1 + nb de LoRA cochés « ⚖ batch » (axe sans/avec) — le backend
+  // batchMult = 1 + nb de LoRA cochés « batch » (axe sans/avec) — le backend
   // multiplie les cellules d'autant, le compteur de coût doit suivre.
   const cells = selectionCount * strengths.length * count * batchMult;
   const canLaunch = selectionCount > 0 && strengths.length > 0 && cells > 0 && !launching && !gpuBusy;
@@ -65,7 +65,7 @@ export default function StudioRunSetup({
           <button type="button" onClick={() => setDescribeOpen(true)}
             title="Describe an image into a test prompt (vision model)"
             className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-[0.625rem] hover:text-content">
-            🔎 Describe
+            Describe
           </button>
         </span>
         <textarea value={prompt} onChange={(e) => onPrompt(e.target.value)} rows={5}
@@ -86,7 +86,7 @@ export default function StudioRunSetup({
           <span className="tabular-nums text-content px-2 py-0.5 rounded border border-border bg-app/60">{seed}</span>
           <button type="button" onClick={onReroll} aria-label="New random seed"
             title="New random seed"
-            className="px-2 py-0.5 rounded border border-border bg-surface text-content hover:bg-surface-raised">🎲</button>
+            className="px-2 py-0.5 rounded border border-border bg-surface text-content hover:bg-surface-raised"></button>
         </label>
 
         <label className="flex items-center gap-1.5 text-content-muted text-[0.6875rem]">
@@ -101,16 +101,16 @@ export default function StudioRunSetup({
 
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-content-subtle text-[0.6875rem]"
-          title={`GPU cost: checked LoRAs × strengths × images per config${batchMult > 1 ? ` × ${batchMult} (⚖ batch axis: without + with each checked LoRA)` : ''}`}>
+          title={`GPU cost: checked LoRAs × strengths × images per config${batchMult > 1 ? ` × ${batchMult} (batch axis: without + with each checked LoRA)` : ''}`}>
           {selectionCount} LoRA × {strengths.length} strength × {count}
-          {batchMult > 1 && <span className="text-amber-300"> × {batchMult} ⚖</span>} ={' '}
+          {batchMult > 1 && <span className="text-amber-300"> × {batchMult} </span>} ={' '}
           <span className={`tabular-nums font-semibold ${cells > 0 ? 'text-content' : 'text-content-subtle'}`}>{cells}</span>{' '}
           cell(s) to generate
         </span>
         <button type="button" onClick={onLaunch} disabled={!canLaunch}
           aria-label="Run the test"
           className="ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
-          {launching ? '…' : '🚀 Run the test'}
+          {launching ? '…' : 'Run the test'}
         </button>
       </div>
       {selectionCount === 0 && (

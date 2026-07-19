@@ -9,7 +9,7 @@ une FILE de posts (Message.Queue, type 6) ; chaque post porte 1 média DIRECT
 PornPics → on hérite de `_PhotoSiteSource` (pagination `--chapter-range`, la
 récursion type-6 de gdl.enumerate collecte les médias des posts).
 
-⚠️ gallery-dl n'accepte QUE l'hôte canonique `(www.)?fapello.com` : un miroir de
+⚠ gallery-dl n'accepte QUE l'hôte canonique `(www.)?fapello.com` : un miroir de
 langue comme `fr.fapello.com` renvoie « Unsupported URL ». On normalise donc
 l'hôte AVANT l'énumération. Le download (URL CDN directe avec extension) passe par
 l'extracteur `directlink` de gallery-dl → le downloader hérité de GalleryDlSource

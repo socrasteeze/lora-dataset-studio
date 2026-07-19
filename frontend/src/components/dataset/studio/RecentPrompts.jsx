@@ -1,10 +1,10 @@
 // Vignettes des prompts récents (clic pour recharger) — rétro-compat string vs objet.
 // Extrait behavior-preserving de LoraTestStudio.jsx (bloc « Prompts récents »),
-// + bouton 🗑 par preset (supprime le prompt et ses cellules/images de test).
+// + bouton par preset (supprime le prompt et ses cellules/images de test).
 export default function RecentPrompts({ items, datasetId, selectedPrompt, onPick, onDelete }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-content-subtle text-[0.5625rem] uppercase">Recent prompts (click to reload · 🗑 to delete) — thumbnail = image 👍</span>
+      <span className="text-content-subtle text-[0.5625rem] uppercase">Recent prompts (click to reload · to delete) — thumbnail = image </span>
       <div className="flex gap-1.5 flex-wrap">
         {items.map((item) => {
           // rétro-compat : avant restart Flask, l'API renvoie des strings ;
@@ -12,7 +12,7 @@ export default function RecentPrompts({ items, datasetId, selectedPrompt, onPick
           const pr = typeof item === 'string' ? { prompt: item } : item;
           const sel = selectedPrompt === pr.prompt;
           // Conteneur = la « carte » (porte la bordure) ; deux boutons frères à
-          // l'intérieur (PAS imbriqués) : recharger (principal) + supprimer (🗑).
+          // l'intérieur (PAS imbriqués) : recharger (principal) + supprimer ().
           return (
             <div key={pr.prompt}
               className={`flex items-stretch rounded-lg border text-[0.625rem] max-w-[260px] overflow-hidden ${
@@ -27,7 +27,7 @@ export default function RecentPrompts({ items, datasetId, selectedPrompt, onPick
                   : <span className="w-8 h-10 rounded bg-app/60 shrink-0 flex items-center justify-center text-content-subtle">?</span>}
                 <span className="flex flex-col items-start min-w-0">
                   <span className="truncate max-w-[150px]">{pr.prompt}</span>
-                  {pr.count ? <span className="text-content-subtle">{pr.count} img{pr.thumb_rating === 1 ? ' · 👍' : ''}</span> : null}
+                  {pr.count ? <span className="text-content-subtle">{pr.count} img{pr.thumb_rating === 1 ? ' · liked' : ''}</span> : null}
                 </span>
               </button>
               {onDelete && (
@@ -39,7 +39,7 @@ export default function RecentPrompts({ items, datasetId, selectedPrompt, onPick
                   title="Delete this recent prompt (and its test images)"
                   aria-label="Delete this recent prompt"
                   className="shrink-0 px-1.5 flex items-center border-l border-border text-red-300/70 hover:text-red-300 hover:bg-red-500/15">
-                  🗑
+
                 </button>
               )}
             </div>

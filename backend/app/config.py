@@ -98,7 +98,7 @@ DEFAULTS = {
         'onstart': '',                 # raw-image fallback: optional startup command
     },
     'face_scoring': {'python': '', 'models_root': '', 'green': 0.50, 'orange': 0.45},
-    # 🗃️ Image bank triage thresholds. Raw scores are persisted per image;
+    # Image bank triage thresholds. Raw scores are persisted per image;
     # these thresholds only drive the FLAGS computed at read time — so tuning
     # them re-sorts an already-scanned bank instantly, no rescan needed.
     # sharpness_min: Laplacian variance below this = flagged blurry (the classic
@@ -368,7 +368,7 @@ def backups_dir() -> Path:
     return d
 
 def banks_root() -> Path:
-    """Working data of the 🗃️ image banks (thumbnails + face-embedding cache),
+    """Working data of the image banks (thumbnails + face-embedding cache),
     one subfolder per bank — never the source images, which stay in the user's
     folder untouched."""
     root = _data_dir() / 'banks'

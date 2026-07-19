@@ -36,7 +36,7 @@ export default function ResultCell({ row, strength, variant, cellList, scoreMap,
           {score && score.score !== 0 ? (score.score > 0 ? `+${score.score}` : score.score) : '·'}
           {score && score.voted > 0 && (
             <span className="text-content-subtle"> · {score.voted}/{score.images}
-              {score.like_rate != null ? ` · ${Math.round(score.like_rate * 100)}%👍` : ''}</span>
+              {score.like_rate != null ? ` · ${Math.round(score.like_rate * 100)}%` : ''}</span>
           )}
           {score && score.low_confidence && score.voted > 0 && (
             <span className="text-amber-400" title="Few votes — low reliability"> ⚠</span>

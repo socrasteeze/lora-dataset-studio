@@ -218,7 +218,7 @@ def test_captions_replace_route(client, app):
 
 
 def test_captions_write_files_route(client, app):
-    """💾 Write .txt files: kohya-style same-stem sidecars next to the KEPT
+    """Write .txt files: kohya-style same-stem sidecars next to the KEPT
     captioned images only, trigger prepended like the export ZIP. Uncaptioned
     kept images are counted as skipped (not written), rejects are ignored,
     and a re-call after a caption edit overwrites the file (resync)."""

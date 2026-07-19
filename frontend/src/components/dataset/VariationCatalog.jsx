@@ -113,7 +113,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
     const p = customPrompt.trim();
     if (!p) return;
     const hot = nsfwMode;
-    const shot = { id: `custom_${Date.now()}`, label: `${hot ? '🔞' : '✨'} ${p.slice(0, 40)}`,
+    const shot = { id: `custom_${Date.now()}`, label: hot ? `🔞 ${p.slice(0, 40)}` : p.slice(0, 40),
                    prompt: p, framing: customFraming, nsfw: hot };
     setCustomShots((s) => [...s, shot]);
     setSelected((s) => new Set(s).add(shot.id));   // freshly added = selected
@@ -288,7 +288,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
     setCustomPresets((items) => deleteShotPreset(items, preset.id));
   };
 
-  // ✨ Prompt suffixes (Idea by vvilams — Discord): the dataset's creative-
+  // Prompt suffixes (Idea by vvilams — Discord): the dataset's creative-
   // direction text (one global + one per framing), surfaced here so it can be
   // tuned PER BATCH without opening the Settings modal. These are the SAME
   // dataset fields the modal edits (one shared truth) — pre-filled from the
@@ -374,7 +374,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
       <div className="flex items-center gap-2">
-        <span aria-hidden="true">🎬</span>
+        <span aria-hidden="true"></span>
         <h2 className="text-content font-semibold text-sm">Generate variations</h2>
         <span className="text-content-subtle text-[0.6875rem]">
           pick the shots to synthesize from the reference photo
@@ -463,7 +463,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
                   className="flex w-full min-w-0 flex-col gap-1.5 p-2 pr-12 text-left">
                   <span className="flex w-full min-w-0 items-baseline gap-1">
                     <span className={`truncate text-[0.6875rem] font-semibold ${active ? 'text-white' : 'text-content'}`}>
-                      ✨ {preset.name}
+                      {preset.name}
                     </span>
                     <span className="ml-auto shrink-0 text-[0.625rem] text-content-subtle">{st?.total || 0}</span>
                   </span>
@@ -582,7 +582,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         {customShots.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span aria-hidden="true">✨</span>
+              <span aria-hidden="true"></span>
               <span className="text-[0.6875rem] uppercase font-semibold text-content-muted">Custom</span>
               <span className="text-content-subtle text-[0.625rem]">your own shots — remove with ✕</span>
             </div>
@@ -679,7 +679,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
           <details> keeps its fields mounted, so drafts survive fold/unfold. */}
       <details className="rounded-lg border border-border bg-app/30 open:pb-2">
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
-          ✨ Custom shot
+          Custom shot
           <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
             write your own prompt — it becomes a reusable card in the Custom group above{nsfwMode ? ' — 🔞 register active' : ''}
           </span>
@@ -708,15 +708,15 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         </div>
       </details>
 
-      {/* ✨ Prompt suffixes — the dataset's creative-direction text, editable
+      {/* Prompt suffixes — the dataset's creative-direction text, editable
           right here so it can be adjusted per batch (Idea by vvilams — Discord).
           Applies to EVERY engine at generation time and shares the dataset
-          fields with the ⚙️ Settings modal; persisted just before the batch is
+          fields with the Settings modal; persisted just before the batch is
           enqueued. Collapsed unless a suffix is already set. */}
       <details className="rounded-lg border border-border bg-app/30 open:pb-2"
         open={suffixOpen} onToggle={(e) => setSuffixOpen(e.currentTarget.open)}>
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold flex items-center gap-1.5">
-          ✨ Prompt suffixes
+          Prompt suffixes
           <span className="font-normal text-content-subtle text-[0.625rem]">
             creative direction added to every generated shot{suffixDirty ? ' · applied when you generate' : ''}
           </span>
@@ -744,7 +744,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
           <p className="text-content-subtle text-[0.625rem]">
             Free text appended to every <b>generated</b> variation — the identity lock is
             untouched. A framing suffix applies to that shot type first, then the global one.
-            Saved to the dataset when you generate, and shared with ⚙️ Dataset settings.
+            Saved to the dataset when you generate, and shared with Dataset settings.
           </p>
         </div>
       </details>
@@ -756,7 +756,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         <details className="rounded-lg border border-border bg-app/30 open:pb-2"
           onToggle={(e) => { if (e.currentTarget.open) requestHelpTip('klein-tuning-open'); }}>
           <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
-            🖥️ Klein tuning
+            Klein tuning
             <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
               model file · consistency LoRA {loraStrength <= 0 ? 'off' : loraStrength.toFixed(2)}
               {activeLoraPreset && activeLoraPreset.loras.length > 0
@@ -860,7 +860,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
             ? (generating
                 ? `Generating…${generating.total ? ` ${generating.done}/${generating.total}` : ''}`
                 : '…')
-            : `⚡ Generate (${selected.size * multiplier})`}
+            : `Generate (${selected.size * multiplier})`}
         </button>
       </div>
     </div>

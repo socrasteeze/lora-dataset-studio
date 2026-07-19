@@ -14,7 +14,7 @@
  * relevé au-dessus via PAGES_WITH_BOTTOM_BAR ('/studio').
  */
 
-export default function StudioActionBar({ shortcuts = [], canRun, running, onRun, runLabel = '🚀 Run the test' }) {
+export default function StudioActionBar({ shortcuts = [], canRun, running, onRun, runLabel = 'Run the test' }) {
   const jump = (id) => {
     try { window.dispatchEvent(new CustomEvent('studio:reveal', { detail: id })); } catch { /* ignore */ }
     // Laisse la section s'ouvrir (setState) avant de scroller vers elle.

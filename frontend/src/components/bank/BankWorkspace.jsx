@@ -8,10 +8,10 @@ import PromoteDialog from './PromoteDialog'
 const PAGE_SIZE = 120
 
 const FLAG_LABEL = {
-  blur: '🌫 Blurry', noise: '📺 Noisy', uniform: '⬜ Flat',
-  small: '📐 Small', unreadable: '❌ Unreadable',
+  blur: 'Blurry', noise: 'Noisy', uniform: '⬜ Flat',
+  small: 'Small', unreadable: 'Unreadable',
   // V2 scoring flags (aesthetic · NSFW · watermark passes).
-  low_aesthetic: '💔 Low aesthetic', nsfw: '🔞 NSFW', watermark: '🚩 Watermark',
+  low_aesthetic: 'Low aesthetic', nsfw: '🔞 NSFW', watermark: 'Watermark',
 }
 // Quality flags the CPU scan produces vs the ones the ML scoring/watermark
 // passes add — auto-reject only offers a flag whose pass has actually run.
@@ -44,7 +44,7 @@ function ProgressBar({ activity, onCancel }) {
   const pct = total > 0 ? Math.round((100 * done) / total) : null
   return (
     <div className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
-      <span aria-hidden>⏳</span>
+      <span aria-hidden></span>
       <span className="text-content">
         {{ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
           watermark: 'Watermark scan', promote: 'Promotion' }[kind] || 'Job'} running —
@@ -98,10 +98,10 @@ function Tile({ img, bankId, selected, onToggle, size }) {
       <span className="absolute left-1 top-1 flex flex-wrap gap-0.5 max-w-[85%]">
         {img.status === 'keep' && badge('✓', 'bg-emerald-500/80 text-white')}
         {img.status === 'reject' && badge(`✕ ${img.reject_reason || ''}`.trim(), 'bg-rose-500/80 text-white')}
-        {img.promoted_dataset_id != null && badge('⬆', 'bg-indigo-500/80 text-white')}
+        {img.promoted_dataset_id != null && badge('', 'bg-indigo-500/80 text-white')}
         {img.flags.map((f) => badge(FLAG_LABEL[f]?.slice(0, 2) || f, 'bg-black/60 text-amber-200'))}
-        {img.face_cluster != null && badge(`👤${img.face_cluster}`, 'bg-black/60 text-sky-200')}
-        {img.style_cluster != null && badge(`🎨${img.style_cluster}`, 'bg-black/60 text-fuchsia-200')}
+        {img.face_cluster != null && badge(`${img.face_cluster}`, 'bg-black/60 text-sky-200')}
+        {img.style_cluster != null && badge(`${img.style_cluster}`, 'bg-black/60 text-fuchsia-200')}
         {img.dup_group != null && badge(`≈${img.dup_group}`, 'bg-black/60 text-fuchsia-200')}
       </span>
       <a href={`/api/bank/${bankId}/file/${img.id}`} target="_blank" rel="noreferrer"
@@ -255,7 +255,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           className="rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
           ← Banks
         </button>
-        <h1 className="text-lg font-bold text-content">🗃️ {payload?.name || `Bank #${bankId}`}</h1>
+        <h1 className="text-lg font-bold text-content">{payload?.name || `Bank #${bankId}`}</h1>
         <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.625rem] font-semibold uppercase tracking-wide">Beta</span>
         <span className="truncate font-mono text-xs text-content-subtle" title={payload?.source_path}>
           {payload?.source_path}
@@ -281,7 +281,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <button type="button" onClick={() => startScan(false)} disabled={live}
           title="Score every unscanned image (sharpness/noise/flat/size), hash it and group near-duplicates — CPU only, runs in the background"
           className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-          🔎 Scan quality
+          Scan quality
         </button>
         {(counts?.scanned || 0) > 0 && (
           <button type="button" onClick={() => startScan(true)} disabled={live}
@@ -295,28 +295,28 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images.'
             : 'Install the Quality tools (Setup) to sort by person'}
           className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          👥 Group by person
+          Group by person
         </button>
         <button type="button" onClick={startScore} disabled={live || !caps.bank_scoring}
           title={caps.bank_scoring
             ? 'Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". GPU when available; runs in the background.'
             : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style'}
           className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          ✨ Score{!caps.bank_scoring && ' (needs setup)'}
+          Score{!caps.bank_scoring && ' (needs setup)'}
         </button>
         <button type="button" onClick={startWatermark} disabled={live || !visionReady}
           title={visionReady
             ? 'Scan every non-rejected image for an overlaid watermark/logo/URL with the same Qwen3-VL detector the datasets use (detection only — the bank never edits your files). GPU vision pass.'
             : 'Pull the vision model (Settings ▸ Captioning & quality) to scan for watermarks'}
           className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          🚩 Find watermarks{!visionReady && ' (needs setup)'}
+          Find watermarks{!visionReady && ' (needs setup)'}
         </button>
         <div className="relative">
           <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
             aria-expanded={showAutoReject}
             title="Bulk-reject the still-undecided images carrying the chosen quality flags"
             className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-            🧹 Auto-reject flagged…
+            Auto-reject flagged…
           </button>
           {showAutoReject && (
             <>
@@ -348,7 +348,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <button type="button" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
           title={canPromote ? 'Copy the kept selection into a dataset' : 'Keep some images first'}
           className="ml-auto rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-          ⬆ Promote to dataset…
+          Promote to dataset…
         </button>
       </div>
 
@@ -397,7 +397,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                       loading="lazy" className="h-16 w-16 object-cover" />
                   )}
                   <span className="absolute bottom-0 inset-x-0 bg-black/60 text-center text-[10px] font-semibold text-white">
-                    🎨{c.id} · {c.size}
+                    {c.id} · {c.size}
                   </span>
                 </button>
               </li>
@@ -440,7 +440,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {FLAG_LABEL[f]} {flags[f] ?? 0}
           </Chip>
         ))}
-        <Chip active={filter.flag === 'clean'} onClick={() => setF({ flag: filter.flag === 'clean' ? null : 'clean' })}>✨ Clean</Chip>
+        <Chip active={filter.flag === 'clean'} onClick={() => setF({ flag: filter.flag === 'clean' ? null : 'clean' })}>Clean</Chip>
         {/* Score-derived flags — only surfaced once their pass has produced data. */}
         {availableScoreFlags.map((f) => (
           <Chip key={f} active={filter.flag === f}
@@ -455,7 +455,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         </Chip>
         {payload?.faces_scanned > 0 && (
           <Chip active={filter.flag === 'no_face'} onClick={() => setF({ flag: filter.flag === 'no_face' ? null : 'no_face' })}>
-            🚫👤 No face
+            No face
           </Chip>
         )}
         <span className="ml-auto" />

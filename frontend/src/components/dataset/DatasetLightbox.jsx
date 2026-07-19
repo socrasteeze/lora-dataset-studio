@@ -125,7 +125,7 @@ export default function DatasetLightbox({
             className="min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-indigo-400/50 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             {improveReady
               ? '✓ Review improvement first'
-              : improvementActive ? '✨ Improving…' : '✨ Upscale & improve'}
+              : improvementActive ? 'Improving…' : 'Upscale & improve'}
           </button>
         )}
       </div>

@@ -2,7 +2,7 @@
 
 MVP of the « Studio de test de LoRA » (design 2026-06-12) : pour un dataset
 entraîné, balaye une grille checkpoint x strength en générations Z-Image
-(seed fixe, 1 prompt identité), note 👍/👎 chaque cellule et persiste les
+(seed fixe, 1 prompt identité), note /chaque cellule et persiste les
 réglages gagnants sur le FaceDataset.
 
 Clones the dataset fan-out mechanics exactly:
@@ -153,13 +153,13 @@ def _basename(path: str) -> str:
 
 
 def _wilson_lower_bound(likes: int, voted: int, z: float = 1.96) -> float:
-    """Borne basse de l'intervalle de Wilson (95%) sur le taux de 👍.
+    """Borne basse de l'intervalle de Wilson (95%) sur le taux de .
 
     C'est la métrique de tri correcte pour « meilleure config d'après les votes » :
     un compte brut (likes − dislikes) favorise les configs simplement TESTÉES plus
     souvent ; le taux brut (likes/voted) favorise les configs à 1 seul vote. Wilson
-    combine taux ÉLEVÉ *et* confiance (nb de votes) : 2👍/2 (0.34) bat 6👍4👎 (0.31),
-    et 5👍/5 (0.57) bat 2👍/2 (0.34). 0.0 si aucun vote."""
+    combine taux ÉLEVÉ *et* confiance (nb de votes) : 2/2 (0.34) bat 64(0.31),
+    et 5/5 (0.57) bat 2/2 (0.34). 0.0 si aucun vote."""
     if voted <= 0:
         return 0.0
     p = likes / voted
@@ -211,7 +211,7 @@ def _trigger_token_match(norm: str, trigger: str) -> bool:
     """True si `norm` commence par `trigger` SUIVI d'un séparateur (`_`/`-`) ou de la
     fin de chaîne - le trigger doit être un TOKEN entier, pas juste un préfixe.
 
-    ⚠️ Régression corrigée (bug found 2026-07-01) : un simple `startswith` faisait
+    ⚠ Régression corrigée (bug found 2026-07-01) : un simple `startswith` faisait
     qu'un trigger COURT s'offrait les LoRA d'un trigger plus LONG qui le préfixe
     ('lola' ⊂ 'lola3869' ⊂ 'lola2') - ex. le dataset 'Lola' affichait les checkpoints
     'lola3869'. Le nom est toujours '<trigger>-<step>' ou '<trigger>_<step>' (ou le
@@ -236,7 +236,7 @@ def _trigger_match_checkpoints(ds, family=None) -> list[dict]:
     (cf. `_trigger_token_match`) : un trigger préfixe d'un autre ('lola' ⊂ 'lola3869')
     ne s'offre PAS les LoRA du voisin. Returns [{filename, label}] (forme LoraLoader).
 
-    ⚠️ Le trigger est CANONICALISÉ via `lt._safe_trigger` (la MÊME fonction qui nomme
+    ⚠ Le trigger est CANONICALISÉ via `lt._safe_trigger` (la MÊME fonction qui nomme
     le fichier côté entraînement/déploiement) avant le match : un trigger multi-mots
     ('raw test upscale') se déploie en 'lora_raw_test_upscale_…' (espaces → '_'), donc
     matcher le trigger brut avec espaces ne préfixait JAMAIS le nom sous-scoré et le
@@ -346,7 +346,7 @@ def list_all_testable_checkpoints(user_id) -> list[dict]:
     """Pour le sélecteur autonome : agrège les checkpoints testables de TOUS les
     datasets du user, UNE ENTRÉE PAR (dataset × famille).
 
-    ⚠️ Un dataset est MULTI-FAMILLE : le même trigger peut être déployé sous
+    ⚠ Un dataset est MULTI-FAMILLE : le même trigger peut être déployé sous
     loras/{z image, sdxl, krea}. On itère donc `available_families(ds)` (qui dérive la
     famille du DOSSIER via family_of_lora, pas du scalaire `ds.train_type`) et on émet
     une entrée par famille présente.
@@ -500,7 +500,7 @@ def build_matrix(checkpoints, strengths, aspects=None, cfgs=None, steps_list=Non
             for c in cps for s in sts for a in asp for cf in cfs for sp in sps for sp2 in sps2]
 
 
-# --- « 🔎 Describe » : image → TEST PROMPT via le modèle vision Ollama ---------
+# --- « Describe » : image → TEST PROMPT via le modèle vision Ollama ---------
 # Upload guard (l'endpoint plafonne aussi, ceci est la borne de service).
 STUDIO_DESCRIBE_MAX_BYTES = 20 * 1024 * 1024
 
@@ -1349,7 +1349,7 @@ def _preflight_run(user_id, run_family, checkpoint, bases, allowed, prompt, seed
 
 # --- Run lifecycle -----------------------------------------------------------
 def _batch_lora_axis(batch_loras, run_family) -> list:
-    """Valide la liste « ⚖ batch axis » (mêmes règles anti path-injection que les
+    """Valide la liste « batch axis » (mêmes règles anti path-injection que les
     always-on) et renvoie l'axe de test [None, {filename,strength}, …] - None =
     la cellule de RÉFÉRENCE sans le LoRA. Dédupé, borné à 4 LoRA (coût GPU)."""
     perm_allowed = {c['filename'] for c in permanent_lora_candidates(run_family)}
@@ -1429,7 +1429,7 @@ def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=No
         except (TypeError, ValueError):
             st = 1.0
         extra_loras.append({'filename': fn, 'strength': st})
-    # Axe « ⚖ batch » : chaque config tourne une fois SANS puis une fois AVEC
+    # Axe « batch » : chaque config tourne une fois SANS puis une fois AVEC
     # chaque LoRA coché batch (les always-on ci-dessus s'appliquent partout).
     batch_axis = _batch_lora_axis(batch_loras, run_family)
 
@@ -1518,7 +1518,7 @@ def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=No
         for checkpoint, strength, cell_aspect, cell_cfg, cell_steps, cell_steps2 in cells:
             # Format/CFG/steps (1 et 2) testés comme axes à part entière (multi-sélection).
             width, height = _aspect_dims(cell_aspect, run_family, knobs['resolution_tier'])
-            for batch_lora in batch_axis:  # AXE ⚖ batch : sans, puis avec chaque LoRA coché
+            for batch_lora in batch_axis:  # AXE batch : sans, puis avec chaque LoRA coché
               row_extra = extra_loras + ([{**batch_lora, 'batch': True}] if batch_lora else [])
               wf_extra = extra_loras + ([batch_lora] if batch_lora else [])
               cell_extra_json = json.dumps(row_extra) if row_extra else None
@@ -1630,7 +1630,7 @@ def create_comparison_run(user_id, selections, strengths, seed=None, prompt=None
         except (TypeError, ValueError):
             st = 1.0
         extra_loras.append({'filename': fn, 'strength': st})
-    # Axe « ⚖ batch » : chaque config tourne une fois SANS puis une fois AVEC
+    # Axe « batch » : chaque config tourne une fois SANS puis une fois AVEC
     # chaque LoRA coché batch (même mécanique que create_run).
     batch_axis = _batch_lora_axis(batch_loras, run_type)
     # Rebalance Krea (node 30) - même encodage float que create_run (None=défaut, ≤1=OFF, >1=ON@force).
@@ -1688,7 +1688,7 @@ def create_comparison_run(user_id, selections, strengths, seed=None, prompt=None
         cells = build_matrix([checkpoint], strengths, aspects, cfgs, steps_list, steps2_list)
         for cp, strength, cell_aspect, cell_cfg, cell_steps, cell_steps2 in cells:
             width, height = _aspect_dims(cell_aspect, run_type, knobs['resolution_tier'])
-            for batch_lora in batch_axis:  # AXE ⚖ batch : sans, puis avec chaque LoRA coché
+            for batch_lora in batch_axis:  # AXE batch : sans, puis avec chaque LoRA coché
               row_extra = extra_loras + ([{**batch_lora, 'batch': True}] if batch_lora else [])
               wf_extra = extra_loras + ([batch_lora] if batch_lora else [])
               cell_extra_json = json.dumps(row_extra) if row_extra else None
@@ -1942,7 +1942,7 @@ def link_completed_test_image(job_id, filename, failed=False, reason=None):
     if failed:
         img.status = 'failed'
         img.error = (reason
-                     or 'Generation failed (see 🪵 Server log in Settings for the ComfyUI error).')
+                     or 'Generation failed (see Server log in Settings for the ComfyUI error).')
     else:
         img.filename = filename
         img.status = 'done'
@@ -2014,8 +2014,8 @@ def cell_scores(dataset_id, family=None) -> list[dict]:
     même dataset entraîné sous plusieurs familles. Un checkpoint sans préfixe de
     dossier (ancien nom) compte comme 'zimage'.
 
-    `score` (👍−👎) reste exposé pour l'affichage, mais le TRI se fait sur `rank`
-    = borne basse de Wilson sur le taux de 👍 (taux × confiance) - pas sur le
+    `score` (−) reste exposé pour l'affichage, mais le TRI se fait sur `rank`
+    = borne basse de Wilson sur le taux de (taux × confiance) - pas sur le
     compte brut, qui biaisait vers les configs simplement plus testées. Tri
     best-first : rank ↓, nb de votes ↓ (confiance), strength ↑ (anti-overfit)."""
     rows = LoraTestImage.query.filter_by(dataset_id=dataset_id).all()
@@ -2054,7 +2054,7 @@ def cell_scores(dataset_id, family=None) -> list[dict]:
 
 
 def model_net_scores(dataset_id) -> dict:
-    """Sentiment net par modèle (👍−👎 sur toutes ses images) - exposé pour
+    """Sentiment net par modèle (−sur toutes ses images) - exposé pour
     l'affichage. Le gate de best_cell, lui, utilise le TAUX (voir _model_like_rates)."""
     rows = LoraTestImage.query.filter_by(dataset_id=dataset_id).all()
     net = {}
@@ -2067,7 +2067,7 @@ def model_net_scores(dataset_id) -> dict:
 
 
 def _model_like_rates(scores) -> dict:
-    """Taux de 👍 par modèle (likes/voted) agrégé sur ses configs - sert à
+    """Taux de par modèle (likes/voted) agrégé sur ses configs - sert à
     écarter un modèle globalement mal noté. {model: rate|None} (None = 0 vote)."""
     acc = {}
     for e in scores:
@@ -2111,7 +2111,7 @@ def model_comparison(dataset_id, scores=None) -> list[dict]:
 
 
 def checkpoint_model_breakdown(dataset_id, scores=None) -> list[dict]:
-    """Par (checkpoint, z_model) : nb d'images générées / votées + taux de 👍.
+    """Par (checkpoint, z_model) : nb d'images générées / votées + taux de .
     C'est le « nombre de générées par modèle, par LoRA » - le dénominateur qui
     montre où l'échantillon est mince (ex. Lola testé 12× sur bigLove vs 3× sur
     l'officiel). Trié par label de checkpoint puis taux décroissant.
@@ -2142,9 +2142,9 @@ def checkpoint_model_breakdown(dataset_id, scores=None) -> list[dict]:
 
 def best_cell(dataset_id, scores=None) -> dict | None:
     """Config recommandée d'après les votes :
-      1. candidats = configs nettes positives (👍 > 👎) ;
+      1. candidats = configs nettes positives (> ) ;
       2. tri par `rank` Wilson ↓ (taux × confiance) - le MÉRITE de la config prime ;
-      3. départages : nb de votes ↓ (confiance), puis taux de 👍 GLOBAL du modèle ↓
+      3. départages : nb de votes ↓ (confiance), puis taux de GLOBAL du modèle ↓
          (à config équivalente, on préfère le modèle mieux noté), puis strength ↑.
     Le sentiment du modèle est un DÉPARTAGE, pas un filtre : une config nettement
     mieux notée n'est jamais écartée parce que son modèle est moyen ailleurs (sinon
@@ -2190,7 +2190,7 @@ def best_preset(dataset_id, scores=None) -> dict | None:
 def best_per_checkpoint(dataset_id, scores=None) -> list[dict]:
     """Meilleur réglage PAR checkpoint (les votes varient beaucoup d'un modèle à
     l'autre - un best global ne suffit pas). Pour chaque checkpoint ayant ≥1 config
-    nette positive (👍>👎), retourne sa config la mieux notée (MÊME tri Wilson que
+    nette positive (>), retourne sa config la mieux notée (MÊME tri Wilson que
     best_cell), enrichie d'une image représentative. Trié par rank décroissant.
 
     `scores` partageable (cf. best_cell) pour éviter de re-scanner la table."""
@@ -2376,7 +2376,7 @@ def score_faces(user_id, dataset_id, family=None) -> dict:
 def face_ranking(dataset_id, family) -> list:
     """Classement des checkpoints par similarité faciale MOYENNE (cellules déjà
     scorées, famille donnée). [{checkpoint, label, avg, n}] trié meilleur d'abord -
-    le front marque le 1er comme « 🏆 best epoch »."""
+    le front marque le 1er comme « best epoch »."""
     rows = (LoraTestImage.query.filter_by(dataset_id=dataset_id)
             .filter(LoraTestImage.face_score.isnot(None)).all())
     rows = [r for r in rows if (family_of_lora(r.checkpoint) or 'zimage') == family]
@@ -2594,7 +2594,7 @@ def studio_payload_run(user_id, run_id) -> dict | None:
 
 
 def _recent_prompts(rows, limit=6) -> list[dict]:
-    """Prompts distincts utilisés (récent→ancien) AVEC une vignette : une image 👍
+    """Prompts distincts utilisés (récent→ancien) AVEC une vignette : une image
     générée avec ce prompt (à défaut, la plus récente terminée), + le nombre d'images.
     Permet de voir ce que fait chaque prompt dans le menu. `thumb_dataset_id` porte
     le dataset de la vignette (nécessaire quand les rows couvrent PLUSIEURS datasets).
@@ -2612,7 +2612,7 @@ def _recent_prompts(rows, limit=6) -> list[dict]:
         e = seen[p]
         if r.filename:
             e['count'] += 1
-            if r.rating == 1 and e['thumb_rating'] != 1:      # préférer un 👍 (le + récent)
+            if r.rating == 1 and e['thumb_rating'] != 1:      # préférer un (le + récent)
                 e['thumbnail'], e['thumb_rating'] = r.filename, 1
                 e['thumb_dataset_id'] = r.dataset_id
             elif e['thumbnail'] is None:                       # sinon la 1re terminée vue (= + récente)

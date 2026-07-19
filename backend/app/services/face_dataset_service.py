@@ -382,7 +382,7 @@ def dual_captions_enabled(ds) -> bool:
 
 
 # --- Per-dataset caption method options --------------------------------------
-# The Captions ⚙️ Options popover writes these to the caption_options JSON column.
+# The Captions Options popover writes these to the caption_options JSON column.
 # All three are OVERRIDES of the global captioning defaults: an empty value means
 # "follow the global default" (captioning.backend / ollama.vision_model), so a
 # dataset that never touched the popover behaves byte-for-byte as before.
@@ -1917,7 +1917,7 @@ def _watermark_route_payload(img):
     """The routes Clean WOULD take for a 'detected' image, as a dict spread into the
     image payload:
       - 'watermark_route'        : the DEFAULT route ('crop' | 'lama' | 'review'), used
-                                   by the 🚩 tooltip and the batch/lightbox planned line;
+                                   by the tooltip and the batch/lightbox planned line;
       - 'watermark_route_nocrop' : the SAME routing with auto-crop disabled ('lama' |
                                    'review') -- only ever differs when the default is
                                    'crop'. It lets the review lightbox offer a per-image
@@ -2022,7 +2022,7 @@ def dataset_payload(user_id, dataset_id):
                     'derivation_kind': i.derivation_kind,
                     'source_metadata': normalize_source_metadata(i.source_metadata),
                     'upscale_ratio': i.upscale_ratio,
-                    # Core creative prompt (generated tiles) → seeds the ✏️ edit
+                    # Core creative prompt (generated tiles) → seeds the ✏ edit
                     # bubble so the user edits the real prompt, not a blank box.
                     'variation_prompt': i.variation_prompt,
                     # Per-image leak flag (identity for character, concept for concept,
@@ -2030,8 +2030,8 @@ def dataset_payload(user_id, dataset_id):
                     # manual treatment (the aggregate badge alone forced a grid hunt).
                     'leak': _img_leaks(i),
                     'face_score': i.face_score, 'face_state': i.face_state,
-                    # Watermark V1: state drives the tile badge (🚩 detected / ⊘ dismissed
-                    # / ✨ cleaned / ⚠ failed) and the "Clean (N)" count; bbox lets the UI
+                    # Watermark V1: state drives the tile badge (detected / ⊘ dismissed
+                    # / cleaned / ⚠ failed) and the "Clean (N)" count; bbox lets the UI
                     # draw the detected box (review lightbox); watermark_route(_nocrop)
                     # name the planned action ('crop'|'lama'|'review') with auto-crop on
                     # and off, so the lightbox can offer a per-image crop-vs-inpaint choice.
@@ -3162,7 +3162,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
     d'identite isolee).
 
     `image_ids` (optionnel) restreint la passe a ce sous-ensemble d'images gardees —
-    utilise par le bouton 🔄 Re-caption cible du panneau Identity-leak (une seule image
+    utilise par le bouton Re-caption cible du panneau Identity-leak (une seule image
     ou « toutes les fuyantes ») ; None -> tout le dataset (comportement batch). Meme
     moteur, meme mode, meme contexte kind et memes regles de nettoyage que le lot complet.
 
@@ -3175,7 +3175,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return 0
-    # Per-dataset method overrides (Captions ⚙️ Options): the chosen engine, an extra
+    # Per-dataset method overrides (Captions Options): the chosen engine, an extra
     # instruction appended to the prompt, and the Ollama vision model to run. Each falls
     # back to the global default when the dataset never set it.
     opts = caption_options(ds)
@@ -3738,7 +3738,7 @@ def detect_watermarks(user_id, dataset_id, *, include_dismissed=False):
 
 def dismiss_watermarks(user_id, dataset_id, image_ids):
     """Mark 'detected' images as 'dismissed' -- the user ruled, in the review lightbox,
-    that the flag is a FALSE positive. Dismissed images drop the 🚩 badge, leave the
+    that the flag is a FALSE positive. Dismissed images drop the badge, leave the
     Clean batch, and are skipped by future detect passes (see detect_watermarks) so
     they're never re-flagged. Only 'detected' rows of THIS dataset transition (ids that
     don't belong / aren't detected are silently ignored, like batch_image_action).
@@ -4240,7 +4240,7 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     the variation prompt can't be recovered.
 
     `prompt` (optional) is the user-EDITED core creative prompt from the tile's
-    ✏️ bubble. When given it REPLACES and is PERSISTED into `variation_prompt`
+    ✏ bubble. When given it REPLACES and is PERSISTED into `variation_prompt`
     (so a later plain regenerate / reject-regenerate reuses the edit), then feeds
     the identity-guard wrapper like any catalog prompt — the face lock is still
     applied on top, the user only steers the creative half. Empty/None = the
@@ -4414,7 +4414,7 @@ def link_completed_dataset_image(job_id, filename, failed=False, reason=None):
                 and img.status in ('keep', 'reject')):
             img.status = 'failed'
             img.fail_reason = (img.fail_reason or reason
-                               or 'Klein generation failed (see 🪵 Server log in Settings for the ComfyUI error)')
+                               or 'Klein generation failed (see Server log in Settings for the ComfyUI error)')
     else:
         output_dir = _comfy_output_dir()
         src = os.path.join(output_dir, filename) if output_dir else None

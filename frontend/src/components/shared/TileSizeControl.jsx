@@ -7,7 +7,7 @@
 export default function TileSizeControl({ size, onChange, titles, className = '' }) {
   return (
     <div role="group" aria-label="Thumbnail size" className={`flex items-center gap-1 shrink-0 ${className}`}>
-      <span aria-hidden className="text-content-subtle text-xs">🔳</span>
+      <span aria-hidden className="text-content-subtle text-xs"></span>
       {['S', 'M', 'L'].map((s) => (
         <button key={s} type="button" onClick={() => onChange(s)}
           aria-pressed={size === s} title={titles[s]}

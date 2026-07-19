@@ -1658,7 +1658,7 @@ def _sync_latest_checkpoint(run, remote):
     2026-07-13). Never raises, never flips the run's status. EVERY synced save
     is KEPT (user ask: harvest ALL trained epochs) — the pod prunes its own
     saves to max_step_saves, so grabbing each one as it appears is the only
-    way to collect the full epoch history; disk is reclaimed via the 🗑/🧹
+    way to collect the full epoch history; disk is reclaimed via the /
     tools and the trash.
 
     Some pods cannot serve big files WHILE training (observed live: streams
@@ -1808,7 +1808,7 @@ def _mirror_one(run, run_dir, base, src_name):
             # A LOCAL run of the same dataset+family already produced this
             # exact name (the unsuffixed FINAL collides whenever both worlds
             # completed a run) — never clobber local work. The cloud result
-            # stays available in staging, ComfyUI and the hub's ⬇ button.
+            # stays available in staging, ComfyUI and the hub's button.
             logger.warning('local run dir already has %s — cloud mirror skipped '
                            '(local checkpoint left untouched)', dest_name)
             return
@@ -2047,8 +2047,8 @@ def all_runs(limit: int = 20) -> dict:
                'steps': rec.steps, 'masked': bool(rec.masked),
                'variant': rec.variant, 'base_model': rec.base_model or '',
                'settings': settings,
-               # Stable local-run identity for the 💻 #N chip + Checkpoints
-               # deep-link. Cloud rows show ☁ #<cloud run id> (run_id, below).
+               # Stable local-run identity for the #N chip + Checkpoints
+               # deep-link. Cloud rows show #<cloud run id> (run_id, below).
                'record_id': rec.id,
                # local rows live only in the registry -> addressed by record id;
                # a cloud row overrides this with 'cloud-<id>' via _run_payload.
@@ -2105,7 +2105,7 @@ def all_runs(limit: int = 20) -> dict:
             if r['source'] == 'local' and r['dataset_id'] == cur_ds:
                 # its freshly-registered history row is dropped to avoid the
                 # double — carry its share_key (Share config) AND record_id
-                # (💻 #N chip) onto the live card.
+                # (#N chip) onto the live card.
                 dropped = recent.pop(i)
                 local_active['share_key'] = dropped.get('share_key')
                 local_active['record_id'] = dropped.get('record_id')

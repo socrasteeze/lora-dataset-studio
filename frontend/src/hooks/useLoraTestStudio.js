@@ -3,7 +3,7 @@
  *
  * Polls /api/dataset/<id>/lora-test/status (3 s while cells are pending, same
  * rhythm as the dataset fan-out) and exposes the mutations: launch run, rate
- * a cell 👍/👎, cancel the run, persist the best settings.
+ * a cell /, cancel the run, persist the best settings.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../components/common/Toast';

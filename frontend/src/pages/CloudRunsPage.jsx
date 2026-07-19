@@ -109,7 +109,7 @@ function RunThumb({ run, broken, onBroken }) {
   return (
     <div aria-hidden
       className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-app/60 text-content-subtle">
-      <span className="text-base opacity-50">🖼</span>
+      <span className="text-base opacity-50"></span>
       <span className="px-1 text-center text-[0.5625rem] uppercase tracking-wide leading-tight">
         {FAMILY_SHORT[run.train_type] || 'LoRA'}
       </span>
@@ -454,8 +454,9 @@ export default function CloudRunsPage() {
             {ident ? (
               <RunIdChip source={ident.source} id={ident.id} />
             ) : (
-              <span aria-hidden title={run.source === 'cloud' ? 'Cloud run (vast.ai)' : 'Local run'}>
-                {run.source === 'cloud' ? '☁️' : '💻'}
+              <span className="text-[0.625rem] uppercase text-content-subtle"
+                title={run.source === 'cloud' ? 'Cloud run (vast.ai)' : 'Local run'}>
+                {run.source === 'cloud' ? 'cloud' : 'local'}
               </span>
             )}
             <button type="button" onClick={() => openDataset(run.dataset_id)}
@@ -485,7 +486,7 @@ export default function CloudRunsPage() {
             {run.steps ? <span className="tabular-nums">{run.steps} steps</span> : null}
             {run.source === 'cloud' && run.saves > 0 && (
               <span className="tabular-nums" title="Checkpoints this run saved (synced locally)">
-                💾 {run.saves} save{run.saves > 1 ? 's' : ''}
+                {run.saves} save{run.saves > 1 ? 's' : ''}
               </span>
             )}
             {run.gpu && <span>{run.gpu}</span>}
@@ -503,7 +504,7 @@ export default function CloudRunsPage() {
           {line && (
             <p className="m-0 truncate text-content-subtle text-[0.625rem]"
               title="The effective ai-toolkit settings this launch used">
-              ⚙ {line}
+              {line}
             </p>
           )}
           <RecipeWarning run={run} />
@@ -535,7 +536,7 @@ export default function CloudRunsPage() {
               <a href={checkpointHref(run)}
                 title="Download this run's LoRA checkpoint"
                 className="px-3 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white text-xs font-semibold no-underline">
-                ⬇ LoRA
+                LoRA
               </a>
             )}
             {run.share_key && (
@@ -556,7 +557,7 @@ export default function CloudRunsPage() {
       <header className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="m-0 flex items-center gap-2 text-content text-xl font-bold">
-            <span><span aria-hidden>🏋️</span> Training runs</span>
+            <span><span aria-hidden></span> Training runs</span>
             <HelpBadge topic="page-cloud" />
           </h1>
           {/* Escape hatch to the provider: see the pod's own console (billing,
@@ -608,7 +609,7 @@ export default function CloudRunsPage() {
             <div className="flex flex-wrap items-center gap-2">
               {data.local_active.record_id != null
                 ? <RunIdChip source="local" id={data.local_active.record_id} />
-                : <span aria-hidden>💻</span>}
+                : <span aria-hidden></span>}
               <button type="button" onClick={() => openDataset(data.local_active.current.dataset_id)}
                 title="Open this dataset"
                 className="text-content font-semibold text-sm hover:underline">
@@ -701,7 +702,7 @@ export default function CloudRunsPage() {
                 {run.checkpoint_ready && (
                   <a href={checkpointHref(run)}
                     className="px-3 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-200 text-xs font-semibold no-underline">
-                    ⬇ Download the LoRA
+                    Download the LoRA
                   </a>
                 )}
                 {run.share_key && (
@@ -763,7 +764,7 @@ export default function CloudRunsPage() {
                   poll();
                 }}
                 className="ml-auto px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-xs font-semibold">
-                🧹 Clean finished runs
+                Clean finished runs
               </button>
             )}
           </div>

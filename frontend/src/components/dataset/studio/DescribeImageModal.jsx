@@ -1,4 +1,4 @@
-// « 🔎 Describe » — drop or pick an image, the Ollama vision model describes it as a
+// « Describe » — drop or pick an image, the Ollama vision model describes it as a
 // ready-to-paste TEST PROMPT (scene/pose/framing/clothing, no identity, no trigger
 // word — the Studio injects the trigger separately). On success the text is handed to
 // `onResult`, which decides whether to overwrite a non-empty field. The model may be
@@ -70,7 +70,7 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface-overlay p-4 flex flex-col gap-3 shadow-xl">
         <div className="flex items-center justify-between">
           <h2 className="text-content text-sm font-semibold flex items-center gap-1.5">
-            <span aria-hidden>🔎</span> Describe an image
+            <span aria-hidden></span> Describe an image
           </h2>
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close"
             className="w-8 h-8 rounded-lg border border-border bg-app text-content-muted hover:text-content disabled:opacity-40">×</button>
@@ -100,7 +100,7 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
             </>
           ) : (
             <>
-              <span className="text-2xl" aria-hidden>🖼️</span>
+              <span className="text-2xl" aria-hidden></span>
               <span className="text-content text-[0.75rem]">Drop an image here, or click to choose</span>
               <span className="text-content-subtle text-[0.625rem]">webp, png or jpg · up to {MAX_BYTES / (1024 * 1024)} MB</span>
             </>

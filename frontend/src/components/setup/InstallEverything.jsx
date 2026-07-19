@@ -145,7 +145,7 @@ export default function InstallEverything({ plan, caps, onDone }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-content">
-              ⬇ Install everything
+              Install everything
               <HelpBadge topic="page-setup" className="ml-2" />
             </h2>
             <p className="mt-1 text-sm text-content-muted">
