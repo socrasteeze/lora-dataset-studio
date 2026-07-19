@@ -50,6 +50,14 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-19-klein-paths-anywhere',
+    date: '2026-07-19',
+    title: 'Pin Klein models from anywhere on disk',
+    blurb:
+      "Settings → Image engine now links absolute paths that live outside ComfyUI's model folders (Downloads, an HF cache, another drive) into an lds-pinned/ folder automatically — so full bf16 UNETs and qwen_3_8b.safetensors show ✓ found and load without moving files. Native weights also run at full precision instead of being forced through FP8.",
+    to: '/settings/engines',
+  },
+  {
     id: '2026-07-19-model-paths-configurable',
     date: '2026-07-19',
     title: 'Point the app at your models with full paths',

@@ -179,8 +179,8 @@ def test_capabilities_expose_klein_overrides(app, tmp_path, monkeypatch):
 def test_absolute_paths_resolve_to_loader_names(app, tmp_path):
     """Every model field accepts a FULL absolute path: a path under a registered
     root is converted to the relative loader name ComfyUI's nodes need; a path
-    outside every root reports 'outside_roots' (ComfyUI could never load it) and
-    falls back to auto-detection."""
+    outside every root is hardlinked/symlinked into lds-pinned/ so it still
+    resolves to 'ok' (ComfyUI can load the staged name)."""
     from app import config as cfg
     from app.services import klein_edit_helper as keh
     with app.app_context():
@@ -190,12 +190,87 @@ def test_absolute_paths_resolve_to_loader_names(app, tmp_path):
         cfg.save_config({'klein': {'unet': str(unet_abs),
                                    'vae': str(outside)}})
         assert keh.resolve_klein_unet() == os.path.join('my models', 'tune.safetensors')
-        # outside-roots vae -> fallback to the canonical file on disk
-        assert keh.resolve_klein_vae() == 'flux2-vae.safetensors'
+        # outside-roots vae → staged under models/vae/lds-pinned/
+        assert keh.resolve_klein_vae() == os.path.join('lds-pinned', 'other.safetensors')
+        staged = base / 'models' / 'vae' / 'lds-pinned' / 'other.safetensors'
+        assert staged.is_file()
+        assert os.path.samefile(staged, outside)
         status = keh.klein_override_status()
         assert status['unet']['status'] == 'ok'
         assert status['vae'] == {'configured': str(outside),
-                                 'found': False, 'status': 'outside_roots'}
+                                 'found': True, 'status': 'ok'}
+
+
+def test_external_pin_stages_unet_and_text_encoder(app, tmp_path):
+    """bf16 / full-precision weights living outside ComfyUI folders (Downloads,
+    an HF cache, …) still pin cleanly: resolve stages them into lds-pinned/."""
+    from app import config as cfg
+    from app.services import klein_edit_helper as keh
+    with app.app_context():
+        base = _comfy(tmp_path, cfg, unet=False, te=False)
+        unet_ext = _install(tmp_path, 'weights', 'flux-2-klein-9b.safetensors')
+        te_ext = _install(tmp_path, 'weights', 'qwen_3_8b.safetensors')
+        cfg.save_config({'klein': {'unet': str(unet_ext),
+                                   'text_encoder': str(te_ext)}})
+        assert keh.resolve_klein_unet() == os.path.join(
+            'lds-pinned', 'flux-2-klein-9b.safetensors')
+        assert keh.resolve_klein_text_encoder() == os.path.join(
+            'lds-pinned', 'qwen_3_8b.safetensors')
+        status = keh.klein_override_status()
+        assert status['unet']['found'] and status['text_encoder']['found']
+        # Idempotent: second resolve reuses the same link.
+        assert keh.resolve_klein_unet() == os.path.join(
+            'lds-pinned', 'flux-2-klein-9b.safetensors')
+
+
+def test_external_pin_basename_collision_gets_hash_prefix(app, tmp_path):
+    from app import config as cfg
+    from app.services import klein_edit_helper as keh
+    with app.app_context():
+        base = _comfy(tmp_path, cfg, te=False)
+        # Occupy the bare basename under lds-pinned with a DIFFERENT file.
+        other = _install(base, 'models', 'text_encoders', 'lds-pinned',
+                         'qwen_3_8b.safetensors', data=_VALID_ST + b'x')
+        ext = _install(tmp_path, 'elsewhere', 'qwen_3_8b.safetensors')
+        cfg.save_config({'klein': {'text_encoder': str(ext)}})
+        rel = keh.resolve_klein_text_encoder()
+        assert rel.startswith('lds-pinned' + os.sep)
+        assert rel.endswith('qwen_3_8b.safetensors')
+        assert rel != os.path.join('lds-pinned', 'qwen_3_8b.safetensors')
+        staged = base / 'models' / 'text_encoders' / rel
+        assert staged.is_file()
+        assert os.path.samefile(staged, ext)
+        assert not os.path.samefile(other, ext)
+
+
+def test_unet_weight_dtype_follows_filename(app, tmp_path, monkeypatch):
+    """Native bf16 UNETs must not keep the workflow's hardcoded fp8_e4m3fn."""
+    from app import config as cfg
+    from app.services import klein_edit_helper as keh
+    with app.app_context():
+        base = _comfy(tmp_path, cfg)
+        _install(base, 'models', 'unet', 'klein',
+                 'flux-2-klein-9b.safetensors')
+        assert keh._unet_weight_dtype(
+            os.path.join('klein', 'flux-2-klein-9b.safetensors')) == 'default'
+        assert keh._unet_weight_dtype(
+            os.path.join('klein', 'flux-2-klein-9b-kv-fp8.safetensors')) == 'fp8_e4m3fn'
+        captured = {}
+
+        def fake_add_job(**kw):
+            captured['wf'] = kw['workflow_data']
+            return kw.get('job_id') or 'job-1'
+
+        monkeypatch.setattr(keh.queue_manager, 'add_job', fake_add_job)
+        src = base / 'output' / 'src.png'
+        src.write_bytes(_png())
+        keh.enqueue_klein_edit('local', 'src.png', 'improve',
+                               klein_model='flux-2-klein-9b.safetensors')
+        assert captured['wf']['114']['inputs']['weight_dtype'] == 'default'
+        captured.clear()
+        keh.enqueue_klein_edit('local', 'src.png', 'improve',
+                               klein_model='flux-2-klein-9b-fp8.safetensors')
+        assert captured['wf']['114']['inputs']['weight_dtype'] == 'fp8_e4m3fn'
 
 
 def test_consistency_lora_accepts_absolute_path(app, tmp_path):
@@ -212,12 +287,13 @@ def test_consistency_lora_accepts_absolute_path(app, tmp_path):
         assert rel == os.path.join('klein', 'Flux2-Klein-9B-consistency-V2.safetensors')
         assert path == str(lora_abs)
         assert 'klein_lora' not in keh.klein_missing_assets()
-        # outside every loras root -> reported absent, klein_lora goes missing
+        # outside every loras root → staged into lds-pinned/ and loadable
         outside = _install(tmp_path, 'elsewhere', 'lora.safetensors')
         cfg.save_config({'klein': {'consistency_lora': str(outside)}})
         rel, path = keh._consistency_lora()
-        assert path is None
-        assert 'klein_lora' in keh.klein_missing_assets()
+        assert rel == os.path.join('lds-pinned', 'lora.safetensors')
+        assert path is not None and os.path.samefile(path, outside)
+        assert 'klein_lora' not in keh.klein_missing_assets()
 
 
 def test_missing_assets_reports_absent_subset(app, tmp_path):

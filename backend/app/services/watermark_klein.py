@@ -443,6 +443,7 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
     crop_img.convert('RGB').save(crop_path)
 
     workflow['114']['inputs']['unet_name'] = unet
+    workflow['114']['inputs']['weight_dtype'] = keh._unet_weight_dtype(unet)
     workflow['10']['inputs']['vae_name'] = vae
     workflow['90']['inputs']['clip_name'] = te
     workflow['52']['inputs']['image'] = crop_name

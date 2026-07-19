@@ -103,10 +103,10 @@ function HelpModeToggle({ onToggle }) {
       title={enabled
         ? 'Help mode is on — click any ? badge to jump to the guide'
         : 'Turn on Help mode to reveal ? badges that link to the guide'}
-      className={`${NAV_ITEM_BASE} inline-flex items-center gap-1.5 ${enabled
+      className={`${NAV_ITEM_BASE} inline-flex items-center gap-1.5 leading-none ${enabled
         ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-inset ring-indigo-400/50'
         : 'text-content-muted hover:text-content hover:bg-surface-raised'}`}>
-      <span aria-hidden className="grid h-4 w-4 place-items-center rounded-full border border-current text-[10px] font-bold leading-none">?</span>
+      <span aria-hidden className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-current text-[9px] font-bold leading-none">?</span>
       <span>Help mode</span>
     </button>
   )
@@ -133,15 +133,16 @@ function NavBar() {
       {/* Bank sits right after Datasets: it FEEDS them (triage a big unsorted
           folder, then promote the keepers into a dataset). */}
       <NavLink to="/bank" className={navItemClass} onClick={() => setOpen(false)}>
-        <span className="inline-flex items-center gap-1"><span aria-hidden></span> Bank
-          <span className="px-1 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.5625rem] font-semibold uppercase tracking-wide leading-none">Beta</span>
+        <span className="inline-flex items-center gap-1.5 leading-none">
+          Bank
+          <span className="rounded border border-amber-400/50 bg-amber-500/10 px-1 text-[0.5625rem] font-semibold uppercase tracking-wide leading-none text-amber-300">Beta</span>
         </span>
       </NavLink>
       {/* Unified runs hub (cloud + local history) — useful as soon as ANY
           training path exists, not just the cloud one. */}
       {(caps.cloud_training || caps.training_visible) && (
         <NavLink to="/cloud" className={navItemClass} onClick={() => setOpen(false)}>
-          <span className="inline-flex items-center gap-1"><span aria-hidden></span> Runs</span>
+          Runs
         </NavLink>
       )}
       {caps.studio_visible && (
@@ -167,7 +168,7 @@ function NavBar() {
           LoRA Dataset Studio
         </NavLink>
         {/* Workflow first (make → train in cloud → test), docs/config last. */}
-        <nav className="hidden md:flex gap-1" aria-label="Main navigation">
+        <nav className="hidden md:flex items-center gap-1" aria-label="Main navigation">
           {navLinks}
           <WhatsNewButton />
           <CheckUpdatesButton />
