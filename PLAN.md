@@ -129,8 +129,9 @@ Goal: stop storing multi-GB models two or three times.
 - [ ] Cross-check LDS's built-in training presets against the ai-toolkit fork's
       `stepSuggestion.ts` advisor for the families actually trained (keep the
       advisor's flagged-uncertain values flagged).
-- [ ] Add a `FORK_NOTES.md` to the TagGUI fork (it's the only fork without a
-      merge map; `Plan.md` there is roadmap, not divergence tracking).
+- [x] Add a `FORK_NOTES.md` to the TagGUI fork (done 2026-07-19 — it lists the
+      fork-only files, the four edited upstream files, and the merge routine;
+      `Plan.md` there stays the roadmap).
 - [ ] Decide whether the SwarmUI fork's mobile/PWA lane needs anything from
       LDS's QR/LAN access story (probably not — they serve different pages).
 
@@ -154,4 +155,4 @@ Goal: stop storing multi-GB models two or three times.
   touchpoints — keep it that way).
 - SwarmUI: `CLAUDE.md` Fork Delta + builtin-extension-only rule (zero core
   edits so far — keep it that way).
-- TagGUI: no merge map yet (Phase 5 item).
+- TagGUI: `FORK_NOTES.md` (divergence ledger) + `Plan.md` (roadmap).
