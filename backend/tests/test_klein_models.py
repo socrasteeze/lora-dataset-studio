@@ -135,7 +135,7 @@ def test_configured_overrides_win_over_autodetection(app, tmp_path):
             os.path.join('klein', 'flux-2-klein-9b-fp8.safetensors')
         status = keh.klein_override_status()
         assert status['unet'] == {'configured': 'my models/custom-klein-tune.safetensors',
-                                  'found': True}
+                                  'found': True, 'status': 'ok'}
         assert status['vae']['found'] and status['text_encoder']['found']
 
 
@@ -154,7 +154,8 @@ def test_configured_override_missing_falls_back_with_badge(app, tmp_path):
                                                         'flux-2-klein-9b-fp8.safetensors')
         assert keh.resolve_klein_vae() == 'flux2-vae.safetensors'
         status = keh.klein_override_status()
-        assert status['unet'] == {'configured': 'nope/missing.safetensors', 'found': False}
+        assert status['unet'] == {'configured': 'nope/missing.safetensors',
+                                  'found': False, 'status': 'missing'}
         assert status['vae']['found'] is False
         assert 'text_encoder' not in status          # unset slots are omitted
         assert keh.klein_missing_assets() == ['klein_lora']   # engine still asset-ready
@@ -168,8 +169,55 @@ def test_capabilities_expose_klein_overrides(app, tmp_path, monkeypatch):
         cfg.save_config({'klein': {'vae': 'missing-vae.safetensors'}})
         with patch('app.capabilities._http_ok', return_value=True):
             caps = capabilities.probe(force=True)
-    assert caps['comfyui']['klein_overrides'] == {
-        'vae': {'configured': 'missing-vae.safetensors', 'found': False}}
+    ov = caps['comfyui']['klein_overrides']
+    assert ov['vae'] == {'configured': 'missing-vae.safetensors',
+                         'found': False, 'status': 'missing'}
+    # consistency_lora has a non-empty default -> always reported (absent here).
+    assert ov['consistency_lora']['found'] is False
+
+
+def test_absolute_paths_resolve_to_loader_names(app, tmp_path):
+    """Every model field accepts a FULL absolute path: a path under a registered
+    root is converted to the relative loader name ComfyUI's nodes need; a path
+    outside every root reports 'outside_roots' (ComfyUI could never load it) and
+    falls back to auto-detection."""
+    from app import config as cfg
+    from app.services import klein_edit_helper as keh
+    with app.app_context():
+        base = _comfy(tmp_path, cfg, lora=True)
+        unet_abs = _install(base, 'models', 'unet', 'my models', 'tune.safetensors')
+        outside = _install(tmp_path, 'elsewhere', 'other.safetensors')
+        cfg.save_config({'klein': {'unet': str(unet_abs),
+                                   'vae': str(outside)}})
+        assert keh.resolve_klein_unet() == os.path.join('my models', 'tune.safetensors')
+        # outside-roots vae -> fallback to the canonical file on disk
+        assert keh.resolve_klein_vae() == 'flux2-vae.safetensors'
+        status = keh.klein_override_status()
+        assert status['unet']['status'] == 'ok'
+        assert status['vae'] == {'configured': str(outside),
+                                 'found': False, 'status': 'outside_roots'}
+
+
+def test_consistency_lora_accepts_absolute_path(app, tmp_path):
+    """klein.consistency_lora as a full path under a loras root resolves to the
+    loras-relative LoraLoader name; a full path OUTSIDE every root reports the
+    asset missing (never hands ComfyUI an unloadable name)."""
+    from app import config as cfg
+    from app.services import klein_edit_helper as keh
+    with app.app_context():
+        base = _comfy(tmp_path, cfg, lora=True)
+        lora_abs = base / 'models' / 'loras' / 'klein' / 'Flux2-Klein-9B-consistency-V2.safetensors'
+        cfg.save_config({'klein': {'consistency_lora': str(lora_abs)}})
+        rel, path = keh._consistency_lora()
+        assert rel == os.path.join('klein', 'Flux2-Klein-9B-consistency-V2.safetensors')
+        assert path == str(lora_abs)
+        assert 'klein_lora' not in keh.klein_missing_assets()
+        # outside every loras root -> reported absent, klein_lora goes missing
+        outside = _install(tmp_path, 'elsewhere', 'lora.safetensors')
+        cfg.save_config({'klein': {'consistency_lora': str(outside)}})
+        rel, path = keh._consistency_lora()
+        assert path is None
+        assert 'klein_lora' in keh.klein_missing_assets()
 
 
 def test_missing_assets_reports_absent_subset(app, tmp_path):

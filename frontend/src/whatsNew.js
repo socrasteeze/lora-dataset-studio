@@ -50,6 +50,14 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-19-model-paths-configurable',
+    date: '2026-07-19',
+    title: 'Point the app at your models with full paths',
+    blurb:
+      "Every Klein model field — diffusion model, text encoder, VAE, and now the consistency LoRA (finally editable in Settings) — accepts a full absolute path as well as a ComfyUI-relative name, and generation-LoRA preset rows do too. A path under any of ComfyUI's model folders (including extra_model_paths.yaml roots) is converted automatically to what the loader needs, and each field shows exactly what happened: found, not found, or outside ComfyUI's folders with the fix named.",
+    to: '/settings/engines',
+  },
+  {
     id: '2026-07-19-emoji-free-ui',
     date: '2026-07-19',
     title: 'A calmer, emoji-free interface',

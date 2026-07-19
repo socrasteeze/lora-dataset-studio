@@ -14,6 +14,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-07-19 | *(this wave)* | **Configurable model paths everywhere** — every Klein model reference (UNET/TE/VAE pins, the consistency LoRA — now editable in Settings — and generation-LoRA preset rows) accepts a full absolute path as well as a ComfyUI-relative name; paths under any registered root auto-convert to loader names, with a three-state badge (found / not found / outside ComfyUI's folders). |
 | 2026-07-19 | `1ca80bc` + dist `1398e56` | **Emoji-free UI** — stripped ~700 decorative emoji across the app, docs and comments; plain-text labels, monochrome state glyphs kept, real text where an emoji was a button's only content. The `🔞` label prefix is kept as a functional NSFW data marker. |
 | 2026-07-19 | `59f0529`, `1b74d5b` | **PLAN.md** — the phased integration plan for the whole local stack (ComfyUI + SwarmUI + ai-toolkit + TagGUI) with LDS as the hub. |
 | 2026-07-19 | `c56790d` + dist `6677553` | **Klein model-file pins** — Settings ▸ Image engine fields (`klein.unet` / `klein.text_encoder` / `klein.vae`) to name the exact loader files, incl. files outside `klein`-named folders and `extra_model_paths.yaml` roots; missing pins fall back to auto-detect with a visible "not found" badge. |
@@ -70,7 +71,11 @@ Compatibility notes:
 ## Divergence 2: Klein model-file pins
 
 Optional `klein.unet` / `klein.text_encoder` / `klein.vae` config keys pin the
-exact loader files, ahead of the auto-detection. Touched upstream files:
+exact loader files, ahead of the auto-detection. All model references — the
+pins, `klein.consistency_lora` (now a Settings field) and generation-LoRA
+preset rows — also accept absolute paths, auto-converted to ComfyUI-relative
+loader names when the file sits under a registered root
+(`resolve_model_ref` in klein_edit_helper). Touched upstream files:
 `backend/app/config.py` (defaults), `backend/app/services/klein_edit_helper.py`
 (`_configured_model`, `klein_override_status`, resolver priority),
 `backend/app/capabilities.py` (`comfyui.klein_overrides` payload),
