@@ -169,6 +169,12 @@ class ImageBank(db.Model):
     created_at = db.Column(DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(DateTime, default=db.func.current_timestamp(),
                            onupdate=db.func.current_timestamp())
+    # Persisted summary of the last "Launch all" pipeline run (JSON): per-step
+    # done/skipped(reason)/error plus the headline counts, so the outcome is
+    # still there when the user reopens the bank the next morning. NULL = no
+    # pipeline has ever run. Additive column — the image_bank table shipped in
+    # the Beta, so it needs the additive path (see _SCHEMA_ADDITIONS).
+    pipeline_report = db.Column(Text, nullable=True)
 
     def __repr__(self):
         return f'<ImageBank {self.id} {self.name}>'
@@ -226,6 +232,12 @@ class BankImage(db.Model):
     # URL was found → the read-time 'watermark' flag) | 'error'. Detection only; the
     # bank never edits the source file (cleaning stays a dataset-side action).
     watermark_state = db.Column(String(16), nullable=True)
+    # Caption pass — a plain DESCRIPTIVE caption (no trigger, no identity omission:
+    # a bank has no trigger word and nothing to protect). It doubles as the bank's
+    # search text (the search bar matches caption + relpath) AND rides along to the
+    # dataset on promotion, so a promoted selection starts already captioned. NULL =
+    # not captioned yet. Additive column — created by db.create_all(), no migration.
+    caption = db.Column(Text, nullable=True)
     # Triage decision — same words as dataset images (pending|keep|reject).
     # reject_reason: blur|noise|uniform|small|duplicate|unreadable|manual
     #                |low_aesthetic|nsfw|watermark (the V2 score-derived flags).

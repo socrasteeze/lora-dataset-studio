@@ -89,6 +89,30 @@ export const WHATS_NEW = [
     to: '/settings/engines',
   },
   {
+    id: '2026-07-19-bank-launch-all',
+    date: '2026-07-19',
+    title: 'Launch all — clean a whole bank while you sleep',
+    blurb:
+      "One button now runs the entire Image bank triage end to end: quality scan → auto-reject the flagged and duplicate shots → score → find watermarks → group by person → (optionally) caption. Hit “Launch all”, tick which passes run and how auto-reject behaves, and walk away — a pass whose tool isn't installed (or a busy GPU) is simply skipped with a reason instead of failing the run, and the heavy passes only touch the survivors, never the images you just rejected. You can Stop it any time, and when you come back a saved report tells you exactly what ran, what was skipped and why, with the headline counts.",
+    to: '/bank',
+  },
+  {
+    id: '2026-07-19-bank-face-pass-gpu',
+    date: '2026-07-19',
+    title: 'The Image bank face pass can run on your GPU',
+    blurb:
+      "The bank's subject (face) pass now uses your GPU automatically when it can — much faster on a big bank — and quietly falls back to CPU when it can't, so nothing breaks. It only takes the GPU when nothing else is using it, never competing with a training run. (GPU needs onnxruntime-gpu in the face-scoring interpreter; without it the pass keeps running on CPU exactly as before.) The “No face” filter is also sharper now: it shows only photos where no face was found — pictures with a small, low-confidence or side-profile face no longer slip into that list.",
+    to: '/bank',
+  },
+  {
+    id: '2026-07-19-bank-captions-search',
+    date: '2026-07-19',
+    title: 'Caption images inside the Bank and search a big dump by what’s in it',
+    blurb:
+      "The Image bank can now caption its images with the same engines your datasets use (JoyCaption / Ollama vision, your Settings). Hit “Caption” to describe every not-yet-captioned image, or select some first to caption just those — it runs in the background, is Stop-able mid-run, and never races your GPU. The captions then power a new search bar: type “red dress” and the grid filters to matching images (it matches file names too), combinable with every existing filter — the fast way to find shots in a 9,000-image Telegram export. Best of all, captions follow the images: promote a captioned selection and the dataset starts already captioned for them.",
+    to: '/bank',
+  },
+  {
     id: '2026-07-19-folder-browse-button',
     date: '2026-07-19',
     title: 'Browse for a folder instead of typing its path',

@@ -4,6 +4,8 @@ import { useToast } from '../common/Toast'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import DupGroupsPanel from './DupGroupsPanel'
 import PromoteDialog from './PromoteDialog'
+import LaunchAllDialog from './LaunchAllDialog'
+import PipelineReport from './PipelineReport'
 
 const PAGE_SIZE = 120
 
@@ -38,28 +40,51 @@ async function fetchAllIds(bankId, params) {
   return ids
 }
 
+const STEP_SHORT = {
+  scan: 'Scan', auto_reject: 'Auto-reject', score: 'Score',
+  watermark: 'Watermarks', faces: 'Person', caption: 'Caption',
+}
+
 function ProgressBar({ activity, onCancel }) {
   if (!activity || activity.finished) return null
   const { kind, done, total, detail } = activity
   const pct = total > 0 ? Math.round((100 * done) / total) : null
+  const pipe = kind === 'pipeline' ? activity.pipeline : null
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
-      <span aria-hidden></span>
-      <span className="text-content">
-        {{ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
-          watermark: 'Watermark scan', promote: 'Promotion' }[kind] || 'Job'} running —
-        {' '}{done}{total ? ` / ${total}` : ''}{detail ? ` · ${detail}` : ''}
-      </span>
-      {pct != null && (
-        <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
-          aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-          <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
-        </div>
+    <div className="space-y-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
+      <div className="flex items-center gap-3">
+        <span className="text-content">
+          {pipe
+            ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${STEP_SHORT[pipe.current] || pipe.current}`
+            : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
+              watermark: 'Watermark scan', caption: 'Captioning', promote: 'Promotion' }[kind] || 'Job') + ' running'}
+          {' — '}{done}{total ? ` / ${total}` : ''}{detail ? ` · ${detail}` : ''}
+        </span>
+        {pct != null && (
+          <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
+            aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+            <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
+          </div>
+        )}
+        <button type="button" onClick={onCancel}
+          className="ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised">
+          Stop
+        </button>
+      </div>
+      {pipe && Array.isArray(pipe.results) && pipe.results.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5 pl-6 text-xs">
+          {pipe.results.map((r, i) => (
+            <li key={`${r.step}-${i}`}
+              className={`rounded px-1.5 py-px ${r.status === 'done' ? 'bg-emerald-500/15 text-emerald-300'
+                : r.status === 'error' ? 'bg-rose-500/15 text-rose-300'
+                : 'bg-black/20 text-content-subtle'}`}
+              title={r.reason || r.detail || ''}>
+              {r.status === 'done' ? 'done' : r.status === 'error' ? 'err' : 'skip'}{' '}
+              {STEP_SHORT[r.step] || r.step}
+            </li>
+          ))}
+        </ul>
       )}
-      <button type="button" onClick={onCancel}
-        className="ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised">
-        Cancel
-      </button>
     </div>
   )
 }
@@ -87,7 +112,8 @@ function Tile({ img, bankId, selected, onToggle, size }) {
           + (img.aesthetic_score != null ? ` · aesthetic ${img.aesthetic_score.toFixed(1)}` : '')
           + (img.nsfw_score != null ? ` · NSFW ${Math.round(img.nsfw_score * 100)}%` : '')
           + (img.face_cluster ? ` · person #${img.face_cluster}` : '')
-          + (img.style_cluster ? ` · style #${img.style_cluster}` : '')}
+          + (img.style_cluster ? ` · style #${img.style_cluster}` : '')
+          + (img.caption ? `\n${img.caption}` : '')}
         className="block w-full">
         <img src={`/api/bank/${bankId}/thumb/${img.id}`} alt={img.name} loading="lazy"
           className={`w-full object-cover ${size === 'S' ? 'h-24' : 'h-36'}`} />
@@ -103,6 +129,7 @@ function Tile({ img, bankId, selected, onToggle, size }) {
         {img.face_cluster != null && badge(`${img.face_cluster}`, 'bg-black/60 text-sky-200')}
         {img.style_cluster != null && badge(`${img.style_cluster}`, 'bg-black/60 text-fuchsia-200')}
         {img.dup_group != null && badge(`≈${img.dup_group}`, 'bg-black/60 text-fuchsia-200')}
+        {img.caption && badge('🏷️', 'bg-black/60 text-emerald-200')}
       </span>
       <a href={`/api/bank/${bankId}/file/${img.id}`} target="_blank" rel="noreferrer"
         title="Open the original file" aria-label={`Open ${img.name} full size`}
@@ -116,12 +143,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const { caps } = useCapabilities()
   const [payload, setPayload] = useState(null)
   const [filter, setFilter] = useState({ status: null, flag: null, cluster: null,
-    style: null, subfolder: null })
+    style: null, subfolder: null, search: null })
+  const [searchText, setSearchText] = useState('')
   const [subfolders, setSubfolders] = useState([])
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState({ images: [], total: 0 })
   const [selected, setSelected] = useState(() => new Set())
   const [promoteOpen, setPromoteOpen] = useState(false)
+  const [launchOpen, setLaunchOpen] = useState(false)
+  const [dismissedReportAt, setDismissedReportAt] = useState(null)
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [showAutoReject, setShowAutoReject] = useState(false)
   const [tileSize, setTileSize] = useState('M')
@@ -147,6 +177,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // subfolder is a string facet where '' is meaningful (bank root) — send it
     // whenever it isn't null, empty string included.
     if (f.subfolder != null) params.subfolder = f.subfolder
+    if (f.search) params.search = f.search
     return params
   }, [])
 
@@ -188,6 +219,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setFilter(f); setOffset(0); setSelected(new Set())
     refreshImages(f, 0)
   }
+
+  // Debounce the search box, then apply it as a filter (page 1, selection cleared).
+  useEffect(() => {
+    const term = searchText.trim()
+    if ((filter.search || '') === term) return undefined
+    const t = setTimeout(() => setF({ search: term || null }), 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchText])
   const goto = (off) => { setOffset(off); refreshImages(filter, off) }
 
   const act = async (fn, okMsg) => {
@@ -207,7 +247,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const startFaces = () => act(() => postJson(`/api/bank/${bankId}/faces`, {}), null)
   const startScore = () => act(() => postJson(`/api/bank/${bankId}/score`, {}), null)
   const startWatermark = () => act(() => postJson(`/api/bank/${bankId}/watermark`, {}), null)
+  const startCaption = () => act(
+    () => postJson(`/api/bank/${bankId}/caption`,
+      selected.size ? { image_ids: [...selected] } : {}), null)
   const cancelJob = () => act(() => postJson(`/api/bank/${bankId}/cancel`, {}), null)
+  const startPipeline = async (config) => {
+    setLaunchOpen(false)
+    await act(() => postJson(`/api/bank/${bankId}/pipeline`, config),
+      'Launch all started — you can walk away; Stop any time.')
+  }
 
   const batchStatus = async (ids, status) => {
     if (!ids.length) return
@@ -277,10 +325,22 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
       <ProgressBar activity={payload?.activity} onCancel={cancelJob} />
 
+      {!live && payload?.pipeline_report
+        && payload.pipeline_report.finished_at !== dismissedReportAt && (
+        <PipelineReport report={payload.pipeline_report}
+          onDismiss={() => setDismissedReportAt(payload.pipeline_report.finished_at)} />
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
+          title="Run the whole triage in one go — scan, auto-reject, score, watermarks, group by person and (optionally) caption. Start it and walk away."
+          className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-bold text-white shadow disabled:opacity-50">
+          Launch all…
+        </button>
+        <span aria-hidden className="mx-0.5 h-5 w-px bg-border" />
         <button type="button" onClick={() => startScan(false)} disabled={live}
           title="Score every unscanned image (sharpness/noise/flat/size), hash it and group near-duplicates — CPU only, runs in the background"
-          className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
           Scan quality
         </button>
         {(counts?.scanned || 0) > 0 && (
@@ -311,6 +371,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
           Find watermarks{!visionReady && ' (needs setup)'}
         </button>
+        <button type="button" onClick={startCaption} disabled={live}
+          title={selected.size
+            ? `Caption the ${selected.size} selected image(s) with your caption engine (Settings ▸ Captioning & quality). Captions become searchable and follow the images when you promote them to a dataset.`
+            : 'Caption every not-yet-captioned image (skips rejected) with your caption engine. Captions become searchable tags and follow the images when you promote them to a dataset. Select images first to caption just those.'}
+          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
+          🏷️ Caption{selected.size ? ` ${selected.size} selected` : ' all'}
+        </button>
         <div className="relative">
           <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
             aria-expanded={showAutoReject}
@@ -321,7 +388,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {showAutoReject && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowAutoReject(false)} aria-hidden />
-              <div className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface p-3 shadow-xl space-y-2">
+              <div className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2">
                 <p className="text-xs text-content-muted">
                   Rejects the UNDECIDED images with these flags. Your manual ✓/✕ are never changed;
                   everything stays reversible (nothing is deleted from disk).
@@ -425,6 +492,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         </div>
       )}
 
+      {/* Full-text search over captions + file paths */}
+      <div className="relative max-w-md">
+        <span aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-content-subtle">🔍</span>
+        <input type="search" value={searchText} onChange={(e) => setSearchText(e.target.value)}
+          placeholder="Search captions and file names… (e.g. red dress)"
+          aria-label="Search the bank by caption or file name"
+          className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
+        {searchText && (
+          <button type="button" onClick={() => setSearchText('')} aria-label="Clear search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
+        )}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-1.5">
         <Chip active={!filter.status && !filter.flag && filter.cluster == null && filter.style == null}
@@ -527,6 +607,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           selectedIds={[...selected]}
           onClose={() => setPromoteOpen(false)}
           onStarted={() => { setPromoteOpen(false); refreshPayload() }} />
+      )}
+
+      {launchOpen && (
+        <LaunchAllDialog caps={caps} visionReady={visionReady}
+          onClose={() => setLaunchOpen(false)} onLaunch={startPipeline} />
       )}
     </div>
   )
