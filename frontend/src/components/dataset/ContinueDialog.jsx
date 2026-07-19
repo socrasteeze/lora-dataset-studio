@@ -1,10 +1,10 @@
-/** ▶ Continue training — flexible resume for a finished run (local or cloud).
+/** ▶ Continue training — flexible resume for a finished run.
  * Replaces the old fixed « +1000 » confirm/prompt: pick how many more steps, WHICH
  * checkpoint to resume from (default = latest, but an earlier, less-cooked epoch is
  * the whole point — « step 750 beat the over-cooked 1000 »), and optionally adjust
  * the handful of settings a resume can safely change (cadence + preview prompts).
  *
- * Purely presentational and props-driven so the local panel and the cloud Runs hub
+ * Purely presentational and props-driven so the local panel and the Runs hub
  * share one dialog. onResolve(payload | null): payload =
  * { extraSteps, fromStep, overrides } (fromStep null = resume from the latest,
  * in place), or null on cancel. */
@@ -18,7 +18,7 @@ const TIMESTEP_CHOICES = ['sigmoid', 'linear', 'weighted', 'shift'];
 
 export default function ContinueDialog({
   context,                 // short run identity, e.g. "Lola — Z-Image · Turbo"
-  where = 'local',         // 'local' | 'cloud' — only tweaks the seeding note wording
+  where = 'local',         // 'local' | 'remote' — only tweaks the seeding note wording
   checkpoints = [],        // [{ step, final?, best? }] — the run's saves
   bestStep = null,         // optional « Find best epoch » recommendation to flag
   settings = {},           // inherited effective settings shown as the starting point
@@ -128,7 +128,7 @@ export default function ContinueDialog({
           {isEarlier && (
             <span className="text-amber-300/90 text-[0.6875rem] leading-relaxed">
               Restarts from step {fromStep}: the run’s later checkpoints are set aside (kept
-              {where === 'cloud' ? ' in this run’s staging' : ' on disk'}, recoverable), and the
+              {where === 'remote' || where === 'cloud' ? ' in this run’s staging' : ' on disk'}, recoverable), and the
               continuation writes its own saves.
             </span>
           )}

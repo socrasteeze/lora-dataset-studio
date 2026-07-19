@@ -117,15 +117,13 @@ function RunThumb({ run, broken, onBroken }) {
   );
 }
 
-/** error_pod_kept billing warning — INSIDE the concerned card (it used to be
- * an orphan full-width banner above the whole history). */
+/** Legacy remote-run recovery note — unused for local history, kept for old rows. */
 function PodKeptNote() {
   return (
     <div role="alert"
       className="w-full rounded-md border border-amber-400/40 bg-amber-500/10 px-2.5 py-2 text-amber-200 text-[0.6875rem] leading-relaxed">
-      <span className="font-semibold">⚠ Pod kept for manual checkpoint recovery</span> — it keeps
-      billing until reaped. Download its LoRA, then it is cleaned up automatically after the
-      recovery window.
+      <span className="font-semibold">⚠ Run kept for manual checkpoint recovery</span> — download
+      its LoRA; it is cleaned up automatically after the recovery window.
     </div>
   );
 }
@@ -136,14 +134,14 @@ function AutoRetryBadges({ run }) {
       {run.auto_retry_of != null && (
         <span
           className="rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-0.5 text-sky-200 text-[0.625rem]"
-          title={`Automatic retry of cloud run #${run.auto_retry_of}`}>
+          title={`Automatic retry of run #${run.auto_retry_of}`}>
           ↻ automatic retry {run.auto_retry_count || 1}/1
         </span>
       )}
       {run.auto_retry_run_id != null && (
         <span
           className="rounded border border-violet-400/40 bg-violet-500/10 px-1.5 py-0.5 text-violet-200 text-[0.625rem]"
-          title={`Automatically relaunched as cloud run #${run.auto_retry_run_id}`}>
+          title={`Automatically relaunched as run #${run.auto_retry_run_id}`}>
           ↻ auto-retried as #{run.auto_retry_run_id}
         </span>
       )}
@@ -424,12 +422,8 @@ export default function CloudRunsPage() {
     }
   };
 
-  const configured = data?.configured;
-  const actives = data?.actives || [];
-  const recent = data?.recent || [];
-  const limit = data?.limit || 1;
-  const budget = data?.monthly_budget || 0;
-  const spent = data?.month_spend || 0;
+  // Fork is local-only: ignore remote actives/history (backend may still return them).
+  const recent = (data?.recent || []).filter((r) => r.source !== 'cloud');
 
   /* One HISTORY card. Visual hierarchy: rank 1 = thumbnail + identity chip +
      name + a strong status pill; rank 2 = the metrics that matter (duration,
@@ -455,8 +449,8 @@ export default function CloudRunsPage() {
               <RunIdChip source={ident.source} id={ident.id} />
             ) : (
               <span className="text-[0.625rem] uppercase text-content-subtle"
-                title={run.source === 'cloud' ? 'Cloud run (vast.ai)' : 'Local run'}>
-                {run.source === 'cloud' ? 'cloud' : 'local'}
+                title={run.source === 'cloud' ? 'Remote run (archived)' : 'Local run'}>
+                {run.source === 'cloud' ? 'remote' : 'local'}
               </span>
             )}
             <button type="button" onClick={() => openDataset(run.dataset_id)}
@@ -560,49 +554,22 @@ export default function CloudRunsPage() {
             <span><span aria-hidden></span> Training runs</span>
             <HelpBadge topic="page-cloud" />
           </h1>
-          {/* Escape hatch to the provider: see the pod's own console (billing,
-              logs, manual destroy) when something looks off app-side. */}
-          <a href="https://cloud.vast.ai/instances/" target="_blank" rel="noreferrer"
-            className="ml-auto text-xs font-medium text-sky-300 underline hover:text-sky-200">
-            Open the vast.ai console ↗
-          </a>
         </div>
         <p className="m-0 text-content-muted text-sm">
-          Every training in one place — cloud and local: watch progress, stop a run,
+          Every local training run in one place — watch progress, stop a run,
           download a finished LoRA, and see the exact settings each launch used.
         </p>
       </header>
 
-      {data && !configured && (
-        <div className="rounded-lg border border-border bg-surface p-4 text-content-muted text-sm">
-          Cloud training isn’t configured yet. Add your vast.ai API key in{' '}
-          <button type="button" onClick={() => navigate('/settings')}
-            className="text-sky-300 underline hover:text-sky-200">Settings</button>{' '}
-          to rent GPUs on demand.
-        </div>
-      )}
+      {/* Fork is local-only: remote rental prompts stay off. */}
 
-      {configured && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-          <span className="text-content">
-            <b className="tabular-nums">{actives.length}</b>
-            <span className="text-content-muted">/{limit} active</span>
-          </span>
-          <span className="text-content-muted tabular-nums">
-            ${data.total_price_per_hour || 0}/h total
-          </span>
-          <span className="text-content-muted tabular-nums">
-            this month: ${spent.toFixed(2)}{budget > 0 ? ` of $${budget.toFixed(2)}` : ' (no budget cap)'}
-          </span>
-        </div>
-      )}
 
       {/* Active runs */}
       <div className="flex flex-col gap-3">
         <h2 className="m-0 text-content-muted text-xs font-semibold uppercase tracking-wide">
           In progress
         </h2>
-        {/* Live LOCAL training — its own card next to the cloud actives. */}
+        {/* Live local training card. */}
         {data?.local_active?.current && (
           <div id={runRowDomId('local', data.local_active.record_id)}
             className="flex flex-col gap-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-3">
@@ -658,79 +625,10 @@ export default function CloudRunsPage() {
         )}
         {!data ? (
           <p className="m-0 text-content-subtle text-sm">Loading…</p>
-        ) : actives.length === 0 ? (
-          !data.local_active && (
-            <p className="m-0 text-content-subtle text-sm">
-              No run in progress. Launch one from a dataset’s training panel.
-            </p>
-          )
-        ) : (
-          actives.map((run) => (
-            <div key={run.run_id} id={runRowDomId('cloud', run.run_id)}
-              className="flex flex-col gap-2 rounded-xl border border-sky-500/30 bg-sky-500/5 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <RunIdChip source="cloud" id={run.run_id} />
-                <button type="button" onClick={() => openDataset(run.dataset_id)}
-                  title="Open this dataset"
-                  className="text-content font-semibold text-sm hover:underline">
-                  {run.dataset_name || run.run_name || `Dataset #${run.dataset_id}`}
-                </button>
-                <span className="rounded border border-border bg-surface px-1.5 py-0.5 text-content-muted text-[0.625rem] uppercase">
-                  {famLabel(run.train_type)}
-                </span>
-                {/* No variant shown on the active card, so spell the base in
-                    full here — official ("Z-Image Turbo") and custom alike. */}
-                <BaseModelChip label={runBaseModelLabel(run)} />
-                <DatasetVersionChip version={run.version} />
-                <StatusBadge status={run.status} />
-                <AutoRetryBadges run={run} />
-                <span className="text-content-subtle text-[0.625rem]">{timeAgo(run.created_at)}</span>
-                <span className="ml-auto text-content-muted text-[0.6875rem] tabular-nums">
-                  {run.gpu ? `${run.gpu} · ` : ''}{run.price_per_hour != null ? `$${run.price_per_hour}/h · ` : ''}
-                  ~${run.cost_estimate} so far
-                </span>
-              </div>
-
-              <RecipeWarning run={run} />
-              <TrainingProgress datasetId={run.dataset_id} trainType={run.train_type} variant={run.variant} cloud />
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => stop(run)} disabled={stopping[run.run_id]}
-                  className="px-3 py-1.5 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
-                  {stopping[run.run_id] ? 'Stopping…' : 'Stop run'}
-                </button>
-                {run.checkpoint_ready && (
-                  <a href={checkpointHref(run)}
-                    className="px-3 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-200 text-xs font-semibold no-underline">
-                    Download the LoRA
-                  </a>
-                )}
-                {run.share_key && (
-                  <button type="button" onClick={() => shareConfig(run)}
-                    title="Download this run's full settings as a paste-safe text file (recipe / help thread)"
-                    className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content-muted hover:text-content text-xs font-semibold">
-                    ⎘ Share config
-                  </button>
-                )}
-                <span className="ml-auto flex items-center gap-2">
-                  {/* Per-run escape hatch to this pod's provider console (billing,
-                      logs, manual destroy). The vast instance id, when known, goes
-                      in the tooltip so it's findable in the console's instance list. */}
-                  <a href="https://cloud.vast.ai/instances/" target="_blank" rel="noreferrer"
-                    title={run.vast_instance_id
-                      ? `vast.ai instance ${run.vast_instance_id} — provider console (billing, logs, manual destroy)`
-                      : 'vast.ai console — billing, logs, manual destroy'}
-                    className="px-2 py-1 rounded-lg text-sky-300 hover:text-sky-200 text-xs no-underline">
-                    vast.ai console ↗
-                  </a>
-                  <button type="button" onClick={() => openDataset(run.dataset_id)}
-                    className="px-2 py-1 rounded-lg text-content-muted hover:text-content text-xs">
-                    Open dataset ↗
-                  </button>
-                </span>
-              </div>
-            </div>
-          ))
+        ) : !data.local_active && (
+          <p className="m-0 text-content-subtle text-sm">
+            No run in progress. Launch one from a dataset’s training panel.
+          </p>
         )}
       </div>
 
@@ -749,16 +647,10 @@ export default function CloudRunsPage() {
                 <span className="sr-only">{recentCollapsed ? ' — collapsed' : ' — expanded'}</span>
               </button>
             </h2>
-            {/* the fold must not hide an active billing warning entirely */}
-            {recentCollapsed && recent.some((r) => r.status === 'error_pod_kept') && (
-              <span className="text-amber-300 text-[0.6875rem]">
-                ⚠ a kept pod is still billing — expand for details
-              </span>
-            )}
             {!recentCollapsed && (
               <button type="button"
                 onClick={async () => {
-                  if (!window.confirm('Move the staging folders of all FINISHED runs to the trash?\n\nDataset copies, samples and checkpoint duplicates already imported. Active runs and pods kept for recovery are spared. Recoverable until you empty the trash in Settings.')) return;
+                  if (!window.confirm('Move the staging folders of all FINISHED runs to the trash?\n\nDataset copies, samples and checkpoint duplicates already imported. Active runs are spared. Recoverable until you empty the trash in Settings.')) return;
                   const d = await postJson('/api/dataset/train/cloud/purge', {});
                   if (d.ok) toast.info(`Cleaned ${d.purged_runs} run(s) — ${(d.freed_bytes / 1e9).toFixed(1)} GB moved to the trash.`);
                   poll();
@@ -790,9 +682,6 @@ export default function CloudRunsPage() {
                         · {group.runs.length} run{group.runs.length > 1 ? 's' : ''}
                       </span>
                     </button>
-                    {collapsed && group.runs.some((r) => r.status === 'error_pod_kept') && (
-                      <span className="whitespace-nowrap text-amber-300 text-[0.625rem]">⚠ kept pod billing</span>
-                    )}
                     <button type="button" onClick={() => openDataset(group.datasetId)}
                       className="ml-auto whitespace-nowrap rounded-lg px-2 py-0.5 text-content-muted hover:text-content text-[0.6875rem]">
                       Open dataset ↗
@@ -816,7 +705,7 @@ export default function CloudRunsPage() {
           context={`${famLabel(continueRunTarget.train_type)}${
             trainingRunVariantLabel(continueRunTarget.train_type, continueRunTarget.variant)
               ? ` · ${trainingRunVariantLabel(continueRunTarget.train_type, continueRunTarget.variant)}` : ''}`}
-          where="cloud"
+          where="local"
           checkpoints={((continueRunTarget.resume_steps?.length
             ? continueRunTarget.resume_steps
             : [continueRunTarget.steps]).filter(Boolean)).map((step) => ({ step }))}

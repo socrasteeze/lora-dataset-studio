@@ -9,7 +9,6 @@ import {
   checkpointSelectionMatchesTraining,
   checkpointVariantLabel,
   checkpointVariantOptions,
-  cloudTrainingLaunchPayload,
   defaultCheckpointBase,
   defaultCheckpointVariant,
   loraFolderLabel,
@@ -938,96 +937,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     if (!caps.training_visible) onCheckpointsChange?.(0);
   }, [caps.training_visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cloud run status (global — several cloud runs may be active at once,
-  // across different datasets, up to cloudStatus.limit). Polled independently
-  // of the local `status` poll above, and only while a vast.ai key is
-  // actually configured.
-  const [cloudStatus, setCloudStatus] = useState({
-    configured: false, limit: 1, actives: [], active: null, total_price_per_hour: 0, last: null,
-  });
-  useEffect(() => {
-    if (!caps.cloud_training) return undefined;
-    let alive = true;
-    let t;
-    const tick = async () => {
-      try {
-        const r = await fetch('/api/dataset/train/cloud/status', { credentials: 'include' });
-        if (r.ok && alive) setCloudStatus(await r.json());
-      } catch { /* transient */ }
-      if (alive) t = setTimeout(tick, 5000);
-    };
-    t = setTimeout(tick, 0);
-    return () => { alive = false; clearTimeout(t); };
-  }, [caps.cloud_training]);
-  // Compat: older servers (or a stale poll) may still answer with only the
-  // single `active` field — fall back to a 1-element list built from it.
-  const actives = cloudStatus.actives || (cloudStatus.active ? [cloudStatus.active] : []);
-  // Per-(dataset, family): switching the LoRA-type selector shows THAT
-  // family's run. A run without train_type (older server payload) matches
-  // any family, preserving the previous behavior.
-  const cloudActiveHere = actives.find((a) => a.dataset_id === ds.currentId
-    && (!a.train_type || a.train_type === trainType));
-  // Multi-family parallelism is safe again: each cloud run's monitor builds its
-  // job config from its OWN stamped family/variant, not the shared dataset row
-  // (backend _run_config_dataset — fix for the 2026-07-14 incident). So a Krea
-  // run and a Z-Image run may train the same dataset at once; the button is
-  // blocked only when a run of the SAME family is already active here.
-  // Single source of truth for WHY « Train in cloud » is disabled — most
-  // fundamental cause first (family unsupported > custom weights > too few
-  // images > a run already active here > global limit). Drives BOTH the tooltip
-  // AND the always-visible reason line below: a disabled button must state its
-  // reason without a hover (the owner lost time guessing on a greyed SDXL button
-  // whose only explanation lived in a title attribute).
   // Slider mode floors the image requirement at the substrate minimum (the
   // preflight/assert_trainable stay authoritative server-side).
   const trainMinFloor = sliderOn ? TRAIN_MIN_SLIDER[0] : (TRAIN_MIN[trainType]?.[0] ?? 12);
   // « Continue anyway » relaxes the image-floor gate (a bypassable quality blocker
   // the user acknowledged); a physical impossibility never yields a truthy ack.
   const belowFloor = keptCount < trainMinFloor && !allowNotReady;
-  const cloudTooFewImages = belowFloor;
-  const cloudLimitReached = actives.length >= (cloudStatus.limit || 1);
-  const cloudDisabledReason =
-    trainType === 'sdxl'
-      ? 'SDXL trains locally only — the cloud lane covers Z-Image, Krea 2 and FLUX.2 Klein'
-    : trainType === 'flux'
-      ? 'FLUX.1 trains locally only — the cloud lane covers Z-Image, Krea 2 and FLUX.2 Klein'
-    : (vaePath || tePath)
-      ? 'Custom VAE/text-encoder overrides are local-only — clear them in Advanced options to train in the cloud'
-    : customWeightsEmpty
-      ? 'Enter the path to your custom weights .safetensors first'
-    : baseBlocksTrain
-      ? 'Convert the custom base first — the cloud lane pushes the converted copy to your Hugging Face account'
-    : cloudTooFewImages
-      ? `Only ${keptCount} image(s) kept — the cloud minimum for ${sliderOn ? 'a slider' : typeLabel} is ${trainMinFloor}`
-    : cloudActiveHere
-      ? `A ${typeLabel} cloud run is already active on this dataset`
-    : cloudLimitReached
-      ? `Cloud run limit reached (${actives.length}/${cloudStatus.limit || 1}) — stop one or raise the limit in Settings`
-    : null;
-
-  // Launch-time GPU speed picker: the button opens a dialog that lists live
-  // vast.ai offers by speed (price/h + approx time + cost); the chosen class is
-  // forwarded as gpu_name. launchCloud carries the POST + the MISMATCH_CAPTION
-  // retry that used to live inline in the button handler.
-  const [cloudDialog, setCloudDialog] = useState(false);
-  const launchCloud = async (gpuName) => {
-    let body = {
-      ...cloudTrainingLaunchPayload({
-        baseModel: base, variant, trainType, masked, steps: stepsN, gpuName,
-      }),
-      ...(allowNotReady ? { allow_not_ready: true } : {}),
-    };
-    let d = await postJson(`/api/dataset/${ds.currentId}/train/cloud`, body);
-    for (let flag; d && d.ok === false && (flag = confirmableRetryFlag(d.error, 'Train anyway (force)')); ) {
-      if (flag === 'declined') { d = null; break; }  // the confirm WAS the answer
-      body = { ...body, [flag]: true };
-      d = await postJson(`/api/dataset/${ds.currentId}/train/cloud`, body);
-    }
-    if (d && d.ok === false) {
-      toastTrainError(d, 'Cloud training failed');
-    }
-    // Success needs no toast — the 5s cloud-status poll picks it up.
-  };
 
   if (!caps.training_visible) {
     return (
@@ -1060,16 +975,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           : <span aria-live="polite" className="ml-auto text-content-subtle text-[0.6875rem]">{keptCount} image(s) kept</span>}
       </div>
 
-      {/* A cloud run left its pod alive for manual recovery (any dataset) — it
-          keeps billing until reaped, so this must stay visible regardless of
-          which dataset's panel happens to be open. No action button: the
-          recovery is manual (outside the app) and expiry-reaping is automatic. */}
-      {cloudStatus.last?.status === 'error_pod_kept' && (
-        <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-amber-300 text-[0.6875rem]">
-          ⚠ A previous cloud run kept its pod for manual recovery — it is still billing until reaped. {cloudStatus.last.error}
-        </p>
-      )}
-
       {/* Local training CRASHED (ai-toolkit run.py exited non-zero): the watcher
           captured the reason into training_error. Without surfacing it, a run that
           starts then dies just flips back to idle after the green "Training started"
@@ -1100,47 +1005,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           base={status.current?.base_model ?? base}
           trainType={status.current?.train_type || trainType}
           variant={status.current?.variant || variant} />
-      )}
-
-      {/* Cloud run progress + stop (this dataset only) — separate from the local
-          poll above; runs entirely on the vast.ai pod. */}
-      {cloudActiveHere && (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-[0.6875rem] text-sky-200 flex-wrap">
-            <span aria-hidden></span>
-            <span className="font-semibold">Cloud run — {cloudActiveHere.status}</span>
-            {cloudActiveHere.gpu && <span>{cloudActiveHere.gpu}</span>}
-            {cloudActiveHere.price_per_hour != null && (
-              <span className="tabular-nums">${cloudActiveHere.price_per_hour}/h · ~${cloudActiveHere.cost_estimate} so far</span>
-            )}
-            {/* Full progress bar, loss curve and samples live on the Runs hub. */}
-            <Link to="/cloud" title="Open the Runs page — full progress, loss curve and samples"
-              className="ml-auto px-1 py-0.5 text-sky-300 hover:text-sky-200 font-medium underline decoration-sky-300/40">
-              View in Runs ↗
-            </Link>
-            <button type="button" className="px-2 py-0.5 rounded bg-red-600/80 text-white text-[0.6875rem] font-semibold"
-              onClick={async () => { await postJson('/api/dataset/train/cloud/stop', { run_id: cloudActiveHere.run_id }); }}>
-              Stop cloud run
-            </button>
-          </div>
-          <TrainingProgress datasetId={ds.currentId}
-            base={cloudActiveHere.base_model ?? ''}
-            trainType={cloudActiveHere.train_type || trainType}
-            variant={cloudActiveHere.variant || variant} cloud />
-        </div>
-      )}
-      {/* Download link only when the LAST run matches the selected family
-          (a legacy payload without train_type matches any family). Keeping it
-          keyed on cloudStatus.last stays simple — per-family history is
-          served by ?train_type= on the checkpoint route itself. */}
-      {caps.cloud_training && !cloudActiveHere && cloudStatus.last
-        && cloudStatus.last.dataset_id === ds.currentId
-        && (!cloudStatus.last.train_type || cloudStatus.last.train_type === trainType)
-        && cloudStatus.last.checkpoint_ready && cloudStatus.last.status === 'done' && (
-        <a href={`/api/dataset/${ds.currentId}/train/cloud/checkpoint?train_type=${encodeURIComponent(trainType)}`}
-          className="text-sky-300 text-[0.6875rem] underline w-fit">
-          Download the cloud-trained LoRA (.safetensors)
-        </a>
       )}
 
       {/* --- Chemin essentiel : choisir le type de LoRA et lancer. Le reste
@@ -1197,16 +1061,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           <span aria-hidden></span> Train the LoRA
         </button>
         <HelpBadge topic="action-training-launch" />
-        {caps.cloud_training && (
-          <button type="button"
-            disabled={!!cloudDisabledReason}
-            title={cloudDisabledReason
-              || 'Rents a vast.ai GPU for this run (~$1-2), auto-terminated'}
-            onClick={() => setCloudDialog(true)}
-            className="px-3 py-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 text-sky-200 text-sm font-semibold disabled:opacity-40">
-            <span aria-hidden></span> Train in cloud
-          </button>
-        )}
         {status.in_progress && (
           <button type="button" onClick={async () => { await ds.stopTraining(); refreshStatus(); }}
             className="px-3 py-1.5 rounded-lg bg-red-600/80 text-white text-sm font-semibold">
@@ -1337,21 +1191,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           </>
         )}
       </div>
-
-      {/* A disabled Train-in-cloud button always states WHY, right under the
-          button row — the tooltip alone was invisible until hovered, so a greyed
-          SDXL cloud button read as an unexplained limit (owner-reported). */}
-      {caps.cloud_training && cloudDisabledReason && (
-        <p className="m-0 text-sky-300/90 text-[0.6875rem]">
-          Cloud training unavailable — {cloudDisabledReason}
-        </p>
-      )}
-
-      {actives.length > 0 && (
-        <p className="m-0 text-content-subtle text-[0.625rem]">
-          {actives.length}/{cloudStatus.limit || 1} cloud runs — ${cloudStatus.total_price_per_hour || 0}/h total
-        </p>
-      )}
 
       {/* Pointeur visible quand le bouton Train est bloqué par un réglage qui
           vit dans la section repliée — sinon la cause resterait cachée. */}
@@ -1503,15 +1342,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 </select>
               )}
               {/* FLUX.2 Klein : deux TAILLES de base (pas une histoire de distillation
-                  comme Krea) — 4B = la voie locale 16-24 GB, 9B = 32-48 GB, pensé
-                  pour Train in cloud. Les deux sont gated sur Hugging Face. */}
+                  comme Krea) — 4B = 16-24 GB VRAM, 9B = 32-48 GB. Les deux sont
+                  gated sur Hugging Face. */}
               {trainType === 'flux2klein' && (
                 <select value={variant} onChange={(e) => setVariant(e.target.value)}
                   aria-label="FLUX.2 Klein model size"
-                  title="FLUX.2 Klein model size — 4B fits a 16-24 GB local GPU (recommended locally); 9B needs 32-48 GB VRAM, best trained via Train in cloud. Both bases are gated on Hugging Face: accept the license and set a HF token before the first run."
+                  title="FLUX.2 Klein model size — 4B fits a 16-24 GB local GPU (recommended); 9B needs 32-48 GB VRAM. Both bases are gated on Hugging Face: accept the license and set a HF token before the first run."
                   className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
-                  <option value="4b">4B (local, 16-24 GB)</option>
-                  <option value="9b">9B (cloud, 32-48 GB)</option>
+                  <option value="4b">4B (16-24 GB)</option>
+                  <option value="9b">9B (32-48 GB)</option>
                 </select>
               )}
             </div>
@@ -1557,7 +1396,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 <span className="text-content-subtle text-[0.625rem] leading-relaxed">
                   Local path to a <b className="text-content-muted font-medium">{typeLabel}</b> .safetensors
                   (same architecture). The file is checked at launch (exists, valid, arch signature);
-                  an unrecognized file asks for confirmation. Local-only — cloud training refuses it.
+                  an unrecognized file asks for confirmation. Local training only.
                 </span>
               </div>
             )}
@@ -1621,7 +1460,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 <span className="text-content-subtle text-[0.625rem] leading-relaxed">
                   Leave both empty to use the checkpoint's own VAE/text encoders. A VAE is a local
                   .safetensors; the text encoder may be a local folder or a Hugging Face repo id.
-                  Checked at launch. These are SDXL-only and local-only (cloud training refuses them).
+                  Checked at launch. These are SDXL-only and for local training.
                 </span>
               </div>
             )}
@@ -2455,14 +2294,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           onResolve={resolvePreflight} />
       )}
 
-      {cloudDialog && (
-        <CloudLaunchDialog
-          datasetId={ds.currentId} trainType={trainType} variant={variant}
-          base={base} steps={stepsN}
-          keptCount={keptCount} cloudStatus={cloudStatus}
-          onClose={() => setCloudDialog(false)} onLaunch={launchCloud} />
-      )}
-
       {/* Resume ou Fresh : un run existe déjà pour ce (trigger, base). ai-toolkit
           reprendrait silencieusement son dernier checkpoint — on demande. */}
       {resumeAsk && (
@@ -2509,294 +2340,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           busy={status.in_progress}
           onResolve={runContinue} />
       )}
-    </div>
-  );
-}
-
-const _FAMILY_LABEL = { zimage: 'Z-Image', krea: 'Krea 2', sdxl: 'SDXL', flux: 'FLUX.1', flux2klein: 'FLUX.2 Klein' };
-
-function _fmtDuration(min) {
-  if (min == null) return '—';
-  if (min < 90) return `~${min} min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `~${h} h ${m} min` : `~${h} h`;
-}
-
-/* Custom-base gate inside the cloud dialog: a custom base trains from a
-   PRIVATE repo on the user's Hugging Face account (lds-base-<hash>). This
-   section checks whether that repo already carries the base (cache-hit →
-   launch straight away) and otherwise offers the ONE-TIME push — uploaded
-   once, reused by every future cloud run, never public. */
-function CustomBasePushSection({ datasetId, trainType, variant, base, onReadyChange }) {
-  const [state, setState] = useState(null);      // last GET /custom-base payload
-  const [checkError, setCheckError] = useState(null);
-  const [pushBusy, setPushBusy] = useState(false);
-  const [pushError, setPushError] = useState(null);
-  const [pollNonce, setPollNonce] = useState(0);
-
-  useEffect(() => {
-    let alive = true;
-    let timer;
-    const tick = async () => {
-      let d = null;
-      try {
-        const qs = new URLSearchParams({ train_type: trainType, base_model: base });
-        if (variant) qs.set('variant', variant);
-        const r = await fetch(`/api/dataset/${datasetId}/train/cloud/custom-base?${qs.toString()}`,
-          { credentials: 'include' });
-        d = await r.json().catch(() => ({}));
-        if (!alive) return;
-        if (!r.ok || d.ok === false) {
-          setCheckError(d.error || `Could not check the custom base (HTTP ${r.status})`);
-          d = null;
-        } else {
-          setCheckError(null);
-          setState(d);
-        }
-      } catch {
-        if (alive) setCheckError('Network error while checking the custom base');
-      }
-      // Keep polling while the background push is running (multi-GB upload).
-      if (alive && d?.job?.state === 'running') timer = setTimeout(tick, 3000);
-    };
-    tick();
-    return () => { alive = false; clearTimeout(timer); };
-  }, [datasetId, trainType, variant, base, pollNonce]);
-
-  const ready = !!state?.ready;
-  useEffect(() => { onReadyChange(ready); }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const startPush = async (allowUnverified = false) => {
-    setPushBusy(true);
-    setPushError(null);
-    try {
-      const d = await postJson(`/api/dataset/${datasetId}/train/cloud/custom-base/push`, {
-        train_type: trainType, variant, base_model: base,
-        ...(allowUnverified ? { allow_unverified_weights: true } : {}),
-      });
-      if (d && d.ok === false) {
-        const msg = String(d.error || 'Push failed');
-        const marker = 'CUSTOM_WEIGHTS_UNVERIFIED: ';
-        if (!allowUnverified && msg.includes(marker)) {
-          const detail = msg.slice(msg.indexOf(marker) + marker.length);
-          if (window.confirm(`${detail}\n\nPush anyway (force)?`)) return startPush(true);
-        } else {
-          setPushError(msg);
-        }
-        return;
-      }
-      setPollNonce((n) => n + 1);        // job started — begin polling its state
-    } finally {
-      setPushBusy(false);
-    }
-  };
-
-  const job = state?.job || {};
-  const pushing = pushBusy || job.state === 'running';
-  const sizeLabel = state?.local_size_bytes != null ? ` (~${fmtBytes(state.local_size_bytes)})` : '';
-  let body;
-  if (checkError) {
-    body = <p className="m-0 text-red-300 text-[0.75rem]">⚠ {checkError}</p>;
-  } else if (!state) {
-    body = <p className="m-0 text-content-muted text-[0.75rem]">Checking your custom base on Hugging Face…</p>;
-  } else if (ready) {
-    body = (
-      <p className="m-0 text-emerald-300 text-[0.75rem]">
-        ✓ Custom base found in your private repo <span className="font-mono">{state.repo_id}</span> —
-        the pod downloads it with your HF token. Nothing to upload again.
-      </p>
-    );
-  } else if (state.reason === 'no_token') {
-    body = (
-      <p className="m-0 text-amber-300 text-[0.75rem]">
-        ⚠ Add your Hugging Face token (HF_TOKEN) in Settings ▸ API keys first — your custom
-        base rides in a private repo on your account, and the pod needs the token to read it.
-      </p>
-    );
-  } else if (state.reason === 'token_invalid') {
-    body = (
-      <p className="m-0 text-amber-300 text-[0.75rem]">
-        ⚠ Your Hugging Face token was rejected — paste a valid HF_TOKEN in Settings ▸ API keys.
-      </p>
-    );
-  } else if (pushing) {
-    body = (
-      <p className="m-0 text-sky-200 text-[0.75rem]">
-        Uploading your custom base{sizeLabel} to the private repo
-        {state.repo_id ? <> <span className="font-mono">{state.repo_id}</span></> : null}…
-        One-time upload — every future cloud run reuses it. Keep the app running.
-      </p>
-    );
-  } else {
-    const why = state.reason === 'size_mismatch'
-      ? 'Your local custom base changed since it was pushed — push it again to update the private copy.'
-      : state.reason === 'file_missing'
-        ? 'The private repo exists but is missing the file this variant needs — push again to add it.'
-        : 'This run uses custom weights the pod cannot download yet.';
-    body = (
-      <div className="flex flex-col gap-1.5">
-        <p className="m-0 text-content-muted text-[0.75rem]">
-          {why} Pushing uploads your custom base{sizeLabel} to a <b className="text-content">PRIVATE</b> repo
-          on your Hugging Face account — one time; future cloud runs reuse it. It is never made public.
-        </p>
-        {!state.local_available && (
-          <p className="m-0 text-amber-300 text-[0.75rem]">
-            ⚠ The local file is unavailable ({state.local_reason || 'missing'}) — restore it to push.
-          </p>
-        )}
-        {(pushError || job.state === 'error') && (
-          <p className="m-0 text-red-300 text-[0.75rem]">⚠ {pushError || job.error}</p>
-        )}
-        <button type="button" onClick={() => startPush(false)}
-          disabled={!state.local_available || pushBusy}
-          className="w-fit px-3 py-1.5 rounded-lg border border-sky-500/50 bg-sky-500/10 text-sky-200 text-sm font-semibold disabled:opacity-40">
-          Push custom base to Hugging Face (one-time)
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-lg border border-border bg-surface px-3 py-2">
-      <p className="m-0 mb-1 text-content text-[0.75rem] font-semibold">
-        Custom base: <span className="font-mono font-normal">{baseName(base)}</span>
-      </p>
-      {body}
-    </div>
-  );
-}
-
-/* Launch-time GPU speed picker. Fetches live vast.ai offers grouped by GPU
-   class (slowest→fastest), each with price/h and an APPROXIMATE training time
-   and total run cost for this dataset+family. Picking a tier rents the cheapest
-   live offer of that class; the price cap in Settings still bounds what's shown.
-   A custom base adds the push gate above the tiers (see CustomBasePushSection). */
-function CloudLaunchDialog({ datasetId, trainType, variant, base, steps, keptCount, cloudStatus, onClose, onLaunch }) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState(null);     // {tiers, steps, family, max_price_per_hour}
-  const [selected, setSelected] = useState(null);
-  const [launching, setLaunching] = useState(false);
-  // Custom base ('' = official): the launch stays blocked until the private
-  // repo on the user's HF account carries the base (pushed once, reused).
-  const isCustomBase = !!String(base || '').trim();
-  const [customBaseReady, setCustomBaseReady] = useState(!isCustomBase);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const qs = new URLSearchParams({ train_type: trainType });
-        if (steps) qs.set('steps', String(steps));
-        const r = await fetch(`/api/dataset/${datasetId}/train/cloud/offers?${qs.toString()}`,
-          { credentials: 'include' });
-        const body = await r.json().catch(() => ({}));
-        if (!alive) return;
-        if (!r.ok || body.ok === false) {
-          setError(body.error || body.hint || `Could not load offers (HTTP ${r.status})`);
-        } else {
-          setData(body);
-          if (body.tiers && body.tiers.length) setSelected(body.tiers[0].gpu_name);
-        }
-      } catch {
-        if (alive) setError('Network error while loading GPU offers');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, [datasetId, trainType, steps]);
-
-  const go = async () => {
-    if (!selected) return;
-    setLaunching(true);
-    try {
-      await onLaunch(selected);      // owns its own error toasts
-      onClose();
-    } finally {
-      setLaunching(false);
-    }
-  };
-
-  const tiers = data?.tiers || [];
-  const budget = cloudStatus?.monthly_budget || 0;
-  const spent = cloudStatus?.month_spend || 0;
-
-  return (
-    <div role="dialog" aria-modal="true" aria-label="Choose cloud GPU speed"
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
-      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
-      <div className="w-full max-w-lg rounded-xl border border-border bg-surface-overlay p-4 flex flex-col gap-3">
-        <h3 className="m-0 text-content font-bold text-sm">
-          <span aria-hidden></span> Choose GPU speed for this run
-        </h3>
-
-        {isCustomBase && (
-          <CustomBasePushSection
-            datasetId={datasetId} trainType={trainType} variant={variant}
-            base={base} onReadyChange={setCustomBaseReady} />
-        )}
-
-        {loading && <p className="m-0 text-content-muted text-sm">Loading live GPU offers…</p>}
-        {error && <p className="m-0 text-red-300 text-sm">⚠ {error}</p>}
-        {!loading && !error && tiers.length === 0 && (
-          <p className="m-0 text-content-muted text-sm">
-            No GPU available under ${data?.max_price_per_hour}/h right now — raise the
-            price cap in Settings, or try again shortly.
-          </p>
-        )}
-
-        {tiers.length > 0 && (
-          <div className="flex flex-col gap-1.5 max-h-[50vh] overflow-y-auto">
-            {tiers.map((t) => (
-              <label key={t.gpu_name}
-                className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
-                  selected === t.gpu_name
-                    ? 'border-sky-400/70 bg-sky-500/10'
-                    : 'border-border bg-surface hover:bg-surface-raised'}`}>
-                <input type="radio" name="gpu-tier" className="accent-sky-400"
-                  checked={selected === t.gpu_name}
-                  onChange={() => setSelected(t.gpu_name)} />
-                <span className="flex-1 min-w-0">
-                  <span className="block text-content text-sm font-semibold truncate">
-                    {t.gpu_name}
-                    {t.gpu_ram_gb ? <span className="text-content-subtle font-normal"> · {t.gpu_ram_gb} GB</span> : null}
-                  </span>
-                  <span className="block text-content-subtle text-[0.75rem] tabular-nums">
-                    {t.dph_total != null ? `$${t.dph_total.toFixed(3)}/h` : 'price n/a'}
-                    {' · '}{_fmtDuration(t.est_minutes)}
-                    {t.est_cost != null ? ` · ≈ $${t.est_cost.toFixed(2)} total` : ''}
-                  </span>
-                  {t.exceeds_cap && (
-                    <span className="block text-amber-300 text-[0.6875rem]">
-                      ⚠ Longer than the {Math.round((data?.max_runtime_minutes || 480) / 60)} h runtime cap — the run would be cut short (checkpoint rescued). Pick a faster GPU or raise the cap in Settings.
-                    </span>
-                  )}
-                </span>
-              </label>
-            ))}
-          </div>
-        )}
-
-        <p className="m-0 text-content-subtle text-[0.6875rem]">
-          {(data?.steps ?? steps ?? '—')} steps · {_FAMILY_LABEL[data?.family || trainType] || (data?.family || trainType)}
-          {keptCount != null ? ` · ${keptCount} img` : ''}
-          {budget > 0 ? ` · this month: $${spent.toFixed(2)} of $${budget.toFixed(2)}` : ''}
-          {'. '}Time & cost are approximate; the pod is auto-terminated when done.
-        </p>
-
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={go} disabled={!selected || launching || !customBaseReady}
-            title={!customBaseReady ? 'Push the custom base to your Hugging Face account first' : undefined}
-            className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
-            {launching ? 'Launching…' : 'Rent & train'}
-          </button>
-          <button type="button" onClick={onClose} disabled={launching}
-            className="ml-auto px-3 py-1.5 rounded-lg text-content-muted hover:text-content text-sm disabled:opacity-40">
-            Cancel
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

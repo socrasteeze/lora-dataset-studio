@@ -98,6 +98,11 @@ DEFAULTS = {
         'onstart': '',                 # raw-image fallback: optional startup command
     },
     'face_scoring': {'python': '', 'models_root': '', 'green': 0.50, 'orange': 0.45},
+    # Image-bank Score pass (aesthetic / NSFW / style). Interpreter is written
+    # out-of-band by Setup ▸ Install bank scoring into data/envs/bank_scoring;
+    # models_root overrides the HF/torch cache for those weights. Empty python
+    # = fall back to the app interpreter (probe fails until install).
+    'bank_scoring': {'python': '', 'models_root': ''},
     # Image bank triage thresholds. Raw scores are persisted per image;
     # these thresholds only drive the FLAGS computed at read time — so tuning
     # them re-sorts an already-scanned bank instantly, no rescan needed.

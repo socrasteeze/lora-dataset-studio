@@ -51,7 +51,7 @@ export function formatDiagnostic(d) {
   if (disk.free_gb != null) envBits.push(`disk ${disk.free_gb}GB free / ${disk.total_gb}GB`)
   envBits.push(`captioning=${cf.captioning_backend}`, `allow_crop=${yn(cf.watermark_allow_crop)}`, `LAN=${yn(cf.lan_enabled)}`)
   L.push(envBits.join(' · '))
-  L.push(`ai-toolkit=${yn(c.aitoolkit_valid)} · face scoring=${yn(c.face_scoring)} · masks=${yn(c.masks)} · cloud=${yn(c.cloud_training)} · default family=${cf.training_default_family}`)
+  L.push(`ai-toolkit=${yn(c.aitoolkit_valid)} · face scoring=${yn(c.face_scoring)} · masks=${yn(c.masks)} · default family=${cf.training_default_family}`)
 
   const engErrs = Object.entries(ge.engines || {})
   if (engErrs.length || ge.studio) {

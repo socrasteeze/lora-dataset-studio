@@ -50,6 +50,22 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-19-bank-scoring-settings-save',
+    date: '2026-07-19',
+    title: 'Saving generation-LoRA presets no longer fails after Bank Score install',
+    blurb:
+      'If you had installed Image-bank scoring, saving Settings (including a custom Klein generation-LoRA preset) could error with unknown config section bank_scoring. That section is recognized now, and a blank echo cannot wipe the managed Score interpreter.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-19-local-only-training',
+    date: '2026-07-19',
+    title: 'Training is local-only — no remote GPU rental',
+    blurb:
+      'Runs, the training panel, Setup, and Settings no longer offer remote GPU rental. Everything trains on your machine via ai-toolkit; leftover rental keys in .env are ignored.',
+    to: '/cloud',
+  },
+  {
     id: '2026-07-19-klein-paths-anywhere',
     date: '2026-07-19',
     title: 'Pin Klein models from anywhere on disk',
@@ -386,7 +402,7 @@ export const WHATS_NEW = [
     date: '2026-07-17',
     title: 'Train slider LoRAs in the cloud',
     blurb:
-      'Concept-slider training is unlocked on the cloud GPU path, so you can build strength sliders (age, expression, style intensity…) without tying up your local card.',
+      'Concept-slider training works on the local GPU path, so you can build strength sliders (age, expression, style intensity…) on your own card.',
     to: '/cloud',
   },
   {

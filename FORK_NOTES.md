@@ -113,13 +113,21 @@ conflict trivially — take upstream's content, then re-strip the emoji from the
 merged result (a line-safe strip: never let a removal eat the newline of a line
 that ends with an emoji).
 
-## Divergence 4: Training Settings without Cloud GPU cards
+## Divergence 4: Local-only training (no remote GPU rental)
 
-Settings → Training keeps **Defaults** only. The vast.ai API key card and
-Cloud training guardrails were removed from the Settings UI (Runs page /
-backend cloud code remain for local run history). Upstream merges that restore
-`TrainingSection.jsx` cloud cards: delete them again and prune the matching
-`helpRegistry.js` topics + `docs/guide/settings-reference.md` subsections.
+Settings → Training keeps **Defaults** only — no rental API-key card and no
+cloud guardrails. The UI also:
+
+- Forces `cloud_training: false` in `CapabilitiesContext` (even if a leftover
+  key sits in `.env`).
+- Removes **Train in cloud**, GPU-speed picker, and Runs-page rental banners.
+- Shows **Runs** as local history only (cloud rows filtered out).
+
+Backend cloud routes may still exist dormant; they must not surface in the UI.
+Upstream merges that restore Training Settings cards, Setup “rent a GPU” copy,
+or Runs rental prompts: delete them again. Contract:
+`frontend/tests/local-only-engines-contract.test.mjs` (also forbids rental UI
+strings).
 
 ## Merge routine (every upstream sync)
 

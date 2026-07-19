@@ -33,9 +33,8 @@ a 12B model like Krea 2, so **~24 GB VRAM** is the comfort zone (drop the resolu
 Studio) is coming — until then, test your Flux LoRA in your own ComfyUI.
 
 **FLUX.2 Klein note:** two model sizes, picked next to the base selector — **4B**
-(default) trains on a **16–24 GB** local GPU, **9B** needs **32–48 GB VRAM** and is
-best trained via **Train in cloud** (both local and cloud runs are supported for
-this family). Both bases are *gated* on Hugging Face: accept the license of
+(default) trains on a **16–24 GB** local GPU; **9B** needs **32–48 GB VRAM**.
+Both bases are *gated* on Hugging Face: accept the license of
 `FLUX.2-klein-base-4B` / `-9B` and set a HF token before the first run. In-app
 testing (Test Studio) is coming — until then, test your Klein LoRA in your own
 ComfyUI.

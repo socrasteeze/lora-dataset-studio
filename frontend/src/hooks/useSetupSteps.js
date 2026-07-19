@@ -98,7 +98,7 @@ export const COMFYUI_SKIP_LOST = [
 export const COMFYUI_SKIP_KEPT = [
   'Scraping and dataset curation',
   'Captioning (Ollama vision model or JoyCaption)',
-  'LoRA training — local ai-toolkit and cloud (vast.ai)',
+  'LoRA training — local ai-toolkit',
   'Publishing datasets and LoRAs to Hugging Face',
 ]
 

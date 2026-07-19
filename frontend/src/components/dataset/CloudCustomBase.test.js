@@ -1,38 +1,25 @@
-// Cloud custom-base push flow (source contract, same style as
-// TrainingContinueGuards.test.js): the launch dialog must gate "Rent & train"
-// on the private-repo readiness, offer the one-time push, and the panel must
-// no longer flat-block the cloud button for custom weights on the three
-// supported families.
+// Fork local-only: remote GPU rental UI (custom-base push gate, Rent & train
+// button, remote-rental launch dialog) must stay deleted from TrainingPanel.
+// Upstream merges that resurrect CloudLaunchDialog / CustomBasePushSection
+// fail this contract.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const panel = readFileSync(new URL('./TrainingPanel.jsx', import.meta.url), 'utf8');
+// Split so this test file itself does not trip the local-only UI contract.
+const trainInCloud = 'Train in ' + 'cloud';
 
-test('cloud dialog embeds the custom-base push gate and blocks launch until ready', () => {
-  assert.match(panel, /function CustomBasePushSection\(/);
-  assert.match(panel, /train\/cloud\/custom-base\?/);           // readiness poll
-  assert.match(panel, /train\/cloud\/custom-base\/push/);       // one-time push POST
-  assert.match(panel, /disabled=\{!selected \|\| launching \|\| !customBaseReady\}/);
+test('TrainingPanel has no remote rental launch dialog or custom-base push gate', () => {
+  assert.ok(!panel.includes('function CustomBasePushSection('));
+  assert.ok(!panel.includes('function CloudLaunchDialog('));
+  assert.ok(!panel.includes(trainInCloud));
+  assert.ok(!panel.includes('Rent & train'));
+  assert.ok(!panel.includes('train/cloud/custom-base'));
+  assert.ok(!panel.includes('/train/cloud'));
 });
 
-test('push copy states PRIVATE repo + one-time + reused, in English', () => {
-  assert.match(panel, /PRIVATE<\/b> repo/);
-  assert.match(panel, /future cloud runs reuse it/);
-  assert.match(panel, /never made public/);
-});
-
-test('custom weights no longer flat-block cloud for supported families', () => {
-  // the old blanket refusal string must be gone from the disabled-reason chain…
-  assert.ok(!panel.includes(
-    "? 'Custom weights are local-only — cloud training uses the official Hugging Face bases'"));
-  // …while VAE/TE overrides (SDXL-only, genuinely local-only) still block,
-  // and an unconverted Z-Image custom base still asks for conversion first.
-  assert.match(panel, /Custom VAE\/text-encoder overrides are local-only/);
-  assert.match(panel, /Convert the custom base first — the cloud lane pushes the converted copy/);
-});
-
-test('arch sniff refusal stays confirmable from the push flow', () => {
-  assert.match(panel, /CUSTOM_WEIGHTS_UNVERIFIED: /);
-  assert.match(panel, /Push anyway \(force\)\?/);
+test('TrainingPanel still trains locally via ai-toolkit', () => {
+  assert.match(panel, /Train the LoRA/);
+  assert.ok(panel.includes('ds.train(') || panel.includes('await ds.train'));
 });

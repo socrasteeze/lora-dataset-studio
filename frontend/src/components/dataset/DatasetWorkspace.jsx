@@ -510,7 +510,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   };
   // The folder lives on the machine running the app, so a browser file-picker
   // can't reach it. Try the server's native "choose a folder" dialog first;
-  // when the server has no desktop (LAN/tablet, Linux/vast.ai) fall back to the
+  // when the server has no desktop (LAN/tablet, headless Linux) fall back to the
   // in-app folder browser.
   const importFolderPrompt = async () => {
     const r = await pickNativeFolder();
