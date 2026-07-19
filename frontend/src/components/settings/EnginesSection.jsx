@@ -140,8 +140,56 @@ function KleinLorasCard({ config, setField }) {
   )
 }
 
+/* The three overridable Klein model slots. `key` is the DOM id the help
+   registry focuses (the contract test scans these literals); `cfg` is the
+   klein.* config key; `slot` matches caps.comfyui.klein_overrides. */
+const KLEIN_MODEL_SLOTS = [
+  { key: 'klein-model-unet', cfg: 'unet', slot: 'unet', label: 'Diffusion model (UNET)',
+    hint: "Relative to a diffusion-model folder — e.g. klein/flux-2-klein-9b-fp8.safetensors under models/unet, or a bare filename for a file at a folder root." },
+  { key: 'klein-model-text_encoder', cfg: 'text_encoder', slot: 'text_encoder', label: 'Text encoder',
+    hint: 'Relative to models/text_encoders — e.g. qwen_3_8b_fp8mixed.safetensors.' },
+  { key: 'klein-model-vae', cfg: 'vae', slot: 'vae', label: 'VAE',
+    hint: 'Relative to models/vae — e.g. flux2-vae.safetensors.' },
+]
+
+function KleinModelFilesCard({ config, setField, caps }) {
+  const overrides = caps?.comfyui?.klein_overrides || {}
+  return (
+    <Card
+      id="klein-model-files"
+      title="Klein model files (optional)"
+      help="Pin the exact files the Klein graph loads instead of relying on auto-detection (canonical download names, then a narrow token scan). Paths are ComfyUI-relative loader names, so they can point anywhere ComfyUI itself can load from — including folders registered via extra_model_paths.yaml. Leave a field empty to keep auto-detection for that slot. A pinned file that is not found on disk falls back to auto-detection and shows a ⚠ badge here."
+    >
+      {KLEIN_MODEL_SLOTS.map(({ key, cfg, slot, label, hint }) => {
+        const st = overrides[slot]
+        return (
+          <div key={key}>
+            <div className="flex items-center justify-between">
+              <label htmlFor={key} className="block text-sm font-medium text-content">{label}</label>
+              {st && (
+                <span className={`text-xs ${st.found ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {st.found ? '✓ found' : '⚠ not found — auto-detection is used'}
+                </span>
+              )}
+            </div>
+            <input
+              id={key}
+              type="text"
+              value={config.klein?.[cfg] || ''}
+              onChange={(e) => setField('klein', cfg, e.target.value)}
+              placeholder="Empty = auto-detect"
+              className={INPUT_CLASS}
+            />
+            <p className="mt-1 text-xs text-content-muted">{hint}</p>
+          </div>
+        )
+      })}
+    </Card>
+  )
+}
+
 export default function EnginesSection(props) {
-  const { config, setField } = props
+  const { config, setField, caps } = props
   return (
     <div className="space-y-6">
       <Card title="Engine"
@@ -151,6 +199,8 @@ export default function EnginesSection(props) {
           NSFW-capable. The cloud API engines were removed from this fork.
         </p>
       </Card>
+
+      <KleinModelFilesCard config={config} setField={setField} caps={caps} />
 
       <KleinLorasCard config={config} setField={setField} />
     </div>

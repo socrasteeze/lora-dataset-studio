@@ -191,6 +191,12 @@ const TOPICS = [
 
   // ---- Settings: per-field topics (kind 'setting') -----------------------
   // engines
+  setting('klein.unet', 'engines', 'klein-model-unet', 'Klein diffusion model (UNET) file',
+    ['klein', 'unet', 'diffusion model', 'model file', 'path', 'override', 'pin', 'custom model']),
+  setting('klein.text_encoder', 'engines', 'klein-model-text_encoder', 'Klein text encoder file',
+    ['klein', 'text encoder', 'clip', 'qwen', 'model file', 'path', 'override', 'pin']),
+  setting('klein.vae', 'engines', 'klein-model-vae', 'Klein VAE file',
+    ['klein', 'vae', 'model file', 'path', 'override', 'pin']),
   setting('klein.generation_lora_presets', 'engines', 'klein-generation-lora-presets', 'Klein generation LoRA presets',
     ['lora', 'preset', 'presets', 'klein', 'generation', 'texture', 'anatomy', 'style', 'chain', 'nsfw'],
     { trigger: 'klein-tuning-open',

@@ -50,6 +50,14 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-19-klein-model-file-pins',
+    date: '2026-07-19',
+    title: 'Point Klein at the exact model files you want',
+    blurb:
+      'Settings → Image engine now has three optional fields to pin the diffusion model (UNET), text encoder and VAE the Klein graph loads — including files that don’t live in a "klein"-named folder, or anywhere ComfyUI’s extra_model_paths.yaml reaches. Empty fields keep the automatic detection, and a pinned file that isn’t on disk falls back to auto-detection with a visible ⚠ badge instead of blocking generation.',
+    to: '/settings/engines',
+  },
+  {
     id: '2026-07-19-local-only-engines',
     date: '2026-07-19',
     title: 'Fully local generation — the cloud API engines are gone',
