@@ -23,6 +23,7 @@ into a hardcoded path), and the hardcoded consistency-LoRA filename/strength are
 now the `klein.consistency_lora` / `klein.consistency_strength` settings.
 """
 from __future__ import annotations
+import hashlib
 import logging
 import os
 import random
@@ -38,6 +39,10 @@ from ..job_queue import queue_manager
 logger = logging.getLogger(__name__)
 
 WORKFLOW_IMPROVE_SKIN_PATH = cfg.BACKEND_DIR / 'workflows' / 'improve skin.json'
+
+# Subfolder under each ComfyUI model root where absolute paths outside every
+# registered root are hardlinked/symlinked so stock loader nodes can see them.
+_PINNED_SUBDIR = 'lds-pinned'
 
 # Nodes this helper rewires — fail LOUDLY if the workflow file changes shape
 # instead of silently enqueuing a job with the wrong source/prompt/model.
@@ -102,6 +107,88 @@ def _find_model_file(comfy_type, canonical, tokens):
     return None
 
 
+def _same_file(a, b):
+    """True when both paths exist and refer to the same inode/file."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def _link_file(src, dst):
+    """Create dst as a hardlink to src, falling back to a symlink. Returns True
+    on success. Hardlinks are preferred: same-volume Windows links need no
+    admin/Developer Mode and cost no extra disk for multi-GB weights."""
+    try:
+        os.link(src, dst)
+        return True
+    except OSError:
+        pass
+    try:
+        os.symlink(src, dst)
+        return True
+    except OSError:
+        return False
+
+
+def _stage_external_model(comfy_type, abs_path):
+    """Hardlink/symlink an absolute path into <first search root>/lds-pinned/ so
+    ComfyUI's stock loaders can open it. Returns the relative loader name, or
+    None when no root exists or linking fails (permissions / cross-volume with
+    no symlink privilege). Idempotent: reuses an existing link that already
+    points at the same file; on basename collision with a different source,
+    prefixes a short hash of the source path."""
+    roots = comfy_model_paths.search_roots(comfy_type)
+    if not roots:
+        return None
+    stage_root = os.path.normpath(roots[0])
+    src = os.path.normpath(abs_path)
+    base = os.path.basename(src)
+    dest_dir = os.path.join(stage_root, _PINNED_SUBDIR)
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except OSError as e:
+        logger.warning('could not create %s for external pin: %s', dest_dir, e)
+        return None
+
+    def _rel(name):
+        return os.path.join(_PINNED_SUBDIR, name)
+
+    cand = os.path.join(dest_dir, base)
+    if os.path.lexists(cand):
+        if _same_file(cand, src):
+            return _rel(base)
+        # Different file already owns this basename — disambiguate.
+        digest = hashlib.sha1(
+            os.path.normcase(os.path.abspath(src)).encode('utf-8', 'replace')
+        ).hexdigest()[:8]
+        base = f'{digest}_{os.path.basename(src)}'
+        cand = os.path.join(dest_dir, base)
+        if os.path.lexists(cand) and _same_file(cand, src):
+            return _rel(base)
+        if os.path.lexists(cand):
+            try:
+                os.remove(cand)
+            except OSError as e:
+                logger.warning('could not replace staged pin %s: %s', cand, e)
+                return None
+    if not _link_file(src, cand):
+        logger.warning(
+            'could not hardlink/symlink %s into %s — leave the file under a '
+            'ComfyUI model folder or register its folder in extra_model_paths.yaml',
+            src, dest_dir)
+        return None
+    return _rel(base)
+
+
+def _unet_weight_dtype(unet_ref):
+    """UNETLoader weight_dtype for the resolved Klein UNET name: FP8 builds need
+    fp8_e4m3fn; native bf16 / full weights use default."""
+    if unet_ref and 'fp8' in os.path.basename(unet_ref).lower():
+        return 'fp8_e4m3fn'
+    return 'default'
+
+
 def resolve_model_ref(comfy_type, value):
     """(relative_loader_name, status) for a user-entered model reference — either
     a ComfyUI-relative loader name OR an absolute path (~ and env vars expanded).
@@ -111,9 +198,9 @@ def resolve_model_ref(comfy_type, value):
     model folder (base models/<type> plus extra_model_paths.yaml roots), so an
     absolute path is CONVERTED to that relative name when the file sits under
     one of the <comfy_type> search roots. An absolute path outside every root is
-    a file ComfyUI itself could never load → 'outside_roots' (the UI turns that
-    into "register the folder in extra_model_paths.yaml"), deliberately distinct
-    from 'missing' (no such file at all / relative name not found)."""
+    hardlinked/symlinked into <root>/lds-pinned/ so the loader can still see it
+    ('ok'); only when that staging fails does the status stay 'outside_roots'
+    (distinct from 'missing' — no such file at all / relative name not found)."""
     raw = (value or '').strip()
     if not raw:
         return None, 'empty'
@@ -130,6 +217,9 @@ def resolve_model_ref(comfy_type, value):
                 continue
             if rel != os.pardir and not rel.startswith(os.pardir + os.sep):
                 return rel, 'ok'
+        staged = _stage_external_model(comfy_type, ab)
+        if staged:
+            return staged, 'ok'
         return None, 'outside_roots'
     if _abs_under_roots(comfy_type, v):
         return v, 'ok'
@@ -300,11 +390,11 @@ def _configured_lora(cfg_key):
         return rel, _lora_abs(rel)
     name = raw.replace('\\', '/').replace('/', os.sep)
     if status == 'outside_roots':
-        # The file EXISTS but no registered loras root reaches it — a LoraLoader
-        # could never load it, so report it as absent (path None) rather than
-        # handing ComfyUI an unloadable name. The Settings badge names the fix.
-        logger.warning('%s: %r exists but is outside every ComfyUI loras root — '
-                       'register its folder in extra_model_paths.yaml', cfg_key, raw)
+        # Staging into lds-pinned/ failed (permissions / cross-volume). Report
+        # absent rather than handing ComfyUI an unloadable name.
+        logger.warning('%s: %r exists but could not be linked into a ComfyUI '
+                       'loras folder — move it under models/loras or fix link '
+                       'permissions', cfg_key, raw)
         return name, None
     roots = comfy_model_paths.search_roots('loras')
     return name, (os.path.join(roots[0], name) if roots else None)
@@ -651,6 +741,7 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     # each new generation overwriting the previous one in the dataset dir.
     workflow["9"]["inputs"]["filename_prefix"] = f"{user_id}_DatasetFace_{uid}"
     workflow["114"]["inputs"]["unet_name"] = unet_ref
+    workflow["114"]["inputs"]["weight_dtype"] = _unet_weight_dtype(unet_ref)
     workflow["10"]["inputs"]["vae_name"] = vae_ref
     workflow["90"]["inputs"]["clip_name"] = te_ref
 

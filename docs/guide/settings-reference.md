@@ -39,16 +39,17 @@ This fork generates exclusively on the local **Klein** engine (via ComfyUI) — 
 
 Pin the exact files the Klein graph loads instead of relying on auto-detection. Every field accepts **a full absolute path or a ComfyUI-relative loader name**; empty fields keep the default behaviour (canonical download filename first, then a narrow token scan of the ComfyUI model folders).
 
-- **Diffusion model (UNET)** → `klein.unet`. E.g. a full path, or `klein/flux-2-klein-9b-fp8.safetensors` under `models/unet` (a bare filename for a file at a folder root). This also lets you use a UNET that does **not** live in a `klein`-named subfolder (which the automatic scan would never find). The workspace's per-run Klein model picker still wins over this pin when you explicitly choose a model there. Default **empty** (auto-detect).
-- **Text encoder** → `klein.text_encoder`. Full path, or relative to `models/text_encoders` — e.g. `qwen_3_8b_fp8mixed.safetensors`. Default **empty**.
-- **VAE** → `klein.vae`. Full path, or relative to `models/vae` — e.g. `flux2-vae.safetensors`. Default **empty**.
-- **Consistency LoRA** → `klein.consistency_lora`. Full path, or relative to `models/loras`. The structure-anchoring LoRA chained onto the Klein edit graph; clearing the field disables it. Default `klein/Flux2-Klein-9B-consistency-V2.safetensors` (the Setup download location).
+- **Diffusion model (UNET)** → `klein.unet`. E.g. a full path from anywhere, or `klein/flux-2-klein-9b.safetensors` (bf16) / `klein/flux-2-klein-9b-kv-fp8.safetensors` under `models/unet`. This also lets you use a UNET that does **not** live in a `klein`-named subfolder (which the automatic scan would never find). The workspace's per-run Klein model picker still wins over this pin when you explicitly choose a model there. Default **empty** (auto-detect).
+- **Text encoder** → `klein.text_encoder`. Full path from anywhere, or relative to `models/text_encoders` — e.g. `qwen_3_8b.safetensors` (full) or `qwen_3_8b_fp8mixed.safetensors`. Default **empty**.
+- **VAE** → `klein.vae`. Full path from anywhere, or relative to `models/vae` — e.g. `flux2-vae.safetensors`. Default **empty**.
+- **Consistency LoRA** → `klein.consistency_lora`. Full path from anywhere, or relative to `models/loras`. The structure-anchoring LoRA chained onto the Klein edit graph; clearing the field disables it. Default `klein/Flux2-Klein-9B-consistency-V2.safetensors` (the Setup download location).
 
 How references resolve:
 
 - A **full path under any of ComfyUI's model folders** — including folders registered in `extra_model_paths.yaml` (the app parses it exactly like ComfyUI does) — is converted automatically to the relative loader name ComfyUI's nodes need, and the field shows **✓ found**.
-- A reference that **can't be resolved** falls back to auto-detection instead of blocking generation, with a **not found** badge so the miss is never silent.
-- A full path to a file that exists but sits **outside every ComfyUI model folder** can't be loaded by ComfyUI at all — stock loader nodes only see registered folders. The badge says so explicitly: register that folder in ComfyUI's `extra_model_paths.yaml` (or move the file), then re-check.
+- A **full path anywhere else** (Downloads, an HF cache, another drive) is **hardlinked or symlinked** into `<ComfyUI models>/<type>/lds-pinned/` so stock loader nodes can still open it — same **✓ found** badge. The config keeps your original absolute path; the link is created on resolve.
+- A reference that **can't be resolved** (missing file, or linking failed) falls back to auto-detection instead of blocking generation, with a badge so the miss is never silent.
+- Native / bf16 UNETs (filename without `fp8`) run with `weight_dtype: default`; FP8 builds keep `fp8_e4m3fn`.
 - Generation-LoRA **preset rows** accept full paths the same way.
 - Pinning the wrong *kind* of file (e.g. another family's text encoder) is not validated — the generate will fail at sampling time with a shape error. The narrow auto-detection exists precisely to avoid that; only pin files you know are Klein-compatible.
 
@@ -172,29 +173,11 @@ The **Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** extra
 
 ## Training
 
-Defaults for new runs, plus everything about the optional cloud training lane.
+Defaults for new local training runs.
 
 ### Defaults
 
 - **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`. Default **`zimage`**. Purely a starting point — you can switch family per run.
-
-### Cloud GPU (vast.ai)
-
-- **vast.ai API key** → `VAST_API_KEY` (secret). Add it to unlock **Train in cloud**. **Test** validates it (and auto-saves it first). The card includes a step-by-step guide to getting the key from [cloud.vast.ai](https://cloud.vast.ai/).
-
-### Cloud training
-
-Guard-rails on cost and host quality for rented pods. The card also shows a live **Spent this month** line. Everything here has a sane default — you can leave it all alone and just add the key.
-
-| Setting | Key | Default | Range | What it does |
-|---|---|---|---|---|
-| **Max simultaneous cloud runs** | `cloud.max_concurrent_runs` | `1` | 1–10 | How many cloud pods may train at once. |
-| **Max price per hour ($)** | `cloud.max_price_per_hour` | `0.80` | 0.1–5 | A safety cap on the hourly offer price; pricier hosts are skipped before launch. |
-| **Monthly budget ($, 0 = unlimited)** | `cloud.monthly_budget_usd` | `0` | ≥0 | A hard spend ceiling for the month; new launches are **blocked** once you pass it. `0` means no limit. |
-| **Stall timeout (minutes)** | `cloud.stall_timeout_minutes` | `30` | 5–240 | If no training step progresses for this long, the watchdog rescues the logs and kills the pod. |
-| **Min host reliability** | `cloud.min_reliability` | `0.98` | 0.9–0.999 | vast.ai reliability floor. Lowering toward 0.95 surfaces cheaper hosts at a higher boot-failure risk. |
-| **Verified hosts only** | `cloud.verified_only` | **on** | toggle | Restrict to vast.ai's verified hosts (the historical, safer behaviour). |
-| **Secure Cloud only** | `cloud.secure_cloud_only` | **off** | toggle | Restrict to vast.ai's *datacenter* (Secure Cloud) tier — usually narrows the market and raises the price, so it's opt-in. |
 
 ### Advanced options (per run)
 

@@ -1033,7 +1033,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-3 text-content-muted text-sm">
         <span aria-hidden></span>
-        Training needs ai-toolkit (local GPU) or a vast.ai API key (cloud) — set either in Settings.
+        Training needs ai-toolkit (local GPU) — set its directory in Settings → Local tools.
       </div>
     );
   }
