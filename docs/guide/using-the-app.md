@@ -180,10 +180,54 @@ Work the funnel in that order: quality first (cheap, catches the trash), then
 subject, then selection. A promoted image keeps its badge in the bank so you
 always know what's been used where.
 
+**🎨 Curate down to the right subset.** Culling removes the bad shots; curation
+picks the *good* subset — and it's most of what makes a LoRA good. Once **✨
+Score** has run (it caches a CLIP embedding per image), the **Curate** row under
+the selection bar offers two selectors that cost no extra GPU time:
+
+- **🎨 Pick diverse** — enter a number and it selects the images that best
+  *cover the variety* of what you're looking at (varied angles, outfits, scenes),
+  instead of that many near-identical frames. It's the antidote to a dump of
+  4 000 shots of the same pose: ask for 60 and you get 60 that actually differ.
+- **🎯 Similar to selected** — select **one** image as a reference, and it ranks
+  everything by how much it looks like that image and selects the closest N — the
+  fast way to pull one person or one look out of a mixed export.
+
+Both honour whatever filter and 🔍 search are active ("the 60 most diverse of
+*this* subfolder"), and both just **select** — the images light up and you review
+them with the same ✓ Keep / ✕ Reject / ⬆ Promote bar. Nothing is auto-kept or
+deleted, so a selection you don't like costs one click to clear.
+
+**📐 Classify framing** tags every non-rejected image by *shot type* — face
+close-up, bust, full body or back view — using the same detector the datasets
+use. The result becomes a row of **📐 Framing** filter chips (compose with every
+other filter and search), so balancing a character set's angles is a couple of
+clicks. It's a GPU vision pass; add it to **🚀 Launch all** to have it run
+overnight with the rest.
+
+**📊 Coverage advice** (idea by [@antonp](https://github.com/perfectgf/lora-dataset-studio))
+is a read-only panel next to the Curate row. From what you've **kept** (or every
+non-rejected image before you've kept anything), it says in plain sentences what
+leans and what's thin for a good LoRA — *"70% face shots, add body/back"*,
+*"person #1 is 60% of the set — one subject or a mix?"*, *"only 8 kept, most
+families want 20+"*. It's **advice only** — nothing is kept or rejected — and
+pure maths on data the passes already computed, so it costs no GPU. The
+framing-balance line needs the 📐 Framing pass to have run; without it the panel
+still covers person mix, style spread and resolution and hints to run framing.
+**🗑 Delete rejected from disk** (next to Promote) is the one exception to the
+"your source folder is never modified" rule, and it's opt-in. Once you're happy
+with your triage, it removes every image you marked ✕ rejected from its source
+folder — the actual files, not just the status. It asks you to type **DELETE**
+first, and sends the files to your OS trash when [`send2trash`](https://pypi.org/project/Send2Trash/)
+is installed (a permanent delete otherwise). This is **irreversible** — the
+app's own trash can't recover these, they live outside the app. Kept and
+undecided images are never touched, and a file it can't remove (locked,
+read-only) is reported and left alone rather than aborting the batch.
+
 **🚀 Launch all** does the whole funnel for you in one go. Tick which passes
 run and how auto-reject behaves, hit Go, and walk away — it chains *scan →
-auto-reject → score → find watermarks → group by person → (optional) caption*
-in that exact order. Two things make it safe to run overnight: a pass whose
+auto-reject → score → find watermarks → group by person → classify framing →
+(optional) caption* in that exact order. Two things make it safe to run overnight: a pass whose
 tool isn't installed, or a moment when the GPU is busy with a training run, is
 **skipped with a reason** instead of failing the whole run; and because
 auto-reject runs *before* the heavy passes, scoring/watermarks/person only ever

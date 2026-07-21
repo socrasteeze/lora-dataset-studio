@@ -40,7 +40,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from PIL import Image
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, case, func, or_
 
 from .. import config as cfg
 from ..extensions import db
@@ -202,6 +202,7 @@ def _image_dict(row: BankImage, th: dict) -> dict:
         'dup_group': row.dup_group,
         'semantic_dup_group': row.semantic_dup_group,
         'face_state': row.face_state, 'face_cluster': row.face_cluster,
+        'framing': row.framing,
         'status': row.status, 'reject_reason': row.reject_reason,
         'promoted_dataset_id': row.promoted_dataset_id,
         'caption': row.caption,
@@ -240,6 +241,46 @@ _QUALITY_FLAGS = ('blur', 'noise', 'uniform', 'small', 'unreadable')
 # and filter independently (each only meaningful once its pass has run).
 _SCORE_FLAGS = ('low_aesthetic', 'nsfw', 'watermark')
 
+# Resolution tiers for the Bank grid — bucketed on MEGAPIXELS (width×height, the
+# same rank as the resolution sort) so a mixed dump can be skimmed and mass-acted
+# one tier at a time. Each entry is (stable_id, lo, hi) in raw pixels, a HALF-OPEN
+# [lo, hi) range (lower-inclusive, upper-exclusive); hi=None means "no ceiling".
+# So a 1000×1000 (1.00 MP) and a 1024×1024 (1.05 MP) both land in 'res_1_2', and a
+# 2000×2000 (4.00 MP) lands in 'res_gt_4'. The 0.25 MP floor (not 0.30) is chosen
+# so a 512×512 (0.26 MP) — a legit small training crop — sits in '0.25–1 MP', while
+# only true junk (Telegram thumbnails ~0.1–0.2 MP, ≤448²) falls in '< 0.25 MP'.
+# Ids are user-facing filter keys — never rename without an alias.
+_RES_BUCKETS = (
+    ('res_lt_025', 0, 250_000),
+    ('res_025_1', 250_000, 1_000_000),
+    ('res_1_2', 1_000_000, 2_000_000),
+    ('res_2_4', 2_000_000, 4_000_000),
+    ('res_gt_4', 4_000_000, None),
+)
+_RES_BOUNDS = {bid: (lo, hi) for bid, lo, hi in _RES_BUCKETS}
+
+# Framing buckets — the SAME four shot types the datasets classify (face close-up,
+# bust, full body, back view). 'unknown' is a parseable-but-not-one-of-four answer;
+# it counts and filters but is never a training target. Ids are user-facing filter
+# keys — never rename without an alias. The built-in character composition aims for
+# a 12/6/6/1 face/bust/body/back mix; the coverage advice phrases against that
+# proportion, never as a hard rule.
+_FRAMINGS = ('face', 'bust', 'body', 'back')
+_FRAMING_KEYS = _FRAMINGS + ('unknown',)
+_FRAMING_TARGET = {'face': 12, 'bust': 6, 'body': 6, 'back': 1}
+
+
+def _framing_counts(bank_id, extra_crit=None) -> dict:
+    """Per-bucket image counts for the 📐 Framing chips in ONE GROUP BY. Rows with
+    a NULL framing (not classified) are excluded, so every key is present with a
+    real count. ``extra_crit`` narrows the pool (e.g. status='keep' for coverage)."""
+    q = (db.session.query(BankImage.framing, func.count(BankImage.id))
+         .filter(BankImage.bank_id == bank_id, BankImage.framing.isnot(None)))
+    if extra_crit is not None:
+        q = q.filter(extra_crit)
+    got = {k: n for k, n in q.group_by(BankImage.framing).all()}
+    return {k: int(got.get(k, 0)) for k in _FRAMING_KEYS}
+
 
 def _subfolder_of(relpath: str) -> str:
     """Top-level subfolder of a bank-relative path ('' for a root-level file) —
@@ -257,6 +298,30 @@ def _unresolved_dup_groups_q(bank_id, col=BankImage.dup_group):
                     BankImage.status != 'reject')
             .group_by(col)
             .having(func.count(BankImage.id) >= 2))
+
+
+def _res_bucket_case():
+    """A single SQL CASE mapping each scanned row to its resolution-tier id, used
+    both to COUNT per tier (one GROUP BY) and — via _RES_BOUNDS — to FILTER a page
+    to one tier. Rows with a NULL dimension never reach this (callers pre-filter
+    width/height NOT NULL), so no NULL-misfile into the top tier."""
+    area = BankImage.width * BankImage.height
+    whens = [(area < hi, bid) for bid, _lo, hi in _RES_BUCKETS if hi is not None]
+    return case(*whens, else_=_RES_BUCKETS[-1][0])
+
+
+def _res_bucket_counts(bank_id) -> dict:
+    """Per-tier image counts for the resolution chips (bank-wide, like the flag
+    totals) in ONE GROUP BY. Unscanned rows (width/height NULL) are excluded, so a
+    tier that no image falls into simply reports 0. Every tier id is present."""
+    bucket = _res_bucket_case()
+    rows = (db.session.query(bucket, func.count(BankImage.id))
+            .filter(BankImage.bank_id == bank_id,
+                    BankImage.width.isnot(None),
+                    BankImage.height.isnot(None))
+            .group_by(bucket).all())
+    got = {bid: n for bid, n in rows}
+    return {bid: int(got.get(bid, 0)) for bid, _lo, _hi in _RES_BUCKETS}
 
 
 def bank_payload(user_id, bank_id) -> dict | None:
@@ -280,11 +345,14 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'scored': base.filter(or_(BankImage.aesthetic_score.isnot(None),
                                   BankImage.nsfw_score.isnot(None))).count(),
         'watermark_scanned': base.filter(BankImage.watermark_state.isnot(None)).count(),
+        'framing_classified': base.filter(BankImage.framing.isnot(None)).count(),
     }
+    framing = _framing_counts(bank_id)
     flags = {}
     for flag in _QUALITY_FLAGS + _SCORE_FLAGS:
         crit = _flag_filter(flag, th)
         flags[flag] = base.filter(crit).count() if crit is not None else 0
+    res_buckets = _res_bucket_counts(bank_id)
     dup_rows = (db.session.query(BankImage.dup_group, func.count(BankImage.id))
                 .filter(BankImage.bank_id == bank_id,
                         BankImage.dup_group.isnot(None))
@@ -340,7 +408,8 @@ def bank_payload(user_id, bank_id) -> dict | None:
     return {
         'id': bank.id, 'name': bank.name, 'source_path': bank.source_path,
         'created_at': bank.created_at.isoformat() if bank.created_at else None,
-        'counts': counts, 'flags': flags, 'dup': dup,
+        'counts': counts, 'flags': flags, 'res_buckets': res_buckets,
+        'framing': framing, 'dup': dup,
         'semantic_dup': semantic_dup,
         'clusters': clusters, 'faces_scanned': faces_scanned,
         'style_clusters': style_clusters,
@@ -382,17 +451,49 @@ def list_banks(user_id) -> list:
 
 def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
                 group=None, style=None, subfolder=None, search=None,
-                semantic_group=None, offset=0, limit=200) -> dict | None:
+                semantic_group=None, sort=None, res_bucket=None, framing=None,
+                ids=None, offset=0, limit=200) -> dict | None:
     """One PAGE of the bank grid (a 9 000-image bank must never ship whole).
     Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ search.
     ``search`` is a plain full-text term matched (case-insensitive LIKE) against the
     caption AND the relpath — so captions double as searchable tags for a big dump
     ("red dress"), combinable with every other filter. Flag filters sort by the
-    relevant score (worst first) so the review reads top-down."""
+    relevant score (worst first) so the review reads top-down.
+    ``sort`` ('res_desc'/'res_asc') overrides the order by image resolution
+    (megapixels = width×height, so 900×900 outranks 1200×300); unscanned rows
+    (width/height NULL) always sink to the end. It composes with every filter.
+    ``res_bucket`` (a _RES_BUCKETS id) narrows to one resolution tier — a
+    half-open [lo, hi) megapixel band — and composes with every filter AND the
+    sort (the tier + Resolution↑/↓ combo is the mixed-dump cleanup flow).
+    ``ids`` is the "show selected" VIEW: an explicit ordered list of image ids
+    that OVERRIDES every facet/sort (the selection IS the scope) and renders the
+    page in the SAME order the caller passed — so a similarity ranking from
+    ``select_similar`` shows reference-first, closest-to-farthest, instead of the
+    default id order. Unknown/foreign ids are dropped silently."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         return None
     th = thresholds()
+    if ids is not None:
+        # Explicit id view — the selection is the scope, order is preserved.
+        # Dedupe keeping first occurrence so the requested order is authoritative.
+        seen = set()
+        ordered = [i for i in ids if not (i in seen or seen.add(i))]
+        by_id = {}
+        # Chunk the IN() so a big selection can't blow past SQLite's bound-
+        # variable limit (default 999); the curation cap is 2 000 ids.
+        for start in range(0, len(ordered), 500):
+            chunk = ordered[start:start + 500]
+            for r in (BankImage.query
+                      .filter(BankImage.bank_id == bank_id,
+                              BankImage.id.in_(chunk)).all()):
+                by_id[r.id] = r
+        ordered_rows = [by_id[i] for i in ordered if i in by_id]
+        total = len(ordered_rows)
+        off = max(0, int(offset))
+        page = ordered_rows[off:off + max(1, min(500, int(limit)))]
+        return {'images': [_image_dict(r, th) for r in page], 'total': total,
+                'offset': off}
     q = BankImage.query.filter_by(bank_id=bank_id)
     if status in ('pending', 'keep', 'reject'):
         q = q.filter(BankImage.status == status)
@@ -442,6 +543,10 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         q = q.filter(BankImage.semantic_dup_group == int(semantic_group))
     if style is not None:
         q = q.filter(BankImage.style_cluster == int(style))
+    if framing in _FRAMING_KEYS:
+        # One framing bucket (face/bust/body/back/unknown) — composes with every
+        # other facet. An unknown/absent value simply doesn't filter.
+        q = q.filter(BankImage.framing == framing)
     if subfolder is not None:
         # '' scopes to root-level files; any other value to that top-level folder
         # and everything nested under it. startswith() escapes LIKE metachars.
@@ -457,6 +562,25 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         like = f'%{esc}%'
         q = q.filter(or_(BankImage.caption.ilike(like, escape='\\'),
                          BankImage.relpath.ilike(like, escape='\\')))
+    if res_bucket in _RES_BOUNDS:
+        # One resolution tier: [lo, hi) on megapixels (width×height). The NOT-NULL
+        # guards drop unscanned rows (a NULL product would satisfy neither bound
+        # cleanly), so a tier never leaks unscanned images. Composes with the sort.
+        lo, hi = _RES_BOUNDS[res_bucket]
+        area = BankImage.width * BankImage.height
+        q = q.filter(BankImage.width.isnot(None), BankImage.height.isnot(None))
+        if lo:
+            q = q.filter(area >= lo)
+        if hi is not None:
+            q = q.filter(area < hi)
+    if sort in ('res_desc', 'res_asc'):
+        # Explicit resolution sort wins over the flag worst-first order. Rank by
+        # megapixels (width×height), tie-break on id for a stable page boundary.
+        # Unscanned rows (either dimension NULL → NULL product) sink to the end
+        # in BOTH directions: order by "is NULL" first (0 before 1 in SQLite).
+        area = BankImage.width * BankImage.height
+        area_dir = area.desc() if sort == 'res_desc' else area.asc()
+        order = (area.is_(None).asc(), area_dir, BankImage.id.asc())
     total = q.count()
     order_by = order if isinstance(order, tuple) else (order,)
     rows = q.order_by(*order_by).offset(max(0, int(offset))) \
@@ -851,15 +975,23 @@ def _best_of(rows):
 
 
 def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
-                 col=BankImage.dup_group, attr='dup_group', reason='duplicate'):
+                 col=BankImage.dup_group, attr='dup_group', reason='duplicate',
+                 respect_existing_keep=True):
     """Resolve duplicate groups: keep one member, REJECT the others (a status,
     never a file deletion, so it's reversible). strategy 'best'|'first' applies to
     one group or, when ``group`` is None, to every unresolved group at once;
     explicit ``keep_ids`` (manual pick) applies to their own groups. Only
-    non-rejected members are touched; a member the user already KEPT stays kept
-    (never flipped by a bulk resolve). ``col``/``attr``/``reason`` pick the stage:
+    non-rejected members are touched. ``col``/``attr``/``reason`` pick the stage:
     dup_group (exact/'duplicate') or semantic_dup_group (crops/'semantic_dup').
-    Returns {'resolved': groups, 'rejected': images}."""
+
+    ``respect_existing_keep`` (default True) protects members the user already
+    KEPT from a bulk resolve — right for the AUTOMATIC pipeline auto-reject, so a
+    mass resolve never un-keeps a manual pick. An EXPLICIT resolve the user fired
+    from a dup/same-shot group passes False: the whole point is to collapse the
+    group to ONE, and the members of a same-shot group are typically ALL 'keep',
+    so respecting keep would reject nobody. The elected keeper is always safe
+    (``r.id in keep``); with False every OTHER member falls to reject, keep
+    included. Returns {'resolved': groups, 'rejected': images}."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -891,7 +1023,7 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
             keep = {_best_of(rows).id}
         changed = False
         for r in rows:
-            if r.id in keep or r.status == 'keep':
+            if r.id in keep or (respect_existing_keep and r.status == 'keep'):
                 continue
             r.status, r.reject_reason = 'reject', reason
             rejected += 1
@@ -903,12 +1035,13 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
 
 
 def resolve_semantic_dups(user_id, bank_id, strategy='best', group=None,
-                          keep_ids=None):
+                          keep_ids=None, respect_existing_keep=True):
     """resolve_dups for stage 2 (semantic_dup_group, reject reason
     'semantic_dup')."""
     return resolve_dups(user_id, bank_id, strategy=strategy, group=group,
                         keep_ids=keep_ids, col=BankImage.semantic_dup_group,
-                        attr='semantic_dup_group', reason='semantic_dup')
+                        attr='semantic_dup_group', reason='semantic_dup',
+                        respect_existing_keep=respect_existing_keep)
 
 
 # --- statuses & flag application --------------------------------------------
@@ -954,6 +1087,243 @@ def apply_flags(user_id, bank_id, flags) -> dict:
             r.status, r.reject_reason = 'reject', flag
         out[flag] = len(rows)
     db.session.commit()
+    return out
+
+
+# --- curation selectors (diversity · reference similarity) ------------------
+# Both reuse the CLIP embeddings the ✨ Score pass already cached — no GPU, no
+# re-scan (same contract as the semantic-dedup stage). They only ever build a
+# SELECTION (a set of image ids the UI checks); the user reviews it before any
+# Keep / Reject / Promote — nothing is mutated or deleted here.
+_CURATION_MAX_N = 2000       # a curated LoRA set is 20–200 images; this is generous
+
+
+def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
+                style=None, subfolder=None, search=None):
+    """The candidate-pool query for the curation selectors — the SAME filter
+    composition as list_images (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩
+    search), minus the ordering/pagination, so "give me 60 diverse images" is
+    composable with whatever the grid is currently showing.
+
+    Kept as its own function (a small, deliberate mirror of the list_images WHERE
+    clauses) rather than a shared refactor: three curation-related branches touch
+    this file in parallel, so an additive helper rebases clean where an edit to
+    the list_images hot path would collide. When NO status is chosen the reject
+    pile is excluded — you curate from what you might keep, never from the bin."""
+    q = BankImage.query.filter_by(bank_id=bank_id)
+    if status in ('pending', 'keep', 'reject'):
+        q = q.filter(BankImage.status == status)
+    else:
+        q = q.filter(BankImage.status != 'reject')
+    if flag == 'flagged':
+        crits = [c for c in (_flag_filter(f, th) for f in _QUALITY_FLAGS)
+                 if c is not None]
+        q = q.filter(or_(*crits))
+    elif flag == 'clean':
+        q = q.filter(BankImage.quality_state == 'ok')
+        for f in ('blur', 'noise', 'uniform', 'small'):
+            q = q.filter(~_flag_filter(f, th))
+    elif flag == 'dups':
+        q = q.filter(BankImage.dup_group.isnot(None))
+    elif flag == 'semantic_dups':
+        q = q.filter(BankImage.semantic_dup_group.isnot(None))
+    elif flag == 'no_face':
+        q = q.filter(BankImage.face_state == 'no_face')
+    elif flag in _QUALITY_FLAGS + _SCORE_FLAGS:
+        crit = _flag_filter(flag, th)
+        if crit is not None:
+            q = q.filter(crit)
+    if cluster is not None:
+        q = q.filter(BankImage.face_cluster == int(cluster))
+    if style is not None:
+        q = q.filter(BankImage.style_cluster == int(style))
+    if subfolder is not None:
+        if subfolder == '':
+            q = q.filter(~BankImage.relpath.contains(os.sep))
+        else:
+            q = q.filter(BankImage.relpath.startswith(subfolder + os.sep))
+    term = (search or '').strip()
+    if term:
+        esc = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        like = f'%{esc}%'
+        q = q.filter(or_(BankImage.caption.ilike(like, escape='\\'),
+                         BankImage.relpath.ilike(like, escape='\\')))
+    return q
+
+
+def _pool_embeddings(bank, emb_by_path, filters):
+    """(ids, E) for the filtered pool rows that HAVE a cached embedding: ids is a
+    list ordered by image id (so every tie-break below is deterministic), E is the
+    matching (m×d) float32 matrix, L2-normalised. Empty ids ⇒ E is None."""
+    import numpy as np
+    rows = (_pool_query(bank.id, thresholds(), **filters)
+            .order_by(BankImage.id.asc()).all())
+    ids, vecs = [], []
+    for r in rows:
+        p = abs_image_path(bank, r)
+        emb = emb_by_path.get(p) if p else None
+        if emb is not None:
+            ids.append(r.id)
+            vecs.append(emb)
+    if not ids:
+        return ids, None
+    E = np.stack(vecs).astype('float32')
+    E /= (np.linalg.norm(E, axis=1, keepdims=True) + 1e-8)
+    return ids, E
+
+
+def select_diverse(user_id, bank_id, n=60, *, filters=None):
+    """Farthest-point sampling over the ✨ Score CLIP embeddings: the ``n`` images
+    of the (filtered) pool that best COVER the visual space — the antidote to a
+    dump of 4 000 near-identical shots. Greedy FPS: seed with the lowest-id row
+    (deterministic), then repeatedly add the point whose nearest already-chosen
+    neighbour is FARTHEST (max-min cosine distance). O(n·m·d) — one (m×d)·(d,)
+    product per pick, ~sub-second even at m=24 000 / n=2 000.
+
+    Returns {'image_ids': [...] (sorted), 'pool': m, 'requested': n}. Raises
+    ValueError (→400, "run ✨ Score first") when no embedding exists yet, so the UI
+    shows the clear hint instead of an empty, unexplained selection."""
+    import numpy as np
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    emb_by_path = _load_score_embeddings(bank)
+    if not emb_by_path:
+        raise ValueError('run ✨ Score first — diversity sampling reuses its '
+                         'embeddings')
+    n = max(1, min(int(n), _CURATION_MAX_N))
+    ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
+    m = len(ids)
+    if m <= n:                                   # whole pool already fits
+        return {'image_ids': sorted(ids), 'pool': m, 'requested': n}
+    # min_dist[i] = cosine distance from row i to the NEAREST chosen row so far.
+    chosen = [0]                                 # seed = lowest id (E[0])
+    min_dist = 1.0 - E @ E[0]
+    min_dist[0] = -1.0                           # never re-pick a chosen row
+    for _ in range(n - 1):
+        nxt = int(np.argmax(min_dist))           # ties → lowest index = lowest id
+        if min_dist[nxt] <= -1.0:                # pool exhausted (all chosen)
+            break
+        chosen.append(nxt)
+        min_dist = np.minimum(min_dist, 1.0 - E @ E[nxt])
+        min_dist[nxt] = -1.0
+    return {'image_ids': sorted(ids[i] for i in chosen),
+            'pool': m, 'requested': n}
+
+
+def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=None):
+    """Rank the (filtered) pool by CLIP cosine similarity to a REFERENCE bank image
+    (its own cached ✨ Score embedding) — "keep what looks like THIS", to pull one
+    person / look out of a mixed dump. Returns the top-``n`` most similar ids, OR
+    everything with cosine ≥ ``min_score`` when that is given; the reference itself
+    (cosine 1.0) is always included. Reuses the cached embeddings — no GPU.
+
+    Returns {'results': [{id, score}], 'image_ids': [...], 'pool': m, 'ref_id'}.
+    Raises ValueError (→400) when Score hasn't run or the reference has no cached
+    embedding (e.g. it was rejected before Score, or edited since)."""
+    import numpy as np
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    emb_by_path = _load_score_embeddings(bank)
+    if not emb_by_path:
+        raise ValueError('run ✨ Score first — reference similarity reuses its '
+                         'embeddings')
+    ref = db.session.get(BankImage, int(ref_id))
+    if ref is None or ref.bank_id != bank_id:
+        raise ValueError('reference image not found in this bank')
+    ref_path = abs_image_path(bank, ref)
+    ref_emb = emb_by_path.get(ref_path) if ref_path else None
+    if ref_emb is None:
+        raise ValueError('the reference image has no ✨ Score embedding — score '
+                         'it first (it may have been rejected before Score ran)')
+    ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
+    if not ids:
+        return {'results': [], 'image_ids': [], 'pool': 0, 'ref_id': int(ref_id)}
+    rv = np.asarray(ref_emb, dtype='float32')
+    rv /= (np.linalg.norm(rv) + 1e-8)
+    sims = E @ rv                                 # cosine similarity, (m,)
+    order = np.argsort(-sims, kind='stable')     # desc; stable ⇒ id tie-break
+    if min_score is not None:
+        keep = [int(k) for k in order if sims[k] >= float(min_score)]
+    else:
+        n = max(1, min(int(n), _CURATION_MAX_N))
+        keep = [int(k) for k in order[:n]]
+    results = [{'id': ids[k], 'score': round(float(sims[k]), 4)} for k in keep]
+    return {'results': results, 'image_ids': [ids[k] for k in keep],
+            'pool': len(ids), 'ref_id': int(ref_id)}
+def _trash_or_remove(path: str) -> str:
+    """Send a source file to the OS trash when send2trash is installed, else
+    hard-delete it. Returns the mode actually used ('trash' | 'delete'). The
+    import is optional so an install that predates the dependency still works
+    (degraded to a permanent delete) — the caller reports which happened."""
+    try:
+        from send2trash import send2trash   # optional dependency
+    except Exception:
+        os.remove(path)
+        return 'delete'
+    send2trash(path)
+    return 'trash'
+
+
+def delete_rejected(user_id, bank_id) -> dict:
+    """Delete the SOURCE files of every status='reject' image from disk, then
+    drop their bank_image rows.
+
+    This is the ONLY bank action that writes to the user's source folder. It is
+    destructive: with send2trash installed the files go to the OS trash (real,
+    OS-level recovery); without it they are permanently removed. Either way the
+    app's own trash cannot bring them back — these are files outside the app.
+
+    Non-rejected images are never touched. Per-file failures (permission, a path
+    that escapes the bank folder) are collected and reported; they never abort
+    the batch. A row is dropped only when its file is gone afterwards (deleted,
+    trashed, or already absent) — a file we failed to remove keeps its row so the
+    user can see and retry it. Returns
+    {'mode', 'deleted', 'trashed', 'already_absent', 'rows_removed', 'skipped'}.
+    """
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    if bank_jobs.running(bank_id):
+        raise RuntimeError('a job is running on this bank — stop it first')
+
+    rows = BankImage.query.filter_by(bank_id=bank_id, status='reject').all()
+    out = {'mode': 'trash', 'deleted': 0, 'trashed': 0, 'already_absent': 0,
+           'rows_removed': 0, 'skipped': []}
+    remove_ids = []
+    saw_hard_delete = False
+    for row in rows:
+        path = abs_image_path(bank, row)
+        if path is None:
+            # relpath escapes the bank folder — refuse to touch it, keep the row.
+            out['skipped'].append({'relpath': row.relpath, 'reason': 'unsafe_path'})
+            continue
+        if not os.path.exists(path):
+            out['already_absent'] += 1
+            remove_ids.append(row.id)
+            continue
+        try:
+            mode = _trash_or_remove(path)
+        except OSError as e:
+            out['skipped'].append({'relpath': row.relpath, 'reason': str(e)})
+            continue
+        if mode == 'trash':
+            out['trashed'] += 1
+        else:
+            out['deleted'] += 1
+            saw_hard_delete = True
+        remove_ids.append(row.id)
+
+    for i0 in range(0, len(remove_ids), _SQL_IN_CHUNK):
+        BankImage.query.filter(
+            BankImage.id.in_(remove_ids[i0:i0 + _SQL_IN_CHUNK])
+        ).delete(synchronize_session=False)
+    out['rows_removed'] = len(remove_ids)
+    db.session.commit()
+    # 'delete' means at least one file was permanently removed (send2trash absent
+    # or it refused a path); the UI wording follows this.
+    out['mode'] = 'delete' if saw_hard_delete else 'trash'
     return out
 
 
@@ -1401,17 +1771,112 @@ def _watermark_job(bank_id, rescan):
     return run
 
 
+# --- framing pass (reuses the dataset face/bust/body/back classifier) -------
+def start_framing(app, user_id, bank_id, rescan=False):
+    """Classify every non-rejected image by SHOT TYPE (face / bust / body / back),
+    reusing the SAME Qwen3-VL classifier the datasets use (CLASSIFY_PROMPT). Feeds
+    the 📐 Framing filter chips and the coverage advice. Needs the vision model
+    pulled; serialized against training/vision like the watermark pass (503 when
+    the GPU is held). ``rescan`` re-classifies rows that already have a framing."""
+    from ..capabilities import probe_ollama_model
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    if not probe_ollama_model().get('ok'):
+        raise RuntimeError('the vision model is not available '
+                           '(Settings ▸ Captioning & quality)')
+    reason = _gpu_busy_reason()
+    if reason:
+        raise RuntimeError(reason)
+    q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+    if not rescan:
+        q = q.filter(BankImage.framing.is_(None))
+    return bank_jobs.start(app, bank_id, 'framing',
+                           _framing_job(bank_id, rescan), total=q.count())
+
+
+def _framing_job(bank_id, rescan):
+    def run(job):
+        from .face_dataset_service import CLASSIFY_PROMPT, _parse_classify
+        from .vision_ollama import describe_image_ollama, unload_vision_model
+        from ..gpu_window import gpu_exclusive_vision_window
+        bank = db.session.get(ImageBank, bank_id)
+        if not bank:
+            return
+        q = (BankImage.query.filter_by(bank_id=bank_id)
+             .filter(BankImage.status != 'reject'))
+        if not rescan:
+            q = q.filter(BankImage.framing.is_(None))
+        rows = q.order_by(BankImage.id.asc()).all()
+        bank_jobs.progress(job, done=0, total=len(rows), detail='framing')
+        if not rows:
+            return
+        classified = errors = 0
+        with gpu_exclusive_vision_window(flag_ttl=1800):
+            try:
+                for row in rows:
+                    if bank_jobs.cancelled(job):
+                        break
+                    path = abs_image_path(bank, row)
+                    if not path or not os.path.isfile(path):
+                        bank_jobs.bump(job)
+                        continue
+                    try:
+                        with open(path, 'rb') as fh:
+                            raw = describe_image_ollama(
+                                fh.read(), CLASSIFY_PROMPT, num_predict=400,
+                                prefer_json=True, fmt='json', keep_alive='5m')
+                    except Exception:  # noqa: BLE001 — one bad file never sinks the pass
+                        errors += 1
+                        bank_jobs.bump(job)
+                        continue
+                    # Empty output = Ollama unreachable, NOT "unknown": leave the
+                    # framing NULL so a retry can finish it (same reasoning as the
+                    # watermark/dataset classifier), never mislabel everything.
+                    if not (raw or '').strip():
+                        bank_jobs.bump(job)
+                        continue
+                    framing, _label = _parse_classify(raw)
+                    row.framing = framing            # face|bust|body|back|unknown
+                    classified += 1
+                    if classified % 25 == 0:
+                        db.session.commit()
+                    bank_jobs.bump(job)
+            finally:
+                db.session.commit()
+                unload_vision_model()  # hand the VRAM back to ComfyUI
+        if bank_jobs.cancelled(job):
+            bank_jobs.progress(job, detail=f'cancelled — {classified} classified so far')
+            return
+        detail = f'done — {classified} classified'
+        if errors:
+            detail += f', {errors} unreadable'
+        bank_jobs.progress(job, detail=detail)
+    return run
+
+
 # --- caption pass (reuses the dataset caption engines) ----------------------
-def start_caption(app, user_id, bank_id, ids=None, force=False):
+def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None):
     """Launch the caption pass over a selection (``ids``) or, when empty, every
     non-rejected readable image. Reuses the dataset caption engines (JoyCaption /
     Ollama per Settings) through a dataset-free descriptive brick; the captions
     double as the bank's search text and ride along on promotion. Serialized
     against training/vision like the score/watermark passes (503 when the GPU is
-    held). BankJobBusy when a job is already live, ValueError on a bad bank/config."""
+    held). BankJobBusy when a job is already live, ValueError on a bad bank/config.
+
+    ``vocabulary`` picks a caption REGISTER (one of face_dataset_service's
+    CAPTION_VOCABULARIES: 'explicit' | 'clinical' | 'safe') — the SAME lane the
+    dataset caption uses, appended as an instruction. Explicit only spells sexual
+    content out when the backend runs an abliterated Ollama model; the choice rides
+    per-call (the UI passes it), so a call WITHOUT it is byte-identical to before
+    (no instruction appended). Richer captions also mean richer 🔍 search text."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
+    from .face_dataset_service import CAPTION_VOCABULARIES
+    vocab = (vocabulary or '').strip().lower() or None
+    if vocab and vocab not in CAPTION_VOCABULARIES:
+        raise ValueError(f'invalid caption vocabulary: {vocab}')
     backend = (cfg.get('captioning.backend') or 'auto').lower()
     if backend == 'none':
         raise ValueError('no captioning backend configured (Settings ▸ Captioning & quality)')
@@ -1426,12 +1891,12 @@ def start_caption(app, user_id, bank_id, ids=None, force=False):
         q = q.filter(or_(BankImage.caption.is_(None), BankImage.caption == ''))
     total = q.count()
     return bank_jobs.start(app, bank_id, 'caption',
-                           _caption_job(bank_id, ids, force), total=total)
+                           _caption_job(bank_id, ids, force, vocab), total=total)
 
 
-def _caption_job(bank_id, ids, force):
+def _caption_job(bank_id, ids, force, vocabulary=None):
     def run(job):
-        from .face_dataset_service import caption_paths
+        from .face_dataset_service import caption_paths, vocabulary_instruction
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -1467,9 +1932,13 @@ def _caption_job(bank_id, ids, force):
 
         # GPU-exclusive for the whole pass, exactly like the score/watermark passes:
         # frees ComfyUI VRAM and blocks a training start for the duration.
+        # The vocabulary register rides in as the SAME appended instruction the
+        # dataset pass uses (None when unset → byte-identical to the plain pass).
+        extra = vocabulary_instruction(vocabulary)
         with gpu_exclusive_vision_window(flag_ttl=1800):
             caption_paths(
                 paths,
+                extra_instructions=extra,
                 should_cancel=lambda: bank_jobs.cancelled(job),
                 on_caption=_on_caption,
                 progress=lambda d, t: bank_jobs.progress(job, done=d, total=t))
@@ -1489,7 +1958,7 @@ def _caption_job(bank_id, ids, force):
 # dropped (the deliberate cost/quality trade-off: duplicate "keep best" therefore
 # ranks on sharpness/size, not the aesthetic score that isn't computed yet).
 PIPELINE_STEPS = ('scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark',
-                  'faces', 'caption')
+                  'faces', 'framing', 'caption')
 # Auto-reject inside the pipeline runs right after the quality scan, so it can
 # only act on the CPU-scan flags (and duplicates). The score-derived flags
 # (low_aesthetic/nsfw/watermark) have no data yet at that point.
@@ -1521,6 +1990,13 @@ def _faces_prereq() -> str | None:
     from .face_similarity import is_available
     if not is_available():
         return 'face scoring extra not installed (Setup ▸ Quality tools)'
+    return None
+
+
+def _framing_prereq() -> str | None:
+    from ..capabilities import probe_ollama_model
+    if not probe_ollama_model().get('ok'):
+        return 'vision model not available (Settings ▸ Captioning & quality)'
     return None
 
 
@@ -1575,6 +2051,7 @@ def _bank_counts(bank_id) -> dict:
         'scored': base.filter(or_(BankImage.aesthetic_score.isnot(None),
                                   BankImage.nsfw_score.isnot(None))).count(),
         'watermark_detected': base.filter(BankImage.watermark_state == 'detected').count(),
+        'framing_classified': base.filter(BankImage.framing.isnot(None)).count(),
         'captioned': base.filter(and_(BankImage.caption.isnot(None),
                                        BankImage.caption != '')).count(),
         'dup_groups': dup_groups,
@@ -1742,6 +2219,16 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, 
         entry['counts'] = {'person_groups': c['person_groups']}
         entry['detail'] = job.get('detail') or f"{c['person_groups']} person cluster(s)"
         return
+    if step == 'framing':
+        reason = _framing_prereq() or _gpu_busy_reason()
+        if reason:
+            entry['status'], entry['reason'] = 'skipped', reason
+            return
+        _framing_job(bank_id, rescan=False)(job)
+        c = _bank_counts(bank_id)
+        entry['counts'] = {'framing_classified': c['framing_classified']}
+        entry['detail'] = job.get('detail') or f"{c['framing_classified']} classified by framing"
+        return
     if step == 'caption':
         reason = _caption_prereq() or _gpu_busy_reason()
         if reason:
@@ -1781,12 +2268,187 @@ def subfolders_payload(user_id, bank_id) -> dict | None:
     return {'subfolders': items, 'total': sum(counts.values())}
 
 
+# --- coverage advice (idea by @antonp) --------------------------------------
+# A read-only ADVICE panel: from what you'd actually train on (the kept set, or
+# every non-rejected image before anything is kept), it says what leans and what
+# is thin for a good LoRA — purely from data the passes already computed (framing,
+# person clusters, style clusters, resolution). It NEVER selects or rejects; it
+# only phrases honest, non-alarmist sentences. Everything here is pure DB math,
+# zero GPU — the framing part just needs the 📐 Framing pass to have run.
+def _pct(n, total) -> int:
+    return int(round(100 * n / total)) if total else 0
+
+
+def _coverage_stats(bank_id) -> dict:
+    """Everything the coverage panel needs, from the pool the user would train on:
+    the KEPT images, or — before anything is kept — every non-rejected image (so
+    the panel is useful from the first look). Pure aggregate SQL, no GPU."""
+    base = BankImage.query.filter_by(bank_id=bank_id)
+    kept_n = base.filter_by(status='keep').count()
+    pool_is_kept = kept_n > 0
+    crit = (BankImage.status == 'keep') if pool_is_kept \
+        else (BankImage.status != 'reject')
+    pool = base.filter(crit)
+    total = pool.count()
+
+    framing = _framing_counts(bank_id, extra_crit=crit)
+    framing_known = sum(framing[k] for k in _FRAMINGS)
+    framing_available = framing_known + framing['unknown'] > 0
+
+    # Person clusters within the pool, biggest first (list of sizes).
+    person_rows = (db.session.query(BankImage.face_cluster, func.count(BankImage.id))
+                   .filter(BankImage.bank_id == bank_id, crit,
+                           BankImage.face_cluster.isnot(None))
+                   .group_by(BankImage.face_cluster)
+                   .order_by(func.count(BankImage.id).desc()).all())
+    person_sizes = [int(n) for _c, n in person_rows]
+    style_rows = (db.session.query(BankImage.style_cluster, func.count(BankImage.id))
+                  .filter(BankImage.bank_id == bank_id, crit,
+                          BankImage.style_cluster.isnot(None))
+                  .group_by(BankImage.style_cluster)
+                  .order_by(func.count(BankImage.id).desc()).all())
+    style_sizes = [int(n) for _c, n in style_rows]
+    top_person_id = int(person_rows[0][0]) if person_rows else None
+
+    # Resolution: how much of the pool is small (< 1 MP), where low-res caps detail.
+    res_scanned = pool.filter(BankImage.width.isnot(None),
+                              BankImage.height.isnot(None)).count()
+    under_1mp = pool.filter(BankImage.width.isnot(None), BankImage.height.isnot(None),
+                            BankImage.width * BankImage.height < 1_000_000).count()
+
+    return {
+        'pool': 'kept' if pool_is_kept else 'candidates',
+        'total': total,
+        'framing': framing, 'framing_known': framing_known,
+        'framing_available': framing_available,
+        'person': {'clusters': person_sizes, 'top_id': top_person_id,
+                   'total': sum(person_sizes),
+                   'singletons': sum(1 for n in person_sizes if n == 1)},
+        'style': {'clusters': style_sizes, 'total': sum(style_sizes)},
+        'resolution': {'scanned': res_scanned, 'under_1mp': under_1mp},
+    }
+
+
+def _coverage_advice(stats: dict) -> list:
+    """Turn the coverage stats into a short list of honest, actionable sentences.
+    Each is {'tone': 'warn'|'info', 'text': ...}. Pure function of ``stats`` (unit
+    of the logic — deterministic on a known distribution). Never alarmist: a
+    dominance reads as a QUESTION, a thin axis as a gentle 'add a few'."""
+    total = stats['total']
+    pool = stats['pool']
+    noun = 'kept' if pool == 'kept' else 'candidate'
+    out = []
+    if total == 0:
+        return [{'tone': 'info',
+                 'text': 'Nothing to advise on yet — keep some images (or run a '
+                         'pass) and the coverage read appears here.'}]
+
+    # Size — most families want a couple dozen.
+    if total < 20:
+        out.append({'tone': 'warn',
+                    'text': f'Only {total} {noun} — most LoRA families train more '
+                            f'reliably with 20+ images.'})
+
+    # Framing balance (needs the 📐 Framing pass).
+    fr, known = stats['framing'], stats['framing_known']
+    if not stats['framing_available']:
+        out.append({'tone': 'info',
+                    'text': 'Run the 📐 Framing pass to see how your face / bust / '
+                            'body / back shots balance.'})
+    elif known > 0:
+        dom = max(_FRAMINGS, key=lambda k: fr[k])
+        dom_share = fr[dom] / known
+        thin = [k for k in _FRAMINGS if _pct(fr[k], known) < 10]
+        if dom_share >= 0.55 and total >= 8:
+            add = ' / '.join(k for k in ('body', 'back', 'bust', 'face')
+                             if k in thin) or 'other angles'
+            out.append({'tone': 'warn',
+                        'text': f'{_pct(fr[dom], known)}% {dom} shots — add '
+                                f'{add} for a fuller character.'})
+        elif fr['back'] == 0 and known >= 10:
+            out.append({'tone': 'info',
+                        'text': 'No back views — a few help a character hold up '
+                                'from behind (optional).'})
+
+    # Person mix — a dominance is a question, not a verdict.
+    ppl = stats['person']
+    if ppl['total'] > 0 and ppl['clusters']:
+        top = ppl['clusters'][0]
+        if len(ppl['clusters']) >= 2 and top / ppl['total'] >= 0.5:
+            out.append({'tone': 'info',
+                        'text': f'Person #{ppl["top_id"]} is {_pct(top, ppl["total"])}% '
+                                f'of the set — is this one subject, or a mix?'})
+        if ppl['singletons'] >= 3 and total >= 10:
+            out.append({'tone': 'info',
+                        'text': f'{ppl["singletons"]} people appear only once — a '
+                                f'character LoRA wants one consistent subject.'})
+
+    # Style spread — only when it's genuinely mixed (no single dominant style).
+    st = stats['style']
+    if len(st['clusters']) >= 2 and st['total'] > 0 \
+            and st['clusters'][0] / st['total'] < 0.7 and total >= 8:
+        out.append({'tone': 'info',
+                    'text': f'{len(st["clusters"])} visual styles in the set — '
+                            f'mixing photoreal and illustration can dilute a LoRA.'})
+
+    # Resolution — low-res caps the training resolution.
+    res = stats['resolution']
+    if res['scanned'] > 0:
+        share = res['under_1mp'] / res['scanned']
+        if share >= 0.3:
+            out.append({'tone': 'info',
+                        'text': f'{_pct(res["under_1mp"], res["scanned"])}% are under '
+                                f'1 MP — low-res images cap the detail a LoRA can learn.'})
+
+    if not out:
+        out.append({'tone': 'info',
+                    'text': 'Nothing stands out — your set looks reasonably balanced.'})
+    # Warnings first so the panel reads worst-to-mildest.
+    out.sort(key=lambda a: 0 if a['tone'] == 'warn' else 1)
+    return out
+
+
+def coverage(user_id, bank_id) -> dict | None:
+    """The read-only coverage advice for the bank (idea by @antonp). Returns the
+    distributions the panel renders plus the generated advice, or None if the bank
+    is gone. Never mutates; pure DB, zero GPU."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    stats = _coverage_stats(bank_id)
+    stats['advice'] = _coverage_advice(stats)
+    return stats
+
+
 # --- promotion --------------------------------------------------------------
+def _promotable_query(bank_id, dataset_id):
+    """The KEPT images eligible to promote into ``dataset_id``: everything kept
+    that isn't ALREADY sitting on this exact target. promoted_dataset_id is a
+    scalar (it remembers only the LAST target), so the guard is per-target, not
+    a global 'promoted anywhere' lock — an image promoted to dataset A stays
+    promotable to B. (The dataset-side perceptual dedup on import is the real
+    guard against genuine duplicates.)"""
+    return (BankImage.query.filter_by(bank_id=bank_id, status='keep')
+            .filter(or_(BankImage.promoted_dataset_id.is_(None),
+                        BankImage.promoted_dataset_id != dataset_id)))
+
+
+def promotable_count(user_id, bank_id, dataset_id) -> int | None:
+    """How many kept images the 'promote all' path would send to ``dataset_id``
+    right now — the honest number behind the modal's copy line. None = bank or
+    dataset gone."""
+    if not get_bank(user_id, bank_id):
+        return None
+    if not FaceDataset.query.filter_by(id=dataset_id, user_id=user_id).first():
+        return None
+    return _promotable_query(bank_id, dataset_id).count()
+
+
 def start_promote(app, user_id, bank_id, ids, dataset_id):
     """Copy a selection into a dataset through the normal import path
-    (normalize + perceptual dedup vs the dataset). ``ids`` empty = every KEPT,
-    not-yet-promoted image. Background job (a big promotion decodes hundreds
-    of files)."""
+    (normalize + perceptual dedup vs the dataset). ``ids`` empty = every KEPT
+    image not already on THIS dataset. Background job (a big promotion decodes
+    hundreds of files)."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -1797,8 +2459,7 @@ def start_promote(app, user_id, bank_id, ids, dataset_id):
         ids = [int(i) for i in ids]
     else:
         ids = [r.id for r in
-               BankImage.query.filter_by(bank_id=bank_id, status='keep')
-               .filter(BankImage.promoted_dataset_id.is_(None))
+               _promotable_query(bank_id, dataset_id)
                .order_by(BankImage.id.asc()).all()]
     if not ids:
         raise ValueError('nothing to promote — keep some images first')

@@ -219,7 +219,9 @@ def test_resolve_keep_first_and_manual_pick(client, tmp_path, app):
     assert by['b_copy.jpg']['status'] == 'reject'
 
 
-def test_resolve_never_flips_a_manual_keep(client, tmp_path):
+def test_auto_resolve_never_flips_a_manual_keep(client, tmp_path, app):
+    """The AUTOMATIC resolver (pipeline auto-reject) must never un-keep a manual
+    pick: resolve_dups_keep_best keeps respect_existing_keep=True."""
     im = checkerboard(size=256, cell=16)
     bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': im, 'b.jpg': im})
     client.post(f'/api/bank/{bank_id}/scan', json={})
@@ -227,10 +229,76 @@ def test_resolve_never_flips_a_manual_keep(client, tmp_path):
     ids = {i['name']: i['id'] for i in groups[0]['images']}
     client.post(f'/api/bank/{bank_id}/images/status',
                 json={'ids': [ids['b.jpg']], 'status': 'keep'})
-    client.post(f'/api/bank/{bank_id}/dups/resolve', json={'strategy': 'first'})
+    with app.app_context():
+        from app.services import image_bank_service as banks
+        assert banks.resolve_dups_keep_best('local', bank_id) == 0   # keep protected
     by = {i['name']: i for i in
           client.get(f'/api/bank/{bank_id}/images').get_json()['images']}
-    assert by['b.jpg']['status'] == 'keep'               # manual keep survives
+    assert by['b.jpg']['status'] == 'keep'               # manual keep survives auto
+
+
+def test_explicit_resolve_rejects_kept_losers(client, tmp_path, app):
+    """An EXPLICIT resolve (user clicks Keep best / Keep first / Resolve ALL on a
+    same-shot group) must collapse the group to ONE — even when every member is
+    already 'keep' (the usual same-shot case). Before the fix the guard skipped
+    'keep' members, so the losers stayed kept and the toast read '0 rejected'."""
+    im = checkerboard(size=256, cell=16)
+    bank_id, _src = _mkbank(client, tmp_path, {
+        'a.jpg': im, 'b.jpg': im, 'c.jpg': im,
+    })
+    client.post(f'/api/bank/{bank_id}/scan', json={})
+    groups = client.get(f'/api/bank/{bank_id}/dup-groups').get_json()['groups']
+    ids = {i['name']: i['id'] for i in groups[0]['images']}
+    # ALL three members kept — the shape that produced 'Resolved N — 0 rejected'.
+    client.post(f'/api/bank/{bank_id}/images/status',
+                json={'ids': list(ids.values()), 'status': 'keep'})
+
+    # AUTO path first: with every member kept it rejects nobody (unchanged).
+    with app.app_context():
+        from app.services import image_bank_service as banks
+        assert banks.resolve_dups_keep_best('local', bank_id) == 0
+
+    # EXPLICIT path: keep first → a.jpg elected, b + c fall to reject.
+    r = client.post(f'/api/bank/{bank_id}/dups/resolve', json={'strategy': 'first'})
+    assert r.get_json() == {'ok': True, 'resolved': 1, 'rejected': 2}
+    by = {i['name']: i for i in
+          client.get(f'/api/bank/{bank_id}/images').get_json()['images']}
+    assert by['a.jpg']['status'] == 'keep'               # elected keeper untouched
+    assert by['b.jpg']['status'] == 'reject'
+    assert by['c.jpg']['status'] == 'reject'
+    assert by['b.jpg']['reject_reason'] == 'duplicate'
+
+
+def test_explicit_semantic_resolve_rejects_kept_losers(client, tmp_path, app):
+    """Same per-group collapse for stage-2 semantic groups: an explicit resolve
+    over an all-kept semantic_dup_group rejects the losers (reason semantic_dup),
+    while the elected keeper survives — set up at the service layer so no CLIP
+    extra is needed."""
+    im = checkerboard(size=256, cell=16)
+    bank_id, _src = _mkbank(client, tmp_path, {
+        'a.jpg': im, 'b.jpg': im, 'c.jpg': im,
+    })
+    client.post(f'/api/bank/{bank_id}/scan', json={})
+    with app.app_context():
+        from app.models import BankImage
+        from app.extensions import db
+        rows = (BankImage.query.filter_by(bank_id=bank_id)
+                .order_by(BankImage.id.asc()).all())
+        for r in rows:
+            r.semantic_dup_group, r.status = 1, 'keep'
+        db.session.commit()
+        keeper_id = rows[0].id
+    # Explicit manual pick keeps the first row; the two kept losers get rejected.
+    r = client.post(f'/api/bank/{bank_id}/semantic-dups/resolve',
+                    json={'keep_ids': [keeper_id]})
+    assert r.get_json()['rejected'] == 2
+    with app.app_context():
+        from app.models import BankImage
+        rows = BankImage.query.filter_by(bank_id=bank_id).all()
+        kept = [x for x in rows if x.status == 'keep']
+        rej = [x for x in rows if x.status == 'reject']
+        assert len(kept) == 1 and kept[0].id == keeper_id
+        assert len(rej) == 2 and all(x.reject_reason == 'semantic_dup' for x in rej)
 
 
 # --- flag application + statuses --------------------------------------------
@@ -265,6 +333,104 @@ def test_images_filters_and_pagination(client, tmp_path):
     assert [i['name'] for i in flagged['images']] == ['gray.jpg']
     status = client.get(f'/api/bank/{bank_id}/images?status=reject').get_json()
     assert status['total'] == 0
+
+
+def test_images_sort_by_resolution(client, tmp_path, app):
+    """Sort=res_desc/res_asc orders by MEGAPIXELS (width×height), not width — a
+    900×900 (810k px) outranks a wider 1200×300 (360k). Unscanned rows (width or
+    height NULL) sink to the end in BOTH directions, and the sort composes with
+    filters + pagination."""
+    files = {f'{n}.jpg': checkerboard(size=64) for n in ('a', 'b', 'c', 'd', 'e')}
+    bank_id, _src = _mkbank(client, tmp_path, files)
+    # Set dimensions by hand (bypass the scan) so the areas are unambiguous.
+    dims = {'a': (900, 900), 'b': (1200, 300), 'c': (1000, 1000),
+            'd': (400, 400), 'e': (None, None)}   # e = unscanned → NULL area
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        for row in BankImage.query.filter_by(bank_id=bank_id).all():
+            w, h = dims[row.relpath.split('.')[0]]
+            row.width, row.height = w, h
+        db.session.commit()
+
+    def names(sort, **qs):
+        params = '&'.join(f'{k}={v}' for k, v in {'sort': sort, **qs}.items())
+        got = client.get(f'/api/bank/{bank_id}/images?{params}').get_json()
+        return [i['name'].split('.')[0] for i in got['images']]
+
+    # Descending megapixels: c(1M) > a(810k) > b(360k) > d(160k); NULL 'e' last.
+    assert names('res_desc') == ['c', 'a', 'b', 'd', 'e']
+    # Ascending: d < b < a < c; NULL 'e' still last (never first).
+    assert names('res_asc') == ['d', 'b', 'a', 'c', 'e']
+    # Composes with pagination — the top-2 of the descending order.
+    page = client.get(f'/api/bank/{bank_id}/images?sort=res_desc&limit=2').get_json()
+    assert [i['name'].split('.')[0] for i in page['images']] == ['c', 'a']
+    assert page['total'] == 5
+    # Composes with a status filter: reject the two largest, keep the sort.
+    client.post(f'/api/bank/{bank_id}/images/status',
+                json={'ids': [i['id'] for i in
+                              client.get(f'/api/bank/{bank_id}/images?sort=res_desc&limit=2')
+                              .get_json()['images']], 'status': 'reject'})
+    assert names('res_desc', status='pending') == ['b', 'd', 'e']
+    # An unknown sort value is ignored (falls back to the default id order).
+    assert names('bogus') == ['a', 'b', 'c', 'd', 'e']
+
+
+def test_resolution_buckets_counts_and_filter(client, tmp_path, app):
+    """Resolution tiers bucket on MEGAPIXELS with HALF-OPEN [lo, hi) bounds. The
+    exact boundaries matter: 1000×1000 (1.00 MP) and 1024×1024 (1.05 MP) both land
+    in '1–2 MP' (lower-inclusive), 512×512 (0.26 MP) in '0.25–1 MP' (never the junk
+    tier), 2000×2000 (4.00 MP) in '> 4 MP'. The payload reports one count per tier
+    (unscanned excluded), and res_bucket narrows a page, composing with status +
+    sort + pagination."""
+    names = ('thumb', 'small', 'std', 'std2', 'big', 'huge', 'unscanned')
+    files = {f'{n}.jpg': checkerboard(size=64) for n in names}
+    bank_id, _src = _mkbank(client, tmp_path, files)
+    # Hand-set dimensions on the exact tier boundaries (bypass the scan).
+    dims = {'thumb': (400, 400),      # 0.16 MP  → res_lt_025
+            'small': (512, 512),      # 0.26 MP  → res_025_1 (NOT junk)
+            'std':   (1000, 1000),    # 1.00 MP  → res_1_2 (lower-inclusive)
+            'std2':  (1024, 1024),    # 1.05 MP  → res_1_2
+            'big':   (1920, 1080),    # 2.07 MP  → res_2_4
+            'huge':  (2000, 2000),    # 4.00 MP  → res_gt_4 (lower-inclusive)
+            'unscanned': (None, None)}  # NULL area → excluded from every tier
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        for row in BankImage.query.filter_by(bank_id=bank_id).all():
+            w, h = dims[row.relpath.split('.')[0]]
+            row.width, row.height = w, h
+        db.session.commit()
+
+    # One count per tier, every id present, unscanned counted nowhere.
+    buckets = client.get(f'/api/bank/{bank_id}').get_json()['res_buckets']
+    assert buckets == {'res_lt_025': 1, 'res_025_1': 1, 'res_1_2': 2,
+                       'res_2_4': 1, 'res_gt_4': 1}
+
+    def names_in(bucket, **qs):
+        params = '&'.join(f'{k}={v}' for k, v in {'res_bucket': bucket, **qs}.items())
+        got = client.get(f'/api/bank/{bank_id}/images?{params}').get_json()
+        return sorted(i['name'].split('.')[0] for i in got['images'])
+
+    # Each tier returns exactly its members — the boundary cases sit where claimed.
+    assert names_in('res_lt_025') == ['thumb']
+    assert names_in('res_025_1') == ['small']
+    assert names_in('res_1_2') == ['std', 'std2']     # 1.00 and 1.05 MP together
+    assert names_in('res_2_4') == ['big']
+    assert names_in('res_gt_4') == ['huge']
+    # Composes with the resolution sort: the two '1–2 MP' rows, largest first.
+    got = client.get(f'/api/bank/{bank_id}/images'
+                     '?res_bucket=res_1_2&sort=res_desc').get_json()
+    assert [i['name'].split('.')[0] for i in got['images']] == ['std2', 'std']
+    # Composes with a status filter + pagination: reject 'std', page the rest.
+    std_id = next(i['id'] for i in
+                  client.get(f'/api/bank/{bank_id}/images?res_bucket=res_1_2')
+                  .get_json()['images'] if i['name'].startswith('std.'))
+    client.post(f'/api/bank/{bank_id}/images/status',
+                json={'ids': [std_id], 'status': 'reject'})
+    assert names_in('res_1_2', status='pending') == ['std2']
+    # An unknown tier id is ignored (no filter → the whole scanned+unscanned set).
+    assert names_in('bogus') == sorted(names)
 
 
 def test_no_face_filter_only_matches_no_face_state(client, tmp_path, app):
@@ -344,6 +510,51 @@ def test_promote_keeps_into_dataset(client, tmp_path, app):
         assert all(r2.source == 'import' and r2.status == 'keep' for r2 in rows)
     # Second promotion with nothing left to promote → 400.
     r = client.post(f'/api/bank/{bank_id}/promote', json={'dataset_id': ds_id})
+    assert r.status_code == 400
+
+
+def test_promote_same_image_to_a_second_dataset(client, tmp_path, app):
+    """A kept image already promoted to dataset A must still be promotable to a
+    DIFFERENT dataset B. The scalar promoted_dataset_id only remembers the LAST
+    target, so the eligible set is per-target (promoted-elsewhere ≠ promoted-here),
+    not a global 'promoted anywhere' lock. Regression for the Bank 'nothing to
+    promote' toast when the modal still counted the kept images."""
+    bank_id, _src = _mkbank(client, tmp_path, {
+        'a.jpg': checkerboard(size=256, cell=16), 'b.jpg': noisy(size=256),
+    })
+    client.post(f'/api/bank/{bank_id}/scan', json={})
+    imgs = client.get(f'/api/bank/{bank_id}/images').get_json()['images']
+    keep_ids = [i['id'] for i in imgs]
+    client.post(f'/api/bank/{bank_id}/images/status',
+                json={'ids': keep_ids, 'status': 'keep'})
+    with app.app_context():
+        from app.services import face_dataset_service as svc
+        ds_a = svc.create_dataset('local', 'Dataset A', 'dsa').id
+        ds_b = svc.create_dataset('local', 'Dataset B', 'dsb').id
+
+    # Promote everything kept to A.
+    r = client.post(f'/api/bank/{bank_id}/promote', json={'dataset_id': ds_a})
+    assert r.status_code == 202
+
+    # The honest promotable count must be per-target: 0 left for A, but all
+    # kept images are still promotable to B.
+    ca = client.get(f'/api/bank/{bank_id}/promotable?dataset_id={ds_a}').get_json()
+    cb = client.get(f'/api/bank/{bank_id}/promotable?dataset_id={ds_b}').get_json()
+    assert ca['count'] == 0
+    assert cb['count'] == 2
+
+    # Promoting to a DIFFERENT dataset succeeds (this raised 400 before the fix).
+    r = client.post(f'/api/bank/{bank_id}/promote', json={'dataset_id': ds_b})
+    assert r.status_code == 202
+    payload = client.get(f'/api/bank/{bank_id}').get_json()
+    assert payload['activity']['finished'] is True
+    assert payload['activity']['error'] is None
+    with app.app_context():
+        from app.models import FaceDatasetImage
+        assert FaceDatasetImage.query.filter_by(dataset_id=ds_b).count() == 2
+
+    # Re-promoting to B (all now sit on B) is a no-op → 400, same as same-target.
+    r = client.post(f'/api/bank/{bank_id}/promote', json={'dataset_id': ds_b})
     assert r.status_code == 400
 
 

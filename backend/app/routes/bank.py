@@ -67,6 +67,20 @@ def bank_images(bank_id):
 
     # subfolder is a STRING facet ('' = bank root), distinct from the int filters.
     subfolder = args.get('subfolder')
+    # ids: the "show selected" VIEW — a comma-separated ordered id list that
+    # overrides the facets. Present-but-empty means "an empty selection" (0 rows),
+    # so distinguish None (no id view) from '' (empty view).
+    ids_arg = args.get('ids')
+    ids = None
+    if ids_arg is not None:
+        ids = []
+        for tok in ids_arg.split(','):
+            tok = tok.strip()
+            if tok:
+                try:
+                    ids.append(int(tok))
+                except ValueError:
+                    pass
     payload = banks.list_images(
         LOCAL_USER, bank_id,
         status=args.get('status') or None,
@@ -75,6 +89,10 @@ def bank_images(bank_id):
         semantic_group=_int('semantic_group'),
         subfolder=subfolder if subfolder is not None else None,
         search=args.get('search') or None,
+        sort=args.get('sort') or None,
+        res_bucket=args.get('res_bucket') or None,
+        framing=args.get('framing') or None,
+        ids=ids,
         offset=_int('offset') or 0, limit=_int('limit') or 200)
     if payload is None:
         return jsonify({'error': 'not found'}), 404
@@ -145,14 +163,37 @@ def bank_watermark(bank_id):
                   rescan=bool(data.get('rescan')))
 
 
+@bp.post('/bank/<int:bank_id>/framing')
+def bank_framing(bank_id):
+    """Classify every non-rejected image by shot type (face/bust/body/back),
+    reusing the dataset Qwen3-VL classifier. {rescan:true} re-classifies scanned
+    rows. 202/409/503."""
+    data = request.get_json(silent=True) or {}
+    return _start(banks.start_framing, _app(), LOCAL_USER, bank_id,
+                  rescan=bool(data.get('rescan')))
+
+
+@bp.get('/bank/<int:bank_id>/coverage')
+def bank_coverage(bank_id):
+    """Read-only coverage advice (idea by @antonp): what the kept set leans on and
+    what's thin for a good LoRA, from data the passes already computed. 404 when
+    the bank is gone."""
+    payload = banks.coverage(LOCAL_USER, bank_id)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
+
+
 @bp.post('/bank/<int:bank_id>/caption')
 def bank_caption(bank_id):
     """Caption a selection (image_ids) or every non-rejected image, reusing the
     dataset caption engines. {force:true} re-captions already-captioned rows.
-    202/409/503/400."""
+    {vocabulary} picks the register ('explicit'|'clinical'|'safe') — same lane as
+    the dataset caption; invalid → 400. 202/409/503/400."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_caption, _app(), LOCAL_USER, bank_id,
-                  ids=data.get('image_ids') or None, force=bool(data.get('force')))
+                  ids=data.get('image_ids') or None, force=bool(data.get('force')),
+                  vocabulary=data.get('vocabulary') or None)
 
 
 @bp.post('/bank/<int:bank_id>/pipeline')
@@ -177,6 +218,21 @@ def bank_promote(bank_id):
         return jsonify({'error': 'dataset_id is required'}), 400
     return _start(banks.start_promote, _app(), LOCAL_USER, bank_id,
                   data.get('image_ids') or [], dataset_id)
+
+
+@bp.get('/bank/<int:bank_id>/promotable')
+def bank_promotable(bank_id):
+    """How many kept images 'promote all' would copy into ?dataset_id right now
+    — the honest count for the promote modal (per-target: images already on
+    OTHER datasets still count)."""
+    try:
+        dataset_id = int(request.args.get('dataset_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'dataset_id is required'}), 400
+    n = banks.promotable_count(LOCAL_USER, bank_id, dataset_id)
+    if n is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'count': n})
 
 
 @bp.post('/bank/<int:bank_id>/cancel')
@@ -207,7 +263,8 @@ def bank_dups_resolve(bank_id):
     try:
         out = banks.resolve_dups(LOCAL_USER, bank_id, strategy=strategy,
                                  group=data.get('group'),
-                                 keep_ids=data.get('keep_ids'))
+                                 keep_ids=data.get('keep_ids'),
+                                 respect_existing_keep=False)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -236,7 +293,8 @@ def bank_semantic_dups_resolve(bank_id):
     try:
         out = banks.resolve_semantic_dups(LOCAL_USER, bank_id, strategy=strategy,
                                           group=data.get('group'),
-                                          keep_ids=data.get('keep_ids'))
+                                          keep_ids=data.get('keep_ids'),
+                                          respect_existing_keep=False)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -261,6 +319,90 @@ def bank_apply_flags(bank_id):
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'rejected': out})
+
+
+def _curation_filters(data):
+    """The shared candidate-pool filters for the curation selectors — the same
+    facets as the grid (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩ search),
+    read out of a JSON body. Unknown keys (e.g. the grid's ``sort``) are ignored."""
+    def _int(name):
+        v = data.get(name)
+        try:
+            return int(v) if v not in (None, '') else None
+        except (TypeError, ValueError):
+            return None
+
+    subfolder = data.get('subfolder')
+    return {
+        'status': data.get('status') or None,
+        'flag': data.get('flag') or None,
+        'cluster': _int('cluster'),
+        'style': _int('style'),
+        # '' is a meaningful subfolder (bank root); '__all__'/None mean "no scope".
+        'subfolder': subfolder if subfolder not in (None, '__all__') else None,
+        'search': data.get('search') or None,
+    }
+
+
+@bp.post('/bank/<int:bank_id>/select-diverse')
+def bank_select_diverse(bank_id):
+    """Farthest-point selection of the N most VARIED images in the current filter,
+    reusing the ✨ Score embeddings (no GPU). Returns the chosen ids for the UI to
+    check — never mutates. 400 with a "run Score first" hint when unscored."""
+    data = request.get_json(silent=True) or {}
+    try:
+        n = int(data.get('n') or 60)
+    except (TypeError, ValueError):
+        n = 60
+    try:
+        out = banks.select_diverse(LOCAL_USER, bank_id, n=n,
+                                   filters=_curation_filters(data))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **out})
+
+
+@bp.post('/bank/<int:bank_id>/select-similar')
+def bank_select_similar(bank_id):
+    """Rank the current filter by CLIP similarity to a reference bank image
+    ({ref_id}); returns the top-N ids (or everything ≥ {min_score}) for the UI to
+    check. Reuses the ✨ Score embeddings (no GPU). 400 when unscored / bad ref."""
+    data = request.get_json(silent=True) or {}
+    try:
+        ref_id = int(data.get('ref_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'ref_id is required'}), 400
+    try:
+        n = int(data.get('n') or 60)
+    except (TypeError, ValueError):
+        n = 60
+    min_score = data.get('min_score')
+    try:
+        min_score = float(min_score) if min_score not in (None, '') else None
+    except (TypeError, ValueError):
+        min_score = None
+    try:
+        out = banks.select_similar(LOCAL_USER, bank_id, ref_id, n=n,
+                                   min_score=min_score,
+                                   filters=_curation_filters(data))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **out})
+
+
+@bp.post('/bank/<int:bank_id>/delete-rejected')
+def bank_delete_rejected(bank_id):
+    """Destructive: delete the SOURCE files of every rejected image from disk
+    (OS trash when send2trash is present, hard delete otherwise) and drop their
+    rows. The ONLY bank action that writes to the source folder — the front-end
+    gates it behind a type-DELETE confirmation."""
+    try:
+        out = banks.delete_rejected(LOCAL_USER, bank_id)
+    except ValueError:
+        return jsonify({'error': 'not found'}), 404
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 409
+    return jsonify({'ok': True, **out})
 
 
 def _row_or_404(bank_id, image_id):

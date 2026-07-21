@@ -383,8 +383,8 @@ def _merge_resume_overrides(snapshot, patch):
 
 def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
                        overrides=None) -> dict:
-    """Reprend un run cloud TERMINÉ (done) depuis un checkpoint harvesté et vise
-    step_de_reprise + extra_steps — le pendant cloud de
+    """Reprend un run cloud TERMINAL (done OU en échec) depuis un checkpoint
+    harvesté et vise step_de_reprise + extra_steps — le pendant cloud de
     lora_training.continue_training. C'est un VRAI launch_cloud_training (pod
     frais, mêmes garde-fous : limite de runs actifs, budget, unicité par
     famille) avec les paramètres persistés du run source (variante/famille/
@@ -402,8 +402,14 @@ def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
     run = db.session.get(CloudTrainingRun, int(run_id))
     if not run:
         raise ValueError('unknown cloud run')
-    if run.status != 'done':
-        raise ValueError('only a finished (done) run can be continued')
+    # Continue from any TERMINAL run — a run that failed at pod teardown
+    # ('pod did not become ready in time') can still have harvested, complete
+    # checkpoints in its staging, and resuming from one is valid. Only a run
+    # that is STILL RUNNING is blocked; the `no harvested checkpoint` check
+    # below is the real gate for a terminal run whose staging was cleaned.
+    if run.status in ACTIVE_STATES:
+        raise ValueError('a run that is still running cannot be continued — '
+                         'wait for it to finish or fail')
     try:
         p = json.loads(run.train_params or '{}')
     except ValueError:
@@ -1467,11 +1473,19 @@ def _monitor(app, run_id):
                 _set(run, phase_detail='Resuming — reattaching to running job')
 
             # -- poll until terminal ------------------------------------------
-            # Stall watchdog state: armed only once training has produced its
-            # first step (before that — base download, quantization, latent
-            # caching — the watchdog stays INACTIVE; those phases are covered
-            # by ready_timeout + max_runtime).
+            # Two watchdogs share one progress clock (last_progress_ts):
+            #  * stall — once training has produced a step, kill if the step
+            #    counter freezes past stall_timeout_minutes.
+            #  * first-step — BEFORE the first step (base download, quantize,
+            #    latent caching) kill if step 1 is never reached in time. Only
+            #    the runtime cap used to bound this phase, so a pod whose base
+            #    download collapsed to a crawl burned the WHOLE cap for zero
+            #    steps (run #75: 26.3 GB base at ~12 kB/s, 10h45 / 7 € / 0 saves
+            #    — 2026-07-19). A healthy Krea-2-Raw run reaches step 1 in a few
+            #    minutes (its full 2000-step run was ~84 min), so the default is
+            #    generous enough to survive an honestly slow download.
             stall_seconds = int(c.get('stall_timeout_minutes') or 30) * 60
+            first_step_seconds = int(c.get('first_step_timeout_minutes') or 45) * 60
             last_step = -1
             last_progress_ts = _now()
             last_ok = _now()
@@ -1559,6 +1573,20 @@ def _monitor(app, run_id):
                             detail='Stalled — no step progress for '
                                    f'{stall_seconds // 60} min; pod terminated',
                             error='stall watchdog')
+                    return
+                elif last_step <= 0 and (_now() - last_progress_ts) > first_step_seconds:
+                    # No training step in first_step_timeout_minutes — the pod is
+                    # wedged before step 1 (typically the base-model download
+                    # crawling; nothing to rescue since no checkpoint exists).
+                    try:
+                        remote.stop_job(job_id)
+                    except Exception:
+                        pass
+                    _finish(run, 'error',
+                            detail='No training step reached in '
+                                   f'{first_step_seconds // 60} min — pod likely '
+                                   'stuck downloading the base model; terminated',
+                            error='first-step watchdog')
                     return
                 _sleep(POLL_SECONDS)
         except Exception as e:
@@ -2217,6 +2245,263 @@ def _node_checkpoints(rec, crun):
     return out
 
 
+def _rec_config(rec):
+    """The settings the run actually used, for the Lab inspector. None (not {})
+    when a run recorded nothing (legacy) so the UI can say 'config not recorded'
+    instead of showing an empty table."""
+    if not rec.settings:
+        return None
+    try:
+        cfg = json.loads(rec.settings)
+        return cfg if isinstance(cfg, dict) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def set_run_note(record_id, text):
+    """Save the free-form Lab note on a run. False (no-op) if the record is gone."""
+    from ..models import TrainingRunRecord
+    from ..extensions import db
+    rec = TrainingRunRecord.query.get(record_id)
+    if rec is None:
+        return False
+    rec.note = text or ''
+    db.session.commit()
+    return True
+
+
+def set_checkpoint_note(record_id, step, text):
+    """Save the free-form Lab note on one checkpoint (record_id, step). False if
+    the owning run is gone."""
+    from ..models import TrainingRunRecord, CheckpointNote
+    from ..extensions import db
+    if TrainingRunRecord.query.get(record_id) is None:
+        return False
+    row = CheckpointNote.query.filter_by(record_id=record_id, step=step).first()
+    if row is None:
+        row = CheckpointNote(record_id=record_id, step=step)
+        db.session.add(row)
+    row.note = text or ''
+    db.session.commit()
+    return True
+
+
+def checkpoint_notes_for(record_id):
+    """{step: note} for a run's annotated checkpoints (empty notes omitted)."""
+    from ..models import CheckpointNote
+    return {r.step: r.note for r in
+            CheckpointNote.query.filter_by(record_id=record_id).all()
+            if r.note}
+
+
+def training_in_progress() -> bool:
+    """True while a LoRA training holds the GPU — the Lab's inline generation is
+    refused with a 409 in that window (a training and a generation must never
+    share the GPU). Reads the same persisted flag the queue and the vision window
+    check, so all three agree on 'GPU held by training'."""
+    from ..job_queue import queue_manager
+    return bool(queue_manager._get_system_state('training_in_progress', False))
+
+
+# --- Lab inline previews (D) -------------------------------------------------
+# The flagship: render ONE same-prompt/same-seed image per selected lineage
+# checkpoint, reusing the EXISTING Test-Studio ComfyUI engine pinned to those
+# checkpoints at strength 1.0 (not a checkpoint×strength grid). A checkpoint is
+# "testable" only when its step has a matching DEPLOYED LoRA in the family pool
+# (the same pool the Studio tests) — otherwise there is nothing ComfyUI can load,
+# so we say "not deployed" instead of launching a silent no-op.
+
+def _step_of_testable(filename) -> int | None:
+    """The training step embedded in a deployed testable LoRA filename, so a
+    lineage pill (which carries its own step) can be joined to the deployed LoRA
+    of the same step. ai-toolkit deploys the step ZERO-PADDED IN THE MIDDLE, e.g.
+    'lora_morgot_cv_000001500_Krea-2-Raw_rc74_v3' (step 1500) — not at the end, so
+    an end-anchored match misses every real checkpoint. Match the zero-padded run
+    first (unambiguous: base/rc/version tokens aren't zero-padded), then fall back
+    to a plain step at the very end ('<trigger>-<step>' / 'lora_<trigger>_<step>').
+    A final save with no number yields None (matched by step only)."""
+    stem = os.path.basename(str(filename or '')).rsplit('.', 1)[0]
+    if stem.lower().startswith('lora_'):
+        stem = stem[5:]
+    # Zero-padded step anywhere in the name (leading 0, ≥4 digits) — this is the
+    # ai-toolkit convention and never collides with 'Krea-2-Raw'/'rc74'/'v3'.
+    m = re.search(r'[-_](0\d{3,})(?=[-_]|$)', stem)
+    if not m:
+        m = re.search(r'[-_](\d+)$', stem)   # legacy: plain step at the end
+    return int(m.group(1)) if m else None
+
+
+def _testable_by_step(dataset_id, family) -> dict:
+    """{step: deployed_lora_filename} for this dataset+family — the checkpoints
+    the Lab can actually generate a preview for. Best-effort: no dataset / no
+    deployed LoRA → {} (every pill reads as not-testable, the Generate button
+    stays disabled with the app's usual 'needs setup' hint)."""
+    ds = fds.get_dataset(cfg.LOCAL_USER, dataset_id)
+    if not ds:
+        return {}
+    from . import lora_test_studio as studio
+    out = {}
+    try:
+        cands = studio.list_test_checkpoints(ds, family)
+    except Exception:
+        return {}
+    for c in cands:
+        s = _step_of_testable(c.get('filename'))
+        if s is not None:
+            out[s] = c['filename']
+    return out
+
+
+def checkpoint_previews_for(record_id) -> dict:
+    """{step: {status, url, seed}} for a run's inline-generated previews. Each
+    stored pointer resolves LIVE to its reused LoraTestImage: 'done' with a served
+    url once the file exists, 'failed' if the cell failed, else 'pending' (the job
+    is still in the serial queue). A dangling pointer (image row gone) is dropped
+    so the node never claims a preview it can't show."""
+    from ..models import CheckpointPreview, LoraTestImage
+    rows = CheckpointPreview.query.filter_by(record_id=record_id).all()
+    if not rows:
+        return {}
+    img_ids = [r.lora_test_image_id for r in rows if r.lora_test_image_id]
+    imgs = ({i.id: i for i in LoraTestImage.query
+             .filter(LoraTestImage.id.in_(img_ids)).all()} if img_ids else {})
+    out = {}
+    for r in rows:
+        img = imgs.get(r.lora_test_image_id)
+        if img is None:
+            continue
+        status = img.status if img.status in ('pending', 'done', 'failed') else 'pending'
+        url = (f'/api/dataset/{r.dataset_id}/img/{img.filename}'
+               if status == 'done' and img.filename else None)
+        out[r.step] = {'status': status, 'url': url, 'seed': r.seed}
+    return out
+
+
+def generate_checkpoint_previews(user_id, dataset_id, checkpoints, prompt=None,
+                                 seed=None, family=None) -> dict:
+    """Point the EXISTING Test-Studio engine at the selected lineage checkpoints,
+    each at strength 1.0, with ONE shared prompt+seed — a same-conditions look at
+    how the LoRA evolves epoch by epoch. `checkpoints` = [{record_id, step}].
+
+    Each is resolved to the deployed LoRA of its step; checkpoints with no deployed
+    LoRA are SKIPPED (reported, never a silent no-op). None resolvable → needs_setup
+    True so the route answers an actionable 409 instead of launching an empty run.
+    GPU serialization is the engine's own (each cell rides the serial image queue,
+    which the queue leaves pending while a training/vision pass holds the GPU); the
+    training→409 guard sits in the route. Stores/refreshes a CheckpointPreview per
+    rendered checkpoint pointing at the reused LoraTestImage row (regeneration just
+    re-points it). Returns {queued, skipped:[{record_id,step,reason}], needs_setup,
+    seed}."""
+    from ..models import CheckpointPreview
+    fam = (family or '').strip().lower() or None
+    if fam is None:
+        ds = fds.get_dataset(cfg.LOCAL_USER, dataset_id)
+        fam = (getattr(ds, 'train_type', None) or 'zimage').lower() if ds else 'zimage'
+    by_step = _testable_by_step(dataset_id, fam)
+    resolved, skipped = [], []
+    for c in (checkpoints or []):
+        try:
+            rid, step = int(c['record_id']), int(c['step'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        fn = by_step.get(step)
+        if not fn:
+            skipped.append({'record_id': rid, 'step': step, 'reason': 'not_deployed'})
+            continue
+        resolved.append((rid, step, fn))
+    if not resolved:
+        return {'queued': 0, 'skipped': skipped, 'needs_setup': True, 'seed': None}
+
+    from . import lora_test_studio as studio
+    # Pin the engine to EXACTLY these checkpoints at strength 1.0, one image each
+    # (count=1). The Studio validates/preflights + enqueues; a GpuBusyError (vision
+    # holding the GPU) or a StudioAssetsMissing (ComfyUI not set up) propagates and
+    # the route maps it to the same structured error the Studio already returns.
+    result = studio.create_run(
+        user_id, dataset_id, checkpoints=[fn for _, _, fn in resolved],
+        strengths=[1.0], seed=seed, prompt=prompt, family=fam, count=1)
+    ids = result.get('ids') or []
+    run_seed = result.get('seed', seed)
+    # Single base model × single strength × count=1 → cells are 1:1 with `resolved`
+    # in order; zip guards against any engine-side short count (never a wrong link).
+    for (rid, step, _fn), img_id in zip(resolved, ids):
+        row = CheckpointPreview.query.filter_by(record_id=rid, step=step).first()
+        if row is None:
+            row = CheckpointPreview(record_id=rid, step=step, dataset_id=dataset_id)
+            db.session.add(row)
+        row.lora_test_image_id = img_id
+        row.prompt = prompt or ''
+        row.seed = run_seed
+    db.session.commit()
+    return {'queued': len(resolved), 'skipped': skipped, 'needs_setup': False,
+            'seed': run_seed}
+
+
+def _record_checkpoints_on_disk(rec) -> int:
+    """How many of this run's checkpoints are still on disk RIGHT NOW — the guard
+    the "remove a gone run" action checks. Mirrors the graph badge: a cloud run
+    counts its staging saves (plus a harvested final LoRA), a local run counts the
+    run-dir files the checkpoint scan attributes to this record. Best-effort: a
+    scan we can't run reports 0 — an unprovable presence must never block removing
+    a run the graph already shows as gone, and never raise (no 500)."""
+    try:
+        if rec.source == 'cloud':
+            crun = (db.session.get(CloudTrainingRun, rec.cloud_run_id)
+                    if rec.cloud_run_id else None)
+            if crun is None:
+                return 0
+            n = _staging_save_count(crun)
+            if not n and crun.checkpoint_local_path \
+                    and os.path.isfile(crun.checkpoint_local_path):
+                n = 1
+            return n
+        return len(_node_checkpoints(rec, None))
+    except Exception:
+        return 0
+
+
+def delete_run_record(record_id) -> str:
+    """Remove a GONE run (no checkpoints on disk) from the lineage graph — its
+    TrainingRunRecord, its checkpoint notes, and (by detaching) its lineage edge.
+    METADATA ONLY: the checkpoints are already gone, so nothing on disk is touched.
+
+    Guards instead of deleting silently:
+      • a run whose checkpoints are still on disk is REFUSED ('has_saves') so a
+        recoverable run is never discarded from under the user;
+      • children that resumed FROM this run are DETACHED (parent_record_id → NULL),
+        keeping them in the graph as honest "origin unknown" roots rather than
+        breaking the tree on a dangling edge.
+
+    Returns 'not_found' | 'has_saves' | 'deleted' | 'conflict'. The FK children
+    (CheckpointNote — no relationship cascade in this schema) are deleted and
+    FLUSHED before the parent row so SQLite never raises the repo's "delete 500"
+    IntegrityError; a stray one is caught and reported as 'conflict', never a 500."""
+    from ..models import TrainingRunRecord, CheckpointNote
+    from sqlalchemy.exc import IntegrityError
+    rec = db.session.get(TrainingRunRecord, int(record_id))
+    if rec is None:
+        return 'not_found'
+    if _record_checkpoints_on_disk(rec) > 0:
+        return 'has_saves'
+    try:
+        # Detach any run that resumed from this one BEFORE deleting it: the child
+        # stays displayed (as a root), the parent edge just disappears.
+        (TrainingRunRecord.query
+         .filter_by(parent_record_id=rec.id)
+         .update({'parent_record_id': None}, synchronize_session=False))
+        # Delete FK children first and flush, so deleting the parent row can't hit
+        # an IntegrityError (the "delete 500" trap — no cascade on these tables).
+        CheckpointNote.query.filter_by(record_id=rec.id).delete(
+            synchronize_session=False)
+        db.session.flush()
+        db.session.delete(rec)
+        db.session.commit()
+        return 'deleted'
+    except IntegrityError:
+        db.session.rollback()
+        return 'conflict'
+
+
 def _lineage_node(rec, crun, requested_id, failed_local_id):
     """One genealogy-tree node from a provenance record, enriched with what the
     card badge shows: family/variant/base/version/date, run status, and whether
@@ -2237,6 +2522,9 @@ def _lineage_node(rec, crun, requested_id, failed_local_id):
         'base_model': rec.base_model or '',
         'version': rec.version,
         'steps': rec.steps,
+        'config': _rec_config(rec),
+        'note': rec.note or '',
+        'has_note': bool((rec.note or '').strip()),
         'created_at': rec.created_at.isoformat() if rec.created_at else None,
         'is_current': rec.id == requested_id,
         # A record with a resume step but no resolvable parent (legacy: the edge
@@ -2265,6 +2553,21 @@ def _lineage_node(rec, crun, requested_id, failed_local_id):
             node['checkpoints'] = []
             node['saves'] = None
             node['checkpoint_ready'] = None
+    _cnotes = checkpoint_notes_for(rec.id)
+    _cprev = checkpoint_previews_for(rec.id)
+    # A pill is `testable` when its step maps to a deployed LoRA the Studio engine
+    # can load — the front enables Generate only for testable selections and shows
+    # the app's usual 'needs setup' hint otherwise. `preview_*` render the inline
+    # thumbnail (or its pending/failed state) in the node card.
+    _testable = _testable_by_step(rec.dataset_id, rec.family)
+    for _ck in (node.get('checkpoints') or []):
+        _step = _ck.get('step')
+        _ck['note'] = _cnotes.get(_step, '')
+        _ck['testable'] = _step in _testable
+        _pv = _cprev.get(_step)
+        if _pv:
+            _ck['preview_url'] = _pv.get('url')
+            _ck['preview_status'] = _pv.get('status')
     return node
 
 
