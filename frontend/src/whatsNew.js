@@ -49,6 +49,13 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-21-desktop-shortcut',
+    date: '2026-07-21',
+    title: '🖥️ A proper Desktop icon',
+    blurb:
+      "The release ZIP now ships Create Desktop Shortcut.bat next to start.bat — double-click it once and you get a LoRA Dataset Studio shortcut on your Desktop with the app's own icon, instead of a generic batch-file icon or hunting through the extracted folder every time.",
+  },
+  {
     id: '2026-07-21-studio-resolution-multiplier',
     date: '2026-07-21',
     title: '🔍 Push Test Studio renders larger',

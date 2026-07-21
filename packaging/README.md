@@ -11,6 +11,11 @@ extracted folder on first launch, creates `.venv`, installs the core requirement
 and opens the browser. Nothing is installed system-wide and administrator rights
 are not required.
 
+The archive also ships **`Create Desktop Shortcut.bat`** and the app's `icon.ico`
+at the bundle root. Double-clicking it adds a `LoRA Dataset Studio.lnk` shortcut
+to the Desktop that points at `start.bat` and carries the app's own icon instead
+of a generic batch-file icon (see `scripts/create_shortcut.ps1`).
+
 ## Build the release archive
 
 On Windows, either double-click `packaging\build.bat` or run:
