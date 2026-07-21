@@ -8,7 +8,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'engines', title: 'Image engine', icon: '', eyebrow: 'generation',
     description: 'The local Klein engine used to generate dataset images.',
     keywords: ['klein', 'engine', 'comfyui', 'local', 'generation',
-      'lora', 'preset', 'texture', 'anatomy', 'nsfw'] },
+      'lora', 'preset', 'texture', 'anatomy', 'nsfw', 'identity', 'prompt', 'guard', 'improve', 'upscale'] },
   { id: 'scraping', title: 'Scraping & sources', icon: '', eyebrow: 'sources',
     description: 'Credentials used when scanning image sources.',
     keywords: ['reddit', 'client id', 'civitai', 'pexels', 'pexels api', 'api key', 'scrape', 'scraper',

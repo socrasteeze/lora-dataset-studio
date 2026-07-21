@@ -1,0 +1,361 @@
+"""🗃️ Image bank — CURATION selectors (turn a big dump into a good LoRA subset).
+
+Two pure-CPU selectors that reuse the CLIP embeddings the ✨ Score pass cached
+(no GPU, no re-scan — same contract as the semantic-dedup stage):
+
+  • select-diverse  — farthest-point sampling: the N images that best COVER the
+                      visual space (the antidote to 4 000 near-identical shots);
+  • select-similar  — rank by cosine similarity to a REFERENCE bank image
+                      ("keep what looks like THIS").
+
+Both only ever return a SELECTION (a set of image ids the UI checks) — nothing
+is mutated or deleted. We seed a synthetic score_cache.npz (as the scoring
+subprocess would) so grouping runs WITHOUT torch. Background jobs run inline
+under TESTING; these selectors are synchronous.
+"""
+import os
+
+import pytest
+from PIL import Image
+
+np = pytest.importorskip('numpy')
+
+
+# --- factories (mirror the semantic-dedup suite) -----------------------------
+def _flat(size=64, value=128):
+    return Image.new('RGB', (size, size), (value, value, value))
+
+
+def _mkbank(client, tmp_path, names, name='B'):
+    src = tmp_path / 'src'
+    for rel in names:
+        os.makedirs(os.path.dirname(str(src / rel)), exist_ok=True)
+        _flat(value=(hash(rel) % 200) + 20).save(str(src / rel))
+    r = client.post('/api/bank/create', json={'name': name, 'folder': str(src)})
+    assert r.status_code == 200, r.get_json()
+    return r.get_json()['id'], src
+
+
+def _uid():
+    from app.config import LOCAL_USER
+    return LOCAL_USER
+
+
+def _emb(*coords):
+    """A 768-dim L2-normed vector with the given leading coordinates."""
+    v = np.zeros(768, dtype='float32')
+    v[:len(coords)] = coords
+    v /= (np.linalg.norm(v) + 1e-8)
+    return v
+
+
+def _write_score_cache(app, bank_id, embs_by_name, state='ok'):
+    with app.app_context():
+        from app.models import BankImage
+        from app.services import image_bank_service as banks
+        bank = banks.get_bank(_uid(), bank_id)
+        rows = {os.path.basename(r.relpath): r
+                for r in BankImage.query.filter_by(bank_id=bank_id).all()}
+        paths, states, arr, sigs = [], [], [], []
+        for nm, e in embs_by_name.items():
+            r = rows[nm]
+            p = banks.abs_image_path(bank, r)
+            paths.append(p)
+            states.append(state)
+            arr.append(np.asarray(e, dtype='float32'))
+            st = os.stat(p)
+            sigs.append(f'{st.st_size}:{st.st_mtime_ns}')
+        cache_path = banks._score_cache_path(bank_id)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            str(cache_path),
+            paths=np.array(paths), states=np.array(states),
+            aes=np.array([float('nan')] * len(paths), dtype='float32'),
+            nsfw=np.array([float('nan')] * len(paths), dtype='float32'),
+            embs=np.stack(arr).astype('float32'), sigs=np.array(sigs))
+
+
+def _id_of(app, bank_id, name):
+    with app.app_context():
+        from app.models import BankImage
+        rows = {os.path.basename(r.relpath): r.id
+                for r in BankImage.query.filter_by(bank_id=bank_id).all()}
+        return rows[name]
+
+
+def _names_of(app, bank_id, ids):
+    with app.app_context():
+        from app.models import BankImage
+        by_id = {r.id: os.path.basename(r.relpath)
+                 for r in BankImage.query.filter_by(bank_id=bank_id).all()}
+        return {by_id[i] for i in ids}
+
+
+# --- diversity (farthest-point sampling) -------------------------------------
+def test_diverse_picks_one_per_cluster(client, tmp_path, app):
+    """4 tight clusters of near-identical embeddings; asking for 4 diverse images
+    picks ONE from each cluster — never 4 near-duplicates of one cluster."""
+    names = []
+    embs = {}
+    # cluster c along axis c, 3 members each with a tiny wobble.
+    for c in range(4):
+        for k in range(3):
+            nm = f'c{c}_{k}.jpg'
+            names.append(nm)
+            base = [0.0, 0.0, 0.0, 0.0]
+            base[c] = 1.0
+            base[(c + 1) % 4] = 0.02 * k        # small intra-cluster wobble
+            embs[nm] = _emb(*base)
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, embs)
+    r = client.post(f'/api/bank/{bank_id}/select-diverse', json={'n': 4})
+    assert r.status_code == 200, r.get_json()
+    body = r.get_json()
+    assert body['pool'] == 12 and len(body['image_ids']) == 4
+    picked = _names_of(app, bank_id, body['image_ids'])
+    clusters = {nm.split('_')[0] for nm in picked}
+    assert clusters == {'c0', 'c1', 'c2', 'c3'}     # one per cluster, full coverage
+
+
+def test_diverse_is_deterministic(client, tmp_path, app):
+    """Same pool + same n ⇒ byte-identical selection (lowest-id seed, id tie-break)."""
+    names = [f'i{k}.jpg' for k in range(8)]
+    embs = {nm: _emb(*np.random.RandomState(k).randn(5)) for k, nm in enumerate(names)}
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, embs)
+    a = client.post(f'/api/bank/{bank_id}/select-diverse', json={'n': 5}).get_json()
+    b = client.post(f'/api/bank/{bank_id}/select-diverse', json={'n': 5}).get_json()
+    assert a['image_ids'] == b['image_ids']
+    assert a['image_ids'] == sorted(a['image_ids'])   # returned sorted
+
+
+def test_diverse_whole_pool_when_n_exceeds(client, tmp_path, app):
+    names = ['a.jpg', 'b.jpg']
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, {'a.jpg': _emb(1.0), 'b.jpg': _emb(0.0, 1.0)})
+    body = client.post(f'/api/bank/{bank_id}/select-diverse',
+                       json={'n': 50}).get_json()
+    assert body['pool'] == 2 and len(body['image_ids']) == 2
+
+
+def test_diverse_hint_when_no_embeddings(client, tmp_path, app):
+    bank_id, _ = _mkbank(client, tmp_path, ['a.jpg'])
+    r = client.post(f'/api/bank/{bank_id}/select-diverse', json={'n': 4})
+    assert r.status_code == 400
+    assert 'Score first' in r.get_json()['error']
+
+
+def test_diverse_composes_with_filter_and_excludes_rejects(client, tmp_path, app):
+    """The pool honours the grid filter (here a style_cluster) AND, with no status
+    filter, drops rejected rows — you curate from what you might keep."""
+    names = [f'i{k}.jpg' for k in range(6)]
+    embs = {nm: _emb(*np.random.RandomState(k + 100).randn(5)) for k, nm in enumerate(names)}
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, embs)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        rows = sorted(BankImage.query.filter_by(bank_id=bank_id).all(), key=lambda r: r.id)
+        rows[0].style_cluster = 1                 # only i0..i2 in style 1
+        rows[1].style_cluster = 1
+        rows[2].style_cluster = 1
+        rows[2].status = 'reject'                 # i2 rejected → out of the pool
+        db.session.commit()
+    body = client.post(f'/api/bank/{bank_id}/select-diverse',
+                       json={'n': 10, 'style': 1}).get_json()
+    assert body['pool'] == 2                       # i0, i1 (i2 rejected)
+    picked = _names_of(app, bank_id, body['image_ids'])
+    assert picked == {'i0.jpg', 'i1.jpg'}
+
+
+# --- reference similarity ----------------------------------------------------
+def test_similar_ranks_by_cosine_to_reference(client, tmp_path, app):
+    """Top-N most similar to the reference are its near-neighbours; the reference
+    itself is always included (cosine 1.0), the far image is excluded at N=2."""
+    names = ['ref.jpg', 'near.jpg', 'mid.jpg', 'far.jpg']
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, {
+        'ref.jpg':  _emb(1.0, 0.0),
+        'near.jpg': _emb(0.98, np.sqrt(1 - 0.98 ** 2)),
+        'mid.jpg':  _emb(0.80, np.sqrt(1 - 0.80 ** 2)),
+        'far.jpg':  _emb(0.10, np.sqrt(1 - 0.10 ** 2))})
+    ref_id = _id_of(app, bank_id, 'ref.jpg')
+    body = client.post(f'/api/bank/{bank_id}/select-similar',
+                       json={'ref_id': ref_id, 'n': 2}).get_json()
+    assert _names_of(app, bank_id, body['image_ids']) == {'ref.jpg', 'near.jpg'}
+    # results are score-ranked, reference first at cosine 1.0.
+    assert body['results'][0]['id'] == ref_id
+    assert body['results'][0]['score'] == pytest.approx(1.0, abs=1e-3)
+    assert body['results'][1]['score'] > body['results'][-1]['score'] \
+        if len(body['results']) > 2 else True
+
+
+def test_similar_threshold_mode(client, tmp_path, app):
+    """min_score keeps everything at/above the cosine cut, whatever the count."""
+    names = ['ref.jpg', 'near.jpg', 'far.jpg']
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, {
+        'ref.jpg':  _emb(1.0, 0.0),
+        'near.jpg': _emb(0.95, np.sqrt(1 - 0.95 ** 2)),
+        'far.jpg':  _emb(0.50, np.sqrt(1 - 0.50 ** 2))})
+    ref_id = _id_of(app, bank_id, 'ref.jpg')
+    body = client.post(f'/api/bank/{bank_id}/select-similar',
+                       json={'ref_id': ref_id, 'min_score': 0.9}).get_json()
+    assert _names_of(app, bank_id, body['image_ids']) == {'ref.jpg', 'near.jpg'}
+
+
+def test_similar_requires_ref_id(client, tmp_path, app):
+    bank_id, _ = _mkbank(client, tmp_path, ['a.jpg'])
+    _write_score_cache(app, bank_id, {'a.jpg': _emb(1.0)})
+    r = client.post(f'/api/bank/{bank_id}/select-similar', json={'n': 4})
+    assert r.status_code == 400
+    assert 'ref_id' in r.get_json()['error']
+
+
+def test_similar_hint_when_no_embeddings(client, tmp_path, app):
+    bank_id, _ = _mkbank(client, tmp_path, ['a.jpg', 'b.jpg'])
+    ref_id = _id_of(app, bank_id, 'a.jpg')
+    r = client.post(f'/api/bank/{bank_id}/select-similar',
+                    json={'ref_id': ref_id, 'n': 2})
+    assert r.status_code == 400
+    assert 'Score first' in r.get_json()['error']
+
+
+def test_similar_ref_without_embedding_is_400(client, tmp_path, app):
+    """A reference that has no cached embedding (e.g. never scored) gets a clear
+    error, not a silent empty selection."""
+    names = ['ref.jpg', 'a.jpg', 'b.jpg']
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    # Cache covers a/b but NOT ref.
+    _write_score_cache(app, bank_id, {'a.jpg': _emb(1.0, 0.0),
+                                      'b.jpg': _emb(0.0, 1.0)})
+    ref_id = _id_of(app, bank_id, 'ref.jpg')
+    r = client.post(f'/api/bank/{bank_id}/select-similar',
+                    json={'ref_id': ref_id, 'n': 2})
+    assert r.status_code == 400
+    assert 'embedding' in r.get_json()['error']
+
+
+# --- "show selected" grid view (?ids=…) --------------------------------------
+# The curation selectors return a SELECTION scattered across the bank; the grid
+# must be able to render exactly those ids, in the order given, so the result is
+# actually visible (and a similarity ranking reads closest→farthest).
+def test_ids_view_preserves_given_order(client, tmp_path, app):
+    names = [f'i{k}.jpg' for k in range(5)]
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    a, b, c = (_id_of(app, bank_id, n) for n in ('i0.jpg', 'i2.jpg', 'i4.jpg'))
+    r = client.get(f'/api/bank/{bank_id}/images?ids={c},{a},{b}')
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body['total'] == 3
+    assert [im['id'] for im in body['images']] == [c, a, b]     # exact order kept
+
+
+def test_ids_view_overrides_facets_and_drops_unknown(client, tmp_path, app):
+    """The id list is the scope: it ignores status/flag facets, and ids that
+    aren't in this bank (or don't exist) are silently dropped."""
+    names = [f'i{k}.jpg' for k in range(4)]
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    with app.app_context():
+        from app.extensions import db
+        from app.models import BankImage
+        rows = sorted(BankImage.query.filter_by(bank_id=bank_id).all(), key=lambda r: r.id)
+        rows[0].status = 'reject'                  # i0 rejected — must still show in the view
+        db.session.commit()
+    i0, i1 = (_id_of(app, bank_id, n) for n in ('i0.jpg', 'i1.jpg'))
+    # status=keep would normally hide i0/i1; the id view ignores it. 999999 is unknown.
+    r = client.get(f'/api/bank/{bank_id}/images?status=keep&ids={i1},999999,{i0}')
+    body = r.get_json()
+    assert [im['id'] for im in body['images']] == [i1, i0]      # facet ignored, unknown dropped
+    assert body['total'] == 2
+
+
+def test_ids_view_paginates_in_order(client, tmp_path, app):
+    names = [f'i{k}.jpg' for k in range(6)]
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    order = [_id_of(app, bank_id, f'i{k}.jpg') for k in (5, 4, 3, 2, 1, 0)]
+    csv = ','.join(str(i) for i in order)
+    p1 = client.get(f'/api/bank/{bank_id}/images?ids={csv}&offset=0&limit=2').get_json()
+    p2 = client.get(f'/api/bank/{bank_id}/images?ids={csv}&offset=2&limit=2').get_json()
+    assert p1['total'] == 6 and p2['total'] == 6
+    assert [im['id'] for im in p1['images']] == order[:2]
+    assert [im['id'] for im in p2['images']] == order[2:4]
+
+
+def test_similar_result_feeds_ids_view_end_to_end(client, tmp_path, app):
+    """The whole fix: select-similar returns ranked ids, and feeding them back as
+    the ?ids= view renders the grid reference-first, closest→farthest."""
+    names = ['ref.jpg', 'near.jpg', 'mid.jpg', 'far.jpg']
+    bank_id, _ = _mkbank(client, tmp_path, names)
+    _write_score_cache(app, bank_id, {
+        'ref.jpg':  _emb(1.0, 0.0),
+        'near.jpg': _emb(0.98, np.sqrt(1 - 0.98 ** 2)),
+        'mid.jpg':  _emb(0.80, np.sqrt(1 - 0.80 ** 2)),
+        'far.jpg':  _emb(0.10, np.sqrt(1 - 0.10 ** 2))})
+    ref_id = _id_of(app, bank_id, 'ref.jpg')
+    sel = client.post(f'/api/bank/{bank_id}/select-similar',
+                      json={'ref_id': ref_id, 'n': 4}).get_json()
+    ranked = sel['image_ids']
+    assert ranked[0] == ref_id                     # reference first (cosine 1.0)
+    csv = ','.join(str(i) for i in ranked)
+    grid = client.get(f'/api/bank/{bank_id}/images?ids={csv}').get_json()
+    assert [im['id'] for im in grid['images']] == ranked   # grid mirrors the ranking
+
+
+# --- the two selectors are DISTINCT, and similarity is REFERENCE-sensitive ---
+# Regression guard for the reported symptom "🎨 Pick diverse and 🎯 Similar to
+# selected show EXACTLY the same thing, whatever the reference". Every other test
+# here exercises one selector in isolation; none pins that the two DISAGREE on a
+# shared pool, nor that select-similar actually follows its ref_id. A pool whose
+# embeddings collapsed to one vector (or a selector that ignored the cache / the
+# reference) would silently pass the isolated tests yet return identical,
+# ref-insensitive selections — exactly the failure this locks out. Two disjoint
+# neighbour clusters (around refA and refB) plus two off-axis outliers.
+def _two_cluster_bank(client, tmp_path, app):
+    embs = {
+        'a0.jpg': _emb(1.0, 0.0),                       # refA cluster …
+        'a1.jpg': _emb(0.96, np.sqrt(1 - 0.96 ** 2)),
+        'a2.jpg': _emb(0.92, np.sqrt(1 - 0.92 ** 2)),
+        'b0.jpg': _emb(0.0, 1.0),                       # refB cluster (orthogonal) …
+        'b1.jpg': _emb(np.sqrt(1 - 0.96 ** 2), 0.96),
+        'b2.jpg': _emb(np.sqrt(1 - 0.92 ** 2), 0.92),
+        'x0.jpg': _emb(0.0, 0.0, 1.0),                  # far outliers on their own axes
+        'x1.jpg': _emb(0.0, 0.0, 0.0, 1.0),
+    }
+    bank_id, _ = _mkbank(client, tmp_path, list(embs))
+    _write_score_cache(app, bank_id, embs)
+    return bank_id
+
+
+def test_similar_is_reference_sensitive(client, tmp_path, app):
+    """Two DIFFERENT references over the same pool ⇒ two DIFFERENT selections,
+    each led by its own reference — the core of "regardless of the reference"."""
+    bank_id = _two_cluster_bank(client, tmp_path, app)
+    a0, b0 = (_id_of(app, bank_id, n) for n in ('a0.jpg', 'b0.jpg'))
+    sa = client.post(f'/api/bank/{bank_id}/select-similar',
+                     json={'ref_id': a0, 'n': 3}).get_json()
+    sb = client.post(f'/api/bank/{bank_id}/select-similar',
+                     json={'ref_id': b0, 'n': 3}).get_json()
+    assert sa['results'][0]['id'] == a0 and sb['results'][0]['id'] == b0   # ref first
+    assert sa['image_ids'] != sb['image_ids']                             # NOT identical
+    # Each ref pulls its own orthogonal cluster — the two selections are disjoint.
+    assert set(sa['image_ids']).isdisjoint(sb['image_ids'])
+    assert _names_of(app, bank_id, sa['image_ids']) == {'a0.jpg', 'a1.jpg', 'a2.jpg'}
+    assert _names_of(app, bank_id, sb['image_ids']) == {'b0.jpg', 'b1.jpg', 'b2.jpg'}
+
+
+def test_diverse_differs_from_similar_on_same_pool(client, tmp_path, app):
+    """Diversity coverage ≠ reference similarity on the same real-shaped pool: FPS
+    reaches the far outliers a near-neighbour ranking never would, so the two
+    selectors return genuinely different sets (they must never coincide)."""
+    bank_id = _two_cluster_bank(client, tmp_path, app)
+    a0 = _id_of(app, bank_id, 'a0.jpg')
+    div = client.post(f'/api/bank/{bank_id}/select-diverse',
+                      json={'n': 3}).get_json()
+    sim = client.post(f'/api/bank/{bank_id}/select-similar',
+                      json={'ref_id': a0, 'n': 3}).get_json()
+    assert sorted(div['image_ids']) != sorted(sim['image_ids'])           # NOT identical
+    # Diversity reaches the outliers; similarity-to-a0 stays inside a0's cluster.
+    div_names = _names_of(app, bank_id, div['image_ids'])
+    assert div_names & {'x0.jpg', 'x1.jpg'}                               # coverage grabs a far point
+    assert _names_of(app, bank_id, sim['image_ids']) == {'a0.jpg', 'a1.jpg', 'a2.jpg'}

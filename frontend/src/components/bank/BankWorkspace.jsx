@@ -4,8 +4,13 @@ import { useToast } from '../common/Toast'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import DupGroupsPanel from './DupGroupsPanel'
 import PromoteDialog from './PromoteDialog'
+import DeleteRejectedDialog from './DeleteRejectedDialog'
 import LaunchAllDialog from './LaunchAllDialog'
 import PipelineReport from './PipelineReport'
+// Reuse the dataset's register list so the Bank lane never drifts from it.
+import { VOCABULARY_OPTIONS } from '../dataset/CaptionOptionsPopover'
+// Ordered zone model + the "what's next" accent, both pure/testable.
+import { BANK_ZONES, nextBankStep } from './bankGuide.js'
 
 const PAGE_SIZE = 120
 
@@ -19,6 +24,25 @@ const FLAG_LABEL = {
 // passes add — auto-reject only offers a flag whose pass has actually run.
 const QUALITY_REJECT_FLAGS = ['blur', 'noise', 'uniform', 'small']
 const SCORE_REJECT_FLAGS = ['low_aesthetic', 'nsfw', 'watermark']
+// Resolution tiers — ids + labels MUST mirror backend _RES_BUCKETS (order and
+// megapixel bands). Rendered as a dedicated chip row so a mixed dump can be
+// sliced by resolution and mass-acted one tier at a time.
+const RES_BUCKETS = [
+  { id: 'res_lt_025', label: '< 0.25 MP' },
+  { id: 'res_025_1', label: '0.25–1 MP' },
+  { id: 'res_1_2', label: '1–2 MP' },
+  { id: 'res_2_4', label: '2–4 MP' },
+  { id: 'res_gt_4', label: '> 4 MP' },
+]
+// Framing buckets — ids MUST mirror backend _FRAMING_KEYS. Face/bust/body/back
+// are the character composition axes; 'unknown' is a parseable-but-unclassed shot.
+const FRAMING_BUCKETS = [
+  { id: 'face', label: '😀 Face' },
+  { id: 'bust', label: '👤 Bust' },
+  { id: 'body', label: '🧍 Body' },
+  { id: 'back', label: '🔙 Back' },
+  { id: 'unknown', label: '❔ Unknown' },
+]
 const STATUS_RING = {
   keep: 'ring-2 ring-emerald-400',
   reject: 'ring-2 ring-rose-400 opacity-60',
@@ -43,7 +67,7 @@ async function fetchAllIds(bankId, params) {
 const STEP_SHORT = {
   scan: 'Scan', auto_reject: 'Auto-reject', score: 'Score',
   semantic_dedup: 'Crops', watermark: 'Watermarks', faces: 'Person',
-  caption: 'Caption',
+  framing: 'Framing', caption: 'Caption',
 }
 
 function ProgressBar({ activity, onCancel }) {
@@ -59,7 +83,7 @@ function ProgressBar({ activity, onCancel }) {
             ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${STEP_SHORT[pipe.current] || pipe.current}`
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
               semantic_dedup: 'Crops & variants', watermark: 'Watermark scan',
-              caption: 'Captioning', promote: 'Promotion' }[kind] || 'Job') + ' running'}
+              framing: 'Framing pass', caption: 'Captioning', promote: 'Promotion' }[kind] || 'Job') + ' running'}
           {' — '}{done}{total ? ` / ${total}` : ''}{detail ? ` · ${detail}` : ''}
         </span>
         {pct != null && (
@@ -102,6 +126,134 @@ function Chip({ active, onClick, children, title }) {
   )
 }
 
+// One header stat — a bold tabular figure with a subtle label. Kept/rejected/
+// promoted carry their status colour so the strip reads at a glance.
+function Stat({ label, value, tone }) {
+  const toneCls = { emerald: 'text-emerald-300', rose: 'text-rose-300', indigo: 'text-indigo-300' }[tone] || 'text-content'
+  const n = typeof value === 'number' ? value.toLocaleString() : value
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className={`font-semibold tabular-nums ${toneCls}`}>{n}</span>
+      <span className="text-xs text-content-subtle">{label}</span>
+    </span>
+  )
+}
+
+// A small uppercase eyebrow that names a group of controls (a filter facet, the
+// passes toolbar) so dense rows read as grouped rather than as a flat wall.
+function GroupLabel({ children }) {
+  return (
+    <span className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">{children}</span>
+  )
+}
+
+// A labelled cluster of filter chips — the eyebrow names the facet (Status,
+// Quality, Score, Groups); chips wrap together within it on narrow viewports.
+function FilterGroup({ label, children }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <GroupLabel>{label}</GroupLabel>
+      {children}
+    </div>
+  )
+}
+
+// The individual analysis passes share one quiet, uniform button so they read
+// as a secondary group next to the prominent Launch all / Promote actions.
+function PassButton({ onClick, disabled, title, children }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} title={title}
+      className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content transition-colors hover:bg-surface disabled:opacity-50 disabled:hover:bg-surface-raised">
+      {children}
+    </button>
+  )
+}
+
+// One numbered workflow zone: a labelled, collapsible section grouping the
+// controls of one step (① Analyser … ④ Promouvoir). `accented` draws a discreet
+// amber ring + "Next step" pill on the ONE zone nextBankStep recommends — purely
+// advisory: every zone stays open and clickable. Default expanded (nothing hidden).
+function ZoneSection({ zone, accented, children }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <section className={`rounded-xl border bg-surface ${accented
+      ? 'border-amber-400/60 ring-1 ring-amber-400/40' : 'border-border'}`}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        className="flex w-full items-center gap-2 px-4 py-2 text-left">
+        <span aria-hidden className="text-base tabular-nums">{zone.emoji}</span>
+        <span className="text-sm font-semibold text-content">{zone.label}</span>
+        {accented && (
+          <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+            Next step
+          </span>
+        )}
+        <span aria-hidden className="ml-auto text-xs text-content-subtle">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div className="space-y-3 px-4 pb-3">{children}</div>}
+    </section>
+  )
+}
+
+// 📊 Coverage advice (idea by @antonp) — a read-only, collapsible panel. Reads
+// what the passes already computed (framing, person/style clusters, resolution)
+// and says, in plain sentences, what the kept set leans on and what's thin for a
+// good LoRA. Never selects or rejects; warnings first, then gentler notes.
+function FramingBar({ framing }) {
+  const total = FRAMING_BUCKETS.reduce((a, b) => a + (framing[b.id] || 0), 0)
+  if (!total) return null
+  const tone = { face: 'bg-teal-400', bust: 'bg-sky-400', body: 'bg-indigo-400',
+    back: 'bg-fuchsia-400', unknown: 'bg-content-subtle' }
+  return (
+    <div className="space-y-1">
+      <div className="flex h-2 overflow-hidden rounded bg-surface-raised" role="img"
+        aria-label="Framing distribution of the set">
+        {FRAMING_BUCKETS.map((b) => (framing[b.id] || 0) > 0 && (
+          <div key={b.id} className={tone[b.id]} style={{ width: `${(100 * framing[b.id]) / total}%` }}
+            title={`${b.label}: ${framing[b.id]}`} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-content-subtle">
+        {FRAMING_BUCKETS.map((b) => (framing[b.id] || 0) > 0 && (
+          <span key={b.id}>{b.label} {framing[b.id]}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CoveragePanel({ coverage, onClose }) {
+  if (!coverage) {
+    return <p className="text-sm text-content-subtle">Reading coverage…</p>
+  }
+  const poolWord = coverage.pool === 'kept' ? 'kept' : 'candidate (nothing kept yet)'
+  return (
+    <div className="space-y-3 rounded-lg border border-indigo-400/40 bg-indigo-500/5 px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold text-content">📊 Coverage advice</span>
+        <span className="text-xs text-content-subtle">
+          {coverage.total.toLocaleString()} {poolWord} image{coverage.total === 1 ? '' : 's'}
+        </span>
+        <span className="ml-auto rounded border border-indigo-400/40 px-1.5 py-px text-[10px] uppercase tracking-wide text-indigo-300"
+          title="Community idea by @antonp">idea by @antonp</span>
+        <button type="button" onClick={onClose} aria-label="Hide coverage advice"
+          className="rounded-md border border-border px-1.5 py-0.5 text-xs text-content-subtle hover:text-content">✕</button>
+      </div>
+      {coverage.framing_available && <FramingBar framing={coverage.framing} />}
+      <ul className="space-y-1 text-sm">
+        {coverage.advice.map((a, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span aria-hidden>{a.tone === 'warn' ? '⚠️' : '💡'}</span>
+            <span className={a.tone === 'warn' ? 'text-amber-200' : 'text-content-muted'}>{a.text}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-content-subtle">
+        Advice only — nothing is kept or rejected. Based on what the passes already computed.
+      </p>
+    </div>
+  )
+}
+
 function Tile({ img, bankId, selected, onToggle, size }) {
   const badge = (txt, cls) => (
     <span className={`rounded px-1 py-px text-[10px] font-semibold leading-none ${cls}`}>{txt}</span>
@@ -114,6 +266,7 @@ function Tile({ img, bankId, selected, onToggle, size }) {
           + (img.aesthetic_score != null ? ` · aesthetic ${img.aesthetic_score.toFixed(1)}` : '')
           + (img.nsfw_score != null ? ` · NSFW ${Math.round(img.nsfw_score * 100)}%` : '')
           + (img.face_cluster ? ` · person #${img.face_cluster}` : '')
+          + (img.framing ? ` · ${img.framing}` : '')
           + (img.style_cluster ? ` · style #${img.style_cluster}` : '')
           + (img.semantic_dup_group ? ` · same shot #${img.semantic_dup_group}` : '')
           + (img.caption ? `\n${img.caption}` : '')}
@@ -130,6 +283,7 @@ function Tile({ img, bankId, selected, onToggle, size }) {
         {img.promoted_dataset_id != null && badge('', 'bg-indigo-500/80 text-white')}
         {img.flags.map((f) => badge(FLAG_LABEL[f]?.slice(0, 2) || f, 'bg-black/60 text-amber-200'))}
         {img.face_cluster != null && badge(`${img.face_cluster}`, 'bg-black/60 text-sky-200')}
+        {img.framing && badge(`${img.framing}`, 'bg-black/60 text-teal-200')}
         {img.style_cluster != null && badge(`${img.style_cluster}`, 'bg-black/60 text-fuchsia-200')}
         {img.dup_group != null && badge(`≈${img.dup_group}`, 'bg-black/60 text-fuchsia-200')}
         {img.semantic_dup_group != null && badge(`✂${img.semantic_dup_group}`, 'bg-black/60 text-orange-200')}
@@ -147,19 +301,45 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const { caps } = useCapabilities()
   const [payload, setPayload] = useState(null)
   const [filter, setFilter] = useState({ status: null, flag: null, cluster: null,
-    style: null, subfolder: null, search: null })
+    style: null, subfolder: null, search: null, sort: 'default', resBucket: null,
+    framing: null })
   const [searchText, setSearchText] = useState('')
   const [subfolders, setSubfolders] = useState([])
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState({ images: [], total: 0 })
   const [selected, setSelected] = useState(() => new Set())
   const [promoteOpen, setPromoteOpen] = useState(false)
+  const [deleteRejectedOpen, setDeleteRejectedOpen] = useState(false)
   const [launchOpen, setLaunchOpen] = useState(false)
   const [dismissedReportAt, setDismissedReportAt] = useState(null)
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [showAutoReject, setShowAutoReject] = useState(false)
+  // Curation popovers ('diverse' | 'similar' | null) and their target counts.
+  const [curateOpen, setCurateOpen] = useState(null)
+  const [diverseN, setDiverseN] = useState(60)
+  const [similarN, setSimilarN] = useState(60)
+  // "Show selected" VIEW: render ONLY the selected ids, in a chosen order.
+  // showSelected flips the grid from the facet page to the selection; selectedOrder
+  // holds the order to render them in — the similarity/diversity ranking after a
+  // curate action (reference first, closest→farthest), else insertion order. It's a
+  // VIEW, not a status: Keep/Reject/Promote still act on the selection itself.
+  const [showSelected, setShowSelected] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState(null)
   const [tileSize, setTileSize] = useState('M')
+  // Caption register for the 🏷️ Caption pass ('' = model's own wording). Explicit is
+  // the NSFW lane — same registers as the dataset caption, passed per-run.
+  const [captionVocab, setCaptionVocab] = useState('')
+  // Coverage advice (idea by @antonp) — a collapsible read-only panel, fetched
+  // on demand (and refreshed whenever it's open and the bank changes).
+  const [coverageOpen, setCoverageOpen] = useState(false)
+  const [coverage, setCoverage] = useState(null)
   const activityWasLive = useRef(false)
+
+  const loadCoverage = useCallback(async () => {
+    try {
+      setCoverage(await apiFetch(`/api/bank/${bankId}/coverage`))
+    } catch { /* transient — the panel keeps its last read */ }
+  }, [bankId])
 
   const refreshPayload = useCallback(async () => {
     try {
@@ -182,16 +362,30 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // whenever it isn't null, empty string included.
     if (f.subfolder != null) params.subfolder = f.subfolder
     if (f.search) params.search = f.search
+    // Resolution sort — sent to the grid AND to fetchAllIds so "Select all in
+    // filter" walks the same order. 'default' keeps the server's flag order.
+    if (f.sort && f.sort !== 'default') params.sort = f.sort
+    // Resolution tier — a facet like the flags; also flows to fetchAllIds so
+    // "Select all in filter" stays scoped to the active tier.
+    if (f.resBucket) params.res_bucket = f.resBucket
+    // Framing bucket (face/bust/body/back/unknown) — a facet like the flags.
+    if (f.framing) params.framing = f.framing
     return params
   }, [])
 
-  const refreshImages = useCallback(async (f = filter, off = offset) => {
-    const params = { ...filterParams(f), offset: String(off), limit: String(PAGE_SIZE) }
+  const refreshImages = useCallback(async (f = filter, off = offset, view) => {
+    // `view` (optional) lets a caller drive the fetch with values it just set,
+    // dodging state-closure lag; otherwise read the current selection view.
+    const on = view ? view.on : showSelected
+    const order = view ? view.order : selectedOrder
+    const params = on
+      ? { ids: (order || []).join(','), offset: String(off), limit: String(PAGE_SIZE) }
+      : { ...filterParams(f), offset: String(off), limit: String(PAGE_SIZE) }
     try {
       const d = await apiFetch(`/api/bank/${bankId}/images?${new URLSearchParams(params)}`)
       setPage(d)
     } catch { /* transient — next poll retries */ }
-  }, [bankId, filter, offset, filterParams])
+  }, [bankId, filter, offset, filterParams, showSelected, selectedOrder])
 
   useEffect(() => {
     refreshPayload(); refreshImages()
@@ -221,10 +415,41 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }, [live, refreshPayload, refreshImages, toast, payload?.activity?.error,
       payload?.activity?.cancelled, payload?.activity?.detail])
 
+  // Keep the coverage panel current: refetch when it opens, and whenever the kept
+  // set or the framing classification changes (a keep/reject or the framing pass).
+  useEffect(() => {
+    if (coverageOpen) loadCoverage()
+  }, [coverageOpen, loadCoverage, payload?.counts?.keep,
+      payload?.counts?.framing_classified])
+
+  // Leaving the selection view: back to the facet grid.
+  const exitSelectionView = () => { setShowSelected(false); setSelectedOrder(null) }
+
+  // The "Show selected (N)" / "Show all" toggle. Entering keeps any curate ranking
+  // (selectedOrder); a plain manual selection shows in insertion order.
+  const toggleSelectionView = () => {
+    if (showSelected) {
+      exitSelectionView(); setOffset(0); refreshImages(filter, 0, { on: false })
+    } else {
+      const order = (selectedOrder && selectedOrder.length) ? selectedOrder : [...selected]
+      setSelectedOrder(order); setShowSelected(true); setOffset(0)
+      refreshImages(filter, 0, { on: true, order })
+    }
+  }
+
   const setF = (patch) => {
     const f = { ...filter, ...patch }
-    setFilter(f); setOffset(0); setSelected(new Set())
-    refreshImages(f, 0)
+    setFilter(f); setOffset(0); setSelected(new Set()); exitSelectionView()
+    refreshImages(f, 0, { on: false })
+  }
+
+  // Sort only reorders — the same rows match, so the selection (a set of ids)
+  // is kept; just jump back to page 1 to read the new order top-down. A facet
+  // sort has no meaning inside the selection view, so it drops back to the grid.
+  const setSort = (sort) => {
+    const f = { ...filter, sort }
+    setFilter(f); setOffset(0); exitSelectionView()
+    refreshImages(f, 0, { on: false })
   }
 
   // Debounce the search box, then apply it as a filter (page 1, selection cleared).
@@ -256,9 +481,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const startSemanticDedup = () => act(
     () => postJson(`/api/bank/${bankId}/semantic-dedup`, {}), null)
   const startWatermark = () => act(() => postJson(`/api/bank/${bankId}/watermark`, {}), null)
+  const startFraming = () => act(() => postJson(`/api/bank/${bankId}/framing`, {}), null)
   const startCaption = () => act(
-    () => postJson(`/api/bank/${bankId}/caption`,
-      selected.size ? { image_ids: [...selected] } : {}), null)
+    () => postJson(`/api/bank/${bankId}/caption`, {
+      ...(selected.size ? { image_ids: [...selected] } : {}),
+      ...(captionVocab ? { vocabulary: captionVocab } : {}),
+    }), null)
   const cancelJob = () => act(() => postJson(`/api/bank/${bankId}/cancel`, {}), null)
   const startPipeline = async (config) => {
     setLaunchOpen(false)
@@ -271,6 +499,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     await act(() => postJson(`/api/bank/${bankId}/images/status`, { ids, status }),
       `${ids.length} image(s) → ${status}`)
     setSelected(new Set())
+    // The selection is gone, so its view has nothing left to show — return to the grid.
+    if (showSelected) { exitSelectionView(); setOffset(0); refreshImages(filter, 0, { on: false }) }
   }
 
   const applyAutoReject = async () => {
@@ -293,44 +523,132 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     }
   }
 
+  // --- Curation selectors (reuse the ✨ Score embeddings — no GPU) ------------
+  // Both build a SELECTION the user then reviews with the existing ✓/✕/Promote
+  // bar — nothing is auto-kept or deleted. The candidate pool is the current
+  // filter (composable), so "60 most diverse of this subfolder" just works.
+  // Curate a selection AND switch to the "show selected" view so the result is
+  // actually visible (60 ids scattered across a 24k-image bank are invisible as
+  // mere checkmarks). `order` is the ids in the order the grid should render them.
+  const showCuratedSelection = (order) => {
+    setSelected(new Set(order))
+    setSelectedOrder(order)
+    setShowSelected(true)
+    setOffset(0)
+    refreshImages(filter, 0, { on: true, order })
+  }
+
+  const pickDiverse = async () => {
+    setCurateOpen(null)
+    try {
+      const d = await postJson(`/api/bank/${bankId}/select-diverse`,
+        { n: diverseN, ...filterParams(filter) })
+      if (!d.image_ids?.length) {   // scored, but the current filter holds nothing
+        toast.info('Nothing to sample — no scored images match the current filter.')
+        return
+      }
+      showCuratedSelection(d.image_ids)
+      toast.info(`Showing the ${d.image_ids.length} most diverse of ${d.pool}. Review, then ✓ Keep or ⬆ Promote — or “Show all” to leave this view.`)
+    } catch (e) {
+      toast.error(e?.message || 'Diversity sampling failed.')
+    }
+  }
+
+  const findSimilar = async () => {
+    setCurateOpen(null)
+    const ref = [...selected][0]
+    if (ref == null) return
+    try {
+      const d = await postJson(`/api/bank/${bankId}/select-similar`,
+        { ref_id: ref, n: similarN, ...filterParams(filter) })
+      if (!d.image_ids?.length) {
+        toast.info('No matches — no scored images match the current filter.')
+        return
+      }
+      // Backend returns the ids ranked by similarity (reference first); keep that
+      // order so the view reads closest→farthest instead of by id.
+      showCuratedSelection(d.image_ids)
+      toast.info(`Showing the ${d.image_ids.length} most similar to the reference (of ${d.pool}), closest first. Review, then ✓ Keep or ⬆ Promote — or “Show all” to leave this view.`)
+    } catch (e) {
+      toast.error(e?.message || 'Similarity search failed.')
+    }
+  }
+
   const counts = payload?.counts
   const flags = payload?.flags || {}
+  const resBuckets = payload?.res_buckets || {}
+  // Only surface tiers that actually hold scanned images (plus the active one,
+  // so a tier you're filtering on never vanishes mid-review).
+  const shownResBuckets = RES_BUCKETS.filter(
+    (b) => (resBuckets[b.id] || 0) > 0 || filter.resBucket === b.id)
   const clusters = payload?.clusters || []
   const styleClusters = payload?.style_clusters || []
+  const framingCounts = payload?.framing || {}
+  const framingClassified = counts?.framing_classified || 0
+  // Only surface framing chips once the pass has classified something (plus the
+  // active one, so a chip you're filtering on never vanishes mid-review).
+  const shownFramings = FRAMING_BUCKETS.filter(
+    (b) => (framingCounts[b.id] || 0) > 0 || filter.framing === b.id)
   const visionReady = !!caps.ollama?.vision_model_ready
+  // The explicit lane only spells acts out with an uncensored (abliterated) vision
+  // model. We can't prove abliteration, but the common builds name themselves — a soft
+  // heuristic drives an honest "may soften" hint (never a hard block: a differently
+  // named abliterated model still works).
+  const visionModel = caps.ollama?.vision_model || ''
+  const visionModelLooksUncensored = /abliterat|uncensor|huihui|nsfw/i.test(visionModel)
   const scored = counts?.scored || 0
   const watermarkScanned = counts?.watermark_scanned || 0
   // Score flags only make sense once their pass ran; watermark is its own pass.
   const availableScoreFlags = SCORE_REJECT_FLAGS.filter(
     (f) => (f === 'watermark' ? watermarkScanned : scored) > 0)
   const canPromote = (counts?.keep || 0) > 0 || selected.size > 0
+  // Is any facet narrowing the grid? Drives the "N shown of TOTAL" readout.
+  const isFiltered = !!(filter.status || filter.flag || filter.cluster != null
+    || filter.style != null || filter.subfolder != null || filter.search
+    || filter.resBucket || filter.framing)
+
+  // The ONE recommended next step, from the counters the header strip already
+  // reads. Advisory only — draws an amber "Next step" accent on that zone.
+  const activeStep = nextBankStep({
+    scanned: counts?.scanned || 0,
+    scored: scored || 0,
+    keep: counts?.keep || 0,
+    scoringAvailable: !!caps?.bank_scoring,
+  })
+  const analyzeZone = BANK_ZONES.find((z) => z.id === 'analyze')
+  const triageZone = BANK_ZONES.find((z) => z.id === 'triage')
+  const curateZone = BANK_ZONES.find((z) => z.id === 'curate')
+  const promoteZone = BANK_ZONES.find((z) => z.id === 'promote')
 
   return (
     <div className="space-y-4">
-      <header className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onBack}
-          className="rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
-          ← Banks
-        </button>
-        <h1 className="text-lg font-bold text-content">{payload?.name || `Bank #${bankId}`}</h1>
-        <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.625rem] font-semibold uppercase tracking-wide">Beta</span>
-        <span className="truncate font-mono text-xs text-content-subtle" title={payload?.source_path}>
-          {payload?.source_path}
-        </span>
+      <header className="space-y-2 rounded-xl border border-border bg-surface px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={onBack}
+            className="rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
+            ← Banks
+          </button>
+          <h1 className="text-lg font-bold text-content">{payload?.name || `Bank #${bankId}`}</h1>
+          <span className="rounded border border-amber-400/50 bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-300">Beta</span>
+        </div>
+        {payload?.source_path && (
+          <p className="truncate font-mono text-xs text-content-subtle" title={payload.source_path}>
+            {payload.source_path}
+          </p>
+        )}
+        {counts && (
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm">
+            <Stat label="images" value={counts.total} />
+            <Stat label="scanned" value={counts.scanned} />
+            {scored > 0 && <Stat label="scored" value={scored} />}
+            {watermarkScanned > 0 && <Stat label="watermark-checked" value={watermarkScanned} />}
+            <Stat label="undecided" value={counts.pending} />
+            <Stat label="kept" value={counts.keep} tone="emerald" />
+            <Stat label="rejected" value={counts.reject} tone="rose" />
+            <Stat label="promoted" value={counts.promoted} tone="indigo" />
+          </div>
+        )}
       </header>
-
-      {counts && (
-        <p className="text-sm text-content-muted">
-          <span className="font-semibold text-content">{counts.total}</span> images ·
-          {' '}{counts.scanned} scanned ·
-          {scored > 0 && <> {scored} scored ·</>}
-          {watermarkScanned > 0 && <> {watermarkScanned} watermark-checked ·</>}
-          {' '}{counts.pending} undecided ·
-          {' '}<span className="text-emerald-300">{counts.keep} kept</span> ·
-          {' '}<span className="text-rose-300">{counts.reject} rejected</span> ·
-          {' '}<span className="text-indigo-300">{counts.promoted} promoted</span>
-        </p>
-      )}
 
       <ProgressBar activity={payload?.activity} onCancel={cancelJob} />
 
@@ -340,107 +658,100 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           onDismiss={() => setDismissedReportAt(payload.pipeline_report.finished_at)} />
       )}
 
+      {/* ① Analyser — run the analysis passes (or 🚀 Launch all) on the dump.
+          Grouping + accent only; every pass keeps its own endpoint/behaviour. */}
+      <ZoneSection zone={analyzeZone} accented={activeStep === 'analyze'}>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
           title="Run the whole triage in one go — scan, auto-reject, score, watermarks, group by person and (optionally) caption. Start it and walk away."
-          className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-bold text-white shadow disabled:opacity-50">
+          className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
           Launch all…
         </button>
-        <span aria-hidden className="mx-0.5 h-5 w-px bg-border" />
-        <button type="button" onClick={() => startScan(false)} disabled={live}
-          title="Score every unscanned image (sharpness/noise/flat/size), hash it and group near-duplicates — CPU only, runs in the background"
-          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          Scan quality
-        </button>
-        {(counts?.scanned || 0) > 0 && (
-          <button type="button" onClick={() => startScan(true)} disabled={live}
-            title="Re-score everything (e.g. after files changed on disk)"
-            className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-            Rescan all
-          </button>
-        )}
-        <button type="button" onClick={startFaces} disabled={live || !caps.face_scoring}
-          title={caps.face_scoring
-            ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images.'
-            : 'Install the Quality tools (Setup) to sort by person'}
-          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          Group by person
-        </button>
-        <button type="button" onClick={startScore} disabled={live || !caps.bank_scoring}
-          title={caps.bank_scoring
-            ? 'Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". GPU when available; runs in the background.'
-            : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style'}
-          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          Score{!caps.bank_scoring && ' (needs setup)'}
-        </button>
-        <button type="button" onClick={startWatermark} disabled={live || !visionReady}
-          title={visionReady
-            ? 'Scan every non-rejected image for an overlaid watermark/logo/URL with the same Qwen3-VL detector the datasets use (detection only — the bank never edits your files). GPU vision pass.'
-            : 'Pull the vision model (Settings ▸ Captioning & quality) to scan for watermarks'}
-          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          Find watermarks{!visionReady && ' (needs setup)'}
-        </button>
-        <button type="button" onClick={startCaption} disabled={live}
-          title={selected.size
-            ? `Caption the ${selected.size} selected image(s) with your caption engine (Settings ▸ Captioning & quality). Captions become searchable and follow the images when you promote them to a dataset.`
-            : 'Caption every not-yet-captioned image (skips rejected) with your caption engine. Captions become searchable tags and follow the images when you promote them to a dataset. Select images first to caption just those.'}
-          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          🏷️ Caption{selected.size ? ` ${selected.size} selected` : ' all'}
-        </button>
-        <button type="button" onClick={startSemanticDedup} disabled={live || scored === 0}
-          title={scored > 0
-            ? 'Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses — reuses the ✨ Score embeddings, so it costs no extra GPU time. Review them under the ✂ Same shot chip.'
-            : 'Run ✨ Score first — semantic near-duplicates reuse its embeddings'}
-          className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-          ✂ Find crops &amp; variants{scored === 0 && ' (needs Score)'}
-        </button>
-        <div className="relative">
-          <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
-            aria-expanded={showAutoReject}
-            title="Bulk-reject the still-undecided images carrying the chosen quality flags"
-            className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50 hover:bg-surface">
-            Auto-reject flagged…
-          </button>
-          {showAutoReject && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowAutoReject(false)} aria-hidden />
-              <div className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2">
-                <p className="text-xs text-content-muted">
-                  Rejects the UNDECIDED images with these flags. Your manual ✓/✕ are never changed;
-                  everything stays reversible (nothing is deleted from disk).
-                </p>
-                {[...QUALITY_REJECT_FLAGS, ...availableScoreFlags].map((f) => (
-                  <label key={f} className="flex items-center gap-2 text-sm text-content">
-                    <input type="checkbox" checked={rejectFlags.has(f)}
-                      onChange={(e) => setRejectFlags((prev) => {
-                        const next = new Set(prev)
-                        if (e.target.checked) next.add(f); else next.delete(f)
-                        return next
-                      })} />
-                    {FLAG_LABEL[f]} <span className="text-content-subtle">({flags[f] ?? 0} flagged)</span>
-                  </label>
-                ))}
-                <button type="button" onClick={applyAutoReject} disabled={!rejectFlags.size}
-                  className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">
-                  Reject them
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-        <button type="button" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
-          title={canPromote ? 'Copy the kept selection into a dataset' : 'Keep some images first'}
-          className="ml-auto rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-          Promote to dataset…
-        </button>
+        <p className="hidden text-xs text-content-subtle md:block">
+          One-click funnel — or step through the passes below.
+        </p>
       </div>
+
+      {/* Analysis passes — individual, quieter than the primary actions. */}
+      <div className="space-y-1.5">
+        <GroupLabel>Analysis passes</GroupLabel>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <PassButton onClick={() => startScan(false)} disabled={live}
+            title="Score every unscanned image (sharpness/noise/flat/size), hash it and group near-duplicates — CPU only, runs in the background">
+            🔎 Scan quality
+          </PassButton>
+          {(counts?.scanned || 0) > 0 && (
+            <PassButton onClick={() => startScan(true)} disabled={live}
+              title="Re-score everything (e.g. after files changed on disk)">
+              Rescan all
+            </PassButton>
+          )}
+          <PassButton onClick={startFaces} disabled={live || !caps.face_scoring}
+            title={caps.face_scoring
+              ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images.'
+              : 'Install the Quality tools (Setup) to sort by person'}>
+            👥 Group by person
+          </PassButton>
+          <PassButton onClick={startScore} disabled={live || !caps.bank_scoring}
+            title={caps.bank_scoring
+              ? 'Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". GPU when available; runs in the background.'
+              : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style'}>
+            ✨ Score{!caps.bank_scoring && ' (needs setup)'}
+          </PassButton>
+          <PassButton onClick={startWatermark} disabled={live || !visionReady}
+            title={visionReady
+              ? 'Scan every non-rejected image for an overlaid watermark/logo/URL with the same Qwen3-VL detector the datasets use (detection only — the bank never edits your files). GPU vision pass.'
+              : 'Pull the vision model (Settings ▸ Captioning & quality) to scan for watermarks'}>
+            🚩 Find watermarks{!visionReady && ' (needs setup)'}
+          </PassButton>
+          <PassButton onClick={startFraming} disabled={live || !visionReady}
+            title={visionReady
+              ? 'Classify every non-rejected image by shot type — face close-up, bust, full body, back view — with the same Qwen3-VL classifier the datasets use. Powers the 📐 Framing filter and the coverage advice. GPU vision pass.'
+              : 'Pull the vision model (Settings ▸ Captioning & quality) to classify framing'}>
+            📐 Classify framing{!visionReady && ' (needs setup)'}
+          </PassButton>
+          <PassButton onClick={startSemanticDedup} disabled={live || scored === 0}
+            title={scored > 0
+              ? 'Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses — reuses the ✨ Score embeddings, so it costs no extra GPU time. Review them under the ✂ Same shot chip.'
+              : 'Run ✨ Score first — semantic near-duplicates reuse its embeddings'}>
+            ✂ Find crops &amp; variants{scored === 0 && ' (needs Score)'}
+          </PassButton>
+          <PassButton onClick={startCaption} disabled={live}
+            title={selected.size
+              ? `Caption the ${selected.size} selected image(s) with your caption engine (Settings ▸ Captioning & quality). Captions become searchable and follow the images when you promote them to a dataset.`
+              : 'Caption every not-yet-captioned image (skips rejected) with your caption engine. Captions become searchable tags and follow the images when you promote them to a dataset. Select images first to caption just those.'}>
+            🏷️ Caption{selected.size ? ` ${selected.size} selected` : ' all'}
+          </PassButton>
+          <label className="flex items-center gap-1 text-xs text-content-subtle">
+            <span className="sr-only">Caption vocabulary register</span>
+            <select value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}
+              disabled={live} aria-label="Caption vocabulary register"
+              title="How captions name nude or sexual content. Explicit needs an uncensored (abliterated) Ollama vision model. Richer, more explicit captions also make the 🔍 search find more."
+              className="px-2 py-1 rounded-lg bg-app/60 border border-border text-content text-xs disabled:opacity-40">
+              {VOCABULARY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </label>
+        </div>
+        {captionVocab === 'explicit' && !visionModelLooksUncensored && (
+          <p className="text-xs text-amber-400/90">
+            ⚠️ Explicit captions need an uncensored (abliterated) Ollama vision model
+            {visionModel ? ` — “${visionModel}” may refuse or soften explicit terms` : ''}.
+            Pull one in Settings ▸ Captioning &amp; quality. Richer captions also feed the 🔍 search.
+          </p>
+        )}
+      </div>
+      </ZoneSection>
+
+      {/* ② Trier — browse by facet/cluster and Keep/Reject to decide what stays.
+          Stays fully visible; density was never the complaint. */}
+      <ZoneSection zone={triageZone} accented={activeStep === 'triage'}>
 
       {/* Person clusters (after the face pass) */}
       {clusters.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">
+          <GroupLabel>
             People ({clusters.length} cluster{clusters.length > 1 ? 's' : ''} — biggest first)
-          </p>
+          </GroupLabel>
           <ul className="flex gap-2 overflow-x-auto pb-1">
             {clusters.map((c) => (
               <li key={c.id} className="shrink-0">
@@ -465,9 +776,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {/* Style clusters (after the scoring pass) — group screenshots/memes vs photoreal */}
       {styleClusters.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">
+          <GroupLabel>
             Styles ({styleClusters.length} group{styleClusters.length > 1 ? 's' : ''} — biggest first)
-          </p>
+          </GroupLabel>
           <ul className="flex gap-2 overflow-x-auto pb-1">
             {styleClusters.map((c) => (
               <li key={c.id} className="shrink-0">
@@ -489,105 +800,331 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         </div>
       )}
 
-      {/* Subfolder scoping (a Telegram export nests one folder per chat/date) */}
-      {subfolders.length > 1 && (
+      {/* Search, subfolder scoping, and the grouped flag filters. */}
+      <div className="space-y-2.5 rounded-lg border border-border bg-surface px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-content-subtle">
-            Subfolder
-          </label>
-          <select value={filter.subfolder ?? '__all__'}
-            onChange={(e) => setF({ subfolder: e.target.value === '__all__' ? null : e.target.value })}
-            className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-content">
-            <option value="__all__">All subfolders</option>
-            {subfolders.map((s) => (
-              <option key={s.name || '__root__'} value={s.name}>
-                {s.name === '' ? '(bank root)' : s.name} · {s.count}
-              </option>
-            ))}
-          </select>
+          <div className="relative min-w-[12rem] max-w-md flex-1">
+            <span aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-content-subtle">🔍</span>
+            <input type="search" value={searchText} onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search captions and file names… (e.g. red dress)"
+              aria-label="Search the bank by caption or file name"
+              className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
+            {searchText && (
+              <button type="button" onClick={() => setSearchText('')} aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
+            )}
+          </div>
+          {/* Subfolder scoping (a Telegram export nests one folder per chat/date) */}
+          {subfolders.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <GroupLabel>Subfolder</GroupLabel>
+              <select value={filter.subfolder ?? '__all__'}
+                onChange={(e) => setF({ subfolder: e.target.value === '__all__' ? null : e.target.value })}
+                className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-content">
+                <option value="__all__">All subfolders</option>
+                {subfolders.map((s) => (
+                  <option key={s.name || '__root__'} value={s.name}>
+                    {s.name === '' ? '(bank root)' : s.name} · {s.count}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Full-text search over captions + file paths */}
-      <div className="relative max-w-md">
-        <span aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-content-subtle">🔍</span>
-        <input type="search" value={searchText} onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Search captions and file names… (e.g. red dress)"
-          aria-label="Search the bank by caption or file name"
-          className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
-        {searchText && (
-          <button type="button" onClick={() => setSearchText('')} aria-label="Clear search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
-        )}
+        {/* Filters — grouped by facet so the chips read as a system, not a wall */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <FilterGroup label="Status">
+            <Chip active={!filter.status && !filter.flag && filter.cluster == null && filter.style == null}
+              onClick={() => setF({ status: null, flag: null, cluster: null, style: null })}>All</Chip>
+            <Chip active={filter.status === 'pending'} onClick={() => setF({ status: filter.status === 'pending' ? null : 'pending' })}>Undecided</Chip>
+            <Chip active={filter.status === 'keep'} onClick={() => setF({ status: filter.status === 'keep' ? null : 'keep' })}>✓ Kept</Chip>
+            <Chip active={filter.status === 'reject'} onClick={() => setF({ status: filter.status === 'reject' ? null : 'reject' })}>✕ Rejected</Chip>
+          </FilterGroup>
+
+          <FilterGroup label="Quality">
+            {['blur', 'noise', 'uniform', 'small', 'unreadable'].map((f) => (
+              <Chip key={f} active={filter.flag === f}
+                onClick={() => setF({ flag: filter.flag === f ? null : f })}
+                title="Sorted worst-first">
+                {FLAG_LABEL[f]} {flags[f] ?? 0}
+              </Chip>
+            ))}
+            <Chip active={filter.flag === 'clean'} onClick={() => setF({ flag: filter.flag === 'clean' ? null : 'clean' })}>✨ Clean</Chip>
+          </FilterGroup>
+
+          {/* Score-derived flags — only surfaced once their pass has produced data. */}
+          {availableScoreFlags.length > 0 && (
+            <FilterGroup label="Score">
+              {availableScoreFlags.map((f) => (
+                <Chip key={f} active={filter.flag === f}
+                  onClick={() => setF({ flag: filter.flag === f ? null : f, cluster: null, style: null })}
+                  title={f === 'watermark' ? 'Overlaid watermark detected' : 'Sorted worst-first'}>
+                  {FLAG_LABEL[f]} {flags[f] ?? 0}
+                </Chip>
+              ))}
+            </FilterGroup>
+          )}
+
+          <FilterGroup label="Groups">
+            <Chip active={filter.flag === 'dups'} onClick={() => setF({ flag: filter.flag === 'dups' ? null : 'dups', cluster: null })}
+              title="Exact / resized duplicate groups (perceptual hash) with their resolution panel">
+              ≈ Duplicates {payload?.dup?.unresolved ?? 0}
+            </Chip>
+            {(payload?.semantic_dup?.groups ?? 0) > 0 && (
+              <Chip active={filter.flag === 'semantic_dups'}
+                onClick={() => setF({ flag: filter.flag === 'semantic_dups' ? null : 'semantic_dups', cluster: null })}
+                title="Semantic near-duplicates — same shot, different crop/compression — with their resolution panel">
+                ✂ Same shot {payload?.semantic_dup?.unresolved ?? 0}
+              </Chip>
+            )}
+            {payload?.faces_scanned > 0 && (
+              <Chip active={filter.flag === 'no_face'} onClick={() => setF({ flag: filter.flag === 'no_face' ? null : 'no_face' })}>
+                🚫👤 No face
+              </Chip>
+            )}
+          </FilterGroup>
+
+          {/* Resolution tiers — one active at a time; re-click clears.
+              Composes with every filter and with the Resolution ↑/↓ sort. */}
+          {shownResBuckets.length > 0 && (
+            <FilterGroup label="📐 Resolution">
+              {shownResBuckets.map((b) => (
+                <Chip key={b.id} active={filter.resBucket === b.id}
+                  onClick={() => setF({ resBucket: filter.resBucket === b.id ? null : b.id })}
+                  title="Filter the grid to this resolution tier (megapixels = width×height)">
+                  {b.label} {resBuckets[b.id] ?? 0}
+                </Chip>
+              ))}
+            </FilterGroup>
+          )}
+
+          {/* Framing tiers — face/bust/body/back (+ unknown), from the 📐 Framing
+              pass. One active at a time; re-click clears. Composes with everything. */}
+          {shownFramings.length > 0 && (
+            <FilterGroup label="📐 Framing">
+              {shownFramings.map((b) => (
+                <Chip key={b.id} active={filter.framing === b.id}
+                  onClick={() => setF({ framing: filter.framing === b.id ? null : b.id })}
+                  title="Filter the grid to this shot type (from the Framing pass)">
+                  {b.label} {framingCounts[b.id] ?? 0}
+                </Chip>
+              ))}
+            </FilterGroup>
+          )}
+        </div>
+
+        {/* View controls — order and tile size, off to the right on their own line */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          <GroupLabel>View</GroupLabel>
+          <label className="flex items-center gap-1 text-xs text-content-muted">
+            Sort
+            <select value={filter.sort} onChange={(e) => setSort(e.target.value)}
+              title="Order the grid by image resolution (megapixels). Unscanned images sink to the end."
+              aria-label="Sort the grid"
+              className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-content">
+              <option value="default">Default</option>
+              <option value="res_desc">Resolution ↓</option>
+              <option value="res_asc">Resolution ↑</option>
+            </select>
+          </label>
+          <span className="ml-auto" />
+          <button type="button" onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}
+            className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
+            {tileSize === 'M' ? 'Small tiles' : 'Medium tiles'}
+          </button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Chip active={!filter.status && !filter.flag && filter.cluster == null && filter.style == null}
-          onClick={() => setF({ status: null, flag: null, cluster: null, style: null })}>All</Chip>
-        <Chip active={filter.status === 'pending'} onClick={() => setF({ status: filter.status === 'pending' ? null : 'pending' })}>Undecided</Chip>
-        <Chip active={filter.status === 'keep'} onClick={() => setF({ status: filter.status === 'keep' ? null : 'keep' })}>✓ Kept</Chip>
-        <Chip active={filter.status === 'reject'} onClick={() => setF({ status: filter.status === 'reject' ? null : 'reject' })}>✕ Rejected</Chip>
-        <span aria-hidden className="mx-1 h-4 w-px bg-border" />
-        {['blur', 'noise', 'uniform', 'small', 'unreadable'].map((f) => (
-          <Chip key={f} active={filter.flag === f}
-            onClick={() => setF({ flag: filter.flag === f ? null : f })}
-            title="Sorted worst-first">
-            {FLAG_LABEL[f]} {flags[f] ?? 0}
-          </Chip>
-        ))}
-        <Chip active={filter.flag === 'clean'} onClick={() => setF({ flag: filter.flag === 'clean' ? null : 'clean' })}>Clean</Chip>
-        {/* Score-derived flags — only surfaced once their pass has produced data. */}
-        {availableScoreFlags.map((f) => (
-          <Chip key={f} active={filter.flag === f}
-            onClick={() => setF({ flag: filter.flag === f ? null : f, cluster: null, style: null })}
-            title={f === 'watermark' ? 'Overlaid watermark detected' : 'Sorted worst-first'}>
-            {FLAG_LABEL[f]} {flags[f] ?? 0}
-          </Chip>
-        ))}
-        <Chip active={filter.flag === 'dups'} onClick={() => setF({ flag: filter.flag === 'dups' ? null : 'dups', cluster: null })}
-          title="Exact / resized duplicate groups (perceptual hash) with their resolution panel">
-          ≈ Duplicates {payload?.dup?.unresolved ?? 0}
-        </Chip>
-        {(payload?.semantic_dup?.groups ?? 0) > 0 && (
-          <Chip active={filter.flag === 'semantic_dups'}
-            onClick={() => setF({ flag: filter.flag === 'semantic_dups' ? null : 'semantic_dups', cluster: null })}
-            title="Semantic near-duplicates — same shot, different crop/compression — with their resolution panel">
-            ✂ Same shot {payload?.semantic_dup?.unresolved ?? 0}
-          </Chip>
-        )}
-        {payload?.faces_scanned > 0 && (
-          <Chip active={filter.flag === 'no_face'} onClick={() => setF({ flag: filter.flag === 'no_face' ? null : 'no_face' })}>
-            No face
-          </Chip>
-        )}
-        <span className="ml-auto" />
-        <button type="button" onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}
-          className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
-          {tileSize === 'M' ? 'Small tiles' : 'Medium tiles'}
-        </button>
-      </div>
-
-      {/* Selection bar */}
+      {/* Results readout + selection actions */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-content-muted">
+          <span className="font-semibold tabular-nums text-content">{(page.total ?? 0).toLocaleString()}</span> shown
+          {isFiltered && (
+            <span className="text-content-subtle"> of {(counts?.total ?? 0).toLocaleString()}</span>
+          )}
+        </span>
+        <span aria-hidden className="h-4 w-px bg-border" />
         <span className="text-content-muted">{selected.size} selected</span>
         <button type="button" onClick={selectAllCurrent}
           className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
           Select all in filter
         </button>
+        {/* Bulk-reject undecided images by quality flag — a triage shortcut that
+            leaves your manual ✓/✕ untouched and deletes nothing off disk. */}
+        <div className="relative">
+          <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
+            aria-expanded={showAutoReject}
+            title="Bulk-reject the still-undecided images carrying the chosen quality flags"
+            className="rounded-md border border-border bg-surface-raised px-2 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+            🧹 Auto-reject…
+          </button>
+          {showAutoReject && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowAutoReject(false)} aria-hidden />
+              <div className="absolute left-0 z-50 mt-1 w-72 rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2">
+                <p className="text-xs text-content-muted">
+                  Rejects the UNDECIDED images with these flags. Your manual ✓/✕ are never changed;
+                  everything stays reversible (nothing is deleted from disk).
+                </p>
+                {[...QUALITY_REJECT_FLAGS, ...availableScoreFlags].map((f) => (
+                  <label key={f} className="flex items-center gap-2 text-sm text-content">
+                    <input type="checkbox" checked={rejectFlags.has(f)}
+                      onChange={(e) => setRejectFlags((prev) => {
+                        const next = new Set(prev)
+                        if (e.target.checked) next.add(f); else next.delete(f)
+                        return next
+                      })} />
+                    {FLAG_LABEL[f]} <span className="text-content-subtle">({flags[f] ?? 0} flagged)</span>
+                  </label>
+                ))}
+                <button type="button" onClick={applyAutoReject} disabled={!rejectFlags.size}
+                  className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">
+                  Reject them
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        {(selected.size > 0 || showSelected) && (
+          <button type="button" onClick={toggleSelectionView}
+            aria-pressed={showSelected}
+            title={showSelected
+              ? 'Back to the full grid with its filters'
+              : 'Show only the selected images (as their own view), so a scattered curation/similarity result is visible in one place'}
+            className={`rounded-md border px-2 py-0.5 text-xs font-medium ${showSelected
+              ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
+              : 'border-border text-content-muted hover:text-content hover:bg-surface-raised'}`}>
+            {showSelected ? '↩ Show all' : `🔎 Show selected (${selected.size})`}
+          </button>
+        )}
         {selected.size > 0 && (
           <>
-            <button type="button" onClick={() => setSelected(new Set())}
+            <button type="button" onClick={() => { setSelected(new Set()); if (showSelected) { exitSelectionView(); setOffset(0); refreshImages(filter, 0, { on: false }) } }}
               className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">Clear</button>
             <button type="button" onClick={() => batchStatus([...selected], 'keep')}
-              className="rounded-md border border-emerald-400/50 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-200">✓ Keep</button>
+              className="rounded-md border border-emerald-400/50 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20">✓ Keep</button>
             <button type="button" onClick={() => batchStatus([...selected], 'reject')}
-              className="rounded-md border border-rose-400/50 bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-200">✕ Reject</button>
+              className="rounded-md border border-rose-400/50 bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/20">✕ Reject</button>
             <button type="button" onClick={() => batchStatus([...selected], 'pending')}
               className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">↺ Undecided</button>
           </>
         )}
       </div>
+      </ZoneSection>
+
+      {/* ③ Curer — optional refinement (diverse/similar/coverage). Always
+          accessible, but never the accented "next step". */}
+      <ZoneSection zone={curateZone} accented={false}>
+
+      {/* Curation — build a good LoRA subset out of a big dump (reuses ✨ Score
+          embeddings, no GPU). Diversity coverage + reference similarity, both
+          producing a SELECTION the user reviews above. */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Curate</span>
+        <div className="relative">
+          <button type="button" disabled={live || scored === 0}
+            onClick={() => setCurateOpen((v) => (v === 'diverse' ? null : 'diverse'))}
+            aria-expanded={curateOpen === 'diverse'}
+            title={scored > 0
+              ? 'Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) — the fix for a dump of near-identical shots. Reuses the ✨ Score embeddings, no GPU.'
+              : 'Run ✨ Score first — diversity sampling reuses its embeddings'}
+            className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+            🎨 Pick diverse…{scored === 0 && ' (needs Score)'}
+          </button>
+          {curateOpen === 'diverse' && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setCurateOpen(null)} aria-hidden />
+              <div className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2">
+                <p className="text-xs text-content-muted">
+                  Selects the most <strong>varied</strong> images of the current filter — the best
+                  coverage of the visual space, not N look-alikes. Reviews as a normal selection
+                  (nothing is kept or deleted yet).
+                </p>
+                <label className="flex items-center gap-2 text-sm text-content">
+                  How many
+                  <input type="number" min={1} max={2000} value={diverseN}
+                    onChange={(e) => setDiverseN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                    className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
+                </label>
+                <button type="button" onClick={pickDiverse}
+                  className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white">
+                  Select {diverseN} most diverse
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="relative">
+          <button type="button" disabled={live || scored === 0 || selected.size !== 1}
+            onClick={() => setCurateOpen((v) => (v === 'similar' ? null : 'similar'))}
+            aria-expanded={curateOpen === 'similar'}
+            title={scored === 0
+              ? 'Run ✨ Score first — reference similarity reuses its embeddings'
+              : selected.size === 1
+                ? 'Rank the current filter by how much it looks like the ONE selected image, and select the closest N — pull a person/look out of a mixed dump. Reuses the ✨ Score embeddings, no GPU.'
+                : 'Select exactly one image to use as the reference'}
+            className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+            🎯 Similar to selected…
+          </button>
+          {curateOpen === 'similar' && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setCurateOpen(null)} aria-hidden />
+              <div className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2">
+                <p className="text-xs text-content-muted">
+                  Ranks the current filter by CLIP similarity to your one selected image and selects
+                  the closest — a fast way to extract one person or look. The reference is kept in
+                  the selection.
+                </p>
+                <label className="flex items-center gap-2 text-sm text-content">
+                  How many
+                  <input type="number" min={1} max={2000} value={similarN}
+                    onChange={(e) => setSimilarN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                    className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
+                </label>
+                <button type="button" onClick={findSimilar}
+                  className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white">
+                  Select {similarN} most similar
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        {scored === 0 && (
+          <span className="text-xs text-content-subtle">Run ✨ Score to unlock curation.</span>
+        )}
+        <button type="button" onClick={() => setCoverageOpen((v) => !v)}
+          aria-expanded={coverageOpen}
+          title="See what your kept set leans on and what's thin for a good LoRA — advice only, nothing is kept or rejected."
+          className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+          📊 Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
+        </button>
+      </div>
+
+      {coverageOpen && (
+        <CoveragePanel coverage={coverage} onClose={() => setCoverageOpen(false)} />
+      )}
+      </ZoneSection>
+
+      {/* ④ Promouvoir — ship the kept set into a dataset, or clear rejects off
+          disk. Same actions/handlers as before — just grouped as the last step. */}
+      <ZoneSection zone={promoteZone} accented={activeStep === 'promote'}>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
+          title={canPromote ? 'Copy the kept selection into a dataset' : 'Keep some images first'}
+          className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+          ⬆ Promote to dataset…
+        </button>
+        <button type="button" onClick={() => setDeleteRejectedOpen(true)}
+          disabled={live || !(counts?.reject > 0)}
+          title={(counts?.reject > 0)
+            ? 'Delete the rejected images from your disk (OS trash when available). Irreversible — asks you to type DELETE first. Kept images are untouched.'
+            : 'No rejected images to delete'}
+          className="rounded-md border border-rose-500/50 px-3 py-1.5 text-sm text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+          🗑 Delete rejected from disk{(counts?.reject > 0) ? ` (${counts.reject})` : ''}
+        </button>
+      </div>
+      </ZoneSection>
 
       {filter.flag === 'dups' ? (
         <DupGroupsPanel bankId={bankId} live={live} kind="exact"
@@ -629,10 +1166,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       )}
 
       {promoteOpen && (
-        <PromoteDialog bankId={bankId} keepCount={counts?.keep || 0}
+        <PromoteDialog bankId={bankId}
           selectedIds={[...selected]}
           onClose={() => setPromoteOpen(false)}
           onStarted={() => { setPromoteOpen(false); refreshPayload() }} />
+      )}
+
+      {deleteRejectedOpen && (
+        <DeleteRejectedDialog bankId={bankId} count={counts?.reject || 0}
+          sourcePath={payload?.source_path}
+          onClose={() => setDeleteRejectedOpen(false)}
+          onDone={() => { setDeleteRejectedOpen(false); setSelected(new Set()); refreshPayload(); refreshImages() }} />
       )}
 
       {launchOpen && (

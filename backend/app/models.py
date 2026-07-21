@@ -246,6 +246,13 @@ class BankImage(db.Model):
     # dataset on promotion, so a promoted selection starts already captioned. NULL =
     # not captioned yet. Additive column — created by db.create_all(), no migration.
     caption = db.Column(Text, nullable=True)
+    # Framing pass — the SAME face/bust/body/back classification the datasets use
+    # (Qwen3-VL, CLASSIFY_PROMPT). face = head close-up | bust = upper body |
+    # body = full body | back = seen from behind | 'unknown' = a parseable answer
+    # that wasn't one of the four | NULL = not classified yet (retryable). Powers
+    # the 📐 Framing filter chips AND the coverage advice. Additive column —
+    # created by db.create_all(), no migration (see _SCHEMA_ADDITIONS).
+    framing = db.Column(String(8), nullable=True, index=True)
     # Triage decision — same words as dataset images (pending|keep|reject).
     # reject_reason: blur|noise|uniform|small|duplicate|unreadable|manual
     #                |low_aesthetic|nsfw|watermark (the V2 score-derived flags).
@@ -519,7 +526,46 @@ class TrainingRunRecord(db.Model):
     # continuation that ran before the edge was persisted (see lineage_backfill).
     # Kept distinct so a reconstructed edge stays auditable and reversible.
     lineage_origin = db.Column(db.String(16))
+    note = db.Column(db.Text)                                # free-form run note (Lab)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CheckpointNote(db.Model):
+    """A free-form note on one checkpoint of a run, keyed by (record_id, step).
+    Checkpoints aren't their own rows, so notes live here. New table -> created
+    by db.create_all(), no migration."""
+    __tablename__ = 'checkpoint_note'
+    id = db.Column(db.Integer, primary_key=True)
+    record_id = db.Column(db.Integer, nullable=False, index=True)
+    step = db.Column(db.Integer, nullable=False)
+    note = db.Column(db.Text, nullable=False, default='')
+    __table_args__ = (db.UniqueConstraint('record_id', 'step',
+                                          name='uq_checkpoint_note'),)
+
+
+class CheckpointPreview(db.Model):
+    """The Lab's inline-generated preview for one checkpoint (record_id, step):
+    a same-prompt/same-seed image so an experienced user can eyeball how the LoRA
+    evolves epoch by epoch. Checkpoints aren't their own rows, so — like notes —
+    the preview mapping lives here, keyed by (record_id, step). It does NOT store
+    an image itself: the picture is produced by the reused Test-Studio engine and
+    lands in the per-dataset folder as a LoraTestImage; `lora_test_image_id` points
+    at that row so the node reads the (async) filename + status live. Regenerating
+    a checkpoint replaces the pointer. New table -> created by db.create_all(),
+    no migration."""
+    __tablename__ = 'checkpoint_preview'
+    id = db.Column(db.Integer, primary_key=True)
+    record_id = db.Column(db.Integer, nullable=False, index=True)
+    step = db.Column(db.Integer, nullable=False)
+    dataset_id = db.Column(db.Integer, nullable=False, index=True)
+    # The reused Test-Studio result row that carries the actual image (its
+    # filename is null until the job completes); the node joins through it.
+    lora_test_image_id = db.Column(db.Integer, nullable=True)
+    prompt = db.Column(db.Text, nullable=False, default='')
+    seed = db.Column(db.BigInteger, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('record_id', 'step',
+                                          name='uq_checkpoint_preview'),)
 
 
 class TrainingPreset(db.Model):
