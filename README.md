@@ -466,6 +466,11 @@ Python 3.10–3.12? It's used as-is and nothing is downloaded. On 3.13+ only, th
 core app still runs but the ML extras can't install.) Override the port with
 `set LDS_PORT=<port>` before running.
 
+Want a Desktop icon instead of digging into the extracted folder each time?
+Double-click **`Create Desktop Shortcut.bat`** (shipped alongside `start.bat`)
+— it adds a `LoRA Dataset Studio` shortcut that opens `start.bat` and carries
+the app's own icon.
+
 You can use the same flow from a git checkout instead of the release ZIP:
 
 ```bash

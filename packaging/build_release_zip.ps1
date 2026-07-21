@@ -41,10 +41,15 @@ Copy-Item -Recurse -Force (Join-Path $Root 'frontend\dist') (Join-Path $Stage 'f
 
 New-Item -ItemType Directory -Force (Join-Path $Stage 'scripts') | Out-Null
 Copy-Item -Force (Join-Path $Root 'scripts\bootstrap_python.ps1') (Join-Path $Stage 'scripts')
+Copy-Item -Force (Join-Path $Root 'scripts\create_shortcut.ps1') (Join-Path $Stage 'scripts')
 
-foreach ($file in @('start.bat', 'README.md', 'LICENSE', 'config.example.json', '.env.example')) {
+foreach ($file in @('start.bat', 'Create Desktop Shortcut.bat', 'README.md', 'LICENSE', 'config.example.json', '.env.example')) {
   Copy-Item -Force (Join-Path $Root $file) $Stage
 }
+
+# icon.ico ships at the bundle root (not under packaging/, which isn't copied)
+# so create_shortcut.ps1 can find it in the extracted release ZIP too.
+Copy-Item -Force (Join-Path $Root 'packaging\icon.ico') (Join-Path $Stage 'icon.ico')
 
 # Stamp a build marker so a packaged (no-.git) install is identifiable: the tag
 # it was cut from, the source commit and the build time. The app's local version
