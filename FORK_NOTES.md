@@ -15,6 +15,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-07-20 | *(merge)* | **Upstream sync** (Bank curation series + lineage Experiment Lab + editable identity prompts) — kept only the `klein_identity` identity-prompt card in Settings (dropped upstream's `face_single`/`face_multi`/`CHATGPT_AUTH_OPTIONS` UI); re-stripped emoji from conflicting Bank/Settings hunks per Divergence 3. |
 | 2026-07-19 | *(docs)* | **Preset alignment report** — full cross-check of the fifteen LDS built-ins against the ai-toolkit fork's presets/advisor (`docs/preset-alignment-2026-07.md`; copy + additive preset sync landed in the ai-toolkit fork). No LDS preset values changed. |
 | 2026-07-19 | `a61612c` + dist `8434e09` | **Local-only dist guard** — contract test + merge routine so an upstream `frontend/dist` rebuild cannot resurrect Nano Banana / OpenAI Setup UI. |
 | 2026-07-19 | `610b499` / merge `fe76cb8` | **Klein paths from anywhere** — absolute pins outside Comfy roots hardlink/symlink into `lds-pinned/`; bf16 UNETs use `weight_dtype: default`; Training Settings drop vast.ai cards (Runs/backend left). |
@@ -63,13 +64,23 @@ as hostile until `npm run build` and the local-only contract test pass.
 - `backend/app/services/face_dataset_service.py` — API fan-out section removed;
   `LEGACY_API_ENGINE_TAGS` keeps rows created by the removed engines
   regenerating through Klein (their `klein_model` column holds an engine tag).
-- `backend/app/services/face_variations.py` — API identity-guard wrappers
-  (`wrap_variation`, `IDENTITY_GUARD*`) removed; Klein wrapper untouched.
+- `backend/app/services/face_variations.py` — API identity-guard wrapper
+  (`wrap_variation`, `IDENTITY_GUARD`/`IDENTITY_GUARD_MULTI`) came back
+  2026-07-20 as shared plumbing for upstream's editable-identity-prompts
+  feature (`get_identity_prompt`, `identity_prompt_defaults`); it is DEAD CODE
+  in this fork (nothing calls `wrap_variation` — the Klein-only pipeline only
+  ever resolves `klein_identity`/`klein_improve`) but stays since removing it
+  would mean forking `IDENTITY_PROMPT_KINDS`/`identity_prompt_defaults()` off
+  upstream's shape too. Keep it merged in as-is; just don't surface
+  `face_single`/`face_multi` in Settings (see EnginesSection.jsx below).
 - Frontend: `VariationCatalog.jsx` (single Klein card), `EnginesSection.jsx`
-  (Klein LoRA presets only — **no** Gemini/OpenAI secret fields),
+  (Klein LoRA presets + only the `klein_identity` identity-prompt card — the
+  `face_single`/`face_multi` cards and any `CHATGPT_AUTH_OPTIONS`-style block
+  upstream adds stay dropped, no Gemini/OpenAI secret fields),
   `SetupPage.jsx` / `useSetupSteps.js` (**no** API-keys / "Image generation"
   step), `CapabilitiesContext.jsx`, `settings/registry.js`,
-  `OverviewSection.jsx`, `helpRegistry.js`, `diagnosticFormat.js`,
+  `OverviewSection.jsx`, `helpRegistry.js` (no `GEMINI_API_KEY`/
+  `OPENAI_API_KEY` topics), `diagnosticFormat.js`,
   `DatasetWorkspace.jsx`, `ReferencePanel.jsx` + their tests.
 - Docs: `README.md`, `docs/guide/settings-reference.md`,
   `docs/guide/getting-started.md`, `docs/guide/using-the-app.md`,
