@@ -5,7 +5,9 @@ feature gating elsewhere in the app. `_http_ok` is the single network seam —
 every reachability probe goes through it so tests can patch one symbol.
 `_import_ok` is the equivalent seam for the slow subprocess import-probes.
 """
+import concurrent.futures
 import copy
+import json
 import os
 import re
 import shutil
@@ -24,6 +26,40 @@ _cache_ts = 0.0
 
 _IMPORT_TTL = 600
 _import_cache = {}  # key -> (ts, ok)
+
+
+def _import_cache_path() -> Path:
+    return cfg.data_dir() / 'capability_import_cache.json'
+
+
+def _load_import_cache() -> None:
+    """Warm _import_cache from the last process's results so a fresh boot
+    (e.g. right after a git sync + restart) doesn't re-pay the cold-import
+    cost (~20s+ each for insightface/rembg/torch/etc, see _import_ok) when
+    the previous probe is still within the TTL. Entries are read as-is;
+    _cached_import's own TTL check discards anything stale."""
+    try:
+        raw = json.loads(_import_cache_path().read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return
+    if not isinstance(raw, dict):
+        return
+    for k, v in raw.items():
+        if isinstance(v, list) and len(v) == 2:
+            try:
+                _import_cache[k] = (float(v[0]), bool(v[1]))
+            except (TypeError, ValueError):
+                continue
+
+
+def _save_import_cache() -> None:
+    try:
+        _import_cache_path().write_text(json.dumps(_import_cache), encoding='utf-8')
+    except OSError:
+        pass
+
+
+_load_import_cache()
 
 _ZIMAGE_RE = re.compile(r'z[ -]?image', re.IGNORECASE)
 # Aligned with klein_edit_helper / utils.comfyui (was missing '.sft', so the
@@ -68,6 +104,7 @@ def _cached_import(key: str, python: str, module_expr: str) -> bool:
         # probe re-tries against a warm import instead of a 600 s false ✗.
         return False
     _import_cache[cache_key] = (now, ok)
+    _save_import_cache()
     return ok
 
 
@@ -295,11 +332,17 @@ def comfyui_runtime(timeout=3) -> dict:
 
 def clear_import_cache() -> None:
     """Drop cached import-probe results and the main probe cache so the next
-    probe re-checks freshly installed packages instead of a stale 600s 'False'."""
+    probe re-checks freshly installed packages instead of a stale 600s 'False'.
+    Also drops the on-disk copy — a fresh install must not be masked by a
+    cached-from-before-the-install result surviving a later restart."""
     global _cache, _cache_ts
     _import_cache.clear()
     _cache = None
     _cache_ts = 0.0
+    try:
+        _import_cache_path().unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def probe_aitoolkit() -> dict:
@@ -734,11 +777,21 @@ def probe(force=False) -> dict:
     ollama = probe_ollama()
     ollama_installed = probe_ollama_installed()
     aitoolkit = probe_aitoolkit()
-    face_scoring = probe_face_scoring()
-    masks = probe_masks()
-    bank_scoring = probe_bank_scoring()
-    watermark_inpaint = probe_watermark_inpaint()
-    joycaption = probe_joycaption(aitoolkit)
+    # These five each shell out a cached-but-possibly-cold subprocess import
+    # (insightface/rembg/torch+open_clip+transformers/simple_lama_inpainting/
+    # the ai-toolkit venv's captioning deps — see _cached_import). Run them
+    # concurrently so a cold boot pays the SLOWEST one, not the sum of all five.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        f_face = pool.submit(probe_face_scoring)
+        f_masks = pool.submit(probe_masks)
+        f_bank = pool.submit(probe_bank_scoring)
+        f_watermark = pool.submit(probe_watermark_inpaint)
+        f_joycaption = pool.submit(probe_joycaption, aitoolkit)
+        face_scoring = f_face.result()
+        masks = f_masks.result()
+        bank_scoring = f_bank.result()
+        watermark_inpaint = f_watermark.result()
+        joycaption = f_joycaption.result()
     models = _scan_models()
     # Klein engine readiness is now honest tri-component: the graph needs the UNET
     # AND the VAE AND the text-encoder. All three gate on the RESOLVER (the exact

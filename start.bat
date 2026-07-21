@@ -98,7 +98,26 @@ if "%REBUILD%"=="1" (
   %PY% -m venv .venv || exit /b 1
 )
 
-"%VPY%" -m pip install -q -r backend\requirements.txt || exit /b 1
+REM --- Skip the pip resolve/install pass when requirements.txt hasn't changed
+REM     since the last successful install against THIS venv. `pip install -r`
+REM     on an already-satisfied set still pays a full dependency resolve every
+REM     launch; a sync-upstream that didn't touch requirements.txt gains nothing
+REM     from repeating it. Hash-gated on the file's own content, not mtime (a
+REM     git checkout/merge can touch mtime without changing content).
+set "REQ_HASH_FILE=.venv\.requirements.hash"
+set "REQ_HASH="
+for /f "delims=" %%H in ('certutil -hashfile backend\requirements.txt SHA256 ^| findstr /v "hash SHA256"') do if not defined REQ_HASH set "REQ_HASH=%%H"
+set "REQ_HASH_OLD="
+if exist "%REQ_HASH_FILE%" set /p REQ_HASH_OLD=<"%REQ_HASH_FILE%"
+if "%REBUILD%"=="1" set "REQ_HASH_OLD="
+set "SKIP_PIP=0"
+if defined REQ_HASH if /i "%REQ_HASH%"=="%REQ_HASH_OLD%" set "SKIP_PIP=1"
+if "%SKIP_PIP%"=="1" (
+  echo [i] backend\requirements.txt unchanged since the last install -- skipping pip.
+) else (
+  "%VPY%" -m pip install -q -r backend\requirements.txt || exit /b 1
+  if defined REQ_HASH (>"%REQ_HASH_FILE%" echo %REQ_HASH%)
+)
 if not exist frontend\dist\index.html (
   echo frontend\dist is missing -- this repo ships it prebuilt. Run: cd frontend ^&^& npm install ^&^& npm run build
   exit /b 1
