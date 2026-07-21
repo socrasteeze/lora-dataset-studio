@@ -49,6 +49,14 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-20-library-rename',
+    date: '2026-07-20',
+    title: 'Rename a dataset right from the library',
+    blurb:
+      'Named a dataset in a hurry and stuck with a placeholder like "1"? Hover any card in the Datasets library and a ✎ button now lets you rename it on the spot — no need to open the dataset and dig through ⋯ More → Edit settings.',
+    to: '/datasets',
+  },
+  {
     id: '2026-07-20-faster-setup-scan',
     date: '2026-07-20',
     title: 'Setup no longer makes you wait through a slow machine scan',
