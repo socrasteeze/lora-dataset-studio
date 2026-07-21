@@ -49,6 +49,13 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-20-faster-setup-scan',
+    date: '2026-07-20',
+    title: 'Setup no longer makes you wait through a slow machine scan',
+    blurb:
+      "The Setup wizard's \"Scanning your machine…\" step used to run five slow checks one after another right after a restart, sometimes taking minutes. They now run at the same time instead, the result survives a restart so a fresh boot doesn't re-pay the cost, and the wizard shows the scan without blocking on the slowest check.",
+  },
+  {
     id: '2026-07-20-bank-guided-zones',
     date: '2026-07-20',
     title: '🧭 The Bank top is now a guided path, not a wall of buttons',

@@ -112,7 +112,10 @@ export default function SetupPage() {
         setConfig(saved.config)
         savedConfigRef.current = JSON.stringify(saved.config)
       }
-      await refresh(true)
+      // Don't hold the spinner up for the full capability probe (cold ML-extra
+      // imports can take a while right after a restart) — refresh it in the
+      // background and let the rows update reactively once `caps` lands.
+      refresh(true)
       return d
     } catch { return null }
     finally { setDetecting(false); setScanned(true) }
