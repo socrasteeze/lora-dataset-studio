@@ -390,6 +390,13 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
           images are made locally on your GPU via ComfyUI — free, NSFW-capable
         </span>
       </div>
+      {/* Discoverability: the generation prompt (identity/style directives) is
+          editable, but users don't know where. Point them at it right where the
+          "why is this coming out realistic?" question arises. */}
+      <p className="text-content-subtle text-[0.625rem] -mt-1">
+        Not the look you wanted (a stylized reference coming out realistic)? Edit the generation prompt in{' '}
+        <a href="#/settings/engines" className="text-amber-300 underline decoration-amber-300/50">Settings › Image engines →</a>
+      </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <div aria-disabled={!klAvailable}
           className={`flex items-start gap-3 rounded-xl border p-3 text-left border-primary/60 bg-primary/15 ring-1 ring-primary/40 ${klAvailable ? '' : 'opacity-50'}`}>
