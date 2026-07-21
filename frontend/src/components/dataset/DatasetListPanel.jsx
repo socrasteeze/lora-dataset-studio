@@ -141,8 +141,17 @@ function tileStats(d) {
   return `${kept} kept`;
 }
 
+/** window.prompt-based rename (same pattern as VariationCatalog's shot-preset
+ *  rename) — a quick fix for a name typed carelessly at creation (e.g. a bare
+ *  "1"), reachable right from the library tile instead of buried in the
+ *  workspace's ⋯ More → Edit settings. */
+function promptRename(onRename, d) {
+  const name = window.prompt('Rename dataset:', d.name);
+  if (name != null && name.trim() && name.trim() !== d.name) onRename(d.id, name.trim());
+}
+
 /** Photo-first tile: the reference face IS the identity — lead with it. */
-function DatasetTile({ d, onOpen, onDelete, onExportZip, onExportBackup }) {
+function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup }) {
   const canExportZip = (d.images_kept ?? 0) > 0;
   return (
     <div className="library-card group relative overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-primary/40">
@@ -210,23 +219,32 @@ function DatasetTile({ d, onOpen, onDelete, onExportZip, onExportBackup }) {
           Backup
         </button>
       </div>
-      {onDelete && (
-        <button type="button"
-          onClick={() => {
-            if (window.confirm(`Permanently delete the dataset "${d.name}" and all its images? This cannot be undone.`)) onDelete(d.id);
-          }}
-          title="Delete this dataset" aria-label={`Delete the dataset ${d.name}`}
-          className="library-card__actions absolute right-1.5 top-1.5 rounded-lg border border-red-500/40 bg-black/50 px-2 py-1 text-xs text-red-300 opacity-70 backdrop-blur-sm transition-opacity hover:bg-red-500/25 hover:opacity-100">
-
-        </button>
-      )}
+      <div className="library-card__actions absolute right-1.5 top-1.5 flex gap-1">
+        {onRename && (
+          <button type="button" onClick={() => promptRename(onRename, d)}
+            title="Rename this dataset" aria-label={`Rename the dataset ${d.name}`}
+            className="grid h-6 w-6 place-items-center rounded-lg border border-border bg-black/50 text-xs text-content-subtle opacity-70 backdrop-blur-sm transition-opacity hover:bg-white/10 hover:text-content hover:opacity-100">
+            ✎
+          </button>
+        )}
+        {onDelete && (
+          <button type="button"
+            onClick={() => {
+              if (window.confirm(`Permanently delete the dataset "${d.name}" and all its images? This cannot be undone.`)) onDelete(d.id);
+            }}
+            title="Delete this dataset" aria-label={`Delete the dataset ${d.name}`}
+            className="grid h-6 w-6 place-items-center rounded-lg border border-red-500/40 bg-black/50 text-xs text-red-300 opacity-70 backdrop-blur-sm transition-opacity hover:bg-red-500/25 hover:opacity-100">
+            ✕
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 /** Compact row for the S size: identity at a glance, one dataset per line,
  *  icon-only actions. Everything the photo tile shows, at list density. */
-function DatasetRow({ d, onOpen, onDelete, onExportZip, onExportBackup }) {
+function DatasetRow({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup }) {
   const canExportZip = (d.images_kept ?? 0) > 0;
   const kind = datasetKind(d);
   const iconBtn = 'grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border bg-app/50 text-xs text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content';
@@ -288,6 +306,13 @@ function DatasetRow({ d, onOpen, onDelete, onExportZip, onExportBackup }) {
           className={iconBtn}>
 
         </button>
+        {onRename && (
+          <button type="button" onClick={() => promptRename(onRename, d)}
+            title="Rename this dataset" aria-label={`Rename the dataset ${d.name}`}
+            className={iconBtn}>
+            ✎
+          </button>
+        )}
         {onDelete && (
           <button type="button"
             onClick={() => {
@@ -295,7 +320,7 @@ function DatasetRow({ d, onOpen, onDelete, onExportZip, onExportBackup }) {
             }}
             title="Delete this dataset" aria-label={`Delete the dataset ${d.name}`}
             className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-red-500/40 bg-app/50 text-xs text-red-300 transition-colors hover:bg-red-500/25">
-
+            ✕
           </button>
         )}
       </div>
@@ -450,7 +475,7 @@ function NewDatasetForm({ onCreate, onClose }) {
 }
 
 export default function DatasetListPanel({
-  datasets, onOpen, onCreate, onDelete, onRestore, onExportZip, onExportBackup, backup,
+  datasets, onOpen, onCreate, onDelete, onRename, onRestore, onExportZip, onExportBackup, backup,
 }) {
   // Library-first: the creation form stays folded behind "+ New dataset" so the
   // page opens on the collection — except on an empty library, where creating
@@ -601,14 +626,14 @@ export default function DatasetListPanel({
                   tileSize === 'S' ? (
                     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                       {items.map((d) => (
-                        <DatasetRow key={d.id} d={d} onOpen={onOpen} onDelete={onDelete}
+                        <DatasetRow key={d.id} d={d} onOpen={onOpen} onDelete={onDelete} onRename={onRename}
                           onExportZip={onExportZip} onExportBackup={onExportBackup} />
                       ))}
                     </div>
                   ) : (
                     <div className={GRID_COLS[tileSize]}>
                       {items.map((d) => (
-                        <DatasetTile key={d.id} d={d} onOpen={onOpen} onDelete={onDelete}
+                        <DatasetTile key={d.id} d={d} onOpen={onOpen} onDelete={onDelete} onRename={onRename}
                           onExportZip={onExportZip} onExportBackup={onExportBackup} />
                       ))}
                     </div>

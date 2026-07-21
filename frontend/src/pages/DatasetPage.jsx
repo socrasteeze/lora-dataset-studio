@@ -18,7 +18,7 @@ export default function DatasetPage() {
            browsing surface — more columns beat a narrower reading measure.
            The empty-state hero and the creation form re-cap themselves. */
         <DatasetListPanel datasets={ds.datasets} onOpen={ds.open} onCreate={ds.create}
-          onDelete={ds.deleteDataset} onRestore={ds.importBackup}
+          onDelete={ds.deleteDataset} onRename={ds.renameDataset} onRestore={ds.importBackup}
           onExportZip={ds.exportZipFor} onExportBackup={ds.exportBackupFor}
           backup={{
             start: ds.backupEverything, job: ds.backupJob,

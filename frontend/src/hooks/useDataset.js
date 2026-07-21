@@ -316,6 +316,18 @@ export function useDataset() {
     await fetchList();
   }, [fetchList, setCurrentId, toast]);
 
+  // Quick rename from the library tile — id-scoped (unlike updateSettings, which
+  // only edits the currently OPEN dataset), so it works without opening the
+  // workspace first. Only the name changes; trigger/kind/etc are untouched
+  // (settings route: absent fields are left alone, see update_dataset_settings).
+  const renameDataset = useCallback(async (id, name) => {
+    const n = (name || '').trim();
+    if (!n) return;
+    const d = await postJson(`/api/dataset/${id}/settings`, { name: n });
+    if (!d.ok) { toast.error(d.error || 'Could not rename dataset'); return; }
+    await fetchList();
+  }, [fetchList, toast]);
+
   // Run a GPU-bound action exclusively (I2): re-entrancy guard + busy flag.
   // A second call while one is in flight is dropped instead of double-firing.
   const wrap = useCallback(async (fn) => {
@@ -1100,7 +1112,7 @@ export function useDataset() {
   return { datasets, currentId, data, busy: busyLive, localBusy: busy, captioning: captioningLive,
            analyzing: analyzingLive, watermarking: watermarkingLive, activity,
            nonces, mirroringIds, refNonce, recaptioningIds, create, open,
-           deleteDataset, updateSettings, setCurrentId, setRef, addExtraRef, removeExtraRef,
+           deleteDataset, renameDataset, updateSettings, setCurrentId, setRef, addExtraRef, removeExtraRef,
            generate, importFiles, scrapeImport, resolveSmallImageRescue, improveImage, classify, caption, recaption, recaptionImages,
            setStatus, setCaption, mirrorImage, crop, cropRef, recropRefAuto, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces,
            findWatermarks, cleanWatermarks, cleanWatermarkImages, restoreWatermarkImage, dismissWatermarks, saveWatermarkRegions,
