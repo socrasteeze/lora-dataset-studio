@@ -49,6 +49,34 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-21-tidier-top-bar',
+    date: '2026-07-21',
+    title: '🧭 A tidier top bar',
+    blurb:
+      "Your workspaces (Datasets, Bank, Runs, Test Studio) now sit together on the left, while Guide and Help tuck into a ? menu and Setup and Settings into a ⚙ menu on the right. Less clutter, same one-click reach.",
+  },
+  {
+    id: '2026-07-21-toggle-thumb-alignment',
+    date: '2026-07-21',
+    title: '🎚️ Toggle switches sit flush again',
+    blurb:
+      "The little sliding knob on on/off switches now rests with an even 1-2px gap on both ends instead of floating short of the right edge when on. Purely cosmetic, but it looks right now. Thanks to bbsorry for the pixel-perfect report.",
+  },
+  {
+    id: '2026-07-21-zimage-convert-cross-drive',
+    date: '2026-07-21',
+    title: '🗜️ Convert a custom Z-Image base even when your models live on another drive',
+    blurb:
+      "Clicking \"Convert the base\" no longer fails with a red \"Paths don't have the same drive\" toast when your ComfyUI models folder is a junction to a second drive (a common setup — big weights rarely fit the system disk). The conversion now follows the junction across drives while still refusing any base path that tries to escape your models folder.",
+  },
+  {
+    id: '2026-07-21-cloud-unreachable-grace',
+    date: '2026-07-21',
+    title: '☁️ Fewer legacy cloud runs lost to a passing network blip',
+    blurb:
+      "For anyone still finishing a training on an already-rented pod: a run that briefly drops off the network (a vast.ai proxy hiccup mid-training) is no longer given up so quickly. The grace before a run is declared \"pod unreachable\" is now measured as real consecutive silence, not polluted by slow log/checkpoint mirroring, and defaults to a more forgiving 6 minutes (advanced tuning: cloud.unreachable_grace_minutes in config.json). Also: a transient rental refusal at pod creation now retries on a fresh offer instead of failing the launch outright.",
+  },
+  {
     id: '2026-07-20-library-rename',
     date: '2026-07-20',
     title: 'Rename a dataset right from the library',
