@@ -193,6 +193,8 @@ Defaults for new local training runs.
 
 - **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`. Default **`zimage`**. Purely a starting point — you can switch family per run.
 
+This fork's Settings → Training keeps only **Defaults** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
+
 ### Advanced options (per run)
 
 These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. One is worth calling out because of a caveat:
@@ -278,3 +280,60 @@ These have no UI control — they're for advanced users editing `config.json` by
 | Key | Default | Role |
 |---|---|---|
 | `updates.repo` | `perfectgf/lora-dataset-studio` | The GitHub repo the update checker reads its release feed from. |
+
+**Cloud training (vast.ai):** this fork's Settings → Training has no rental-GPU card, so these are edited by hand. Cloud training itself still works end to end (a dataset with an existing cloud run keeps showing it in **Runs**, and Continue/Retry still work) — there's simply no guided Settings UI to launch a *new* one.
+
+| Key | Default | Role |
+|---|---|---|
+| `VAST_API_KEY` | *(unset)* | Secret, in `.env`. Required to enable cloud training at all. |
+| `cloud.max_concurrent_runs` | `1` | Simultaneous cloud pods allowed (1–10). |
+| `cloud.max_price_per_hour` | `0.80` | Safety cap on the hourly offer price in $; pricier hosts are skipped before launch. |
+| `cloud.monthly_budget_usd` | `0` | Hard monthly spend ceiling in $ (`0` = unlimited); launches are blocked past it. |
+| `cloud.stall_timeout_minutes` | `30` | Kill + rescue a cloud run after this many minutes without step progress. |
+| `cloud.unreachable_grace_minutes` | `6` | How long a running pod may stay unreachable (a vast.ai network blackout, measured as real consecutive silence) before the run is given up and auto-retried on a fresh host. Raise it if healthy runs die with *pod unreachable*. |
+| `cloud.min_reliability` | `0.98` | vast.ai host-reliability floor (0.9–0.999); lower surfaces cheaper, riskier hosts. |
+| `cloud.verified_only` | `true` | Restrict to vast.ai verified hosts. |
+| `cloud.secure_cloud_only` | `false` | Restrict to vast.ai's Secure Cloud (datacenter) tier (narrows the market, raises price). |
+
+## config.json key reference (all keys)
+
+A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-editing (copy `config.example.json` to `config.json` first — it's git-ignored, in your data directory). Every key here is documented in full, with defaults and traps, in the sections above; this table is the index. **Secrets** (`HF_TOKEN`, `VAST_API_KEY`, optional scraper credentials) live in `.env`, not here. This fork has no `GEMINI_API_KEY` / `OPENAI_API_KEY` — the cloud image-generation engines were removed; Klein/ComfyUI is the only generation path.
+
+| Key | Meaning |
+|---|---|
+| `server.host` | Interface the Flask server binds to (default `127.0.0.1`, local-only). |
+| `server.port` | Port the server listens on (default `5050`). |
+| `server.require_token` | On a non-loopback bind, require remote clients to present an access token (default `false` — a trusted LAN needs none). Toggle and token also live in Settings → Server & access. |
+| `paths.dataset_images_root` | Where dataset images are stored. Empty string defaults to `<data dir>/datasets`. |
+| `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |
+| `comfyui.base_dir` | ComfyUI install directory, used to derive `output`/`input`/`models`/`loras` dirs if those aren't set explicitly. |
+| `comfyui.output_dir` | Explicit override for ComfyUI's output folder. |
+| `comfyui.input_dir` | Explicit override for ComfyUI's input folder. |
+| `comfyui.models_dir` | Explicit override for ComfyUI's models folder (used to scan available checkpoints/UNETs). |
+| `comfyui.loras_dir` | Explicit override for ComfyUI's LoRA folder. |
+| `ollama.url` | Base URL of your Ollama instance (default `http://127.0.0.1:11434`). |
+| `ollama.vision_model` | Ollama vision model used for auto-classify and auto head-crop (default `huihui_ai/qwen3-vl-abliterated:8b-instruct`, the uncensored **abliterated** build — use the Instruct, not Thinking, variant). |
+| `aitoolkit.dir` | ai-toolkit install directory. |
+| `aitoolkit.datasets_dir` | Override for ai-toolkit's datasets folder (defaults to `<aitoolkit.dir>/datasets`). |
+| `aitoolkit.output_dir` | Override for ai-toolkit's output folder (defaults to `<aitoolkit.dir>/output`). |
+| `aitoolkit.hf_home` | Override for the Hugging Face cache directory ai-toolkit uses. |
+| `aitoolkit.python` | Full path to the Python interpreter to run ai-toolkit with. Empty = auto-detect a `venv/`/`.venv/` next to `run.py`; set it for conda/uv/system-Python installs that have no venv folder. |
+| `engines.default` | Image-generation engine (`klein` — the only engine on this fork). |
+| `engines.enabled` | List of engines shown as options in the UI (`['klein']` on this fork). |
+| `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
+| `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, or `flux2klein`). |
+| `face_scoring.python` | Python interpreter used to run the InsightFace subprocess (empty = current interpreter). |
+| `face_scoring.models_root` | Directory where InsightFace model weights are stored/downloaded. |
+| `face_scoring.green` | Similarity score threshold (0–1) above which an image is flagged "green" (strong match). |
+| `face_scoring.orange` | Similarity score threshold (0–1) above which an image is flagged "orange" (borderline match). |
+| `masks.python` | Python interpreter used to run the rembg subprocess (empty = current interpreter). |
+| `watermark.python` | Python interpreter used to run the LaMa watermark-inpainting subprocess (empty = reuse `masks.python`, then the current interpreter). |
+| `watermark.device` | LaMa processing device: `auto` (CUDA when available, otherwise CPU), `cuda`, or `cpu`. |
+| `watermark.allow_crop` | When `true` (default), a border watermark is cropped off; when `false`, it is repainted instead. Also editable in the Clean bar. |
+| `klein.consistency_lora` | Filename of the Klein consistency LoRA, relative to ComfyUI's LoRA folder. |
+| `klein.consistency_strength` | Strength (0–1) applied to the Klein consistency LoRA. |
+| `klein.generation_lora_presets` | Named generation-LoRA stacks (default empty) picked per run in Klein tuning; each has a name and up to 8 `{file, strength}` rows. Managed in Settings → Image engines. |
+| `klein.small_image_prompt` | Optional shared instruction for scraper rescue and single/bulk image improvement (empty = reference image only). |
+| `updates.repo` | GitHub repo the update checker reads its release feed from (default `perfectgf/lora-dataset-studio`). |
+
+Additional config-file-only keys (ComfyUI folder overrides, cloud internals, quality-tool interpreters, Klein consistency LoRA) are documented in [Config-file-only settings](#config-file-only-settings) above.
