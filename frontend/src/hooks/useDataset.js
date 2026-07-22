@@ -278,8 +278,11 @@ export function useDataset() {
     return d;
   }, [currentId, fetchList, refresh]);
 
-  // Edit name / trigger / (concept) description / KIND after creation. Trigger change
-  // is safe (prepended at export); a concept-desc change resets the avoid-list → the
+  // Edit name / trigger / (concept) description / KIND after creation. A trigger change
+  // needs no re-caption (prepended at export) but DOES rename what the dataset already
+  // produced on disk, since the trigger is the naming key — the reply's trigger_rename
+  // says how many files moved, or that a name clash blocked it. The dataset NAME is
+  // display-only and never touches disk. A concept-desc change resets the avoid-list → the
   // toast nudges a re-caption (same contract as fidelity). A kind change flips the
   // caption strategy and the visible panels (server refuses with 409 while work is
   // in progress → the !ok branch surfaces the message) and nudges a re-caption.
@@ -295,7 +298,17 @@ export function useDataset() {
     // quiet: the generation panel persists suffix edits silently right before a
     // batch (the "Generating…" state is the feedback); the modal stays verbose.
     if (!opts.quiet) {
-      if (d.kind_changed) {
+      const renamed = d.trigger_rename;
+      if (renamed && !renamed.ok) {
+        // The new trigger already owns files on disk, so nothing was moved rather
+        // than half of it — say so, because the old artefacts keep the old name.
+        toast.warning('Trigger word saved, but the artefacts it already produced could '
+          + 'not be renamed: another dataset already uses that name on disk. They keep '
+          + 'the old name.');
+      } else if (renamed && renamed.files > 0) {
+        toast.success(`Settings saved — ${renamed.files} file${renamed.files > 1 ? 's' : ''} `
+          + 'renamed to follow the new trigger word (LoRAs, run folder, export)');
+      } else if (d.kind_changed) {
         toast.success(`Kind changed to ${d.kind} — re-caption to apply the new caption style to existing captions`);
       } else {
         toast.success(d.concept_desc_changed
@@ -938,6 +951,36 @@ export function useDataset() {
     return d;
   }, [currentId, toast]);
 
+  // ☁ The CLOUD lane of the same ▶ Continue gesture: the chosen LOCAL checkpoint is
+  // seeded onto a FRESH pod (the backend's resume_ckpt_path seam) instead of resuming
+  // on this machine. Same payload as continueTraining — one dialog, two lanes — and
+  // the same interactive-refusal contract, so TrainingPanel's confirm+retry helper
+  // drives either lane without a second code path.
+  const continueTrainingInCloud = useCallback(async (extraSteps = 1000, baseModel, variant, trainType, opts = {}) => {
+    const body = {
+      extra_steps: extraSteps,
+      ...trainingRunSelection(baseModel, trainType, variant),
+      masked: opts.masked !== false,
+      allow_caption_mismatch: !!opts.allowCaptionMismatch,
+      allow_uncaptioned: !!opts.allowUncaptioned,
+      allow_unverified_weights: !!opts.allowUnverifiedWeights,
+      allow_caption_quality: !!opts.allowCaptionQuality,
+      allow_not_ready: !!opts.allowNotReady,
+      ...(opts.fromStep != null ? { from_step: opts.fromStep } : {}),
+      ...(opts.overrides ? { overrides: opts.overrides } : {}),
+      ...(opts.gpuName ? { gpu_name: opts.gpuName } : {}),
+    };
+    const d = await postJson(`/api/dataset/${currentId}/train/cloud/continue-local`, body);
+    if (d.ok) toast.success(`Cloud run started from step ${d.resumed_from} → ${d.target_steps}`);
+    else if (!String(d.error || '').includes('CUSTOM_WEIGHTS_UNVERIFIED: ')
+             && !String(d.error || '').includes('CAPTION_QUALITY: ')
+             && !String(d.error || '').includes('MISMATCH_CAPTION: ')
+             && !String(d.error || '').includes('UNCAPTIONED: ')) {
+      toast.error(d.error || 'Unexpected error');
+    }
+    return d;
+  }, [currentId, toast]);
+
   // trainType = famille sélectionnée dans le menu LORA TYPE (Z-Image / SDXL / Krea).
   // Transmise à l'API pour que checkpoints + liste « IN COMFYUI » suivent le menu et
   // pas le train_type persisté du dataset (sinon LoRA Krea affichés sur la page Z-Image).
@@ -1118,7 +1161,7 @@ export function useDataset() {
            findWatermarks, cleanWatermarks, cleanWatermarkImages, restoreWatermarkImage, dismissWatermarks, saveWatermarkRegions,
            purgeUnused, exportZip, exportBackup, exportZipFor, exportBackupFor, importBackup, importDatasetZip, importDatasetFolder,
            backupEverything, backupJob, downloadBackup, openBackupsFolder, dismissBackup, restoreJob, dismissRestore,
-           refresh, train, stopTraining, continueTraining,
+           refresh, train, stopTraining, continueTraining, continueTrainingInCloud,
            listCheckpoints, importCheckpoint, deleteCheckpoint,
            trainBaseInfo, setTrainSettings, prepareBase };
 }

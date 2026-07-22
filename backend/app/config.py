@@ -179,9 +179,29 @@ DEFAULTS = {
               # then dropped.
               'generation_lora_presets': [],
               # Optional instruction for small scraped-image rescue only.
-              # Manual "Upscale & improve" uses its own fixed quality profile.
               # Empty is intentional: never invent a restoration prompt for the user.
-              'small_image_prompt': ''},
+              'small_image_prompt': '',
+              # Manual "Upscale & improve" quality profile. Its INSTRUCTION was
+              # already editable (identity_prompts.klein_improve) but the knobs
+              # deciding how much the pass actually changes were hardcoded at the
+              # call site — including BOTH LoRA strengths pinned to 0, which meant
+              # the workflow's own realistic LoRA (0.8 in improve skin.json) never
+              # applied at all. These defaults reproduce that exact historical
+              # behaviour, so an untouched install renders byte-identically; raise
+              # improve_base_lora_strength to actually let that LoRA work.
+              'improve_steps': 4,
+              'improve_base_lora_strength': 0.0,
+              # Overrides klein.consistency_strength for THIS pass only. It is the
+              # dx8152 consistency LoRA (anchors composition/background), NOT an
+              # identity LoRA — clamped [0, 1.5] by enqueue_klein_edit.
+              # 1.0 where generation defaults to 0.5: dx8152 warns that 0.8-1.0 "can
+              # prevent edits from applying", which is a problem for a restaging and
+              # exactly the point here — an improve pass must add detail WITHOUT
+              # redrawing the composition. Tuned on real runs, not from the guide.
+              'improve_consistency_strength': 1.0,
+              # Total pixel budget the source is rescaled to before sampling, so it
+              # is the output resolution. 2 = the value hardcoded in the workflow.
+              'improve_megapixels': 2.0},
     # Editable identity / quality prompts (feature request by @bbsorry / 雨田壹).
     # The identity "locks" that ride ahead of every generated variation used to be
     # hardcoded and invisible; these overrides expose them without touching the
@@ -400,6 +420,16 @@ def backups_dir() -> Path:
     d = _data_dir() / 'backups'
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+def bank_sources_root() -> Path:
+    """Image folders CREATED by "Import to bank" — a copy of a dataset's kept
+    images, so the new bank OWNS its files instead of pointing at the dataset's
+    live folder (curating one would otherwise mutate the other). Deliberately
+    NOT banks_root(): that one holds working data only and its contract is that
+    it never contains source images."""
+    root = _data_dir() / 'bank_sources'
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 def banks_root() -> Path:
     """Working data of the image banks (thumbnails + face-embedding cache),

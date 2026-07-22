@@ -16,6 +16,7 @@ import {
   trainingRunSelection,
   trainFamilyLabel,
 } from '../../utils/checkpointBrowser';
+import { confirmableRetryFlag } from '../../utils/trainingRefusals';
 import {
   describeZImageRecipe,
   isLongZImageTurboRun,
@@ -36,6 +37,7 @@ import ContinueDialog from './ContinueDialog';
 import RunLineageGraph from './RunLineageGraph';
 import TrainingProgress from './TrainingProgress';
 import PreflightModal from './PreflightModal';
+import SettingsLink from '../common/SettingsLink';
 import { DatasetVersionChip, RunIdChip } from './RunIdentityBadges';
 import {
   cloudGroupsFrom, localRunIdentity, runRowDomId,
@@ -640,27 +642,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     const msg = (d && d.error) || fallback;
     toast.error(d && d.hint ? `${msg} — ${d.hint}` : msg);
   };
-  // Confirmable launch refusals: the server prefixes the error with a marker;
-  // the window.confirm IS the user's answer, the retry carries the matching
-  // force flag. Both can fire in sequence (uncaptioned first, then mismatch) —
-  // call sites loop until launched, declined, or a non-confirmable error.
-  const CONFIRMABLE_REFUSALS = [
-    ['MISMATCH_CAPTION: ', 'allow_caption_mismatch'],
-    ['UNCAPTIONED: ', 'allow_uncaptioned'],
-    ['CAPTION_QUALITY: ', 'allow_caption_quality'],
-    // Custom-weights arch sniff couldn't positively verify the file → the
-    // window.confirm IS the answer, retry carries allow_unverified_weights.
-    ['CUSTOM_WEIGHTS_UNVERIFIED: ', 'allow_unverified_weights'],
-  ];
-  const confirmableRetryFlag = (error, actionLabel) => {
-    const s = String(error || '');
-    for (const [marker, flag] of CONFIRMABLE_REFUSALS) {
-      if (s.includes(marker)) {
-        return window.confirm(s.replace(marker, '') + `\n\n${actionLabel}?`) ? flag : 'declined';
-      }
-    }
-    return null;
-  };
+  // Confirmable launch refusals live in utils/trainingRefusals.js — the Runs hub
+  // needs the SAME markers now that its ▶ Continue can resume on this machine.
 
   // Pre-launch sanity gate (server preflight): blockers stop with a toast,
   // warnings open the interactive PreflightModal (lists WHICH captions leak /
@@ -712,11 +695,19 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // resume from, and the safe settings to adjust. Open on the checkpoint list's
   // Continue button; resolves to a payload or null (cancel).
   const [continueOpen, setContinueOpen] = useState(false);
+  // The checkpoint the dialog opens ON, when it was opened from a ◉ Graph pill
+  // (null = the plain Continue button → the dialog's historical "latest" default).
+  const [continueInitialStep, setContinueInitialStep] = useState(null);
   const runContinue = async (payload) => {
     setContinueOpen(false);
+    setContinueInitialStep(null);
     if (!payload) return;
+    // ONE dialog, two lanes: the chosen checkpoint either resumes on this machine
+    // or is seeded onto a fresh cloud pod. Same payload, same guarded+confirmable
+    // request helper — only the hook call differs.
+    const inCloud = payload.lane === 'cloud';
     await runConfirmableTrainingRequest(
-      (continueOpts) => ds.continueTraining(
+      (continueOpts) => (inCloud ? ds.continueTrainingInCloud : ds.continueTraining)(
         payload.extraSteps, checkpointBase, checkpointVariant, checkpointTrainType,
         { ...continueOpts, fromStep: payload.fromStep, overrides: payload.overrides }),
       { masked },
@@ -974,6 +965,22 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const checkpointMatchesTraining = checkpointSelectionMatchesTraining(
     checkpointTrainType, checkpointBase, checkpointVariant,
     trainType, base, variant);
+  // ▶ Continue from a ◉ Graph checkpoint pill — the SAME gesture as the Runs hub,
+  // routed through THIS panel's local resume flow (no second call path): remember
+  // the clicked step and open the shared dialog on it. The dialog resumes the
+  // active checkpoint set, so a pill from another family/base has no step to
+  // resume here: say so instead of silently falling back to the latest save.
+  const continueFromGraphCheckpoint = (node, pill) => {
+    const step = pill?.step ?? null;
+    if (step != null && !checkpoints.some((c) => c.step === step)) {
+      toast.warning(`Step ${step} is not in the active checkpoint set (${checkpointTypeLabel} · ${checkpointVariantDisplay}) `
+        + '— switch the Checkpoints selection to that run’s family, base and variant, '
+        + 'or continue that cloud run from the Runs page.');
+      return;
+    }
+    setContinueInitialStep(step);
+    setContinueOpen(true);
+  };
   const onCheckpointTypeChange = (nextType) => {
     const choices = baseInfo?.bases_by_type?.[nextType] || [];
     setCheckpointTrainType(nextType);
@@ -987,12 +994,53 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     if (!caps.training_visible) onCheckpointsChange?.(0);
   }, [caps.training_visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A finished run writes its checkpoints to disk, but nothing re-read the list:
+  // the poll only refreshed its own status, so a LoRA that had just finished
+  // training stayed invisible until the browse filter changed or the page was
+  // reloaded — reported as "sometimes I have to refresh the page to see the LoRAs".
+  // Watch the run concerning THIS dataset end, then re-read what it produced.
+  const runActiveHere = Boolean(status.in_progress && status.current?.dataset_id === ds.currentId);
+  const runWasActiveHere = useRef(false);
+  useEffect(() => {
+    if (runWasActiveHere.current && !runActiveHere) {
+      loadCheckpoints();
+      // The graph shows the same checkpoints as pills; refresh it too when it is
+      // the visible view, otherwise the two views would disagree.
+      if (checkpointsView === 'graph' && checkpointManagerOpen) loadDatasetGraph();
+    }
+    runWasActiveHere.current = runActiveHere;
+  }, [runActiveHere]); // eslint-disable-line react-hooks/exhaustive-deps
   // Slider mode floors the image requirement at the substrate minimum (the
   // preflight/assert_trainable stay authoritative server-side).
   const trainMinFloor = sliderOn ? TRAIN_MIN_SLIDER[0] : (TRAIN_MIN[trainType]?.[0] ?? 12);
   // « Continue anyway » relaxes the image-floor gate (a bypassable quality blocker
   // the user acknowledged); a physical impossibility never yields a truthy ack.
   const belowFloor = keptCount < trainMinFloor && !allowNotReady;
+
+  // ▶ Continue — WHERE it runs. Fork is local-only (FORK_NOTES Divergence 4): the
+  // cloud lane is always closed here, each lane still states its own reason so
+  // the dialog never shows a dead option without explaining why.
+  const continueLanes = {
+    local: caps.aitoolkit?.valid === false
+      ? { available: false,
+          reason: 'Local training needs ai-toolkit — set it up in Settings, or continue in the cloud.' }
+      : status.in_progress
+        ? { available: false,
+            reason: 'A training is already running on this machine — continue in the cloud, or wait for it to finish.' }
+        : { available: true },
+    cloud: !caps.cloud_training
+      ? { available: false,
+          reason: 'Cloud training needs a rental key set up in Settings.' }
+      : { available: true },
+  };
+  // The lane the dialog OPENS on = the lane the source checkpoint was trained in
+  // (a cloud epoch mirrored into the run folder defaults to Cloud). Unknown step
+  // → the newest save's provenance, the run the plain Continue button resumes.
+  const laneOfStep = (step) => {
+    const c = (step != null && checkpoints.find((k) => k.step === step))
+      || checkpoints[checkpoints.length - 1];
+    return c?.source === 'cloud' ? 'cloud' : 'local';
+  };
 
   if (!caps.training_visible) {
     return (
@@ -1008,7 +1056,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-content font-semibold text-sm"><span aria-hidden></span> LoRA Training ({typeLabel})</span>
         {!status.installed && (
-          <span className="text-amber-300 text-[0.6875rem]">ai-toolkit not installed — run setup-aitoolkit.ps1</span>
+          <span className="text-amber-300 text-[0.6875rem]">ai-toolkit not ready — point to its Python (its venv/Scripts/python.exe) in Settings › Local tools</span>
         )}
         {status.in_progress
           ? <span className="ml-auto flex items-center gap-2">
@@ -1063,6 +1111,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            accessible en un clic. --- */}
       <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
         <span className="text-content-muted text-[0.625rem] uppercase">LoRA type</span>
+        {/* Which family is preselected, and the cloud GPU guard-rails (budget,
+            price ceiling, stall timeout), are settings — say so where the choice
+            is actually being made. */}
+        <SettingsLink section="training" className="order-last ml-auto">
+          Defaults &amp; cloud limits
+        </SettingsLink>
         <select value={trainType} onChange={(e) => onTypeChange(e.target.value)}
           disabled={trainTypeBusy || presetBusy}
           aria-label="Type of LoRA to train"
@@ -2125,6 +2179,16 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {datasetGraph?.tree && (
                 Array.isArray(datasetGraph.tree.nodes) && datasetGraph.tree.nodes.length
                   ? <RunLineageGraph tree={datasetGraph.tree}
+                      // Same pill gesture as the Runs hub, served by this panel's
+                      // Continue dialog: 'any' lets a local run's save offer it too.
+                      // Gated on the checkpoint selection matching Training (the
+                      // dialog resumes THAT lane); whether the continuation can run
+                      // locally, in the cloud or neither is the dialog's own,
+                      // per-lane answer — so a local training in flight no longer
+                      // hides the action, it just closes the Local lane.
+                      continueSource="any"
+                      onContinueCheckpoint={checkpointMatchesTraining
+                        ? continueFromGraphCheckpoint : undefined}
                       refetchTree={async () => {
                         const tree = await fetchDatasetLineage();
                         setDatasetGraph({ tree });
@@ -2174,15 +2238,39 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-[0.6875rem] font-semibold disabled:opacity-40">
                   {bestEpochBusy ? 'Scoring samples…' : 'Find best epoch'}
                 </button>
-                <button type="button" disabled={status.in_progress || !checkpointMatchesTraining}
-                  onClick={() => setContinueOpen(true)}
+                {/* A local training in flight no longer locks this button: the
+                    dialog offers the cloud lane, and closes the local one with its
+                    reason. It stays disabled when NEITHER lane could run. */}
+                <button type="button"
+                  disabled={!checkpointMatchesTraining
+                    || (status.in_progress && !continueLanes.cloud.available)}
+                  onClick={() => { setContinueInitialStep(null); setContinueOpen(true); }}
                   title={!checkpointMatchesTraining
                     ? 'To continue this run, select the same LoRA family, base and variant in Training first'
-                    : 'Resume from any of this run’s checkpoints — pick the step count, the checkpoint, and the safe settings'}
+                    : status.in_progress
+                      ? 'A training is running here — continue this run in the cloud instead'
+                      : 'Resume from any of this run’s checkpoints — pick where it runs, the step count, the checkpoint, and the safe settings'}
                   className="ml-auto px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-[0.6875rem] font-semibold disabled:opacity-40">
                   ▶ Continue training…
                 </button>
               </div>
+              {/* A disabled button whose only explanation is a title= reads as a DEAD
+                  button: no hover, no reason, and the report is "it does nothing".
+                  State it in the panel, like the Find-best-epoch lines just below. */}
+              {!checkpointMatchesTraining && (
+                <p className="m-0 text-amber-300 text-[0.625rem]">
+                  ▶ Continue is off: these checkpoints come from a different LoRA family,
+                  base or variant than the one selected in Training above. Match them to
+                  continue this run.
+                </p>
+              )}
+              {checkpointMatchesTraining && status.in_progress
+                && !continueLanes.cloud.available && (
+                <p className="m-0 text-amber-300 text-[0.625rem]">
+                  ▶ Continue is off while a training runs on this machine.
+                  {' '}{continueLanes.cloud.reason}
+                </p>
+              )}
               {bestEpoch && !bestEpoch.available && (
                 <p className="m-0 text-amber-300 text-[0.625rem]">{bestEpoch.reason}</p>
               )}
@@ -2440,13 +2528,17 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       {continueOpen && (
         <ContinueDialog
           context={`${checkpointBaseLabel} · ${checkpointVariantDisplay}`}
-          where="local"
+          where={laneOfStep(continueInitialStep)}
+          lanes={continueLanes}
           checkpoints={checkpoints}
           bestStep={bestEpoch?.available ? bestEpoch.best_step : null}
+          initialFromStep={continueInitialStep}
           settings={{ save_every: advSave, sample_every: advSampleEvery,
             sample_prompts: adv?.sample_prompts,
             optimizer: adv?.optimizer, learning_rate: adv?.learning_rate }}
-          busy={status.in_progress}
+          // A local training in flight no longer freezes the whole dialog: the
+          // Local lane is disabled with its reason, the Cloud lane stays usable.
+          busy={status.in_progress && !continueLanes.cloud.available}
           onResolve={runContinue} />
       )}
 

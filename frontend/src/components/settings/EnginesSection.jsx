@@ -223,6 +223,25 @@ function IdentityPromptField({ field, value, onChange, onRestore, defaultText })
   )
 }
 
+// Bounds mirror the server-side clamps in face_dataset_service._improve_float /
+// _improve_int — the UI should not offer a value the backend will silently pull back.
+const IMPROVE_KNOBS = [
+  { key: 'improve_megapixels', label: 'Output size (MP)', fallback: 2,
+    min: 0.5, max: 8, step: 0.5,
+    hint: 'The result’s resolution. 2 = the shipped value.' },
+  { key: 'improve_base_lora_strength', label: 'Enhancement LoRA', fallback: 0,
+    min: 0, max: 2, step: 0.05,
+    hint: '0 = off (the shipped behaviour). Try 0.5–0.8. Needs klein/realistic.safetensors.' },
+  // Drives klein.consistency_strength, which enqueue_klein_edit clamps to 1.5 — the
+  // UI must not offer a value the engine pulls back. It anchors COMPOSITION, not
+  // identity: it was mislabelled "Character LoRA" when these knobs first shipped.
+  { key: 'improve_consistency_strength', label: 'Consistency LoRA', fallback: 0,
+    min: 0, max: 1.5, step: 0.05,
+    hint: 'Holds the composition and background. High values resist the edit.' },
+  { key: 'improve_steps', label: 'Steps', fallback: 4,
+    min: 1, max: 50, step: 1, hint: 'More steps = slower, usually cleaner.' },
+]
+
 function IdentityPromptsCard({ config, setField, promptDefaults }) {
   const ip = config.identity_prompts || {}
   const defaults = promptDefaults || {}
@@ -291,6 +310,46 @@ function IdentityPromptsCard({ config, setField, promptDefaults }) {
         <p className="mt-3 text-xs text-content-subtle">
           Separate from the scraper rescue prompt for small images — see Settings ▸ Scraping ▸ “Klein rescue — small scraped images”.
         </p>
+      </div>
+
+      {/* The instruction above was already editable, but the knobs deciding how
+          much the pass actually changes were hardcoded — including both LoRA
+          strengths at 0, which meant the workflow's own realistic LoRA never
+          applied. Defaults here are those historical values. */}
+      <div className="border-t border-border pt-4">
+        <h4 className="text-sm font-medium text-content">Upscale &amp; improve — strength</h4>
+        <p className="mt-1 mb-2 text-xs text-content-muted">
+          Output resolution, and how much the pass is allowed to change the image. All four
+          start at the values the action used before they were exposed, so leaving them alone
+          keeps today’s result.
+        </p>
+        <p className="mb-2 text-xs text-content-muted">
+          The <strong>enhancement LoRA</strong> needs its weights file
+          (<code>klein/realistic.safetensors</code>): without it that node is skipped and the
+          strength changes nothing. Setup downloads it with the other Klein assets — if the
+          slider seems to do nothing, run <strong>Install everything</strong> there first.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {IMPROVE_KNOBS.map((k) => (
+            <div key={k.key}>
+              <label htmlFor={`klein-${k.key}`} className="block text-xs font-medium text-content">
+                {k.label}
+              </label>
+              <input
+                id={`klein-${k.key}`}
+                type="number"
+                min={k.min}
+                max={k.max}
+                step={k.step}
+                value={config.klein?.[k.key] ?? k.fallback}
+                onChange={(e) => setField('klein', k.key,
+                  e.target.value === '' ? k.fallback : Number(e.target.value))}
+                className={INPUT_CLASS}
+              />
+              <p className="mt-1 text-[0.6875rem] text-content-subtle">{k.hint}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </Card>
   )

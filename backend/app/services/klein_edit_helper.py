@@ -55,7 +55,11 @@ _REQUIRED_NODES = ('52', '6', '77', '9', '114', '10', '90')
 # action that provides each. REQUIRED = the graph is invalid without it (block +
 # auto-download); RECOMMENDED = quality only (the consistency LoRA — degrade).
 KLEIN_REQUIRED = ('klein_model', 'klein_text_encoder', 'klein_vae')
-KLEIN_RECOMMENDED = ('klein_lora',)
+KLEIN_RECOMMENDED = ('klein_lora', 'klein_enhancement_lora')
+# The detail LoRA node 139 of the improve workflow loads. Kept as a constant
+# because the node is BYPASSED when the file is absent, so its presence is what
+# decides whether the "Upscale & improve" enhancement strength does anything.
+ENHANCEMENT_LORA_NAME = os.path.join('klein', 'realistic.safetensors')
 
 _MODEL_SUFFIXES = ('.safetensors', '.gguf', '.sft')
 
@@ -479,6 +483,8 @@ def klein_missing_assets():
     _, lora_path = _consistency_lora()
     if not (lora_path and os.path.exists(lora_path)):
         missing.append('klein_lora')
+    if not _lora_abs(ENHANCEMENT_LORA_NAME):
+        missing.append('klein_enhancement_lora')
     return missing
 
 
@@ -536,6 +542,9 @@ def _klein_asset_paths():
     _, lora_path = _consistency_lora()
     if lora_path and os.path.exists(lora_path):
         paths['klein_lora'] = lora_path
+    enhancement = _lora_abs(ENHANCEMENT_LORA_NAME)
+    if enhancement:
+        paths['klein_enhancement_lora'] = enhancement
     return paths
 
 
@@ -672,7 +681,8 @@ def _comfy_output_dir():
 def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
                        extra_metadata=None, lora_strength=None, source_path=None,
                        extra_ref_paths=None, sampler_steps=None,
-                       base_lora_strength=None, generation_loras=None):
+                       base_lora_strength=None, generation_loras=None,
+                       output_megapixels=None):
     """Copy the source into ComfyUI input, configure the single Klein edit
     workflow, and enqueue it. Returns the app job_id. Raises ValueError on a
     missing source / unloadable workflow / missing required node, RuntimeError
@@ -733,6 +743,11 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
         workflow["77"]["inputs"]["steps"] = max(1, int(sampler_steps))
     if base_lora_strength is not None and "139" in workflow:
         workflow["139"]["inputs"]["strength_model"] = float(base_lora_strength)
+    # Output size: node 174 rescales the source to a total pixel budget before the
+    # sampler, so it IS the resolution of the result. Hardcoded at 2 MP until now,
+    # which made "Upscale" a fixed 2 MP pass whatever the source was worth.
+    if output_megapixels is not None and "174" in workflow:
+        workflow["174"]["inputs"]["megapixels"] = float(output_megapixels)
     # UNIQUE prefix per job: SaveImage numbers files from what's currently in
     # ComfyUI's output folder, and the app MOVES each result out right after
     # completion — with a shared prefix the counter kept re-issuing the same
@@ -803,6 +818,15 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     if "139" not in workflow:
         logger.warning("workflow node 139 missing — consistency LoRA injection skipped")
     elif not lora_path or not os.path.exists(lora_path):
+        # A strength the CALLER deliberately passed must never be silently ignored:
+        # the job would run, look wrong, and give no clue why. Reported as a missing
+        # ASSET so the caller's existing auto-download handles it, not a bare failure.
+        # Gated on an EXPLICIT lora_strength: generation leaves it None and takes
+        # klein.consistency_strength from config, where the documented contract is to
+        # degrade and fetch the LoRA in the background — erroring there would stop
+        # people generating at all over an optional quality LoRA.
+        if lora_strength is not None and float(lora_strength) > 0:
+            raise KleinModelsMissing(['klein_lora'])
         logger.warning(f"consistency LoRA not found at {lora_path} — injection skipped")
     elif not strength or float(strength) <= 0:
         logger.info("consistency LoRA strength 0 — injection skipped (LoRA off)")
@@ -864,6 +888,12 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     base_lora = (workflow.get("139", {}).get("inputs", {}).get("lora_name") or '').replace('/', os.sep)
     base_lora_path = _lora_abs(base_lora)   # base + extra_model_paths loras roots
     if "139" in workflow and not base_lora_path:
+        # Same rule as the consistency LoRA: bypassing is fine at strength 0 (the node
+        # would contribute nothing anyway), but silently dropping it while the user
+        # asked for a real strength is what made this setting look broken — it moved
+        # no pixel and said nothing. Surface it as a missing asset so it gets fetched.
+        if base_lora_strength is not None and float(base_lora_strength) > 0:
+            raise KleinModelsMissing(['klein_enhancement_lora'])
         logger.info("base LoRA %r absent — bypassing node 139", base_lora)
         _bypass_node(workflow, "139", "model")
 

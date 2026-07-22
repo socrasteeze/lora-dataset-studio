@@ -20,6 +20,7 @@ import threading
 import time
 import uuid
 import zipfile
+from types import SimpleNamespace
 from typing import BinaryIO
 from urllib.parse import urlsplit
 
@@ -144,12 +145,57 @@ _TRASH_LOCK_MESSAGE = (
 # running on the dataset. Deleting under it would orphan the run's provenance row
 # and — for a cloud run — leave a paid vast pod training against images we just
 # trashed. RuntimeError -> 409 (routes._common._map_error); dataset untouched.
-_ACTIVE_RUN_MESSAGE = (
+_ACTIVE_RUN_TEMPLATE = (
     'A training run is active on this dataset — stop it (or let it finish) '
-    'before deleting.')
+    'before {action}.')
+_ACTIVE_RUN_MESSAGE = _ACTIVE_RUN_TEMPLATE.format(action='deleting')
 SMALL_IMAGE_SOURCE = 'small_image_source'
 KLEIN_SMALL_IMAGE = 'klein_small_image'
 KLEIN_IMAGE_IMPROVE = 'klein_image_improve'
+
+# The three "Upscale & improve" knobs live in config (klein.improve_*). Read
+# through clamps: a hand-edited config with a string, a negative or a wild value
+# must degrade the pass to something sane, never raise inside the enqueue path.
+_IMPROVE_MAX_STRENGTH = 2.0
+_IMPROVE_MAX_STEPS = 50
+
+
+# Config keys renamed after they shipped. improve_character_lora_strength was a
+# MISNOMER: the value drives klein.consistency_strength (composition anchoring),
+# never an identity LoRA. Renamed rather than left lying, but a value already saved
+# under the old name must keep working — config keys live in users' config.json.
+_IMPROVE_KEY_ALIASES = {
+    'improve_consistency_strength': ('improve_character_lora_strength',),
+}
+
+
+def _improve_float(key, default, ceiling=_IMPROVE_MAX_STRENGTH) -> float:
+    """Per-key ceiling: the consistency LoRA is itself clamped to 1.5 downstream, and
+    the megapixel budget is a resolution, not a strength — one shared ceiling would
+    either lie to the user or silently cap a value the UI had offered."""
+    raw = cfg.get(f'klein.{key}')
+    # cfg.get merges the shipped defaults, so the new key NEVER reads as absent —
+    # "still at its default" is what actually means "the user has not set this one",
+    # and only then may a value saved under the old name speak for it.
+    if raw is None or raw == default:
+        for legacy in _IMPROVE_KEY_ALIASES.get(key, ()):
+            legacy_value = cfg.get(f'klein.{legacy}')
+            if legacy_value is not None:
+                raw = legacy_value
+                break
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(0.0, min(ceiling, v))
+
+
+def _improve_int(key, default) -> int:
+    try:
+        v = int(cfg.get(f'klein.{key}'))
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(_IMPROVE_MAX_STEPS, v))
 # KLEIN_IMAGE_IMPROVE_PROMPT is the shipped DEFAULT of the editable klein_improve
 # prompt (imported from face_variations, which owns the identity/quality prompt
 # registry). Re-exported here so `svc.KLEIN_IMAGE_IMPROVE_PROMPT` keeps resolving.
@@ -687,8 +733,11 @@ def update_dataset_settings(user_id, dataset_id, *, name=None, trigger_word=None
     or None if the dataset is absent; raises ValueError on invalid input and
     RuntimeError (-> 409) when a kind switch is asked while work is in progress.
 
-    Changing the **trigger word** is safe and needs NO re-caption: captions are stored
-    without it (it's prepended at export). Changing a concept dataset's **description**
+    Changing the **trigger word** needs NO re-caption: captions are stored without it
+    (it's prepended at export). It is, however, the ON-DISK naming key, so everything
+    the dataset already produced is renamed to follow — see _propagate_trigger_rename,
+    reported back as `trigger_rename`. Refused (409) while a run is live, because the
+    run folder is what ai-toolkit auto-resumes from. Changing a concept dataset's **description**
     (what the captions must omit) invalidates the cached LLM avoid-list (concept_terms)
     so it regenerates — but images already captioned keep the OLD omission until
     re-captioned (same 'future captions' contract as set_fidelity).
@@ -710,6 +759,12 @@ def update_dataset_settings(user_id, dataset_id, *, name=None, trigger_word=None
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return None
+    # The on-disk naming key, measured ONCE before any mutation and once after them
+    # all. Two different edits can move it (the trigger word, or a style's name — see
+    # below), and a dataset can be edited by both in a single save, so comparing the
+    # start and end states is the only reading that can't disagree with itself.
+    _lt = _lora_training()
+    naming_before = _lt._safe_trigger(ds) if _lt else None
     prev_label = (ds.kind or '').lower() or 'character'
     kind_changed = False
     if kind is not None:
@@ -736,10 +791,40 @@ def update_dataset_settings(user_id, dataset_id, *, name=None, trigger_word=None
     if name is not None:
         n = (name or '').strip()
         if n:
-            ds.name = n[:100]
+            new_name = n[:100]
+            # A STYLE has no visible trigger — it is always-on, so the field is hidden
+            # and the token that names its files is retained internally, out of reach.
+            # Its NAME is therefore the only identity it can edit, so for a style (and
+            # only a style) the name drives the naming token too; without this, a style
+            # dataset could never rename the LoRAs it had already produced. The token is
+            # pure file naming for a style (never an activation word), so moving it
+            # changes nothing about captions or generation.
+            if is_style(ds) and new_name != (ds.name or '') and _lt:
+                token = _lt._safe_trigger(SimpleNamespace(
+                    trigger_word=new_name, id=ds.id))[:60]
+                if token != (ds.trigger_word or ''):
+                    _guard_no_active_training(dataset_id, action='renaming a style dataset')
+                    ds.trigger_word = token
+            ds.name = new_name
+    trigger_rename = None        # (old_safe, new_safe) when the on-disk naming key moved
+    # A STYLE has no trigger FIELD — the settings modal sends back the stored token
+    # verbatim (`trigger_word: style ? d.trigger_word : ...`). Honouring that echo
+    # here overwrote the token the name block had just derived from the new name, so
+    # renaming a style changed its label and nothing else: the reported bug. For a
+    # style the name is the only lever, so an incoming trigger is never an edit.
+    if is_style(ds):
+        trigger_word = None
     if trigger_word is not None:
         t = (trigger_word or '').strip()
         if t:
+            if t[:60] != (ds.trigger_word or ''):
+                # The trigger is the ON-DISK naming key (u{user}_{trigger} run folders,
+                # lora_{trigger} deployed files), so changing it renames everything this
+                # dataset already produced. Refuse mid-flight: the run folder IS what
+                # ai-toolkit auto-resumes from, and moving it under a live job would
+                # strand the run. The rename itself is decided from naming_before /
+                # naming_after around the whole edit, not here.
+                _guard_no_active_training(dataset_id, action='changing the trigger word')
             ds.trigger_word = t[:60]
         elif not is_style(ds):
             # A character/concept trigger is the summon token — it cannot be blank.
@@ -759,12 +844,102 @@ def update_dataset_settings(user_id, dataset_id, *, name=None, trigger_word=None
         ds.prompt_suffix = _normalize_prompt_suffix(prompt_suffix)
     if prompt_suffixes is not None:
         ds.prompt_suffixes = _normalize_prompt_suffixes(prompt_suffixes)
+    naming_after = _lt._safe_trigger(ds) if _lt else None
+    if naming_before and naming_after and naming_before != naming_after:
+        trigger_rename = (naming_before, naming_after)
     db.session.commit()
     res = {'ok': True, 'concept_desc_changed': concept_changed}
     if kind_changed:
         res.update(kind_changed=True, kind=(ds.kind or 'character'),
                    previous_kind=prev_label)
+    if trigger_rename:
+        moved = _propagate_trigger_rename(ds, *trigger_rename)
+        # Only reported when it actually did something: a dataset that never trained
+        # has no artefacts to move, and a silent 0-file rename is indistinguishable
+        # from no rename at all — so the response stays exactly as it was before.
+        if moved['files'] or not moved['ok']:
+            res['trigger_rename'] = moved
     return res
+
+
+def _lora_training():
+    """lora_training, or None in a phase-1 install where it isn't present yet.
+    Lazy: face_dataset_service <-> lora_training is a circular import at module level."""
+    try:
+        from . import lora_training as lt
+        return lt
+    except ImportError:
+        return None
+
+
+def _propagate_trigger_rename(ds, old_safe, new_safe) -> dict:
+    """Carry a trigger rename through to disk AND to the rows that point at the
+    renamed files. Returns {'ok', 'files', 'rows', 'conflicts'} for the caller to
+    report; never raises — a failed rename leaves a working dataset whose old
+    artefacts simply keep the old name (exactly today's behaviour).
+
+    The database rewrite is DERIVED FROM THE FILES ACTUALLY RENAMED rather than
+    rebuilt from the trigger: stored checkpoint values carry a ComfyUI subfolder
+    ('z image\\...') and a family/step suffix, so reconstructing them here would
+    duplicate — and eventually contradict — the naming rules in lora_training.
+    Matching on basename keeps this correct whatever those rules become."""
+    lt = _lora_training()
+    if lt is None:
+        return {'ok': False, 'files': 0, 'rows': 0, 'conflicts': []}
+    out = lt.rename_training_artifacts(ds.user_id, old_safe, new_safe)
+    if not out['ok']:
+        # A destination already existed (a dataset already using the new trigger).
+        # Nothing was moved, so nothing in the DB may be rewritten either.
+        return {'ok': False, 'files': 0, 'rows': 0, 'conflicts': out['conflicts']}
+
+    renames = out['renamed']
+    by_basename = {os.path.basename(src): os.path.basename(dest)
+                   for src, dest in renames if src.endswith('.safetensors')}
+    dir_moves = [(src, dest) for src, dest in renames if not os.path.splitext(src)[1]]
+    rows = 0
+
+    def _remap(value):
+        """The new name for a stored LoRA reference, or None when it isn't one of
+        the files we just moved. Compares on basename so a stored subfolder prefix
+        ('z image\\lora_X.safetensors') survives untouched."""
+        if not value:
+            return None
+        base = os.path.basename(str(value).replace('\\', '/'))
+        new_base = by_basename.get(base)
+        return str(value)[:-len(base)] + new_base if new_base else None
+
+    if by_basename:
+        for row in LoraTestImage.query.filter_by(dataset_id=ds.id).all():
+            new_ck = _remap(row.checkpoint)
+            if new_ck:
+                row.checkpoint = new_ck
+                rows += 1
+        # The dataset's winning Test-Studio settings pin a LoRA filename too.
+        settings = _safe_json(ds.best_settings)
+        if isinstance(settings, dict):
+            new_ck = _remap(settings.get('lora_filename'))
+            if new_ck:
+                settings['lora_filename'] = new_ck
+                ds.best_settings = json.dumps(settings)
+                rows += 1
+
+    # Cloud runs store the local run identity (u{user}_{trigger}{tag}) and cache
+    # absolute paths under the renamed run folders — both carry the old trigger.
+    from ..models import CloudTrainingRun
+    old_run, new_run = f'u{ds.user_id}_{old_safe}', f'u{ds.user_id}_{new_safe}'
+    for run in CloudTrainingRun.query.filter_by(dataset_id=ds.id).all():
+        if run.run_name and lt._trigger_boundary(run.run_name, old_run):
+            run.run_name = new_run + run.run_name[len(old_run):]
+            rows += 1
+        for attr in ('staging_dir', 'checkpoint_local_path'):
+            cur = getattr(run, attr, None)
+            for src, dest in dir_moves:
+                if cur and os.path.normcase(str(cur)).startswith(os.path.normcase(src)):
+                    setattr(run, attr, dest + str(cur)[len(src):])
+                    rows += 1
+                    break
+    db.session.commit()
+    return {'ok': True, 'files': len(renames), 'rows': rows, 'conflicts': []}
 
 
 def get_dataset(user_id, dataset_id):
@@ -1209,7 +1384,7 @@ def delete_image(user_id, image_id):
     return True
 
 
-def _guard_no_active_training(dataset_id):
+def _guard_no_active_training(dataset_id, *, action='deleting'):
     """Raise RuntimeError (-> 409) when a LOCAL or CLOUD training run is mid-flight
     on this dataset, so delete_dataset refuses instead of silently orphaning the
     run. Lazy imports dodge the cloud_training/lora_training <-> face_dataset_service
@@ -1223,13 +1398,13 @@ def _guard_no_active_training(dataset_id):
     except ImportError:
         ct = None
     if ct is not None and ct.active_runs_for(dataset_id):
-        raise RuntimeError(_ACTIVE_RUN_MESSAGE)
+        raise RuntimeError(_ACTIVE_RUN_TEMPLATE.format(action=action))
     try:
         from . import lora_training as lt
     except ImportError:
         lt = None
     if lt is not None and lt.is_local_run_active(dataset_id):
-        raise RuntimeError(_ACTIVE_RUN_MESSAGE)
+        raise RuntimeError(_ACTIVE_RUN_TEMPLATE.format(action=action))
 
 
 def delete_dataset(user_id, dataset_id):
@@ -4439,7 +4614,17 @@ def _improve_existing_image_locked(user_id, image_id):
         job_id = keh.enqueue_klein_edit(
             user_id=str(user_id), source_filename=img.filename,
             source_path=source_path, edit_prompt=prompt,
-            lora_strength=0.0, sampler_steps=4, base_lora_strength=0.0,
+            # The "Upscale & improve" quality profile, now user-tunable. Defaults
+            # (0 / 4 / 0) are the values that were hardcoded here, so an untouched
+            # install behaves exactly as before. Clamped, because a bad config
+            # value must degrade the pass, never crash the enqueue.
+            # The fallback MUST equal the shipped config default: _improve_float treats
+            # "still at its default" as "the user has not set this", which is what lets
+            # a value saved under the old key name speak for it.
+            lora_strength=_improve_float('improve_consistency_strength', 1.0, 1.5),
+            sampler_steps=_improve_int('improve_steps', 4),
+            base_lora_strength=_improve_float('improve_base_lora_strength', 0.0),
+            output_megapixels=_improve_float('improve_megapixels', 2.0, 8.0),
             extra_metadata={
                 'is_dataset': True,
                 'dataset_id': img.dataset_id,
