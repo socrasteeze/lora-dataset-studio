@@ -23,7 +23,7 @@ captioning rules and a few guards change with the dataset kind.
    crop editor (or *Reset to auto*) if the framing is off. Up to 3 extra angles
    can be added for multi-view consistency.
 3. **Generate variations** — fire the **variation catalog** on the local Klein
-   engine: 45 shots across expression,
+   engine: 53 shots across expression,
    angle, lighting, framing, outfit and background, each wrapped in an identity
    guard so the face stays the same person.
 4. **Import** your own photos too (drag & drop) — each is auto-cropped to the
