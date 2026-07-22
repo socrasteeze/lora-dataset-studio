@@ -351,7 +351,11 @@ def probe_aitoolkit() -> dict:
         return {'ok': False, 'detail': 'aitoolkit.dir not configured'}
     venv_python = cfg.aitoolkit_path('venv_python')
     has_run = (d / 'run.py').exists()
-    ok = has_run and bool(venv_python) and venv_python.exists()
+    # is_file(), NOT exists(): the training launch gate (lora_training.is_installed)
+    # checks is_file(), so a venv_python that resolves to a directory or a broken
+    # link would make the diagnostic report ai-toolkit=yes while training still
+    # says "not installed". Keep the two in lockstep so the diagnostic never lies.
+    ok = has_run and bool(venv_python) and venv_python.is_file()
     if ok:
         return {'ok': True, 'detail': str(d)}
     if has_run:
@@ -493,9 +497,11 @@ def probe_scrape_deps() -> dict:
     only (no import cost): the scrape stack runs IN-PROCESS, so the app's own
     interpreter is the one that must see the packages. curl_cffi + gallery_dl
     are the two hard requirements (picazor/civitai fetch, gallery enumeration);
-    bs4/cloudscraper ride along in the same install."""
+    bs4/cloudscraper/instaloader ride along in the same install. Every module the
+    scrape stack imports belongs here: an omission reads as "installed" while the
+    source that needs it still raises at runtime (instaloader did, until 2026-07)."""
     import importlib.util
-    missing = [m for m in ('curl_cffi', 'gallery_dl', 'bs4', 'cloudscraper')
+    missing = [m for m in ('curl_cffi', 'gallery_dl', 'bs4', 'cloudscraper', 'instaloader')
                if importlib.util.find_spec(m) is None]
     return {'ok': not missing,
             'detail': 'scrape deps OK' if not missing else f"missing: {', '.join(missing)}"}

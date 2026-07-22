@@ -562,6 +562,39 @@ def _base_tag(ds) -> str:
     return _base_tag_for(getattr(ds, 'train_base_model', None))
 
 
+def official_base_repo(ds, family=None, variant=_PERSISTED):
+    """The Hugging Face repo a CLOUD pod will download for the OFFICIAL base of this
+    recipe, or None when the run uses custom local weights (nothing to fetch) or a
+    family whose base is not an HF repo.
+
+    Exists for one reason: a gated repo the account has not been granted access to
+    fails with a 403 **on the pod**, i.e. after a GPU has been rented and paid for.
+    Three runs were burned that way on krea/Krea-2-Raw. Resolving the repo here lets
+    the launch check the gate BEFORE reserving anything.
+
+    Mirrors the recipe decisions (`_krea_is_raw`, `_flux2klein_is_9b`, the Z-Image
+    variant matrix) rather than restating them, so a recipe change cannot silently
+    leave this behind."""
+    fam = _train_type(ds, family)
+    weights = getattr(ds, 'train_base_model', None)
+    if _is_custom_weights(weights) or (weights and os.path.isfile(str(weights))):
+        return None                       # local file: the pod never asks HF for it
+    if fam == 'krea':
+        return 'krea/Krea-2-Raw' if _krea_is_raw(ds, variant) else 'krea/Krea-2-Turbo'
+    if fam == 'flux':
+        return 'black-forest-labs/FLUX.1-dev'
+    if fam == 'flux2klein':
+        return ('black-forest-labs/FLUX.2-klein-base-9B' if _flux2klein_is_9b(ds, variant)
+                else 'black-forest-labs/FLUX.2-klein-base-4B')
+    if fam == 'zimage':
+        var = str((getattr(ds, 'train_variant', None) if variant is _PERSISTED else variant)
+                  or 'turbo').lower()
+        if var == 'deturbo':
+            return ZIMAGE_DETURBO_BASE
+        return ZIMAGE_BASE if var == 'base' else ZIMAGE_TURBO_BASE
+    return None
+
+
 KREA_BASE_LABEL = 'Krea-2-Turbo'   # mirrors name_or_path 'krea/Krea-2-Turbo'
 # Flux a une seule base officielle (FLUX.1-dev). Sans point dans le label (sinon
 # _base_tag_for le prendrait pour une extension et tronquerait à « FLUX ») → tag
@@ -3462,6 +3495,141 @@ def purge_training_artifacts(user_id, trigger_safe) -> list[str]:
     logger.info('purge_training_artifacts u%s/%s : %d artefact(s) retiré(s)',
                 user_id, trigger_safe, len(removed))
     return removed
+
+
+def _rename_plan(root, old_prefix, new_prefix, *, want_dir=False, suffix=None) -> list:
+    """Entries of `root` on the EXACT boundary of old_prefix, paired with their
+    renamed path. `suffix` restricts to one extension and is stripped before the
+    boundary test (a job config's boundary lives in its stem, not in '.json')."""
+    out = []
+    if not os.path.isdir(root):
+        return out
+    for name in os.listdir(root):
+        if suffix and not name.endswith(suffix):
+            continue
+        src = os.path.join(root, name)
+        if os.path.isdir(src) != want_dir:
+            continue
+        stem = name[:-len(suffix)] if suffix else name
+        if not _trigger_boundary(stem, old_prefix):
+            continue
+        out.append((src, os.path.join(root, new_prefix + name[len(old_prefix):])))
+    return out
+
+
+def _rename_inside_run(run_dir, old_trigger_safe, new_trigger_safe) -> list:
+    """Rename the `lora_<trigger>` subfolder and every `lora_<trigger>*` weights file
+    INSIDE a run folder that was just renamed.
+
+    ai-toolkit stamps the trigger at three levels, not one:
+        ulocal_<trigger>_<base>/ lora_<trigger>/ lora_<trigger>_000000250.safetensors
+    Moving only the outer folder therefore fixed nothing the user could see: importing
+    a checkpoint deploys it under the SOURCE FILE's stem (`import_checkpoint`), so the
+    LoRA still landed in ComfyUI under the old trigger. Reported after renaming a
+    style dataset — the label changed, the deployed name did not.
+
+    Best-effort per entry: a locked file is skipped, not fatal. Depth 1 is deliberate
+    — that is the exact shape ai-toolkit writes, and walking deeper would risk
+    renaming unrelated payloads (samples, optimizer state) that merely share a prefix."""
+    moved = []
+    try:
+        entries = sorted(os.listdir(run_dir))
+    except OSError:
+        return moved
+    for name in entries:
+        if not _trigger_boundary(os.path.splitext(name)[0], f'lora_{old_trigger_safe}'):
+            continue
+        src = os.path.join(run_dir, name)
+        dest = os.path.join(run_dir, f'lora_{new_trigger_safe}'
+                            + name[len(f'lora_{old_trigger_safe}'):])
+        if os.path.exists(dest):
+            logger.warning('rename: %s already exists — left in place', dest)
+            continue
+        try:
+            os.rename(src, dest)
+            moved.append((src, dest))
+            if os.path.isdir(dest):        # the lora_<trigger>/ folder: its files too
+                moved += _rename_inside_run(dest, old_trigger_safe, new_trigger_safe)
+        except OSError as e:
+            logger.warning('rename: %s -> %s échoué : %s', src, dest, e)
+    return moved
+
+
+def rename_training_artifacts(user_id, old_trigger_safe, new_trigger_safe) -> dict:
+    """Rename every training artefact of a (user, trigger) onto a NEW trigger —
+    the mirror of purge_training_artifacts, for an edit instead of a delete.
+
+    Without this, changing a dataset's trigger word orphaned everything it had
+    already produced: the deployed LoRA, the ai-toolkit run folder, the export and
+    the job config all keep the OLD trigger in their name, so they no longer match
+    the dataset that made them (and a later run under the new trigger starts from
+    an empty folder while the old one lingers as dead weight).
+
+    Covers the same four backends as the purge: deployed LoRAs (all five family
+    dirs), run output/, export datasets/, and config/generated/. Same safety
+    rules too — exact trigger-boundary matching (never a sibling: Lola vs Lola2),
+    bare os.listdir names (no path traversal), empty trigger is a no-op.
+
+    PLANNED IN FULL, THEN EXECUTED: a half-renamed set is worse than none at all
+    (artefacts split across two triggers with no record of the split), so any
+    destination that already exists aborts the whole rename and nothing is moved.
+    Returns {'renamed': [(src, dest)], 'conflicts': [dest], 'ok': bool}; ok is
+    False only when a conflict blocked it. Idempotent: a second call finds
+    nothing left under the old trigger and is a successful no-op.
+
+    Each backend is probed independently — an unconfigured one (no ComfyUI dir
+    yet) simply yields no roots to sweep instead of aborting the rename."""
+    old_trigger_safe = (old_trigger_safe or '').strip()
+    new_trigger_safe = (new_trigger_safe or '').strip()
+    if (not old_trigger_safe or not new_trigger_safe
+            or old_trigger_safe == new_trigger_safe or user_id in (None, '')):
+        return {'renamed': [], 'conflicts': [], 'ok': True}
+
+    old_run, new_run = f'u{user_id}_{old_trigger_safe}', f'u{user_id}_{new_trigger_safe}'
+    old_lora, new_lora = f'lora_{old_trigger_safe}', f'lora_{new_trigger_safe}'
+
+    def _roots(accessors):
+        roots = []
+        for accessor in accessors:
+            try:
+                roots.append(str(accessor()))
+            except RuntimeError:
+                pass                      # backend not configured yet -> nothing to sweep
+        return roots
+
+    plan = []
+    # 1) deployed LoRAs in ComfyUI (zimage + sdxl + krea + flux + flux2klein)
+    for root in _roots((_lora_dest_dir_zimage, _lora_dest_dir_sdxl, _lora_dest_dir_krea,
+                        _lora_dest_dir_flux, _lora_dest_dir_flux2klein)):
+        plan += _rename_plan(root, old_lora, new_lora, suffix='.safetensors')
+    # 2) run output + 3) export datasets (whole folders)
+    for root in _roots((_output_dir, _datasets_dir)):
+        plan += _rename_plan(root, old_run, new_run, want_dir=True)
+    # 4) job configs, keyed by run name (one trigger can have several families)
+    for root in _roots((_jobs_dir,)):
+        plan += _rename_plan(root, old_run, new_run, suffix='.json')
+
+    conflicts = [dest for _, dest in plan if os.path.exists(dest)]
+    if conflicts:
+        logger.warning('rename_training_artifacts u%s %s->%s : abandon, %d collision(s)',
+                       user_id, old_trigger_safe, new_trigger_safe, len(conflicts))
+        return {'renamed': [], 'conflicts': conflicts, 'ok': False}
+
+    renamed = []
+    for src, dest in plan:
+        try:
+            os.rename(src, dest)
+            renamed.append((src, dest))
+            if os.path.isdir(dest):
+                renamed += _rename_inside_run(dest, old_trigger_safe, new_trigger_safe)
+        except OSError as e:
+            # Best-effort like the purge: a locked file (an open LoRA, a folder held
+            # by a viewer) is logged and skipped rather than aborting mid-way, which
+            # would leave the set split with no way to tell which half moved.
+            logger.warning('rename: %s -> %s échoué : %s', src, dest, e)
+    logger.info('rename_training_artifacts u%s %s->%s : %d artefact(s) renommé(s)',
+                user_id, old_trigger_safe, new_trigger_safe, len(renamed))
+    return {'renamed': renamed, 'conflicts': [], 'ok': True}
 
 
 def write_job_config(ds, dataset_folder: str, steps: int = 3000) -> str:

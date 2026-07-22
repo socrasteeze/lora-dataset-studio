@@ -80,6 +80,19 @@ _KLEIN_DOWNLOADS = {
         'dest': ('loras', 'klein', 'Flux2-Klein-9B-consistency-V2.safetensors'),
         'min_free_gb': 1, 'gated': False,
     },
+    # The detail LoRA node 139 of the improve workflow loads. It shipped as a
+    # hardcoded filename the graph expected to already exist, so on any machine
+    # without it the node was silently BYPASSED — the "Upscale & improve"
+    # enhancement strength then moved nothing, with no way to tell. Downloading it
+    # like every other Klein asset is what makes that setting mean something.
+    # Same author as the consistency LoRA above; Apache-2.0, so linking the
+    # original source is enough — the file is never re-hosted here.
+    'klein_enhancement_lora': {
+        'url': 'https://huggingface.co/dx8152/Flux2-Klein-9B-Enhanced-Details/resolve/main/realistic.safetensors',
+        'dest': ('loras', 'klein', 'realistic.safetensors'),
+        'min_free_gb': 1, 'gated': False,
+        'license_url': 'https://huggingface.co/dx8152/Flux2-Klein-9B-Enhanced-Details',
+    },
     'klein_text_encoder': {
         'url': 'https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b/resolve/main/split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors',
         'dest': ('text_encoders', 'qwen_3_8b_fp8mixed.safetensors'),
@@ -512,13 +525,21 @@ def _check_klein_precondition(action):
 # preconditions are already satisfiable. Firing order is grouped by capability area for
 # a coherent "X / N" progress display; the real scheduling still comes from start()
 # (pip serialized FIFO, model downloads parallel), so the order here is cosmetic.
-_INSTALL_ALL_ORDER = ('face_scoring', 'masks', 'watermark_inpaint', 'ollama_model',
-                      'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora')
+_INSTALL_ALL_ORDER = ('scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint',
+                      'ollama_model',
+                      'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
+                      'klein_enhancement_lora')
 
 
 def _action_needed(action, caps) -> bool:
     """Is `action` both MISSING and satisfiable right now, from live capabilities?
     Pure (caps in, bool out) — the single rule install_all_plan is built from."""
+    if action == 'scrape_extras':
+        # Pure-python wheels into THIS interpreter, so no ML-range gate: runnable on
+        # any Python the app itself starts on. scrape_deps is False as soon as ONE of
+        # the modules is absent, which is what makes a later-added package (instaloader)
+        # reachable from "Install everything" instead of only the per-tile Reinstall.
+        return not caps.get('scrape_deps')
     if action in ('face_scoring', 'masks'):
         # These install into the app's OWN interpreter, so they need it inside the ML
         # wheel range (3.10-3.12); on a newer Python they'd only source-build and fail,

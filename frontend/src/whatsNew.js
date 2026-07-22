@@ -56,6 +56,181 @@ export const WHATS_NEW = [
       "The release ZIP now ships Create Desktop Shortcut.bat next to start.bat — double-click it once and you get a LoRA Dataset Studio shortcut on your Desktop with the app's own icon, instead of a generic batch-file icon or hunting through the extracted folder every time.",
   },
   {
+    id: '2026-07-23-continue-lane-picker-on-runs',
+    date: '2026-07-23',
+    title: '▶ Continue a cloud run on your own GPU, straight from the Runs page',
+    blurb:
+      'The Continue dialog already let you pick Local or Cloud — but only inside a dataset panel. Opened from the Runs page it silently relaunched a pod, even when your own GPU was free. It now offers the same choice: finish that epoch on this machine (its checkpoint was already mirrored here) or on a fresh pod. A lane you can’t use stays visible with the reason, and it is the RIGHT reason for that run — the cloud one counts the runs of that run’s own dataset, not the whole page. Refusals now speak up too: a busy GPU or a caption change is a toast, not a click that seems to do nothing.',
+    to: '/cloud',
+  },
+  {
+    id: '2026-07-22-hf-gate-checked-before-renting',
+    date: '2026-07-22',
+    title: '☁ A locked model no longer costs you a rented GPU',
+    blurb:
+      'Some base models are gated on Hugging Face: you must accept their licence once, and a repository can become gated overnight — three runs failed that way on a config that had worked the day before. The failure happened on the pod, after renting: you paid for a GPU that downloaded nothing. The launch now checks that access first and refuses before reserving anything, naming the model and the page to open. If Hugging Face is simply unreachable the launch still goes ahead — an outage must not ground a run that would have worked. And the run card no longer shows only "403 Client Error": these messages carry their explanation on the second line, which used to be visible only by hovering.',
+    to: '/cloud',
+  },
+  {
+    id: '2026-07-22-style-rename-actually-renames',
+    date: '2026-07-22',
+    title: '✎ Renaming a Style dataset really renames its files now',
+    blurb:
+      'Two bugs made it change the label and nothing else. A Style has no trigger field, so the settings dialog sends the stored token back unchanged — and that echo overwrote the token just derived from the new name, so nothing on disk ever moved. And the rename only touched the outer run folder, while training stamps the name at three levels: the run folder, a subfolder inside it, and every checkpoint file. Since importing a checkpoint deploys it under the file\'s own name, the LoRA kept arriving in ComfyUI under the old one. Both fixed. If you renamed a Style before this, rename it once more for its files to catch up.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-22-version-label-names-the-commit',
+    date: '2026-07-22',
+    title: '🔢 The version shown is the version you are running',
+    blurb:
+      "The version number only moves when a release is cut, so anyone following the project on a git checkout was told they were on the last release — even sitting twenty commits past it. Being told “you're up to date” under an older number than the code you are running reads as a contradiction, and made it impossible to tell what was actually live. The update check already knew the branch and the commit; it now says them. Packaged installs are unchanged: there the release number really is the truth.",
+    to: '/settings/maintenance',
+  },
+  {
+    id: '2026-07-22-export-links-open-the-disclosure',
+    date: '2026-07-22',
+    title: '🎯 "Import to bank", "Portable backup" and "Publish to Hugging Face" show up again',
+    blurb:
+      'Those three ways out of a dataset live behind the "More ways out" fold, and clicking their link in the Import & export menu highlighted the link while the button stayed hidden inside the closed fold. Jumping to a panel now opens whatever fold it sits in, so the button you asked for is the one you land on.',
+    to: '/datasets?section=export&panel=to-bank',
+  },
+  {
+    id: '2026-07-22-improve-tuned-profile-and-loud-missing-lora',
+    date: '2026-07-22',
+    title: '✨ A better "Upscale & improve" out of the box — and it speaks up now',
+    blurb:
+      'The pass now ships with a high consistency strength by default. That setting resists redrawing the shot, which is a drawback when you are restaging an image and exactly the point when you are only adding detail — so an improve keeps your composition instead of quietly reinventing it. And a LoRA strength you raised is never silently ignored any more: if its weights file is missing, the pass says so (which is what fetches it) rather than running unchanged and leaving you guessing. At strength 0 nothing changes — a LoRA you did not ask for is still skipped quietly.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-22-enhancement-lora-installed-automatically',
+    date: '2026-07-22',
+    title: '⬇ The improve detail LoRA installs itself now',
+    blurb:
+      'The "Upscale & improve" enhancement strength depends on a weights file the app never shipped or fetched — and when it is missing, that node is skipped entirely, so the slider moved nothing at all and said nothing about it. It is now downloaded with the other Klein assets by Setup ▸ Install everything, straight into the right ComfyUI folder. Fetched from its original public source (dx8152, Apache-2.0), never re-hosted.',
+    to: '/setup',
+  },
+  {
+    id: '2026-07-22-settings-links-where-you-act',
+    date: '2026-07-22',
+    title: '⚙️ "This is adjustable" — said where you are, not where the setting lives',
+    blurb:
+      'Several things were configurable without anything saying so: the Upscale & improve strength, which model writes your captions, the credentials a scraper source needs, the default LoRA family and the cloud GPU limits. Each of those places now carries a small link straight to the right Settings section, so you never have to go hunting for a page you did not know existed. The cloud banner also lands on the section that actually holds the vast.ai key instead of the Settings landing page.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-22-checkpoints-refresh-when-a-run-ends',
+    date: '2026-07-22',
+    title: '🔄 Freshly trained LoRAs appear on their own',
+    blurb:
+      'When a run finished, its checkpoints were on disk but the list never re-read them — so the LoRA you had just trained stayed invisible until you changed the browse filter or reloaded the page. The panel now watches the run that concerns this dataset end, local or cloud, and re-reads what it produced; the lineage graph refreshes with it so the two views cannot disagree.',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-22-export-more-ways-out',
+    date: '2026-07-22',
+    title: '📦 Import & export: one clear action, the rest tucked away',
+    blurb:
+      'Export ZIP is what you reach for; Import to bank, Backup and Publish to Hugging Face are occasional. They now sit behind a single “More ways out” disclosure instead of four buttons competing for the same glance. Sidebar links still jump straight to them — the panel opens itself.',
+    to: '/datasets?section=export',
+  },
+  {
+    id: '2026-07-22-update-survives-history-rewrite',
+    date: '2026-07-22',
+    title: '🔄 Updating no longer breaks if the project history is rewritten',
+    blurb:
+      'In-app updates used to depend on every commit keeping its identity forever. If the project history was ever rewritten, every commit got a new id, no fast-forward was possible, and “Update & restart” failed for good — on a checkout that was otherwise perfectly healthy. The updater now recognises that case and resyncs, but only after proving nothing would be lost: it refuses if you have uncommitted changes to tracked files, or local commits of your own. Untracked files are never touched. The “commits behind” count is measured by content too, so a rewrite no longer reads as hundreds of pending commits when you are already up to date.',
+    to: '/setup',
+  },
+  {
+    id: '2026-07-22-improve-strength-settings',
+    date: '2026-07-22',
+    title: '🔧 "Upscale & improve" is now adjustable, not a fixed profile',
+    blurb:
+      'Its instruction was editable, but everything deciding what the pass produces was hardcoded — the output size at 2 MP whatever your source was worth, and both LoRA strengths at 0, which meant the enhancement LoRA built into the workflow never applied at all. Settings ▸ Image engines now exposes the output size, the enhancement LoRA, the consistency LoRA (it anchors composition, not identity) and the step count. All four start at exactly the values the action used before, so leaving them alone changes nothing. One caveat worth knowing: the enhancement LoRA reads a file that ships with neither the app nor the Klein install, and when it is missing its node is skipped entirely — so that one slider does nothing until you have it.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-22-import-dataset-to-bank',
+    date: '2026-07-22',
+    title: '↑ Import to bank — send a dataset back the other way',
+    blurb:
+      "The bank could feed datasets, but nothing went the other way. Import & export now has ↑ Import to bank: the dataset's kept images are copied into a brand-new bank under a name you choose, so you can re-triage them with the bank tools — duplicate detection (perceptual and semantic), framing, quality and face scores — and promote a cleaner selection back out. They are COPIED, not shared, so nothing you do in the bank can disturb the dataset. Deleting such a bank takes its copy to Trash with it, so it never lingers on disk.",
+    to: '/datasets?section=export',
+  },
+  {
+    id: '2026-07-22-continue-says-why-it-is-off',
+    date: '2026-07-22',
+    title: '▶ "Continue training" now tells you why it is greyed out',
+    blurb:
+      'When the button was disabled, the reason was only in its hover tooltip — so it read as a button that simply does nothing. The reason is now written in the panel itself, in the same amber line the epoch tools use: either the checkpoints come from a different LoRA family, base or variant than the one selected in Training, or a training is already running on this machine and no cloud lane is available.',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-22-trigger-rename-follows-on-disk',
+    date: '2026-07-22',
+    title: '✎ Renaming the trigger word now renames the LoRAs it already made',
+    blurb:
+      "The trigger word is what names everything a dataset produces — the deployed LoRA, the training run folder, the export. Changing it used to leave all of that behind under the old name, orphaned from the dataset that made it. Now the files follow: LoRAs, run folder, export and job config are renamed together, and the Test Studio history and cloud runs keep pointing at them. If the new name is already taken on disk nothing is moved at all (never half), and the edit is refused while a run is live, since that folder is what training resumes from. Style datasets have no visible trigger — they are always-on — so there it is the dataset NAME that renames them.",
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-22-install-everything-covers-scraper',
+    date: '2026-07-22',
+    title: '⬇ "Install everything" now repairs the scraper too',
+    blurb:
+      "The scraper packages were the one component Install everything never touched: it reported everything was already in place while a source kept failing on a missing package. They are now part of the plan, and the check looks at every package the scraper imports — so a package added by an update (instaloader, for Instagram) is picked up instead of staying invisible until you found the per-tile Reinstall button.",
+    to: '/setup',
+  },
+  {
+    id: '2026-07-22-continue-choose-local-or-cloud',
+    date: '2026-07-22',
+    title: '▶ Continue: choose where it runs — this GPU or a rented one',
+    blurb:
+      "A checkpoint is just a file, so where it was trained no longer decides where it can be finished. The Continue dialog now has a Local / Cloud switch: send a run trained on your machine to a rented GPU (the checkpoint is uploaded and training picks up from it), or finish a cloud epoch here. A lane you can't use says why instead of vanishing — and a local training in progress no longer blocks the cloud one.",
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-22-final-checkpoint-previewable',
+    date: '2026-07-22',
+    title: '☑ The final checkpoint can be previewed too',
+    blurb:
+      'Importing the last save of a run left its pill in the lineage graph without a tick-box, so the one checkpoint you most want to look at was the only one you could not preview. The final save is deployed without a step number in its name; it is now matched back to its own run, and ticking it generates a preview like any other epoch.',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-22-continue-from-any-graph-checkpoint',
+    date: '2026-07-22',
+    title: '▶ Continue from any checkpoint straight from the graph — in your dataset too',
+    blurb:
+      "Clicking a checkpoint in the lineage graph used to offer “Continue from here” only on the Runs page. In a dataset's Checkpoints & LoRAs graph the same click now opens the Continue dialog already set on THAT step — including for runs trained on this machine — so resuming from the epoch that held up best is one click, not a dropdown hunt.",
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-22-lineage-preview-checkbox-visible',
+    date: '2026-07-22',
+    title: '☑ The preview tick-box on checkpoints is finally visible',
+    blurb:
+      "In the lineage graph, the little corner box that picks a checkpoint for an inline preview was a 14px near-invisible square — easy to miss and fiddly to tap on a phone. It's bigger now with a clear outline, and the hint spells out that only an imported (📦 deployed) checkpoint can be ticked.",
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-22-aitoolkit-readiness-honest',
+    date: '2026-07-22',
+    title: '🎓 Clearer guidance when ai-toolkit isn\'t ready to train',
+    blurb:
+      "If training can't use ai-toolkit, the hint now points you at the real fix — set its venv Python (venv/Scripts/python.exe) in Settings › Local tools — instead of a setup script that doesn't exist. And the diagnostic no longer reports ai-toolkit as ready when its interpreter isn't actually a usable file, so \"ai-toolkit=yes\" and the training gate finally agree. Thanks to sylvie for the report.",
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-21-instagram-scrape-and-english-messages',
+    date: '2026-07-21',
+    title: '📸 Instagram scraping is back — and every scraper speaks English',
+    blurb:
+      "Instagram scraping works again: the missing 'instaloader' dependency now ships with the scrape extras (Setup › Install everything). Every scraper error message — Instagram, Civitai, Pexels, Reddit, RedGifs, Picazor, Erome and more — now reads in clear English, and the \"missing dependency\" ones tell you exactly which extra to install.",
+  },
+  {
     id: '2026-07-21-load-default-prompt-to-edit',
     date: '2026-07-21',
     title: '✎ Tweak a built-in prompt instead of retyping it',
