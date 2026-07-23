@@ -1493,7 +1493,11 @@ def delete_dataset(user_id, dataset_id):
 
 def cancel_pending(user_id, dataset_id):
     """Cancel all in-flight (pending) generations of a dataset and drop their
-    rows. Returns the number cancelled.
+    rows. Returns (cancelled, unconfirmed): `cancelled` is every row removed
+    from the queue; `unconfirmed` is the subset that was actually rendering on
+    ComfyUI when the interrupt request could not be confirmed sent (network
+    hiccup, prompt not yet visible in /queue, ...) — those renders may still
+    finish on the GPU even though their row and dataset tile are already gone.
 
     ⏹ Stop generation also stops the server-side ✨ improve BATCH: cancelling the
     rows alone used to be pointless, because whatever was feeding the queue simply
@@ -1501,7 +1505,7 @@ def cancel_pending(user_id, dataset_id):
     image in between the arming and the row deletion."""
     ds = get_dataset(user_id, dataset_id)
     if not ds:
-        return 0
+        return 0, 0
     dataset_activity.request_cancel(dataset_id, dataset_activity.IMPROVE_KINDS)
     # Only in-flight generations (pending AND no result file yet) - leave
     # completed-but-uncurated images alone.
@@ -1509,11 +1513,21 @@ def cancel_pending(user_id, dataset_id):
             .filter_by(dataset_id=dataset_id, status='pending')
             .filter(FaceDatasetImage.filename.is_(None)).all())
     n = 0
+    unconfirmed = 0
     for img in rows:
         if img.job_id:  # Klein rows only - API rows never carry a job_id
             try:
                 from ..job_queue import queue_manager
-                queue_manager.cancel_job(img.job_id, str(user_id), 'image')
+                interrupt_result = {}
+                queue_manager.cancel_job(
+                    img.job_id, str(user_id), 'image',
+                    on_interrupt_result=lambda ok: interrupt_result.update(ok=ok))
+                if interrupt_result.get('ok') is False:
+                    unconfirmed += 1
+                    logger.warning(
+                        'cancel_pending: dataset %s image %s — ComfyUI did not '
+                        'confirm the interrupt; the render may still be running',
+                        dataset_id, img.id)
             except Exception:
                 pass
         if img.derivation_kind == KLEIN_SMALL_IMAGE:
@@ -1529,7 +1543,7 @@ def cancel_pending(user_id, dataset_id):
     # (its completion callbacks won't fire for cancelled jobs). An API batch's own
     # begin/end entry is untouched — its worker unwinds and end()s on its own.
     _sync_generate_activity(dataset_id)
-    return n
+    return n, unconfirmed
 
 
 def purge_unused(user_id, dataset_id):

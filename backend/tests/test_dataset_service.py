@@ -969,6 +969,43 @@ def test_klein_generate_activity_cleared_on_cancel(app, monkeypatch):
         assert da.get(ds.id) is None
 
 
+def test_cancel_pending_reports_renders_comfyui_never_confirmed_stopping(app, monkeypatch):
+    """The row/tile is removed either way, but if ComfyUI never confirmed the
+    interrupt for an in-flight render, cancel_pending must say so — silently
+    counting it as 'cancelled' would hide a render still running on the GPU."""
+    from app.services import face_dataset_service as svc
+    from app.config import LOCAL_USER
+    from app.models import FaceDatasetImage, ImageGenerationQueue
+    from app.extensions import db
+    with app.app_context():
+        import app.job_queue as jq
+        ds = svc.create_dataset(LOCAL_USER, 'KC3', 'kc3')
+
+        job_ids = []
+        for _ in range(2):
+            jid = jq.queue_manager.add_job(workflow_data={'1': {}})
+            row = ImageGenerationQueue.query.filter_by(job_id=jid).one()
+            row.status = 'processing'
+            row.comfyui_prompt_id = f'prompt-{jid}'
+            db.session.add(FaceDatasetImage(
+                dataset_id=ds.id, status='pending', filename=None, job_id=jid))
+            job_ids.append(jid)
+        db.session.commit()
+
+        # First job's interrupt is confirmed sent; the second's is not (timing
+        # race, prompt not yet visible in ComfyUI's /queue, ...).
+        results = iter([True, False])
+        monkeypatch.setattr(jq.queue_manager, 'interrupt_comfyui_job',
+                            lambda *a, **k: next(results))
+
+        cancelled, unconfirmed = svc.cancel_pending(LOCAL_USER, ds.id)
+
+        assert cancelled == 2
+        assert unconfirmed == 1
+        # Both rows are gone from the dataset regardless of confirmation.
+        assert FaceDatasetImage.query.filter_by(dataset_id=ds.id).count() == 0
+
+
 # --- Import d'un dataset existant (ZIP kohya) --------------------------------
 def _training_zip(entries):
     """entries: list of (arcname, bytes) — builds an in-memory zip."""

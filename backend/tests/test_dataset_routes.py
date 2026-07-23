@@ -24,6 +24,27 @@ def test_create_returns_ok_envelope(client):
     assert full['name'] == 'Lola' and full['trigger_word'] == 'lola'
 
 
+def test_cancel_reports_unconfirmed_renders(client, monkeypatch):
+    """The cancel route must forward how many in-flight renders ComfyUI never
+    confirmed stopping — dropping that would let the UI claim a clean stop
+    while a render keeps going on the GPU."""
+    ds_id = _create(client).get_json()['id']
+    monkeypatch.setattr('app.routes.datasets.svc.cancel_pending',
+                        lambda *_a, **_k: (3, 1))
+    resp = client.post(f'/api/dataset/{ds_id}/cancel')
+    assert resp.status_code == 200
+    assert resp.get_json() == {'ok': True, 'cancelled': 3, 'unconfirmed': 1}
+
+
+def test_cancel_omits_unconfirmed_when_every_render_was_confirmed(client, monkeypatch):
+    ds_id = _create(client).get_json()['id']
+    monkeypatch.setattr('app.routes.datasets.svc.cancel_pending',
+                        lambda *_a, **_k: (2, 0))
+    resp = client.post(f'/api/dataset/{ds_id}/cancel')
+    assert resp.status_code == 200
+    assert resp.get_json() == {'ok': True, 'cancelled': 2}
+
+
 def test_create_requires_name_and_trigger(client):
     resp = client.post('/api/dataset/create', json={'name': '', 'trigger_word': ''})
     assert resp.status_code == 400
