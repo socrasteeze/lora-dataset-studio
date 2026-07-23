@@ -25,6 +25,8 @@ For containerized or scripted setups, a handful of environment variables overrid
 | `LDS_CONFIG` | Path to `config.json`. |
 | `LDS_ENV` | Path to the `.env` secrets file. |
 | `LDS_HOST` | Bind host — takes priority over `server.host`. |
+| `LDS_PORT` | Bind port — takes priority over `server.port`. |
+| `LDS_NO_BROWSER` | `1` disables the browser auto-open at startup (the launcher otherwise opens the actual bound address once the server is up). |
 | `FLASK_DEBUG` | `1` enables Flask debug mode. |
 
 ## Overview
