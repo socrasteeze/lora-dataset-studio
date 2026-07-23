@@ -79,6 +79,78 @@ export const WHATS_NEW = [
     to: '/datasets?section=add',
   },
   {
+    id: '2026-07-23-crop-extra-references',
+    date: '2026-07-23',
+    title: '✂ Crop your extra reference photos too',
+    blurb:
+      'Extra references could be added and removed, but never reframed: a great side-angle shot with half a living room in it stayed that way. Each extra-ref thumbnail now has its own ✂ button, opening the same crop editor as the main reference. The full frame is kept behind the scenes, so you can widen a crop back out later instead of only tightening it — and that also works on the extra refs you imported before today.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-23-interface-fully-in-english',
+    date: '2026-07-23',
+    title: '🔤 The last French labels are gone',
+    blurb:
+      'A few corners of the app were still speaking French. The 🗃 Bank\'s four zones read ① Analyze, ② Triage, ③ Curate, ④ Promote instead of their French names, the Pexels language picker offers "French" rather than "Français", and the quotes wrapping model and checkpoint names in dialogs and banners are no longer French guillemets. Nothing moved and nothing was renamed under the hood — same zones, same buttons, same saved settings, just read in one language.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-23-bank-cards-show-their-first-images',
+    date: '2026-07-23',
+    title: '🗃 Tell your banks apart at a glance',
+    blurb:
+      'The 🗃 Bank list used to be a wall of names and folder paths — you had to open a bank to remember what was in it. Each card now shows a strip of its first five images, with a "+N" badge for the rest. It works on banks you never scanned too (the thumbnails are made on the spot), and clicking one opens the bank.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-23-one-box-per-editable-prompt',
+    date: '2026-07-23',
+    title: '✎ One box per editable prompt — the real text, ready to edit',
+    blurb:
+      'Each editable prompt in Settings › Image engines showed you two things: an empty field, and a grey read-only copy of the built-in text you had to click "Load default to edit" to use. Now there is a single box, already holding the exact prompt in use — put your cursor in it and change a word. Nothing is stored while the text still matches the built-in one, so you keep receiving improvements to that prompt instead of being frozen on today\'s wording, and "Reset to default" puts you back there in one click. The line under the box always says which of the two you are on.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-23-edit-identity-instruction-from-extra-refs',
+    date: '2026-07-23',
+    title: '✎ Tune the identity instruction where you add the extra refs',
+    blurb:
+      'Adding "Extra refs" is how you ask for a stronger identity lock — but the instruction those photos actually ride on lived three clicks away in Settings. A small ✎ next to the + now opens it right there, with the shipped text ready to edit and a reset. It shows two instructions because the shared config has two keys, but only one actually drives Klein: the restage block that reads whatever the number of references. That one is badged, so you can no longer spend ten minutes rewriting a text your generations ignore.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-23-one-backup-menu-in-the-library',
+    date: '2026-07-23',
+    title: '💾 One Backup menu instead of three loose controls',
+    blurb:
+      'The Datasets header used to line up "Back up everything", a bare "Include trained LoRAs" checkbox and "Import backup" side by side — a checkbox floating next to a button it silently belonged to. They are now one 💾 Backup menu, with the LoRAs option sitting right under the action it changes, so it is obvious what it applies to. "+ New dataset" stays where it was. A backup in progress is still impossible to miss: the button itself reads "Backing up…" and the progress window keeps running whether the menu is open or closed.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-23-import-from-a-bank-in-add-images',
+    date: '2026-07-23',
+    title: '🗃 Pull images straight from a bank, without leaving the dataset',
+    blurb:
+      'Triaging a big folder in the 🗃 Bank and then feeding a dataset with it meant going back to the Bank page and promoting from there. "Add images" now offers "Import from a bank" right next to the photo dropzone and the scraper: choose which bank, see how many of its kept images would actually land in THIS dataset (near-duplicates and images already here are excluded from the count), and start. It copies in the background, so the grid fills in on its own. When a bank offers nothing, it says which kind of nothing: a bank you never triaged tells you how many images are still undecided and offers to open it, while a bank whose kept images are all already here simply says so.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-23-delete-a-save-from-the-graph',
+    date: '2026-07-23',
+    title: '🗑 Undo a checkpoint step by step, straight from the lineage graph',
+    blurb:
+      'A run that saved every epoch fills the disk fast, and until now the only way to get rid of one was to leave the graph, switch to the flat list and hunt the filename down. Click any checkpoint pill and its actions now end with a quiet delete row that walks backwards through what you did: while the checkpoint is deployed it reads "Remove from ComfyUI" and takes out only the imported copy — the training save stays, so nothing is lost. Once it is no longer deployed the same row reads "Delete the training save" and clears the run file itself. The confirmation always names which of the two you are about to delete, says what survives, and reminds you it goes to the trash (recoverable until you empty it in Settings). If the checkpoint is the one pinned as the dataset\'s ★ best settings in the Test Studio, the warning comes first. Cloud saves are deleted on the right run, and a run still training keeps its saves.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-07-23-grid-filter-by-decision',
+    date: '2026-07-23',
+    title: '🔎 Show only what still needs a ✓/✕',
+    blurb:
+      'The Images header already told you "254 awaiting ✓/✕" — but nothing could pull those 254 out of a 508-image grid, and "select all" always took all 508. A new Show row above the grid filters by decision: All, Undecided, Kept, Rejected, or Improve candidates, each with its live count. Everything downstream follows the visible list, so "select all" now grabs exactly the subset you are looking at — pick Improve candidates and one click reviews the whole batch. It stacks with the caption tag filter, it is remembered between visits, and whenever a filter is on, a banner above the grid says "showing 254 of 508" so a narrowed view can never be mistaken for lost images.',
+    to: '/datasets?section=images',
+  },
+  {
     id: '2026-07-23-bulk-improve-is-a-server-job',
     date: '2026-07-23',
     title: '✨ Improve 250 images at once — and Stop really stops',
@@ -339,7 +411,7 @@ export const WHATS_NEW = [
     date: '2026-07-20',
     title: '🧭 The Bank top is now a guided path, not a wall of buttons',
     blurb:
-      "The 🗃️ Bank's controls are now grouped into four ordered, labeled zones — ① Analyser, ② Trier, ③ Curer, ④ Promouvoir — that follow the natural workflow, and a subtle amber marker points at the recommended next step based on where your bank is (nothing scanned → Analyse; scored with images kept → Promote). Nothing is hidden — every control stays where you can reach it — it just finally reads as a path instead of a pile.",
+      "The 🗃️ Bank's controls are now grouped into four ordered, labeled zones — ① Analyze, ② Triage, ③ Curate, ④ Promote — that follow the natural workflow, and a subtle amber marker points at the recommended next step based on where your bank is (nothing scanned → Analyse; scored with images kept → Promote). Nothing is hidden — every control stays where you can reach it — it just finally reads as a path instead of a pile.",
     to: '/bank',
   },
   {

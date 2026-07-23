@@ -1,16 +1,22 @@
 import { useRef, useState } from 'react';
+import IdentityPromptModal from './IdentityPromptModal';
 
 // Cap identique à MAX_EXTRA_REFS côté backend (face_dataset_service).
 const MAX_EXTRA_REFS = 3;
 
 export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCropRef, busy,
                                          importBusy = busy, visionBusy = false, nonce = 0,
-                                         extraRefs = [], onAddExtraRef, onRemoveExtraRef }) {
+                                         extraRefs = [], onAddExtraRef, onRemoveExtraRef,
+                                         onCropExtraRef }) {
   const inp = useRef(null);
   const inpExtra = useRef(null);
   // Auto head-crop = OPT-IN (vision pass, pauses ComfyUI). Default OFF: upload is
   // instant (centered square) and ✂ Crop adjusts manually — faster in practice.
   const [autoCrop, setAutoCrop] = useState(false);
+  // ✎ next to the Extra-refs "+": the identity instruction those extra photos
+  // ride on is a GLOBAL setting buried in Settings ▸ Image engines — reachable
+  // here, in the one place where the user is thinking about identity locking.
+  const [promptModal, setPromptModal] = useState(false);
   const imgUrl = (fn) => `/api/dataset/${datasetId}/img/${encodeURIComponent(fn)}${nonce ? `?v=${nonce}` : ''}`;
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
@@ -45,8 +51,8 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
       </div>
 
       {/* Références additionnelles — identité multi-angles, chaînées en
-          ReferenceLatent natifs côté Klein. Crop/scoring restent sur la
-          principale. */}
+          ReferenceLatent natifs côté Klein. Recadrables une par une (✂ sur la
+          vignette) ; le scoring reste sur la principale. */}
       {refFilename && (
         <div className="flex items-center gap-2 flex-wrap border-t border-border pt-2">
           <span className="text-content-subtle text-[0.6875rem]">
@@ -61,6 +67,14 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
                 className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl bg-black/70 text-white text-[0.625rem] leading-none disabled:opacity-40">
                 ✕
               </button>
+              {/* ✂ in the OPPOSITE corner of ✕: the tile is 48 px, two 16 px targets
+                  diagonally apart never overlap and stay reachable. */}
+              <button type="button" onClick={() => onCropExtraRef?.(fn)} disabled={busy}
+                aria-label="Crop this extra reference"
+                title="Crop this extra reference — the full frame stays kept, so you can widen it back out later"
+                className="absolute bottom-0 left-0 w-4 h-4 flex items-center justify-center rounded-tr bg-black/70 text-white text-[0.625rem] leading-none disabled:opacity-40">
+                ✂
+              </button>
             </div>
           ))}
           {extraRefs.length < MAX_EXTRA_REFS && (
@@ -71,10 +85,17 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
               +
             </button>
           )}
+          <button type="button" onClick={() => setPromptModal(true)}
+            aria-label="Edit the identity instruction used with multiple references"
+            title="Edit the identity instruction sent with multiple references — global setting, one box per engine family"
+            className="w-6 h-6 rounded-lg border border-border-strong text-content-muted text-xs leading-none hover:bg-surface-raised">
+            ✎
+          </button>
           <input ref={inpExtra} type="file" accept="image/*" className="hidden" disabled={importBusy}
             onChange={(e) => { if (e.target.files[0]) onAddExtraRef?.(e.target.files[0]); e.target.value = ''; }} />
         </div>
       )}
+      {promptModal && <IdentityPromptModal onClose={() => setPromptModal(false)} />}
     </div>
   );
 }
