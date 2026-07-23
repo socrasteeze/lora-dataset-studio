@@ -774,6 +774,14 @@ export function useDataset() {
     setRefNonce((n) => n + 1);
   }, [currentId, refresh, toast]);
 
+  // Crop ONE extra reference (identified by filename — extras have no numeric id).
+  const cropExtraRef = useCallback(async (filename, box) => {
+    const d = await postJson(`/api/dataset/${currentId}/ref/extra/crop`, { filename, ...box });
+    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
+    await refresh();
+    setRefNonce((n) => n + 1);
+  }, [currentId, refresh, toast]);
+
   // Reset to the automatic head-crop (re-run on the kept original, no re-upload).
   const recropRefAuto = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/ref/recrop-auto`, {});
@@ -1114,7 +1122,7 @@ export function useDataset() {
     const d = await postJson('/api/backup/full/restore', fd, true);
     if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
     if (d.kind === 'single') {
-      toast.success(`Dataset « ${d.name} » restored`);
+      toast.success(`Dataset “${d.name}” restored`);
       await fetchList();
       await open(d.id);
       return;
@@ -1177,7 +1185,7 @@ export function useDataset() {
            nonces, mirroringIds, refNonce, recaptioningIds, create, open,
            deleteDataset, renameDataset, updateSettings, setCurrentId, setRef, addExtraRef, removeExtraRef,
            generate, importFiles, scrapeImport, resolveSmallImageRescue, improveImage, improveBatch, classify, caption, recaption, recaptionImages,
-           setStatus, setCaption, mirrorImage, crop, cropRef, recropRefAuto, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces,
+           setStatus, setCaption, mirrorImage, crop, cropRef, cropExtraRef, recropRefAuto, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces,
            findWatermarks, cleanWatermarks, cleanWatermarkImages, restoreWatermarkImage, dismissWatermarks, saveWatermarkRegions,
            purgeUnused, exportZip, exportBackup, exportZipFor, exportBackupFor, importBackup, importDatasetZip, importDatasetFolder,
            backupEverything, backupJob, downloadBackup, openBackupsFolder, dismissBackup, restoreJob, dismissRestore,

@@ -14,6 +14,7 @@ import {
   checkpointKey, toggleCheckpointSelection, selectedCheckpointRefs,
   describePreviewSelection, parseSeedInput,
   checkpointDeployed, lineageImportPayload,
+  checkpointDeleteTarget, describeCheckpointDelete,
 } from './lineagePreview.js';
 
 /* ◉ Graph view of a run's lineage — the showcase rendering. A tidy left-to-right
@@ -201,7 +202,7 @@ function CheckpointPill({ pill, offX, offY, active, selected, preview, big, onOp
 }
 
 export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
-  continueSource = 'cloud', refetchTree }) {
+  continueSource = 'cloud', refetchTree, bestSettingsLora = null }) {
   const toast = useToast();
   // Runs removed in-session (a gone run deleted from the detail panel) drop from
   // the graph without a full refetch; children re-root via removeRunFromTree.
@@ -230,6 +231,8 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
   const closePopover = useCallback(() => setOpenCk(null), []);
   // 📦 Deploying a checkpoint straight from its pill popover (Import → loras/…).
   const [importing, setImporting] = useState(false);
+  // 🗑 Trashing a checkpoint from that same popover (destructive → confirmed).
+  const [deleting, setDeleting] = useState(false);
   // A preview thumbnail opened LARGE in a lightbox: { url, step } | null.
   const [bigPreview, setBigPreview] = useState(null);
   const zoomPreview = useCallback((url, step) => setBigPreview({ url, step }), []);
@@ -342,6 +345,39 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
       setImporting(false);
     }
   }, [datasetId, refetchTree, mergeFromTree, toast]);
+
+  // 🗑 ONE delete action per pill, aimed at WHAT THE PILL SHOWS: a deployed pill
+  // removes its ComfyUI copy (the run's save stays), a plain pill deletes the
+  // training save itself. Deletion is therefore progressive — undeploy first,
+  // then the same action reaches the raw save. The target (route + body + label)
+  // comes from checkpointDeleteTarget, which reads the SAME `testable` flag that
+  // decides "✓ Deployed" vs "Import → loras/…", so the button can't aim at one
+  // file while the popover claims the other. postJson THROWS on 400/409 (e.g.
+  // the server's "this dataset is training right now"), so the catch shows the
+  // server's own words. On success the lineage is refetched: the deployed pill
+  // flips to not-deployed (next click aims at the save), a deleted save's pill
+  // disappears — never a stale claim until the next reload.
+  const handleDeleteCheckpoint = useCallback(async (node, pill) => {
+    const target = checkpointDeleteTarget(node, pill);
+    if (datasetId == null || !target) return;
+    const { message } = describeCheckpointDelete(node, pill, { bestSettingsLora });
+    if (!window.confirm(message)) return;
+    setDeleting(true);
+    try {
+      await postJson(`/api/dataset/${datasetId}/${target.path}`, target.body);
+      toast.success(target.kind === 'deployed'
+        ? `Removed from ComfyUI (training save kept): ${target.filename}`
+        : `Training save moved to the trash: ${target.filename}`);
+      setOpenCk(null);
+      if (typeof refetchTree === 'function') {
+        try { const t = await refetchTree(); if (t) mergeFromTree(t); } catch { /* it is deleted server-side */ }
+      }
+    } catch (e) {
+      toast.error(e?.message || 'Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  }, [datasetId, bestSettingsLora, refetchTree, mergeFromTree, toast]);
 
   const handleGenerate = useCallback(async () => {
     const refs = selectedCheckpointRefs(selectedCk, pillByKey);
@@ -633,7 +669,9 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
             Flips ABOVE the pill when there's no room below (bottom rows), and is
             clamped horizontally, so the scroll panel never clips it. */}
         {openCk && (() => {
-          const POP_W = 210, POP_H = 152;
+          // Height budget grew with the 🗑 row, so the flip-above / clamp
+          // geometry still keeps the whole popover inside the scroll panel.
+          const POP_W = 210, POP_H = 182;
           const below = openCk.pill.y + openCk.pill.h + 4;
           const py = below + POP_H > g.height ? Math.max(0, openCk.pill.y - POP_H - 4) : below;
           const px = Math.max(0, Math.min(openCk.pill.x, g.width - POP_W));
@@ -686,6 +724,23 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
                     <span aria-hidden>📦</span> {importing ? 'Importing…' : `Import → ${loraFolderLabel(openCk.node.train_type)}`}
                   </button>
                 ) : null}
+                {/* 🗑 Destructive, so VISUALLY IN RETREAT below a hairline: a
+                    quiet text row, not a fourth coloured button one clicks by
+                    reflex. Its LABEL names the file it would delete right now —
+                    the ComfyUI copy while the pill is deployed, the training
+                    save once it isn't — so the two are never confused. */}
+                {(() => {
+                  const target = checkpointDeleteTarget(openCk.node, openCk.pill);
+                  if (!target) return null;
+                  return (
+                    <button type="button" disabled={deleting}
+                      onClick={() => handleDeleteCheckpoint(openCk.node, openCk.pill)}
+                      title={target.title}
+                      className="mt-1 flex items-center gap-1.5 border-t border-border px-2 pt-1.5 pb-0.5 text-left text-content-subtle text-[0.625rem] hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-50">
+                      <span aria-hidden>🗑</span> {deleting ? 'Deleting…' : target.label}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </foreignObject>

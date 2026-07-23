@@ -122,3 +122,42 @@ test('the ◉ Graph button is the prominent (accent) view control', () => {
   // On the Runs hub the graph toggle wears the indigo accent, not a bare grey.
   assert.match(cloud, /border-indigo-400\/40 bg-indigo-500\/10 text-indigo-200/);
 });
+
+test('the pill delete aims at what the pill SHOWS — deployed copy vs training save', () => {
+  // The route is NOT hardcoded in the component: it comes from the target the
+  // helper picks off the pill's deployed state (both routes live in the helper,
+  // unit-tested in lineagePreview.test.js).
+  assert.match(graph, /const target = checkpointDeleteTarget\(node, pill\);/);
+  assert.match(graph, /postJson\(`\/api\/dataset\/\$\{datasetId\}\/\$\{target\.path\}`, target\.body\)/);
+  const helpers = fs.readFileSync(new URL('./lineagePreview.js', import.meta.url), 'utf8');
+  assert.match(helpers, /checkpointDeployed\(pill\)/);            // ONE source of truth for "deployed"
+  assert.match(helpers, /path: 'train\/checkpoint\/delete'/);      // deployed → the ComfyUI copy
+  assert.match(helpers, /path: 'train\/run-checkpoint\/delete'/);  // otherwise → the run's save
+  // The BUTTON says which of the two it would delete, right now.
+  assert.match(graph, /\{deleting \? 'Deleting…' : target\.label\}/);
+  assert.match(graph, /title=\{target\.title\}/);
+  // Confirmed, with the ★ best-settings pin reaching the confirmation text.
+  assert.match(graph, /describeCheckpointDelete\(node, pill, \{ bestSettingsLora \}\)/);
+  assert.match(graph, /if \(!window\.confirm\(message\)\) return;/);
+  // postJson THROWS on 400/409 — the server's own message must be shown, not eaten.
+  assert.match(graph, /catch \(e\) \{\s*toast\.error\(e\?\.message \|\| 'Delete failed'\);/);
+  // The pill must stop lying: same refetch path the import success uses, so a
+  // just-undeployed pill flips to "not deployed" (next click aims at the save).
+  assert.match(graph, /Removed from ComfyUI \(training save kept\)[^]*?refetchTree\(\)/);
+});
+
+test('the lineage payload carries the deployed copy name from the testable map', () => {
+  const svc = fs.readFileSync(new URL('../../../../backend/app/services/cloud_training.py', import.meta.url), 'utf8');
+  // Same map that sets `testable` also names the deployed file — no second source.
+  assert.match(svc, /_ck\['testable'\] = _step in _testable/);
+  assert.match(svc, /_ck\['deployed_filename'\] = _deploy_names\.get\(/);
+  // …resolved to the form the deployed-delete route whitelists.
+  assert.match(svc, /def _deletable_deploy_names/);
+  assert.match(svc, /lt\.list_imported_checkpoints\(cfg\.LOCAL_USER, dataset_id, family=family\)/);
+});
+
+test('the dataset panel feeds the graph the ★ best-settings pin', () => {
+  assert.match(panel, /bestSettingsLora=\{ds\.data\?\.best_settings\?\.lora_filename \|\| null\}/);
+  const tree = fs.readFileSync(new URL('./RunLineageTree.jsx', import.meta.url), 'utf8');
+  assert.match(tree, /bestSettingsLora=\{bestSettingsLora\}/);
+});
