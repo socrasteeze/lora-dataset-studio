@@ -131,5 +131,9 @@ if not exist frontend\dist\index.html (
 rem Port 5000 is a frequent collision (macOS AirPlay, another local Flask app).
 rem Use 5050 by default; override by setting LDS_PORT before running start.bat.
 if not defined LDS_PORT set "LDS_PORT=5050"
-start "" http://127.0.0.1:%LDS_PORT%/
+rem The browser is opened by run.py itself, at the REAL bound host:port (which
+rem may be a LAN/Tailscale address, not 127.0.0.1) and only once the server is
+rem actually accepting connections. Opening a hardcoded 127.0.0.1 here fired
+rem before the server bound and greeted LAN/tailnet setups with "cannot connect".
+rem Set LDS_NO_BROWSER=1 to disable the auto-open.
 "%VPY%" backend\run.py

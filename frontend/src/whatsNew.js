@@ -49,6 +49,13 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-22-startup-opens-real-address',
+    date: '2026-07-22',
+    title: '🌐 Startup no longer greets you with "cannot connect"',
+    blurb:
+      'If you serve the app on a LAN or Tailscale address, the launcher used to pop a browser at a hardcoded 127.0.0.1 — before the server had even started — so you were met with a "cannot connect" page every launch. It now opens the real address it is actually serving on (carrying the access token when the LAN token gate is on), and only once the server is accepting connections. Set LDS_NO_BROWSER=1 to skip the auto-open entirely.',
+  },
+  {
     id: '2026-07-22-stop-buttons-actually-stop',
     date: '2026-07-22',
     title: '⏹ The Stop buttons stopped lying',

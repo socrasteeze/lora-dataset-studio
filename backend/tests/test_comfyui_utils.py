@@ -42,8 +42,33 @@ def test_cancel_comfyui_prompt_never_interrupts_unrelated_running_prompt(app):
     with app.app_context(), \
          patch('app.utils.comfyui.requests.get', return_value=_response(queue)), \
          patch('app.utils.comfyui.requests.post') as post:
-        assert cancel_comfyui_prompt('target-prompt', 'target-job') is False
+        # The target prompt is absent from a REACHABLE ComfyUI's queue: it is not
+        # running, so this is confirmed-stopped (True), NOT "may still be running".
+        # The core guarantee still holds — the unrelated running prompt is left
+        # untouched (no /interrupt POST).
+        assert cancel_comfyui_prompt('target-prompt', 'target-job') is True
     post.assert_not_called()
+
+
+def test_cancel_comfyui_prompt_reports_unknown_only_when_comfyui_unreachable(app):
+    """A reachable-but-absent prompt is confirmed stopped (True); the ONLY False
+    is a genuine failure to reach ComfyUI, the sole case a caller may warn the
+    render might still be running."""
+    import requests as _requests
+    from app.utils.comfyui import cancel_comfyui_prompt
+    with app.app_context(), \
+         patch('app.utils.comfyui.requests.get',
+               side_effect=_requests.exceptions.ConnectionError('refused')):
+        assert cancel_comfyui_prompt('target-prompt', 'target-job') is False
+
+
+def test_cancel_comfyui_prompt_no_prompt_id_is_confirmed_stopped(app):
+    """A job cancelled before it was ever submitted to ComfyUI has no prompt id
+    and nothing orphaned — confirmed stopped, not unknown."""
+    from app.utils.comfyui import cancel_comfyui_prompt
+    with app.app_context():
+        assert cancel_comfyui_prompt(None, 'target-job') is True
+        assert cancel_comfyui_prompt('', 'target-job') is True
 
 
 def test_cancel_comfyui_prompt_deletes_matching_pending_prompt(app):
