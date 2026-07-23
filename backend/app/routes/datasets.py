@@ -814,8 +814,14 @@ def dataset_delete(dataset_id):
 def dataset_cancel(dataset_id):
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
-    n = svc.cancel_pending(LOCAL_USER, dataset_id)
-    return jsonify({'ok': True, 'cancelled': n})
+    n, unconfirmed = svc.cancel_pending(LOCAL_USER, dataset_id)
+    payload = {'ok': True, 'cancelled': n}
+    if unconfirmed:
+        # The row/tile is gone either way, but ComfyUI never confirmed the
+        # interrupt for `unconfirmed` of them — the UI can flag that those
+        # renders may still be running instead of implying an instant stop.
+        payload['unconfirmed'] = unconfirmed
+    return jsonify(payload)
 
 
 @bp.post('/dataset/image/<int:image_id>/delete')

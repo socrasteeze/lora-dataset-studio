@@ -262,11 +262,21 @@ def dataset_train_stop():
         expected_run_token = expected_run_token.strip()
     # Preserve the original no-argument call for the dataset-manager button;
     # only the Runs hub opts into target-aware protection.
-    stopped = (lt.stop_training()
-               if expected_dataset_id is None and expected_run_token is None
-               else lt.stop_training(
-                   expected_dataset_id=expected_dataset_id,
-                   expected_run_token=expected_run_token))
+    try:
+        stopped = (lt.stop_training()
+                   if expected_dataset_id is None and expected_run_token is None
+                   else lt.stop_training(
+                       expected_dataset_id=expected_dataset_id,
+                       expected_run_token=expected_run_token))
+    except lt.TrainingStopVerificationError:
+        # The kill was sent but the process is still alive — never report success
+        # here, or the UI would re-enable ComfyUI while the trainer keeps the GPU.
+        return jsonify({
+            'ok': False,
+            'error': 'Sent the stop signal but could not confirm the training '
+                     'process actually exited. It may still be running — try '
+                     'Stop again in a moment.',
+        }), 502
     if stopped is False:
         # The Runs hub polls every few seconds. Its card can therefore describe
         # run A just after A ended and queued run B started; never let that stale

@@ -4593,6 +4593,10 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
     return res
 
 
+class TrainingStopVerificationError(RuntimeError):
+    """The kill was issued but the training process could not be confirmed dead."""
+
+
 def stop_training(expected_dataset_id=None, expected_run_token=None) -> bool:
     """Tue le process d'entraînement (s'il tourne) PUIS lève le flag → le
     superviseur relance ComfyUI. L'ordre compte : si on levait le flag d'abord,
@@ -4635,6 +4639,17 @@ def stop_training(expected_dataset_id=None, expected_run_token=None) -> bool:
                     os.kill(int(pid), 15)
             except (ValueError, OSError) as e:
                 logger.warning(f"stop_training: kill pid {pid} échoué : {e}")
+            if not _wait_pid_dead(pid):
+                # Kill issued but the process is still alive (stale/reused PID,
+                # access denied, taskkill silently failed). Do NOT clear the
+                # in-progress flag or hand the GPU back to ComfyUI here — that
+                # would report Stop as successful while the trainer keeps running.
+                # Leave state as-is so a retry (or manual kill) is still possible.
+                logger.error(
+                    f"stop_training: pid {pid} still alive "
+                    f"{_STOP_VERIFY_TIMEOUT_SECONDS}s after kill attempt")
+                raise TrainingStopVerificationError(
+                    f"Could not confirm training process {pid} stopped")
         # Stop = arrêt voulu : on VIDE la file D'ABORD (sinon le prochain poll
         # relancerait l'entraînement suivant), PUIS on lève le flag EN DERNIER
         # (c'est lui qui signale à ComfyUI de reprendre le GPU).
@@ -5094,6 +5109,25 @@ def _pid_alive(pid) -> bool:
         return bool(pid) and psutil.pid_exists(int(pid))
     except Exception:
         return False
+
+
+_STOP_VERIFY_TIMEOUT_SECONDS = 5.0
+
+
+def _wait_pid_dead(pid, timeout=None, interval=0.25) -> bool:
+    """Poll until `pid` is gone or `timeout` elapses. taskkill/os.kill return
+    before the OS has necessarily reaped the process, so a caller that trusts
+    them immediately can report a stop as successful while the trainer still
+    holds the GPU."""
+    import time
+    if timeout is None:
+        timeout = _STOP_VERIFY_TIMEOUT_SECONDS
+    deadline = time.monotonic() + timeout
+    while _pid_alive(pid):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(interval)
+    return True
 
 
 def get_train_queue() -> list:

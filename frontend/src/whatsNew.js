@@ -49,6 +49,14 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-22-stop-buttons-actually-stop',
+    date: '2026-07-22',
+    title: '⏹ The Stop buttons stopped lying',
+    blurb:
+      '⏹ Stop generation greyed itself out the instant a batch started — the one moment you might actually want to click it. And both Stop generation and Stop training could report success even when the underlying render or process refused to die, leaving it running unseen. The button now stays clickable for the whole batch, and Stop tells you honestly when it could not confirm the work actually ended instead of pretending it did.',
+    to: '/datasets?section=images',
+  },
+  {
     id: '2026-07-23-fix-generate-variations-crash',
     date: '2026-07-23',
     title: '🐛 "Add images" no longer crashes on a fresh dataset',

@@ -324,6 +324,20 @@ def test_stop_rejects_a_stale_local_run_card(client, monkeypatch):
     }
 
 
+def test_stop_reports_an_error_when_the_kill_cannot_be_confirmed(client, monkeypatch):
+    from app.services.lora_training import TrainingStopVerificationError
+    _valid(monkeypatch, True)
+
+    def _raise():
+        raise TrainingStopVerificationError('pid 4242 still alive')
+    monkeypatch.setattr('app.services.lora_training.stop_training', lambda: _raise())
+    resp = client.post('/api/dataset/train/stop')
+    assert resp.status_code == 502
+    body = resp.get_json()
+    assert body['ok'] is False
+    assert 'could not confirm' in body['error'].lower()
+
+
 # --- /train/checkpoints -------------------------------------------------------
 
 def test_checkpoints_returns_family_variant_recommendations(client, monkeypatch):

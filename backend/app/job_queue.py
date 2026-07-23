@@ -343,13 +343,22 @@ class JobQueueManager:
         db.session.commit()
         return job_id
 
-    def cancel_job(self, job_id, user_id=None, job_type='image', *, commit=True) -> bool:
+    def cancel_job(self, job_id, user_id=None, job_type='image', *, commit=True,
+                   on_interrupt_result=None) -> bool:
         """pending -> cancelled directly; processing/sent_to_comfy -> best-effort
         (marks the row; `process_one` checks status before finalizing).
 
         ``commit=False`` lets destructive services include the cancellation in
         the same DB transaction as deleting their owning row. Existing callers
         keep the historical immediate-commit behaviour.
+
+        The return value only reflects whether a row was found and marked —
+        NOT whether ComfyUI actually stopped rendering it. A caller that needs
+        that distinction (e.g. to avoid reporting "cancelled" for a render
+        still running on the GPU) can pass ``on_interrupt_result``: called with
+        the bool result of the ComfyUI interrupt attempt, but only when the job
+        was actually in flight (pending rows never reach ComfyUI, so there is
+        nothing to interrupt).
         """
         if job_type != 'image':
             return False
@@ -368,7 +377,9 @@ class JobQueueManager:
             # the matching prompt. commit=False deliberately has no external side
             # effect before its owning transaction succeeds.
             if previous_status in ('processing', 'sent_to_comfy'):
-                self.interrupt_comfyui_job(prompt_id, job.job_id)
+                interrupted = self.interrupt_comfyui_job(prompt_id, job.job_id)
+                if on_interrupt_result:
+                    on_interrupt_result(interrupted)
         return True
 
     def interrupt_comfyui_job(self, prompt_id, job_id) -> bool:

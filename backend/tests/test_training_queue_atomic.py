@@ -391,6 +391,35 @@ def test_stop_waits_until_launch_publishes_the_new_pid(
     assert any('7878' in args for args in killed)
 
 
+def test_stop_training_raises_when_the_kill_cannot_be_confirmed(monkeypatch):
+    """taskkill/os.kill can return before the OS reaps the process. If the pid
+    is still alive afterwards, stop_training must not report success — that
+    would tell the UI Stop worked and let the watcher hand the GPU back to
+    ComfyUI while the trainer is still running."""
+    from app.services import lora_training as lt
+
+    state = {
+        'training_in_progress': True,
+        'training_pid': 4242,
+    }
+    monkeypatch.setattr(lt.queue_manager, '_get_system_state',
+                        lambda key, default=None: state.get(key, default))
+    monkeypatch.setattr(lt.queue_manager, '_set_system_state', lambda *a, **k: None)
+    monkeypatch.setattr(lt, '_save_queue', lambda items: pytest.fail(
+        'queue must not be cleared when the kill is unconfirmed'))
+    monkeypatch.setattr(lt, '_pid_alive', lambda _pid: True)  # never dies
+    monkeypatch.setattr(lt, '_STOP_VERIFY_TIMEOUT_SECONDS', 0)  # don't slow the test down
+    if lt.os.name == 'nt':
+        monkeypatch.setattr(lt.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0))
+    else:
+        monkeypatch.setattr(lt.os, 'kill', lambda *a, **k: None)
+
+    with pytest.raises(lt.TrainingStopVerificationError):
+        lt.stop_training()
+
+    assert state['training_in_progress'] is True
+
+
 def test_queued_continue_replays_captured_base_variant_and_confirmation(monkeypatch):
     from app.services import lora_training as lt
 

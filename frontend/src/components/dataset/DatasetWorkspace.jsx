@@ -856,8 +856,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     : 'First results look wrong? Stop now — the remaining API calls are skipped (not billed).'}
                 </span>
               </div>
+              {/* 'generate' (like 'improve') must be excluded here too: the server marks
+                  activity.kind='generate' for the whole batch, which flips ds.busy true —
+                  without the exclusion this button greys itself out for the entire run. */}
               <button type="button" onClick={ds.cancelPending}
-                disabled={ds.busy && act?.kind !== 'improve'}
+                disabled={ds.busy && act?.kind !== 'improve' && act?.kind !== 'generate'}
                 title="Cancels every generation still in flight (and stops a running improvement batch); finished images stay."
                 className="ml-auto shrink-0 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold disabled:opacity-40">
                 {act?.cancelling && act?.kind === 'improve' ? 'Stopping…' : 'Stop generation'}

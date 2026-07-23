@@ -830,8 +830,15 @@ export function useDataset() {
 
   const cancelPending = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/cancel`);
-    if (d.ok) toast.success(`${d.cancelled} generation(s) cancelled`);
-    else toast.error(d.error || 'Unexpected error');
+    if (d.ok) {
+      toast.success(`${d.cancelled} generation(s) cancelled`);
+      // ComfyUI didn't confirm the interrupt for some of them — the tiles are
+      // gone from the dataset either way, but those renders may still finish
+      // on the GPU in the background.
+      if (d.unconfirmed) {
+        toast.warning(`${d.unconfirmed} of them may still finish rendering in the background`);
+      }
+    } else toast.error(d.error || 'Unexpected error');
     await refresh();
   }, [currentId, refresh, toast]);
 
