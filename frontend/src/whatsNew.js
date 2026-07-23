@@ -49,6 +49,13 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-22-no-more-silent-hangs',
+    date: '2026-07-22',
+    title: '🛡️ Long jobs can no longer wedge each other',
+    blurb:
+      'Two reliability fixes from a full hang audit: a stalled Ollama model download now fails with a clear error instead of hanging its setup task forever, and very long caption/vision batches no longer silently lose their exclusive GPU lock mid-run (which could let queued image generations pile onto the GPU while captioning was still working).',
+  },
+  {
     id: '2026-07-22-startup-opens-real-address',
     date: '2026-07-22',
     title: '🌐 Startup no longer greets you with "cannot connect"',

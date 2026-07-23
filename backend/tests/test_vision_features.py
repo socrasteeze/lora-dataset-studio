@@ -81,6 +81,25 @@ def test_window_ownership_prevents_flag_stomp_on_re_acquisition(app, monkeypatch
         queue_manager._set_system_state('vision_in_progress', None)
 
 
+def test_window_heartbeat_rearms_ttl_for_batches_that_outlive_it(app, monkeypatch):
+    """A caption batch longer than flag_ttl used to silently lose its GPU lock
+    mid-run (the TTL was set once at entry), letting queued image jobs render on
+    top of the vision pass. The in-window heartbeat must keep re-arming the TTL."""
+    import time
+    from app import gpu_window
+    from app.gpu_window import gpu_exclusive_vision_window
+    from app.job_queue import queue_manager
+    monkeypatch.setattr('app.utils.comfyui.free_comfyui_vram', lambda *a, **k: True)
+    monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.05)
+    with app.app_context():
+        with gpu_exclusive_vision_window(flag_ttl=1):
+            time.sleep(1.4)  # well past the original 1s TTL
+            assert queue_manager._get_system_state('vision_in_progress'), \
+                'flag lapsed mid-batch — the heartbeat should have re-armed the TTL'
+        # normal exit still releases the lock (heartbeat must not resurrect it)
+        assert queue_manager._get_system_state('vision_in_progress') is None
+
+
 def test_boot_recovery_clears_persisted_vision_lock(app):
     """A request dies with the server process, but its DB flag survives unless
     startup explicitly removes it. Restarting must never strand "GPU busy"."""

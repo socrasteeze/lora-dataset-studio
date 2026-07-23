@@ -195,8 +195,11 @@ def pull_status() -> dict:
 def _run_pull(model: str):
     url = _url()
     try:
+        # Read timeout matters here: with (10, None) a stalled stream hangs this
+        # pull thread forever with no way to cancel it. Ollama emits progress
+        # lines continuously; 5 minutes of silence means the pull is dead.
         resp = requests.post(f'{url}/api/pull', json={'name': model, 'stream': True},
-                             stream=True, timeout=(10, None))
+                             stream=True, timeout=(10, 300))
         if resp.status_code >= 400:
             _finish_pull('error', error=f'Ollama rejected the pull (HTTP {resp.status_code})')
             return

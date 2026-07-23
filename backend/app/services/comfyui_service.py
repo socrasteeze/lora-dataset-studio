@@ -109,7 +109,8 @@ class ComfyUIService:
         if not ok:
             return None, msg
         payload = json.dumps({"prompt": prompt, "client_id": client_id})
-        r = requests.post(urljoin(cfg.get('comfyui.api_url'), "/prompt"), data=payload)
+        r = requests.post(urljoin(cfg.get('comfyui.api_url'), "/prompt"), data=payload,
+                          timeout=10)
         if r.status_code == 200:
             return r.json(), None
         return None, r.text

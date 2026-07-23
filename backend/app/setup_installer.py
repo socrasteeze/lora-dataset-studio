@@ -1300,8 +1300,12 @@ def _run_klein_download(action) -> int:
 def _run_ollama_model(action) -> int:
     url = (cfg.get('ollama.url') or '').rstrip('/')
     model = cfg.get('ollama.vision_model') or ''
+    # (connect, read) timeout: a pull that goes 5 min without emitting a single
+    # progress line is stalled — better to fail the action than hang this worker
+    # thread forever (Ollama streams progress constantly; even its silent phases,
+    # like sha256 verification of a multi-GB model, finish well inside this).
     resp = requests.post(f'{url}/api/pull', json={'name': model, 'stream': True},
-                         stream=True, timeout=None)
+                         stream=True, timeout=(10, 300))
     if resp.status_code >= 400:
         _append(action, f'HTTP {resp.status_code}')
         return 1
