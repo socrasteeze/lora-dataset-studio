@@ -49,6 +49,14 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-23-fix-generate-variations-crash',
+    date: '2026-07-23',
+    title: '🐛 "Add images" no longer crashes on a fresh dataset',
+    blurb:
+      'Opening the Generate variations panel on a new Character or Concept dataset threw "An unexpected error occurred" every time — a leftover reference from the old multi-engine picker (Nano Banana / ChatGPT) never got cleaned up when this fork went local-only. Fixed.',
+    to: '/datasets?section=add',
+  },
+  {
     id: '2026-07-23-bulk-improve-is-a-server-job',
     date: '2026-07-23',
     title: '✨ Improve 250 images at once — and Stop really stops',

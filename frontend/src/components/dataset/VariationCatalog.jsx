@@ -425,7 +425,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
       {/* Klein-only tuning, grouped: model file + consistency-LoRA strength.
           A <details> so the defaults stay out of a newcomer's way — children
           remain mounted, so the model picker still reports its choice. */}
-      {isKlein && klAvailable && (
+      {klAvailable && (
         <details className="rounded-lg border border-border bg-app/30 open:pb-2"
           onToggle={(e) => { if (e.currentTarget.open) requestHelpTip('klein-tuning-open'); }}>
           <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
