@@ -57,6 +57,55 @@ except ImportError:
 
 app = create_app()
 
+
+def _local_browse_url(host, port, token=None):
+    """The URL to open ON THIS machine for a server bound to ``host:port``.
+
+    A wildcard bind (``0.0.0.0`` / ``::``) is not itself browsable, so fall back
+    to loopback. A specific LAN / Tailscale host is reachable from the machine
+    itself and is what the user actually uses to reach the app, so open it
+    verbatim rather than a 127.0.0.1 that nothing is serving. The access token
+    (present only when the LAN token gate is on) rides along so the opened tab
+    is not an immediate 403. Returns ``(url, connect_host)`` — the second value
+    is the host to probe for readiness."""
+    connect_host = host if host not in ('0.0.0.0', '::', '', None) else '127.0.0.1'
+    url = f'http://{connect_host}:{port}/'
+    if token:
+        url += f'?token={token}'
+    return url, connect_host
+
+
+def _open_browser_when_ready(host, port, token=None, attempts=60, delay=0.5):
+    """Open the local browser at the real bound address, but only AFTER the
+    server accepts a connection. start.bat used to ``start`` a hardcoded
+    127.0.0.1 URL BEFORE this process had even bound — so a server.host pointing
+    at a LAN / Tailscale address greeted the user with "cannot connect" every
+    launch. Opening here means we know the true host/port/token and can wait for
+    readiness. Best-effort and daemon-threaded: a browser that never opens must
+    never hold up the server. Set LDS_NO_BROWSER=1 to skip entirely."""
+    import socket
+    import threading
+    import time
+    import webbrowser
+    url, connect_host = _local_browse_url(host, port, token)
+
+    def _wait_and_open():
+        for _ in range(attempts):
+            try:
+                with socket.create_connection((connect_host, port), timeout=delay):
+                    break
+            except OSError:
+                time.sleep(delay)
+        else:
+            return  # never came up in time — don't pop a failing tab
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+    threading.Thread(target=_wait_and_open, name='open-browser', daemon=True).start()
+
+
 if __name__ == '__main__':
     host = os.environ.get('LDS_HOST') or cfg_get('server.host')
     port = int(os.environ.get('LDS_PORT') or cfg_get('server.port'))
@@ -89,6 +138,12 @@ if __name__ == '__main__':
     # reading cfg_get again there would lie about what's currently serving requests.
     app.config['LDS_BOUND_HOST'] = host
     app.config['LDS_BOUND_PORT'] = port
+    # Open the local browser at the ACTUAL bound address (with token) once the
+    # server is up — replaces start.bat's hardcoded, fired-too-early 127.0.0.1.
+    _browse_url, _ = _local_browse_url(host, port, os.environ.get('LDS_ACCESS_TOKEN'))
+    print(f"[LDS] Serving at {_browse_url}")
+    if os.environ.get('LDS_NO_BROWSER') != '1':
+        _open_browser_when_ready(host, port, os.environ.get('LDS_ACCESS_TOKEN'))
     app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1',
             host=host,
             # LDS_PORT wins over config so the launcher can dodge a busy 5000

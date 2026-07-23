@@ -522,11 +522,21 @@ def cancel_comfyui_prompt(prompt_id, client_id=None, worker_url=None) -> bool:
     delete operation is used instead. The optional LDS job id (sent as
     ComfyUI's ``client_id``) is checked when the queue exposes it.
 
-    Returns whether a cancellation request was sent. Network errors and an
-    already-finished prompt are normal best-effort failures and return False.
+    Returns True when the prompt is confirmed NOT left running on ComfyUI:
+    either a delete/interrupt was sent for it, OR ComfyUI was reachable and the
+    prompt is not in its queue at all — an idle ComfyUI that isn't pending/
+    running the prompt has already finished or dropped it, so there is nothing
+    to interrupt and nothing orphaned. Returns False ONLY when ComfyUI could not
+    be reached (or the interrupt/delete POST itself failed) to determine this —
+    the sole case where the render's fate is genuinely unknown and a caller may
+    warn that it might still be running. A reachable-but-absent prompt must not
+    raise that warning: it is the normal outcome of Stopping the moment a render
+    finishes, and treating it as "may still be running" is a false alarm.
     """
     if not prompt_id:
-        return False
+        # No ComfyUI prompt was ever submitted for this job, so nothing is
+        # running on ComfyUI to leave orphaned — confirmed stopped, not unknown.
+        return True
     api_addr = worker_url or api_address()
 
     def _matches(entry):
@@ -554,6 +564,11 @@ def cancel_comfyui_prompt(prompt_id, client_id=None, worker_url=None) -> bool:
             response = requests.post(urljoin(api_addr, "/interrupt"), timeout=3)
             response.raise_for_status()
             return True
+
+        # Reached ComfyUI and the prompt is neither pending nor running: it is
+        # not executing (finished or already cleared). Nothing to interrupt —
+        # and, crucially, nothing left running. Confirmed stopped, NOT unknown.
+        return True
     except requests.exceptions.RequestException as exc:
         logger.warning("Could not cancel ComfyUI prompt %s: %s", prompt_id, exc)
     except Exception as exc:

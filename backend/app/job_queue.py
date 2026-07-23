@@ -389,9 +389,17 @@ class JobQueueManager:
         transactionally can mark every row first, commit once, then perform the
         external ComfyUI side effect without letting the worker claim the next
         row halfway through that batch.
+
+        Returns True when the render is confirmed not left running on ComfyUI
+        (nothing was submitted, or ComfyUI confirmed it is interrupted/absent);
+        False ONLY when ComfyUI could not be reached to confirm — the single
+        case a caller should surface as "may still be running".
         """
         if not prompt_id:
-            return False
+            # The job never reached ComfyUI (cancelled before submit), so there
+            # is nothing running to leave orphaned — confirmed stopped, not
+            # unknown. Returning False here mis-flagged it as "may still run".
+            return True
         _signal_poll_cancel(prompt_id)
         try:
             from .utils.comfyui import cancel_comfyui_prompt
