@@ -111,6 +111,37 @@ Klein needs a reachable ComfyUI **and** the Klein model files (~16 GB VRAM
 class). **Setup → ComfyUI** offers the download; the license-gated fp8 model
 needs a Hugging Face token (Settings → Local tools).
 
+## The browser opens "cannot connect" at startup
+
+Fixed as of 2026-07-22 — update & restart if you still see it. The launcher
+used to open a hardcoded `http://127.0.0.1:<port>/` *before* the server had
+started, so any setup serving on a LAN or Tailscale `server.host` was greeted
+with a dead tab every launch. It now opens the address the server is actually
+bound to, only once the server accepts connections (with the access token
+attached when the token gate is on). Don't want a tab at all — for example when
+you only ever open the app from another device? Set `LDS_NO_BROWSER=1` before
+launching.
+
+## A Stop button doesn't seem to stop anything
+
+As of 2026-07-22 every Stop in the app reports honestly instead of assuming:
+
+- **Stop training** kills the training process and then *verifies it died*
+  before saying so. If the process can't be confirmed dead within a few
+  seconds you get an explicit error — retry the Stop, or check Task Manager
+  for a wedged `python` process.
+- **Stop generation** removes the queued renders immediately and asks ComfyUI
+  to abort the one in flight. If ComfyUI is unreachable and can't confirm the
+  abort, the app says the render *may still be running* rather than claiming
+  success — the running render finishes on the GPU but its output is discarded.
+- **Stop captioning** finishes the image currently being written, keeps
+  everything captioned so far, and frees the GPU. The button reads
+  "Stopping…" until that image completes (bounded by the per-image timeout).
+
+If a Stop button is greyed out, another batch on the same dataset (for
+example a caption pass) is holding the activity slot; it re-enables the
+moment that batch ends.
+
 ## Port 5000 conflict on macOS
 
 macOS reserves port 5000 for AirPlay Receiver. Change the port in

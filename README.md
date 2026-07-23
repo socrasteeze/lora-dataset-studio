@@ -222,6 +222,9 @@ Everything above degrades gracefully — a feature simply stays hidden until its
 
 ### Recent improvements
 
+- **Stop buttons you can trust** — a full pass over every Stop/Cancel in the app. **Stop generation** is clickable for the whole batch (it used to grey itself out exactly when you needed it), **Stop training** now *verifies* the training process actually died before reporting success (an unkillable process returns an honest error instead of a false "stopped"), and a cancelled render that ComfyUI never confirmed aborting is reported as such instead of silently claimed. A false "may still be running" warning that fired on perfectly normal cancels was also silenced.
+- **No more silent hangs or GPU pile-ups** — an audit of every blocking call and pause path: a stalled Ollama model download now fails with a clear error instead of hanging its setup task forever, and very long caption/vision batches no longer lose their exclusive GPU lock mid-run (which could let queued image generations pile onto the GPU while captioning was still working — the lock now renews itself for as long as the batch runs).
+- **Startup opens the real address** — serving on a LAN or Tailscale address used to greet you with a browser tab at a hardcoded `127.0.0.1`, opened before the server was even up ("cannot connect" every launch). The launcher now opens the address it is *actually* serving on, only once the server accepts connections, with the access token carried along when the token gate is on. Set `LDS_NO_BROWSER=1` to skip the auto-open.
 - **Run lineage & family-tree graph** — when you continue a training (from its last checkpoint or an earlier, less-cooked epoch) a lineage is born: the original run, its continuation, the re-continuation, any branch you forked off. The Runs page draws it two ways — a compact **List** and a **Graph**, a left-to-right family tree with flowing connectors and the path to the run you're viewing lit up. The graph shows each run's **checkpoints as pills**, and a continuation's connector starts from the **exact checkpoint it resumed** — click any checkpoint to **download** it or **continue from here**. It opens for a single run the moment it has one saved checkpoint (also from a dataset's Checkpoints & LoRAs panel), and older continuations are **reconnected automatically** on first start — anything too ambiguous is left as a root, never invented.
 - **Image bank (Beta) — a giant unsorted folder becomes a dataset** — point the new **Bank** tab at a huge, messy dump (a Telegram export, a scrape pile): a quality scan flags blurry/noisy/flat/too-small shots, near-duplicates group up with one **keep-best** click, and a face pass sorts everything **by person — no reference photo needed** (now **GPU-accelerated** when the card is free). Then **Score** rates aesthetics, flags NSFW and groups by visual style, **Find crops & variants** catches the same shot re-cropped or re-compressed (reusing Score's embeddings, no extra GPU pass), **Find watermarks** flags overlaid logos/URLs, **Caption** describes images right in the Bank and a **search** filters a 9,000-image dump by what's in it. A per-subfolder scope slices a big export by chat, and a **Browse** button opens your own folder dialog. Your source folder is never modified; promote the keepers straight into a dataset. **Launch all** runs the whole pipeline end to end while you sleep, with a morning report.
 - **Sharper training recipes from verified research** — two defaults re-tuned from a fact-checked sweep of recent community results: a **FLUX.2 Klein style** LoRA now trains the winning **128/64/64/32** network (a 64-run sweep and Black Forest Labs' own example converge on it), and **Slider** LoRAs default to **alpha 4** (matching the Ostris slider notebook). Both are just smarter defaults — existing runs are untouched, and Advanced options still lets you set the alpha back.
@@ -599,11 +602,13 @@ No Python is needed up front: `start.bat` looks for a compatible interpreter
 (`py -3.12/3.11/3.10` — the range with prebuilt wheels for the optional ML extras)
 and, if it finds none, **downloads a self-contained CPython 3.12** into a local
 `.python\` folder (~44 MB, once — no system install, no admin, nothing added to
-PATH). It then creates a `.venv`, installs `backend/requirements.txt`, opens
-`http://127.0.0.1:5050/` in your browser, and starts the server. (Already have
-Python 3.10–3.12? It's used as-is and nothing is downloaded. On 3.13+ only, the
-core app still runs but the ML extras can't install.) Override the port with
-`set LDS_PORT=<port>` before running.
+PATH). It then creates a `.venv`, installs `backend/requirements.txt`, starts
+the server, and opens your browser at the address the server is actually bound
+to (default `http://127.0.0.1:5050/`; a LAN/Tailscale `server.host` opens that
+address instead, once the server is up). (Already have Python 3.10–3.12? It's
+used as-is and nothing is downloaded. On 3.13+ only, the core app still runs
+but the ML extras can't install.) Override the port with `set LDS_PORT=<port>`
+before running; set `LDS_NO_BROWSER=1` to skip the browser auto-open.
 
 Want a Desktop icon instead of digging into the extracted folder each time?
 Double-click **`Create Desktop Shortcut.bat`** (shipped alongside `start.bat`)

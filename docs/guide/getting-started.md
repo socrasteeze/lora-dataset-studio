@@ -30,8 +30,10 @@ detected. This fork has no cloud image-generation API engines.
 [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest),
 extract it, then double-click `start.bat`. Releases contain an archive/source, not
 a prebuilt executable launcher. `start.bat` finds or downloads a compatible Python
-(3.10–3.12), creates `.venv`, installs the requirements, and opens the app at
-`http://127.0.0.1:5050/`.
+(3.10–3.12), creates `.venv`, installs the requirements, starts the server, and
+opens the app in your browser at the address it is actually serving on (default
+`http://127.0.0.1:5050/`; a LAN/Tailscale `server.host` opens that address
+instead, once the server is up — set `LDS_NO_BROWSER=1` to skip the auto-open).
 
 **Any OS (manual venv):**
 
