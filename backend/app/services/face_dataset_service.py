@@ -48,6 +48,7 @@ from .face_variations import (CAPTION_PROMPT, CAPTION_PROMPT_BOORU,
                               drop_identity_sentences, drop_identity_tags,
                               is_nsfw_label, prompt_by_label, wrap_variation,
                               wrap_variation_klein, get_identity_prompt,
+                              normalize_subject_type,
                               KLEIN_IMAGE_IMPROVE_PROMPT)
 
 logger = logging.getLogger(__name__)
@@ -732,8 +733,16 @@ def dataset_prompt_suffix(ds, framing=None) -> str:
                                  getattr(ds, 'prompt_suffixes', None), framing)
 
 
+def subject_type_of(ds) -> str:
+    """The dataset's subject type, normalised — NULL/legacy -> 'human'. The single
+    reader every wrap call site uses so a legacy dataset (column NULL) generates
+    exactly as before."""
+    return normalize_subject_type(getattr(ds, 'subject_type', None) if ds else None)
+
+
 def create_dataset(user_id, name, trigger_word, kind=None, concept_desc=None, train_type=None,
-                   fidelity=None, prompt_suffix=None, prompt_suffixes=None, *, commit=True):
+                   fidelity=None, prompt_suffix=None, prompt_suffixes=None, subject_type=None,
+                   *, commit=True):
     """Create a dataset and return its row.
 
     ``commit=False`` is reserved for callers that need to coordinate the row with
@@ -753,6 +762,10 @@ def create_dataset(user_id, name, trigger_word, kind=None, concept_desc=None, tr
                      # à omettre nommément (les captions décrivent le contenu, jamais le
                      # rendu — c'est le prompt de caption qui porte cette règle).
                      kind=k, concept_desc=(desc[:500] if k == 'concept' else None),
+                     # subject_type steers the generation catalog + identity lock;
+                     # None left as NULL (== 'human') so a plain create is unchanged.
+                     subject_type=(normalize_subject_type(subject_type)
+                                   if subject_type is not None else None),
                      train_type=normalize_train_type(train_type),
                      # fidelity ne concerne que les personnages (concept : l'acte est
                      # omis ; style : les sujets varient, aucune identité à protéger).
@@ -803,7 +816,7 @@ def _guard_kind_switch(dataset_id):
 
 def update_dataset_settings(user_id, dataset_id, *, name=None, trigger_word=None,
                             concept_desc=None, kind=None, prompt_suffix=None,
-                            prompt_suffixes=None):
+                            prompt_suffixes=None, subject_type=None):
     """Edit a dataset's identity AFTER creation. Returns {'ok', 'concept_desc_changed'}
     (plus {'kind_changed', 'kind', 'previous_kind'} when the kind actually changed),
     or None if the dataset is absent; raises ValueError on invalid input and
@@ -920,6 +933,10 @@ def update_dataset_settings(user_id, dataset_id, *, name=None, trigger_word=None
         ds.prompt_suffix = _normalize_prompt_suffix(prompt_suffix)
     if prompt_suffixes is not None:
         ds.prompt_suffixes = _normalize_prompt_suffixes(prompt_suffixes)
+    # subject_type: None = untouched. Only steers FUTURE wraps (existing images keep
+    # their stored variation_prompt), so no in-flight guard is needed.
+    if subject_type is not None:
+        ds.subject_type = normalize_subject_type(subject_type)
     naming_after = _lt._safe_trigger(ds) if _lt else None
     if naming_before and naming_after and naming_before != naming_after:
         trigger_rename = (naming_before, naming_after)
@@ -2069,7 +2086,13 @@ def _import_backup_zipfile(user_id: int, z: zipfile.ZipFile):
 def replace_in_captions(user_id, dataset_id, find, replace, mode='text'):
     """Bulk-edit the captions of KEPT images (the ones that train). Two modes:
 
-    - 'text': plain substring replace, case-sensitive.
+    - 'text': whole-word replace, CASE-INSENSITIVE — the same match rule as the
+      grid filter ("smile" hits "a warm smile" but not "smiling") and the most-
+      frequent-words counter, both case-insensitive. So clicking a "bulldog ×41"
+      chip and stripping it removes all 41 whatever their casing (the captions
+      hold "Bulldog"); a case-sensitive substring replace matched 0 and looked
+      broken. Whole-word so "red" never eats the "red" inside "colored". When
+      `replace` is empty the gaps a stripped word leaves in prose are tidied.
     - 'tag':  the caption is treated as a comma-separated tag list (booru); `find`
       must match a WHOLE tag (trimmed, case-insensitive) and is replaced by
       `replace` — or dropped when `replace` is empty. Avoids the ', ,' artifacts a
@@ -2092,7 +2115,13 @@ def replace_in_captions(user_id, dataset_id, find, replace, mode='text'):
     for img in rows:
         old = img.caption or ''
         if mode == 'text':
-            new = old.replace(find, replace or '')
+            pattern = re.compile(rf'\b{re.escape(find)}\b', re.IGNORECASE)
+            new = pattern.sub(replace or '', old)
+            if not (replace or '').strip():          # stripping: tidy prose gaps
+                new = re.sub(r'\s+([,.;:])', r'\1', new)   # space before punctuation
+                new = re.sub(r'(,\s*){2,}', ', ', new)     # collapsed repeated commas
+                new = re.sub(r'\s{2,}', ' ', new)          # collapsed double spaces
+                new = new.strip(' ,;')
         else:
             tags = [t.strip() for t in old.split(',')]
             out, seen = [], set()
@@ -2281,6 +2310,9 @@ def dataset_payload(user_id, dataset_id):
         'id': ds.id, 'name': ds.name, 'trigger_word': ds.trigger_word,
         'train_type': (ds.train_type or 'zimage'),
         'kind': (ds.kind or 'character'),
+        # WHAT the subject is (NULL/legacy -> 'human'); drives the generation
+        # catalog + identity lock. Orthogonal to `kind`.
+        'subject_type': subject_type_of(ds),
         # Dual long+short captioning toggle (Advanced options) → the caption editor shows
         # the short field only when this is on.
         'dual_captions': dual_captions_enabled(ds),
@@ -4617,7 +4649,8 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                         # suffix exactly once (never a double application).
                         edit_prompt=wrap_variation_klein(
                             v['prompt'], nsfw=nsfw, framing=v.get('framing'),
-                            suffix=dataset_prompt_suffix(ds, v.get('framing'))),
+                            suffix=dataset_prompt_suffix(ds, v.get('framing')),
+                            subject_type=subject_type_of(ds)),
                         klein_model=klein_model,
                         lora_strength=lora_strength, extra_ref_paths=extra_paths,
                         generation_loras=run_loras,
@@ -5013,7 +5046,8 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
             framing=img.framing,
             # CURRENT dataset suffix, applied at wrap: `prompt` is the raw
             # stored/edited creative prompt, so this is the ONLY application.
-            suffix=dataset_prompt_suffix(ds, img.framing)),
+            suffix=dataset_prompt_suffix(ds, img.framing),
+            subject_type=subject_type_of(ds)),
         klein_model=model,
         lora_strength=lora_strength, extra_ref_paths=extra_paths,
         generation_loras=resolve_generation_lora_preset(generation_lora_preset),
