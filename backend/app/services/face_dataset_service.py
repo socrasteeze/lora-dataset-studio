@@ -660,7 +660,7 @@ def set_fidelity(user_id, dataset_id, fidelity) -> bool:
 # NB : 'flux2klein' (FLUX.2 Klein) — PAS 'klein' : ce namespace est déjà pris par
 # le moteur de GÉNÉRATION (engines.klein, unet/klein/) ; un train_type 'klein'
 # télescoperait les résolveurs de modèles et les chemins loras du Studio.
-TRAIN_TYPES = ('zimage', 'sdxl', 'krea', 'flux', 'flux2klein')
+TRAIN_TYPES = ('zimage', 'sdxl', 'krea', 'flux', 'flux2klein', 'anima')
 
 
 def normalize_train_type(t) -> str:
@@ -5209,6 +5209,7 @@ _TRAIN_FAMILY_LABELS = {
     'flux2klein': 'FLUX.2 Klein',
     'flux': 'FLUX.1',
     'sdxl': 'SDXL',
+    'anima': 'Anima',
 }
 
 

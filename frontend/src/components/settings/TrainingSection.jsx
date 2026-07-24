@@ -2,7 +2,7 @@ import { INPUT_CLASS, Card } from './primitives'
 
 // Keep in sync with backend TRAIN_TYPES (face_dataset_service.py) — 'flux' had
 // been forgotten here when the FLUX.1 family landed (fixed alongside flux2klein).
-const FAMILY_OPTIONS = ['zimage', 'sdxl', 'krea', 'flux', 'flux2klein']
+const FAMILY_OPTIONS = ['zimage', 'sdxl', 'krea', 'flux', 'flux2klein', 'anima']
 
 export default function TrainingSection(props) {
   const { config, setField } = props
