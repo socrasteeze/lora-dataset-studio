@@ -204,7 +204,7 @@ Defaults for new local training runs.
 
 ### Defaults
 
-- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`. Default **`zimage`**. Purely a starting point — you can switch family per run.
+- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download); it is **local-only** for now (needs an up-to-date ai-toolkit + diffusers — cloud training arrives once the GPU pod image is verified).
 
 This fork's Settings → Training keeps only **Defaults** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
 
@@ -334,7 +334,14 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `engines.default` | Image-generation engine (`klein` — the only engine on this fork). |
 | `engines.enabled` | List of engines shown as options in the UI (`['klein']` on this fork). |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
-| `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, or `flux2klein`). |
+| `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, or `anima`). |
+| `cloud.max_concurrent_runs` | Simultaneous cloud pods allowed (default `1`, 1–10). Also in Settings → Training. |
+| `cloud.max_price_per_hour` | Safety cap on the hourly offer price in $ (default `0.80`); pricier hosts are skipped before launch. |
+| `cloud.monthly_budget_usd` | Hard monthly spend ceiling in $ (default `0` = unlimited); launches are blocked past it. |
+| `cloud.stall_timeout_minutes` | Kill + rescue a cloud run after this many minutes without step progress (default `30`, 5–240). |
+| `cloud.min_reliability` | vast.ai host-reliability floor (default `0.98`, 0.9–0.999); lower surfaces cheaper, riskier hosts. |
+| `cloud.verified_only` | Restrict to vast.ai verified hosts (default `true`). |
+| `cloud.secure_cloud_only` | Restrict to vast.ai's Secure Cloud (datacenter) tier (default `false`; narrows the market, raises price). |
 | `face_scoring.python` | Python interpreter used to run the InsightFace subprocess (empty = current interpreter). |
 | `face_scoring.models_root` | Directory where InsightFace model weights are stored/downloaded. |
 | `face_scoring.green` | Similarity score threshold (0–1) above which an image is flagged "green" (strong match). |
