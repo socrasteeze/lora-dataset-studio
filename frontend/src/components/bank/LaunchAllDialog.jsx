@@ -19,7 +19,7 @@ const QUALITY_FLAGS = [
   { key: 'small', label: '📐 Small' },
 ]
 
-export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch }) {
+export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, onQueue }) {
   // A heavy pass is "ready" when its tool is installed; scan/auto-reject always are.
   const ready = useMemo(() => ({
     scan: true,
@@ -78,13 +78,13 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch }
   }))
   const nRun = plan.filter((s) => !s.willSkip).length
 
-  const launch = () => {
-    onLaunch({
-      steps: [...steps],
-      reject_flags: autoRejectOn ? [...rejectFlags] : [],
-      resolve_dups: autoRejectOn && resolveDups,
-    })
-  }
+  const config = () => ({
+    steps: [...steps],
+    reject_flags: autoRejectOn ? [...rejectFlags] : [],
+    resolve_dups: autoRejectOn && resolveDups,
+  })
+  const launch = () => onLaunch(config())
+  const queue = () => onQueue(config())
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Launch all"
@@ -168,6 +168,13 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch }
             className="rounded-md border border-border px-3 py-1.5 text-sm text-content-muted hover:text-content hover:bg-surface-raised">
             Cancel
           </button>
+          {onQueue && (
+            <button type="button" onClick={queue} disabled={nRun === 0}
+              title="Line this bank up to run when the ones ahead of it finish — never fails for a busy GPU."
+              className="rounded-md border border-border bg-surface-raised px-4 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-50">
+              ➕ Add to queue
+            </button>
+          )}
           <button type="button" onClick={launch} disabled={nRun === 0}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
             🚀 Launch{nRun ? ` ${nRun} pass${nRun > 1 ? 'es' : ''}` : ''}

@@ -143,7 +143,12 @@ touching the folder itself:
 1. **Create a bank** — give it a name and paste the folder path. The app
    inventories every image in place (subfolders included). Nothing is copied,
    nothing is modified; rejecting an image is a reversible status, never a file
-   deletion.
+   deletion. If your folder is really a *folder of folders* (a Telegram export
+   with one subfolder per chat, say), tick **One bank per subfolder** and each
+   top-level subfolder becomes its own bank — so you can curate, queue and
+   promote each one separately. A preview shows exactly which banks will be made
+   and how many images each holds; loose images sitting directly in the parent
+   get their own bank too, so nothing is dropped.
 2. **Scan quality** — a background pass (CPU only, a few minutes even on
    thousands of images) scores every file: sharpness, noise, flat/empty
    frames, resolution — and groups **near-duplicates**. The flags follow the
@@ -236,6 +241,14 @@ pass left **off by default** (it's the slowest GPU pass and a clean-up run
 rarely needs a description on every shot). Stop it any time — and when you come
 back, a saved report at the top of the bank tells you exactly what ran, what was
 skipped and why, with the headline counts.
+
+Got several banks to clean? Instead of babysitting them one at a time, open a
+bank's Launch-all dialog from the Banks page and choose **Add to queue**. The
+**Launch-all queue** works through the banks one at a time, each one waiting its
+turn for the GPU rather than failing when another bank — or a training run — is
+using it. A panel on the Banks page shows what's running and what's lined up, and
+lets you cancel a bank or clear the whole queue. Queue three exports before bed
+and they'll be triaged by morning.
 
 ## Tips that save runs
 

@@ -1,0 +1,94 @@
+"""🗃️ Image bank — "one bank per subfolder" importer.
+
+Point at a parent folder whose top-level subfolders each become their OWN bank
+(rooted at the subfolder, files referenced in place). Loose images sitting
+directly in the parent get their own parent-named bank by default, so nothing is
+silently dropped. Deeper nesting stays a child bank's own subfolder facet.
+"""
+import os
+
+from PIL import Image
+
+
+def _save(path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    Image.new('RGB', (32, 32), (128, 128, 128)).save(path, 'JPEG', quality=90)
+
+
+def _tree(src, layout):
+    """layout: {relpath: True} — create a small image at each relpath under src."""
+    for rel in layout:
+        _save(str(src / rel))
+
+
+def _banks(client):
+    return {b['name']: b for b in client.get('/api/banks').get_json()['banks']}
+
+
+def test_split_preview_counts_subfolders_and_loose(client, tmp_path):
+    src = tmp_path / 'export'
+    _tree(src, ['chatA/1.jpg', 'chatA/2.jpg', 'chatB/1.jpg',
+                'loose1.jpg', 'loose2.jpg', 'loose3.jpg'])
+    r = client.post('/api/bank/split/preview', json={'folder': str(src)})
+    assert r.status_code == 200, r.get_json()
+    d = r.get_json()
+    assert d['loose_root_count'] == 3
+    assert {(s['name'], s['image_count']) for s in d['subfolders']} == {
+        ('chatA', 2), ('chatB', 1)}
+
+
+def test_split_creates_one_bank_per_subfolder_plus_loose(client, tmp_path):
+    src = tmp_path / 'export'
+    _tree(src, ['chatA/1.jpg', 'chatA/2.jpg', 'chatB/1.jpg', 'loose1.jpg'])
+    r = client.post('/api/bank/split', json={'folder': str(src)})
+    assert r.status_code == 200, r.get_json()
+    created = r.get_json()['banks']
+    # 2 subfolders + 1 loose bank = 3 banks, nothing dropped.
+    assert len(created) == 3
+    banks = _banks(client)
+    prefix = f'{os.path.basename(str(src))} / '
+    assert banks[f'{prefix}chatA']['total'] == 2
+    assert banks[f'{prefix}chatB']['total'] == 1
+    assert banks[f'{prefix}(loose files)']['total'] == 1
+    # Each subfolder bank is rooted at its own subfolder (files referenced in place).
+    assert banks[f'{prefix}chatA']['source_path'] == os.path.join(
+        os.path.realpath(str(src)), 'chatA')
+
+
+def test_split_can_skip_loose(client, tmp_path):
+    src = tmp_path / 'export'
+    _tree(src, ['chatA/1.jpg', 'loose1.jpg', 'loose2.jpg'])
+    r = client.post('/api/bank/split',
+                    json={'folder': str(src), 'include_loose': False})
+    assert r.status_code == 200, r.get_json()
+    created = r.get_json()['banks']
+    assert len(created) == 1                       # only chatA; loose skipped
+    assert all('loose' not in b['name'] for b in created)
+
+
+def test_split_no_subfolders_falls_back_to_single_bank(client, tmp_path):
+    src = tmp_path / 'flat'
+    _tree(src, ['a.jpg', 'b.jpg'])
+    r = client.post('/api/bank/split', json={'folder': str(src)})
+    assert r.status_code == 200, r.get_json()
+    created = r.get_json()['banks']
+    assert len(created) == 1
+    assert created[0]['added'] == 2
+
+
+def test_split_preserves_nested_dirs_as_child_subfolder(client, tmp_path):
+    src = tmp_path / 'export'
+    _tree(src, ['chatA/2024/deep.jpg'])
+    r = client.post('/api/bank/split', json={'folder': str(src)})
+    assert r.status_code == 200, r.get_json()
+    bank_id = r.get_json()['banks'][0]['id']
+    # The nested "2024" dir becomes the child bank's own subfolder facet.
+    subs = client.get(f'/api/bank/{bank_id}/subfolders').get_json()
+    names = {s['name'] for s in subs.get('subfolders', [])}
+    assert '2024' in names
+
+
+def test_split_bad_folder_is_400(client, tmp_path):
+    r = client.post('/api/bank/split', json={'folder': str(tmp_path / 'nope')})
+    assert r.status_code == 400
+    assert 'not found' in r.get_json()['error']
