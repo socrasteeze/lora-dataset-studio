@@ -157,21 +157,81 @@ or Runs rental prompts: delete them again. Contract:
 `frontend/tests/local-only-engines-contract.test.mjs` (also forbids rental UI
 strings).
 
+## Merge diagnostics (read BEFORE resolving a single conflict)
+
+Lessons from actually doing these merges, aimed at an agent seeing this repo
+cold each time. The goal: spend the least effort finding what genuinely needs
+a decision, and don't miss the parts that merge with zero conflict markers.
+
+1. **`git diff --stat HEAD..upstream/main` is not "what's new this sync" — it
+   is the full historical divergence.** It re-lists every file this fork has
+   ever diverged on (README.md, FORK_NOTES.md, deleted cloud-engine files,
+   PLAN.md, docs/, …), most of which nothing touched in the current window.
+   The ground truth for "what's actually new" is the **commit list**:
+   `git log --oneline HEAD..upstream/main`. Read every commit *message* first
+   — they usually name the feature outright ("edit the reference photo with a
+   prompt (ChatGPT / Nano Banana)", "generate with several engines in one
+   batch") which tells you in one line whether a Divergence applies, before
+   you've opened a single diff.
+2. **After merging, conflict markers only mark where BOTH sides touched the
+   SAME lines.** A rejected feature's plumbing routinely lands with ZERO
+   conflicts in files this fork didn't happen to touch that sync — a new
+   route, a new hook + its slot in the returned object, a new button, a new
+   `whatsNew.js`/help-registry entry, a new tuple member. Conflict-resolution
+   alone will miss all of these. After every merge, sweep the WHOLE tree:
+   ```
+   grep -rln "chatgpt\|nanobanana\|ChatGPT\|Nano Banana\|reference_edit\|engineSelection\|GEMINI_API_KEY\|OPENAI_API_KEY" \
+     backend/app backend/tests frontend/src frontend/tests
+   ```
+   Vet every hit against "Deleted files" / "kept as-is dead code" above —
+   most will be pre-existing legacy references (`LEGACY_API_ENGINE_TAGS`,
+   explanatory comments). Anything **new** (a fresh function, prop, JSX
+   button, activity kind, changelog entry) belongs to the rejected feature
+   and must be stripped even though nothing flagged it as a conflict.
+3. **Known clean-auto-merge hiding spots**, checked every time a cloud-engine
+   feature recurs: `frontend/src/whatsNew.js` (a new entry describing it),
+   `frontend/src/help/helpRegistry.js` (a new `action`/`setting` topic),
+   `frontend/src/hooks/useDataset.js` (a new callback **and** its slot in the
+   big returned object at the bottom of the hook), the consuming component's
+   button/modal wiring (e.g. `ReferencePanel.jsx`'s button, `DatasetWorkspace.jsx`'s
+   modal + state), `backend/app/services/dataset_activity.py`'s `KINDS` tuple
+   (a new activity kind for the rejected feature's progress indicator).
+4. **When a legitimate feature and a rejected one ship in the SAME upstream
+   commits, they commonly interleave inside the same file/hunk** (e.g.
+   `VariationCatalog.jsx` carrying both `subject-type` and multi-engine
+   `EngineCard`/`MODE_CHOICES` in the 2026-07-24 sync). Resolve **at the hunk
+   level** — keep the legitimate half, drop the cloud half. Never blanket-
+   revert the whole file to `--ours`/HEAD, or the good half is lost too.
+5. **Before deleting a function/constant that belonged only to a rejected
+   feature, confirm it truly has zero remaining callers**:
+   `grep -rn '<symbol>' backend/ frontend/src/` — a helper can be referenced
+   from a spot well outside the conflict hunk you're currently editing (this
+   is how `_all_ref_bytes`-style orphans happen). Delete definitions only
+   after every call site is gone.
+6. **A file with no conflict markers and no matches in step 2's grep is not
+   automatically clean** — run the standard test suites anyway (step 4 below);
+   they catch what grep can't (renamed imports, prop-shape mismatches).
+
 ## Merge routine (every upstream sync)
 
 ```
 git fetch upstream
+git log --oneline HEAD..upstream/main         # read every message (diagnostic 1)
 git merge upstream/main
 # 1. Re-delete any resurrected API-engine files (list above).
-# 2. Resolve conflicts — for engine/Setup/EnginesSection, prefer THIS fork.
-# 3. If frontend/dist or Setup/engines UI came from upstream, wipe their effect:
+# 2. Resolve conflicts — for engine/Setup/EnginesSection, prefer THIS fork;
+#    for a file mixing a legit feature with a rejected one, resolve per-hunk
+#    (diagnostic 4), don't revert the whole file.
+# 3. Sweep the WHOLE tree for clean-merged rejected-feature leftovers
+#    (diagnostics 2-3), not just conflicted files.
+# 4. If frontend/dist or Setup/engines UI came from upstream, wipe their effect:
 cd frontend && npm run build
-# 4. Prove local-only did not regress:
+# 5. Prove local-only did not regress:
 cd frontend && node --test tests/local-only-engines-contract.test.mjs
 python -m pytest
 cd frontend && node --test
-# 5. Commit sources, then a separate build(frontend): commit for dist.
-# 6. Ask before push; never force-push without confirmation.
+# 6. Commit sources, then a separate build(frontend): commit for dist.
+# 7. Ask before push; never force-push without confirmation.
 ```
 
 **Hard stop:** if Setup shows "Image generation" with Gemini/OpenAI key fields,
