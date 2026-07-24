@@ -43,10 +43,13 @@ Run through this before calling a wave done:
 ## Fork sync (upstream)
 
 This repo is a fork. Before/after `git merge upstream/main`, follow
-`FORK_NOTES.md` — especially **Divergence 1 (local-only generation)**. Never
-re-add Gemini/OpenAI/Nano Banana generation engines. After any merge that
-touches `frontend/`, run `cd frontend && npm run build` and the local-only
-contract test before calling the sync done.
+`FORK_NOTES.md` — especially **Divergence 1 (local-only generation)** and the
+**Merge diagnostics** section (read it *before* touching a single conflict —
+it explains how to tell real new-sync changes from historical noise and how
+to catch rejected-feature leftovers that merge with zero conflict markers).
+Never re-add Gemini/OpenAI/Nano Banana generation engines. After any merge
+that touches `frontend/`, run `cd frontend && npm run build` and the
+local-only contract test before calling the sync done.
 
 ## Releases
 
