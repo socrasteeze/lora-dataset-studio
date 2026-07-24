@@ -49,6 +49,22 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-24-bank-launch-queue',
+    date: '2026-07-24',
+    title: '⏳ Queue several banks to triage back-to-back',
+    blurb:
+      'You can now line up more than one image bank for "Launch all" and walk away. Open a bank\'s Launch-all dialog from the Banks page and choose "Add to queue" instead of running it now — the queue works through one bank at a time, waiting its turn for the GPU instead of failing when another bank (or a training run) is using it. A queue panel on the Banks page shows what\'s running and what\'s lined up, and lets you cancel or clear the line.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-24-bank-split-subfolders',
+    date: '2026-07-24',
+    title: '🗂 Import a folder as one bank per subfolder',
+    blurb:
+      'Importing a folder-of-folders (say a Telegram export with one subfolder per chat) can now create a separate bank for each top-level subfolder instead of one giant mixed bank — so you can curate, queue and promote each chat on its own. Tick "One bank per subfolder" when creating a bank, and a preview shows exactly which banks will be made and how many images each holds. Loose images sitting directly in the parent get their own bank too, so nothing is ever dropped. Files are referenced in place, never copied.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-24-subject-type-selector',
     date: '2026-07-24',
     title: '🐾 Build LoRAs of animals, objects and creatures — not just people',

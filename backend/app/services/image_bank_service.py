@@ -45,7 +45,7 @@ from sqlalchemy import and_, case, func, or_
 from .. import config as cfg
 from ..extensions import db
 from ..models import BankImage, FaceDataset, ImageBank
-from . import bank_jobs, trash
+from . import bank_jobs, bank_queue, trash
 from .face_dataset_service import _dhash, _hamming, import_images
 from .image_quality import ANALYSIS_MAX_SIDE, quality_metrics
 
@@ -129,12 +129,20 @@ def create_bank(user_id, name, folder):
                 if len(rels) > BANK_MAX_FILES:
                     raise ValueError(
                         f'too many images in the folder (max {BANK_MAX_FILES})')
-    bank = ImageBank(user_id=user_id, name=name, source_path=folder)
+    return _register_bank(user_id, name, folder, rels)
+
+
+def _register_bank(user_id, name, source_path, rels):
+    """Persist one ImageBank rooted at ``source_path`` with a BankImage per rel
+    (each relative to ``source_path``). Shared by create_bank and the per-
+    subfolder split. Assumes name/folder are validated and ``rels`` is within
+    BANK_MAX_FILES — instant (no decode); scoring is the separate scan pass."""
+    bank = ImageBank(user_id=user_id, name=name, source_path=source_path)
     db.session.add(bank)
     db.session.flush()          # need bank.id for the child rows
     for i, rel in enumerate(rels, 1):
         try:
-            size = os.path.getsize(os.path.join(folder, rel))
+            size = os.path.getsize(os.path.join(source_path, rel))
         except OSError:
             size = None
         db.session.add(BankImage(bank_id=bank.id, relpath=rel, file_size=size))
@@ -142,6 +150,76 @@ def create_bank(user_id, name, folder):
             db.session.flush()
     db.session.commit()
     return bank, len(rels)
+
+
+def _split_walk(folder):
+    """Validate + realpath ``folder`` and bucket every image under it by its
+    top-level subfolder. Returns ``(folder, buckets, loose)`` where ``buckets``
+    maps subfolder name -> list of rels RELATIVE TO THAT SUBFOLDER (nested dirs
+    preserved, so they stay the child bank's own subfolder facet) and ``loose``
+    is the list of root-level filenames. ValueError on a missing folder."""
+    folder = (folder or '').strip().strip('"\'')
+    if not folder or not os.path.isdir(folder):
+        raise ValueError(f'folder not found or not readable: {folder or "(empty)"}')
+    folder = os.path.realpath(folder)
+    buckets, loose = {}, []
+    for root, _dirs, files in os.walk(folder):
+        for f in files:
+            if not f.lower().endswith(IMG_EXTS):
+                continue
+            rel = os.path.relpath(os.path.join(root, f), folder)
+            sub = _subfolder_of(rel)
+            if sub == '':
+                loose.append(rel)
+            else:
+                inner = os.path.relpath(os.path.join(folder, rel),
+                                        os.path.join(folder, sub))
+                buckets.setdefault(sub, []).append(inner)
+    return folder, buckets, loose
+
+
+def split_folder_preview(folder) -> dict:
+    """Dry run for the "one bank per subfolder" importer: how many images each
+    top-level subfolder holds and how many loose images sit at the root. Creates
+    nothing. {folder, subfolders:[{name, image_count}], loose_root_count}."""
+    folder, buckets, loose = _split_walk(folder)
+    subs = [{'name': n, 'image_count': len(rels)}
+            for n, rels in sorted(buckets.items())]
+    return {'folder': folder, 'subfolders': subs, 'loose_root_count': len(loose)}
+
+
+def split_folder_into_banks(user_id, folder, name_prefix=None,
+                            include_loose=True):
+    """Create ONE bank per top-level subfolder of ``folder`` (each rooted at that
+    subfolder, referencing files in place — no copy). Loose images sitting
+    directly in the parent get their own parent-named bank when ``include_loose``
+    (default True), so nothing is ever silently dropped: ``subA/``, ``subB/`` +
+    10 loose images -> 3 banks. Falls back to a single create_bank when there is
+    no image-bearing subfolder. Returns [{id, name, added}], newest last.
+
+    Per-bank BANK_MAX_FILES still applies (each subfolder is its own bank)."""
+    folder, buckets, loose = _split_walk(folder)
+    parent_name = os.path.basename(folder.rstrip('/\\')) or 'bank'
+    prefix = name_prefix if name_prefix is not None else f'{parent_name} / '
+    if not buckets:
+        bank, added = create_bank(user_id, parent_name, folder)
+        return [{'id': bank.id, 'name': bank.name, 'added': added}]
+    created = []
+    for sub in sorted(buckets):
+        rels = buckets[sub]
+        if len(rels) > BANK_MAX_FILES:
+            raise ValueError(
+                f'too many images in subfolder "{sub}" (max {BANK_MAX_FILES})')
+        bank, added = _register_bank(user_id, f'{prefix}{sub}',
+                                     os.path.join(folder, sub), rels)
+        created.append({'id': bank.id, 'name': bank.name, 'added': added})
+    if include_loose and loose:
+        if len(loose) > BANK_MAX_FILES:
+            raise ValueError(f'too many loose images (max {BANK_MAX_FILES})')
+        bank, added = _register_bank(user_id, f'{prefix}(loose files)',
+                                     folder, loose)
+        created.append({'id': bank.id, 'name': bank.name, 'added': added})
+    return created
 
 
 def _is_imported_source(path) -> bool:
@@ -478,6 +556,7 @@ def list_banks(user_id, dataset_id=None) -> list:
             'scanned': base.filter(BankImage.quality_state.isnot(None)).count(),
             'preview_ids': _preview_ids(bank.id),
             'activity': bank_jobs.get(bank.id),
+            'queue_state': bank_queue.state_for(bank.id),
         }
         if promotable is not None:
             row['promotable'] = promotable.get(bank.id, 0)

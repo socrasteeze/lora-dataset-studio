@@ -12,6 +12,7 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 from ..config import LOCAL_USER
 from ..models import BankImage
 from ..services import bank_jobs
+from ..services import bank_queue
 from ..services import image_bank_service as banks
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,36 @@ def bank_create():
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'id': bank.id, 'added': added})
+
+
+@bp.post('/bank/split/preview')
+def bank_split_preview():
+    """Dry run for "one bank per subfolder": the top-level subfolders of a folder
+    and their image counts, plus the loose (root-level) image count. Creates
+    nothing. 400 on a missing/unreadable folder."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(banks.split_folder_preview(data.get('folder')))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@bp.post('/bank/split')
+def bank_split():
+    """Create one bank per top-level subfolder of ``folder`` (files referenced in
+    place). ``include_loose`` (default true) also makes a bank from the loose
+    root-level images so nothing is dropped. Returns the created banks. 400 on a
+    bad folder / a subfolder over the size cap."""
+    data = request.get_json(silent=True) or {}
+    include_loose = data.get('include_loose')
+    try:
+        created = banks.split_folder_into_banks(
+            LOCAL_USER, data.get('folder'),
+            name_prefix=data.get('name_prefix'),
+            include_loose=True if include_loose is None else bool(include_loose))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'banks': created})
 
 
 @bp.post('/bank/from-dataset')
@@ -231,6 +262,51 @@ def bank_pipeline(bank_id):
                   steps=data.get('steps') or None,
                   reject_flags=data.get('reject_flags') or None,
                   resolve_dups=bool(data.get('resolve_dups')))
+
+
+@bp.post('/bank/<int:bank_id>/queue')
+def bank_queue_add(bank_id):
+    """Add this bank's "Launch all" run to the cross-bank queue instead of
+    starting it now. Same body as /pipeline. 202 on enqueue, 409 when the bank
+    is already queued, 400 on an empty/invalid step list, 404 when the bank is
+    gone."""
+    if banks.get_bank(LOCAL_USER, bank_id) is None:
+        return jsonify({'error': 'not found'}), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        position = bank_queue.enqueue(
+            _app(), LOCAL_USER, bank_id,
+            steps=data.get('steps') or None,
+            reject_flags=data.get('reject_flags') or None,
+            resolve_dups=bool(data.get('resolve_dups')))
+    except bank_queue.BankAlreadyQueued as e:
+        return jsonify({'error': str(e)}), 409
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'position': position}), 202
+
+
+@bp.get('/bank-queue')
+def bank_queue_list():
+    """The cross-bank queue: which bank is running and what is lined up behind
+    it, so the Banks page can show and manage the queue."""
+    return jsonify(bank_queue.snapshot())
+
+
+@bp.delete('/bank-queue/<int:bank_id>')
+def bank_queue_remove(bank_id):
+    """Drop a bank from the queue; cancels its live pipeline if it is the one
+    currently running. 404 when the bank wasn't queued."""
+    if not bank_queue.cancel(bank_id):
+        return jsonify({'error': 'not queued'}), 404
+    return jsonify({'ok': True})
+
+
+@bp.post('/bank-queue/clear')
+def bank_queue_clear():
+    """Empty the whole queue (and cancel the running pipeline)."""
+    removed = bank_queue.clear()
+    return jsonify({'ok': True, 'removed': removed})
 
 
 @bp.post('/bank/<int:bank_id>/promote')
