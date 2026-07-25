@@ -119,6 +119,20 @@ def bank_get(bank_id):
     return jsonify(payload)
 
 
+@bp.post('/bank/<int:bank_id>/rename')
+def bank_rename(bank_id):
+    """Rename a bank — label only, nothing about the triage or the source folder
+    moves. 400 on an empty/oversized name, 404 when the bank is gone."""
+    data = request.get_json(silent=True) or {}
+    try:
+        bank = banks.rename_bank(LOCAL_USER, bank_id, data.get('name'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    if bank is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, 'id': bank.id, 'name': bank.name})
+
+
 @bp.delete('/bank/<int:bank_id>')
 def bank_delete(bank_id):
     if not banks.delete_bank(LOCAL_USER, bank_id):

@@ -8,9 +8,71 @@ import LaunchAllDialog from '../components/bank/LaunchAllDialog'
 import FolderPickerField from '../components/common/FolderPicker'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast } from '../components/bank/bankSync'
+import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
 
 const CURRENT_KEY = 'bankCurrentId'
+const SORT_KEY = 'bankListSort'
+// Mirrors ImageBank.name's column width (image_bank_service.BANK_NAME_MAX): the
+// server refuses a longer name rather than let SQLite truncate it silently, so
+// stop it here too and the user never types into a 400.
+const BANK_NAME_MAX = 100
+
+/** The bank title: click to open, ✎ to rename in place. A bank is named once, at
+ * creation — often before its content is known, and the per-subfolder split names
+ * them automatically — so the label has to stay editable. Only the label changes:
+ * nothing about the folder or the triage moves. */
+function BankTitle({ bank, onOpen, onRename }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(bank.name)
+  const [saving, setSaving] = useState(false)
+
+  const start = () => { setDraft(bank.name); setEditing(true) }
+  const cancel = () => { setEditing(false); setDraft(bank.name) }
+  const submit = async (e) => {
+    e.preventDefault()
+    const name = draft.trim()
+    if (!name || name === bank.name) { cancel(); return }
+    setSaving(true)
+    try {
+      await onRename(name)
+      setEditing(false)
+    } catch {
+      /* onRename already told the user; stay in edit mode so the typed name
+         isn't thrown away and the save can simply be retried. */
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={submit} className="flex min-w-0 grow items-center gap-1">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') cancel() }}
+          aria-label={`New name for ${bank.name}`} maxLength={BANK_NAME_MAX} autoFocus
+          className="min-w-0 grow rounded-md border border-border bg-surface-raised px-2 py-1 text-sm text-content" />
+        <button type="submit" disabled={saving}
+          className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-emerald-300 disabled:opacity-50">
+          {saving ? '…' : 'Save'}
+        </button>
+        <button type="button" onClick={cancel}
+          className="px-1 text-xs text-content-subtle hover:text-content">Cancel</button>
+      </form>
+    )
+  }
+  return (
+    <>
+      <button type="button" onClick={onOpen}
+        className="min-w-0 truncate text-left text-base font-semibold text-content hover:underline">
+        {bank.name}
+      </button>
+      <button type="button" onClick={start} title="Rename this bank"
+        aria-label={`Rename bank ${bank.name}`}
+        className="shrink-0 px-1 text-content-subtle hover:text-content">✎</button>
+    </>
+  )
+}
 
 /** The card's thumbnail strip: the bank's first few images, so a list of banks
  * reads at a glance instead of as a wall of folder paths. Clicking a thumbnail
@@ -97,6 +159,11 @@ export default function BankPage() {
   const [name, setName] = useState('')
   const [folder, setFolder] = useState('')
   const [creating, setCreating] = useState(false)
+  // The list order is a display preference, so it lives client-side and sticks
+  // (a library of twenty banks is unusable in creation order — see bankSort).
+  const [sort, setSort] = useState(() => {
+    try { return normalizeBankSort(localStorage.getItem(SORT_KEY)) } catch { return DEFAULT_BANK_SORT }
+  })
   // "One bank per subfolder": split a parent folder so each top-level subfolder
   // becomes its own bank (loose root images get their own bank too — nothing
   // dropped). A live preview shows what will be created before committing.
@@ -187,6 +254,26 @@ export default function BankPage() {
       toast.error(err?.message || 'Could not create the bank(s).')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const changeSort = (id) => {
+    const next = normalizeBankSort(id)
+    setSort(next)
+    try { localStorage.setItem(SORT_KEY, next) } catch { /* ignore */ }
+  }
+
+  // Rename in place: patch the loaded row instead of re-fetching, because GET
+  // /api/banks force-re-walks every source folder (see refresh_banks) — far too
+  // much work for a label change.
+  const rename = async (bank, newName) => {
+    try {
+      const d = await postJson(`/api/bank/${bank.id}/rename`, { name: newName })
+      setBanks((rows) => (rows || []).map((b) => (b.id === bank.id ? { ...b, name: d.name } : b)))
+      toast.success('Bank renamed.')
+    } catch (e) {
+      toast.error(e?.message || 'Could not rename the bank.')
+      throw e
     }
   }
 
@@ -327,17 +414,27 @@ export default function BankPage() {
           No bank yet — create one above to start triaging a folder.
         </p>
       ) : (
+        <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-content-muted">{banks.length} bank(s)</p>
+          <label className="flex items-center gap-2 text-xs text-content-muted">
+            Sort
+            <select value={sort} onChange={(e) => changeSort(e.target.value)}
+              aria-label="Sort the banks"
+              className="rounded-md border border-border bg-surface-raised px-2 py-1 text-xs text-content">
+              {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </label>
+        </div>
         <ul className="grid gap-3 sm:grid-cols-2">
-          {banks.map((b) => {
+          {sortBanks(banks, sort).map((b) => {
             const qs = queueStateOf(b)
             return (
             <li key={b.id}
               className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => open(b.id)}
-                  className="text-left text-base font-semibold text-content hover:underline">
-                  {b.name}
-                </button>
+                <BankTitle bank={b} onOpen={() => open(b.id)}
+                  onRename={(newName) => rename(b, newName)} />
                 {b.activity && !b.activity.finished && (
                   <span className="text-xs text-amber-300">{b.activity.kind}…</span>
                 )}
@@ -374,6 +471,7 @@ export default function BankPage() {
             )
           })}
         </ul>
+        </div>
       )}
 
       {dialogBankId != null && (

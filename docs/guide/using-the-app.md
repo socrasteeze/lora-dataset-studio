@@ -191,6 +191,20 @@ Work the funnel in that order: quality first (cheap, catches the trash), then
 subject, then selection. A promoted image keeps its badge in the bank so you
 always know what's been used where.
 
+**Keeping the list readable.** A bank is named once, at creation — and *One bank
+per subfolder* names them after the folders — so the list gets unwieldy fast.
+Click the **✎** next to a bank's name to rename it: only the label changes, the
+source folder, the images and every ✓/✕ stay exactly where they are. The **Sort**
+menu above the cards reorders the list (newest or oldest first, name A→Z or Z→A,
+most images, least triaged) and remembers your choice between visits.
+
+**You can curate while a pass is running.** Opening another bank and accepting or
+rejecting images while a scan — or the whole Launch-all queue — is working is
+supported and safe. If a save happens to land at the exact moment a pass is
+writing, the app waits and replays it for you; in the rare case it still can't
+get through you'll see "the database is busy… try again in a moment", and
+clicking again is all it takes. Your decision is never partially applied.
+
 **🎨 Curate down to the right subset.** Culling removes the bad shots; curation
 picks the *good* subset — and it's most of what makes a LoRA good. Once **✨
 Score** has run (it caches a CLIP embedding per image), the **Curate** row under
