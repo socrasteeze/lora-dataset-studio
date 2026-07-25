@@ -2864,32 +2864,73 @@ def _lineage_node(rec, crun, requested_id, failed_local_id):
             node['checkpoint_ready'] = None
     _cnotes = checkpoint_notes_for(rec.id)
     _cprev = checkpoint_previews_for(rec.id)
-    # A pill is `testable` when its step maps to a deployed LoRA the Studio engine
-    # can load — the front enables Generate only for testable selections and shows
-    # the app's usual 'needs setup' hint otherwise. `preview_*` render the inline
-    # thumbnail (or its pending/failed state) in the node card.
-    # Scoped to THIS run so its step-less final deploy (`..._rc90_v2`, no step in
-    # the name) joins its own final pill instead of going unmatched.
-    _testable = _testable_by_step(rec.dataset_id, rec.family,
-                                  run_tag=_deployed_run_tag(rec),
-                                  final_step=_final_step_of(node.get('checkpoints')))
-    # The deployed copy's own name, from the SAME map that decides `testable` —
-    # so "is it deployed" and "which file would Remove-from-ComfyUI trash" can
-    # never drift apart. Resolved to the form the deployed-delete route accepts.
-    _deploy_names = _deletable_deploy_names(rec.dataset_id, rec.family) if _testable else {}
+    # Deployment (testable + the deployed copy's own name) comes from the SHARED
+    # annotator, so the graph pills and the Checkpoints panel rows answer "is this
+    # deployed, and which ComfyUI file is it?" with the same join. Scoped to THIS
+    # run so its step-less final deploy (`..._rc90_v2`, no step in the name) joins
+    # its own final pill instead of going unmatched.
+    annotate_deployed_checkpoints(rec.dataset_id, rec.family,
+                                  node.get('checkpoints') or [],
+                                  run_tag=_deployed_run_tag(rec))
     for _ck in (node.get('checkpoints') or []):
         _step = _ck.get('step')
         _ck['note'] = _cnotes.get(_step, '')
-        _ck['testable'] = _step in _testable
-        _dep = _testable.get(_step)
-        if _dep:
-            _ck['deployed_filename'] = _deploy_names.get(
-                os.path.basename(str(_dep).replace('\\', '/')).lower())
+        # `preview_*` render the inline thumbnail (or its pending/failed state).
         _pv = _cprev.get(_step)
         if _pv:
             _ck['preview_url'] = _pv.get('url')
             _ck['preview_status'] = _pv.get('status')
     return node
+
+
+def annotate_deployed_checkpoints(dataset_id, family, checkpoints,
+                                  run_tag=None) -> list:
+    """Stamp `testable` and, when deployed, `deployed_filename` onto a flat list
+    of a run's saves — IN PLACE, returning the same list.
+
+    This is THE join between "a save on disk" and "its copy in ComfyUI", and it
+    has exactly one implementation on purpose: the ◉ Graph pills and the
+    Checkpoints & LoRAs rows must never disagree about which checkpoints are
+    deployed, nor about which file an undeploy would remove. `testable` decides
+    "✓ Deployed vs 📦 Import"; `deployed_filename` is the ONLY handle the UI has
+    on the ComfyUI copy (without it the delete route answers "unknown checkpoint"
+    and the action is withheld) — it is resolved to the form that route accepts.
+
+    `run_tag` ((source, run_id), see _deployed_run_tag) additionally attaches a
+    run's STEP-LESS final deploy to its final save. Best-effort throughout: an
+    unreadable ComfyUI pool leaves every row "not deployed" rather than claiming
+    a deployment that isn't there."""
+    cks = list(checkpoints or [])
+    testable = _testable_by_step(dataset_id, family, run_tag=run_tag,
+                                 final_step=_final_step_of(cks))
+    names = _deletable_deploy_names(dataset_id, family) if testable else {}
+    for ck in cks:
+        step = ck.get('step')
+        ck['testable'] = step in testable
+        dep = testable.get(step)
+        if dep:
+            ck['deployed_filename'] = names.get(
+                os.path.basename(str(dep).replace('\\', '/')).lower())
+    return cks
+
+
+def annotate_deployed_by_run(dataset_id, family, checkpoints) -> list:
+    """`annotate_deployed_checkpoints` for a MIXED list whose rows name their own
+    source run (the Checkpoints panel's local list: several runs' saves in one
+    flat list). Rows are grouped by (run_source, run_id) so each group is joined
+    with ITS run tag — a step-less final save then attaches to the run that
+    produced it, never to a neighbour. Rows with no recorded run (pre-registry
+    files) are joined untagged, which still matches every step-named deploy."""
+    groups = {}
+    for ck in (checkpoints or []):
+        rid = ck.get('run_id')
+        src = ck.get('run_source')
+        key = (src, rid) if rid and src else (None, None)
+        groups.setdefault(key, []).append(ck)
+    for (src, rid), rows in groups.items():
+        annotate_deployed_checkpoints(dataset_id, family, rows,
+                                      run_tag=(src, rid) if rid else None)
+    return list(checkpoints or [])
 
 
 def run_lineage(record_id) -> dict:
@@ -3157,29 +3198,125 @@ def delete_cloud_checkpoint(dataset_id, run_id, filename) -> str:
     return filename
 
 
+# ── Staging cleanup (global 🧹 and per-run 🧹) ────────────────────────────────
+# Both entry points share ONE sparing rule and ONE trashing step, so a run that
+# the global purge spares can never be trashed by the per-run button (and back).
+
+def staging_spare_reason(run) -> str | None:
+    """Why this run's staging must NOT be trashed, or None when it is fair game.
+    The single source of truth for both 🧹 buttons and for the per-run button's
+    disabled state — duplicating it is how the two drift apart."""
+    if run.status in ACTIVE_STATES:
+        return 'this run is still active — its staging is being written to'
+    if run.status == 'error_pod_kept':
+        return ('its pod was kept for manual recovery — clean it up after you '
+                'have retrieved what you need')
+    return None
+
+
+def _trash_staging(run) -> int:
+    """Move ONE run's staging dir to the trash; returns the bytes it held (0 when
+    there was nothing on disk). Callers own the sparing check."""
+    from . import trash
+    sd = run.staging_dir
+    if not sd or not os.path.isdir(sd):
+        return 0
+    size = lt._dir_size(sd)
+    trash.send_to_trash(sd, context=f'staging_run{run.id}')
+    _staging_size_cache.pop(run.id, None)
+    if run.checkpoint_local_path:
+        _set(run, checkpoint_local_path=None)
+    return size
+
+
+# run_id -> (expires_at, bytes). A staging dir is a dataset copy + samples +
+# checkpoints — thousands of files per run, tens of thousands across a history.
+# Walking them belongs to an EXPLICIT request, never to the hub's 5 s poll, and a
+# short TTL keeps a re-open (or a second tab) from re-walking the same disk.
+_staging_size_cache = {}
+_STAGING_SIZE_TTL = 60.0
+
+
+def staging_sizes(run_ids=None) -> dict:
+    """{run_id: bytes on disk} for the runs whose staging dir still exists —
+    what the per-run 🧹 needs to name the weight it is about to move. Runs with
+    no staging (never launched, already purged, hand-deleted) are simply absent,
+    which the UI reads as "nothing to clean here". Best-effort: a directory that
+    cannot be walked is skipped rather than failing the whole request."""
+    now = time.time()
+    q = CloudTrainingRun.query
+    if run_ids is not None:
+        ids = [int(i) for i in run_ids]
+        if not ids:
+            return {}
+        q = q.filter(CloudTrainingRun.id.in_(ids))
+    out = {}
+    for run in q.all():
+        cached = _staging_size_cache.get(run.id)
+        if cached and cached[0] > now:
+            if cached[1]:
+                out[run.id] = cached[1]
+            continue
+        sd = run.staging_dir
+        size = 0
+        if sd and os.path.isdir(sd):
+            try:
+                size = lt._dir_size(sd)
+            except OSError as e:
+                logger.warning('staging size: could not walk %s: %s', sd, e)
+                continue
+        _staging_size_cache[run.id] = (now + _STAGING_SIZE_TTL, size)
+        if size:
+            out[run.id] = size
+    return out
+
+
+def purge_run_staging(run_id) -> dict:
+    """Per-run 🧹: move THIS run's staging dir to the trash. Same sparing rule as
+    the global purge (staging_spare_reason), so the two can't disagree; the DB row
+    stays (history). Raises ValueError on an unknown or spared run — the caller
+    turns it into a 400 with the reason, instead of a silent no-op."""
+    run = CloudTrainingRun.query.get(int(run_id))
+    if not run:
+        raise ValueError('unknown cloud run')
+    reason = staging_spare_reason(run)
+    if reason:
+        raise ValueError(f'this run\'s staging is spared: {reason}')
+    if not run.staging_dir or not os.path.isdir(run.staging_dir):
+        return {'purged': False, 'freed_bytes': 0, 'already_clean': True}
+    try:
+        freed = _trash_staging(run)
+    except OSError as e:
+        logger.warning('purge run %s: could not trash %s: %s',
+                       run.id, run.staging_dir, e)
+        raise RuntimeError(f'could not move this run\'s staging to the trash: {e}')
+    return {'purged': True, 'freed_bytes': freed, 'already_clean': False}
+
+
 def purge_finished_runs() -> dict:
     """Hub 'Clean finished runs': move the staging dirs of TERMINAL runs to the
     trash — dataset copies, samples and checkpoint duplicates of results that
     are already imported/mirrored. Active runs and error_pod_kept (manual
-    recovery may still be under way) are spared. DB rows stay (history)."""
-    from . import trash
+    recovery may still be under way) are spared. DB rows stay (history).
+
+    `already_clean` tells "there was nothing to purge" apart from "0 purged
+    because every attempt failed" — the caller shows two different messages."""
     purged = 0
     freed = 0
+    candidates = 0
     for run in CloudTrainingRun.query.all():
-        if run.status in ACTIVE_STATES or run.status == 'error_pod_kept':
+        if staging_spare_reason(run):
             continue
-        sd = run.staging_dir
-        if not sd or not os.path.isdir(sd):
+        if not run.staging_dir or not os.path.isdir(run.staging_dir):
             continue
+        candidates += 1
         try:
-            freed += lt._dir_size(sd)
-            trash.send_to_trash(sd, context=f'staging_run{run.id}')
+            freed += _trash_staging(run)
             purged += 1
-            if run.checkpoint_local_path:
-                _set(run, checkpoint_local_path=None)
         except OSError as e:
-            logger.warning('purge: could not trash %s: %s', sd, e)
-    return {'purged_runs': purged, 'freed_bytes': freed}
+            logger.warning('purge: could not trash %s: %s', run.staging_dir, e)
+    return {'purged_runs': purged, 'freed_bytes': freed,
+            'already_clean': candidates == 0}
 
 
 def cloud_progress(user_id, dataset_id, train_type=None) -> dict:

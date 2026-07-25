@@ -203,7 +203,10 @@ const TOPICS = [
       'delete rejected', 'delete from disk', 'remove from disk', 'trash',
       'free up space', 'permanently delete', 'clean up rejected',
       'preview', 'previews', 'bank card', 'card preview', 'thumbnail strip',
-      'which bank is which', 'recognise bank', 'cover'],
+      'which bank is which', 'recognise bank', 'cover',
+      'refresh', 'rescan folder', 'new images', 'added images', 'update bank',
+      'sync folder', 'folder changed', 'more images', 'missing files',
+      'folder unavailable', 'moved folder', 'deleted files'],
     guide: { chapter: 'using-the-app', anchor: 'the-image-bank-triage-a-big-folder' },
     app: { route: '/bank' } },
   action('bank-split-subfolders', 'One bank per subfolder',
@@ -215,6 +218,13 @@ const TOPICS = [
     ['queue', 'launch all queue', 'line up', 'back to back', 'batch banks',
       'multiple banks', 'run banks', 'overnight', 'gpu busy', 'wait', 'one at a time'],
     '/bank', 'using-the-app', 'the-image-bank-triage-a-big-folder'),
+  action('bank-review-one-by-one', 'Review a bank one image at a time',
+    ['review', 'review one by one', 'one by one', 'lightbox', 'full size', 'fullscreen',
+     'big image', 'zoom', 'open image', 'keep reject skip', 'keep', 'reject', 'skip',
+     'fast triage', 'quick triage', 'decide', 'decision', 'next image', 'advance',
+     'random', 'random order', 'shuffle', 'shuffled', 'sample', 'representative',
+     'keyboard', 'shortcut', 'shortcuts', 'hotkey', 'bank', 'triage'],
+    '/bank', 'using-the-app', 'review-a-bank-one-image-at-a-time'),
   { id: 'page-setup', kind: 'page', title: 'Setup wizard',
     keywords: ['setup', 'wizard', 'onboarding', 'install', 'install everything',
       'install all', 'connect', 'tools'],
@@ -261,6 +271,23 @@ const TOPICS = [
      'too many epochs', 'graph delete', 'pill delete', 'does it delete my lora',
      'imported lora kept', 'best settings warning'],
     '/datasets?section=checkpoints', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  action('lineage-undeploy-checkpoint', 'Undeploy a LoRA from ComfyUI (reversible)',
+    // Same topic for the ◉ Graph pills and the Checkpoints & LoRAs rows — the
+    // two surfaces now offer the SAME control, so they must not teach two answers.
+    ['undeploy', 'undeploy lora', 'remove from comfyui', 'unimport', 'un-deploy',
+     'deployed badge', 'no undeploy button', 'take it out of comfyui', 'redeploy',
+     'deploy again', 'training save kept', 'reversible',
+     'already deployed', 'which lora is in comfyui', 'also in comfyui',
+     'import again', 'imported twice', 'orphan lora', 'run ?'],
+    '/datasets?section=checkpoints', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  action('runs-clean-one-run-staging', 'Clean ONE run\'s staging folder',
+    ['clean run', 'clean one run', 'staging', 'staging folder', 'disk', 'disk space',
+     'gb on disk', 'how big is this run', 'free space', 'purge run', 'clean finished runs',
+     'trash', 'empty the trash', 'nothing was freed', 'cleanup did nothing'],
+    // Upstream points this at a cloud-run troubleshooting H2 this fork does not
+    // carry (Divergence 4 — no rented-GPU sections). Routed to the same anchor
+    // its sibling /cloud topics use instead.
+    '/cloud', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
 
   // ---- Settings: per-field topics (kind 'setting') -----------------------
   // engines
@@ -276,6 +303,10 @@ const TOPICS = [
     ['lora', 'preset', 'presets', 'klein', 'generation', 'texture', 'anatomy', 'style', 'chain', 'nsfw'],
     { trigger: 'klein-tuning-open',
       text: 'Build named generation-LoRA presets in Settings → Image engines, then pick one per run.' }),
+  setting('klein.generation_steps', 'engines', 'klein-generation', 'Klein generation steps',
+    ['klein', 'steps', 'sampler', 'generation', 'quality', 'slower', 'cleaner', 'sampling', '5 steps']),
+  // No 'identity_prompts.face' topic: the API-engine identity locks are not
+  // shown in this fork (Divergence 1) — only the Klein one below.
   setting('identity_prompts.klein_identity', 'engines', 'identity-prompts', 'Klein identity prompt',
     ['identity', 'klein', 'restage', 'face', 'prompt', 'preserve', 'pose']),
   setting('identity_prompts.klein_improve', 'engines', 'identity-prompt-klein-improve', 'Klein improve prompt & toggle',
@@ -375,6 +406,10 @@ const TOPICS = [
     '/datasets?section=curation&panel=watermarks', 'settings-reference', 'captioning-quality',
     { trigger: 'watermark-batch-clean',
       text: 'Clean has two engines — LaMa (fast) and Klein (quality) — and auto-crop can be turned off.' }),
+  action('action-bank-watermark-clean', 'Clean a bank\'s watermarks (2 levels)',
+    ['watermark', 'bank', 'clean', 'crop', 'auto-crop', 'inpaint', 'lama', 'klein',
+     'remove watermark', 'logo', 'url', 'undo cleaning', 'before after', 'original'],
+    '/bank', 'using-the-app', 'clean-the-watermarks-a-bank-found'),
   action('action-grid-status-filter', 'Filter the grid by decision',
     ['filter', 'decision', 'undecided', 'awaiting', 'pending', 'kept', 'keep', 'rejected',
      'reject', 'improve', 'candidates', 'klein', 'isolate', 'triage', 'select all', 'grid'],

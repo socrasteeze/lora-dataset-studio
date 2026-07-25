@@ -65,6 +65,69 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
+    id: '2026-07-25-identity-prompts-per-subject',
+    date: '2026-07-25',
+    title: '🐾 Identity prompts no longer leak between subject types',
+    blurb:
+      'Tweak the identity instruction on an Animal dataset and your Human datasets used to inherit it — which is exactly how variations of a person came back with tails, extra limbs and odd footwear. Each subject type (Human, Animal, Creature, Object, Other) now keeps its OWN set of identity prompts, and both places you can edit them say which subject you are editing: the ✎ button next to Extra refs edits the prompts of the dataset you have open, and Settings ▸ Image engines has a Subject type picker with a dot on every type you have customised. Anything you had already written stays where it was, on the Human set. Reported by ashish.sinha on Discord.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-25-klein-generation-steps',
+    date: '2026-07-25',
+    title: '🎚️ Klein generation steps are yours to set',
+    blurb:
+      'The local Klein engine always spent exactly 5 sampler steps on each variation, with no way to change it. Settings ▸ Image engines ▸ Klein generation quality now exposes that number (1–50). It still starts at 5, so nothing changes until you raise it; more steps render more cleanly and cost proportionally more time. It is a rendering knob, not a fix for anatomy — extra limbs come from the identity prompt, not from the step count. Raised by ashish.sinha on Discord.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-24-bank-watermark-two-level-cleaning',
+    date: '2026-07-24',
+    title: '🚩 Banks can now REMOVE the watermarks they find — in two safe steps',
+    blurb:
+      'Finding the marked images in a bank was all you could do: cleaning them meant promoting the watermark into your dataset first, then cleaning there. A bank now cleans them itself, in two steps you launch by hand. Step 1 crops off the marks sitting in a border — no model, no GPU, and not a single invented pixel. Step 2 repaints whatever a crop can\'t remove, with LaMa (fast) or Klein (slower, and the only one that clears a mark on the subject). Each step shows how many images it still has to work on, so you can see how far down the funnel you are. Your own files are never modified: the cleaned version is a copy the app keeps, promoting sends that cleaned copy to the dataset, and ↩ Undo simply throws it away.',
+  },
+  {
+    id: '2026-07-24-bank-review-one-by-one',
+    date: '2026-07-24',
+    title: '▶ Triage a bank at speed — one full-size image, Keep / Reject / Skip',
+    blurb:
+      'Judging a photo from a 140-pixel thumbnail was never really possible, so the last call always meant opening files by hand. The bank now has a review mode: hit "▶ Review one by one" above the grid and the images of your current filter come up full size, one after the other. ✓ Keep, ✕ Reject and ⏭ Skip each save and jump straight to the next — K, R and S on the keyboard, ←/→ to move without deciding, Esc to leave. Skip means "not now": the image stays undecided, and doesn\'t come back in that run. Tick 🎲 Random order and it walks what\'s left shuffled instead of in folder order — on a scraped dump of 3 000 shots that\'s the difference between 200 near-identical frames in a row and a representative sample from the first click; nothing you have already seen is ever shown twice. Each decision is saved on the spot, so closing after fifty of them keeps all fifty, and the counters at the top follow along.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-24-bank-folder-auto-refresh',
+    date: '2026-07-24',
+    title: '🗃️ Images you add to a bank\'s folder now show up on their own',
+    blurb:
+      'A bank used to be a snapshot: whatever was in the folder the day you created it, forever. Keep scraping into that folder and the new shots simply never appeared — the only way in was to rebuild the bank and lose your triage. The folder is now re-walked automatically when you open the bank list or a bank, and anything new joins it as undecided ("42 new image(s) found in the folder"), ready for the next scan. Strictly additive: not one keep, reject, score or caption is touched. Files you removed from the folder are reported, never deleted from the bank — a disconnected drive can\'t erase your work.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-24-checkpoints-panel-deployed-state',
+    date: '2026-07-24',
+    title: '✓ The Checkpoints panel now says which LoRAs are already in ComfyUI',
+    blurb:
+      'Every checkpoint used to offer "Import → loras/…", even the ones already deployed — and the only way back out lived in a separate list under a red 🗑 that read like destruction. A deployed checkpoint now shows "✓ Deployed" with an ⏏ Undeploy right there, exactly like the run graph: reversible, your training save is kept and you can deploy it again. The list below keeps only the LoRAs no checkpoint on the page explains (imported before run tagging, or dropped in by hand).',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-07-24-per-run-staging-cleanup',
+    date: '2026-07-24',
+    title: '🧹 See what each training run weighs on disk — and clean just that one',
+    blurb:
+      'Every finished run on the Runs page now shows how much disk its staging folder still holds ("8.2 GB on disk"), with a 🧹 button to move just that run to the trash — no more all-or-nothing cleanup of a whole history. Runs still training are left alone exactly as before. The messages are honest too: the trash lives on the same disk, so they now tell you to empty it in Settings to actually reclaim the space, and "nothing to clean" no longer looks like a failed click.',
+    to: '/cloud',
+  },
+  {
+    id: '2026-07-24-explicit-undeploy',
+    date: '2026-07-24',
+    title: '⏏ Undeploy a LoRA from ComfyUI without fearing you are deleting it',
+    blurb:
+      'In the run graph, a deployed checkpoint used to be a dead end: a "✓ Deployed" badge, and the only way back was a discreet 🗑 that read like destruction. It now offers ⏏ Undeploy right next to that badge — the exact counterpart of 📦 Import, and reversible: only the ComfyUI copy is removed, your training save stays and can be deployed again any time. The 🗑 stays where it belongs, for deleting the training save itself.',
+    to: '/cloud',
+  },
+  {
     id: '2026-07-24-subject-type-selector',
     date: '2026-07-24',
     title: '🐾 Build LoRAs of animals, objects and creatures — not just people',

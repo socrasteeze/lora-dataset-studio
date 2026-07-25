@@ -88,6 +88,39 @@ def test_split_preserves_nested_dirs_as_child_subfolder(client, tmp_path):
     assert '2024' in names
 
 
+def test_loose_bank_never_absorbs_the_subfolder_banks_images(client, tmp_path):
+    """The loose-files bank is rooted at the PARENT it shares with the subfolder
+    banks. The live folder re-walk (refresh_bank, run on every /api/banks) must
+    NOT recurse for it, or every subfolder image would be re-imported into it —
+    the bank would grow to the whole export and duplicate its siblings."""
+    src = tmp_path / 'export'
+    _tree(src, ['chatA/1.jpg', 'chatA/2.jpg', 'chatB/1.jpg', 'loose1.jpg'])
+    assert client.post('/api/bank/split', json={'folder': str(src)}).status_code == 200
+    prefix = f'{os.path.basename(str(src))} / '
+    # Several list loads = several forced re-walks; the counts must not drift.
+    for _ in range(3):
+        banks = _banks(client)
+    assert banks[f'{prefix}(loose files)']['total'] == 1
+    assert banks[f'{prefix}chatA']['total'] == 2
+    # A NEW loose file is still picked up (the sync stays live, just top-level).
+    _save(str(src / 'loose2.jpg'))
+    from app.services import image_bank_service as svc
+    svc.reset_folder_sync()
+    assert _banks(client)[f'{prefix}(loose files)']['total'] == 2
+
+
+def test_subfolder_bank_still_picks_up_new_files(client, tmp_path):
+    """A normal (non-loose) split bank keeps upstream's live-folder behaviour."""
+    src = tmp_path / 'export'
+    _tree(src, ['chatA/1.jpg', 'loose1.jpg'])
+    assert client.post('/api/bank/split', json={'folder': str(src)}).status_code == 200
+    prefix = f'{os.path.basename(str(src))} / '
+    _save(str(src / 'chatA' / '2.jpg'))
+    from app.services import image_bank_service as svc
+    svc.reset_folder_sync()
+    assert _banks(client)[f'{prefix}chatA']['total'] == 2
+
+
 def test_split_bad_folder_is_400(client, tmp_path):
     r = client.post('/api/bank/split', json={'folder': str(tmp_path / 'nope')})
     assert r.status_code == 400

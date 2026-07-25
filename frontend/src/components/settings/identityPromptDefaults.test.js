@@ -37,7 +37,11 @@ test('every identity prompt is rendered by the shared single-box field', () => {
   // (no local copy) — the API-engine (face_single/face_multi) fields would edit
   // config nothing reads, since generation is Klein-only here.
   assert.match(engines, /import PromptOverrideField from '\.\.\/common\/PromptOverrideField'/);
-  assert.match(engines, /IDENTITY_PROMPT_FIELDS\.filter\(\(f\) => f\.engines\.includes\('klein'\)\)\.map\(\(f\) => \(\s*<PromptOverrideField/);
+  // ...worded for the SUBJECT TYPE being edited (identityPromptFields), not one
+  // fixed human-only list — a box that says "keep the exact face" on an Animal
+  // dataset is what invited the rewrite that leaked (ashish.sinha, Discord) —
+  // and then filtered to klein per the local-only divergence above.
+  assert.match(engines, /identityPromptFields\(subject\)\.filter\(\(f\) => f\.engines\.includes\('klein'\)\)\.map\(\(f\) => \(\s*<PromptOverrideField/);
   assert.doesNotMatch(engines, /face_single|face_multi/);
   assert.match(engines, /defaultText=\{defaults\[f\.key\]\}/);
   // and the Klein-improve prompt (D), which keeps its on/off toggle
@@ -62,7 +66,34 @@ test('the single box shows the default and normalises a copy of it back to ""', 
 test('the Extra refs row opens the identity-prompt modal', () => {
   assert.match(refPanel, /import IdentityPromptModal from '\.\/IdentityPromptModal'/);
   assert.match(refPanel, /Edit the identity instruction used with multiple references/);
-  assert.match(refPanel, /\{promptModal && <IdentityPromptModal onClose=/);
+  // The modal edits the prompts of THIS dataset's subject type — without that
+  // prop it showed the human lock on every dataset (ashish.sinha, Discord).
+  assert.match(refPanel, /\{promptModal && <IdentityPromptModal subjectType=\{subjectType\} onClose=/);
+});
+
+test('both editing surfaces NAME the subject type they are editing', () => {
+  // Settings has no dataset context, so it needs an explicit picker...
+  assert.match(engines, /const \[subject, setSubject\] = useState\('human'\)/);
+  assert.match(engines, /Subject type/);
+  assert.match(engines, /PROMPT_SUBJECT_TYPES\.map/);
+  assert.match(engines, /subjectHasOverride\(ip, st\)/);
+  // ...and it must write through the nested per-subject setter, not the flat one.
+  assert.match(engines, /writeIdentityPrompt\(prev, subject, key, v\)/);
+  assert.match(settingsPage, /identity_prompts: updater\(prev\.identity_prompts \|\| \{\}\)/);
+  assert.match(settingsPage, /setPromptDefaultsBySubject\(data\.identity_prompt_defaults_by_subject \|\| \{\}\)/);
+  // The modal knows the dataset's subject, so it states it instead of asking.
+  assert.match(modal, /\{stLabel\} subject/);
+  assert.match(modal, /identityPromptPatch\(st, EXTRA_REF_PROMPT_KEYS, prompts\)/);
+  assert.match(modal, /readIdentityPrompt\(prompts, st, f\.key\)/);
+});
+
+test('Klein generation steps are exposed and default to the shipped 5', () => {
+  // "is the number of generation steps fixed at 5" (ashish.sinha, Discord) — it was.
+  assert.match(engines, /id="klein-generation-steps"/);
+  assert.match(engines, /config\.klein\?\.generation_steps \?\? 5/);
+  assert.match(engines, /setField\('klein', 'generation_steps',/);
+  // and it must not oversell itself as an anatomy fix
+  assert.match(engines, /not fix a wrong prompt/);
 });
 
 test('the modal shares the field and edits BOTH multi-reference prompts', () => {
