@@ -32,6 +32,16 @@ def _positive_env_int(name, default):
     return value if value > 0 else default
 
 
+# How long a connection waits for the single SQLite write lock before giving up
+# with "database is locked". A bank pass writes in batches for minutes while the
+# user curates another bank, so 5 s was routinely exceeded and the curating click
+# died as a 500. 15 s comfortably covers a well-behaved batch commit; a wait that
+# long means a background job is misbehaving (holding the transaction across slow
+# work), which is a bug to fix at the source, not to paper over with a bigger
+# number. utils.dbbusy adds the retry + honest-503 layers on top.
+SQLITE_BUSY_TIMEOUT_MS = 15000
+
+
 def _configure_sqlite_connection(dbapi_con, _connection_record):
     """Apply the app's SQLite guarantees to every newly-opened connection.
 
@@ -45,7 +55,7 @@ def _configure_sqlite_connection(dbapi_con, _connection_record):
     try:
         cur.execute('PRAGMA foreign_keys=ON')
         cur.execute('PRAGMA journal_mode=WAL')
-        cur.execute('PRAGMA busy_timeout=5000')
+        cur.execute(f'PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}')
         cur.execute('PRAGMA synchronous=NORMAL')
     finally:
         cur.close()
@@ -247,6 +257,31 @@ def create_app(config_object=None):
                 'error': f'archive too large (maximum {limit // (1024 * 1024)} MiB)',
             }), 413
         return jsonify({'ok': False, 'error': 'upload too large'}), 413
+
+    from sqlalchemy.exc import OperationalError
+    from .utils.dbbusy import DB_BUSY_MESSAGE, is_locked_error
+
+    @app.errorhandler(OperationalError)
+    def _sqlite_write_lock(error):
+        """A lost race for SQLite's single write lock is TRANSIENT, not a crash.
+
+        It used to reach the browser as a bare 500 ("unable to complete action")
+        while a bank pass was running — the click was lost and nothing said it
+        could simply be retried. Answer 503 + ``db_busy`` instead, so the SPA
+        replays it transparently (see fetchClient) and, if the replays also lose,
+        the user reads a sentence that tells them what happened. Any other
+        OperationalError is a real fault and keeps its 500.
+        """
+        if not is_locked_error(error):
+            raise error
+        db.session.rollback()
+        logger.warning('sqlite write lock unavailable on %s %s',
+                       request.method, request.path)
+        if not request.path.startswith('/api/'):
+            raise error
+        resp = jsonify({'ok': False, 'error': DB_BUSY_MESSAGE, 'db_busy': True})
+        resp.headers['Retry-After'] = '2'
+        return resp, 503
 
     with app.app_context():
         from . import models  # noqa: F401

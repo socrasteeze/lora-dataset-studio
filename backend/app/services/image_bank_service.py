@@ -46,6 +46,7 @@ from sqlalchemy import and_, case, func, or_
 from .. import config as cfg
 from ..extensions import db
 from ..models import BankImage, FaceDataset, ImageBank
+from ..utils.dbbusy import write_with_retry
 from . import bank_jobs, bank_queue, trash
 from .face_dataset_service import _dhash, _hamming, import_images
 from .image_quality import ANALYSIS_MAX_SIDE, quality_metrics
@@ -190,6 +191,36 @@ def _register_bank(user_id, name, source_path, rels, root_only=False):
             db.session.flush()
     db.session.commit()
     return bank, len(rels)
+
+
+BANK_NAME_MAX = 100             # matches ImageBank.name's column width
+
+
+def rename_bank(user_id, bank_id, name) -> ImageBank | None:
+    """Rename a bank. Returns the bank, or None when it doesn't exist.
+
+    A bank is named once, at creation — usually from a folder the user hasn't
+    triaged yet, and the per-subfolder split names them automatically. Being
+    stuck with "New folder (3)" across a library of twenty banks is why this
+    exists. Only the label changes: the source folder, every decision, score and
+    thumbnail are untouched, so renaming is free and reversible.
+
+    ValueError on an empty name or one past the column width (a silent SQLite
+    truncation would leave the UI showing something the DB doesn't hold)."""
+    name = (name or '').strip()
+    if not name:
+        raise ValueError('name is required')
+    if len(name) > BANK_NAME_MAX:
+        raise ValueError(f'name is too long (max {BANK_NAME_MAX} characters)')
+    bank = get_bank(user_id, bank_id)
+    if bank is None:
+        return None
+
+    def _apply():
+        bank.name = name
+        return bank
+
+    return write_with_retry(_apply)
 
 
 def _split_walk(folder):
@@ -354,6 +385,12 @@ def refresh_bank(user_id, bank_id, force=False) -> dict | None:
         new_rels, error = [], (f'the folder now holds more than {BANK_MAX_FILES} '
                                'images — the new files were not added')
     new_rels.sort()
+    # COMMIT (not flush) every slice: a flush opens the write transaction and a
+    # 15 000-file drop then held SQLite's single write lock across the whole
+    # insert loop — including one os.path.getsize syscall per file — so anything
+    # the user clicked meanwhile failed with "database is locked". The walk is
+    # additive and idempotent, so a partial commit is safe: the next walk simply
+    # finds the remainder.
     for i, rel in enumerate(new_rels, 1):
         try:
             size = os.path.getsize(os.path.join(folder, rel))
@@ -361,7 +398,7 @@ def refresh_bank(user_id, bank_id, force=False) -> dict | None:
             size = None
         db.session.add(BankImage(bank_id=bank_id, relpath=rel, file_size=size))
         if i % 500 == 0:
-            db.session.flush()
+            db.session.commit()
     if new_rels:
         db.session.commit()
     return _remember_sync(bank_id, now, {
@@ -1115,16 +1152,37 @@ def rebuild_dup_groups(bank_id, max_distance=None) -> int:
         comps.setdefault(find(i), []).append(i)
     groups = sorted((m for m in comps.values() if len(m) >= 2),
                     key=lambda m: (-len(m), m[0]))
+    # Everything above is pure CPU. The write transaction opens HERE and is
+    # committed in bounded slices: a bank with thousands of groups otherwise held
+    # SQLite's single write lock for one transaction of thousands of statements,
+    # which is exactly what made a ✓/✕ on another bank fail with "database is
+    # locked" (see utils.dbbusy). A concurrent reader can briefly see a partly
+    # regrouped bank — harmless, the pass finishes seconds later.
     BankImage.query.filter_by(bank_id=bank_id).update(
         {'dup_group': None}, synchronize_session=False)
-    for gid, members in enumerate(groups, start=1):
-        member_ids = [ids[i] for i in members]
+    db.session.commit()
+    _assign_groups(BankImage.dup_group, ((gid, [ids[i] for i in members])
+                                         for gid, members in enumerate(groups, start=1)))
+    return len(groups)
+
+
+_GROUP_COMMIT_EVERY = 200       # group assignments per write transaction
+
+
+def _assign_groups(column, groups) -> None:
+    """Write ``{column: gid}`` for each (gid, image_ids) pair, committing every
+    _GROUP_COMMIT_EVERY groups so no single transaction holds the write lock for
+    the whole regrouping (see rebuild_dup_groups for the rationale)."""
+    pending = 0
+    for gid, member_ids in groups:
         for i0 in range(0, len(member_ids), _SQL_IN_CHUNK):
             BankImage.query.filter(
                 BankImage.id.in_(member_ids[i0:i0 + _SQL_IN_CHUNK])).update(
-                {'dup_group': gid}, synchronize_session=False)
+                {column: gid}, synchronize_session=False)
+        pending += 1
+        if pending % _GROUP_COMMIT_EVERY == 0:
+            db.session.commit()
     db.session.commit()
-    return len(groups)
 
 
 # --- semantic near-duplicate groups (stage 2 — crops / re-compressed variants) --
@@ -1204,10 +1262,10 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None) -> int | None:
         block = (r.style_cluster if r.style_cluster is not None else -1) \
             if block_by_style else 0
         items.append((r.id, block, emb))
-    # A re-run fully recomputes — clear every semantic group first.
-    BankImage.query.filter_by(bank_id=bank_id).update(
-        {'semantic_dup_group': None}, synchronize_session=False)
     if not items:
+        # A re-run fully recomputes — clear every semantic group.
+        BankImage.query.filter_by(bank_id=bank_id).update(
+            {'semantic_dup_group': None}, synchronize_session=False)
         db.session.commit()
         return 0
     blocks: dict = {}
@@ -1244,13 +1302,16 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None) -> int | None:
         comps.setdefault(find(i), []).append(i)
     groups = sorted((m for m in comps.values() if len(m) >= 2),
                     key=lambda m: (-len(m), items[m[0]][0]))
-    for gid, members in enumerate(groups, start=1):
-        member_ids = [items[i][0] for i in members]
-        for i0 in range(0, len(member_ids), _SQL_IN_CHUNK):
-            BankImage.query.filter(
-                BankImage.id.in_(member_ids[i0:i0 + _SQL_IN_CHUNK])).update(
-                {'semantic_dup_group': gid}, synchronize_session=False)
+    # The clear used to run BEFORE the block matrices above — which opened
+    # SQLite's write transaction and then held it across every dot-product of a
+    # 15 000-image bank. Any ✓/✕ the user made meanwhile died with "database is
+    # locked". Compute first, write last, commit in slices (see _assign_groups).
+    BankImage.query.filter_by(bank_id=bank_id).update(
+        {'semantic_dup_group': None}, synchronize_session=False)
     db.session.commit()
+    _assign_groups(BankImage.semantic_dup_group,
+                   ((gid, [items[i][0] for i in members])
+                    for gid, members in enumerate(groups, start=1)))
     return len(groups)
 
 
@@ -1344,43 +1405,49 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    keep_by_group = {}
-    if keep_ids:
-        rows = BankImage.query.filter(BankImage.bank_id == bank_id,
-                                      BankImage.id.in_(list(keep_ids)[:_SQL_IN_CHUNK])).all()
-        for r in rows:
-            g = getattr(r, attr)
-            if g:
-                keep_by_group.setdefault(g, set()).add(r.id)
-        gids = list(keep_by_group)
-    elif group is not None:
-        gids = [int(group)]
-    else:
-        gids = [g for (g,) in _unresolved_dup_groups_q(bank_id, col).all()]
-    resolved = rejected = 0
-    for gid in gids:
-        rows = (BankImage.query.filter(BankImage.bank_id == bank_id, col == gid)
-                .filter(BankImage.status != 'reject')
-                .order_by(BankImage.id.asc()).all())
-        if len(rows) < 2 and gid not in keep_by_group:
-            continue
-        if gid in keep_by_group:
-            keep = keep_by_group[gid]
-        elif strategy == 'first':
-            keep = {rows[0].id}
+
+    def _apply():
+        keep_by_group = {}
+        if keep_ids:
+            rows = BankImage.query.filter(
+                BankImage.bank_id == bank_id,
+                BankImage.id.in_(list(keep_ids)[:_SQL_IN_CHUNK])).all()
+            for r in rows:
+                g = getattr(r, attr)
+                if g:
+                    keep_by_group.setdefault(g, set()).add(r.id)
+            gids = list(keep_by_group)
+        elif group is not None:
+            gids = [int(group)]
         else:
-            keep = {_best_of(rows).id}
-        changed = False
-        for r in rows:
-            if r.id in keep or (respect_existing_keep and r.status == 'keep'):
+            gids = [g for (g,) in _unresolved_dup_groups_q(bank_id, col).all()]
+        resolved = rejected = 0
+        for gid in gids:
+            rows = (BankImage.query.filter(BankImage.bank_id == bank_id, col == gid)
+                    .filter(BankImage.status != 'reject')
+                    .order_by(BankImage.id.asc()).all())
+            if len(rows) < 2 and gid not in keep_by_group:
                 continue
-            r.status, r.reject_reason = 'reject', reason
-            rejected += 1
-            changed = True
-        if changed or len(rows) >= 2:
-            resolved += 1
-    db.session.commit()
-    return {'resolved': resolved, 'rejected': rejected}
+            if gid in keep_by_group:
+                keep = keep_by_group[gid]
+            elif strategy == 'first':
+                keep = {rows[0].id}
+            else:
+                keep = {_best_of(rows).id}
+            changed = False
+            for r in rows:
+                if r.id in keep or (respect_existing_keep and r.status == 'keep'):
+                    continue
+                r.status, r.reject_reason = 'reject', reason
+                rejected += 1
+                changed = True
+            if changed or len(rows) >= 2:
+                resolved += 1
+        return {'resolved': resolved, 'rejected': rejected}
+
+    # Same reasoning as set_status: a resolve fired while a pass is running must
+    # not be lost to the write lock (see utils.dbbusy).
+    return write_with_retry(_apply)
 
 
 def resolve_semantic_dups(user_id, bank_id, strategy='best', group=None,
@@ -1395,24 +1462,31 @@ def resolve_semantic_dups(user_id, bank_id, strategy='best', group=None,
 
 # --- statuses & flag application --------------------------------------------
 def set_status(user_id, bank_id, ids, status) -> int:
-    """Manual keep/reject/pending on a selection. Returns rows changed."""
+    """Manual keep/reject/pending on a selection. Returns rows changed.
+
+    Wrapped in write_with_retry: this is THE click a user makes while a pass is
+    running on another bank, and losing it to SQLite's single write lock is what
+    turned curating-during-a-run into a string of 500s."""
     if status not in ('pending', 'keep', 'reject'):
         raise ValueError('bad status')
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
     ids = [int(i) for i in (ids or [])]
-    n = 0
-    for i0 in range(0, len(ids), _SQL_IN_CHUNK):
-        rows = BankImage.query.filter(
-            BankImage.bank_id == bank_id,
-            BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all()
-        for r in rows:
-            r.status = status
-            r.reject_reason = 'manual' if status == 'reject' else None
-            n += 1
-    db.session.commit()
-    return n
+
+    def _apply():
+        n = 0
+        for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+            rows = BankImage.query.filter(
+                BankImage.bank_id == bank_id,
+                BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all()
+            for r in rows:
+                r.status = status
+                r.reject_reason = 'manual' if status == 'reject' else None
+                n += 1
+        return n
+
+    return write_with_retry(_apply)
 
 
 def apply_flags(user_id, bank_id, flags) -> dict:
@@ -1423,20 +1497,23 @@ def apply_flags(user_id, bank_id, flags) -> dict:
     if not bank:
         raise ValueError('bank not found')
     th = thresholds()
-    out = {}
-    for flag in flags or []:
-        if flag not in _QUALITY_FLAGS + _SCORE_FLAGS:
-            continue
-        crit = _flag_filter(flag, th)
-        if crit is None:
-            continue
-        rows = (BankImage.query.filter_by(bank_id=bank_id, status='pending')
-                .filter(crit).all())
-        for r in rows:
-            r.status, r.reject_reason = 'reject', flag
-        out[flag] = len(rows)
-    db.session.commit()
-    return out
+
+    def _apply():
+        out = {}
+        for flag in flags or []:
+            if flag not in _QUALITY_FLAGS + _SCORE_FLAGS:
+                continue
+            crit = _flag_filter(flag, th)
+            if crit is None:
+                continue
+            rows = (BankImage.query.filter_by(bank_id=bank_id, status='pending')
+                    .filter(crit).all())
+            for r in rows:
+                r.status, r.reject_reason = 'reject', flag
+            out[flag] = len(rows)
+        return out
+
+    return write_with_retry(_apply)
 
 
 # --- curation selectors (diversity · reference similarity) ------------------
