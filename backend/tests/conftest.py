@@ -45,13 +45,16 @@ def _reset_inmemory_registries():
     image_bank_service.reset_folder_sync()
 
 @pytest.fixture(autouse=True)
-def _isolate_config(tmp_path, monkeypatch):
-    """Point EVERY test at an empty config, not the developer's real config.json.
+def _isolate_user_state(tmp_path, monkeypatch):
+    """Point EVERY test at throwaway user state — never the real one on this
+    machine. Covers the three roots the app resolves from the environment:
+    ``LDS_CONFIG`` (config.json), ``LDS_DATA_DIR`` (data/: studio.db, banks,
+    thumbnails, logs, the provisioned envs) and ``LDS_ENV`` (.env secrets).
 
-    The `app` fixture already did this — but only for tests that take it. A test
-    that calls a config-reading helper directly (a pure wrapper/prompt function,
-    say) took the default LDS_CONFIG and read the real file at the repo root. Two
-    consequences, both bad:
+    The `app` fixture already did all this — but only for tests that take it. A
+    test calling a helper directly (a pure wrapper/prompt function, a service
+    that resolves ``cfg.data_dir()``) fell straight through to the real files at
+    the repo root. Two consequences, both bad:
 
     * a FALSE FAILURE the moment the developer customises anything in Settings —
       an edited Klein identity prompt made the "shipped default" wrapper tests
@@ -59,12 +62,23 @@ def _isolate_config(tmp_path, monkeypatch):
     * worse, a FALSE PASS: on a clean checkout the same tests assert the default
       behaviour and pass for the wrong reason, so CI can never catch the drift.
 
-    `_cache` is a module global keyed on nothing but "has it been loaded", so
-    resetting it here is what actually makes the redirect take effect (see the
-    same reset in the `app` fixture, which stays for its own LDS_DATA_DIR path).
+    And for the writable roots it is not just wrong readings: ``cfg.data_dir()``
+    CREATES the directory it returns, ``save_config()`` writes wherever
+    LDS_CONFIG points and ``set_secrets()`` rewrites ENV_PATH — so an unisolated
+    test could edit the user's live settings, drop files next to their studio.db
+    or touch their .env. A test run must never be able to do that.
+
+    ``_cache`` is a module global keyed on nothing but "has it been loaded", so
+    resetting it is what actually makes the config redirect take effect.
+    ``ENV_PATH`` is worse: it is resolved ONCE at import, so the env var alone
+    would not move it — the attribute has to be patched too (same reason the
+    `app` fixture patches it).
     """
     import app.config as _cfg
     monkeypatch.setenv('LDS_CONFIG', str(tmp_path / 'isolated-config.json'))
+    monkeypatch.setenv('LDS_DATA_DIR', str(tmp_path / 'isolated-data'))
+    monkeypatch.setenv('LDS_ENV', str(tmp_path / 'isolated.env'))
+    monkeypatch.setattr(_cfg, 'ENV_PATH', tmp_path / 'isolated.env')
     monkeypatch.setattr(_cfg, '_cache', None)
     yield
     _cfg._cache = None      # never leave a tmp config cached for the next test

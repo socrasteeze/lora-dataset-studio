@@ -1,4 +1,4 @@
-"""🧪 The suite must never read the developer's real config.json.
+"""🧪 The suite must never read — or write — this machine's real user state.
 
 Found the hard way: two wrapper tests (test_klein_models, test_subject_types)
 assert the SHIPPED default prompt. They take no `app` fixture, so they used the
@@ -7,8 +7,11 @@ moment the owner edited the Klein identity prompt in Settings. The mirror image
 is worse: on a clean checkout those same tests pass for the wrong reason, so CI
 could never catch the drift.
 
-conftest's autouse `_isolate_config` redirects every test at an empty temporary
-config. These cases pin that contract, so it can't silently regress.
+The same hole existed for the two WRITABLE roots: ``cfg.data_dir()`` creates the
+directory it returns (the real data/, next to the user's studio.db) and
+``set_secrets()`` rewrites ENV_PATH (the real .env). conftest's autouse
+`_isolate_user_state` redirects all three at throwaway paths. These cases pin
+that contract, so it can't silently regress.
 """
 import json
 import os
@@ -23,6 +26,33 @@ def test_every_test_reads_an_isolated_config(tmp_path):
     assert path != cfg.REPO_ROOT / 'config.json'
     assert str(tmp_path) not in str(cfg.REPO_ROOT)      # sanity: tmp is elsewhere
     assert not path.exists()                            # empty: nothing carried over
+
+
+def test_the_data_dir_is_isolated_and_never_the_repo_one():
+    """data_dir() CREATES what it returns. Unisolated, a test would materialise
+    directories inside the user's live data/ — next to their studio.db, banks
+    and thumbnails."""
+    real = cfg.REPO_ROOT / 'data'
+    resolved = cfg._data_dir()
+    assert resolved != real
+    assert real not in resolved.parents and resolved != real
+    created = cfg.data_dir()                            # the side effect itself
+    assert created.is_dir()
+    assert real not in created.parents
+
+
+def test_the_env_file_is_isolated_and_never_the_repo_one():
+    """ENV_PATH is resolved ONCE at import, so the env var alone doesn't move it —
+    the attribute has to be patched. set_secrets() writes there, and a leak would
+    rewrite the owner's real .env (API keys and all) from a test run."""
+    assert cfg.ENV_PATH != cfg.REPO_ROOT / '.env'
+    assert not cfg.ENV_PATH.exists()
+    real_env = cfg.REPO_ROOT / '.env'
+    before = real_env.read_bytes() if real_env.exists() else None
+    cfg.set_secrets({'HF_TOKEN': 'not-a-real-token'})
+    assert cfg.ENV_PATH.exists()                        # landed in the temp file
+    if before is not None:
+        assert real_env.read_bytes() == before          # untouched
 
 
 def test_identity_prompts_resolve_to_the_shipped_defaults():
