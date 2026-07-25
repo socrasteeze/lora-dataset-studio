@@ -49,6 +49,24 @@ function withFreshCsrf(options) {
   return { ...options, headers: { ...(options.headers || {}), [name]: token } };
 }
 
+/* The backend answers 503 + {db_busy: true} when it lost the race for SQLite's
+   single write lock — a background pass (a bank scan, the Launch-all queue) was
+   committing at that exact moment. It is transient by construction: the pass
+   releases the lock constantly. Replaying is strictly better than showing the
+   user a failure for a click that was simply unlucky. */
+const DB_BUSY_RETRIES = 2;
+const DB_BUSY_BACKOFF_MS = 400;
+
+async function isDbBusy(res) {
+  if (res.status !== 503) return false;
+  try {
+    // clone(): the caller still has to read the body if we end up returning it.
+    return (await res.clone().json())?.db_busy === true;
+  } catch { return false; }
+}
+
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
 /**
  * fetch() with ONE automatic CSRF recovery, shared by every JSON and FormData
  * caller. When a state-changing request comes back as a CSRF rejection (see
@@ -56,15 +74,23 @@ function withFreshCsrf(options) {
  * refresh the token and replay the request exactly once with the fresh token.
  * The backend re-plants a fresh cookie on every response (including the 400
  * itself), and the light GET below is a belt-and-suspenders for any path that
- * somehow didn't. Returns the raw Response so both parsed-JSON and raw-Response
- * callers reuse the same recovery. Network errors propagate to the caller.
+ * somehow didn't. A `db_busy` 503 is likewise replayed (with backoff) so
+ * curating a bank while another one is being processed doesn't lose clicks.
+ * Returns the raw Response so both parsed-JSON and raw-Response callers reuse
+ * the same recovery. Network errors propagate to the caller.
  */
 export async function fetchWithCsrfRetry(url, options = {}) {
-  const opts = { credentials: 'include', ...options };
+  let opts = { credentials: 'include', ...options };
   let res = await fetch(url, opts);
   if (isCsrfRejection(res) && csrfHeaderName(opts.headers)) {
     await refreshCsrfToken();
-    res = await fetch(url, { credentials: 'include', ...withFreshCsrf(opts) });
+    opts = { credentials: 'include', ...withFreshCsrf(opts) };  // the busy replay below reuses it
+    res = await fetch(url, opts);
+  }
+  for (let i = 0; i < DB_BUSY_RETRIES; i += 1) {
+    if (!await isDbBusy(res)) break;
+    await sleep(DB_BUSY_BACKOFF_MS * (i + 1));
+    res = await fetch(url, opts);
   }
   return res;
 }
@@ -97,7 +123,10 @@ export async function apiFetch(url, options = {}) {
       toastRef?.error('Session expired. Please log in again.');
     } else if (res.status === 429) {
       toastRef?.warning('Too many requests. Please wait a moment.');
-    } else if (res.status >= 500) {
+    } else if (res.status >= 500 && !body?.db_busy) {
+      // db_busy already carries its own sentence (and the caller toasts it) —
+      // a generic "Server error" on top would only muddy a transient, retryable
+      // write collision that the replays above just couldn't win.
       toastRef?.error('Server error. Please try again later.');
     }
 
