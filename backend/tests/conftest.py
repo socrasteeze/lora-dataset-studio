@@ -44,6 +44,31 @@ def _reset_inmemory_registries():
     bank_jobs.reset()
     image_bank_service.reset_folder_sync()
 
+@pytest.fixture(autouse=True)
+def _isolate_config(tmp_path, monkeypatch):
+    """Point EVERY test at an empty config, not the developer's real config.json.
+
+    The `app` fixture already did this — but only for tests that take it. A test
+    that calls a config-reading helper directly (a pure wrapper/prompt function,
+    say) took the default LDS_CONFIG and read the real file at the repo root. Two
+    consequences, both bad:
+
+    * a FALSE FAILURE the moment the developer customises anything in Settings —
+      an edited Klein identity prompt made the "shipped default" wrapper tests
+      fail on that machine only;
+    * worse, a FALSE PASS: on a clean checkout the same tests assert the default
+      behaviour and pass for the wrong reason, so CI can never catch the drift.
+
+    `_cache` is a module global keyed on nothing but "has it been loaded", so
+    resetting it here is what actually makes the redirect take effect (see the
+    same reset in the `app` fixture, which stays for its own LDS_DATA_DIR path).
+    """
+    import app.config as _cfg
+    monkeypatch.setenv('LDS_CONFIG', str(tmp_path / 'isolated-config.json'))
+    monkeypatch.setattr(_cfg, '_cache', None)
+    yield
+    _cfg._cache = None      # never leave a tmp config cached for the next test
+
 @pytest.fixture()
 def app(tmp_path, monkeypatch):
     monkeypatch.setenv('LDS_DATA_DIR', str(tmp_path / 'data'))
