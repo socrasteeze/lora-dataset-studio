@@ -1,7 +1,11 @@
 import { INPUT_CLASS, Card } from './primitives'
 import KleinLoraCombobox, { useKleinGenerationLoras } from './KleinLoraCombobox'
 import PromptOverrideField from '../common/PromptOverrideField'
-import { IDENTITY_PROMPT_FIELDS } from '../common/promptOverride.js'
+import {
+  identityPromptFields, PROMPT_SUBJECT_TYPES,
+  readIdentityPrompt, writeIdentityPrompt, subjectHasOverride,
+} from '../common/promptOverride.js'
+import { SUBJECT_TYPE_LABELS } from '../dataset/subjectTypes.js'
 
 /* Optional generation-LoRA PRESETS for the local Klein engine (Idea by
    @waltm — Discord feature request): named combinations of user-pointed LoRA
@@ -155,11 +159,53 @@ const KLEIN_MODEL_SLOTS = [
   { key: 'klein-model-consistency_lora', cfg: 'consistency_lora', slot: 'consistency_lora', label: 'Consistency LoRA',
     hint: 'Full path from anywhere, or relative to models/loras — the structure-anchoring LoRA chained onto the Klein edit graph. Clearing this disables it entirely.' },
 ]
+/* Klein GENERATION sampling. The shipped workflow hardcodes 5 steps at its
+   sampler node and nothing on the generation paths ever passed a value, so the
+   engine's own `sampler_steps` parameter was unreachable — "is the number of
+   generation steps fixed at 5?" (ashish.sinha, Discord). Default 5 = the exact
+   historical render; the ceiling mirrors the backend clamp. Deliberately its own
+   card, next to the other Klein knobs and clearly NOT the "Upscale & improve"
+   steps, which drive a different pass. */
+const KLEIN_GENERATION_STEPS_MAX = 50   // face_dataset_service._IMPROVE_MAX_STEPS
+
+function KleinGenerationCard({ config, setField }) {
+  const steps = config.klein?.generation_steps ?? 5
+  return (
+    <Card
+      id="klein-generation"
+      title="Klein generation quality"
+      help="How many sampler steps the local Klein engine spends on each generated variation. 5 is the value the app used before this was exposed, so leaving it alone keeps today's result. More steps render more cleanly but take proportionally longer — 10 steps is roughly twice the wait per image. It will not fix a wrong prompt: anatomy problems (extra limbs, tails) come from the identity prompt, not from the step count. Raised by ashish.sinha (Discord)."
+    >
+      <div className="sm:max-w-xs">
+        <label htmlFor="klein-generation-steps" className="block text-xs font-medium text-content">
+          Generation steps
+        </label>
+        <input
+          id="klein-generation-steps"
+          type="number"
+          min={1}
+          max={KLEIN_GENERATION_STEPS_MAX}
+          step={1}
+          value={steps}
+          onChange={(e) => setField('klein', 'generation_steps',
+            e.target.value === '' ? 5 : Number(e.target.value))}
+          className={INPUT_CLASS}
+        />
+        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+          5 = the shipped value. More steps = slower, usually cleaner; 1–{KLEIN_GENERATION_STEPS_MAX}.
+          Applies to variations, regenerations and the small-image rescue — not to
+          “Upscale &amp; improve”, which has its own Steps below.
+        </p>
+      </div>
+    </Card>
+  )
+}
 
 /* Editable identity / quality prompts (feature request by @bbsorry / 雨田壹).
    The identity "locks" that ride ahead of every generated variation used to be
-   hardcoded and invisible; here each is a GLOBAL override shown in ONE editable
-   box that already holds the shipped default text, with a Reset.
+   hardcoded and invisible; here each is an override shown in ONE editable box
+   that already holds the shipped default text, with a Reset — one set PER
+   SUBJECT TYPE, picked with the chips at the top of the card.
 
    IDENTITY_PROMPT_FIELDS (common/promptOverride.js) also ships keys for
    upstream's API-engine wrapper; this fork's generation path is Klein-only
@@ -199,30 +245,75 @@ const IMPROVE_KNOBS = [
     min: 1, max: 50, step: 1, hint: 'More steps = slower, usually cleaner.' },
 ]
 
-function IdentityPromptsCard({ config, setField, promptDefaults }) {
+function IdentityPromptsCard({ config, setField, promptDefaults, promptDefaultsBySubject,
+                               setIdentityPrompts }) {
   const ip = config.identity_prompts || {}
-  const defaults = promptDefaults || {}
+  // Subject type being edited. This screen has NO dataset context, so without an
+  // explicit picker it edited "the" identity prompt — which is exactly how an
+  // animal-tuned lock ended up on human generations (ashish.sinha, Discord).
+  // Human first: it is the default subject and the one the flat legacy keys hold.
+  const [subject, setSubject] = useState('human')
+  const defaults = (promptDefaultsBySubject || {})[subject] || promptDefaults || {}
   const set = (key, v) => setField('identity_prompts', key, v)
+  const setPrompt = (key, v) => setIdentityPrompts((prev) => writeIdentityPrompt(prev, subject, key, v))
   const improveEnabled = ip.klein_improve_enabled !== false
   return (
     <Card
       id="identity-prompts"
       title="Identity & Klein prompts (advanced)"
-      help="The hidden prompts that lock a subject's facial identity across generated variations, now editable. Each box already holds the prompt in use: edit it to override, Reset to go back. Each applies globally to every dataset. Reproducibility note: as long as a box still matches the built-in text, nothing is stored and generation stays byte-identical to before — you also keep receiving improvements to that prompt. Feature request by @bbsorry (雨田壹)."
+      help="The hidden prompt that locks a subject's identity across generated variations, now editable. Pick the subject type first: each type (Human, Animal, Creature, Object, Other) has its OWN text, and one you write for one type never applies to another. The box already holds the prompt in use: edit it to override, Reset to go back. Reproducibility note: as long as the box still matches the built-in text, nothing is stored and generation stays byte-identical to before — you also keep receiving improvements to that prompt. Feature request by @bbsorry (雨田壹); per-subject scoping reported by ashish.sinha."
     >
-      {IDENTITY_PROMPT_FIELDS.filter((f) => f.engines.includes('klein')).map((f) => (
+      {/* flex-wrap: five chips fit one row on a laptop and wrap to two or three
+          on a phone — never a row that overflows the card. */}
+      <div>
+        <span className="block text-sm font-medium text-content">Subject type</span>
+        <p className="mt-1 mb-2 text-xs text-content-muted">
+          Which datasets this prompt applies to. Each subject type keeps its own text —
+          editing the Animal one leaves your Human datasets untouched. A dot marks a type you
+          have already customised.
+        </p>
+        <div role="group" aria-label="Subject type to edit" className="flex flex-wrap gap-1.5">
+          {PROMPT_SUBJECT_TYPES.map((st) => {
+            const on = st === subject
+            return (
+              <button
+                key={st}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setSubject(st)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${
+                  on ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-200 font-semibold'
+                     : 'border-border bg-surface text-content-muted hover:text-content'}`}
+              >
+                {SUBJECT_TYPE_LABELS[st]}
+                {subjectHasOverride(ip, st) && (
+                  <span aria-label="customised" title="Customised" className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Divergence 1: this fork generates on Klein ONLY, so the two identity
+          locks belonging to the removed cloud engines are never shown. */}
+      {identityPromptFields(subject).filter((f) => f.engines.includes('klein')).map((f) => (
         <PromptOverrideField
-          key={f.key}
+          key={`${subject}-${f.key}`}
           id={f.id}
           label={f.label}
           desc={f.desc}
-          value={ip[f.key]}
+          value={readIdentityPrompt(ip, subject, f.key)}
           defaultText={defaults[f.key]}
-          onChange={(v) => set(f.key, v)}
+          onChange={(v) => setPrompt(f.key, v)}
         />
       ))}
 
       <div className="border-t border-border pt-4">
+        <p className="mb-2 text-xs text-content-subtle">
+          The prompt below is <strong>not</strong> per subject type — it asks for texture and
+          detail, which means the same thing for a person, a dog or a car.
+        </p>
         <label htmlFor="identity-prompt-klein-improve-enabled" className="flex items-center gap-2 text-sm font-medium text-content">
           <input
             id="identity-prompt-klein-improve-enabled"
@@ -354,9 +445,13 @@ export default function EnginesSection(props) {
 
       <KleinModelFilesCard config={config} setField={setField} caps={caps} />
 
+      <KleinGenerationCard config={config} setField={setField} />
+
       <KleinLorasCard config={config} setField={setField} />
 
-      <IdentityPromptsCard config={config} setField={setField} promptDefaults={props.promptDefaults} />
+      <IdentityPromptsCard config={config} setField={setField} promptDefaults={props.promptDefaults}
+        promptDefaultsBySubject={props.promptDefaultsBySubject}
+        setIdentityPrompts={props.setIdentityPrompts} />
     </div>
   )
 }

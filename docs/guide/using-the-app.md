@@ -148,7 +148,13 @@ touching the folder itself:
    top-level subfolder becomes its own bank — so you can curate, queue and
    promote each one separately. A preview shows exactly which banks will be made
    and how many images each holds; loose images sitting directly in the parent
-   get their own bank too, so nothing is dropped.
+   get their own bank too, so nothing is dropped. The folder also stays LIVE:
+   keep dropping images into it and they are picked up automatically the next
+   time you open the bank list or the bank itself ("42 new image(s) found in the
+   folder"), as undecided images ready for the next scan — your existing
+   keep/reject decisions, scores and captions are never touched. Files you
+   removed from the folder are reported at the top of the bank, never deleted
+   from it, so an unplugged drive can't wipe your triage.
 2. **Scan quality** — a background pass (CPU only, a few minutes even on
    thousands of images) scores every file: sharpness, noise, flat/empty
    frames, resolution — and groups **near-duplicates**. The flags follow the
@@ -249,6 +255,64 @@ turn for the GPU rather than failing when another bank — or a training run —
 using it. A panel on the Banks page shows what's running and what's lined up, and
 lets you cancel a bank or clear the whole queue. Queue three exports before bed
 and they'll be triaged by morning.
+## Review a bank one image at a time
+
+Filter chips and bulk actions clear the obvious trash, but the last call —
+*is this shot good enough for the LoRA?* — is made one image at a time, and
+squinting at a 140-pixel thumbnail is not how you make it. **▶ Review one by
+one** (above the grid) opens the images of the **current filter** full size, one
+after the other:
+
+- **✓ Keep**, **✕ Reject**, **⏭ Skip** — each one saves and jumps straight to the
+  next image. The keyboard is the point: **K** keep, **R** reject, **S** skip,
+  **←/→** move without deciding, **Esc** to leave. A few hundred images go by in
+  minutes.
+- **⏭ Skip** decides nothing (the image stays undecided) but is not shown again
+  in that run — it's "not now", not "no".
+- **🎲 Random order** walks what's left in shuffled order instead of folder
+  order. On a scraped dump of 3 000 photos, sequential order means 200
+  near-identical frames in a row; random gives you a representative sample from
+  the first click. Ticking or unticking it mid-run only re-orders what you have
+  **not** seen yet — nothing you already judged comes back.
+- Under the image, the facts the passes already computed (resolution, sharpness,
+  aesthetic score, NSFW, quality flags, person and duplicate groups) so you can
+  call it without leaving the lightbox.
+- The counter is honest — *12 / 340* over the snapshot taken when you opened the
+  review, so a decision that drops the image out of the filter can't make the
+  run skip images or loop. Each decision is saved on the spot: close after fifty
+  of them and all fifty are there.
+
+The ▶ button on a tile starts the same review **at that image**. A plain click
+on a tile still selects it for the bulk ✓/✕/⬆ bar, so both ways of working stay.
+
+## Clean the watermarks a bank found
+
+**🚩 Find watermarks** flags the images carrying an overlaid logo, URL or
+@username. Removing them used to mean promoting the watermark into a dataset
+first and cleaning it there; the bank now does it itself, in **two steps you
+launch by hand** — cheapest and safest first:
+
+1. **✂ Auto-crop** cuts off the marks sitting in a border strip. No model, no
+   GPU, no invented pixel: it simply trims the band up to the mark, and only
+   when the image stays big enough to train on. Anything it can't crop that way
+   is left flagged, on purpose.
+2. **🧽 Inpaint** repaints what's left. **LaMa** (fast, non-generative) handles
+   small off-centre marks and leaves marks *on the subject* flagged; **Klein**
+   (slower, via ComfyUI) also clears those. Each engine says what to install
+   when it isn't ready, and the button stays off rather than failing mid-pass.
+
+Each step shows how many images it still has to work on and how many it has
+already handled, so you can see where the funnel stands. **Your source files are
+never modified** — a cleaned image is a copy the app keeps beside the bank's
+thumbnails. That copy is what the grid shows, and what **⬆ Promote** sends to
+the dataset, so a cleaned bank produces a clean dataset. **↩ Undo cleaning**
+just deletes those copies and flags the images again, and **👁 Before / after**
+flips a sample between the cleaned version and your untouched original.
+
+If a bank was scanned by an older version, its flagged images carry no recorded
+mark position; the panel says so and one more **🚩 Find watermarks** run makes
+them cleanable.
+
 
 ## Tips that save runs
 

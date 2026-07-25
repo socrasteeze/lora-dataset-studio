@@ -100,7 +100,15 @@ _SCHEMA_ADDITIONS = (
     ('bank_image', 'caption', 'TEXT'),
     ('bank_image', 'semantic_dup_group', 'INTEGER'),
     ('bank_image', 'framing', 'VARCHAR(8)'),
+    # Bank watermark CLEANING (two manual levels) — the detected bbox is now kept
+    # (the scan used to parse it and throw it away) and the cleaned blob's method
+    # is recorded. Additive: existing banks keep their rows, they just carry NULLs.
+    ('bank_image', 'watermark_bbox', 'TEXT'),
+    ('bank_image', 'watermark_clean_method', 'VARCHAR(16)'),
     ('image_bank', 'pipeline_report', 'TEXT'),
+    # "One bank per subfolder": the loose-files bank is rooted at the parent but
+    # must NOT recurse when its live folder is re-walked (see refresh_bank).
+    ('image_bank', 'root_only', 'BOOLEAN'),
 )
 
 def _apply_additive_migrations():

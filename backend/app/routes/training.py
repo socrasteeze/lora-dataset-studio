@@ -320,17 +320,30 @@ def dataset_train_checkpoints(dataset_id):
                            .filter_by(dataset_id=dataset_id).all()))
     checkpoint_registry.ensure_baseline(LOCAL_USER, dataset_id, fam_resolved,
                                         had_training)
-    return jsonify({'checkpoints': lt.list_checkpoints(LOCAL_USER, dataset_id, **kw),
+    # Deployment stamp (testable + deployed_filename) on EVERY listed save, from
+    # the same join the ◉ Graph pills use — this is what lets the panel show
+    # "✓ Deployed + ⏏ Undeploy" in place of a misleading second "Import →", and
+    # aim the undeploy at the right ComfyUI file. Local rows name their own run,
+    # so they are grouped by run; a cloud group IS one run.
+    local_cks = ct.annotate_deployed_by_run(
+        dataset_id, fam_resolved, lt.list_checkpoints(LOCAL_USER, dataset_id, **kw))
+    cloud_groups = ct.cloud_checkpoint_groups(dataset_id, fam_resolved, variant=variant)
+    for _g in cloud_groups:
+        ct.annotate_deployed_checkpoints(dataset_id, fam_resolved,
+                                         _g.get('checkpoints') or [],
+                                         run_tag=('cloud', _g.get('run_id')))
+    return jsonify({'checkpoints': local_cks,
                     # cloud saves synced locally (incl. an ACTIVE run's latest)
                     # — separate field: the resume-or-fresh prompt reasons on
                     # LOCAL checkpoints only
-                    'cloud_checkpoints': ct.cloud_checkpoints(
-                        dataset_id, fam_resolved, variant=variant),
+                    'cloud_checkpoints': ct.annotate_deployed_by_run(
+                        dataset_id, fam_resolved,
+                        [dict(c, run_source='cloud') for c in ct.cloud_checkpoints(
+                            dataset_id, fam_resolved, variant=variant)]),
                     # same saves grouped BY SOURCE RUN (id/status/gpu/cost/time)
                     # so the panel labels which run produced which epochs and
                     # deep-links each group back to its Runs row
-                    'cloud_checkpoint_groups': ct.cloud_checkpoint_groups(
-                        dataset_id, fam_resolved, variant=variant),
+                    'cloud_checkpoint_groups': cloud_groups,
                     'recommended_steps': lt.recommended_steps(
                         dataset_id, train_type=fam_resolved, variant=variant),
                     'recommended_steps_info': lt.recommended_steps_info(
@@ -1136,6 +1149,41 @@ def dataset_train_cloud_purge():
     """Trash the staging dirs of finished cloud runs (dataset copies, samples,
     checkpoint duplicates already imported)."""
     return jsonify({'ok': True, **ct.purge_finished_runs()})
+
+
+@bp.get('/dataset/train/cloud/staging-sizes')
+def dataset_train_cloud_staging_sizes():
+    """How much disk each cloud run's staging dir still holds, so the Runs hub can
+    show "8.2 GB on disk" on a card and name that weight in the per-run 🧹
+    confirmation. DELIBERATELY its own endpoint (and not a field of the runs
+    payload): sizing means walking thousands of files, which must not ride the
+    hub's 5 s poll. Optional ?run_ids=1,2,3 narrows the walk to the shown cards."""
+    raw = (request.args.get('run_ids') or '').strip()
+    ids = None
+    if raw:
+        try:
+            ids = [int(x) for x in raw.split(',') if x.strip()]
+        except ValueError:
+            return jsonify({'error': 'run_ids must be a comma-separated list of run ids'}), 400
+    sizes = ct.staging_sizes(ids)
+    return jsonify({'ok': True,
+                    'sizes': {str(k): v for k, v in sizes.items()},
+                    'total_bytes': sum(sizes.values())})
+
+
+@bp.post('/dataset/train/cloud/purge-run')
+def dataset_train_cloud_purge_run():
+    """Trash the staging dir of ONE finished cloud run — targeted cleanup, so a
+    45-run history no longer forces an all-or-nothing purge. Spares exactly what
+    the global purge spares (active runs, kept pods) via the shared rule."""
+    body = request.get_json(silent=True) or {}
+    if body.get('run_id') in (None, ''):
+        return jsonify({'error': 'run_id is required'}), 400
+    try:
+        res = ct.purge_run_staging(body['run_id'])
+    except Exception as e:
+        return _map_error(e)
+    return jsonify({'ok': True, **res})
 
 
 @bp.post('/dataset/<int:dataset_id>/train/import')

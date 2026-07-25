@@ -26,10 +26,18 @@ test('the banks page enqueues, polls, cancels and clears the queue', () => {
   assert.match(page, /setInterval\(refreshQueue, 2000\)/);
 });
 
-test('a queued/running bank is badged from queue_state', () => {
-  assert.match(page, /b\.queue_state/);
-  assert.match(page, /queue_state\.state === 'running'/);
-  assert.match(page, /queued · #\$\{b\.queue_state\.position\}/);
+test('a queued/running bank is badged from the polled queue snapshot', () => {
+  // Derived from the cheap /api/bank-queue poll, NOT from re-fetching /api/banks:
+  // that route force-re-walks every source folder (upstream's folder sync), which
+  // must stay a navigation-time action, never a 2 s poll. queue_state on the row
+  // is only the first-paint fallback.
+  assert.match(page, /const queueStateOf = \(bank\) =>/);
+  assert.match(page, /queue\?\.items\?\.find\(\(i\) => i\.bank_id === bank\.id\)/);
+  assert.match(page, /bank\.queue_state/);
+  assert.match(page, /qs\.state === 'running'/);
+  assert.match(page, /queued · #\$\{qs\.position\}/);
+  // The bank cards are NOT on an interval; only the queue snapshot is.
+  assert.doesNotMatch(page, /setInterval\(refresh,/);
 });
 
 test('run-now from the list posts the pipeline, add-to-queue posts the queue', () => {

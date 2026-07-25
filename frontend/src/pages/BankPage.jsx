@@ -7,6 +7,8 @@ import BankWorkspace from '../components/bank/BankWorkspace'
 import LaunchAllDialog from '../components/bank/LaunchAllDialog'
 import FolderPickerField from '../components/common/FolderPicker'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
+import { bankListSyncToast } from '../components/bank/bankSync'
+import FolderSyncNote from '../components/bank/FolderSyncNote'
 
 const CURRENT_KEY = 'bankCurrentId'
 
@@ -108,6 +110,10 @@ export default function BankPage() {
     try {
       const d = await apiFetch('/api/banks')
       setBanks(d.banks || [])
+      // The server re-walked every source folder before answering: say so when
+      // it found something, so the counters never move without an explanation.
+      const note = bankListSyncToast(d.banks)
+      if (note) toast.success(note.text)
     } catch (e) {
       toast.error(e?.message || 'Could not load the banks.')
       setBanks([])
@@ -120,20 +126,24 @@ export default function BankPage() {
 
   useEffect(() => { if (currentId == null) refresh() }, [currentId, refresh])
 
-  // Poll the queue while on the list page; also poll the bank cards (for the live
-  // "running" state) only while the queue actually has something going.
-  const queueActive = !!(queue && (queue.running_bank_id != null || queue.items?.length))
+  // Poll the QUEUE (a cheap in-memory snapshot) while on the list page. The bank
+  // cards are deliberately NOT polled: GET /api/banks force-re-walks every source
+  // folder (see refresh_banks) and toasts what it found — that is a navigation-time
+  // action, not something to run every couple of seconds against a possibly
+  // spun-down drive. The live "queued/running" badge is derived from this snapshot
+  // instead, so it stays current for free.
   useEffect(() => {
     if (currentId != null) return undefined
     refreshQueue()
     const t = setInterval(refreshQueue, 2000)
     return () => clearInterval(t)
   }, [currentId, refreshQueue])
-  useEffect(() => {
-    if (currentId != null || !queueActive) return undefined
-    const t = setInterval(refresh, 2500)
-    return () => clearInterval(t)
-  }, [currentId, queueActive, refresh])
+  // bank_id -> {state, position} from the polled queue, falling back to the
+  // server's queue_state on the bank row (first paint, before the first poll).
+  const queueStateOf = (bank) => {
+    const it = queue?.items?.find((i) => i.bank_id === bank.id)
+    return it ? { state: it.state, position: it.position } : (queue ? null : bank.queue_state)
+  }
 
   // Live preview of the subfolder split (debounced) whenever the toggle is on.
   useEffect(() => {
@@ -212,16 +222,16 @@ export default function BankPage() {
     } catch (e) {
       toast.error(e?.message || 'Could not queue the bank.')
     } finally {
-      refreshQueue(); refresh()
+      refreshQueue()
     }
   }
   const cancelQueued = async (id) => {
     try { await del(`/api/bank-queue/${id}`) } catch (e) { toast.error(e?.message || 'Could not update the queue.') }
-    refreshQueue(); refresh()
+    refreshQueue()
   }
   const clearQueue = async () => {
     try { await postJson('/api/bank-queue/clear', {}) } catch (e) { toast.error(e?.message || 'Could not clear the queue.') }
-    refreshQueue(); refresh()
+    refreshQueue()
   }
 
   if (currentId != null) {
@@ -318,7 +328,9 @@ export default function BankPage() {
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
-          {banks.map((b) => (
+          {banks.map((b) => {
+            const qs = queueStateOf(b)
+            return (
             <li key={b.id}
               className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
               <div className="flex items-center gap-2">
@@ -329,9 +341,9 @@ export default function BankPage() {
                 {b.activity && !b.activity.finished && (
                   <span className="text-xs text-amber-300">{b.activity.kind}…</span>
                 )}
-                {b.queue_state && (
+                {qs && (
                   <span className="rounded bg-indigo-500/15 px-1.5 py-px text-[10px] font-semibold text-indigo-300">
-                    {b.queue_state.state === 'running' ? 'running' : `queued · #${b.queue_state.position}`}
+                    {qs.state === 'running' ? 'running' : `queued · #${qs.position}`}
                   </span>
                 )}
                 <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
@@ -344,12 +356,13 @@ export default function BankPage() {
               <p className="text-xs text-content-muted">
                 {b.total} image(s) · {b.scanned} scanned · <span className="text-emerald-300">{b.keep} kept</span> · <span className="text-rose-300">{b.reject} rejected</span>
               </p>
+              <FolderSyncNote sync={b.folder_sync} />
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => open(b.id)}
                   className="rounded-md border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-content hover:bg-surface">
                   Open →
                 </button>
-                {!b.queue_state && (
+                {!qs && (
                   <button type="button" onClick={() => setDialogBankId(b.id)} disabled={b.total === 0}
                     title="Run Launch all now, or add this bank to the queue"
                     className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
@@ -358,7 +371,8 @@ export default function BankPage() {
                 )}
               </div>
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
 
