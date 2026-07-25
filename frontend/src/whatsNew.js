@@ -49,6 +49,22 @@ import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-25-bank-curate-while-running',
+    date: '2026-07-25',
+    title: '🔓 Keep curating while a bank is being processed',
+    blurb:
+      'Accepting or rejecting images in one bank while another one was scanning (or while the Launch-all queue was working through your library) could fail with a server error, and the click was silently lost. The app now waits its turn for the database instead of giving up, replays the write if it still loses the race, and only ever asks you to try again with a clear message — never a cryptic "unable to complete action". The passes themselves were also fixed to stop holding the database while they crunch numbers, so collisions are far rarer to begin with.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-25-bank-rename-and-sort',
+    date: '2026-07-25',
+    title: '✎ Rename your banks, and sort the list your way',
+    blurb:
+      'Banks can now be renamed: click the ✎ next to a bank\'s name on the Banks page, type the new one, done. Only the label changes — the source folder, the images and every keep/reject decision stay exactly where they were. A Sort menu above the cards also reorders the list (newest, A→Z, most images, least triaged) and remembers your choice, which matters once "one bank per subfolder" has given you twenty of them.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-24-bank-launch-queue',
     date: '2026-07-24',
     title: '⏳ Queue several banks to triage back-to-back',
