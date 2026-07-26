@@ -237,7 +237,7 @@ def _aitoolkit_supports_anima() -> bool:
     connaît pas et get_model_class retomberait SILENCIEUSEMENT sur le loader SD
     legacy → LoRA corrompu. On exige l'arch EXACTE `arch = "anima"` (la chaîne
     émise par _build_job_config_anima). Lecture fraîche : un `git pull` du
-    mainteneur passe la détection à True sans restart. ⚠️ Cette garde vérifie la
+    mainteneur passe la détection à True sans restart. ⚠ Cette garde vérifie la
     PRÉSENCE de l'arch dans les sources, PAS la version de diffusers : Anima exige
     aussi un diffusers récent (AnimaModularPipeline/CosmosTransformer3DModel) —
     un checkout à jour mais un venv ancien lèvera un ImportError au chargement
@@ -2580,7 +2580,8 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
 
     `training_folder` (cloud seam) : utilisé TEL QUEL comme process.training_folder
     dans les 3 familles - aucun appel à _output_dir() (pas d'ai-toolkit local requis).
-    Défaut (None) = comportement historique inchangé (_output_dir() / _run_name(ds))."""
+    Défaut (None) = comportement historique inchangé (`_run_root(ds)`) - c'est aussi
+    le dossier où atterrit training.log, l'invariant que « Run folder » ouvre."""
     if _train_type(ds) == 'sdxl':
         cfg_ = _build_job_config_sdxl(ds, dataset_folder, steps, training_folder=training_folder)
         _apply_style_overrides(ds, cfg_['config']['process'][0], 'sdxl')
@@ -2636,7 +2637,7 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
-                                    else str(_output_dir() / _run_name(ds))),
+                                    else str(_run_root(ds))),
                 'device': 'cuda:0',
                 'trigger_word': trigger,
                 'network': _network_block(ds, _zrank, 'zimage'),
@@ -2728,7 +2729,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
-                                    else str(_output_dir() / _run_name(ds))),
+                                    else str(_run_root(ds))),
                 'device': 'cuda:0',
                 'trigger_word': trigger,
                 'network': _network_block(ds, _krank, 'krea'),
@@ -2810,7 +2811,7 @@ def _build_job_config_flux(ds, dataset_folder: str, steps: int, training_folder=
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
-                                    else str(_output_dir() / _run_name(ds))),
+                                    else str(_run_root(ds))),
                 'device': 'cuda:0',
                 'trigger_word': trigger,
                 'network': _network_block(ds, _frank, 'flux'),
@@ -2900,7 +2901,7 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
-                                    else str(_output_dir() / _run_name(ds))),
+                                    else str(_run_root(ds))),
                 'device': 'cuda:0',
                 'trigger_word': trigger,
                 'network': _network_block(ds, _fkrank, 'flux2klein'),
@@ -2956,7 +2957,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
       canonique de l'entrée, PAS 'sigmoid') ;
     - negative de preview = ANIMA_SAMPLE_NEG (tags anime score_1..3, défaut UI).
 
-    ⚠️ arch 'anima' = EXTENSION (extensions_built_in/diffusion_models/anima), PAS
+    ⚠ arch 'anima' = EXTENSION (extensions_built_in/diffusion_models/anima), PAS
     une arch cœur → garde de version obligatoire (_aitoolkit_supports_anima) sinon
     get_model_class retombe en silence sur le loader SD legacy (LoRA corrompu).
     Anima exige aussi un diffusers récent (AnimaModularPipeline) — angle mort de la
@@ -2986,7 +2987,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
-                                    else str(_output_dir() / _run_name(ds))),
+                                    else str(_run_root(ds))),
                 'device': 'cuda:0',
                 'trigger_word': trigger,
                 'network': _network_block(ds, _arank, 'anima'),
@@ -3066,7 +3067,7 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
             'process': [{
                 'type': 'sd_trainer',
                 'training_folder': (training_folder if training_folder
-                                    else str(_output_dir() / _run_name(ds))),
+                                    else str(_run_root(ds))),
                 'device': 'cuda:0',
                 'trigger_word': trigger,
                 'network': _network_block(ds, _srank, 'sdxl'),
@@ -3115,6 +3116,24 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
 _CK_RE = re.compile(r'_(\d{4,})\.safetensors$')
 
 
+def _run_root(ds, base_model=_PERSISTED, family=None, variant=_PERSISTED):
+    """ai-toolkit's `training_folder` for this run — the run's TOP folder.
+
+    It holds `training.log` (we open it before spawning, so it exists from the
+    first second of a run) and, once ai-toolkit reaches its first save, the
+    `lora_<trigger>` save_root below. Two distinct folders were both being
+    called "the run folder" at nine call sites; this is the top one, `_run_dir`
+    is the save_root, and no caller should rebuild either by hand again."""
+    return _output_dir() / _run_name(ds, base_model, family, variant)
+
+
+def _run_log_path(ds, base_model=_PERSISTED, family=None, variant=_PERSISTED) -> str:
+    """Where the local run's `training.log` is written and read. Single source
+    of truth: the writer, the progress reader and « Run folder » must never
+    disagree on it (they did — a crashed run's log looked missing)."""
+    return str(_run_root(ds, base_model, family, variant) / 'training.log')
+
+
 def _run_dir(user_id, dataset_id, base_model=_PERSISTED, family=None,
              variant=_PERSISTED) -> str:
     ds = fds.get_dataset(user_id, dataset_id)
@@ -3125,7 +3144,7 @@ def _run_dir(user_id, dataset_id, base_model=_PERSISTED, family=None,
     # `base_model` cible le run d'une base PRÉCISE (sélection UI) ; `family` cible la
     # famille sélectionnée (Krea vs Z-Image) - sans quoi le panneau montre les
     # checkpoints du mauvais run quand deux familles partagent le même trigger.
-    return str(_output_dir() / _run_name(ds, base_model, family, variant)
+    return str(_run_root(ds, base_model, family, variant)
                / f'lora_{_safe_trigger(ds)}')
 
 
@@ -3134,7 +3153,8 @@ def open_training_folder(user_id, dataset_id, target='loras', family=None,
     """Ouvre dans l'explorateur de fichiers du POSTE (app locale mono-utilisateur,
     le navigateur tourne sur la même machine) le dossier demandé :
     'loras' → dossier d'import ComfyUI de la famille (loras/krea, loras/sdxl,
-    loras/z image) ; 'run' → dossier de checkpoints du run courant (base+famille) ;
+    loras/z image) ; 'run' → dossier HAUT du run courant (base+famille) : il porte
+    training.log, et les checkpoints sont dans son sous-dossier lora_<trigger> ;
     'dataset' → dossier des images du dataset (data/datasets/<id>/ — où « Write
     .txt files » dépose les captions sidecar ; aucune dépendance ai-toolkit).
     Cibles FIXES résolues côté serveur — le client n'envoie jamais de chemin.
@@ -3144,7 +3164,14 @@ def open_training_folder(user_id, dataset_id, target='loras', family=None,
     if not ds:
         raise ValueError('dataset not found')
     if target == 'run':
-        path = _run_dir(user_id, dataset_id, base_model, family, variant)
+        # The run's TOP folder, not the `lora_<trigger>` save_root below it.
+        # That save_root is created by ai-toolkit at its first save, so a run
+        # that died at boot has none — opening it used to CREATE an empty
+        # folder and reveal that, while `training.log` sat one level up, in
+        # the very folder the failure message sends people to (reported by
+        # wannadecryptor on Discord). The top folder shows the log AND leads
+        # to the checkpoints.
+        path = str(_run_root(ds, base_model, family, variant))
     elif target == 'loras':
         path = _lora_dest_dir(ds, family)
     elif target == 'dataset':
@@ -3199,6 +3226,11 @@ def list_checkpoints(user_id, dataset_id, base_model=_PERSISTED, family=None,
         if rec is not None:
             c['version'] = rec.version
             c['source'] = rec.source
+            # The record that PRODUCED this file. A continuation resolves its
+            # lineage parent (and the LoRA geometry it must keep) from HERE —
+            # `run_id` below is a cloud id for a cloud record, which is not a
+            # record key and cannot be used for either.
+            c['record_id'] = rec.id
             c['trained_at'] = rec.created_at.isoformat() if rec.created_at else None
             # Run identity for the /#N chip + deep-link on the local group
             # header — the same run the deployed file will be tagged with.
@@ -3206,7 +3238,51 @@ def list_checkpoints(user_id, dataset_id, base_model=_PERSISTED, family=None,
                 c['run_id'], c['run_source'] = rec.cloud_run_id, 'cloud'
             else:
                 c['run_id'], c['run_source'] = rec.id, 'local'
+            # The FINAL save has no step in its name, so it was filed under the
+            # last NUMBERED one (2750 for a 3000-step run) — where the dedup of
+            # the ▶ Continue list swallowed it, making the run's real end
+            # unresumable from here. The ◉ Graph reads a cloud run's staging and
+            # numbers the same file at the run's target (3000): two views, two
+            # truths, and a pill the panel then refused. Number it like the graph
+            # does — its own run's target — whenever the record knows better.
+            if c.get('final') and (rec.steps or 0) > c['step']:
+                c['step'] = rec.steps
+    out.sort(key=lambda c: (c['step'], bool(c.get('final'))))
     return out
+
+
+def resume_source_checkpoint(checkpoints, step):
+    """The save a resume at `step` actually loads, out of a list_checkpoints()
+    list — so a continuation can read ITS provenance (`record_id`) and ITS
+    geometry instead of guessing from the lane. Ties (a numbered save and the
+    bare final at the same step) prefer the numbered file, the same rule every
+    ▶ Continue path already uses. None when nothing sits at that step."""
+    matches = [c for c in (checkpoints or []) if c.get('step') == step]
+    if not matches:
+        return None
+    return min(matches, key=lambda c: bool(c.get('final')))
+
+
+def describe_geometry_conflict(parent_geometry, rank, alpha):
+    """Message for "you cannot continue THESE weights at THAT rank", or None when
+    the shapes agree (or the parent's geometry was never recorded).
+
+    A LoRA's rank and alpha size its matrices: rank-32 weights simply do not load
+    into a rank-64 network. So on a resume the geometry is a property of the
+    checkpoint, never a setting to re-pick — and when the two disagree the launch
+    must say so BEFORE renting anything, not train a fresh LoRA the user believes
+    is a continuation."""
+    geo = parent_geometry or {}
+    want_r, want_a = geo.get('rank'), geo.get('alpha')
+    bad = ((want_r is not None and rank is not None and int(want_r) != int(rank))
+           or (want_a is not None and alpha is not None and int(want_a) != int(alpha)))
+    if not bad:
+        return None
+    return (f'this checkpoint was trained at rank {want_r} / alpha {want_a}, and '
+            f'this run would use rank {rank} / alpha {alpha}. A LoRA\'s rank is '
+            'fixed by its weights — continuing it at another rank cannot load '
+            'them. Set rank and alpha back in Training settings, or start a '
+            'fresh run instead of continuing.')
 
 
 def checkpoint_file_path(user_id, dataset_id, filename, base_model=_PERSISTED,
@@ -4278,7 +4354,29 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
     except Exception:
         pass
 
-    # Verdict agrégé pour la pastille : un fail = , sinon un warn = , sinon .
+    # 8) torch build vs GPU architecture — the RTX 50 (Blackwell) trap. Stable
+    # PyTorch wheels stop at sm_90; `torch.cuda.is_available()` stays True, the
+    # run builds its buckets, then dies at the first real computation. Catching
+    # it HERE is the whole point: the alternative is 20 minutes of setup for an
+    # opaque "ai-toolkit exited 1". A warning, not a blocker — the verdict is a
+    # read of the venv, and an unknown probe (None) says nothing at all.
+    try:
+        from .. import capabilities
+        from .training_diagnostics import torch_arch_verdict
+        arch = torch_arch_verdict(capabilities.aitoolkit_torch_info(),
+                                  venv_python=cfg.aitoolkit_path('venv_python'))
+        if arch and not arch['supported']:
+            warnings.append(arch['message']
+                            + (f' Fix: {arch["command"]}' if arch['command'] else ''))
+            # Keep the row SHORT — it sits in a one-line list next to ten other
+            # checks, on a phone too. The full explanation + fix is the warning.
+            _check('torch_arch', 'PyTorch supports this GPU', 'warn',
+                   f'torch {arch["torch"]} has no {arch["sm"]} kernels — the run '
+                   'dies at the first GPU computation')
+    except Exception:
+        pass   # a probe failure must never block or fake a diagnosis
+
+    # Verdict agrégé pour la pastille : un fail = rouge, sinon un warn = orange, sinon vert.
     statuses = {c['status'] for c in checks}
     verdict = ('blocked' if 'fail' in statuses
                else 'warnings' if 'warn' in statuses else 'ready')
@@ -4345,6 +4443,36 @@ def _log_tail(path: str, n: int = 30) -> str:
         return '(log illisible)'
 
 
+# Scanning window for the excerpt: wide enough that a full traceback (frames +
+# exception line) is never cut in half, while `log_tail` keeps its historical
+# 30-line shape for anything still reading that field.
+_ERROR_SCAN_LINES = 200
+
+
+def _crash_payload(log_path, dataset_id, rc) -> dict:
+    """The `training_error` state a crashed local run leaves behind: the tail
+    (path-redacted — this text is shown to the user and pasted into public help
+    threads), the excerpt that actually EXPLAINS the failure, and, when the venv
+    says so, the GPU-architecture verdict that turns "exited 1" into something
+    the user can act on. Best-effort throughout: nothing here may raise inside
+    the watcher thread, and an unknown probe adds no key at all."""
+    from ..utils.redact import redact_user_paths
+    from .training_diagnostics import extract_error_excerpt, torch_arch_verdict
+    wide = _log_tail(log_path, _ERROR_SCAN_LINES)
+    payload = {'dataset_id': dataset_id, 'rc': rc,
+               'log_tail': redact_user_paths(_log_tail(log_path))[-1500:],
+               'excerpt': extract_error_excerpt(wide)}
+    try:
+        from .. import capabilities
+        arch = torch_arch_verdict(capabilities.aitoolkit_torch_info(),
+                                  venv_python=cfg.aitoolkit_path('venv_python'))
+        if arch and not arch['supported']:
+            payload['gpu_arch'] = {'message': arch['message'], 'command': arch['command']}
+    except Exception:
+        pass
+    return payload
+
+
 def _watch_training(app, proc, log_path, dataset_id) -> None:
     """Thread daemon : attend la fin du process ai-toolkit puis fait avancer la
     file (libère ComfyUI / lance le suivant) DÈS la fin, sans dépendre du polling
@@ -4359,13 +4487,12 @@ def _watch_training(app, proc, log_path, dataset_id) -> None:
     try:
         with app.app_context():
             if rc not in (0, None):
-                tail = _log_tail(log_path)
+                payload = _crash_payload(log_path, dataset_id, rc)
                 logger.error("Entraînement ai-toolkit dataset %s terminé en ERREUR (rc=%s). "
-                             "Fin du log :\n%s", dataset_id, rc, tail)
+                             "Cause probable :\n%s", dataset_id, rc,
+                             payload['excerpt']['text'] or payload['log_tail'])
                 # Surface l'erreur à l'UI (sinon un crash = juste « terminé » silencieux).
-                queue_manager._set_system_state(
-                    'training_error', {'dataset_id': dataset_id, 'rc': rc, 'log_tail': tail[-1500:]},
-                    ttl_seconds=3600)
+                queue_manager._set_system_state('training_error', payload, ttl_seconds=3600)
             else:
                 logger.info("Entraînement ai-toolkit dataset %s terminé (rc=%s).", dataset_id, rc)
             process_training_queue()  # libère le GPU / enchaîne la file immédiatement
@@ -4381,7 +4508,7 @@ def archive_previous_run(ds) -> str | None:
     main) et tombent avec le dataset : le nom garde le préfixe `lora_<trigger>`
     donc purge_training_artifacts les balaie aussi. Les copies déjà importées
     dans ComfyUI (loras/<famille>) ne sont pas touchées. None si aucun run."""
-    run_dir = _output_dir() / _run_name(ds)
+    run_dir = _run_root(ds)
     if not run_dir.is_dir():
         return None
     dest = f'{run_dir}_archived_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
@@ -4430,6 +4557,10 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
     if (queue_manager._get_system_state('training_in_progress', False)
             and _pid_alive(queue_manager._get_system_state('training_pid', None))):
         raise ValueError('a training is already in progress - wait for it to finish or queue this dataset')
+    # Cheap refusal BEFORE the dataset export below: re-exporting a whole dataset
+    # only to reject the launch under the spawn lock would burn minutes of disk
+    # for nothing. The authoritative copy of this check lives in that lock.
+    _assert_no_vision_pass_on_gpu()
     if check_captions:
         assert_trainable(dataset_id, train_type=train_type,
                          allow_caption_mismatch=allow_caption_mismatch,
@@ -4550,10 +4681,10 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
     # HF_HOME route les poids base/adapter sur le disque configuré. PYTHONIOENCODING
     # évite les crashs cp1252 sur les logs unicode. Jamais shell=True ; args en liste.
     env = dict(os.environ, HF_HOME=str(_hf_home()), PYTHONIOENCODING='utf-8')
-    run_dir = _output_dir() / _run_name(
-        ds, base_model=base_model, family=launch_fam, variant=variant)
+    run_dir = _run_root(ds, base_model=base_model, family=launch_fam, variant=variant)
     run_dir.mkdir(parents=True, exist_ok=True)
-    log_path = str(run_dir / 'training.log')
+    log_path = _run_log_path(ds, base_model=base_model, family=launch_fam,
+                             variant=variant)
     run_token = secrets.token_hex(16)
     # The authoritative live-run check, identity state and PID publication are
     # one transition under the SAME lock used by Stop and queue advancement.
@@ -4565,6 +4696,10 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
             raise ValueError(
                 'a training is already in progress - wait for it to finish or '
                 'queue this dataset')
+        # Authoritative: a vision pass may have grabbed the window during the
+        # export above. Checked under the SAME lock as the live-run test so the
+        # two GPU owners can never both believe they won the card.
+        _assert_no_vision_pass_on_gpu()
         # Provenance registry: record WHICH dataset version this launch trains on
         # only after this request has won the process slot.
         from . import checkpoint_registry
@@ -4599,6 +4734,14 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
         for key, value in identity.items():
             queue_manager._set_system_state(
                 key, value, ttl_seconds=_TRAIN_STATE_TTL)
+        # ai-toolkit is about to claim the card. Give back the vision model's
+        # 7.5 GB if an isolated call leased it warm (no-op without a live lease).
+        try:
+            from .vision_keepalive import revoke as _revoke_vision
+            _revoke_vision('training starting')
+        except Exception:
+            logger.warning('vision keep-warm revoke failed before training start',
+                           exc_info=True)
         logf = None
         try:
             logf = open(log_path, 'w', encoding='utf-8')
@@ -4649,7 +4792,7 @@ def _seed_continuation_from(user_id, dataset_id, base, family, variant,
     Returns the archived folder path."""
     ds = fds.get_dataset(user_id, dataset_id)
     trigger = _safe_trigger(ds)
-    training_folder = _output_dir() / _run_name(ds, base, family, variant)
+    training_folder = _run_root(ds, base, family, variant)
     if not training_folder.is_dir():
         raise ValueError('run folder missing - cannot seed the earlier checkpoint')
     dest = f'{training_folder}_superseded_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
@@ -4746,6 +4889,33 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
         # Ties (a numbered save and the bare final at the same step): prefer the
         # numbered file — it carries a clean step and is never the run's live final.
         chosen = min(matches, key=lambda c: bool(c.get('final')))
+    # Lineage: the record this continuation resumes FROM is the record that
+    # PRODUCED the file being loaded (list_checkpoints stamps `record_id` on every
+    # save), NOT merely the newest record of the lane. One lane holds several runs,
+    # and their saves coexist in the same run dir: attributing the child to the
+    # newest record drew an edge to a run whose weights were never touched — and,
+    # worse, one whose rank could differ, which is what makes the graph's claim
+    # physically impossible. Falls back to the lane's newest record when the file
+    # carries no stamp (pre-registry saves). Best-effort like all provenance — a
+    # resolution failure leaves the edge NULL and NEVER blocks the continuation.
+    from . import checkpoint_registry
+    _src_ck = resume_source_checkpoint(cks, resume_step)
+    try:
+        _parent = checkpoint_registry.record_by_id((_src_ck or {}).get('record_id'))
+        if _parent is None:
+            _parent = checkpoint_registry.newest_record_for(dataset_id, fam, base or '', var)
+    except Exception:
+        _parent = None
+    # …and the geometry those weights were trained with is not negotiable. The
+    # local lane trains from the dataset's PERSISTED settings, so it cannot quietly
+    # inherit the parent's rank without rewriting the user's own settings behind
+    # their back (the cloud lane can — it carries a per-run snapshot). Refuse
+    # loudly, here: nothing has been archived, persisted or launched yet.
+    _conflict = describe_geometry_conflict(
+        checkpoint_registry.network_geometry(_parent),
+        _lora_rank(ds, fam), _lora_alpha_eff(ds, _lora_rank(ds, fam), fam))
+    if _conflict:
+        raise ValueError(_conflict)
     try:
         extra = max(100, int(extra_steps))
     except (TypeError, ValueError):
@@ -4778,17 +4948,6 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
     # explicit server-side acknowledgement.
     launch_allow_unverified = (allow_unverified_weights
                                or not needs_explicit_z_recipe)
-    # Lineage: the record this continuation resumes FROM is the newest record of
-    # this exact lane (dataset+family+base+variant). Resolved BEFORE launch_training
-    # registers the child, so the child's parent_record_id points at the true
-    # predecessor. Best-effort like all provenance — a resolution failure (no prior
-    # record, or a queue-thread call outside the app context) leaves the edge NULL
-    # and NEVER blocks the continuation.
-    from . import checkpoint_registry
-    try:
-        _parent = checkpoint_registry.newest_record_for(dataset_id, fam, base or '', var)
-    except Exception:
-        _parent = None
     res = launch_training(user_id, dataset_id, steps=resume_step + extra, check_captions=False,
                           base_model=base, variant=var, train_type=fam,
                           masked=masked,
@@ -4989,6 +5148,33 @@ def assert_trainable(dataset_id, train_type=None, allow_caption_mismatch=False,
                 "expects prose. Re-caption in 'Prose' mode, or force the training.")
 
 
+def _assert_no_vision_pass_on_gpu():
+    """Refuse to start a local training while a vision pass owns the GPU.
+
+    The mirror of gpu_exclusive_vision_window's own 'training is running' check.
+    Until now this half only existed on the QUEUE path (_advance_training_queue
+    skips a due item while `vision_in_progress`); a direct launch — the ▶ button,
+    a retry, a continue — walked straight past it.
+
+    It matters because the two do NOT share the card gracefully. Measured on a
+    24 GB card with ~19 GB already resident: the vision model (7.5 GB with its
+    context) no longer fits, Ollama silently spills ~43 % of it to the CPU, the
+    vision pass runs ~13.5x slower and the resident GPU work drops 20-150x.
+    Nothing raises and nothing OOMs — so a training started here would simply
+    crawl for hours with no error to explain it. Refusing is the kinder failure.
+
+    The flag is TTL-bounded and cleared at startup (recover_stale_vision_window),
+    so this can never latch a training out permanently.
+    """
+    if queue_manager._get_system_state('vision_in_progress', False):
+        from ..gpu_window import GpuBusyError
+        raise GpuBusyError(
+            'a vision pass (captioning, watermark or framing) is using the GPU - '
+            'training would fight it for VRAM instead of failing outright, so it '
+            'has to wait. Stop the pass, or queue this dataset and it will start '
+            'by itself when the pass is done.')
+
+
 def is_local_run_active(dataset_id) -> bool:
     """True when the single-flight LOCAL trainer is mid-run on THIS dataset.
     delete_dataset uses it (alongside cloud_training.active_runs_for) to refuse
@@ -5061,14 +5247,20 @@ def last_local_error() -> dict | None:
 
 
 def local_error_message(err) -> str:
-    """One-line, paste-safe summary of a local crash for the Runs page."""
+    """One-line, paste-safe summary of a local crash for the Runs page. Quotes the
+    line that EXPLAINS the crash (last traceback / error line), never the last
+    line of the log — which is very often a harmless FutureWarning. When the log
+    holds no error line at all, the summary stays honest and says just that."""
     if not isinstance(err, dict):
         return 'Training crashed.'
+    from .training_diagnostics import extract_error_excerpt
     rc = err.get('rc')
-    tail = (err.get('log_tail') or '').strip()
-    last = tail.splitlines()[-1].strip() if tail else ''
+    excerpt = err.get('excerpt')
+    if not isinstance(excerpt, dict):     # legacy payload written before excerpts
+        excerpt = extract_error_excerpt(err.get('log_tail') or '')
+    headline = (excerpt.get('headline') or '').strip()[:300]
     base = f'Training crashed (exit code {rc}).' if rc is not None else 'Training crashed.'
-    return f'{base} {last}' if last else base
+    return f'{base} {headline}' if headline else f'{base} No error line in the log.'
 
 
 def _failed_local_record_id() -> int | None:
@@ -5221,6 +5413,12 @@ def score_checkpoint_samples(user_id, dataset_id, base_model=_PERSISTED, family=
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
+    # Same InsightFace lane as the dataset pass -> same single rule. Ranking epochs
+    # by a similarity the model cannot measure would recommend a checkpoint at
+    # random while looking authoritative; `reason` is already what the UI shows.
+    blocked = fds.face_scoring_block_reason(ds)
+    if blocked:
+        return {'available': False, 'reason': blocked}
     if not ds.ref_filename:
         return {'available': False, 'reason': 'this dataset has no reference photo'}
     ref_path = os.path.join(fds._dataset_dir(ds.id), ds.ref_filename)
@@ -5268,9 +5466,7 @@ def training_progress(user_id, dataset_id, base_model=_PERSISTED, family=None,
     active = (bool(queue_manager._get_system_state('training_in_progress', False))
               and cur_id is not None and int(cur_id) == int(dataset_id)
               and _pid_alive(queue_manager._get_system_state('training_pid', None)))
-    log_path = os.path.join(
-        str(_output_dir() / _run_name(ds, base_model, family, variant)),
-        'training.log')
+    log_path = _run_log_path(ds, base_model, family, variant)
     parsed = {'step': None, 'total': None, 'loss': None, 'speed': None, 'eta': None,
               'loss_curve': []}
     log_exists = os.path.isfile(log_path)
@@ -5598,8 +5794,7 @@ def _snapshot_final_checkpoint(dataset_id, step, base_model=_PERSISTED,
     if not ds:
         return None
     trigger = _safe_trigger(ds)
-    run = str(_output_dir() / _run_name(
-        ds, base_model, family, variant) / f'lora_{trigger}')
+    run = str(_run_root(ds, base_model, family, variant) / f'lora_{trigger}')
     final = os.path.join(run, f'lora_{trigger}.safetensors')
     numbered = os.path.join(run, f'lora_{trigger}_{step:09d}.safetensors')
     if not os.path.isfile(final) or os.path.exists(numbered):

@@ -6,12 +6,17 @@ import DupGroupsPanel from './DupGroupsPanel'
 import PromoteDialog from './PromoteDialog'
 import DeleteRejectedDialog from './DeleteRejectedDialog'
 import LaunchAllDialog from './LaunchAllDialog'
+import ScoringPythonDialog from './ScoringPythonDialog'
 import PipelineReport from './PipelineReport'
 import FolderSyncNote from './FolderSyncNote'
+import RelocateBankDialog from './RelocateBankDialog'
 import BankReviewLightbox from './BankReviewLightbox'
 import BankWatermarkPanel from './BankWatermarkPanel'
 // Source-folder re-walk messages (pure/testable).
 import { folderSyncToast } from './bankSync.js'
+import { holdsTheGpu, scoreDeviceNote } from './bankScoreDevice.js'
+// Wording that adapts to the machine (a card-less box is never sold CUDA).
+import { openerLabel } from './scoringPython.js'
 // Reuse the dataset's register list so the Bank lane never drifts from it.
 import { VOCABULARY_OPTIONS } from '../dataset/CaptionOptionsPopover'
 // Ordered zone model + the "what's next" accent, both pure/testable.
@@ -42,10 +47,10 @@ const RES_BUCKETS = [
 // Framing buckets — ids MUST mirror backend _FRAMING_KEYS. Face/bust/body/back
 // are the character composition axes; 'unknown' is a parseable-but-unclassed shot.
 const FRAMING_BUCKETS = [
-  { id: 'face', label: '😀 Face' },
-  { id: 'bust', label: '👤 Bust' },
-  { id: 'body', label: '🧍 Body' },
-  { id: 'back', label: '🔙 Back' },
+  { id: 'face', label: 'Face' },
+  { id: 'bust', label: 'Bust' },
+  { id: 'body', label: 'Body' },
+  { id: 'back', label: 'Back' },
   { id: 'unknown', label: '❔ Unknown' },
 ]
 const STATUS_RING = {
@@ -199,7 +204,7 @@ function ZoneSection({ zone, accented, children }) {
   )
 }
 
-// 📊 Coverage advice (idea by @antonp) — a read-only, collapsible panel. Reads
+// Coverage advice (idea by @antonp) — a read-only, collapsible panel. Reads
 // what the passes already computed (framing, person/style clusters, resolution)
 // and says, in plain sentences, what the kept set leans on and what's thin for a
 // good LoRA. Never selects or rejects; warnings first, then gentler notes.
@@ -234,7 +239,7 @@ function CoveragePanel({ coverage, onClose }) {
   return (
     <div className="space-y-3 rounded-lg border border-indigo-400/40 bg-indigo-500/5 px-3 py-2.5">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold text-content">📊 Coverage advice</span>
+        <span className="text-sm font-semibold text-content">Coverage advice</span>
         <span className="text-xs text-content-subtle">
           {coverage.total.toLocaleString()} {poolWord} image{coverage.total === 1 ? '' : 's'}
         </span>
@@ -247,7 +252,7 @@ function CoveragePanel({ coverage, onClose }) {
       <ul className="space-y-1 text-sm">
         {coverage.advice.map((a, i) => (
           <li key={i} className="flex items-start gap-2">
-            <span aria-hidden>{a.tone === 'warn' ? '⚠️' : '💡'}</span>
+            <span aria-hidden>{a.tone === 'warn' ? '⚠' : ''}</span>
             <span className={a.tone === 'warn' ? 'text-amber-200' : 'text-content-muted'}>{a.text}</span>
           </li>
         ))}
@@ -296,7 +301,7 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
         {img.style_cluster != null && badge(`${img.style_cluster}`, 'bg-black/60 text-fuchsia-200')}
         {img.dup_group != null && badge(`≈${img.dup_group}`, 'bg-black/60 text-fuchsia-200')}
         {img.semantic_dup_group != null && badge(`✂${img.semantic_dup_group}`, 'bg-black/60 text-orange-200')}
-        {img.caption && badge('🏷️', 'bg-black/60 text-emerald-200')}
+        {img.caption && badge('', 'bg-black/60 text-emerald-200')}
       </span>
       {/* ▶ starts the fast-triage lightbox AT this image. It's a separate hit
           target on purpose: the tile's own click still (de)selects for the bulk
@@ -314,7 +319,7 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
 
 export default function BankWorkspace({ bankId, onBack, onGone }) {
   const toast = useToast()
-  const { caps } = useCapabilities()
+  const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities()
   const [payload, setPayload] = useState(null)
   const [filter, setFilter] = useState({ status: null, flag: null, cluster: null,
     style: null, subfolder: null, search: null, sort: 'default', resBucket: null,
@@ -327,7 +332,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [promoteOpen, setPromoteOpen] = useState(false)
   const [deleteRejectedOpen, setDeleteRejectedOpen] = useState(false)
   const [launchOpen, setLaunchOpen] = useState(false)
+  // Score's interpreter picker — reuse a CUDA Python this machine already has
+  // instead of downloading another torch. Opened from the CPU warning.
+  const [scoringPythonOpen, setScoringPythonOpen] = useState(false)
   const [dismissedReportAt, setDismissedReportAt] = useState(null)
+  const [relocating, setRelocating] = useState(false)
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [showAutoReject, setShowAutoReject] = useState(false)
   // Curation popovers ('diverse' | 'similar' | null) and their target counts.
@@ -342,7 +351,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [showSelected, setShowSelected] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [tileSize, setTileSize] = useState('M')
-  // Caption register for the 🏷️ Caption pass ('' = model's own wording). Explicit is
+  // Caption register for the Caption pass ('' = model's own wording). Explicit is
   // the NSFW lane — same registers as the dataset caption, passed per-run.
   const [captionVocab, setCaptionVocab] = useState('')
   // Coverage advice (idea by @antonp) — a collapsible read-only panel, fetched
@@ -585,7 +594,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     }
   }
 
-  // --- Curation selectors (reuse the ✨ Score embeddings — no GPU) ------------
+  // --- Curation selectors (reuse the Score embeddings — no GPU) ------------
   // Both build a SELECTION the user then reviews with the existing ✓/✕/Promote
   // bar — nothing is auto-kept or deleted. The candidate pool is the current
   // filter (composable), so "60 most diverse of this subfolder" just works.
@@ -659,6 +668,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const visionModel = caps.ollama?.vision_model || ''
   const visionModelLooksUncensored = /abliterat|uncensor|huihui|nsfw/i.test(visionModel)
   const scored = counts?.scored || 0
+  // What Score will really run on — the pass no longer holds the GPU when it
+  // computes on the CPU, and the UI must say which of the two is happening.
+  const scoreDevice = payload?.score_device
+  const scoreNote = scoreDeviceNote(scoreDevice, Boolean(caps.bank_scoring))
+  // Does this machine have an NVIDIA card AT ALL? Reported by the same
+  // score_device probe, and only meaningful while the pass would run on the
+  // CPU (a GPU pass answers gpu:true and stops looking). Undefined until the
+  // payload lands — assume a card, so we never flash "no NVIDIA card" at
+  // someone who has one.
+  const scoreGpuPresent = scoreDevice ? scoreDevice.gpu || !!scoreDevice.gpu_present : true
   const watermarkScanned = counts?.watermark_scanned || 0
   // Score flags only make sense once their pass ran; watermark is its own pass.
   const availableScoreFlags = SCORE_REJECT_FLAGS.filter(
@@ -690,15 +709,28 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             className="rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
             ← Banks
           </button>
+          {/* Beta chip retired here — it now marks the LoRA Canvas instead. */}
           <h1 className="text-lg font-bold text-content">{payload?.name || `Bank #${bankId}`}</h1>
-          <span className="rounded border border-amber-400/50 bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-300">Beta</span>
         </div>
         {payload?.source_path && (
-          <p className="truncate font-mono text-xs text-content-subtle" title={payload.source_path}>
-            {payload.source_path}
-          </p>
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="min-w-0 grow truncate font-mono text-xs text-content-subtle"
+              title={payload.source_path}>
+              {payload.source_path}
+            </p>
+            {/* Cold path. The folder-sync note below offers this too, but only once
+                the folder is already gone — and the real move is PLANNED: you look
+                for the option before you drag 30 000 files to another drive, not
+                after breaking the bank to discover it could have been repaired. */}
+            <button type="button" onClick={() => setRelocating(true)}
+              title="Moving this folder to another disk? Point the bank at its new location."
+              className="shrink-0 rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
+              Move folder…
+            </button>
+          </div>
         )}
-        <FolderSyncNote sync={payload?.folder_sync} />
+        <FolderSyncNote sync={payload?.folder_sync}
+          onRelocate={() => setRelocating(true)} />
         {counts && (
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm">
             <Stat label="images" value={counts.total} />
@@ -721,7 +753,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           onDismiss={() => setDismissedReportAt(payload.pipeline_report.finished_at)} />
       )}
 
-      {/* ① Analyze — run the analysis passes (or 🚀 Launch all) on the dump.
+      {/* ① Analyze — run the analysis passes (or Launch all) on the dump.
           Grouping + accent only; every pass keeps its own endpoint/behaviour. */}
       <ZoneSection zone={analyzeZone} accented={activeStep === 'analyze'}>
       <div className="flex flex-wrap items-center gap-2">
@@ -741,7 +773,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <PassButton onClick={() => startScan(false)} disabled={live}
             title="Score every unscanned image (sharpness/noise/flat/size), hash it and group near-duplicates — CPU only, runs in the background">
-            🔎 Scan quality
+            Scan quality
           </PassButton>
           {(counts?.scanned || 0) > 0 && (
             <PassButton onClick={() => startScan(true)} disabled={live}
@@ -753,37 +785,38 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             title={caps.face_scoring
               ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images.'
               : 'Install the Quality tools (Setup) to sort by person'}>
-            👥 Group by person
+            Group by person
           </PassButton>
           <PassButton onClick={startScore} disabled={live || !caps.bank_scoring}
             title={caps.bank_scoring
-              ? 'Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". GPU when available; runs in the background.'
+              ? `Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". Runs in the background${
+                holdsTheGpu(scoreDevice) ? ', and holds the GPU (ComfyUI is unloaded and training cannot start) for its duration' : ' on the CPU, leaving the GPU free'}.`
               : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style'}>
-            ✨ Score{!caps.bank_scoring && ' (needs setup)'}
+            Score{!caps.bank_scoring && ' (needs setup)'}
           </PassButton>
           <PassButton onClick={startFraming} disabled={live || !visionReady}
             title={visionReady
-              ? 'Classify every non-rejected image by shot type — face close-up, bust, full body, back view — with the same Qwen3-VL classifier the datasets use. Powers the 📐 Framing filter and the coverage advice. GPU vision pass.'
+              ? 'Classify every non-rejected image by shot type — face close-up, bust, full body, back view — with the same Qwen3-VL classifier the datasets use. Powers the Framing filter and the coverage advice. GPU vision pass.'
               : 'Pull the vision model (Settings ▸ Captioning & quality) to classify framing'}>
-            📐 Classify framing{!visionReady && ' (needs setup)'}
+            Classify framing{!visionReady && ' (needs setup)'}
           </PassButton>
           <PassButton onClick={startSemanticDedup} disabled={live || scored === 0}
             title={scored > 0
-              ? 'Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses — reuses the ✨ Score embeddings, so it costs no extra GPU time. Review them under the ✂ Same shot chip.'
-              : 'Run ✨ Score first — semantic near-duplicates reuse its embeddings'}>
+              ? 'Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses — reuses the Score embeddings, so it costs no extra GPU time. Review them under the ✂ Same shot chip.'
+              : 'Run Score first — semantic near-duplicates reuse its embeddings'}>
             ✂ Find crops &amp; variants{scored === 0 && ' (needs Score)'}
           </PassButton>
           <PassButton onClick={startCaption} disabled={live}
             title={selected.size
               ? `Caption the ${selected.size} selected image(s) with your caption engine (Settings ▸ Captioning & quality). Captions become searchable and follow the images when you promote them to a dataset.`
               : 'Caption every not-yet-captioned image (skips rejected) with your caption engine. Captions become searchable tags and follow the images when you promote them to a dataset. Select images first to caption just those.'}>
-            🏷️ Caption{selected.size ? ` ${selected.size} selected` : ' all'}
+            Caption{selected.size ? ` ${selected.size} selected` : ' all'}
           </PassButton>
           <label className="flex items-center gap-1 text-xs text-content-subtle">
             <span className="sr-only">Caption vocabulary register</span>
             <select value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}
               disabled={live} aria-label="Caption vocabulary register"
-              title="How captions name nude or sexual content. Explicit needs an uncensored (abliterated) Ollama vision model. Richer, more explicit captions also make the 🔍 search find more."
+              title="How captions name nude or sexual content. Explicit needs an uncensored (abliterated) Ollama vision model. Richer, more explicit captions also make the search find more."
               className="px-2 py-1 rounded-lg bg-app/60 border border-border text-content text-xs disabled:opacity-40">
               {VOCABULARY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
@@ -794,11 +827,42 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             "which level can run, and why not" logic stays unit-tested. */}
         <BankWatermarkPanel bankId={bankId} live={live}
           onChanged={async () => { await refreshPayload(); await refreshImages() }} />
+        {scoreNote && (
+          <p className={`text-xs ${scoreNote.tone === 'warn'
+            ? 'text-amber-400/90' : 'text-content-subtle'}`}>
+            {scoreNote.text}
+          </p>
+        )}
+        {!capsLoading && !caps.bank_scoring && (
+          <p className="text-xs text-content-muted">
+            Score needs its own packages (Setup ▸ Quality tools) — or an interpreter
+            that already has them{scoreGpuPresent
+              ? '. If you train LoRAs or run ComfyUI, this machine probably has one.'
+              : ', which saves installing them twice.'}
+          </p>
+        )}
+        {/* The interpreter picker, offered where it can actually help: the pass is
+            about to crawl on the CPU of a machine that HAS a card, or the scoring
+            packages are missing and another Python here may already carry them
+            (true with or without a card — it saves an install either way). The
+            LABEL adapts: a machine with no NVIDIA card must never be promised "a
+            GPU Python", and the note it gets alongside is "this is how it is",
+            not a fix to chase. */}
+        {!capsLoading && (scoreNote?.tone === 'warn' || !caps.bank_scoring) && (
+          <div>
+            <button type="button" onClick={() => setScoringPythonOpen(true)}
+              className={`rounded-md border px-2 py-1 text-xs font-medium ${scoreGpuPresent
+                ? 'border-amber-400/50 text-amber-300 hover:bg-amber-500/10'
+                : 'border-border text-content-muted hover:bg-surface-raised hover:text-content'}`}>
+              {openerLabel(scoreGpuPresent)}
+            </button>
+          </div>
+        )}
         {captionVocab === 'explicit' && !visionModelLooksUncensored && (
           <p className="text-xs text-amber-400/90">
-            ⚠️ Explicit captions need an uncensored (abliterated) Ollama vision model
+            ⚠ Explicit captions need an uncensored (abliterated) Ollama vision model
             {visionModel ? ` — “${visionModel}” may refuse or soften explicit terms` : ''}.
-            Pull one in Settings ▸ Captioning &amp; quality. Richer captions also feed the 🔍 search.
+            Pull one in Settings ▸ Captioning &amp; quality. Richer captions also feed the search.
           </p>
         )}
       </div>
@@ -866,7 +930,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       <div className="space-y-2.5 rounded-lg border border-border bg-surface px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[12rem] max-w-md flex-1">
-            <span aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-content-subtle">🔍</span>
+
             <input type="search" value={searchText} onChange={(e) => setSearchText(e.target.value)}
               placeholder="Search captions and file names… (e.g. red dress)"
               aria-label="Search the bank by caption or file name"
@@ -912,7 +976,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 {FLAG_LABEL[f]} {flags[f] ?? 0}
               </Chip>
             ))}
-            <Chip active={filter.flag === 'clean'} onClick={() => setF({ flag: filter.flag === 'clean' ? null : 'clean' })}>✨ Clean</Chip>
+            <Chip active={filter.flag === 'clean'} onClick={() => setF({ flag: filter.flag === 'clean' ? null : 'clean' })}>Clean</Chip>
           </FilterGroup>
 
           {/* Score-derived flags — only surfaced once their pass has produced data. */}
@@ -942,7 +1006,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             )}
             {payload?.faces_scanned > 0 && (
               <Chip active={filter.flag === 'no_face'} onClick={() => setF({ flag: filter.flag === 'no_face' ? null : 'no_face' })}>
-                🚫👤 No face
+                No face
               </Chip>
             )}
           </FilterGroup>
@@ -950,7 +1014,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {/* Resolution tiers — one active at a time; re-click clears.
               Composes with every filter and with the Resolution ↑/↓ sort. */}
           {shownResBuckets.length > 0 && (
-            <FilterGroup label="📐 Resolution">
+            <FilterGroup label="Resolution">
               {shownResBuckets.map((b) => (
                 <Chip key={b.id} active={filter.resBucket === b.id}
                   onClick={() => setF({ resBucket: filter.resBucket === b.id ? null : b.id })}
@@ -961,10 +1025,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             </FilterGroup>
           )}
 
-          {/* Framing tiers — face/bust/body/back (+ unknown), from the 📐 Framing
+          {/* Framing tiers — face/bust/body/back (+ unknown), from the Framing
               pass. One active at a time; re-click clears. Composes with everything. */}
           {shownFramings.length > 0 && (
-            <FilterGroup label="📐 Framing">
+            <FilterGroup label="Framing">
               {shownFramings.map((b) => (
                 <Chip key={b.id} active={filter.framing === b.id}
                   onClick={() => setF({ framing: filter.framing === b.id ? null : b.id })}
@@ -1028,7 +1092,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             aria-expanded={showAutoReject}
             title="Bulk-reject the still-undecided images carrying the chosen quality flags"
             className="rounded-md border border-border bg-surface-raised px-2 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-            🧹 Auto-reject…
+            Auto-reject…
           </button>
           {showAutoReject && (
             <>
@@ -1066,7 +1130,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             className={`rounded-md border px-2 py-0.5 text-xs font-medium ${showSelected
               ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
               : 'border-border text-content-muted hover:text-content hover:bg-surface-raised'}`}>
-            {showSelected ? '↩ Show all' : `🔎 Show selected (${selected.size})`}
+            {showSelected ? '↩ Show all' : `Show selected (${selected.size})`}
           </button>
         )}
         {selected.size > 0 && (
@@ -1088,7 +1152,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           accessible, but never the accented "next step". */}
       <ZoneSection zone={curateZone} accented={false}>
 
-      {/* Curation — build a good LoRA subset out of a big dump (reuses ✨ Score
+      {/* Curation — build a good LoRA subset out of a big dump (reuses Score
           embeddings, no GPU). Diversity coverage + reference similarity, both
           producing a SELECTION the user reviews above. */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -1098,10 +1162,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             onClick={() => setCurateOpen((v) => (v === 'diverse' ? null : 'diverse'))}
             aria-expanded={curateOpen === 'diverse'}
             title={scored > 0
-              ? 'Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) — the fix for a dump of near-identical shots. Reuses the ✨ Score embeddings, no GPU.'
-              : 'Run ✨ Score first — diversity sampling reuses its embeddings'}
+              ? 'Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) — the fix for a dump of near-identical shots. Reuses the Score embeddings, no GPU.'
+              : 'Run Score first — diversity sampling reuses its embeddings'}
             className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-            🎨 Pick diverse…{scored === 0 && ' (needs Score)'}
+            Pick diverse…{scored === 0 && ' (needs Score)'}
           </button>
           {curateOpen === 'diverse' && (
             <>
@@ -1131,12 +1195,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             onClick={() => setCurateOpen((v) => (v === 'similar' ? null : 'similar'))}
             aria-expanded={curateOpen === 'similar'}
             title={scored === 0
-              ? 'Run ✨ Score first — reference similarity reuses its embeddings'
+              ? 'Run Score first — reference similarity reuses its embeddings'
               : selected.size === 1
-                ? 'Rank the current filter by how much it looks like the ONE selected image, and select the closest N — pull a person/look out of a mixed dump. Reuses the ✨ Score embeddings, no GPU.'
+                ? 'Rank the current filter by how much it looks like the ONE selected image, and select the closest N — pull a person/look out of a mixed dump. Reuses the Score embeddings, no GPU.'
                 : 'Select exactly one image to use as the reference'}
             className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-            🎯 Similar to selected…
+            Similar to selected…
           </button>
           {curateOpen === 'similar' && (
             <>
@@ -1162,13 +1226,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
         {scored === 0 && (
-          <span className="text-xs text-content-subtle">Run ✨ Score to unlock curation.</span>
+          <span className="text-xs text-content-subtle">Run Score to unlock curation.</span>
         )}
         <button type="button" onClick={() => setCoverageOpen((v) => !v)}
           aria-expanded={coverageOpen}
           title="See what your kept set leans on and what's thin for a good LoRA — advice only, nothing is kept or rejected."
           className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-          📊 Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
+          Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
         </button>
       </div>
 
@@ -1192,7 +1256,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             ? 'Delete the rejected images from your disk (OS trash when available). Irreversible — asks you to type DELETE first. Kept images are untouched.'
             : 'No rejected images to delete'}
           className="rounded-md border border-rose-500/50 px-3 py-1.5 text-sm text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
-          🗑 Delete rejected from disk{(counts?.reject > 0) ? ` (${counts.reject})` : ''}
+          Delete rejected from disk{(counts?.reject > 0) ? ` (${counts.reject})` : ''}
         </button>
       </div>
       </ZoneSection>
@@ -1256,9 +1320,25 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           onClose={() => setLaunchOpen(false)} onLaunch={startPipeline} />
       )}
 
+      {scoringPythonOpen && (
+        <ScoringPythonDialog onClose={() => setScoringPythonOpen(false)}
+          onChanged={async () => {
+            // The pass reads bank_scoring_gpu_available(); force both probes so
+            // the CPU warning and the "holds the GPU" tooltip agree at once.
+            await refreshCaps(true)
+            await refreshPayload()
+          }} />
+      )}
+
       {review && (
         <BankReviewLightbox bankId={bankId} ids={review.ids} startId={review.startId}
           seedImages={page.images} onDecided={onReviewDecided} onClose={closeReview} />
+      )}
+
+      {relocating && (
+        <RelocateBankDialog bankId={bankId} bankName={payload?.name || `Bank #${bankId}`}
+          sourcePath={payload?.source_path} onClose={() => setRelocating(false)}
+          onDone={() => { refreshPayload({ force: true }); refreshImages() }} />
       )}
     </div>
   )

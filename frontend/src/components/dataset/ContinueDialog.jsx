@@ -19,7 +19,7 @@
  * own `where` back and can ignore the field. */
 import { useEffect, useMemo, useState } from 'react';
 import { HelpBadge } from '../../help/HelpMode';
-import { initialResumeStep, resolveInitialLane } from './lineageContinue.js';
+import { initialResumeStep, resolveInitialLane, submitBlockedReason } from './lineageContinue.js';
 
 const SAVE_CHOICES = [250, 500, 1000];
 const SAMPLE_EVERY_CHOICES = [100, 250, 500, 1000];
@@ -69,6 +69,8 @@ export default function ContinueDialog({
   const [lane, setLane] = useState(() => resolveInitialLane(where, lanes));
   const laneState = (id) => (lanes ? (lanes[id] || {}) : {});
   const laneBlocked = !!lanes && laneState(lane).available === false;
+  const blockedReason = submitBlockedReason({
+    latest, laneBlocked, laneReason: laneState(lane).reason, lane });
 
   const inheritedSave = SAVE_CHOICES.includes(settings.save_every) ? settings.save_every : 250;
   const inheritedSampleEvery =
@@ -152,7 +154,7 @@ export default function ContinueDialog({
               <span className="text-content text-[0.75rem] w-28 shrink-0">Run it</span>
               <div role="radiogroup" aria-label="Where to run the continuation"
                 className="flex items-center gap-1 rounded-lg border border-border bg-surface p-0.5">
-                {[['local', '💻 Local'], ['cloud', '☁ Cloud']].map(([id, label]) => {
+                {[['local', 'Local'], ['cloud', 'Cloud']].map(([id, label]) => {
                   const st = laneState(id);
                   const off = st.available === false;
                   return (
@@ -292,13 +294,27 @@ export default function ContinueDialog({
                 gentler — a smaller rate polishes texture without moving the identity, the LR pendant of the low-noise
                 timestep recipe. The values are factors of this run&apos;s current rate.
               </span>
+              {/* This was already the contract; it is now also what the backend
+                  enforces. Naming the actual rank makes it checkable at a glance
+                  — the Estelle run continued a rank-64 LoRA while the dataset had
+                  been edited to rank 32, and nothing on screen said which won. */}
               <span className="text-content-subtle text-[0.625rem] leading-relaxed">
                 Only cadence, preview prompts, the timestep weighting and the learning rate can change on a resume —
-                rank, base, optimizer and the like are locked to the checkpoint being continued.
+                rank, base, optimizer and the like are locked to the checkpoint being continued
+                {settings?.rank
+                  ? <> (rank {settings.rank}{settings.alpha ? ` · alpha ${settings.alpha}` : ''}, inherited from it)</>
+                  : null}.
               </span>
             </div>
           )}
         </div>
+
+        {/* A disabled ▶ Continue that explains nothing reads as a broken button.
+            The blocked lane already prints its reason above; this covers the
+            state that printed none at all. */}
+        {blockedReason && (
+          <span className="text-amber-300/90 text-[0.6875rem] leading-relaxed">{blockedReason}</span>
+        )}
 
         <div className="flex items-center gap-2 pt-1">
           <button type="button" onClick={() => onResolve(null)}

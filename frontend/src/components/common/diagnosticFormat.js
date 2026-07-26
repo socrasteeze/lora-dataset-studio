@@ -25,8 +25,8 @@ export function formatDiagnostic(d) {
   L.push(`LoRA Dataset Studio diagnostic — v${d.app_version}${d.git_sha ? ` (${d.git_sha})` : ''}`)
   L.push(`OS: ${d.os} · Python ${d.python}${pml.ml_supported === false ? ` (⚠ outside ML wheel range ${pml.ml_range})` : ''}`)
 
-  L.push('── Engine ──')
-  L.push(`klein=${yn(e.klein)}`)
+  L.push('── Engines ──')
+  L.push(`default=${cf.default_engine} · klein=${yn(e.klein)} krea=${yn(e.krea)}`)
   if ((c.klein_missing || []).length) L.push(`  klein missing assets: ${c.klein_missing.join(', ')}`)
   L.push(`Keys set: ${Object.entries(d.secrets_present || {}).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}`)
 

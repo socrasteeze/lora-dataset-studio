@@ -51,15 +51,29 @@ DEFAULTS = {
                 # the DERIVED comfyui.skipped in capabilities.probe), so it can never
                 # mask a real error of a configured ComfyUI.
                 'setup_skipped': False},
-    'ollama': {'url': 'http://127.0.0.1:11434', 'vision_model': 'huihui_ai/qwen3-vl-abliterated:8b-instruct'},  # -instruct, NOT ':8b' (=thinking): see get_vision_model()
+    'ollama': {'url': 'http://127.0.0.1:11434', 'vision_model': 'huihui_ai/qwen3-vl-abliterated:8b-instruct',  # -instruct, NOT ':8b' (=thinking): see get_vision_model()
+               # How many vision calls a bank pass keeps in flight. 4 is the
+               # measured knee; see services/vision_pool.py for the numbers.
+               'vision_concurrency': 4,
+               # Seconds an ISOLATED vision call may keep the model resident when
+               # nothing else wants the GPU (0 = always unload, the old
+               # behaviour). See services/vision_keepalive.py.
+               'vision_keep_warm_seconds': 120},
     'aitoolkit': {'dir': '', 'datasets_dir': '', 'output_dir': '', 'hf_home': '',
                   # Explicit interpreter for installs without venv/.venv
                   # (conda, uv, system python). Empty = auto-detect.
                   'python': ''},
-    # Local-only fork: Klein (ComfyUI) is the sole generation engine. The API
-    # engines (Nano Banana / ChatGPT) were removed; stale engines.* keys in an
-    # existing config.json are simply ignored.
-    'engines': {'default': 'klein', 'enabled': ['klein']},
+    # Local-only fork (Divergence 1): the ComfyUI engines are the only ones.
+    # The API engines (Nano Banana / ChatGPT / OpenRouter) were removed; stale
+    # engines.* keys in an existing config.json are simply ignored.
+    # `enabled` is the ENGINE CATALOG as well as the default selection: adding an
+    # engine here is what makes it reach existing installs (see _merge_new_engines
+    # and LEGACY_KNOWN_ENGINES below). `known` is not a setting — it is the ledger
+    # of which engines the app offered the last time the user picked, written by
+    # save_config; [] means "no ledger yet".
+    'engines': {'default': 'klein',
+                'enabled': ['klein', 'krea'],
+                'known': []},
     'captioning': {'backend': 'auto'},                         # auto|joycaption|ollama|none
     'training': {'default_family': 'zimage'},
     # Cloud GPU training (vast.ai). Everything has a sane default: the only
@@ -90,6 +104,11 @@ DEFAULTS = {
         'max_runtime_minutes': 480,    # safety net (stall watchdog is the first line): hard stop past this
         'stall_timeout_minutes': 30,   # no step progress past this -> rescue + kill
         'first_step_timeout_minutes': 45,  # no step 1 reached past this -> kill (base download wedged)
+        # Out-of-monitor freeze watchdog: a training run whose own monitor stopped
+        # reporting for this long is terminated by the supervisor (0 = only warn
+        # in the UI, never cut). Slow-by-design phases (boot/upload/download) are
+        # never judged on this value -- they get a fixed 2 h floor.
+        'freeze_watchdog_minutes': 45,
         'unreachable_grace_minutes': 6,  # tolerated mid-run network blackout before giving up on the pod
         'monthly_budget_usd': 0,       # 0 = unlimited; launches blocked past this
         'disk_gb': 60,                 # instance disk (base model + dataset + checkpoints)
@@ -132,7 +151,7 @@ DEFAULTS = {
              'aesthetic_min': 5.0, 'nsfw_max': 0.5, 'style_threshold': 0.6,
              'semantic_dup_threshold': 0.96},
     'masks': {'python': ''},
-    # Bank ✨ Score pass interpreter (CLIP aesthetic/NSFW stack). Auto-provisioned
+    # Bank Score pass interpreter (CLIP aesthetic/NSFW stack). Auto-provisioned
     # by the bank_scoring installer into its own venv — declared here so a
     # full-config Save round-trips it instead of failing "unknown config section".
     'bank_scoring': {'python': ''},
@@ -209,6 +228,34 @@ DEFAULTS = {
               # Total pixel budget the source is rescaled to before sampling, so it
               # is the output resolution. 2 = the value hardcoded in the workflow.
               'improve_megapixels': 2.0},
+    # Krea 2 Identity Edit — the second LOCAL generation engine (services/
+    # krea_edit_helper.py). Every value here is a RESOLUTION HINT or a sampler
+    # knob, never a hardcoded machine path: blank/absent means "find it yourself"
+    # (canonical filename first, then a narrow token match, across every
+    # extra_model_paths root), which is what makes the engine work on installs
+    # that look nothing like the developer's.
+    'krea': {
+        # Blank = auto-resolve a Krea 2 base under any 'krea'-named model folder,
+        # preferring a Turbo then a Raw build. Set it to a filename to pin one.
+        'base_model': '',
+        # The edit LoRA the whole engine hangs on. Not found under this name ->
+        # the resolver scans the loras roots for a krea2_identity_edit* file, so a
+        # renamed download still works.
+        'identity_lora': 'krea/krea2_identity_edit_v1_2.safetensors',
+        # THE consistency <-> prompt-adherence dial, in pixels: the resolution the
+        # reference is shown to the vision text-encoder at. LOW = follows the
+        # PROMPT (more variety, weaker likeness); HIGH = RESEMBLES the reference
+        # (stronger likeness, but it starts copying the pose and the outfit you
+        # asked it to change). The node's own default is 768; its author
+        # recommends 1024+ for people, and a character dataset is people.
+        'grounding_px': 1024,
+        # Pack reference workflow values, measured working. cfg is pinned at 1.0
+        # in code (guidance-distilled model) and is deliberately NOT a setting.
+        'steps': 10,
+        'identity_lora_strength': 1.0,
+        # How hard the source latent is pushed back into the model each step.
+        'ref_boost': 4.0,
+    },
     # Editable identity / quality prompts (feature request by @bbsorry / 雨田壹).
     # The identity "locks" that ride ahead of every generated variation used to be
     # hardcoded and invisible; these overrides expose them without touching the
@@ -232,6 +279,15 @@ DEFAULTS = {
     'identity_prompts': {'face_single': '', 'face_multi': '', 'klein_identity': '',
                          'klein_improve': '', 'klein_improve_enabled': True,
                          'by_subject': {}},
+    # User shot catalogs imported from JSON, {subject_type: [{id,label,prompt,
+    # framing,nsfw?}]} — idea by ashish.sinha (Discord): have an LLM write 40 shots
+    # instead of typing them. Stored SERVER-side rather than in localStorage so a
+    # catalog survives a browser wipe, shows up on the phone as well as the desktop
+    # and rides along in the full backup. Written by the workspace's Import button
+    # (validated client-side by shotImport.js) and re-checked on read by
+    # face_variations.sanitize_custom_shots — this file is hand-editable, and a
+    # label shadowing a built-in one would hijack prompt/aspect/NSFW resolution.
+    'custom_shots': {},
     'updates': {'repo': 'perfectgf/lora-dataset-studio'},      # GitHub repo for the release feed
 }
 
@@ -246,6 +302,97 @@ def _deep_merge(base, override):
         else:
             out[k] = copy.deepcopy(v)
     return out
+
+# --- engines added by an update --------------------------------------------
+# _deep_merge REPLACES lists (it only recurses into dicts), which is right for
+# every other list we store — but engines.enabled doubles as "which engines
+# exist", so a config saved before an engine shipped pinned its owner to the old
+# catalogue forever: the more someone used the app, the fewer new engines they
+# got, with no hint one existed. New SCALAR keys never had this problem, they
+# fall back to their default; this is a list-only failure mode.
+#
+# The whole difficulty is telling "this engine didn't exist when I saved" from
+# "I unchecked this on purpose" — blindly adding back what's missing would undo
+# an explicit choice, which is worse than the bug. So a save records the
+# catalogue the choice was made from (engines.known), and only engines absent
+# from that ledger are merged in on read. Configs written before the ledger
+# existed have no such record, but we know from the shipping history exactly
+# which engines they could have been offered. On THIS fork that history is a
+# single entry: the API engines were removed in 2026-07-19, before any config
+# this build reads could have been written, so Klein is the only engine a
+# pre-ledger config was ever offered — which is precisely what makes Krea 2 Edit
+# reach installs that had already saved their Settings.
+LEGACY_KNOWN_ENGINES = ('klein',)
+# ^ never extend this tuple. A new engine goes in DEFAULTS['engines']['enabled']
+# and nowhere else; adding it here would mean "everyone has already seen it",
+# i.e. exactly the bug this fixes.
+#
+# Only ONE key in DEFAULTS is a list of choices (engines.enabled) — the other
+# list, klein.generation_lora_presets, is pure user data with an empty default
+# and nothing to merge. Hence a named, tested helper rather than a framework;
+# a second list-of-choices key should reuse the same known/enabled shape.
+
+
+def _clean_engines(seq):
+    return [e for e in (seq or []) if isinstance(e, str) and e]
+
+
+def _engine_catalog(*groups):
+    """Every engine this build knows about, in DEFAULTS order, plus any extra
+    (older or hand-written) names the caller passes — nothing is ever dropped."""
+    out = list(DEFAULTS['engines']['enabled'])
+    for group in groups:
+        for e in _clean_engines(group):
+            if e not in out:
+                out.append(e)
+    return out
+
+
+def _merge_new_engines(conf: dict, user: dict) -> dict:
+    """Add engines that appeared since the user's saved selection (in place).
+
+    Read-time only — the config file is never rewritten, so the fix applies to
+    every existing install without a migration, and a downgrade still finds what
+    it wrote. `user` is the raw file: an absent engines.enabled means the user
+    never expressed a choice and already sits on the full default catalogue.
+
+    Doubles as the shape guard for this section — config.json is hand-editable
+    and a string where a list belongs would otherwise reach every consumer."""
+    eng = conf.get('engines')
+    if not isinstance(eng, dict):
+        eng = conf['engines'] = copy.deepcopy(DEFAULTS['engines'])
+    if not isinstance(eng.get('enabled'), list):
+        eng['enabled'] = list(DEFAULTS['engines']['enabled'])
+    saved = ((user or {}).get('engines') or {})
+    saved = saved.get('enabled') if isinstance(saved, dict) else None
+    if not isinstance(saved, list):
+        return conf
+    enabled = _clean_engines(eng.get('enabled'))
+    if not enabled:
+        # An empty list reads as "no restriction" downstream (face_dataset_service);
+        # filling it in would turn that into a real, restrictive selection.
+        eng['enabled'] = enabled
+        return conf
+    known = ((user or {}).get('engines') or {}).get('known')
+    known = _clean_engines(known) if isinstance(known, list) else []
+    known = known or list(LEGACY_KNOWN_ENGINES)
+    eng['enabled'] = enabled + [e for e in DEFAULTS['engines']['enabled']
+                                if e not in known and e not in enabled]
+    eng['known'] = _engine_catalog(known, eng['enabled'])
+    return conf
+
+
+def _stamp_known_engines(merged: dict, partial: dict) -> dict:
+    """Record the catalogue a selection was made from, on the saves that carry
+    one. Only then: a save of some unrelated section must not certify that its
+    author ever saw the engines they don't have enabled."""
+    incoming = (partial or {}).get('engines')
+    eng = merged.get('engines')
+    if not isinstance(incoming, dict) or 'enabled' not in incoming or not isinstance(eng, dict):
+        return merged
+    eng['known'] = _engine_catalog(eng.get('known'), eng.get('enabled'))
+    return merged
+
 
 MIGRATED_LORA_PRESET_NAME = 'My LoRAs'
 
@@ -310,7 +457,10 @@ def load_config(force=False) -> dict:
                 user = json.loads(p.read_text(encoding='utf-8'))
             except (OSError, ValueError):
                 user = {}
-        _cache = _migrate_klein_loras(_deep_merge(DEFAULTS, user))
+        if not isinstance(user, dict):
+            user = {}
+        _cache = _merge_new_engines(
+            _migrate_klein_loras(_deep_merge(DEFAULTS, user)), user)
         return copy.deepcopy(_cache)
 
 def save_config(partial: dict) -> dict:
@@ -326,9 +476,12 @@ def save_config(partial: dict) -> dict:
         # convert=False when this save explicitly carries the presets: the
         # client already speaks the preset format, so a legacy key left in the
         # file must not resurrect a preset the user just deleted — only purge.
-        merged = _migrate_klein_loras(
+        if not isinstance(current, dict):
+            current = {}
+        merged = _stamp_known_engines(_migrate_klein_loras(
             _deep_merge(current, partial or {}),
-            convert='generation_lora_presets' not in ((partial or {}).get('klein') or {}))
+            convert='generation_lora_presets' not in ((partial or {}).get('klein') or {})),
+            partial)
         tmp = p.with_suffix('.json.tmp')
         tmp.write_text(json.dumps(merged, indent=2, ensure_ascii=False), encoding='utf-8')
         tmp.replace(p)
@@ -380,13 +533,33 @@ def delete_secrets(names) -> None:
 _COMFY_DERIVED = {'output': ('output_dir', 'output'), 'input': ('input_dir', 'input'),
                   'models': ('models_dir', 'models'), 'loras': ('loras_dir', 'models/loras')}
 
-def comfyui_dir(kind: str):
-    key, sub = _COMFY_DERIVED[kind]
-    explicit = get(f'comfyui.{key}') or ''
+# Stable display order for the four override fields (Settings, docs, API payload).
+COMFY_DIR_KINDS = ('output', 'input', 'models', 'loras')
+
+
+def resolve_comfyui_dir(kind: str, base_dir: str, explicit: str = ''):
+    """Pure resolution of one ComfyUI folder: an explicit override wins, else it is
+    derived from the install directory. Kept separate from `comfyui_dir` (which reads
+    live config) so the Settings screen can PREVIEW the very same computation on
+    unsaved field values — what the user is shown is then, by construction, what the
+    app will use. Reported from Discord (vykas22): a ComfyUI launched with
+    --input-directory/--output-directory looked like it was ignored, because the four
+    override keys existed but had no field anywhere in the app.
+
+    Whitespace-only is treated as empty: a stray space used to resolve to Path(' ')
+    and silently shadow the derived folder."""
+    _, sub = _COMFY_DERIVED[kind]
+    explicit = (explicit or '').strip()
     if explicit:
         return Path(explicit)
-    base = get('comfyui.base_dir') or ''
+    base = (base_dir or '').strip()
     return Path(base) / Path(sub) if base else None
+
+
+def comfyui_dir(kind: str):
+    key, _ = _COMFY_DERIVED[kind]
+    return resolve_comfyui_dir(kind, get('comfyui.base_dir') or '',
+                               get(f'comfyui.{key}') or '')
 
 def aitoolkit_path(kind: str):
     root = get('aitoolkit.dir') or ''

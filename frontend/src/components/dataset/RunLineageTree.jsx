@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { buildLineageRows, resumeCaption } from '../../utils/lineageTree';
 import { famLabel, StatusDot, SavesChip } from './lineageChrome';
+import { runNumber, cloudNumber, runIdentityLabel } from '../../utils/runIdentity';
 import RunLineageGraph from './RunLineageGraph';
 
-/* 🌳 A run's lineage — the runs linked by continuations (run → continue →
+/* A run's lineage — the runs linked by continuations (run → continue →
    re-continue, and forks). Two views of the same genealogy, toggled in the
    header and remembered per browser:
      ☰ List  — a compact indented tree (file-tree rails), dense and scannable.
@@ -68,9 +69,14 @@ function LineageNode({ row, onSelect, index }) {
           + (clickable ? 'cursor-pointer hover:border-indigo-400/60 hover:bg-app/70' : '')}>
         <div className="flex min-w-0 items-center gap-1.5">
           <StatusDot status={node.status} />
-          <span className="shrink-0 font-mono text-content-muted text-[0.625rem]">
-            <span aria-hidden>{node.source === 'cloud' ? '☁' : '💻'}</span>{' '}
-            #{node.source === 'cloud' && node.run_id ? node.run_id : node.record_id}
+          {/* One run number across list, graph and inspector: the record id. */}
+          <span className="shrink-0 font-mono text-content-muted text-[0.625rem]"
+            title={runIdentityLabel(node)}>
+            <span aria-hidden>{node.source === 'cloud' ? 'cloud' : 'local'}</span>{' '}
+            {runNumber(node)}
+            {cloudNumber(node) != null && (
+              <span className="text-content-subtle"> · cloud #{cloudNumber(node)}</span>
+            )}
           </span>
           <span className={`min-w-0 truncate text-[0.75rem] font-semibold ${dim ? 'text-content-muted' : 'text-content'}`}
             title={`${famLabel(node.train_type)}${node.variant ? ` · ${node.variant}` : ''}`}>
@@ -163,7 +169,7 @@ export default function RunLineageTree({ tree, loading, error, onSelect, onConti
   return (
     <div className="lds-lineage-in overflow-x-auto rounded-xl border border-border bg-surface p-2.5">
       <div className="mb-1.5 flex items-center gap-2 px-0.5">
-        <span aria-hidden className="text-[0.8125rem] leading-none">🌳</span>
+
         <span className="text-content text-[0.6875rem] font-semibold">Lineage</span>
         <span className="rounded-full bg-app/60 px-1.5 py-0.5 text-content-muted text-[0.5625rem] font-medium">
           {rows.length} run{rows.length > 1 ? 's' : ''}

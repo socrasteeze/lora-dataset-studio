@@ -532,8 +532,12 @@ def describe_test_prompt(image_bytes: bytes) -> str:
     """Describe an uploaded image into a ready-to-paste Studio TEST PROMPT via the
     Ollama vision model (the same abliterated Qwen3-VL the app captions with, so NSFW
     passes). Resizes to <=1024 long side (like captioning) before the call, force-starts
-    a stopped LOCAL Ollama, and unloads the model right after (keep_alive=0) so ComfyUI
-    gets its VRAM back for the next generation.
+    a stopped LOCAL Ollama. Whether the model stays resident afterwards is decided by
+    CONTENTION (services/vision_keepalive.py): with a generation queued or a training
+    running, ComfyUI gets its VRAM back immediately, exactly as before; on an otherwise
+    idle card the model is leased warm so describing several images in a row doesn't pay
+    the 12.8 s cold load every time. The lease is revoked the moment the queue picks up
+    a job.
 
     Raises ValueError on a missing / oversized / unreadable (non-image) upload, and
     RuntimeError when Ollama is unavailable or rejects the request (its own reason is
@@ -547,9 +551,10 @@ def describe_test_prompt(image_bytes: bytes) -> str:
     except Exception as e:
         raise ValueError('unreadable image — expected a webp, png or jpg file') from e
     from .vision_ollama import describe_image_ollama
+    from .vision_keepalive import keep_alive_for_isolated_call
     text = describe_image_ollama(
-        webp, STUDIO_DESCRIBE_PROMPT,
-        num_predict=500, auto_start_local=True, keep_alive=0)
+        webp, STUDIO_DESCRIBE_PROMPT, num_predict=500, auto_start_local=True,
+        keep_alive=keep_alive_for_isolated_call())
     text = (text or '').strip().strip('"').strip()
     if not text:
         raise RuntimeError(
@@ -953,16 +958,58 @@ def _build_cell_workflow(user_id, checkpoint, strength, prompt, seed, z_model,
     return _resolve_workflow_node_classes(workflow, available_classes)
 
 
-def _enqueue_cell(user_id, dataset_id, workflow, prompt) -> str:
+def _enqueue_cell(user_id, dataset_id, workflow, prompt, job_id=None, commit=True) -> str:
     """Enqueue one cell as a normal (serialized) image job. Free: never
     debited - the failure path in job_queue skips the refund for
-    is_lora_test jobs exactly like is_dataset (no credit minting)."""
-    job_id = str(uuid.uuid4())
+    is_lora_test jobs exactly like is_dataset (no credit minting).
+
+    `job_id` lets the caller mint the id BEFORE inserting its own row (so the row
+    carries its job_id from the start instead of being re-written afterwards) and
+    `commit=False` keeps the queue row in the caller's open transaction — together
+    they turn a cell into ONE commit instead of three."""
+    job_id = job_id or str(uuid.uuid4())
     queue_manager.add_job(job_type='image', user_id=str(user_id),
                           workflow_data=workflow, prompt=prompt, job_id=job_id,
                           metadata={'model_name': 'zimage_lora_test',
                                     'is_lora_test': True,
-                                    'dataset_id': dataset_id})
+                                    'dataset_id': dataset_id},
+                          commit=commit)
+    return job_id
+
+
+def _persist_and_enqueue_cell(img, user_id, dataset_id, prompt, build_workflow) -> str:
+    """Insert ONE grid cell and its queue job in a SINGLE transaction, and return
+    its job_id.
+
+    Why one commit and not zero (a single commit for the whole grid): a grid is
+    enqueued cell by cell and an enqueue failure at cell 20/50 must LEAVE the 19
+    already-queued cells in the database — a batch commit would roll their rows back
+    while their jobs stay in the queue (orphan jobs, ghost tiles). Why not three
+    (the historical shape: insert row, enqueue, re-write row with its job_id): each
+    commit takes SQLite's write lock, and a 50-cell grid firing 150 of them back to
+    back is exactly the profile that starves a concurrent writer into
+    'database is locked'.
+
+    On failure the half-built transaction is rolled back (dropping the queue row that
+    may already have been staged) and the cell is re-inserted as 'failed' with the
+    reason, so the caller's `raise` still surfaces a visible, explained tile."""
+    job_id = str(uuid.uuid4())
+    img.job_id = job_id
+    db.session.add(img)
+    try:
+        workflow = build_workflow()
+        _enqueue_cell(user_id, dataset_id, workflow, prompt, job_id=job_id, commit=False)
+        db.session.commit()
+    except Exception as e:
+        # rollback expunges the pending cell + job rows; the cell object goes back to
+        # transient and can be re-added as the failed marker.
+        db.session.rollback()
+        img.job_id = None
+        img.status = 'failed'
+        img.error = str(e)[:400] or 'enqueue failed'   # say WHY, not a mute red tile
+        db.session.add(img)
+        db.session.commit()
+        raise
     return job_id
 
 
@@ -1375,6 +1422,44 @@ def _batch_lora_axis(batch_loras, run_family) -> list:
     return [None] + entries[:4] if entries else [None]
 
 
+def checkpoint_origins(checkpoints, explicit=None) -> dict:
+    """{deployed filename: (record_id, step)} — WHICH training checkpoint each
+    selected LoRA came from, so every cell can record it on its row instead of
+    the app re-deriving it from the filename on every render (the heuristic that
+    already shipped a bug, see LoraTestImage.record_id).
+
+    `explicit` is the mapping a caller that ALREADY knows the answer provides —
+    the LoRA Canvas, where the user picked a lineage pill, so the run and the
+    step are the identity of what was clicked. It always wins.
+
+    Without it the origin is read back from the run tag the DEPLOY stamped into
+    the name (`_rl<record>` / `_rc<cloud run>` + the zero-padded step): the Test
+    Studio picks a filename out of a folder and has no other handle. That tag was
+    written by the app, not inferred from a trigger word — and a name that
+    carries none resolves to (None, None), i.e. an honestly unlinked cell.
+
+    Resolved ONCE per distinct filename: a 40-cell grid over 6 checkpoints costs
+    6 lookups."""
+    out = {}
+    for cp in checkpoints or []:
+        if cp in out:
+            continue
+        hint = (explicit or {}).get(cp)
+        if hint:
+            try:
+                out[cp] = (int(hint['record_id']), int(hint['step']))
+                continue
+            except (KeyError, TypeError, ValueError):
+                pass                     # malformed hint → fall through to the tag
+        try:
+            from .checkpoint_link_backfill import resolve_checkpoint_name
+            hit = resolve_checkpoint_name(cp)
+        except Exception:                # a registry read must never fail a launch
+            hit = None
+        out[cp] = (hit[0], hit[1]) if hit else (None, None)
+    return out
+
+
 def _batch_lora_label(row):
     """Nom lisible du LoRA « batch » d'une cellule (entrée batch:true de son JSON
     extra_loras), ou None - badge de la grille/lightbox."""
@@ -1387,12 +1472,12 @@ def _batch_lora_label(row):
     return None
 
 
-def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=None, z_model=None, z_models=None, aspects=None, cfgs=None, steps_list=None, steps2_list=None, count=1, family=None, permanent_loras=None, batch_loras=None, rebalance=None, rebalance_strength=None, negative=None, sampler=None, scheduler=None, weight_dtype=None, enhancer=None, enhancer_strength=None, detail_amount=None, resolution_tier=None, resolution_multiplier=None, init_image=None, denoise=None) -> dict:
+def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=None, z_model=None, z_models=None, aspects=None, cfgs=None, steps_list=None, steps2_list=None, count=1, family=None, permanent_loras=None, batch_loras=None, rebalance=None, rebalance_strength=None, negative=None, sampler=None, scheduler=None, weight_dtype=None, enhancer=None, enhancer_strength=None, detail_amount=None, resolution_tier=None, resolution_multiplier=None, init_image=None, denoise=None, origins=None) -> dict:
     """Validate + materialize the grid and enqueue every cell.
 
-    Each row is committed BEFORE its enqueue (anti-orphan rule of the dataset
-    fan-out); an enqueue failure marks that row 'failed' and re-raises -
-    already-enqueued cells keep their jobs. Returns {'created', 'seed', 'count', 'ids'}."""
+    Each cell's row and its queue job land in ONE commit (`_persist_and_enqueue_cell`);
+    an enqueue failure marks that row 'failed' and re-raises - already-enqueued cells
+    keep their rows AND their jobs. Returns {'created', 'seed', 'count', 'ids'}."""
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
@@ -1523,6 +1608,10 @@ def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=No
     # sert pour réécrire les nodes à variantes (node 30 Krea) vers le nom réellement
     # enregistré. None (probe échouée) = on garde les noms canoniques.
     available_classes = _target_node_classes()
+    # WHICH lineage checkpoint each selected LoRA is, stamped on every cell it
+    # produces (see checkpoint_origins) — the canvas gallery reads these columns,
+    # it never re-parses a filename.
+    origin_of = checkpoint_origins(cps_in, origins)
     ids = []
     for zm in valid_models:                       # AXE modèle de base (multi-sélection)
         for checkpoint, strength, cell_aspect, cell_cfg, cell_steps, cell_steps2 in cells:
@@ -1545,31 +1634,24 @@ def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=No
                                     detail_amount=knobs['detail_amount'],
                                     resolution_tier=knobs['resolution_tier'],
                                     resolution_multiplier=knobs['resolution_multiplier'],
-                                    init_image=knobs['init_image'], denoise=knobs['denoise'])
-                db.session.add(img)
-                db.session.commit()
-                try:
-                    workflow = _build_cell_workflow(user_id, checkpoint, strength,
-                                                    prompt, cell_seed, zm, allowed,
-                                                    width=width, height=height,
-                                                    cfg=cell_cfg, steps=cell_steps, steps2=cell_steps2,
-                                                    dataset_id=dataset_id,
-                                                    train_type=run_family, extra_loras=wf_extra,
-                                                    rebalance=cell_rebalance,
-                                                    negative=knobs['negative'], sampler=knobs['sampler'],
-                                                    scheduler=knobs['scheduler'], weight_dtype=knobs['weight_dtype'],
-                                                    enhancer_strength=knobs['enhancer_strength'],
-                                                    detail_amount=knobs['detail_amount'],
-                                                    trigger_word=ds.trigger_word,
-                                                    available_classes=available_classes)
-                    job_id = _enqueue_cell(user_id, dataset_id, workflow, prompt)
-                except Exception as e:
-                    img.status = 'failed'
-                    img.error = str(e)[:400] or 'enqueue failed'  # say WHY, not a mute red tile
-                    db.session.commit()
-                    raise
-                img.job_id = job_id
-                db.session.commit()
+                                    init_image=knobs['init_image'], denoise=knobs['denoise'],
+                                    record_id=origin_of.get(checkpoint, (None, None))[0],
+                                    step=origin_of.get(checkpoint, (None, None))[1])
+                _persist_and_enqueue_cell(
+                    img, user_id, dataset_id, prompt,
+                    lambda: _build_cell_workflow(user_id, checkpoint, strength,
+                                                 prompt, cell_seed, zm, allowed,
+                                                 width=width, height=height,
+                                                 cfg=cell_cfg, steps=cell_steps, steps2=cell_steps2,
+                                                 dataset_id=dataset_id,
+                                                 train_type=run_family, extra_loras=wf_extra,
+                                                 rebalance=cell_rebalance,
+                                                 negative=knobs['negative'], sampler=knobs['sampler'],
+                                                 scheduler=knobs['scheduler'], weight_dtype=knobs['weight_dtype'],
+                                                 enhancer_strength=knobs['enhancer_strength'],
+                                                 detail_amount=knobs['detail_amount'],
+                                                 trigger_word=ds.trigger_word,
+                                                 available_classes=available_classes))
                 ids.append(img.id)
     logger.info(f"lora-test: run dataset {dataset_id} -> {len(ids)} cellule(s) "
                 f"({len(valid_models)} modèle(s)), base seed {seed} ×{count}")
@@ -1584,7 +1666,10 @@ def create_comparison_run(user_id, selections, strengths, seed=None, prompt=None
                           resolution_tier=None, resolution_multiplier=None,
                           init_image=None, denoise=None) -> dict:
     """Lance UN run de comparaison sur plusieurs LoRA. `selections` =
-    [{dataset_id, checkpoint}]. Toutes les cellules partagent un run_id + le seed
+    [{dataset_id, checkpoint}] — chaque entrée peut aussi porter `record_id`/`step`
+    (le LoRA Canvas les connaît : ce sont l'identité de la pastille cliquée), ce qui
+    est alors stampé tel quel sur les cellules ; sinon l'origine est relue du tag de
+    déploiement (cf. checkpoint_origins). Toutes les cellules partagent un run_id + le seed
     (équité). Le prompt : `prompt` commun si fourni, sinon l'identity_prompt du
     dataset de CHAQUE cellule (chaque LoRA a son trigger). 1 selection => run mono-LoRA.
 
@@ -1670,14 +1755,28 @@ def create_comparison_run(user_id, selections, strengths, seed=None, prompt=None
     # toute ligne → 409 actionnable.
     _preflight_checkpoint_arch(run_type,
                                [s.get('checkpoint') for s in selections if s.get('checkpoint')])
+    # Un dataset = UN scan de LoRA. `list_test_checkpoints` walks the family's whole
+    # LoRA folder (and stats every match): its result only depends on (dataset, family),
+    # so a 24-cell grid over 8 checkpoints of the same dataset re-scanned that folder 9
+    # times for one identical answer. Memoised for the duration of THIS call only — the
+    # deployed set can change between two runs.
+    _ckpt_memo = {}
+
+    def _dataset_and_checkpoints(ds_id):
+        """(dataset, allowed checkpoint filenames) for this run's family, scanned once."""
+        if ds_id not in _ckpt_memo:
+            _ds = fds.get_dataset(user_id, ds_id)
+            _allowed = {c['filename'] for c in list_test_checkpoints(_ds, run_type)} if _ds else set()
+            _ckpt_memo[ds_id] = (_ds, _allowed)
+        return _ckpt_memo[ds_id]
+
     # Preflight (même contrat que create_run) : le ComfyUI cible peut-il vraiment
     # exécuter le workflow de cette famille ? On vérifie sur la 1re sélection valable
     # (le run est mono-famille) AVANT de créer les lignes → un seul 409 actionnable.
     for _sel in selections:
-        _pf_ds = fds.get_dataset(user_id, _sel.get('dataset_id'))
+        _pf_ds, _pf_allowed = _dataset_and_checkpoints(_sel.get('dataset_id'))
         if not _pf_ds:
             continue
-        _pf_allowed = {c['filename'] for c in list_test_checkpoints(_pf_ds, run_type)}
         _pf_cp = _sel.get('checkpoint')
         if _pf_cp in _pf_allowed:
             _preflight_run(user_id, run_type, _pf_cp, [z_model], _pf_allowed,
@@ -1688,13 +1787,20 @@ def create_comparison_run(user_id, selections, strengths, seed=None, prompt=None
     # Classes du ComfyUI cible, lues UNE fois pour tout le run (cf. create_run) →
     # réécriture des nodes à variantes (node 30 Krea) vers le nom réellement enregistré.
     available_classes = _target_node_classes()
+    # Origine (run + step) de chaque LoRA sélectionné : explicite quand l'appelant
+    # la connaît (canvas), sinon relue du tag de déploiement. Une seule résolution
+    # par nom de fichier distinct.
+    origin_of = checkpoint_origins(
+        [s.get('checkpoint') for s in selections if s.get('checkpoint')],
+        {s['checkpoint']: s for s in selections
+         if s.get('checkpoint') and s.get('record_id') is not None
+         and s.get('step') is not None})
     run_id = uuid.uuid4().hex
     ids = []
     for sel in selections:
-        ds = fds.get_dataset(user_id, sel.get('dataset_id'))
+        ds, allowed = _dataset_and_checkpoints(sel.get('dataset_id'))
         if not ds:
             raise ValueError(f"dataset {sel.get('dataset_id')} not found")
-        allowed = {c['filename'] for c in list_test_checkpoints(ds, run_type)}
         checkpoint = sel.get('checkpoint')
         if checkpoint not in allowed:
             raise ValueError(f'unknown checkpoint for {ds.name}: {checkpoint}')
@@ -1719,26 +1825,24 @@ def create_comparison_run(user_id, selections, strengths, seed=None, prompt=None
                                     detail_amount=knobs['detail_amount'],
                                     resolution_tier=knobs['resolution_tier'],
                                     resolution_multiplier=knobs['resolution_multiplier'],
-                                    init_image=knobs['init_image'], denoise=knobs['denoise'])
-                db.session.add(img); db.session.commit()
-                try:
-                    workflow = _build_cell_workflow(user_id, cp, strength, cell_prompt,
-                                                    cell_seed, z_model, allowed, width=width,
-                                                    height=height, cfg=cell_cfg, steps=cell_steps,
-                                                    steps2=cell_steps2, dataset_id=ds.id,
-                                                    train_type=run_type, extra_loras=wf_extra,
-                                                    rebalance=cell_rebalance,
-                                                    negative=knobs['negative'], sampler=knobs['sampler'],
-                                                    scheduler=knobs['scheduler'], weight_dtype=knobs['weight_dtype'],
-                                                    enhancer_strength=knobs['enhancer_strength'],
-                                                    detail_amount=knobs['detail_amount'],
-                                                    trigger_word=ds.trigger_word,
-                                                    available_classes=available_classes)
-                    job_id = _enqueue_cell(user_id, ds.id, workflow, cell_prompt)
-                except Exception as e:
-                    img.status = 'failed'; img.error = str(e)[:400] or 'enqueue failed'
-                    db.session.commit(); raise
-                img.job_id = job_id; db.session.commit(); ids.append(img.id)
+                                    init_image=knobs['init_image'], denoise=knobs['denoise'],
+                                    record_id=origin_of.get(cp, (None, None))[0],
+                                    step=origin_of.get(cp, (None, None))[1])
+                _persist_and_enqueue_cell(
+                    img, user_id, ds.id, cell_prompt,
+                    lambda: _build_cell_workflow(user_id, cp, strength, cell_prompt,
+                                         cell_seed, z_model, allowed, width=width,
+                                         height=height, cfg=cell_cfg, steps=cell_steps,
+                                         steps2=cell_steps2, dataset_id=ds.id,
+                                         train_type=run_type, extra_loras=wf_extra,
+                                         rebalance=cell_rebalance,
+                                         negative=knobs['negative'], sampler=knobs['sampler'],
+                                         scheduler=knobs['scheduler'], weight_dtype=knobs['weight_dtype'],
+                                         enhancer_strength=knobs['enhancer_strength'],
+                                         detail_amount=knobs['detail_amount'],
+                                         trigger_word=ds.trigger_word,
+                                         available_classes=available_classes))
+                ids.append(img.id)
     logger.info(f"lora-test: comparison run {run_id} -> {len(ids)} cellule(s), {len(selections)} LoRA, seed {seed}")
     return {'created': len(ids), 'seed': seed, 'count': count, 'run_id': run_id, 'ids': ids}
 
@@ -2355,6 +2459,13 @@ def score_faces(user_id, dataset_id, family=None) -> dict:
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
+    # Third InsightFace lane, same single rule (fds.face_scoring_block_reason).
+    # Returned in the shape the panel already renders (scoring_error) so the button
+    # explains itself instead of scoring 0 cells in green.
+    blocked = fds.face_scoring_block_reason(ds)
+    if blocked:
+        return {'scored': 0, 'total': 0, 'ranking': [],
+                'scoring_error': {'kind': 'subject_not_photographic', 'detail': blocked}}
     if not ds.ref_filename:
         raise ValueError('reference photo missing')
     ref_path = fds._ref_path(ds)

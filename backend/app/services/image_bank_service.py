@@ -45,7 +45,7 @@ from sqlalchemy import and_, case, func, or_
 
 from .. import config as cfg
 from ..extensions import db
-from ..models import BankImage, FaceDataset, ImageBank
+from ..models import BankImage, FaceDataset, FaceDatasetImage, ImageBank
 from ..utils.dbbusy import write_with_retry
 from . import bank_jobs, bank_queue, trash
 from .face_dataset_service import _dhash, _hamming, import_images
@@ -61,6 +61,16 @@ THUMB_MAX_SIDE = 320
 _COMMIT_EVERY = 25          # scan DB flush cadence
 _PROMOTE_CHUNK = 20         # files per import_images call (bounded memory)
 _SQL_IN_CHUNK = 500         # SQLite bound-variable ceiling is 999
+# A quality pass that keeps finding NOTHING on disk is not looking at a bank of
+# broken images — it is looking at the wrong folder. Bail out after this many
+# absent files (when they are at least half of what has been walked) rather than
+# grind through 30 000 of them; a handful of genuinely deleted files stays a
+# non-event and only shows up in the folder-sync note.
+_MISSING_ABORT_AT = 20
+MOVED_FOLDER_MSG = (
+    "this folder no longer holds the bank's images — it may have been moved, "
+    'renamed, or sit on a drive that is disconnected. Nothing was changed: '
+    'point the bank at its new folder, then run the pass again.')
 
 
 # --- thresholds -------------------------------------------------------------
@@ -99,7 +109,7 @@ def abs_image_path(bank: ImageBank, row: BankImage) -> str | None:
     """Absolute SOURCE path of a bank image, or None when it escapes the
     bank's folder (belt & braces — relpaths only ever come from our own walk).
 
-    ⚠️ This is the user's own file. It is READ-ONLY for us, and it is NOT what
+    ⚠ This is the user's own file. It is READ-ONLY for us, and it is NOT what
     the app should display or copy once a watermark has been cleaned — every
     reader must go through resolved_image_path() instead (see its docstring)."""
     base = os.path.realpath(bank.source_path)
@@ -430,6 +440,104 @@ def refresh_banks(user_id, force=False) -> dict:
     return out
 
 
+# --- relocate ---------------------------------------------------------------
+_MISSING_SAMPLE = 8         # relpaths quoted back so the user can recognise them
+
+
+class BankRelocateMismatch(ValueError):
+    """The candidate folder holds none of the bank's files. Carries the counts
+    so the route can report them instead of a bare sentence."""
+    def __init__(self, message, preview):
+        super().__init__(message)
+        self.preview = preview
+
+
+def _relocate_target(folder) -> str:
+    """Normalise a pasted folder into an absolute path we can walk. Same
+    unquoting nicety as create_bank (Windows «Copy as path» pastes quoted)."""
+    folder = (folder or '').strip().strip('"\'')
+    if not folder:
+        raise ValueError('a folder is required')
+    if not os.path.isdir(folder):
+        raise ValueError(f'folder not found or not readable: {folder}')
+    return os.path.realpath(folder)
+
+
+def relocate_preview(user_id, bank_id, folder) -> dict:
+    """Dry-run a relocation: how much of THIS bank is in THAT folder?
+
+    Nothing is written. Every known relpath is looked up under the candidate
+    folder (one os.walk, matched case-insensitively through normcase — same
+    keying as refresh_bank, so a drive letter or a folder re-created in another
+    case still counts as the same tree). Returns {folder, total, found, missing,
+    missing_sample, extra, same_folder}; ValueError on an unknown bank/folder.
+
+    The point of the two numbers is that the user decides: a bank moved whole
+    reads 29 759 found / 0 missing, and a mistyped folder reads 0 / 29 759 — a
+    distinction the caller must never make silently on their behalf."""
+    bank = get_bank(user_id, bank_id)
+    if bank is None:
+        raise ValueError('bank not found')
+    target = _relocate_target(folder)
+    known = {}
+    for (rel,) in db.session.query(BankImage.relpath).filter_by(bank_id=bank_id):
+        known.setdefault(os.path.normcase(rel), rel)
+    seen = set()
+    for root, _dirs, files in os.walk(target, onerror=lambda _e: None):
+        for f in files:
+            if f.lower().endswith(IMG_EXTS):
+                seen.add(os.path.normcase(
+                    os.path.relpath(os.path.join(root, f), target)))
+    hit = seen & set(known)
+    gone = sorted(known[k] for k in set(known) - hit)
+    return {
+        'folder': target,
+        'total': len(known),
+        'found': len(hit),
+        'missing': len(gone),
+        'missing_sample': gone[:_MISSING_SAMPLE],
+        'extra': len(seen - hit),
+        'same_folder': os.path.normcase(target) == os.path.normcase(
+            os.path.realpath(bank.source_path or '')),
+    }
+
+
+def relocate_bank(user_id, bank_id, folder, confirm=False) -> dict:
+    """Point a bank at a NEW folder, keeping every row and every analysis.
+
+    Moving a bank costs nothing by construction: BankImage.relpath is relative
+    to source_path, and scores / dhash / duplicate groups / face verdicts /
+    captions / keep-reject decisions all hang off the row id. So this only
+    rewrites ONE string — the danger is never the write, it is aiming it wrong.
+
+    Hence: no call applies anything without ``confirm``; a folder that holds
+    NONE of the bank's files is refused outright (that is a different folder,
+    not a moved one); and a partial match goes through but deletes nothing —
+    rows whose file did not come along keep their analysis and simply read as
+    missing in the folder-sync note. Returns the preview dict plus
+    {'applied', 'needs_confirm', 'overlaps'}."""
+    if bank_jobs.running(bank_id):
+        raise bank_jobs.BankJobBusy(bank_jobs.get(bank_id)['kind'])
+    out = relocate_preview(user_id, bank_id, folder)
+    out['needs_confirm'] = out['missing'] > 0
+    out['applied'] = False
+    if out['total'] and not out['found']:
+        raise BankRelocateMismatch(
+            'none of this bank\'s '
+            f"{out['total']} image(s) are in that folder — it does not look "
+            'like this bank. Pick the folder that CONTAINS the images '
+            '(the one you moved), not its parent.', out)
+    if not confirm:
+        return out
+    bank = get_bank(user_id, bank_id)
+    bank.source_path = out['folder']
+    db.session.commit()
+    _folder_sync.pop(bank_id, None)     # next walk must see the new folder
+    out['applied'] = True
+    out['overlaps'] = overlapping_banks(user_id, bank_id)
+    return out
+
+
 def _is_imported_source(path) -> bool:
     """True when the bank's folder is one WE made ("Import to bank"), i.e. it sits
     under bank_sources_root — as opposed to a folder of the user's own that a bank
@@ -437,9 +545,13 @@ def _is_imported_source(path) -> bool:
     try:
         root = os.path.realpath(cfg.bank_sources_root())
         p = os.path.realpath(str(path or ''))
+        # commonpath RAISES on Windows when the two paths sit on different drives
+        # ("Paths don't have the same drive") — and a bank pointing at another disk
+        # is precisely the common case. Raising here turned every such delete into
+        # a 500. Different drive == certainly not under our root, so: False.
+        return bool(p) and os.path.commonpath([root, p]) == root and p != root
     except (OSError, ValueError):
         return False
-    return bool(p) and os.path.commonpath([root, p]) == root and p != root
 
 
 def delete_bank(user_id, bank_id) -> bool:
@@ -496,7 +608,36 @@ def image_flags(row: BankImage, th: dict) -> list:
     return flags
 
 
-def _image_dict(row: BankImage, th: dict) -> dict:
+def _promoted_dataset_by_image(image_ids) -> dict:
+    """{bank_image_id: dataset_id} for the images a dataset REALLY holds right
+    now, read off the back-links. Only the ids of the page being rendered, so a
+    30 000-image bank still costs one small query. An image promoted into
+    several datasets reports the lowest id — the ⬆ badge only says THAT it
+    landed somewhere, and a stable pick keeps the grid from flickering."""
+    out: dict = {}
+    ids = [int(i) for i in image_ids]
+    for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+        rows = (db.session.query(FaceDatasetImage.bank_image_id,
+                                 func.min(FaceDatasetImage.dataset_id))
+                .filter(FaceDatasetImage.bank_image_id.in_(ids[i0:i0 + _SQL_IN_CHUNK]))
+                .group_by(FaceDatasetImage.bank_image_id).all())
+        out.update({bid: ds for bid, ds in rows})
+    return out
+
+
+def _page_images(rows, th: dict) -> list:
+    """One page of grid payloads, with the ⬆ promoted state resolved in a single
+    extra query for the whole page (never one per row)."""
+    promoted_by = _promoted_dataset_by_image([r.id for r in rows])
+    return [_image_dict(r, th, promoted_by) for r in rows]
+
+
+def _image_dict(row: BankImage, th: dict, promoted_by: dict | None = None) -> dict:
+    # ⬆ promoted = the dataset that holds this image TODAY (back-link), falling
+    # back to the legacy one-way flag for promotions that predate it. Deriving it
+    # means the badge disappears when the user deletes the image in the dataset,
+    # instead of advertising a copy that is gone.
+    promoted = (promoted_by or {}).get(row.id, row.promoted_dataset_id)
     return {
         'id': row.id,
         'name': os.path.basename(row.relpath),
@@ -515,7 +656,7 @@ def _image_dict(row: BankImage, th: dict) -> dict:
         'face_state': row.face_state, 'face_cluster': row.face_cluster,
         'framing': row.framing,
         'status': row.status, 'reject_reason': row.reject_reason,
-        'promoted_dataset_id': row.promoted_dataset_id,
+        'promoted_dataset_id': promoted,
         'caption': row.caption,
     }
 
@@ -582,7 +723,7 @@ _FRAMING_TARGET = {'face': 12, 'bust': 6, 'body': 6, 'back': 1}
 
 
 def _framing_counts(bank_id, extra_crit=None) -> dict:
-    """Per-bucket image counts for the 📐 Framing chips in ONE GROUP BY. Rows with
+    """Per-bucket image counts for the Framing chips in ONE GROUP BY. Rows with
     a NULL framing (not classified) are excluded, so every key is present with a
     real count. ``extra_crit`` narrows the pool (e.g. status='keep' for coverage)."""
     q = (db.session.query(BankImage.framing, func.count(BankImage.id))
@@ -650,7 +791,14 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'pending': base.filter_by(status='pending').count(),
         'keep': base.filter_by(status='keep').count(),
         'reject': base.filter_by(status='reject').count(),
-        'promoted': base.filter(BankImage.promoted_dataset_id.isnot(None)).count(),
+        # Images a dataset REALLY holds today (back-link), plus the ones promoted
+        # before that link existed (legacy flag). Counting the flag alone kept
+        # advertising copies the user had since deleted.
+        'promoted': base.filter(or_(
+            BankImage.promoted_dataset_id.isnot(None),
+            BankImage.id.in_(db.session.query(FaceDatasetImage.bank_image_id)
+                             .filter(FaceDatasetImage.bank_image_id.isnot(None))),
+        )).count(),
         # V2 pass progress — how many images the scoring / watermark passes reached
         # (so the UI can show "scored 0/9000" and enable the threshold facets).
         'scored': base.filter(or_(BankImage.aesthetic_score.isnot(None),
@@ -726,6 +874,7 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'style_clusters': style_clusters,
         'activity': bank_jobs.get(bank_id),
         'pipeline_report': _load_pipeline_report(bank),
+        'score_device': score_device_info(bank_id),
         'thresholds': th,
     }
 
@@ -789,8 +938,7 @@ def _promotable_counts(user_id, dataset_id) -> dict | None:
             .join(ImageBank, ImageBank.id == BankImage.bank_id)
             .filter(ImageBank.user_id == user_id,
                     BankImage.status == 'keep',
-                    or_(BankImage.promoted_dataset_id.is_(None),
-                        BankImage.promoted_dataset_id != dataset_id))
+                    _not_already_on(dataset_id))
             .group_by(BankImage.bank_id).all())
     return {bank_id: n for bank_id, n in rows}
 
@@ -855,8 +1003,7 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         total = len(ordered_rows)
         off = max(0, int(offset))
         page = ordered_rows[off:off + max(1, min(500, int(limit)))]
-        return {'images': [_image_dict(r, th) for r in page], 'total': total,
-                'offset': off}
+        return {'images': _page_images(page, th), 'total': total, 'offset': off}
     q = BankImage.query.filter_by(bank_id=bank_id)
     if status in ('pending', 'keep', 'reject'):
         q = q.filter(BankImage.status == status)
@@ -948,7 +1095,7 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
     order_by = order if isinstance(order, tuple) else (order,)
     rows = q.order_by(*order_by).offset(max(0, int(offset))) \
             .limit(max(1, min(500, int(limit)))).all()
-    return {'images': [_image_dict(r, th) for r in rows], 'total': total,
+    return {'images': _page_images(rows, th), 'total': total,
             'offset': max(0, int(offset))}
 
 
@@ -1008,7 +1155,13 @@ def _scan_one(src_root: str, thumbs: Path, item: tuple) -> dict:
     try:
         out['file_size'] = os.path.getsize(path)
     except OSError:
-        pass
+        # ABSENT ≠ CORRUPT. A file that is simply not there says nothing about
+        # the image — the folder moved, or its drive is unplugged. 'missing' is
+        # an in-memory signal for the job loop only (it is never written to
+        # quality_state, so the row stays unscanned and a later pass retries it).
+        if not os.path.exists(path):
+            out['quality_state'] = 'missing'
+            return out
     try:
         with Image.open(path) as im:
             out['width'], out['height'] = im.size
@@ -1035,12 +1188,26 @@ def start_scan(app, user_id, bank_id, rescan=False):
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    q = BankImage.query.filter_by(bank_id=bank_id)
-    if not rescan:
-        q = q.filter(BankImage.quality_state.is_(None))
-    total = q.count()
+    total = _scan_pool(bank_id, rescan).count()
     return bank_jobs.start(app, bank_id, 'scan',
                            _scan_job(bank_id, rescan), total=total)
+
+
+def _scan_pool(bank_id, rescan):
+    """What the quality pass has to look at. Rejected images are OUT, like every
+    other pass: on a 30 000-image bank two thirds of a rescan went to shots the
+    user had already thrown away.
+
+    Skipping them cannot swallow a FIRST scan: an image is only rejected by hand
+    (after it was scanned) or by this very pass when it turns out unreadable, so
+    a never-scanned image is still pending here. Un-reject one and it comes back
+    into the pool on its own — that is why the filter is `!= reject` rather than
+    an explicit pending/keep list."""
+    q = (BankImage.query.filter_by(bank_id=bank_id)
+         .filter(BankImage.status != 'reject'))
+    if not rescan:
+        q = q.filter(BankImage.quality_state.is_(None))
+    return q
 
 
 def _scan_job(bank_id, rescan):
@@ -1048,16 +1215,18 @@ def _scan_job(bank_id, rescan):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        q = BankImage.query.filter_by(bank_id=bank_id)
-        if not rescan:
-            q = q.filter(BankImage.quality_state.is_(None))
-        items = [(r.id, r.relpath) for r in q.order_by(BankImage.id.asc()).all()]
+        items = [(r.id, r.relpath) for r in
+                 _scan_pool(bank_id, rescan).order_by(BankImage.id.asc()).all()]
         bank_jobs.progress(job, done=0, total=len(items), detail='quality scan')
         thumbs = _thumbs_dir(bank_id)
         thumbs.mkdir(parents=True, exist_ok=True)
         src_root = bank.source_path
+        if items and not os.path.isdir(src_root or ''):
+            bank_jobs.fail(job, MOVED_FOLDER_MSG)
+            return
         workers = min(8, os.cpu_count() or 4)
         done = 0
+        missing = 0
         with ThreadPoolExecutor(max_workers=workers) as ex:
             it = iter(items)
             futures = deque()
@@ -1071,6 +1240,21 @@ def _scan_job(bank_id, rescan):
                 submit_next()
             while futures:
                 res = futures.popleft().result()
+                if res['quality_state'] == 'missing':
+                    # Leave the row EXACTLY as it was (unscanned, undecided) and
+                    # count it. Grading an absent file would auto-reject it, and
+                    # a folder that moved makes every file absent at once — that
+                    # path silently rejects a whole bank, so it must not exist.
+                    missing += 1
+                    done += 1
+                    bank_jobs.bump(job)
+                    if missing >= _MISSING_ABORT_AT and missing * 2 >= done:
+                        db.session.commit()
+                        bank_jobs.fail(job, MOVED_FOLDER_MSG)
+                        return
+                    if not bank_jobs.cancelled(job):
+                        submit_next()
+                    continue
                 row = db.session.get(BankImage, res['id'])
                 if row is not None:
                     row.quality_state = res['quality_state']
@@ -1096,7 +1280,10 @@ def _scan_job(bank_id, rescan):
         if not bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail='grouping duplicates')
             groups = rebuild_dup_groups(bank_id)
-            bank_jobs.progress(job, detail=f'done — {groups} duplicate group(s)')
+            tail = (f' — {missing} file(s) were not on disk and were left '
+                    'untouched') if missing else ''
+            bank_jobs.progress(
+                job, detail=f'done — {groups} duplicate group(s){tail}')
     return run
 
 
@@ -1187,7 +1374,7 @@ def _assign_groups(column, groups) -> None:
 
 # --- semantic near-duplicate groups (stage 2 — crops / re-compressed variants) --
 def _load_score_embeddings(bank: ImageBank) -> dict:
-    """{abs_path: emb (np.float32, L2-normed)} from the ✨ Score pass cache, for the
+    """{abs_path: emb (np.float32, L2-normed)} from the Score pass cache, for the
     scored 'ok' images whose file still matches what was scored. Empty when the pass
     never ran (no cache) — the caller then surfaces the "run Score first" hint. A
     STALE entry (a same-path edit since scoring, detected via the cached size+mtime
@@ -1228,7 +1415,7 @@ def _load_score_embeddings(bank: ImageBank) -> dict:
 
 
 def rebuild_semantic_dup_groups(bank_id, threshold=None) -> int | None:
-    """Stage-2 near-duplicate grouping over the CLIP embeddings the ✨ Score pass
+    """Stage-2 near-duplicate grouping over the CLIP embeddings the Score pass
     cached — catches crops and re-compressed variants of the SAME shot that the
     dHash (stage 1) misses. Returns the group count (groups of ≥2), or None when NO
     embeddings are available (Score hasn't run) so the caller shows the "run Score
@@ -1316,7 +1503,7 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None) -> int | None:
 
 
 def start_semantic_dedup(app, user_id, bank_id, threshold=None):
-    """Launch the stage-2 semantic near-duplicate pass (CPU, reuses the ✨ Score
+    """Launch the stage-2 semantic near-duplicate pass (CPU, reuses the Score
     embeddings — no GPU). ValueError (→400) when Score hasn't produced any usable
     embedding yet, so the UI shows the clear "run Score first" hint rather than a
     job that quietly does nothing."""
@@ -1324,7 +1511,7 @@ def start_semantic_dedup(app, user_id, bank_id, threshold=None):
     if not bank:
         raise ValueError('bank not found')
     if not _load_score_embeddings(bank):
-        raise ValueError('run ✨ Score first — semantic near-duplicates reuse its '
+        raise ValueError('run Score first — semantic near-duplicates reuse its '
                          'embeddings')
     return bank_jobs.start(app, bank_id, 'semantic_dedup',
                            _semantic_dedup_job(bank_id, threshold), total=0)
@@ -1335,7 +1522,7 @@ def _semantic_dedup_job(bank_id, threshold):
         bank_jobs.progress(job, done=0, total=0, detail='finding crops & variants')
         n = rebuild_semantic_dup_groups(bank_id, threshold)
         if n is None:
-            bank_jobs.progress(job, detail='no embeddings — run ✨ Score first')
+            bank_jobs.progress(job, detail='no embeddings — run Score first')
             return
         bank_jobs.progress(job, detail=f'done — {n} semantic near-duplicate group(s)')
     return run
@@ -1360,7 +1547,7 @@ def dup_groups_payload(user_id, bank_id, offset=0, limit=50,
                 .order_by(BankImage.id.asc()).all())
         groups.append({'group': gid,
                        'best_id': _best_of(rows).id if rows else None,
-                       'images': [_image_dict(r, th) for r in rows]})
+                       'images': _page_images(rows, th)})
     return {'groups': groups, 'total': total, 'offset': max(0, int(offset))}
 
 
@@ -1517,7 +1704,7 @@ def apply_flags(user_id, bank_id, flags) -> dict:
 
 
 # --- curation selectors (diversity · reference similarity) ------------------
-# Both reuse the CLIP embeddings the ✨ Score pass already cached — no GPU, no
+# Both reuse the CLIP embeddings the Score pass already cached — no GPU, no
 # re-scan (same contract as the semantic-dedup stage). They only ever build a
 # SELECTION (a set of image ids the UI checks); the user reviews it before any
 # Keep / Reject / Promote — nothing is mutated or deleted here.
@@ -1599,7 +1786,7 @@ def _pool_embeddings(bank, emb_by_path, filters):
 
 
 def select_diverse(user_id, bank_id, n=60, *, filters=None):
-    """Farthest-point sampling over the ✨ Score CLIP embeddings: the ``n`` images
+    """Farthest-point sampling over the Score CLIP embeddings: the ``n`` images
     of the (filtered) pool that best COVER the visual space — the antidote to a
     dump of 4 000 near-identical shots. Greedy FPS: seed with the lowest-id row
     (deterministic), then repeatedly add the point whose nearest already-chosen
@@ -1607,7 +1794,7 @@ def select_diverse(user_id, bank_id, n=60, *, filters=None):
     product per pick, ~sub-second even at m=24 000 / n=2 000.
 
     Returns {'image_ids': [...] (sorted), 'pool': m, 'requested': n}. Raises
-    ValueError (→400, "run ✨ Score first") when no embedding exists yet, so the UI
+    ValueError (→400, "run Score first") when no embedding exists yet, so the UI
     shows the clear hint instead of an empty, unexplained selection."""
     import numpy as np
     bank = get_bank(user_id, bank_id)
@@ -1615,7 +1802,7 @@ def select_diverse(user_id, bank_id, n=60, *, filters=None):
         raise ValueError('bank not found')
     emb_by_path = _load_score_embeddings(bank)
     if not emb_by_path:
-        raise ValueError('run ✨ Score first — diversity sampling reuses its '
+        raise ValueError('run Score first — diversity sampling reuses its '
                          'embeddings')
     n = max(1, min(int(n), _CURATION_MAX_N))
     ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
@@ -1639,7 +1826,7 @@ def select_diverse(user_id, bank_id, n=60, *, filters=None):
 
 def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=None):
     """Rank the (filtered) pool by CLIP cosine similarity to a REFERENCE bank image
-    (its own cached ✨ Score embedding) — "keep what looks like THIS", to pull one
+    (its own cached Score embedding) — "keep what looks like THIS", to pull one
     person / look out of a mixed dump. Returns the top-``n`` most similar ids, OR
     everything with cosine ≥ ``min_score`` when that is given; the reference itself
     (cosine 1.0) is always included. Reuses the cached embeddings — no GPU.
@@ -1653,7 +1840,7 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
         raise ValueError('bank not found')
     emb_by_path = _load_score_embeddings(bank)
     if not emb_by_path:
-        raise ValueError('run ✨ Score first — reference similarity reuses its '
+        raise ValueError('run Score first — reference similarity reuses its '
                          'embeddings')
     ref = db.session.get(BankImage, int(ref_id))
     if ref is None or ref.bank_id != bank_id:
@@ -1661,7 +1848,7 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
     ref_path = abs_image_path(bank, ref)
     ref_emb = emb_by_path.get(ref_path) if ref_path else None
     if ref_emb is None:
-        raise ValueError('the reference image has no ✨ Score embedding — score '
+        raise ValueError('the reference image has no Score embedding — score '
                          'it first (it may have been rejected before Score ran)')
     ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
     if not ids:
@@ -1679,16 +1866,124 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
     return {'results': results, 'image_ids': [ids[k] for k in keep],
             'pool': len(ids), 'ref_id': int(ref_id)}
 def _trash_or_remove(path: str) -> str:
-    """Send a source file to the OS trash when send2trash is installed, else
-    hard-delete it. Returns the mode actually used ('trash' | 'delete'). The
-    import is optional so an install that predates the dependency still works
-    (degraded to a permanent delete) — the caller reports which happened."""
+    """Get a source file out of the user's folder, keeping it recoverable.
+
+    Order of preference: the OS trash (send2trash — real, familiar, restores in
+    place), then the app's own trash (a MOVE into data/trash, recoverable until
+    the user empties it from Settings). A permanent unlink is the last resort,
+    when neither can take the file. send2trash is an OPTIONAL dependency and is
+    absent from a default install, so the app trash is the branch most people
+    actually get — deleting thousands of a user's own photos with no way back
+    was never an acceptable default. Returns the mode used:
+    'trash' | 'app_trash' | 'delete'."""
     try:
         from send2trash import send2trash   # optional dependency
     except Exception:
+        pass
+    else:
+        send2trash(path)
+        return 'trash'
+    try:
+        trash.send_to_trash(path, context='bank-rejected')
+        return 'app_trash'
+    except OSError:
+        # Cross-device copy refused, locked file, unwritable trash… the file is
+        # still in the user's folder at this point, so a plain remove is the only
+        # way to honour the request. It raises on its own failure.
         os.remove(path)
         return 'delete'
-    send2trash(path)
+
+
+def _bank_folders(user_id, exclude_id=None) -> list:
+    """[(bank, normalised realpath)] for the user's banks with a usable folder."""
+    out = []
+    for b in ImageBank.query.filter_by(user_id=user_id).all():
+        if exclude_id is not None and b.id == exclude_id:
+            continue
+        if not b.source_path:
+            continue
+        try:
+            out.append((b, os.path.normcase(os.path.realpath(b.source_path))))
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def overlapping_banks(user_id, bank_id) -> list:
+    """The user's OTHER banks whose folder contains, or sits inside, this one's.
+
+    Two banks over nested folders see the same files, and a bank never owns its
+    source folder — so a delete run from one silently amputates the other. The
+    UI has to be able to say so BEFORE the click. Returns
+    [{'id', 'name', 'source_path', 'relation'}] with relation 'parent' (it
+    contains us) or 'child' (it sits inside us)."""
+    bank = get_bank(user_id, bank_id)
+    if not bank or not bank.source_path:
+        return []
+    try:
+        mine = os.path.normcase(os.path.realpath(bank.source_path))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for other, theirs in _bank_folders(user_id, exclude_id=bank_id):
+        if theirs == mine:
+            relation = 'same'
+        elif mine.startswith(theirs + os.sep):
+            relation = 'parent'
+        elif theirs.startswith(mine + os.sep):
+            relation = 'child'
+        else:
+            continue
+        out.append({'id': other.id, 'name': other.name,
+                    'source_path': other.source_path, 'relation': relation})
+    return sorted(out, key=lambda o: o['id'])
+
+
+def rejected_delete_preview(user_id, bank_id) -> dict | None:
+    """What a Delete rejected would actually destroy — the honest warning the
+    confirmation needs. Counts the rejected files of this bank that ANOTHER bank
+    also lists, per bank, by matching absolute paths against that bank's own
+    inventory. None when the bank is gone.
+
+    Returns {'rejected', 'mode', 'shared': [{'id','name','relation','files'}]}.
+    ``mode`` is where the files would go, resolved the same way the deletion
+    resolves it, so the dialog never promises the wrong thing."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    rows = BankImage.query.filter_by(bank_id=bank_id, status='reject').all()
+    mine = {}
+    for r in rows:
+        p = abs_image_path(bank, r)
+        if p:
+            mine[os.path.normcase(p)] = True
+    shared = []
+    for other in overlapping_banks(user_id, bank_id):
+        ob = db.session.get(ImageBank, other['id'])
+        if ob is None:
+            continue
+        n = 0
+        for (rel,) in db.session.query(BankImage.relpath).filter_by(bank_id=ob.id):
+            try:
+                full = os.path.normcase(os.path.realpath(
+                    os.path.join(os.path.realpath(ob.source_path), rel)))
+            except (OSError, ValueError):
+                continue
+            if full in mine:
+                n += 1
+        if n:
+            shared.append({'id': other['id'], 'name': other['name'],
+                           'relation': other['relation'], 'files': n})
+    return {'rejected': len(rows), 'mode': _delete_mode(), 'shared': shared}
+
+
+def _delete_mode() -> str:
+    """Where a deleted source file WOULD go, without deleting anything: mirrors
+    _trash_or_remove's preference order so the confirmation can say it."""
+    try:
+        import send2trash          # noqa: F401  (probe only)
+    except Exception:
+        return 'app_trash'
     return 'trash'
 
 
@@ -1696,17 +1991,22 @@ def delete_rejected(user_id, bank_id) -> dict:
     """Delete the SOURCE files of every status='reject' image from disk, then
     drop their bank_image rows.
 
-    This is the ONLY bank action that writes to the user's source folder. It is
-    destructive: with send2trash installed the files go to the OS trash (real,
-    OS-level recovery); without it they are permanently removed. Either way the
-    app's own trash cannot bring them back — these are files outside the app.
+    This is the ONLY bank action that writes to the user's source folder. Where
+    the files land is _trash_or_remove's decision (OS trash, else the app's own
+    trash, else a permanent unlink) and rides back in 'mode' — the confirmation
+    dialog says it BEFORE the click, via rejected_delete_preview().
+
+    ⚠ A bank does not own its folder. When another bank sits over the same tree,
+    these files are ITS files too and it will find them gone; the preview names
+    those banks so the warning can.
 
     Non-rejected images are never touched. Per-file failures (permission, a path
     that escapes the bank folder) are collected and reported; they never abort
     the batch. A row is dropped only when its file is gone afterwards (deleted,
     trashed, or already absent) — a file we failed to remove keeps its row so the
     user can see and retry it. Returns
-    {'mode', 'deleted', 'trashed', 'already_absent', 'rows_removed', 'skipped'}.
+    {'mode', 'deleted', 'trashed', 'already_absent', 'rows_removed', 'skipped'}
+    where 'trashed' counts everything that stayed recoverable.
     """
     bank = get_bank(user_id, bank_id)
     if not bank:
@@ -1718,7 +2018,7 @@ def delete_rejected(user_id, bank_id) -> dict:
     out = {'mode': 'trash', 'deleted': 0, 'trashed': 0, 'already_absent': 0,
            'rows_removed': 0, 'skipped': []}
     remove_ids = []
-    saw_hard_delete = False
+    modes_used = set()
     for row in rows:
         path = abs_image_path(bank, row)
         if path is None:
@@ -1734,11 +2034,11 @@ def delete_rejected(user_id, bank_id) -> dict:
         except OSError as e:
             out['skipped'].append({'relpath': row.relpath, 'reason': str(e)})
             continue
-        if mode == 'trash':
-            out['trashed'] += 1
-        else:
+        modes_used.add(mode)
+        if mode == 'delete':
             out['deleted'] += 1
-            saw_hard_delete = True
+        else:
+            out['trashed'] += 1          # OS trash or app trash — recoverable
         remove_ids.append(row.id)
 
     for i0 in range(0, len(remove_ids), _SQL_IN_CHUNK):
@@ -1747,9 +2047,12 @@ def delete_rejected(user_id, bank_id) -> dict:
         ).delete(synchronize_session=False)
     out['rows_removed'] = len(remove_ids)
     db.session.commit()
-    # 'delete' means at least one file was permanently removed (send2trash absent
-    # or it refused a path); the UI wording follows this.
-    out['mode'] = 'delete' if saw_hard_delete else 'trash'
+    # Report the WORST outcome that happened: one permanently removed file makes
+    # the run 'delete', whatever the rest did. The UI wording follows this.
+    for mode in ('delete', 'app_trash', 'trash'):
+        if mode in modes_used:
+            out['mode'] = mode
+            break
     return out
 
 
@@ -2008,11 +2311,58 @@ def _gpu_busy_reason() -> str | None:
     return None
 
 
+def _resolve_score_device() -> tuple:
+    """(device, use_gpu) for the scoring pass — what the CHILD will actually do.
+
+    bank_score_infer.py picks `cuda if torch.cuda.is_available() else cpu` on its
+    own, so the parent asks the same interpreter the same question. It matters
+    beyond a label: use_gpu decides whether we take the GPU-exclusive window,
+    which unloads ComfyUI and blocks any training start for the whole pass. The
+    extra ships CPU-only torch, so the honest answer is usually 'cpu' — and an
+    hour of CPU work must not hold a GPU it never touches."""
+    from ..capabilities import bank_scoring_gpu_available
+    use_gpu = bank_scoring_gpu_available()
+    return ('cuda' if use_gpu else 'cpu'), use_gpu
+
+
+# CLIP ViT-L/14 measured at ~336 ms/image on CPU against ~15 ms on a recent
+# card. Used only to warn, never to refuse — a slow pass is still a pass.
+SCORE_CPU_MS_PER_IMAGE = 336
+
+
+def score_device_info(bank_id=None) -> dict:
+    """What Score will run on, and — when that is the CPU — how long the bank
+    would take and whether this machine even has a card to switch to.
+
+    The pass is not slow by accident: the scoring extra installs CPU-only torch
+    on purpose (Setup builds it a small venv rather than pushing a ~2.5 GB CUDA
+    download on people with no GPU). That is a defensible default, but it has to
+    be VISIBLE — an unexplained hour looks like a hang, and the user cannot fix
+    what nobody told them about."""
+    from ..capabilities import gpu_vram_gb
+    device, use_gpu = _resolve_score_device()
+    out = {'device': device, 'gpu': use_gpu, 'gpu_present': False,
+           'eta_minutes': None}
+    if use_gpu:
+        return out
+    out['gpu_present'] = gpu_vram_gb() is not None
+    if bank_id is not None:
+        pending = (BankImage.query.filter_by(bank_id=bank_id)
+                   .filter(BankImage.status != 'reject')
+                   .filter(BankImage.aesthetic_score.is_(None)).count())
+        # Rounded UP to a whole minute while there is anything left: "0 minutes"
+        # for work that is about to start reads as "instant" and is a lie.
+        out['eta_minutes'] = (max(1, round(pending * SCORE_CPU_MS_PER_IMAGE / 60000))
+                              if pending else None)
+    return out
+
+
 def start_score(app, user_id, bank_id):
     """Launch the scoring pass (LAION aesthetic + NSFW + style clustering) over
     the bank's non-rejected images. Needs the bank-scoring extra (Setup ▸ Quality
-    tools). Serialized against training/vision, so it refuses (503) when the GPU
-    is held."""
+    tools). Serialized against training/vision ONLY when it will really run on
+    the GPU: refusing a CPU pass because 'the GPU is busy' would block an hour of
+    work that never wanted the card."""
     from ..capabilities import probe_bank_scoring
     bank = get_bank(user_id, bank_id)
     if not bank:
@@ -2020,7 +2370,8 @@ def start_score(app, user_id, bank_id):
     if not probe_bank_scoring().get('ok'):
         raise RuntimeError('bank scoring is not installed '
                            '(Quality tools step in Setup)')
-    reason = _gpu_busy_reason()
+    _device, use_gpu = _resolve_score_device()
+    reason = _gpu_busy_reason() if use_gpu else None
     if reason:
         raise RuntimeError(reason)
     total = (BankImage.query.filter_by(bank_id=bank_id)
@@ -2032,6 +2383,8 @@ def _score_job(bank_id):
     def run(job):
         import json as _json
         import sys
+        from contextlib import nullcontext
+
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -2045,7 +2398,12 @@ def _score_job(bank_id):
             if p and os.path.isfile(p):
                 by_path[p] = r.id
         paths = list(by_path)
-        bank_jobs.progress(job, done=0, total=len(paths), detail='scoring pass')
+        device, use_gpu = _resolve_score_device()
+        # Say WHICH device, every time. On CPU this pass is ~20× slower (CLIP
+        # ViT-L is the whole cost), and a progress bar crawling for an hour with
+        # no explanation reads as a hang.
+        bank_jobs.progress(job, done=0, total=len(paths),
+                           detail=f'scoring pass ({device.upper()})')
         if not paths:
             return
         _bank_dir(bank_id).mkdir(parents=True, exist_ok=True)
@@ -2059,11 +2417,16 @@ def _score_job(bank_id):
             'style_threshold': th['style_threshold'],
         })
         python = cfg.get('bank_scoring.python') or sys.executable
-        # GPU-exclusive: frees ComfyUI VRAM and blocks a training start for the
-        # duration, exactly like the dataset vision passes.
+        # The GPU-exclusive window frees ComfyUI's VRAM and blocks any training
+        # start for the whole pass — so it is taken ONLY when the child really
+        # runs on the card, exactly like the face pass. Holding it through an
+        # hour of CPU inference was the worst of both worlds: the GPU idle and
+        # unusable, the work slow anyway.
+        window = (gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu
+                  else nullcontext())
         data, stderr_tail, returncode = _drive_infer_subprocess(
             job, python, _SCORE_SCRIPT, payload, cache_path, _SCORE_PROGRESS_RE,
-            gpu_exclusive_vision_window(flag_ttl=1800))
+            window)
         # Stopped by the user — say exactly what's kept, never a mute ✗ (the cached
         # scores/embeddings are safe; relaunching skips them and finishes the rest).
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):
@@ -2154,6 +2517,7 @@ def _watermark_job(bank_id, rescan):
         import json as _json
         from .face_dataset_service import WATERMARK_BBOX_PROMPT, _parse_watermark_bbox
         from .vision_ollama import describe_image_ollama, unload_vision_model
+        from .vision_pool import map_vision
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -2163,55 +2527,70 @@ def _watermark_job(bank_id, rescan):
         if not rows:
             return
         detected = clean = errors = checked = unanswered = 0
+
+        def prepared():
+            """Yielded on the JOB's thread, one image per free slot in the pool.
+            Everything that reads the database or has a side effect lives here,
+            so it stays off the workers, keeps its original order, and is only
+            paid for by images the pass actually reaches (which matters: the
+            discard below is destructive)."""
+            for row in rows:
+                # Always detect on the SOURCE pixels: a re-scan of an already
+                # cleaned image drops its cleaned version first (otherwise we
+                # would be asking "is there a watermark?" about our own edit).
+                if row.watermark_clean_method:
+                    _discard_clean_blob(bank_id, row)
+                yield row, abs_image_path(bank, row)
+
+        def ask(item):
+            """WORKER thread: read the file, ask Ollama. Touches no session — the
+            path was resolved above, on the owning thread. Returns None (not '')
+            for a file that is gone, so the caller can tell "nothing to analyse"
+            from "the model answered nothing"."""
+            _row, path = item
+            if not path or not os.path.isfile(path):
+                return None
+            with open(path, 'rb') as fh:
+                return describe_image_ollama(
+                    fh.read(), WATERMARK_BBOX_PROMPT, num_predict=400,
+                    prefer_json=True, fmt='json', keep_alive='5m')
+
         with gpu_exclusive_vision_window(flag_ttl=1800):
             try:
-                for i, row in enumerate(rows, 1):
-                    if bank_jobs.cancelled(job):
-                        break
-                    # Always detect on the SOURCE pixels: a re-scan of an already
-                    # cleaned image drops its cleaned version first (otherwise we
-                    # would be asking "is there a watermark?" about our own edit).
-                    if row.watermark_clean_method:
-                        _discard_clean_blob(bank_id, row)
-                    path = abs_image_path(bank, row)
-                    if not path or not os.path.isfile(path):
-                        bank_jobs.bump(job)
-                        continue
-                    try:
-                        with open(path, 'rb') as fh:
-                            raw = describe_image_ollama(
-                                fh.read(), WATERMARK_BBOX_PROMPT, num_predict=400,
-                                prefer_json=True, fmt='json', keep_alive='5m')
-                    except Exception:  # noqa: BLE001 — one bad file never sinks the pass
+                # The calls overlap (see vision_pool); the loop body — every
+                # database write below — still runs here, on this one thread.
+                for (row, _path), raw, error in map_vision(
+                        prepared(), ask,
+                        should_cancel=lambda: bank_jobs.cancelled(job)):
+                    if error is not None:  # one bad file never sinks the pass
                         row.watermark_state = 'error'
                         errors += 1
-                        bank_jobs.bump(job)
-                        continue
+                    elif raw is None:      # file gone: leave the row as it was
+                        pass
                     # Empty output = Ollama unreachable, NOT "clean": leave the
                     # state untouched so a retry can finish it (same reasoning as
                     # the dataset detector), never falsely mark everything clean.
-                    if not (raw or '').strip():
+                    elif not raw.strip():
                         # COUNTED, not merely skipped: a pass where every image
                         # came back empty reported "done — 0 with a watermark,
                         # 0 clean", which reads as "looked at them all, found
                         # nothing" when in truth nothing could be looked at. The
                         # rows stay unscanned on purpose — the report must say so.
                         unanswered += 1
-                        bank_jobs.bump(job)
-                        continue
-                    bbox = _parse_watermark_bbox(raw)
-                    if bbox:
-                        row.watermark_state = 'detected'
-                        # Keep the box — the crop/inpaint levels route on it.
-                        row.watermark_bbox = _json.dumps([round(v, 4) for v in bbox])
-                        detected += 1
                     else:
-                        row.watermark_state = 'none'
-                        row.watermark_bbox = None
-                        clean += 1
-                    checked += 1
-                    if checked % 25 == 0:
-                        db.session.commit()
+                        bbox = _parse_watermark_bbox(raw)
+                        if bbox:
+                            row.watermark_state = 'detected'
+                            # Keep the box — the crop/inpaint levels route on it.
+                            row.watermark_bbox = _json.dumps([round(v, 4) for v in bbox])
+                            detected += 1
+                        else:
+                            row.watermark_state = 'none'
+                            row.watermark_bbox = None
+                            clean += 1
+                        checked += 1
+                        if checked % 25 == 0:
+                            db.session.commit()
                     bank_jobs.bump(job)
             finally:
                 db.session.commit()
@@ -2241,7 +2620,7 @@ def _watermark_job(bank_id, rescan):
 #   level 1 — ✂ auto-crop: CPU/PIL, invents no pixel. Only touches marks the
 #             dataset router calls croppable (inside a border band, and the crop
 #             still leaves a usable image). Everything else is left flagged.
-#   level 2 — 🧽 inpaint: LaMa (fast, non-generative) or Klein (ComfyUI, handles
+#   level 2 — inpaint: LaMa (fast, non-generative) or Klein (ComfyUI, handles
 #             on-subject marks) over what is STILL flagged. allow_crop=False, so
 #             a border mark that level 1 skipped (or that the user never cropped)
 #             is repainted rather than cropped — level 2 is the "repaint what's
@@ -2617,7 +2996,7 @@ def watermark_levels(user_id, bank_id) -> dict | None:
 def start_framing(app, user_id, bank_id, rescan=False):
     """Classify every non-rejected image by SHOT TYPE (face / bust / body / back),
     reusing the SAME Qwen3-VL classifier the datasets use (CLASSIFY_PROMPT). Feeds
-    the 📐 Framing filter chips and the coverage advice. Needs the vision model
+    the Framing filter chips and the coverage advice. Needs the vision model
     pulled; serialized against training/vision like the watermark pass (503 when
     the GPU is held). ``rescan`` re-classifies rows that already have a framing."""
     from ..capabilities import probe_ollama_model
@@ -2641,6 +3020,7 @@ def _framing_job(bank_id, rescan):
     def run(job):
         from .face_dataset_service import CLASSIFY_PROMPT, _parse_classify
         from .vision_ollama import describe_image_ollama, unload_vision_model
+        from .vision_pool import map_vision
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -2654,35 +3034,46 @@ def _framing_job(bank_id, rescan):
         if not rows:
             return
         classified = errors = 0
+
+        def prepared():
+            """Path resolution reads the row, so it belongs on the job's own
+            thread — pulled one image per free slot in the pool."""
+            for row in rows:
+                yield row, abs_image_path(bank, row)
+
+        def ask(item):
+            """WORKER thread: file + network only, no session. None means the
+            file is gone, as opposed to '' meaning the model said nothing."""
+            _row, path = item
+            if not path or not os.path.isfile(path):
+                return None
+            with open(path, 'rb') as fh:
+                return describe_image_ollama(
+                    fh.read(), CLASSIFY_PROMPT, num_predict=400,
+                    prefer_json=True, fmt='json', keep_alive='5m')
+
         with gpu_exclusive_vision_window(flag_ttl=1800):
             try:
-                for row in rows:
-                    if bank_jobs.cancelled(job):
-                        break
-                    path = abs_image_path(bank, row)
-                    if not path or not os.path.isfile(path):
-                        bank_jobs.bump(job)
-                        continue
-                    try:
-                        with open(path, 'rb') as fh:
-                            raw = describe_image_ollama(
-                                fh.read(), CLASSIFY_PROMPT, num_predict=400,
-                                prefer_json=True, fmt='json', keep_alive='5m')
-                    except Exception:  # noqa: BLE001 — one bad file never sinks the pass
+                # The calls overlap (see vision_pool); every write below still
+                # happens here, on this one thread.
+                for (row, _path), raw, error in map_vision(
+                        prepared(), ask,
+                        should_cancel=lambda: bank_jobs.cancelled(job)):
+                    if error is not None:  # one bad file never sinks the pass
                         errors += 1
-                        bank_jobs.bump(job)
-                        continue
+                    elif raw is None:      # file gone: leave the row as it was
+                        pass
                     # Empty output = Ollama unreachable, NOT "unknown": leave the
                     # framing NULL so a retry can finish it (same reasoning as the
                     # watermark/dataset classifier), never mislabel everything.
-                    if not (raw or '').strip():
-                        bank_jobs.bump(job)
-                        continue
-                    framing, _label = _parse_classify(raw)
-                    row.framing = framing            # face|bust|body|back|unknown
-                    classified += 1
-                    if classified % 25 == 0:
-                        db.session.commit()
+                    elif not raw.strip():
+                        pass
+                    else:
+                        framing, _label = _parse_classify(raw)
+                        row.framing = framing        # face|bust|body|back|unknown
+                        classified += 1
+                        if classified % 25 == 0:
+                            db.session.commit()
                     bank_jobs.bump(job)
             finally:
                 db.session.commit()
@@ -2711,7 +3102,7 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None)
     dataset caption uses, appended as an instruction. Explicit only spells sexual
     content out when the backend runs an abliterated Ollama model; the choice rides
     per-call (the UI passes it), so a call WITHOUT it is byte-identical to before
-    (no instruction appended). Richer captions also mean richer 🔍 search text."""
+    (no instruction appended). Richer captions also mean richer search text."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -3036,7 +3427,7 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, 
         # mute ✗) when Score produced no embeddings.
         n = rebuild_semantic_dup_groups(bank_id)
         if n is None:
-            entry['status'], entry['reason'] = 'skipped', 'run ✨ Score first — no embeddings'
+            entry['status'], entry['reason'] = 'skipped', 'run Score first — no embeddings'
             return
         entry['counts'] = {'semantic_groups': n}
         entry['detail'] = f'{n} semantic near-duplicate group(s) to review'
@@ -3116,7 +3507,7 @@ def subfolders_payload(user_id, bank_id) -> dict | None:
 # is thin for a good LoRA — purely from data the passes already computed (framing,
 # person clusters, style clusters, resolution). It NEVER selects or rejects; it
 # only phrases honest, non-alarmist sentences. Everything here is pure DB math,
-# zero GPU — the framing part just needs the 📐 Framing pass to have run.
+# zero GPU — the framing part just needs the Framing pass to have run.
 def _pct(n, total) -> int:
     return int(round(100 * n / total)) if total else 0
 
@@ -3191,11 +3582,11 @@ def _coverage_advice(stats: dict) -> list:
                     'text': f'Only {total} {noun} — most LoRA families train more '
                             f'reliably with 20+ images.'})
 
-    # Framing balance (needs the 📐 Framing pass).
+    # Framing balance (needs the Framing pass).
     fr, known = stats['framing'], stats['framing_known']
     if not stats['framing_available']:
         out.append({'tone': 'info',
-                    'text': 'Run the 📐 Framing pass to see how your face / bust / '
+                    'text': 'Run the Framing pass to see how your face / bust / '
                             'body / back shots balance.'})
     elif known > 0:
         dom = max(_FRAMINGS, key=lambda k: fr[k])
@@ -3263,16 +3654,42 @@ def coverage(user_id, bank_id) -> dict | None:
 
 
 # --- promotion --------------------------------------------------------------
+def _promoted_here(dataset_id):
+    """The bank_image ids the dataset STILL holds — one row per promoted image,
+    written by the promotion itself (FaceDatasetImage.bank_image_id). Deleting
+    the image in the dataset deletes the row, so this shrinks on its own."""
+    return (db.session.query(FaceDatasetImage.bank_image_id)
+            .filter(FaceDatasetImage.dataset_id == dataset_id,
+                    FaceDatasetImage.bank_image_id.isnot(None)))
+
+
+def _not_already_on(dataset_id):
+    """The criterion 'this kept image is not already sitting on that dataset'.
+
+    Measured, not remembered: an image counts as already there only while the
+    dataset really holds a row pointing back at it. Delete that image in the
+    dataset and the bank offers it again — the old one-way promoted_dataset_id
+    flag never came back, so a bank could end up advertising nothing promotable
+    into a dataset it had no image left in, which reads as "the bank lost my
+    images".
+
+    promoted_dataset_id survives as the LEGACY answer, for images promoted
+    before the back-link existed: nothing writes it any more (a promotion clears
+    it as it records the link), so it can only ever describe a pre-upgrade
+    promotion, and it is dropped for good the next time that image is promoted.
+    """
+    return and_(BankImage.id.notin_(_promoted_here(dataset_id)),
+                or_(BankImage.promoted_dataset_id.is_(None),
+                    BankImage.promoted_dataset_id != dataset_id))
+
+
 def _promotable_query(bank_id, dataset_id):
-    """The KEPT images eligible to promote into ``dataset_id``: everything kept
-    that isn't ALREADY sitting on this exact target. promoted_dataset_id is a
-    scalar (it remembers only the LAST target), so the guard is per-target, not
-    a global 'promoted anywhere' lock — an image promoted to dataset A stays
+    """The KEPT images eligible to promote into ``dataset_id``. Per-target, not a
+    global 'promoted anywhere' lock — an image promoted to dataset A stays
     promotable to B. (The dataset-side perceptual dedup on import is the real
     guard against genuine duplicates.)"""
     return (BankImage.query.filter_by(bank_id=bank_id, status='keep')
-            .filter(or_(BankImage.promoted_dataset_id.is_(None),
-                        BankImage.promoted_dataset_id != dataset_id)))
+            .filter(_not_already_on(dataset_id)))
 
 
 def promotable_count(user_id, bank_id, dataset_id) -> int | None:
@@ -3431,7 +3848,7 @@ def _promote_job(user_id, bank_id, ids, dataset_id):
             if bank_jobs.cancelled(job):
                 break
             chunk = rows[c0:c0 + _PROMOTE_CHUNK]
-            blobs, chunk_rows, caps = [], [], []
+            blobs, chunk_rows, caps, frms = [], [], [], []
             for r in chunk:
                 # RESOLVED path: a watermark-cleaned image must reach the dataset
                 # cleaned, otherwise the two cleaning levels were run for nothing.
@@ -3443,17 +3860,35 @@ def _promote_job(user_id, bank_id, ids, dataset_id):
                     # Carry the bank caption onto the dataset image (parallel to blobs),
                     # so a captioned selection lands already captioned.
                     caps.append(r.caption)
+                    # Carry the framing the bank's classify pass already wrote, so
+                    # the dataset's Composition counter is right the moment the
+                    # promotion lands (it only tallies rows that HAVE a framing).
+                    frms.append(r.framing)
                 except (OSError, TypeError):
                     failed += 1
             if blobs:
-                new_ids, bad = import_images(user_id, dataset_id, blobs,
-                                             dedupe=True, stats=stats, captions=caps)
+                new_ids, bad = import_images(
+                    user_id, dataset_id, blobs, dedupe=True, stats=stats,
+                    captions=caps, bank_image_ids=[r.id for r in chunk_rows],
+                    framings=frms)
                 imported += len(new_ids)
                 failed += bad
-                # 'Promoted' = handed to the dataset — a dedupe skip means the
-                # dataset already holds an equivalent, which counts as handled.
+                # The dataset row now carries the link back (import_images writes
+                # it, and hands it to the matched row when a dedupe skips the
+                # blob), so 'already promoted here' is a fact we can re-check.
+                # Clear the legacy one-way flag as we go: it would otherwise keep
+                # excluding this image from the target long after the user
+                # deleted it there.
+                #
+                # The exception is an image whose row in the dataset is already
+                # credited to ANOTHER bank (both banks hold the same photo). There
+                # is one column for one owner, so this bank gets no verifiable
+                # trace and keeps the old flag — the alternative is offering the
+                # image on every promotion, forever.
+                unlinked = set(stats.get('bank_unlinked') or ())
+                stats.pop('bank_unlinked', None)
                 for r in chunk_rows:
-                    r.promoted_dataset_id = dataset_id
+                    r.promoted_dataset_id = dataset_id if r.id in unlinked else None
                 db.session.commit()
             bank_jobs.bump(job, len(chunk))
         dups = stats.get('duplicates', 0)

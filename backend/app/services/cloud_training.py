@@ -20,6 +20,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from sqlalchemy import func
+
 from .. import config as cfg
 from ..extensions import db
 from ..models import CloudTrainingRun
@@ -36,7 +38,30 @@ ACTIVE_STATES = ('preparing', 'provisioning', 'uploading', 'training',
 
 _stop_events = {}        # run_id -> threading.Event
 _monitor_threads = {}    # run_id -> threading.Thread
+_supervisor_thread = None    # the one out-of-monitor watchdog (start_supervisor)
 _auto_retry_lock = threading.Lock()
+
+# -- watchdog / stop authority ------------------------------------------------
+# A pod bills by the hour, so every guarantee below is anchored on the DATABASE
+# (and on the vast API), never on in-process state: a threading.Event does not
+# survive a restart and is worthless when the thread meant to observe it is
+# dead or wedged.
+SUPERVISOR_INTERVAL_SECONDS = 60
+# Database silence past which a monitor thread is no longer trusted to carry
+# out a stop -- it writes phase_detail every poll (~10 s), so two minutes of
+# nothing means it is not coming back in time to save a paid pod.
+STOP_HANDOFF_SECONDS = 120
+# ... and how long a stop handed to a (then) responsive monitor may stay
+# unfinished before the supervisor terminates the pod itself. Generous enough
+# to cover the graceful path: stop the remote job, pull the last checkpoint.
+STOP_DEADLINE_SECONDS = 15 * 60
+# The supervisor defers to a live monitor on the runtime cap (the monitor
+# rescues the checkpoint first); it only acts if the monitor did not.
+_SUPERVISOR_MARGIN_SECONDS = 120
+# Floor for phases that are legitimately silent (staging, boot, upload, final
+# download). The runtime cap stays their real backstop.
+_SILENT_PHASE_FREEZE_SECONDS = 120 * 60
+_FREEZE_WATCHDOG_MINUTES = 45   # default when config carries no value
 # Flask serves requests from multiple threads in the portable app.  SQLite
 # cannot express the two launch invariants (global active-run cap and
 # per-dataset/family uniqueness) as a simple UNIQUE constraint because both
@@ -315,11 +340,45 @@ def latest_run_for(dataset_id, train_type=None):
     return newest
 
 
+# A monitor state write that loses a race for the SQLite write lock must not
+# kill a run that is burning rented GPU time. The DB is opened WAL with
+# busy_timeout=5000 (app/__init__.py), so a writer only ever sees 'database is
+# locked' when another writer held the lock for more than five seconds — a
+# captioning batch, a bank import, a big dataset write. That happened on
+# 2026-07-26: two monitors had just created their job on the pod and died on
+# `_set(status='training')` with `sqlite3.OperationalError: database is locked`,
+# three minutes into runs that then sat abandoned for an hour of paid 5090 time
+# (runs #106 and #107). The lock is transient by nature, so the commit is
+# retried instead of being fatal.
+_COMMIT_RETRIES = 4
+_COMMIT_RETRY_BASE_SECONDS = 0.5
+
+
+def _is_locked_error(exc):
+    return 'database is locked' in str(exc).lower()
+
+
 def _set(run, **fields):
-    for k, v in fields.items():
-        setattr(run, k, v)
-    run.updated_at = datetime.utcnow()
-    db.session.commit()
+    """Write monitor state, surviving a transient SQLite write-lock loss.
+
+    A failed commit leaves the session with a pending rollback and — once
+    rolled back — the instance reverted to its stored values, so the fields are
+    re-applied on every attempt rather than set once up front."""
+    for attempt in range(_COMMIT_RETRIES):
+        for k, v in fields.items():
+            setattr(run, k, v)
+        run.updated_at = datetime.utcnow()
+        try:
+            db.session.commit()
+            return
+        except Exception as e:                    # noqa: BLE001 - re-raised below
+            if attempt == _COMMIT_RETRIES - 1 or not _is_locked_error(e):
+                raise
+            logger.warning('run %s: SQLite write lock busy (attempt %s/%s) — '
+                           'retrying the state write', getattr(run, 'id', '?'),
+                           attempt + 1, _COMMIT_RETRIES)
+            db.session.rollback()
+            _sleep(_COMMIT_RETRY_BASE_SECONDS * (2 ** attempt))
 
 
 def _reconcile_before_launch(app):
@@ -604,18 +663,32 @@ def continue_local_run_in_cloud(user_id, dataset_id, extra_steps=1000,
     lr_factor = override_patch.pop('lr_factor', None)
     if lr_factor is not None:
         override_patch['learning_rate'] = lt.resolve_resume_lr(lt._train_settings(ds), lr_factor)
-    snapshot = _UNSET      # _UNSET → launch stamps the dataset's live settings
-    if override_patch:
-        snapshot = _merge_resume_overrides(getattr(ds, 'train_settings', None),
-                                           override_patch)
-    # Lineage: the parent is the newest record of THIS local lane, exactly like
-    # lora_training.continue_training resolves it. Best-effort — a failure leaves
-    # the edge NULL and never blocks the launch.
+    # Lineage: the parent is the record that PRODUCED the file being seeded — the
+    # `record_id` list_checkpoints stamps on every save — NOT the newest record of
+    # the lane. A lane holds several runs whose saves share one run dir, so "newest
+    # record" pointed the edge at a run whose weights were never loaded: the graph
+    # claimed a continuation of a rank-32 run while a rank-64 file went up the wire.
+    # Falls back to the lane's newest record for a pre-registry save. Best-effort —
+    # a failure leaves the edge NULL and never blocks the launch.
     from . import checkpoint_registry
     try:
-        _parent = checkpoint_registry.newest_record_for(dataset_id, fam, base, var)
+        _parent = checkpoint_registry.record_by_id(chosen.get('record_id'))
+        if _parent is None:
+            _parent = checkpoint_registry.newest_record_for(dataset_id, fam, base, var)
     except Exception:
         _parent = None
+    # The LoRA's geometry belongs to the weights, not to today's dataset settings:
+    # rank-32 weights cannot load into a rank-64 network. Without this, a resume
+    # stamped the dataset's LIVE rank onto the run (snapshot _UNSET) — edit rank
+    # between two runs and the "continuation" silently trained a different LoRA.
+    # This lane carries a PER-RUN snapshot, so the parent's geometry is inherited
+    # here with no side effect on the dataset (the local lane, which trains from
+    # the persisted settings, refuses loudly instead).
+    geometry = checkpoint_registry.network_geometry(_parent)
+    snapshot = _UNSET      # _UNSET → launch stamps the dataset's live settings
+    if override_patch or geometry:
+        snapshot = _merge_resume_overrides(getattr(ds, 'train_settings', None),
+                                           {**override_patch, **geometry})
     res = launch_cloud_training(
         user_id, dataset_id,
         steps=chosen['step'] + extra,
@@ -1291,17 +1364,239 @@ def _provision(run):
         raise
 
 
-def request_stop(run_id=None) -> bool:
+def _idle_seconds(run, now=None) -> float:
+    """How long this run has been silent in the DATABASE — the only progress
+    signal that survives a restart and does not depend on the monitor thread
+    being healthy. Every monitor poll writes phase_detail through _set(), which
+    bumps updated_at, so a frozen updated_at means the monitor stopped
+    completing iterations (whatever the reason: dead, wedged in a socket read,
+    or gone with a restart)."""
+    now = now or datetime.utcnow()
+    ref = run.updated_at or run.created_at or now
+    return max(0.0, (now - ref).total_seconds())
+
+
+def _monitor_is_responsive(run) -> bool:
+    """Can this run's monitor thread be TRUSTED to carry out a stop?
+
+    Both halves matter. A registered thread object proves nothing (the run-103
+    monitor was still alive, blocked forever inside one HTTP call), and a fresh
+    updated_at alone would be satisfied by a monitor that has just died. Only a
+    live thread that is also still writing gets the graceful path."""
+    thread = _monitor_threads.get(int(run.id))
+    if thread is None or not thread.is_alive():
+        return False
+    return _idle_seconds(run) <= STOP_HANDOFF_SECONDS
+
+
+def _force_stop(run, detail, error=None) -> dict:
+    """Terminate the pod HERE, without asking the monitor thread.
+
+    The pod is the thing that costs money, and the vast API is the only
+    authority on whether it is gone: a successful destroy closes the run as
+    'stopped'; a refused or failing destroy must NEVER be reported as a
+    success. In that case the run is parked in 'error_pod_kept' — the existing
+    status meaning "a pod may still be alive out there" — so boot/launch
+    reconciliation reaps it later, and the caller gets the instance id to
+    destroy by hand in the meantime."""
+    iid = run.vast_instance_id
+    _stop_event_for(run.id).set()   # a still-living monitor stands down too
+    if not iid:
+        _set(run, status='stopped', phase_detail=detail,
+             error=error, finished_at=datetime.utcnow())
+        return {'ok': True, 'run_id': run.id, 'mode': 'forced',
+                'message': detail, 'instance_id': None}
+    gone = False
+    failure = ''
+    try:
+        gone = bool(vast_client.destroy_instance(iid))
+        if not gone:
+            failure = 'the vast.ai API refused the termination'
+    except Exception as e:
+        failure = str(e)[:200]
+        logger.warning('forced stop of run %s: destroy %s failed: %s',
+                       run.id, iid, failure)
+    if gone:
+        _set(run, status='stopped', phase_detail=detail,
+             error=error, finished_at=datetime.utcnow())
+        logger.warning('forced stop of run %s: pod %s terminated (%s)',
+                       run.id, iid, error or detail)
+        return {'ok': True, 'run_id': run.id, 'mode': 'forced',
+                'message': detail, 'instance_id': iid}
+    message = (f'Could not terminate instance {iid} ({failure}). It may still '
+               f'be running and billing — destroy it in the vast.ai console.')
+    _set(run, status='error_pod_kept', phase_detail=detail[:500],
+         error=message, finished_at=datetime.utcnow())
+    return {'ok': False, 'run_id': run.id, 'mode': 'failed',
+            'error': message, 'instance_id': iid}
+
+
+def _stop_one(run) -> dict:
+    # Decide BEFORE writing anything: stamping stop_requested_at bumps
+    # updated_at, which would make a frozen run look freshly alive.
+    responsive = _monitor_is_responsive(run)
+    _stop_event_for(run.id).set()
+    if not run.stop_requested_at:
+        _set(run, stop_requested_at=datetime.utcnow())
+    if responsive:
+        # Graceful: the monitor stops the remote job and rescues the latest
+        # checkpoint before terminating. The stamped stop_requested_at arms the
+        # supervisor's deadline in case it wedges on the way.
+        return {'ok': True, 'run_id': run.id, 'mode': 'graceful',
+                'message': 'Stopping the run — the pod is winding down…',
+                'instance_id': run.vast_instance_id}
+    return _force_stop(
+        run,
+        detail='Stopped by user — the run monitor was not responding, so the '
+               'pod was terminated directly (checkpoints already downloaded '
+               'are kept)',
+        error='stopped by user without a responsive monitor')
+
+
+def request_stop(run_id=None) -> dict:
+    """Stop one run (or every active run when run_id is None) and report what
+    ACTUALLY happened.
+
+    Historically this only set an in-process threading.Event and returned True
+    as long as the row was active — so when the monitor thread was dead or
+    wedged, the button answered "ok" and the pod kept billing for hours
+    (incident 2026-07-25). A stop now either terminates the pod or says it
+    could not, naming the instance."""
     if run_id is not None:
         run = CloudTrainingRun.query.get(int(run_id))
-        if not run or run.status not in ACTIVE_STATES:
-            return False
-        _stop_event_for(run.id).set()
-        return True
-    actives = get_active_runs()
-    for run in actives:
-        _stop_event_for(run.id).set()
-    return bool(actives)
+        runs = [run] if run and run.status in ACTIVE_STATES else []
+    else:
+        runs = get_active_runs()
+    if not runs:
+        return {'ok': False, 'mode': 'none', 'runs': [],
+                'error': 'No active cloud run to stop — it may have already '
+                         'finished.'}
+    results = [_stop_one(run) for run in runs]
+    failed = [r for r in results if not r['ok']]
+    modes = {r['mode'] for r in results}
+    return {'ok': not failed,
+            'mode': modes.pop() if len(modes) == 1 else 'mixed',
+            'runs': results,
+            'message': results[0].get('message', ''),
+            'error': failed[0]['error'] if failed else None}
+
+
+def supervise_active_runs() -> list:
+    """One supervisor tick: enforce, from OUTSIDE any monitor thread, the
+    guarantees a monitor can no longer make once it is dead or wedged.
+
+    Three rules, all anchored on durable database state:
+      * runtime cap  — the configured ceiling used to be a deadline computed
+        inside the monitor itself, so the net died with what it protected;
+      * stop deadline — a stop handed to a monitor that never carries it out
+        (a monitor still streaming the checkpoint down is exempt while it
+        keeps writing — see _rescuing_checkpoint);
+      * freeze watchdog — no database progress for longer than the phase
+        allows (see _freeze_limit_seconds).
+    A margin is deliberately left on the first two so a HEALTHY monitor always
+    gets to act first: its own paths rescue the last checkpoint from the pod,
+    while a forced stop can only keep what mid-run mirroring already pulled.
+    Never raises — the whole point is a net that cannot die."""
+    acted = []
+    try:
+        c = cfg.get('cloud') or {}
+        max_seconds = int(c.get('max_runtime_minutes') or 480) * 60
+        now = datetime.utcnow()
+        for run in get_active_runs():
+            try:
+                age = (now - (run.created_at or now)).total_seconds()
+                if age > max_seconds + _SUPERVISOR_MARGIN_SECONDS:
+                    res = _force_stop(
+                        run, detail='Max runtime reached — pod terminated by '
+                                    'the supervisor', error='max runtime cap hit')
+                    acted.append({'run_id': run.id, 'reason': 'runtime_cap',
+                                  'ok': res['ok']})
+                    continue
+                stop_age = ((now - run.stop_requested_at).total_seconds()
+                            if run.stop_requested_at else 0)
+                if stop_age > STOP_DEADLINE_SECONDS \
+                        and not _rescuing_checkpoint(run, now):
+                    res = _force_stop(
+                        run, detail='Stopped by user — the run monitor never '
+                                    'completed the stop, so the pod was '
+                                    'terminated by the supervisor',
+                        error='stop request not honoured in time')
+                    acted.append({'run_id': run.id, 'reason': 'stop_deadline',
+                                  'ok': res['ok']})
+                    continue
+                limit = _freeze_limit_seconds(run, c)
+                if limit and _idle_seconds(run, now) > limit:
+                    res = _force_stop(
+                        run, detail=f'Frozen — no progress for {limit // 60} min; '
+                                    'pod terminated by the supervisor',
+                        error='freeze watchdog')
+                    acted.append({'run_id': run.id, 'reason': 'freeze',
+                                  'ok': res['ok']})
+            except Exception:
+                logger.exception('supervisor: run %s could not be judged', run.id)
+    except Exception:
+        logger.exception('cloud supervisor tick failed')
+    return acted
+
+
+def _rescuing_checkpoint(run, now=None) -> bool:
+    """Is this run, right now, pulling its checkpoint off the pod — and still
+    writing while it does?
+
+    The stop deadline exists for a monitor that WEDGED after being handed a
+    stop. A monitor that is downloading the result is the opposite: it is doing
+    the single most valuable part of the stop, and cutting it there throws away
+    a checkpoint the user already paid for. The exemption is deliberately
+    narrow — it needs the 'downloading' status AND a row written inside the
+    handoff window (the transfer heartbeats far more often than that), so a
+    monitor that dies mid-transfer stops being spared within a couple of
+    minutes and falls back to the freeze watchdog and the runtime cap."""
+    return (run.status == 'downloading'
+            and _idle_seconds(run, now) <= STOP_HANDOFF_SECONDS)
+
+
+def _freeze_limit_seconds(run, c=None) -> int:
+    """Seconds of database silence tolerated in the run's CURRENT phase (0 =
+    watchdog off).
+
+    Only 'training' is judged on the configured value: there the monitor writes
+    phase_detail on every poll (~10 s), so silence is unambiguous. Every other
+    phase is silent by design for long stretches — staging a big dataset,
+    renting and booting a pod, uploading images, pulling the final checkpoint —
+    and killing a run that is merely starting up would be worse than the leak
+    we are closing. They get a fixed, very generous floor; the runtime cap
+    remains their real backstop."""
+    c = c if c is not None else (cfg.get('cloud') or {})
+    raw = c.get('freeze_watchdog_minutes')
+    minutes = _FREEZE_WATCHDOG_MINUTES if raw is None else int(raw or 0)
+    if minutes <= 0:
+        return 0
+    if run.status == 'training':
+        return minutes * 60
+    return max(minutes * 60, _SILENT_PHASE_FREEZE_SECONDS)
+
+
+def _supervisor_loop(app):
+    while True:
+        try:
+            with app.app_context():
+                supervise_active_runs()
+        except Exception:
+            logger.exception('cloud supervisor loop failed')
+        _sleep(SUPERVISOR_INTERVAL_SECONDS)
+
+
+def start_supervisor(app):
+    """Start the single watchdog thread (idempotent). Deliberately independent
+    of boot_recover and of every per-run monitor: it owns nothing, blocks on
+    nothing but its own sleep, and therefore survives what they cannot."""
+    global _supervisor_thread
+    if _supervisor_thread is not None and _supervisor_thread.is_alive():
+        return _supervisor_thread
+    _supervisor_thread = threading.Thread(
+        target=_supervisor_loop, args=(app,), daemon=True, name='cloud-supervisor')
+    _supervisor_thread.start()
+    return _supervisor_thread
 
 
 def reconcile_orphans(app) -> int:
@@ -1513,6 +1808,34 @@ def _finish(run, status, detail='', error=None, destroy=True):
     return pod_gone
 
 
+class _RunClosedExternally(Exception):
+    """The run row left ACTIVE_STATES while this monitor was working — a forced
+    stop or the supervisor closed it. The monitor must stand down instead of
+    resurrecting the row (or renting a pod for a run nobody waits for)."""
+
+
+def _assert_run_open(run):
+    db.session.refresh(run)     # another thread may have committed a close
+    if run.status not in ACTIVE_STATES:
+        raise _RunClosedExternally(run.status)
+
+
+def _finish_if_open(run, status, detail='', error=None, destroy=True):
+    """_finish(), but only for a run that is still ours to close.
+
+    Checking ONCE at the top of the poll loop is not enough. Every terminal
+    branch does minutes of work after that check — stopping the remote job,
+    pulling the final checkpoint, importing it, mirroring it locally — and the
+    supervisor is a different thread on a different session: it can force-stop
+    the run, destroy the pod and write the row inside that window. The monitor
+    would then rewrite a closed row and announce a pod it 'kept' that no longer
+    exists. Re-asserting immediately before the write means a run closed behind
+    our back raises _RunClosedExternally and takes the stand-down path instead
+    (the work done up to here — the downloaded checkpoint — is kept on disk)."""
+    _assert_run_open(run)
+    return _finish(run, status, detail=detail, error=error, destroy=destroy)
+
+
 def _monitor(app, run_id):
     """Full run lifecycle. Runs in a daemon thread; every exit path goes
     through _finish() so the pod cannot be leaked by this thread."""
@@ -1538,9 +1861,11 @@ def _monitor(app, run_id):
         try:
             # -- heavy launch work, moved off the HTTP path (see launch) ----
             _prepare_staging(run)
+            _assert_run_open(run)       # never rent for an already-stopped run
             # -- provision (if resuming, the instance may already exist) ----
             if not run.vast_instance_id:
                 _provision(run)
+            _assert_run_open(run)
             # Boot-readiness timeout anchor. A FRESH launch measures from now
             # (post-provision) so dataset staging / offer search never eat into
             # the pod's boot budget. A RESUME must NOT get a brand-new window on
@@ -1572,6 +1897,7 @@ def _monitor(app, run_id):
                 logger.warning('cloud.ui_port=8675 is stale for template mode — using 18675')
                 port = 18675
             while True:
+                _assert_run_open(run)
                 # A transient vast API hiccup is just "not ready yet" -- only
                 # READY_TIMEOUT_SECONDS may fail the boot wait, never a single
                 # 502 that would destroy a pod about to come up fine.
@@ -1663,16 +1989,34 @@ def _monitor(app, run_id):
                 job_config = _cloudify_job_config(job_config, run.job_name,
                                                   staging_dataset, pod_settings,
                                                   run_params=params)
-                job_id = remote.create_job(run.job_name, job_config)
-                # Continue-in-cloud: drop the source checkpoint into the job's
-                # save_root BEFORE start so ai-toolkit auto-resumes from it.
-                _seed_resume_checkpoint(run, remote, pod_settings)
-                remote.start_job(job_id)
-                _set(run, remote_job_id=job_id, status='training',
-                     phase_detail='Job queued on the pod')
+                job_id, adopted = _create_or_adopt_job(run, remote, job_config)
+                # Persist the id THE INSTANT the job exists on the pod, before
+                # the (slow) seeding and the start. Recording it only after
+                # start_job left a window in which the pod already held the job
+                # but our row still said remote_job_id=NULL — an app restart
+                # inside that window sent the resume straight back into this
+                # branch, where the pod refused the duplicate name with
+                # 409 "Job name already exists" and the run died with the money
+                # already spent (run #107, ~1 h of 5090 time). The run is NOT
+                # yet 'training' here: only start_job earns that status, and the
+                # resume branch relies on the distinction.
+                _set(run, remote_job_id=job_id,
+                     phase_detail='Job created on the pod')
+                if adopted:
+                    # The pod already had this job (this run's earlier attempt).
+                    # Never blind-start it: it may be mid-training.
+                    _ensure_remote_job_started(run, remote, job_id, pod_settings)
+                else:
+                    # Continue-in-cloud: drop the source checkpoint into the
+                    # job's save_root BEFORE start so ai-toolkit auto-resumes.
+                    _seed_resume_checkpoint(run, remote, pod_settings)
+                    remote.start_job(job_id)
+                    _set(run, status='training',
+                         phase_detail='Job queued on the pod')
             else:
                 job_id = run.remote_job_id
                 _set(run, phase_detail='Resuming — reattaching to running job')
+                _ensure_remote_job_started(run, remote, job_id)
 
             # -- poll until terminal ------------------------------------------
             # Two watchdogs share one progress clock (last_progress_ts):
@@ -1702,15 +2046,16 @@ def _monitor(app, run_id):
             unreachable_since = None
             polls = 0
             while True:
+                _assert_run_open(run)
                 if _now() - cap_anchor > max_seconds:
                     try:
                         remote.stop_job(job_id)
                     except Exception:
                         pass
                     _try_download_checkpoint(run, remote, allow_stale=True)
-                    _finish(run, 'stopped',
-                            detail='Max runtime reached — pod terminated',
-                            error='max runtime cap hit')
+                    _finish_if_open(run, 'stopped',
+                                    detail='Max runtime reached — pod terminated',
+                                    error='max runtime cap hit')
                     return
                 if stop_event.is_set():
                     stop_event.clear()
@@ -1720,7 +2065,7 @@ def _monitor(app, run_id):
                     except Exception:
                         pass
                     _try_download_checkpoint(run, remote, allow_stale=True)
-                    _finish(run, 'stopped', detail='Stopped by user')
+                    _finish_if_open(run, 'stopped', detail='Stopped by user')
                     return
                 try:
                     job = remote.get_job(job_id)
@@ -1754,6 +2099,10 @@ def _monitor(app, run_id):
                                         'could not serve the final checkpoint')
                         # LoRA > a few minutes of pod time: keep the pod for
                         # manual recovery; max-runtime/reconcile will reap it.
+                        # Same guard as _finish_if_open: announcing a kept pod
+                        # for a run the supervisor just force-stopped would
+                        # point the user at an instance that is already gone.
+                        _assert_run_open(run)
                         _set(run, status='error_pod_kept',
                              error='checkpoint download failed — pod kept, '
                                    f'recover manually at {run.base_url}',
@@ -1762,12 +2111,12 @@ def _monitor(app, run_id):
                     _download_intermediates(run, remote)
                     _import_result(run)
                     _mirror_into_local_run(run)
-                    _finish(run, 'done', detail='Training complete')
+                    _finish_if_open(run, 'done', detail='Training complete')
                     return
                 if status in ('error', 'stopped'):
                     _try_download_checkpoint(run, remote, allow_stale=True)
-                    _finish(run, 'error' if status == 'error' else 'stopped',
-                            detail=f'Remote job {status}', error=info or status)
+                    _finish_if_open(run, 'error' if status == 'error' else 'stopped',
+                                    detail=f'Remote job {status}', error=info or status)
                     return
                 # -- stall watchdog: guiding rule — NEVER kill a run that
                 # progresses. The elif keeps a progressing poll from ever
@@ -1783,10 +2132,10 @@ def _monitor(app, run_id):
                     except Exception:
                         pass
                     _try_download_checkpoint(run, remote, allow_stale=True)
-                    _finish(run, 'error',
-                            detail='Stalled — no step progress for '
-                                   f'{stall_seconds // 60} min; pod terminated',
-                            error='stall watchdog')
+                    _finish_if_open(run, 'error',
+                                    detail='Stalled — no step progress for '
+                                           f'{stall_seconds // 60} min; pod terminated',
+                                    error='stall watchdog')
                     return
                 elif last_step <= 0 and (_now() - last_progress_ts) > first_step_seconds:
                     # No training step in first_step_timeout_minutes — the pod is
@@ -1796,13 +2145,26 @@ def _monitor(app, run_id):
                         remote.stop_job(job_id)
                     except Exception:
                         pass
-                    _finish(run, 'error',
-                            detail='No training step reached in '
-                                   f'{first_step_seconds // 60} min — pod likely '
-                                   'stuck downloading the base model; terminated',
-                            error='first-step watchdog')
+                    _finish_if_open(run, 'error',
+                                    detail='No training step reached in '
+                                           f'{first_step_seconds // 60} min — pod likely '
+                                           'stuck downloading the base model; terminated',
+                                    error='first-step watchdog')
                     return
                 _sleep(POLL_SECONDS)
+        except _RunClosedExternally as closed:
+            # Someone with more authority than this thread (a forced stop, the
+            # supervisor) already closed the run. Do NOT touch the row -- but a
+            # pod we may have just rented is still ours to kill, unless the row
+            # says it was deliberately kept for manual recovery.
+            logger.warning('cloud run %s closed externally (%s) — monitor '
+                           'standing down', run_id, closed)
+            if run.vast_instance_id and run.status != 'error_pod_kept':
+                try:
+                    vast_client.destroy_instance(run.vast_instance_id)
+                except Exception:
+                    logger.exception('stand-down destroy of %s raised',
+                                     run.vast_instance_id)
         except Exception as e:
             logger.exception('cloud run %s failed', run_id)
             error_text = str(e)[:500]
@@ -1825,6 +2187,86 @@ def _monitor(app, run_id):
             _stop_events.pop(int(run_id), None)
             _monitor_threads.pop(int(run_id), None)
             _sync_state.pop(int(run_id), None)
+
+
+# A run that has reached one of these has provably had its remote job STARTED
+# (only the post-start_job write sets 'training'). Anything earlier means the
+# job may exist on the pod without ever having been launched.
+_JOB_STARTED_STATES = ('training', 'downloading', 'terminating')
+
+
+def _create_or_adopt_job(run, remote, job_config):
+    """Submit this run's job, or ADOPT the one already on the pod.
+
+    Returns (job_id, adopted). The pod's job `name` is unique, and ours is
+    `lds<run.id>_<run_name>` — stable for the life of the run and derived from a
+    primary key, so a 409 on submit can only mean THIS run already created THIS
+    job on THIS pod (an earlier attempt whose id never reached our row). Killing
+    the run over a duplicate of its own job wastes an already-paid hour, so the
+    id is read back from the pod's job list and the run continues.
+
+    If the list cannot resolve the name, the run still fails — but with an error
+    that says what happens next and what becomes of the pod."""
+    try:
+        return remote.create_job(run.job_name, job_config), False
+    except Exception as e:
+        if 'HTTP 409' not in str(e):
+            raise
+        logger.warning('run %s: the pod already holds job %r (409) — adopting it '
+                       'instead of failing the run', run.id, run.job_name)
+        existing = None
+        try:
+            existing = remote.find_job_by_name(run.job_name)
+        except Exception:
+            logger.exception('run %s: could not list the pod jobs to adopt %r',
+                             run.id, run.job_name)
+        job_id = str((existing or {}).get('id') or '')
+        if job_id:
+            _set(run, phase_detail='Reattached to the job already on the pod')
+            return job_id, True
+        raise RuntimeError(
+            f'this pod already holds a training job named "{run.job_name}" '
+            'but would not say which one, so it cannot be reattached. The pod '
+            'is being terminated so it stops costing money; any checkpoint it '
+            'had already produced is lost. Use "Retry" on this run to relaunch '
+            'on a fresh pod — a retry gets a new job name, so it cannot hit '
+            'this again.')
+
+
+def _ensure_remote_job_started(run, remote, job_id, pod_settings=None):
+    """Guarantee the remote job is actually RUNNING, not merely created.
+
+    ai-toolkit creates a job with status 'stopped' and only `start` moves it to
+    'queued'. The poll loop below reads 'stopped' as a terminal state, so a job
+    that exists but was never started would kill the run at the first poll —
+    exactly the bug traded in if the id were recorded early and nothing else
+    changed. A run past `_JOB_STARTED_STATES` provably started its job; anything
+    earlier asks the pod, and starts (after re-seeding any resume checkpoint,
+    which must land before the first step) only a job still sitting at
+    'stopped' with no step. Never blind-starts: re-queuing a live job would
+    disturb a run that is training fine."""
+    if run.status in _JOB_STARTED_STATES:
+        return
+    try:
+        job = remote.get_job(job_id) or {}
+    except Exception as e:
+        # Not fatal here: the poll loop owns pod reachability and its grace
+        # window. Guessing 'never started' on an unreachable pod could re-queue
+        # a job that is training.
+        logger.warning('run %s: could not read job %s to check whether it was '
+                       'started (%s) — leaving it to the poll loop', run.id, job_id, e)
+        return
+    if (job.get('status') or 'stopped') != 'stopped' or (job.get('step') or 0) > 0:
+        _set(run, status='training')     # already live (or finished) — poll it
+        return
+    logger.warning('run %s: job %s exists on the pod but was never started — '
+                   'starting it now', run.id, job_id)
+    _set(run, phase_detail='Resuming — the job was created but never started')
+    _seed_resume_checkpoint(run, remote,
+                            pod_settings if pod_settings is not None
+                            else remote.get_settings())
+    remote.start_job(job_id)
+    _set(run, status='training', phase_detail='Job queued on the pod')
 
 
 def _seed_resume_checkpoint(run, remote, pod_settings):
@@ -1884,7 +2326,8 @@ def _newest_remote_checkpoint(remote, job_id):
     return sorted(files, key=lambda f: f['path'])[-1]
 
 
-def _fetch_checkpoint(run, remote, ckpt, timeout=None, attempts=3) -> str:
+def _fetch_checkpoint(run, remote, ckpt, timeout=None, attempts=3,
+                      on_progress=None) -> str:
     """Download the checkpoint entry ({'path','size'}) into staging and return
     the local path. Skips the transfer when this exact save is already local
     (the mid-run sync usually got there first). Two integrity layers:
@@ -1901,7 +2344,8 @@ def _fetch_checkpoint(run, remote, ckpt, timeout=None, attempts=3) -> str:
             and os.path.basename(run.checkpoint_local_path) == name:
         return dest
     remote.download_public_file(remote_path, dest, timeout=timeout,
-                                expected_size=ckpt.get('size'), attempts=attempts)
+                                expected_size=ckpt.get('size'), attempts=attempts,
+                                on_progress=on_progress)
     want = int(ckpt.get('size') or 0)
     got = os.path.getsize(dest)
     if want and got != want:
@@ -1965,6 +2409,42 @@ def _sync_latest_checkpoint(run, remote):
         logger.debug('mid-run checkpoint sync failed: %s', e)
 
 
+_DOWNLOAD_HEARTBEAT_SECONDS = 20
+
+
+def _transfer_size(got, want) -> str:
+    got_mb = (got or 0) / 1e6
+    return f'{got_mb:.0f} / {want / 1e6:.0f} MB' if want else f'{got_mb:.0f} MB'
+
+
+def _download_heartbeat(run, name):
+    """Progress callback for a long checkpoint transfer.
+
+    A transfer of tens of minutes must not LOOK like a dead monitor. Every
+    safety net in this module reads database progress and nothing else, so a
+    silent transfer is indistinguishable from a wedged thread — and the pod
+    would be terminated exactly while we are rescuing the thing the run was
+    for. Beating updated_at from inside the stream is what makes the two
+    distinguishable; the user gets a moving figure out of it too.
+
+    Throttled, and it never raises: a heartbeat that cannot write must not
+    sink a transfer that is otherwise working."""
+    state = {'ts': 0.0}
+
+    def beat(got, want):
+        now = _now()
+        if now - state['ts'] < _DOWNLOAD_HEARTBEAT_SECONDS:
+            return
+        state['ts'] = now
+        try:
+            _set(run, phase_detail=f'Downloading {name} — '
+                                   f'{_transfer_size(got, want)}'[:500])
+        except Exception:
+            logger.debug('download heartbeat could not write', exc_info=True)
+
+    return beat
+
+
 def _try_download_checkpoint(run, remote, allow_stale=False) -> bool:
     """Download the newest .safetensors into staging. False on failure.
     allow_stale (rescue paths — stop/stall/cap): when the pod can't serve the
@@ -1975,11 +2455,24 @@ def _try_download_checkpoint(run, remote, allow_stale=False) -> bool:
     try:
         ckpt = _newest_remote_checkpoint(remote, run.remote_job_id)
         if ckpt:
+            name = os.path.basename(ckpt['path'].replace('\\', '/'))
+            # The status flips BEFORE the transfer, not after it. This is the
+            # end of a run that WORKED, and the transfer can take tens of
+            # minutes on a pod proxy that cuts the stream every couple of MB.
+            # While it was still labelled 'training' the freeze watchdog judged
+            # it on the training threshold (45 min of database silence) with a
+            # frozen updated_at — it would have destroyed the pod mid-rescue,
+            # throwing away a checkpoint already paid for. 'downloading' is an
+            # ACTIVE state judged on the silent-phase floor, and the heartbeat
+            # below keeps even that from being needed.
+            _set(run, status='downloading',
+                 phase_detail=f'Downloading {name}…'[:500])
             # Large attempts budget: a sick-proxy host cutting the stream
             # every ~0.5-2 MB still delivers an 85 MB file via ~100 resumed
             # connections (validated live 2026-07-13, run #7's manual rescue).
-            dest = _fetch_checkpoint(run, remote, ckpt, attempts=400)
-            _set(run, status='downloading', checkpoint_local_path=dest,
+            dest = _fetch_checkpoint(run, remote, ckpt, attempts=400,
+                                     on_progress=_download_heartbeat(run, name))
+            _set(run, checkpoint_local_path=dest,
                  phase_detail=f'Downloaded {os.path.basename(dest)}')
             return True
     except Exception as e:
@@ -2249,6 +2742,14 @@ def _run_payload(run) -> dict:
             'auto_retry_of': _run_param(run, 'auto_retry_of'),
             'auto_retry_run_id': _run_param(run, 'auto_retry_run_id'),
             'created_at': run.created_at.isoformat() if run.created_at else None,
+            # How long the run has reported nothing, and how long it is allowed
+            # to (0 = the freeze watchdog is off). The card warns on its own
+            # from these two, so a silent run is visible even when the watchdog
+            # is configured never to cut.
+            'idle_seconds': int(_idle_seconds(run)),
+            'idle_limit_seconds': (_freeze_limit_seconds(run)
+                                   if run.status in ACTIVE_STATES else 0),
+            'stop_requested': bool(run.stop_requested_at),
             'finished_at': run.finished_at.isoformat() if run.finished_at else None}
     if base_model is not None:
         payload['base_model'] = base_model
@@ -2365,7 +2866,7 @@ def all_runs(limit: int = 20) -> dict:
         row = {'source': 'cloud', 'settings': None, **_run_payload(crun)}
         _annotate_preview(row, crun, None)
         recent.append(row)
-    # Lineage flag: a row opens the 🌳 tree when it has a parent OR is itself a
+    # Lineage flag: a row opens the tree when it has a parent OR is itself a
     # parent (a continuation branched off it). `records_with_children` is one
     # query over the shown record ids, so a parent still flags even when its
     # child sits outside this window.
@@ -2508,6 +3009,20 @@ def checkpoint_notes_for(record_id):
             if r.note}
 
 
+def training_activity() -> dict:
+    """Is anything training RIGHT NOW — locally or on a rented pod.
+
+    Deliberately the cheapest question the app can ask: one persisted flag plus
+    one indexed COUNT. No capability probe, no disk, no network — the nav bar
+    polls this from every page, so it has to stay free. `cloud` is a count
+    because several pods can train at once; `local` is a boolean because local
+    training is single-flight."""
+    cloud = (CloudTrainingRun.query
+             .filter(CloudTrainingRun.status.in_(ACTIVE_STATES)).count())
+    local = training_in_progress()
+    return {'local': local, 'cloud': cloud, 'running': bool(local or cloud)}
+
+
 def training_in_progress() -> bool:
     """True while a LoRA training holds the GPU — the Lab's inline generation is
     refused with a 409 in that window (a training and a generation must never
@@ -2548,7 +3063,7 @@ def _step_of_testable(filename) -> int | None:
 def _deployed_run_tag(rec):
     """(source, run_id) as it appears in the DEPLOYED names of THIS record's
     saves. Mirrors import_checkpoint's own rule: a cloud launch is tagged with
-    its pod-run id (`_rc<id>`, the ☁ #N chip), everything else with its
+    its pod-run id (`_rc<id>`, the #N chip), everything else with its
     TrainingRunRecord id (`_rl<id>`). (None, None) when a cloud record lost its
     pod-run id — no tag to match, so nothing is claimed."""
     if rec.source == 'cloud':
@@ -2657,28 +3172,132 @@ def _testable_for_record(dataset_id, family, record_id) -> dict:
 
 
 def checkpoint_previews_for(record_id) -> dict:
-    """{step: {status, url, seed}} for a run's inline-generated previews. Each
-    stored pointer resolves LIVE to its reused LoraTestImage: 'done' with a served
-    url once the file exists, 'failed' if the cell failed, else 'pending' (the job
-    is still in the serial queue). A dangling pointer (image row gone) is dropped
-    so the node never claims a preview it can't show."""
+    """{step: {status, url, seed, count}} for a run's checkpoints. Each stored
+    pointer resolves LIVE to its reused LoraTestImage: 'done' with a served url
+    once the file exists, 'failed' if the cell failed, else 'pending' (the job is
+    still in the serial queue). A dangling pointer (image row gone) is dropped so
+    the node never claims a preview it can't show.
+
+    Previews ACCUMULATE, so a checkpoint can hold several rows: the NEWEST one
+    that still resolves is the thumbnail. `count` is not that list's length — it
+    counts every finished test image linked to the checkpoint, wherever it came
+    from (Test Studio, canvas, comparison grid), which is what the gallery under
+    the node opens on."""
     from ..models import CheckpointPreview, LoraTestImage
-    rows = CheckpointPreview.query.filter_by(record_id=record_id).all()
-    if not rows:
+    # Newest first, so the first resolvable row per step is the one shown.
+    rows = (CheckpointPreview.query.filter_by(record_id=record_id)
+            .order_by(CheckpointPreview.id.desc()).all())
+    counts = dict(db.session.query(LoraTestImage.step, func.count(LoraTestImage.id))
+                  .filter(LoraTestImage.record_id == record_id,
+                          LoraTestImage.status == 'done',
+                          LoraTestImage.filename.isnot(None))
+                  .group_by(LoraTestImage.step).all())
+    if not rows and not counts:
         return {}
     img_ids = [r.lora_test_image_id for r in rows if r.lora_test_image_id]
     imgs = ({i.id: i for i in LoraTestImage.query
              .filter(LoraTestImage.id.in_(img_ids)).all()} if img_ids else {})
     out = {}
     for r in rows:
+        if r.step in out:
+            continue                      # an older preview of the same checkpoint
         img = imgs.get(r.lora_test_image_id)
         if img is None:
             continue
         status = img.status if img.status in ('pending', 'done', 'failed') else 'pending'
         url = (f'/api/dataset/{r.dataset_id}/img/{img.filename}'
                if status == 'done' and img.filename else None)
-        out[r.step] = {'status': status, 'url': url, 'seed': r.seed}
+        out[r.step] = {'status': status, 'url': url, 'seed': r.seed,
+                       'count': int(counts.get(r.step) or 0)}
+    # A checkpoint generated from the Test Studio has images but never a preview
+    # pointer. It still has a gallery — the node must say so.
+    for step, n in counts.items():
+        if step is None or step in out:
+            continue
+        out[step] = {'status': None, 'url': None, 'seed': None, 'count': int(n)}
     return out
+
+
+def canvas_generate(user_id, selections, **knobs) -> dict:
+    """◉ Launch from the LoRA Canvas: the EXACT Test-Studio engine, told which
+    checkpoints to run by the pills the user ticked instead of by a picker.
+
+    `selections` = [{dataset_id, checkpoint, record_id, step}] — possibly across
+    SEVERAL datasets, which is the point of the canvas
+    (``LoraTestImage.run_id`` has always grouped cells of different datasets).
+    Every other setting rides through untouched to ``create_comparison_run``,
+    because it IS the same call the comparison grid makes: no second engine, so
+    no drift between the two screens.
+
+    Mixing FAMILIES is refused by the engine itself (one run = one base + one
+    workflow) and the message travels back to the button.
+
+    After the cells are created, one ``CheckpointPreview`` per distinct
+    (record, step) points the node at what it just launched, so the pill shows
+    ◌ rendering and then the picture. It is an INSERT, not an update: previews
+    accumulate, and the older ones stay in the checkpoint's gallery."""
+    from ..models import CheckpointPreview, LoraTestImage
+    from . import lora_test_studio as studio
+
+    res = studio.create_comparison_run(user_id, selections, **knobs)
+    ids = res.get('ids') or []
+    if ids:
+        rows = LoraTestImage.query.filter(LoraTestImage.id.in_(ids)).all()
+        seen = set()
+        # Ordered by id so "the preview" is the first cell of the launch, a
+        # stable choice rather than whatever the query happened to return first.
+        for row in sorted(rows, key=lambda r: r.id):
+            if row.record_id is None or row.step is None:
+                continue                  # an unattributed pick has no node to sit under
+            key = (row.record_id, row.step)
+            if key in seen:
+                continue
+            seen.add(key)
+            db.session.add(CheckpointPreview(
+                record_id=row.record_id, step=row.step, dataset_id=row.dataset_id,
+                lora_test_image_id=row.id, prompt=row.prompt or '', seed=row.seed))
+        db.session.commit()
+    return res
+
+
+def checkpoint_gallery(record_id, step, limit=120) -> dict:
+    """Every finished image this checkpoint ever produced, newest first — the
+    gallery the canvas opens under a node.
+
+    The source is the LINK written at generation time
+    (``lora_test_image.record_id`` / ``.step``), so it holds whatever made the
+    image: an inline canvas preview, a Test-Studio grid cell, a comparison run.
+    Nothing is parsed out of a filename here — that is the whole point of the
+    columns.
+
+    `unlinked` is the honest footnote: images that exist but carry no link (they
+    predate the columns and their filename did not attribute itself). They are
+    NOT shown under a checkpoint they might not belong to; the number is
+    reported so the gap is stated instead of looking like an empty history."""
+    from ..models import LoraTestImage
+    q = (LoraTestImage.query
+         .filter(LoraTestImage.record_id == record_id,
+                 LoraTestImage.step == step,
+                 LoraTestImage.status == 'done',
+                 LoraTestImage.filename.isnot(None))
+         .order_by(LoraTestImage.id.desc()))
+    total = q.count()
+    rows = q.limit(max(1, min(int(limit or 120), 500))).all()
+    from .checkpoint_link_backfill import unlinked_count
+    return {
+        'record_id': record_id, 'step': step, 'count': total,
+        'unlinked': unlinked_count(),
+        'images': [{
+            'id': r.id,
+            'dataset_id': r.dataset_id,
+            'url': f'/api/dataset/{r.dataset_id}/img/{r.filename}',
+            'rating': r.rating,
+            'prompt': r.prompt,
+            'seed': r.seed,
+            'strength': r.strength,
+            'created_at': r.created_at.isoformat() if r.created_at else None,
+        } for r in rows],
+    }
 
 
 def generate_checkpoint_previews(user_id, dataset_id, checkpoints, prompt=None,
@@ -2728,19 +3347,24 @@ def generate_checkpoint_previews(user_id, dataset_id, checkpoints, prompt=None,
     # the route maps it to the same structured error the Studio already returns.
     result = studio.create_run(
         user_id, dataset_id, checkpoints=[fn for _, _, fn in resolved],
-        strengths=[1.0], seed=seed, prompt=prompt, family=fam, count=1)
+        strengths=[1.0], seed=seed, prompt=prompt, family=fam, count=1,
+        # The caller KNOWS which lineage checkpoint each file is — it was just
+        # resolved above — so every cell records it rather than the app deriving
+        # it back from the filename later.
+        origins={fn: {'record_id': rid, 'step': step} for rid, step, fn in resolved})
     ids = result.get('ids') or []
     run_seed = result.get('seed', seed)
     # Single base model × single strength × count=1 → cells are 1:1 with `resolved`
     # in order; zip guards against any engine-side short count (never a wrong link).
+    #
+    # A NEW row per generation: previews accumulate (the unique constraint that
+    # forced one row per checkpoint was lifted — see
+    # services.checkpoint_preview_migration). Regenerating an epoch used to
+    # re-point the single row and the earlier image became unreachable.
     for (rid, step, _fn), img_id in zip(resolved, ids):
-        row = CheckpointPreview.query.filter_by(record_id=rid, step=step).first()
-        if row is None:
-            row = CheckpointPreview(record_id=rid, step=step, dataset_id=dataset_id)
-            db.session.add(row)
-        row.lora_test_image_id = img_id
-        row.prompt = prompt or ''
-        row.seed = run_seed
+        db.session.add(CheckpointPreview(
+            record_id=rid, step=step, dataset_id=dataset_id,
+            lora_test_image_id=img_id, prompt=prompt or '', seed=run_seed))
     db.session.commit()
     return {'queued': len(resolved), 'skipped': skipped, 'needs_setup': False,
             'seed': run_seed}
@@ -2875,11 +3499,14 @@ def _lineage_node(rec, crun, requested_id, failed_local_id):
     for _ck in (node.get('checkpoints') or []):
         _step = _ck.get('step')
         _ck['note'] = _cnotes.get(_step, '')
-        # `preview_*` render the inline thumbnail (or its pending/failed state).
+        # `preview_*` render the inline thumbnail (or its pending/failed state);
+        # `preview_count` is the SIZE of the checkpoint's gallery — every image it
+        # ever produced, from any surface — which the pill shows as a × N badge.
         _pv = _cprev.get(_step)
         if _pv:
             _ck['preview_url'] = _pv.get('url')
             _ck['preview_status'] = _pv.get('status')
+            _ck['preview_count'] = _pv.get('count') or 0
     return node
 
 
@@ -2892,7 +3519,7 @@ def annotate_deployed_checkpoints(dataset_id, family, checkpoints,
     has exactly one implementation on purpose: the ◉ Graph pills and the
     Checkpoints & LoRAs rows must never disagree about which checkpoints are
     deployed, nor about which file an undeploy would remove. `testable` decides
-    "✓ Deployed vs 📦 Import"; `deployed_filename` is the ONLY handle the UI has
+    "✓ Deployed vs Import"; `deployed_filename` is the ONLY handle the UI has
     on the ComfyUI copy (without it the delete route answers "unknown checkpoint"
     and the action is withheld) — it is resolved to the form that route accepts.
 
@@ -3024,6 +3651,141 @@ def dataset_lineage(dataset_id, train_type=None, variant=None) -> dict:
         node['has_superseded_tail'] = node['record_id'] in superseded_parents
     return {'root_id': None, 'current_id': None,
             'nodes': nodes, 'edges': edges, 'single': len(nodes) < 2}
+
+
+def canvas_dataset_index(user_id) -> dict:
+    """The LoRA Canvas' INDEX: every dataset of `user_id` that produced at least
+    one training run, with its run count and the families it covers.
+
+    Deliberately cheap — two grouped queries, no checkpoints, no disk. The canvas
+    draws its dataset filter from this and then pulls each shown dataset's
+    genealogy through the existing per-dataset lineage endpoint. Assembling the
+    whole forest in one response would have to scan every run's saves on disk
+    before ANYTHING could appear on screen, and a library of thirty datasets
+    would stare at a spinner for it. Datasets with no run are omitted: there is
+    nothing to draw for them, and offering them in the filter would only be a
+    list of dead ends.
+
+    Ordered newest-run-first, so the board opens on what was trained recently."""
+    from sqlalchemy import func
+    from ..models import TrainingRunRecord
+    datasets = {d.id: d for d in fds.list_datasets(user_id)}
+    if not datasets:
+        return {'datasets': []}
+    ids = list(datasets)
+    rows = (db.session.query(TrainingRunRecord.dataset_id,
+                             func.count(TrainingRunRecord.id),
+                             func.max(TrainingRunRecord.created_at))
+            .filter(TrainingRunRecord.dataset_id.in_(ids))
+            .group_by(TrainingRunRecord.dataset_id).all())
+    fams = {}
+    for ds_id, fam in (db.session.query(TrainingRunRecord.dataset_id,
+                                        TrainingRunRecord.family)
+                       .filter(TrainingRunRecord.dataset_id.in_(ids))
+                       .distinct().all()):
+        if fam:
+            fams.setdefault(ds_id, set()).add(fam)
+    out = []
+    for ds_id, runs, last_at in rows:
+        ds = datasets.get(ds_id)
+        if ds is None:
+            continue
+        out.append({
+            'id': ds_id,
+            'name': ds.name,
+            'runs': int(runs or 0),
+            'families': sorted(fams.get(ds_id) or ()),
+            'last_run_at': last_at.isoformat() if last_at else None,
+        })
+    out.sort(key=lambda d: (d['last_run_at'] or '', d['id']), reverse=True)
+    return {'datasets': out}
+
+
+# --- ◉ LoRA Canvas: remembered card positions -------------------------------
+#
+# The canvas draws its trees with the automatic layout and lets the user drag a
+# card off it. These three functions are the whole persistence story: read the
+# board's overrides, upsert some, drop a lane's. Everything about WHICH cards get
+# a row and where they land is decided client-side by the pure placement layer
+# (frontend/src/utils/canvasPlacement.js) — the server stores coordinates and
+# asks no questions, so the geometry stays testable without a browser.
+#
+# Positions are a display preference. A failed write must never interrupt what
+# the user is doing (design: "nothing about the canvas may block the canvas"),
+# which is why these are plain, boring upserts with no side effects.
+
+def canvas_positions(user_id, dataset_ids=None) -> dict:
+    """Every remembered card position of `user_id`, grouped by dataset id.
+
+    One request for the whole board on purpose: the canvas opens on N lanes and
+    N round-trips for a handful of tiny rows would be slower than the genealogy
+    fetches they have to be ready before. `dataset_ids` narrows it when the
+    caller already knows the lanes it wants."""
+    from ..models import CanvasNodePosition
+    owned = {d.id for d in fds.list_datasets(user_id)}
+    if dataset_ids is not None:
+        owned &= {int(i) for i in dataset_ids}
+    if not owned:
+        return {'positions': {}}
+    rows = (CanvasNodePosition.query
+            .filter(CanvasNodePosition.dataset_id.in_(list(owned))).all())
+    out = {}
+    for r in rows:
+        out.setdefault(str(r.dataset_id), []).append(
+            {'record_id': r.record_id, 'x': float(r.x), 'y': float(r.y)})
+    for lane in out.values():
+        lane.sort(key=lambda p: p['record_id'])
+    return {'positions': out}
+
+
+def save_canvas_positions(user_id, dataset_id, positions) -> dict:
+    """Upsert card positions for one lane. Returns how many rows the lane holds.
+
+    Idempotent by (dataset_id, record_id) — the canvas re-sends a position on
+    every drop and re-pins the same coordinates whenever a lane gains a run, so
+    a second identical write must be a no-op rather than a duplicate row.
+    Non-finite coordinates are rejected outright: one NaN stored here would make
+    a card unreachable on every future load, and there is no UI to fix it."""
+    from ..models import CanvasNodePosition
+    if not fds.get_dataset(user_id, dataset_id):
+        raise LookupError('dataset not found')
+    wanted = {}
+    for p in (positions or []):
+        try:
+            rid = int(p['record_id'])
+            x, y = float(p['x']), float(p['y'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not (x == x and y == y and abs(x) != float('inf') and abs(y) != float('inf')):
+            continue
+        wanted[rid] = (x, y)
+    if wanted:
+        existing = {r.record_id: r for r in CanvasNodePosition.query.filter(
+            CanvasNodePosition.dataset_id == dataset_id,
+            CanvasNodePosition.record_id.in_(list(wanted))).all()}
+        for rid, (x, y) in wanted.items():
+            row = existing.get(rid)
+            if row is None:
+                db.session.add(CanvasNodePosition(
+                    dataset_id=dataset_id, record_id=rid, x=x, y=y))
+            else:
+                row.x, row.y = x, y
+        db.session.commit()
+    return {'saved': len(wanted),
+            'total': CanvasNodePosition.query.filter_by(dataset_id=dataset_id).count()}
+
+
+def clear_canvas_positions(user_id, dataset_id) -> dict:
+    """✦ Tidy up for one lane: drop every remembered position so the automatic
+    tree takes over again. The escape hatch — an arrangement tangled over twenty
+    runs has to have a way back that is not "edit the database"."""
+    from ..models import CanvasNodePosition
+    if not fds.get_dataset(user_id, dataset_id):
+        raise LookupError('dataset not found')
+    removed = CanvasNodePosition.query.filter_by(
+        dataset_id=dataset_id).delete(synchronize_session=False)
+    db.session.commit()
+    return {'cleared': int(removed or 0)}
 
 
 def gpu_tiers(user_id, dataset_id, train_type=None, steps=None,
@@ -3198,13 +3960,13 @@ def delete_cloud_checkpoint(dataset_id, run_id, filename) -> str:
     return filename
 
 
-# ── Staging cleanup (global 🧹 and per-run 🧹) ────────────────────────────────
+# ── Staging cleanup (global and per-run) ────────────────────────────────
 # Both entry points share ONE sparing rule and ONE trashing step, so a run that
 # the global purge spares can never be trashed by the per-run button (and back).
 
 def staging_spare_reason(run) -> str | None:
     """Why this run's staging must NOT be trashed, or None when it is fair game.
-    The single source of truth for both 🧹 buttons and for the per-run button's
+    The single source of truth for both buttons and for the per-run button's
     disabled state — duplicating it is how the two drift apart."""
     if run.status in ACTIVE_STATES:
         return 'this run is still active — its staging is being written to'
@@ -3239,7 +4001,7 @@ _STAGING_SIZE_TTL = 60.0
 
 def staging_sizes(run_ids=None) -> dict:
     """{run_id: bytes on disk} for the runs whose staging dir still exists —
-    what the per-run 🧹 needs to name the weight it is about to move. Runs with
+    what the per-run needs to name the weight it is about to move. Runs with
     no staging (never launched, already purged, hand-deleted) are simply absent,
     which the UI reads as "nothing to clean here". Best-effort: a directory that
     cannot be walked is skipped rather than failing the whole request."""
@@ -3272,7 +4034,7 @@ def staging_sizes(run_ids=None) -> dict:
 
 
 def purge_run_staging(run_id) -> dict:
-    """Per-run 🧹: move THIS run's staging dir to the trash. Same sparing rule as
+    """Per-run: move THIS run's staging dir to the trash. Same sparing rule as
     the global purge (staging_spare_reason), so the two can't disagree; the DB row
     stays (history). Raises ValueError on an unknown or spared run — the caller
     turns it into a 400 with the reason, instead of a silent no-op."""

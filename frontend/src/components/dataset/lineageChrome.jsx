@@ -3,11 +3,10 @@
    same in either: its family label, its status dot, its on-disk/gone chip. Kept
    in one place so the two views can never drift apart. */
 
-export const FAMILY_LABEL = {
-  zimage: 'Z-Image', krea: 'Krea 2', sdxl: 'SDXL',
-  flux: 'FLUX.1', flux2klein: 'FLUX.2 Klein', anima: 'Anima',
-};
-export const famLabel = (f) => FAMILY_LABEL[f] || f || 'LoRA';
+// The family names live in a JSX-free module so the canvas's "you mixed Krea and
+// Z-Image" refusal can name them in a unit-testable helper. Re-exported here so
+// every existing import keeps working.
+export { FAMILY_LABEL, famLabel } from '../../utils/familyLabels';
 
 const STATUS_TONE = {
   done: 'bg-emerald-400',
@@ -32,7 +31,7 @@ export function SavesChip({ node }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200 text-[0.5625rem] font-medium"
         title={n ? `${n} checkpoint${n > 1 ? 's' : ''} still on disk` : 'LoRA on disk'}>
-        <span aria-hidden>💾</span>{n ? `${n} on disk` : 'on disk'}
+        {n ? `${n} on disk` : 'on disk'}
       </span>
     );
   }

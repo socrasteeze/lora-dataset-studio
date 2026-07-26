@@ -7,6 +7,14 @@ import {
 } from '../common/promptOverride.js'
 import { SUBJECT_TYPE_LABELS } from '../dataset/subjectTypes.js'
 
+/* The engines the generate panel may offer. LOCAL-ONLY on this fork
+   (Divergence 1) — mirrors ENGINES in dataset/engineSelection.js and
+   LOCAL_ENGINES in face_dataset_service.py. Never add a cloud engine here. */
+const ENGINE_OPTIONS = [
+  { id: 'klein', label: 'Klein (ComfyUI, local)' },
+  { id: 'krea', label: 'Krea 2 Edit (ComfyUI, local)' },
+]
+
 /* Optional generation-LoRA PRESETS for the local Klein engine (Idea by
    @waltm — Discord feature request): named combinations of user-pointed LoRA
    files (any files, any purpose — texture, anatomy, style…). Inside a preset
@@ -195,6 +203,111 @@ function KleinGenerationCard({ config, setField }) {
           5 = the shipped value. More steps = slower, usually cleaner; 1–{KLEIN_GENERATION_STEPS_MAX}.
           Applies to variations, regenerations and the small-image rescue — not to
           “Upscale &amp; improve”, which has its own Steps below.
+        </p>
+      </div>
+    </Card>
+  )
+}
+
+/* Krea 2 Identity Edit — the second LOCAL engine. Its headline knob is
+   `grounding_px`, THE consistency <-> prompt-adherence dial, so it is first and
+   explained in plain words: a number nobody can interpret is not a setting.
+   The two path fields are BLANK-MEANS-AUTO on purpose: the resolver finds the
+   files by canonical name then by a narrow token across every ComfyUI model
+   root, so an install that looks nothing like the developer's works untouched —
+   they exist for the person whose files are named something else. */
+const KREA_GROUNDING_MIN = 512      // mirrors krea_edit_helper.GROUNDING_PX_MIN
+const KREA_GROUNDING_MAX = 1536     // mirrors krea_edit_helper.GROUNDING_PX_MAX
+const KREA_STEPS_MAX = 50
+
+function KreaCard({ config, setField }) {
+  const krea = config.krea || {}
+  const grounding = Number(krea.grounding_px ?? 1024)
+  return (
+    <Card
+      id="krea-engine"
+      title="Krea 2 Edit (local)"
+      help="The second local engine. It re-stages your reference photo — new angle, framing, light, background — while keeping the face and the body, from that ONE photo and with no character LoRA, which is what makes it useful before a LoRA exists. It needs the comfyui-krea2edit custom-node pack plus four model files; the engine card in the workspace names whatever is still missing. Its output always keeps the reference's aspect ratio (capped at 2 MP) — the shot catalog's aspect overrides do not apply — because the model was trained on same-size pairs."
+    >
+      <div className="sm:max-w-md">
+        <label htmlFor="krea-grounding" className="block text-xs font-medium text-content">
+          Reference grounding ({grounding} px)
+        </label>
+        <input
+          id="krea-grounding"
+          type="range"
+          min={KREA_GROUNDING_MIN}
+          max={KREA_GROUNDING_MAX}
+          step={64}
+          value={grounding}
+          onChange={(e) => setField('krea', 'grounding_px', Number(e.target.value))}
+          className="mt-1 w-full accent-violet-500"
+        />
+        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+          The resolution your reference is shown to the model&rsquo;s vision encoder at — the
+          consistency ↔ prompt dial. <b>Lower</b> = it follows the shot description (more
+          variety in pose, outfit and scene, looser likeness). <b>Higher</b> = it resembles
+          the reference more, but starts copying the pose and outfit you asked it to change.
+          1024 px is the recommended balance for people; the node&rsquo;s own default is 768.
+        </p>
+      </div>
+
+      <div className="mt-3 sm:max-w-md">
+        <label htmlFor="krea-steps" className="block text-xs font-medium text-content">
+          Sampler steps
+        </label>
+        <input
+          id="krea-steps"
+          type="number"
+          min={1}
+          max={KREA_STEPS_MAX}
+          step={1}
+          value={krea.steps ?? 10}
+          onChange={(e) => setField('krea', 'steps',
+            e.target.value === '' ? 10 : Number(e.target.value))}
+          className={INPUT_CLASS}
+        />
+        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+          10 is the value the model&rsquo;s own reference workflow uses. More is slower and
+          rarely better on this pipeline.
+        </p>
+      </div>
+
+      <div className="mt-3 sm:max-w-md">
+        <label htmlFor="krea-base-model" className="block text-xs font-medium text-content">
+          Base model file (optional)
+        </label>
+        <input
+          id="krea-base-model"
+          type="text"
+          value={krea.base_model ?? ''}
+          placeholder="auto — finds a Krea 2 Turbo/Raw build"
+          onChange={(e) => setField('krea', 'base_model', e.target.value)}
+          className={INPUT_CLASS}
+        />
+        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+          Leave blank unless you own several Krea builds. Blank = the app picks a Krea 2
+          Turbo then Raw model from your ComfyUI. Non-Krea-2 checkpoints that merely carry
+          &ldquo;krea&rdquo; in their name are skipped: the identity LoRA renders pure noise on them.
+        </p>
+      </div>
+
+      <div className="mt-3 sm:max-w-md">
+        <label htmlFor="krea-identity-lora" className="block text-xs font-medium text-content">
+          Identity edit LoRA (optional)
+        </label>
+        <input
+          id="krea-identity-lora"
+          type="text"
+          value={krea.identity_lora ?? ''}
+          placeholder="krea/krea2_identity_edit_v1_2.safetensors"
+          onChange={(e) => setField('krea', 'identity_lora', e.target.value)}
+          className={INPUT_CLASS}
+        />
+        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+          Path relative to ComfyUI&rsquo;s models/loras. If the file isn&rsquo;t there under this
+          name, the app searches your LoRA folders for a krea2_identity_edit file, so a
+          renamed download still works.
         </p>
       </div>
     </Card>
@@ -432,15 +545,48 @@ function KleinModelFilesCard({ config, setField, caps }) {
 }
 
 export default function EnginesSection(props) {
-  const { config, setField, caps } = props
+  const { config, setField, caps, toggleEngine } = props
   return (
     <div className="space-y-6">
-      <Card title="Engine"
-        help="Local-only fork: images are generated by the local Klein engine (ComfyUI). Configure ComfyUI under Local tools; Klein models install from the Setup page.">
+      <Card title="Engines"
+        help="Local-only fork: images are generated on your own GPU through ComfyUI. Configure ComfyUI under Local tools; the model files install from the Setup page.">
         <p className="text-sm text-content-muted">
-          Klein (ComfyUI, local) is the only generation engine — free, on your own GPU,
-          NSFW-capable. The cloud API engines were removed from this fork.
+          Klein and Krea 2 Edit both render locally through ComfyUI — free, on your own
+          GPU, NSFW-capable. The cloud API engines were removed from this fork.
         </p>
+      </Card>
+
+      <Card id="engines-choice" title="Which engines to offer"
+        help="Which engines appear in the generate panel, and which one is preselected. Both run locally, so turning one off is about what you have installed, not about cost: Krea 2 Edit needs its own custom-node pack and model files, so leave it unticked until Setup reports it ready.">
+        <div>
+          <label htmlFor="engine-default" className="block text-sm font-medium text-content">Default engine</label>
+          <select
+            id="engine-default"
+            value={config.engines.default}
+            onChange={(e) => setField('engines', 'default', e.target.value)}
+            className={INPUT_CLASS}
+          >
+            {ENGINE_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </div>
+
+        <fieldset id="engines-enabled" className="scroll-mt-24">
+          <legend className="mb-1 block text-sm font-medium text-content">Enabled engines</legend>
+          <div className="flex flex-col gap-2">
+            {ENGINE_OPTIONS.map((o) => (
+              <label key={o.id} htmlFor={`engine-enabled-${o.id}`} className="flex items-center gap-2 text-sm text-content">
+                <input
+                  id={`engine-enabled-${o.id}`}
+                  type="checkbox"
+                  checked={(config.engines.enabled || []).includes(o.id)}
+                  onChange={() => toggleEngine(o.id)}
+                  className="h-4 w-4 rounded border-border-strong"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </Card>
 
       <KleinModelFilesCard config={config} setField={setField} caps={caps} />
@@ -448,6 +594,8 @@ export default function EnginesSection(props) {
       <KleinGenerationCard config={config} setField={setField} />
 
       <KleinLorasCard config={config} setField={setField} />
+
+      <KreaCard config={config} setField={setField} />
 
       <IdentityPromptsCard config={config} setField={setField} promptDefaults={props.promptDefaults}
         promptDefaultsBySubject={props.promptDefaultsBySubject}

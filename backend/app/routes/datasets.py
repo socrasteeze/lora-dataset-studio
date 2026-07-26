@@ -25,7 +25,9 @@ from ..services.face_variations import (NSFW_VARIATION_CATALOG, VARIATION_CATALO
                                         is_nsfw_label, select_preset,
                                         normalize_subject_type, variation_catalog,
                                         nsfw_variation_catalog, presets_for,
-                                        preset_meta_for)
+                                        preset_meta_for, all_catalog_labels,
+                                        sanitize_custom_shots,
+                                        MAX_CUSTOM_SHOTS_PER_SUBJECT)
 from ..utils.comfyui import KREA_ALLOWED_SAMPLERS, KREA_ALLOWED_SCHEDULERS, get_krea_loras
 from ._common import (_map_error, _require_comfyui, _studio_arch_mismatch_response,
                       _studio_missing_response)
@@ -178,6 +180,39 @@ def dataset_variations():
                     'subject_type': st})
 
 
+@bp.get('/dataset/shot-catalog')
+def dataset_shot_catalog():
+    """The user's imported shots for a subject type + the labels an import may NOT
+    re-use. `reserved_labels` is the union of EVERY catalog plus the legacy aliases,
+    not just this subject's: the by-label resolvers search that whole union, so a
+    label borrowed from another subject type would resolve to the wrong entry."""
+    st = normalize_subject_type(request.args.get('subject_type'))
+    shots = sanitize_custom_shots(cfg.get('custom_shots') or {})
+    return jsonify({'subject_type': st, 'shots': shots.get(st, []),
+                    'reserved_labels': all_catalog_labels(),
+                    'max_shots': MAX_CUSTOM_SHOTS_PER_SUBJECT})
+
+
+@bp.put('/dataset/shot-catalog')
+def dataset_shot_catalog_save():
+    """Replace the imported shots of ONE subject type. The whole list is sent, so a
+    removal is just a shorter list; the other subjects are untouched (config
+    _deep_merge replaces the list under this key only). Sanitized again here — the
+    client validates on import, but this endpoint is the one that writes."""
+    body = request.get_json(force=True, silent=True) or {}
+    st = normalize_subject_type(body.get('subject_type'))
+    shots = body.get('shots')
+    if not isinstance(shots, list):
+        return jsonify({'error': "'shots' must be a list"}), 400
+    if len(shots) > MAX_CUSTOM_SHOTS_PER_SUBJECT:
+        return jsonify({'error': f'too many shots (max {MAX_CUSTOM_SHOTS_PER_SUBJECT})'}), 400
+    kept = sanitize_custom_shots({st: shots}).get(st, [])
+    cfg.save_config({'custom_shots': {st: kept}})
+    # Report what actually landed: a shot dropped here (a label shadowing a
+    # built-in, a framing outside the enum) must not look like it was saved.
+    return jsonify({'subject_type': st, 'shots': kept, 'dropped': len(shots) - len(kept)})
+
+
 @bp.get('/dataset/list')
 def dataset_list():
     dss = svc.list_datasets(LOCAL_USER)
@@ -242,11 +277,10 @@ def dataset_set_ref(dataset_id):
     # widen back out later — the auto head-crop is only the default framing, not a
     # one-way lossy door (the old behavior discarded it and re-crops could only tighten).
     orig_fn = f"{LOCAL_USER}_datasetreforig_{uuid.uuid4().hex[:8]}.webp"
-    with open(os.path.join(dsdir, orig_fn), 'wb') as fh:
-        fh.write(svc.normalize_to_webp(raw, size=2048))
+    svc.write_image_atomic(os.path.join(dsdir, orig_fn),
+                           svc.normalize_to_webp(raw, size=2048))
     fn = f"{LOCAL_USER}_datasetref_{uuid.uuid4().hex[:8]}.webp"
-    with open(os.path.join(dsdir, fn), 'wb') as fh:
-        fh.write(webp)
+    svc.write_image_atomic(os.path.join(dsdir, fn), webp)
     ds.ref_original_filename = orig_fn
     ds.ref_filename = fn
     svc.db.session.commit()
@@ -413,6 +447,43 @@ def _klein_missing_response(missing, missing_nodes=None):
                     'klein_nodes_missing': missing_nodes}), 409
 
 
+def _krea_missing_response(e):
+    """Turn a KreaModelsMissing into a structured 409.
+
+    The generate route's client surfaces `error` as a toast, so that STRING has
+    to be actionable on its own — it names the node pack, every missing weight,
+    the exact path it belongs at and where to get it. The itemized payload uses
+    the same `{files, nodes, node_packs}` vocabulary as `_studio_missing_response`
+    (path/kind/class_type/pack/url/search) so a future banner can render both
+    engines with one component, but it is published under its OWN key: claiming
+    to be a `studio_missing` would make the Studio banner announce a "test
+    pipeline" failure for a generation engine.
+
+    NO auto-download, unlike Klein's 409: Klein's assets are public
+    direct-download Hugging Face files wired into setup_installer, while Krea 2
+    Edit needs a git-cloned node pack and weights this app has no verified direct
+    URL for. Inventing an installer would be worse than saying where to get each
+    piece — so every gap is named with its expected path inside the user's own
+    ComfyUI and the page it comes from."""
+    from ..services import krea_edit_helper as keh
+    files = keh.missing_file_entries(e.missing)
+    node_packs = keh.krea_node_hints(e.missing_nodes)
+    parts = ["Krea 2 Edit can't run yet."]
+    if e.missing_nodes:
+        parts.append(
+            f"Install the “{keh.KREA_NODE_PACK['pack']}” custom-node pack "
+            f"({keh.KREA_NODE_PACK['url']}) into ComfyUI/custom_nodes and restart "
+            f"ComfyUI — it provides {', '.join(e.missing_nodes)}.")
+    for f in files:
+        parts.append(f"Missing {f['kind']}: place it at {f['path']} inside your "
+                     f"ComfyUI folder (from {f['source']}).")
+    parts.append('Then retry the generation.')
+    return jsonify({'ok': False, 'error': ' '.join(parts),
+                    'krea_missing': {'assets': e.missing, 'files': files,
+                                     'nodes': e.missing_nodes,
+                                     'node_packs': node_packs}}), 409
+
+
 def _autostart_optional_klein():
     """Fire-and-forget: fetch any still-missing OPTIONAL Klein asset (the
     consistency LoRA) after a successful generate, so it's present next time.
@@ -421,6 +492,46 @@ def _autostart_optional_klein():
     optional = [m for m in keh.klein_missing_assets() if m in keh.KLEIN_RECOMMENDED]
     if optional:
         _autostart_klein_downloads(optional)
+
+
+def _parse_engine_batches(data):
+    """Normalise the multi-engine payload into [(generator, variations)].
+
+    `engine_batches` (new, optional) is a list of {generator, variations}: the
+    workspace can run one batch per selected engine, either sharing the shots
+    between them or sending every shot to every engine. It is computed client
+    side (the UI has to display the resulting count and cost anyway, and a second
+    implementation here would be a second truth to keep in sync) — so this route
+    validates every entry rather than trusting the split.
+
+    Absent → the historic single `generator` + `variations` shape, unchanged, so
+    a tab that was never reloaded keeps working."""
+    # `in`, not truthiness: an EMPTY list means "the user has no engine selected"
+    # and must be refused, not silently reinterpreted as a legacy Klein request.
+    if 'engine_batches' not in data:
+        return [(data.get('generator') or 'klein', data.get('variations') or [])]
+    raw = data.get('engine_batches')
+    if raw is None:
+        raise ValueError('no engine selected')
+    if not isinstance(raw, list):
+        raise ValueError('engine_batches must be a list')
+    batches = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise ValueError('engine_batches must be a list of {generator, variations}')
+        generator = entry.get('generator') or 'klein'
+        variations = entry.get('variations') or []
+        # Every entry is checked — not just the first one — or an unknown engine
+        # could ride along behind a valid one.
+        if generator not in svc.KNOWN_ENGINES:
+            raise ValueError(f'unknown engine: {generator}')
+        if not isinstance(variations, list):
+            raise ValueError('engine_batches variations must be a list')
+        if variations:
+            batches.append((generator, variations))
+    if not batches:
+        raise ValueError('no variations selected — pick at least one engine and one shot')
+    return batches
 
 
 @bp.post('/dataset/<int:dataset_id>/generate')
@@ -434,30 +545,79 @@ def dataset_generate(dataset_id):
                         'error': 'The API engines were removed from this fork — '
                                  'generation runs on the local Klein engine only.'}), 400
     try:
-        # Klein node preflight (once per request — /object_info is large, so
-        # never per-tile): if the workflow needs a custom node this ComfyUI
-        # lacks, answer one actionable 409 instead of a grid of tiles each
-        # failing ComfyUI validation. Fail-open when /object_info is
-        # unreachable. Combined with the model scan so a fresh install gets
-        # ONE 409 covering both (and the model downloads start in parallel
-        # with the user's node-pack install).
+        batches = _parse_engine_batches(data)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    multiplier = data.get('multiplier', 1)
+    # No NSFW route guard is needed on this fork: every engine in svc.KNOWN_ENGINES
+    # is local (Divergence 1), and the local engines are exactly the ones allowed
+    # to receive NSFW shots. _parse_engine_batches has already refused anything
+    # outside that catalogue.
+    # Klein node preflight (once per request — /object_info is large, so never
+    # per-tile): if the workflow needs a custom node this ComfyUI lacks, answer
+    # one actionable 409 instead of a grid of tiles each failing ComfyUI
+    # validation. Fail-open when /object_info is unreachable. Combined with the
+    # model scan so a fresh install gets ONE 409 covering both (and the model
+    # downloads start in parallel with the user's node-pack install).
+    # The dataset must be checked BEFORE the Klein preflight below: that preflight
+    # answers 409 "install the model", which would be a misleading reply to a
+    # request naming a dataset that doesn't exist (the service used to validate
+    # first, since it ran the preflight itself).
+    if not svc.get_dataset(LOCAL_USER, dataset_id):
+        return jsonify({'ok': False, 'error': 'dataset not found'}), 400
+    # Runs BEFORE any dispatch, and covers the MODEL FILES as well as the nodes:
+    # generate_variations checks the assets itself, but by then the API batches of
+    # a mixed run would already be in flight — the user would be told the batch
+    # failed while paying for half of it. Both gaps answer the same actionable
+    # 409 (with the downloads started), so they are checked together, up front.
+    if any(g == 'klein' for g, _ in batches):
         from ..services import klein_edit_helper as keh
         missing_nodes = keh.klein_missing_nodes()
-        if missing_nodes:
-            return _klein_missing_response(keh.klein_missing_assets(), missing_nodes)
-        ids = svc.generate_variations(LOCAL_USER, dataset_id,
-                                      data.get('variations') or [], data.get('multiplier', 1),
-                                      data.get('klein_model'),
-                                      lora_strength=data.get('lora_strength'),
-                                      # Optional generation-LoRA preset
-                                      # (Idea by @waltm): a NAME resolved
-                                      # from config — absent/'' = none.
-                                      generation_lora_preset=data.get('generation_lora_preset'))
-        _autostart_optional_klein()  # bg-fetch the consistency LoRA if it's absent
+        missing_assets = keh.klein_missing_assets()
+        if missing_nodes or any(a in missing_assets for a in keh.KLEIN_REQUIRED):
+            return _klein_missing_response(missing_assets, missing_nodes)
+    # Same rule for the second LOCAL engine: weights AND the custom-node pack are
+    # checked once, up front, so a two-engine run can't dispatch Klein's share and
+    # only then discover Krea can't render its own.
+    if any(g == 'krea' for g, _ in batches):
+        from ..services import krea_edit_helper as keh2
+        try:
+            keh2.preflight()
+        except keh2.KreaModelsMissing as e:
+            return _krea_missing_response(e)
+    created, per_engine = 0, {}
+    try:
+        # The per-engine calls each enforce MAX_FANOUT on their own share, which
+        # would let a 3-engine run create rows for two engines before the third
+        # is refused. Check the AGGREGATE first: all-or-nothing.
+        svc.check_fanout_budget(
+            dataset_id, sum(len(v) for _, v in batches) * max(1, int(multiplier or 1)))
+        for generator, variations in batches:
+            if generator == 'krea':
+                # Second LOCAL path (Krea 2 Identity Edit): GPU-bound like Klein,
+                # free, NSFW-capable. Its one dial (grounding_px) is a setting,
+                # not a per-run argument — see krea_edit_helper.grounding_px.
+                ids = svc.generate_variations_krea(LOCAL_USER, dataset_id,
+                                                   variations, multiplier)
+            else:
+                ids = svc.generate_variations(LOCAL_USER, dataset_id,
+                                              variations, multiplier,
+                                              data.get('klein_model'),
+                                              lora_strength=data.get('lora_strength'),
+                                              # Optional generation-LoRA preset
+                                              # (Idea by @waltm): a NAME resolved
+                                              # from config — absent/'' = none.
+                                              generation_lora_preset=data.get('generation_lora_preset'))
+                _autostart_optional_klein()  # bg-fetch the consistency LoRA if it's absent
+            created += len(ids)
+            per_engine[generator] = per_engine.get(generator, 0) + len(ids)
     except Exception as e:
         from ..services.klein_edit_helper import KleinModelsMissing
+        from ..services.krea_edit_helper import KreaModelsMissing
         if isinstance(e, KleinModelsMissing):  # a required Klein model isn't installed
             return _klein_missing_response(e.missing)
+        if isinstance(e, KreaModelsMissing):   # asset or node pack absent — no auto-fetch
+            return _krea_missing_response(e)
         return _map_error(e)
     return jsonify({'ok': True, 'created': len(ids)})
 
@@ -640,7 +800,7 @@ def dataset_caption_options_set(dataset_id):
 
 @bp.post('/dataset/<int:dataset_id>/image/<int:image_id>/caption/preview')
 def dataset_image_caption_preview(dataset_id, image_id):
-    """🧪 Caption Lab: run ONE candidate config on ONE image and return the caption
+    """Caption Lab: run ONE candidate config on ONE image and return the caption
     WITHOUT writing it. Ephemeral A/B probe — the modal fires this once per candidate,
     sequentially, and compares them side by side.
 
@@ -882,7 +1042,7 @@ def dataset_image_improve(image_id):
 
 @bp.post('/dataset/<int:dataset_id>/improve/batch')
 def dataset_improve_batch(dataset_id):
-    """Start the SERVER-side ✨ Klein upscale & improve batch over a selection.
+    """Start the SERVER-side Klein upscale & improve batch over a selection.
 
     Returns immediately with {queued, skipped}; progress rides on the dataset's
     `activity` (kind 'improve'), so it survives a reload, and ⏹ Stop generation
@@ -920,10 +1080,20 @@ def dataset_image_regenerate(image_id):
         # Klein node preflight: surface a missing custom node as one 409
         # instead of a silent failed re-roll. Fail-open if /object_info is down;
         # combined with the model scan (same rationale as the batch generate).
-        from ..services import klein_edit_helper as keh
-        missing_nodes = keh.klein_missing_nodes()
-        if missing_nodes:
-            return _klein_missing_response(keh.klein_missing_assets(), missing_nodes)
+        if engine == 'krea':
+            # Krea's own preflight (weights + node pack). Explicit engine only:
+            # when none is given the service picks the row's origin, and its
+            # KreaModelsMissing is mapped below.
+            from ..services import krea_edit_helper as krh
+            try:
+                krh.preflight()
+            except krh.KreaModelsMissing as e:
+                return _krea_missing_response(e)
+        else:
+            from ..services import klein_edit_helper as keh
+            missing_nodes = keh.klein_missing_nodes()
+            if missing_nodes:
+                return _klein_missing_response(keh.klein_missing_assets(), missing_nodes)
         job_id = svc.regenerate_image(LOCAL_USER, image_id,
                                       lora_strength=data.get('lora_strength'),
                                       prompt=edited_prompt,
@@ -932,8 +1102,11 @@ def dataset_image_regenerate(image_id):
                                       app=current_app._get_current_object())
     except Exception as e:
         from ..services.klein_edit_helper import KleinModelsMissing
+        from ..services.krea_edit_helper import KreaModelsMissing
         if isinstance(e, KleinModelsMissing):
             return _klein_missing_response(e.missing)  # auto-download, tell them to retry
+        if isinstance(e, KreaModelsMissing):
+            return _krea_missing_response(e)
         return _map_error(e)
     if job_id is None:
         return jsonify({'error': 'not found'}), 404

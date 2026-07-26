@@ -27,7 +27,8 @@ from urllib.parse import urlsplit
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from ..extensions import db
-from ..models import FaceDataset, FaceDatasetImage, LoraTestImage
+from ..models import (CanvasNodePosition, FaceDataset, FaceDatasetImage,
+                      LoraTestImage)
 from .. import config as cfg
 from . import dataset_activity, trash
 from .dataset_storage import dataset_path, ensure_dataset_dir
@@ -47,7 +48,8 @@ from .face_variations import (CAPTION_PROMPT, CAPTION_PROMPT_BOORU,
                               compose_prompt_suffix, concept_lexical_field,
                               drop_identity_sentences, drop_identity_tags,
                               is_nsfw_label, prompt_by_label, wrap_variation,
-                              wrap_variation_klein, get_identity_prompt,
+                              wrap_variation_klein, wrap_variation_krea,
+                              get_identity_prompt,
                               normalize_subject_type,
                               KLEIN_IMAGE_IMPROVE_PROMPT)
 
@@ -134,6 +136,34 @@ def _ref_path(ds) -> str:
 
 _VALID_STATUS = ('pending', 'keep', 'reject', 'failed')
 MAX_FANOUT = 60
+
+
+def fanout_in_flight(dataset_id):
+    """Pending generations for this dataset that have no file yet — the anti-DoS
+    counter behind MAX_FANOUT. Same query the per-call checks run inline."""
+    return (FaceDatasetImage.query
+            .filter_by(dataset_id=dataset_id, status='pending')
+            .filter(FaceDatasetImage.filename.is_(None)).count())
+
+
+def check_fanout_budget(dataset_id, total):
+    """Refuse a WHOLE multi-engine batch up front when it would blow MAX_FANOUT.
+
+    generate_variations / generate_variations_krea each enforce the cap on their
+    own call, which is enough for a single engine but NOT for a run split across
+    both: two 40-image calls each pass individually while the run totals 80, and
+    the second would be refused only after the first had already created rows —
+    a half-dispatched batch. The multi-engine route calls this with the aggregate
+    BEFORE dispatching anything, so the run is all-or-nothing. The per-call
+    checks stay as defense in depth."""
+    total = int(total)
+    if total > MAX_FANOUT:
+        raise ValueError(f'fan-out too large ({total} > {MAX_FANOUT})')
+    in_flight = fanout_in_flight(dataset_id)
+    if in_flight + total > MAX_FANOUT:
+        raise ValueError(f'too many generations in flight ({in_flight}), wait or cancel')
+
+
 # Shown when a delete can't move a file to Trash because it's still open in
 # another process (typically an antivirus scan of a just-cleaned image, or an
 # open preview). Raised as a RuntimeError so the route maps it to a clean 409
@@ -292,10 +322,9 @@ def add_extra_ref(user_id, dataset_id, image_bytes) -> str:
     # ✂ Crop reads the original, so a re-crop can widen back out instead of only
     # eating further into the previous crop.
     orig_fn = extra_ref_original_name(fn)
-    with open(os.path.join(dsdir, orig_fn), 'wb') as fh:
-        fh.write(normalize_to_webp(image_bytes, size=2048))
-    with open(os.path.join(dsdir, fn), 'wb') as fh:
-        fh.write(normalize_to_webp(image_bytes))
+    write_image_atomic(os.path.join(dsdir, orig_fn),
+                       normalize_to_webp(image_bytes, size=2048))
+    write_image_atomic(os.path.join(dsdir, fn), normalize_to_webp(image_bytes))
     ds.ref_extra_filenames = json.dumps(extras + [fn])
     db.session.commit()
     return fn
@@ -747,6 +776,35 @@ def subject_type_of(ds) -> str:
     reader every wrap call site uses so a legacy dataset (column NULL) generates
     exactly as before."""
     return normalize_subject_type(getattr(ds, 'subject_type', None) if ds else None)
+
+
+# InsightFace/antelopev2 is a detector+embedder trained on PHOTOGRAPHED faces. On a
+# drawn character it detects nothing most of the time, and the rare "detection" is a
+# meaningless cosine — the pass used to fail OPEN: grey tiles or a plausible number,
+# with nothing saying the tool simply cannot read this kind of image.
+# The message states the way out on purpose: there is NO extra setting to force the
+# pass. A knob whose only correct value is "off" is a knob nobody can set right; the
+# subject type IS the switch, it is one click away, and it says what it means. A
+# genuinely photographic dataset mislabelled anime is fixed where the mistake is.
+FACE_SCORING_DRAWN_REASON = (
+    'Face similarity needs a photographic face; it cannot read a drawn one. '
+    'Set the subject type to Human if this dataset is photographic.')
+
+
+def face_scoring_block_reason(ds):
+    """Why InsightFace scoring must NOT run on this dataset, or None to go ahead.
+
+    The SINGLE place the rule lives: the dataset pass, the Studio cell scoring and
+    best-epoch selection all consult this one function, and the dataset payload
+    republishes its result so the UI never re-derives the rule either. A gate
+    posted at four sites would drift; this one cannot.
+
+    Scoped to face SIMILARITY. Head-cropping (`face_crop_to_square_webp` ->
+    `detect_head_bbox`) goes through Qwen3-VL, a general vision model that reads a
+    drawn head perfectly well — it is deliberately NOT gated here."""
+    if subject_type_of(ds) == 'anime':
+        return FACE_SCORING_DRAWN_REASON
+    return None
 
 
 def create_dataset(user_id, name, trigger_word, kind=None, concept_desc=None, train_type=None,
@@ -1538,6 +1596,13 @@ def delete_dataset(user_id, dataset_id):
         pass
     imgs = FaceDatasetImage.query.filter_by(dataset_id=dataset_id).all()
     studio_rows = LoraTestImage.query.filter_by(dataset_id=dataset_id).all()
+    # ◉ LoRA Canvas card positions. The model declares a relationship() to
+    # face_dataset so the unit of work orders the DELETEs, but a mapper-level
+    # dependency only covers rows that are IN the session — so they are loaded
+    # and deleted explicitly here like every other child, and flushed before the
+    # parent below. A dataset must never fail to delete over a display
+    # preference: that exact bug already answered HTTP 500 once in this project.
+    canvas_rows = CanvasNodePosition.query.filter_by(dataset_id=dataset_id).all()
     dataset_path = _dataset_path(dataset_id)
     trashed_path = None
     try:
@@ -1562,6 +1627,8 @@ def delete_dataset(user_id, dataset_id):
         # db.create_all(). New databases also have ON DELETE CASCADE as a guard.
         for cell in studio_rows:
             db.session.delete(cell)
+        for pos in canvas_rows:
+            db.session.delete(pos)
         # Force the child DELETEs to reach the DB BEFORE the parent's. The child
         # models declare only a table-level ForeignKey (no relationship()), so the
         # unit of work has no ordering dependency between them and would otherwise
@@ -1601,7 +1668,7 @@ def cancel_pending(user_id, dataset_id):
     hiccup, prompt not yet visible in /queue, ...) — those renders may still
     finish on the GPU even though their row and dataset tile are already gone.
 
-    ⏹ Stop generation also stops the server-side ✨ improve BATCH: cancelling the
+    ⏹ Stop generation also stops the server-side improve BATCH: cancelling the
     rows alone used to be pointless, because whatever was feeding the queue simply
     queued the next wave. The flag is armed FIRST so the worker can't slip another
     image in between the arming and the row deletion."""
@@ -2270,6 +2337,34 @@ def _watermark_route_payload(img):
     return {'watermark_route': route, 'watermark_route_nocrop': route_nc}
 
 
+def _image_engine(img):
+    """Which engine produced this image — 'klein' | 'krea' — or None when it
+    CANNOT be told.
+
+    `klein_model` carries two different kinds of value: an engine TAG for the
+    Krea rows (and for legacy rows born on the removed API engines) and a local
+    .safetensors file name for the Klein rows. That is enough to answer honestly
+    for both, but not for every legacy row: images generated before the column
+    was populated, and imported photos, hold nothing. Those get None → the UI
+    shows NO badge, which is the right answer. Guessing 'klein' for an empty
+    value would label an old API image as local, and a wrong badge is worse than
+    none.
+
+    A legacy API tag also returns None: the engine that made the row no longer
+    exists on this fork, so naming it would advertise something unselectable."""
+    value = (img.klein_model or '').strip()
+    if not value:
+        return None
+    if value in LEGACY_API_ENGINE_TAGS:
+        return None
+    # Krea 2 Edit rows store the engine id here, unlike Klein: the engine
+    # resolves its base model deterministically at enqueue AND at regenerate
+    # (krea_edit_helper.resolve_krea_unet), so there is no per-row model to keep.
+    if value == KREA_ENGINE:
+        return KREA_ENGINE
+    return 'klein'   # a local model file name — the row was rendered on the GPU
+
+
 def dataset_payload(user_id, dataset_id):
     ds = get_dataset(user_id, dataset_id)
     if not ds:
@@ -2322,6 +2417,11 @@ def dataset_payload(user_id, dataset_id):
         # WHAT the subject is (NULL/legacy -> 'human'); drives the generation
         # catalog + identity lock. Orthogonal to `kind`.
         'subject_type': subject_type_of(ds),
+        # Why face-similarity scoring is refused for this dataset (string), or null
+        # to go ahead. Published so the UI disables the button and states the reason
+        # from the SAME rule the server enforces, instead of re-implementing
+        # "subject_type === 'anime'" in JSX and drifting from it later.
+        'face_scoring_blocked': face_scoring_block_reason(ds),
         # Dual long+short captioning toggle (Advanced options) → the caption editor shows
         # the short field only when this is on.
         'dual_captions': dual_captions_enabled(ds),
@@ -2391,6 +2491,35 @@ def dataset_payload(user_id, dataset_id):
 
 
 # --- Image normalization ---------------------------------------------------
+def write_image_atomic(path, data: bytes) -> None:
+    """Publish an image file in one step: it is either absent or COMPLETE.
+
+    `open(path, 'wb')` truncates immediately, and the bytes usually arrive a
+    second or two later (a WEBP re-encode of a 1024px generation is not free).
+    Under its FINAL name that leaves an empty file on disk for the whole
+    encode, and the grid polls the dataset while a batch runs: the browser
+    asks for it, the server answers 200 with zero bytes, and the tile renders
+    black. Reported after an OpenRouter generation, but nothing about it was
+    engine-specific — every generated image had the same window.
+
+    Writing beside the target and renaming closes it: os.replace is atomic on
+    the same filesystem, so a reader sees the old state or the new one, never
+    a half-written one. A missing file is already handled everywhere (the tile
+    shows its pending state), which is the honest answer while it is encoding.
+    """
+    tmp = f'{path}.part'
+    try:
+        with open(tmp, 'wb') as fh:
+            fh.write(data)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)          # never leave a .part behind on failure
+        except OSError:
+            pass
+        raise
+
+
 def normalize_to_webp(image_bytes: bytes, size: int = 1024) -> bytes:
     """Resize so the longest side ≤ `size`, KEEP the aspect ratio (no square pad),
     return WEBP. Un plan corps reste en portrait (pas de bandes noires que le
@@ -2416,8 +2545,16 @@ def detect_head_bbox(image_bytes):
     # fmt='json' forces Ollama's grammar mode: the model must emit a JSON object from
     # the first token, so reasoning-prone (abliterated) checkpoints can't ramble a
     # <think> trace past num_predict and never reach the coords (a silent-None cause).
+    #
+    # keep_alive is decided by CONTENTION, not by this call site (see
+    # services/vision_keepalive.py). This is the burst case the policy exists for:
+    # cropping five references in a row used to pay the 12.8 s cold load five times
+    # because each upload is its own isolated call. When the card is contended — or
+    # when the signal can't be read — the policy returns 0 and nothing changes.
+    from .vision_keepalive import keep_alive_for_isolated_call
     raw = describe_image_ollama(image_bytes, HEAD_BBOX_PROMPT, num_predict=400,
-                                prefer_json=True, fmt='json')
+                                prefer_json=True, fmt='json',
+                                keep_alive=keep_alive_for_isolated_call())
     try:
         s = raw.index('{')
         obj = json.loads(raw[s:raw.index('}', s) + 1])
@@ -2539,7 +2676,8 @@ def face_crop_to_square_webp(image_bytes: bytes, size: int = 1024, pad: float = 
 
 # --- Import + classify (Qwen3-VL) ------------------------------------------
 def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, stats=None,
-                  source_metadata=None, captions=None):
+                  source_metadata=None, captions=None, bank_image_ids=None,
+                  framings=None):
     """Normalize (or head-crop) + persist + create import rows (status=keep).
     When crop=True, each image is auto head-cropped via Qwen3-VL - the CALLER
     must then hold the GPU-exclusive window - and is by construction a face,
@@ -2561,6 +2699,22 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
     captions here, so a promoted selection starts already captioned). Empty/None entries
     leave the row uncaptioned. A skipped duplicate simply drops its caption with it.
 
+    ``framings`` is an optional list parallel to ``files_bytes`` — a framing
+    ALREADY known for the blob (the image-bank promotion path passes the framing
+    its own classify pass wrote, so a promoted selection lands counted in the
+    composition instead of sitting at 0 until something re-classifies it). Only
+    the catalog buckets are accepted; anything else lands as None so the dataset
+    classifier can still fill it. Ignored when crop=True (a head crop IS a face).
+
+    ``bank_image_ids`` is an optional list parallel to ``files_bytes`` — the
+    bank_image each blob came from, recorded on the new row. A blob dropped as a
+    perceptual DUPLICATE hands its bank id to the row it matched (when that row
+    carries none yet): the dataset does hold that bank image, just under another
+    row, and the bank's "already promoted here" answer must say so. That link is
+    what lets the bank re-offer an image once the user deletes it here. Bank ids
+    that could NOT be linked (the matched row already belongs to another bank —
+    a scalar column can only credit one) are listed in ``stats['bank_unlinked']``.
+
     Returns (ids, failed_count)."""
     ds = get_dataset(user_id, dataset_id)
     if not ds:
@@ -2569,9 +2723,24 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
     # chemin « carré padé » ajoutait des bandes noires que le LoRA apprendrait, et
     # forçait tous les imports personnage en carré — un plan buste/corps importé
     # doit rester tel quel (ai-toolkit gère le bucketing multi-ratios).
-    seen = _existing_dhashes(dataset_id) if dedupe else None
+    seen = _existing_dhash_rows(dataset_id) if dedupe else None
     metadata_by_index = list(source_metadata) if source_metadata is not None else []
     captions_by_index = list(captions) if captions is not None else []
+    bank_ids_by_index = list(bank_image_ids) if bank_image_ids is not None else []
+    framings_by_index = list(framings) if framings is not None else []
+
+    def bank_id_at(i):
+        return bank_ids_by_index[i] if i < len(bank_ids_by_index) else None
+
+    def framing_at(i):
+        # A head crop IS a face by construction; otherwise take the caller's value
+        # when it is one of the composition buckets (an 'unknown'/None verdict must
+        # stay NULL so the dataset classifier can still pick the row up).
+        if crop:
+            return 'face'
+        fr = framings_by_index[i] if i < len(framings_by_index) else None
+        return fr if fr in ('face', 'bust', 'body', 'back') else None
+
     ids = []
     failed = 0
     for index, raw in enumerate(files_bytes):
@@ -2594,6 +2763,7 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
             failed += 1
             logger.warning(f"dataset import: image skipped (dataset {dataset_id}): {e}")
             continue
+        fp = None
         if dedupe:
             try:
                 with Image.open(io.BytesIO(webp)) as im:
@@ -2601,25 +2771,38 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
             except (OSError, ValueError):
                 fp = None   # unreadable output would have failed above; belt & braces
             if fp is not None:
-                if any(_hamming(fp, s) <= SCRAPE_DHASH_MAX_DISTANCE for s in seen):
+                match = next((mid for h, mid in seen
+                              if _hamming(fp, h) <= SCRAPE_DHASH_MAX_DISTANCE), None)
+                if match is not None:
                     if stats is not None:
                         stats['duplicates'] = stats.get('duplicates', 0) + 1
+                    # The dataset already holds this image — hand the provenance to
+                    # the row that holds it, so the source can tell it landed. When
+                    # that row is already claimed (another bank supplied the same
+                    # photo first), report the id back: the caller has no verifiable
+                    # trace here and needs to fall back on its own bookkeeping.
+                    bid = bank_id_at(index)
+                    if bid and not _attach_bank_provenance(match, bid) \
+                            and stats is not None:
+                        stats.setdefault('bank_unlinked', []).append(bid)
                     logger.info(f"dataset import: perceptual duplicate skipped (dataset {dataset_id})")
                     continue
-                seen.append(fp)
         fn = f"{user_id}_dataset_{uuid.uuid4().hex[:8]}.webp"
         with open(os.path.join(_dataset_dir(dataset_id), fn), 'wb') as fh:
             fh.write(webp)
         cap = (captions_by_index[index] if index < len(captions_by_index) else None)
         cap = _cap_caption(cap) if (cap or '').strip() else None
         img = FaceDatasetImage(dataset_id=dataset_id, source='import', status='keep',
-                               filename=fn, framing='face' if crop else None,
+                               filename=fn, framing=framing_at(index),
                                upscale_ratio=scale, caption=cap,
+                               bank_image_id=bank_id_at(index),
                                source_metadata=_source_metadata_storage(
                                    metadata_by_index[index]
                                    if index < len(metadata_by_index) else None))
         db.session.add(img)
         db.session.commit()
+        if dedupe and fp is not None:
+            seen.append((fp, img.id))
         ids.append(img.id)
     return ids, failed
 
@@ -2824,10 +3007,12 @@ def _hamming(a: int, b: int) -> int:
     return bin(a ^ b).count('1')
 
 
-def _existing_dhashes(dataset_id) -> list:
-    """dHashes des images déjà dans le dataset (keep/pending), recalculés à la
-    volée : resize 9×8 ≈ qq ms/image et un dataset plafonne à ~200 images —
-    pas de colonne/migration pour si peu."""
+def _existing_dhash_rows(dataset_id) -> list:
+    """[(dHash, image_id)] des images déjà dans le dataset (keep/pending),
+    recalculés à la volée : resize 9×8 ≈ qq ms/image et un dataset plafonne à
+    ~200 images — pas de colonne/migration pour si peu. L'id accompagne le hash
+    pour que l'appelant sache QUELLE image un doublon a rencontrée (l'import
+    depuis une bank y raccroche sa provenance)."""
     out = []
     rows = FaceDatasetImage.query.filter(
         FaceDatasetImage.dataset_id == dataset_id,
@@ -2837,10 +3022,31 @@ def _existing_dhashes(dataset_id) -> list:
             continue
         try:
             with Image.open(os.path.join(_dataset_dir(dataset_id), r.filename)) as im:
-                out.append(_dhash(im))
+                out.append((_dhash(im), r.id))
         except (OSError, ValueError):
             continue
     return out
+
+
+def _existing_dhashes(dataset_id) -> list:
+    """Les seuls dHashes (sans les ids) — voir _existing_dhash_rows."""
+    return [h for h, _id in _existing_dhash_rows(dataset_id)]
+
+
+def _attach_bank_provenance(image_id, bank_image_id) -> bool:
+    """Raccroche une image de dataset DÉJÀ présente à la bank_image dont elle est
+    le doublon perceptuel, et dit si le lien a été pris. N'écrase jamais une
+    provenance existante : la première bank qui a fourni l'image la garde (sinon
+    deux banks se voleraient le lien à chaque promotion croisée) — l'appelant
+    apprend alors que CETTE bank n'a pas de trace vérifiable ici."""
+    if not image_id or not bank_image_id:
+        return False
+    row = db.session.get(FaceDatasetImage, image_id)
+    if row is None or row.bank_image_id is not None:
+        return False
+    row.bank_image_id = bank_image_id
+    db.session.commit()
+    return True
 
 
 def _accept_scrape_bytes(raw, seen_hashes, skipped, rescue_small=False):
@@ -3739,8 +3945,12 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
     extra_instructions : appended to the prompt (both engines), like the dataset options.
     should_cancel() : polled at each image boundary in the Ollama phase for a graceful
                       stop (JoyCaption runs as one batch and isn't interruptible mid-load,
-                      same as the dataset pass).
+                      same as the dataset pass). The Ollama phase overlaps several calls
+                      (see vision_pool), so a stop drains what is in flight — a couple of
+                      seconds — and every drained answer is still handed to on_caption.
     on_caption(path, caption) : fired as each caption lands, for incremental persistence.
+                      ALWAYS called on the caller's own thread, never on a worker, so it
+                      is free to use the database session.
     progress(done, total)     : progress callback (every handled image, captioned or not).
 
     Best-effort: a totally unavailable engine raises RuntimeError (so the caller can
@@ -3811,22 +4021,54 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
             from .vision_ollama import describe_image_ollama, unload_vision_model
         except ImportError:
             raise RuntimeError('vision (Ollama) service not configured/available yet')
+        from .vision_pool import map_vision
+
+        def _describe(path, *, auto_start=False):
+            """One caption call. Runs on a WORKER thread under map_vision, so it
+            touches nothing but the file and the network."""
+            with open(path, 'rb') as fh:
+                return describe_image_ollama(
+                    fh.read(), cap_prompt, num_predict=2000, model=ollama_model,
+                    keep_alive=_VISION_BATCH_KEEPALIVE,
+                    auto_start_local=auto_start, timeout=(10, 300))
+
+        def _land(path, cap):
+            """Persist one answer. Always on the CALLING thread — `on_caption` is
+            what writes to the database, and that session isn't thread-safe."""
+            nonlocal done
+            cap = (cap or '').strip().strip('"').strip()
+            if cap:
+                _emit(path, _cap_caption(cap))
+            else:
+                done += 1  # handled-but-empty still advances the bar
+                if progress:
+                    progress(done, total)
+
         try:
-            for index, p in enumerate(remaining, 1):
-                if should_cancel and should_cancel():
-                    break  # graceful stop at an image boundary (see caption_images)
-                with open(p, 'rb') as fh:
-                    cap = describe_image_ollama(
-                        fh.read(), cap_prompt, num_predict=2000, model=ollama_model,
-                        keep_alive=_VISION_BATCH_KEEPALIVE,
-                        auto_start_local=(index == 1), timeout=(10, 300))
-                cap = (cap or '').strip().strip('"').strip()
-                if cap:
-                    _emit(p, _cap_caption(cap))
-                else:
-                    done += 1  # handled-but-empty still advances the bar
-                    if progress:
-                        progress(done, total)
+            # The first image runs ALONE, and is the only one allowed to start a
+            # stopped local Ollama: a cold server must be woken (and diagnosed)
+            # once, not by several callers racing into the same restart. It also
+            # warms the model, so the calls that follow overlap real inference
+            # instead of queueing behind a model load.
+            first, rest = remaining[0], remaining[1:]
+            if not (should_cancel and should_cancel()):
+                _land(first, _describe(first, auto_start=True))
+                # The rest overlap: most of a caption call is round-trip waiting,
+                # not GPU work (services/vision_pool.py has the measurements).
+                # should_cancel is still polled per image, so the graceful stop
+                # keeps its meaning — it just drains the calls in flight first.
+                for path, cap, error in map_vision(rest, _describe,
+                                                   should_cancel=should_cancel):
+                    if error is not None:
+                        # A file that vanished mid-pass, a permission error: one
+                        # image is skipped and counted, the batch goes on.
+                        logger.warning('caption_paths: %s skipped: %s',
+                                       os.path.basename(path), error)
+                        done += 1
+                        if progress:
+                            progress(done, total)
+                        continue
+                    _land(path, cap)
         except RuntimeError as e:
             # 'auto' tried JoyCaption first and it was unavailable, then Ollama failed too
             # — report BOTH so the caller isn't debugging blind (issue #6 reasoning).
@@ -3839,7 +4081,7 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
 
 
 # --- Caption Lab: per-candidate preview (no persistence) ---------------------
-# The 🧪 Caption Lab lets the user try a caption CONFIG (engine × Ollama model ×
+# The Caption Lab lets the user try a caption CONFIG (engine × Ollama model ×
 # vocabulary register) on ONE image and read the result WITHOUT writing anything to
 # the row. It rides on caption_paths() — the dataset-free by-path brick — so it runs
 # purely DESCRIPTIVE captioning (no kind omission, no dual short): the point is to
@@ -4050,6 +4292,16 @@ def analyze_faces(user_id, dataset_id) -> dict:
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
+    # Checked BEFORE the reference guard on purpose: an anime dataset with no
+    # reference must hear the useful thing ("this tool can't read a drawn face"),
+    # not "set a reference photo first" — which would send the user off to fix
+    # something that would not have helped. Returned as a scoring_error rather
+    # than raised so the existing toast path states the reason instead of the pass
+    # disappearing silently — a refusal that does not explain itself is the very
+    # failure mode this gate exists to remove.
+    blocked = face_scoring_block_reason(ds)
+    if blocked:
+        return {}, {'kind': 'subject_not_photographic', 'detail': blocked}
     if not ds.ref_filename:
         raise ValueError('reference photo missing')
     ref_path = _ref_path(ds)
@@ -4566,21 +4818,34 @@ def restore_watermark_original(user_id, dataset_id, image_id) -> dict | None:
             **_watermark_regions_payload(img)}
 
 
-# --- Fan-out generation (Klein edit) ---------------------------------------
+# --- Fan-out generation (local edit: Klein / Krea) --------------------------
 def _sync_generate_activity(dataset_id):
-    """Reconcile the Klein 'generate' indicator with the dataset's live count of
-    in-flight Klein jobs (pending rows that still carry a job_id and have no file
-    yet). Klein completions arrive one-by-one on the job-queue monitor thread with
+    """Reconcile the local 'generate' indicator with the dataset's live count of
+    in-flight local jobs (pending rows that still carry a job_id and have no file
+    yet). Local completions arrive one-by-one on the job-queue monitor thread with
     only a job_id — no batch handle — so we track the honest pending COUNT rather
     than a per-batch job set (duplicated/cancelled completions would corrupt one).
     Called on enqueue, on each completion, and on cancel; the registry TTL is the
-    last-resort net. Legacy API rows (job_id is NULL) are excluded — the removed
-    API engines owned their own begin()/end() 'generate' entries."""
-    pending = (FaceDatasetImage.query
-               .filter_by(dataset_id=dataset_id, status='pending')
-               .filter(FaceDatasetImage.filename.is_(None))
-               .filter(FaceDatasetImage.job_id.isnot(None)).count())
-    dataset_activity.sync_pending(dataset_id, 'generate', pending, engine='klein')
+    last-resort net. Legacy rows born on a removed API engine (job_id is NULL) are
+    excluded — those engines owned their own begin()/end() 'generate' entry."""
+    local = (FaceDatasetImage.query
+             .filter_by(dataset_id=dataset_id, status='pending')
+             .filter(FaceDatasetImage.filename.is_(None))
+             .filter(FaceDatasetImage.job_id.isnot(None)))
+    pending = local.count()
+    # There are TWO local engines now, and the indicator names one. Both queue on
+    # the same single GPU and complete the same way, so the COUNT is shared; the
+    # label just tells the truth about what is on it. Klein wins a mixed run only
+    # because it is the historical default — a wrong badge is worse than a vague
+    # one, so 'krea' is only claimed when every in-flight local row really is Krea.
+    # NB: `klein_model != 'krea'` alone would DROP the NULL rows (SQL three-valued
+    # logic), i.e. count a legacy Klein row as "not non-Krea" and mislabel the run.
+    engine = 'klein'
+    if pending and not local.filter(db.or_(
+            FaceDatasetImage.klein_model.is_(None),
+            FaceDatasetImage.klein_model != KREA_ENGINE)).count():
+        engine = KREA_ENGINE
+    dataset_activity.sync_pending(dataset_id, 'generate', pending, engine=engine)
 
 
 def generate_variations(user_id, dataset_id, variations, multiplier, klein_model,
@@ -4663,6 +4928,78 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                         klein_model=klein_model,
                         lora_strength=lora_strength, extra_ref_paths=extra_paths,
                         generation_loras=run_loras, sampler_steps=_generation_steps(),
+                        extra_metadata={'is_dataset': True, 'dataset_id': dataset_id,
+                                        'variation_label': v.get('label')})
+                except Exception:
+                    img.status = 'failed'
+                    db.session.commit()
+                    raise
+                img.job_id = job_id
+                db.session.commit()
+                ids.append(img.id)
+    finally:
+        _sync_generate_activity(dataset_id)
+    return ids
+
+
+def generate_variations_krea(user_id, dataset_id, variations, multiplier):
+    """Krea 2 Identity Edit fan-out — the second LOCAL engine, same contract as
+    `generate_variations` (Klein): one pending row committed BEFORE its job is
+    enqueued, the whole batch preflighted up front, the created ids returned.
+
+    Deliberately fewer knobs than the Klein path: Krea has no consistency LoRA
+    and no generation-LoRA presets (its identity LoRA IS the pipeline, and
+    stacking untested LoRAs on an edit model is how you get noise). The one dial
+    it does have — `grounding_px` — is a SETTING, not a per-run argument, because
+    it changes the meaning of every shot in the batch identically.
+
+    The row stores the ENGINE ID in `klein_model`, like the API rows do, so the
+    grid badge can say "Krea 2 Edit"; the base model itself is re-resolved
+    deterministically at enqueue and at regenerate."""
+    from . import krea_edit_helper as keh
+    ds = get_dataset(user_id, dataset_id)
+    if not ds:
+        raise ValueError('dataset not found')
+    if not ds.ref_filename:
+        raise ValueError('reference image required')
+    # Assets AND custom nodes, before any row exists: a missing piece then
+    # surfaces as one actionable 409 instead of a grid of silently-failing tiles.
+    keh.preflight()
+    mult = max(1, int(multiplier))
+    total = len(variations) * mult
+    if total > MAX_FANOUT:
+        raise ValueError(f'fan-out too large ({total} > {MAX_FANOUT})')
+    in_flight = (FaceDatasetImage.query
+                 .filter_by(dataset_id=dataset_id, status='pending')
+                 .filter(FaceDatasetImage.filename.is_(None)).count())
+    if in_flight + total > MAX_FANOUT:
+        raise ValueError(f'too many generations in flight ({in_flight}), wait or cancel')
+    ref_path = _ref_path(ds)
+    ids = []
+    try:
+        for v in variations:
+            for _ in range(mult):
+                img = FaceDatasetImage(dataset_id=dataset_id, source='generated',
+                                       status='pending', variation_label=v.get('label'),
+                                       framing=v.get('framing'),
+                                       variation_prompt=v['prompt'],
+                                       klein_model=KREA_ENGINE)
+                db.session.add(img)
+                db.session.commit()
+                nsfw = bool(v.get('nsfw')) or is_nsfw_label(v.get('label'))
+                try:
+                    job_id = keh.enqueue_krea_edit(
+                        user_id=str(user_id), source_filename=ds.ref_filename,
+                        source_path=ref_path,
+                        # Suffix applied AT WRAP, like Klein: the row keeps the raw
+                        # catalog prompt so a regenerate re-applies the CURRENT
+                        # suffix exactly once. The label rides along because it
+                        # picks this shot's outfit deterministically.
+                        edit_prompt=wrap_variation_krea(
+                            v['prompt'], nsfw=nsfw, framing=v.get('framing'),
+                            suffix=dataset_prompt_suffix(ds, v.get('framing')),
+                            subject_type=subject_type_of(ds),
+                            label=v.get('label') or ''),
                         extra_metadata={'is_dataset': True, 'dataset_id': dataset_id,
                                         'variation_label': v.get('label')})
                 except Exception:
@@ -4804,7 +5141,7 @@ def _improve_existing_image_locked(user_id, image_id):
 
 
 # --- Bulk Klein upscale & improve: a SERVER job --------------------------------
-# The ✨ Improve button used to loop in the BROWSER, one request per image. On a
+# The Improve button used to loop in the BROWSER, one request per image. On a
 # 250-image selection that produced two bugs with a single root cause — the batch
 # only existed in the tab:
 #   * everything past MAX_FANOUT was REFUSED. That cap is a CONCURRENCY limit
@@ -4884,7 +5221,7 @@ def bulk_improve_eligible_ids(user_id, dataset_id, image_ids):
 
 
 def start_bulk_improve(app, user_id, dataset_id, image_ids):
-    """Start the server-side ✨ Klein upscale & improve batch over ``image_ids``.
+    """Start the server-side Klein upscale & improve batch over ``image_ids``.
 
     Returns ``{'queued', 'skipped'}`` — how many images the job will process and
     how many of the selection were not eligible. Raises ValueError (-> 400) on an
@@ -5021,11 +5358,29 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     if prompt is None:
         raise ValueError('variation prompt unknown')
     requested = (engine or '').strip() or None
-    if requested is not None and requested != 'klein':
+    if requested is not None and requested not in KNOWN_ENGINES:
         raise ValueError(f'unknown engine: {requested}')
-    # Complete every fallible preflight before changing either the row or its
-    # current file. Klein enqueue is itself part of preparation: if the later
-    # DB transition fails, that exact new job is cancelled below.
+    # A row remembers its origin through `klein_model`: an engine TAG for Krea
+    # (and for legacy rows born on a removed API engine), a real model FILE for
+    # Klein. Anything that isn't a known tag is therefore a Klein row. A legacy
+    # API tag names an engine this fork no longer has, so it resolves to Klein —
+    # this is what keeps those old rows regenerable (see LEGACY_API_ENGINE_TAGS).
+    origin = img.klein_model if img.klein_model in KNOWN_ENGINES else 'klein'
+    target = requested or origin
+    # No NSFW clamp is needed here: every engine on this fork is local, and the
+    # local engines are exactly the ones allowed to receive NSFW shots.
+    # Engines disabled in Settings must not be used even when the row (or a
+    # stale workspace selection) points at them: fall back to the default
+    # engine, then to the first enabled one. An empty list means "all
+    # enabled" (legacy configs).
+    enabled = [e for e in (cfg.get('engines.enabled') or [])
+               if e in KNOWN_ENGINES]
+    if enabled and target not in enabled:
+        default = cfg.get('engines.default')
+        target = default if default in enabled else enabled[0]
+    # Complete every fallible target-specific preflight before changing either
+    # the row or its current file. Klein enqueue is itself part of preparation:
+    # if the later DB transition fails, that exact new job is cancelled below.
     from ..job_queue import queue_manager
     old_state = {
         field: getattr(img, field) for field in (
@@ -5035,34 +5390,59 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     }
     old_path = (os.path.join(_dataset_path(img.dataset_id), img.filename)
                 if img.filename else None)
-    try:
-        from .klein_edit_helper import enqueue_klein_edit, resolve_generation_lora_preset
-    except ImportError:
-        raise RuntimeError('ComfyUI is not configured')
-    # Keep the row's real model file when it has one; a legacy row born on a
-    # removed API engine holds an engine TAG here, not a model — use the
-    # workspace's Klein pick instead (None = enqueue's default model).
-    model = (img.klein_model if img.klein_model not in LEGACY_API_ENGINE_TAGS
-             else ((klein_model or '').strip() or None))
-    ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
-    extra_paths = [os.path.join(_dataset_path(ds.id), fn)
-                   for fn in extra_ref_filenames(ds)]
-    new_job_id = enqueue_klein_edit(
-        user_id=str(user_id), source_filename=ds.ref_filename,
-        source_path=ref_path,
-        edit_prompt=wrap_variation_klein(
-            prompt, nsfw=is_nsfw_label(img.variation_label),
-            framing=img.framing,
-            # CURRENT dataset suffix, applied at wrap: `prompt` is the raw
-            # stored/edited creative prompt, so this is the ONLY application.
-            suffix=dataset_prompt_suffix(ds, img.framing),
-            subject_type=subject_type_of(ds)),
-        klein_model=model,
-        lora_strength=lora_strength, extra_ref_paths=extra_paths,
-        generation_loras=resolve_generation_lora_preset(generation_lora_preset),
-        sampler_steps=_generation_steps(),
-        extra_metadata={'is_dataset': True, 'dataset_id': img.dataset_id,
-                        'variation_label': img.variation_label})
+    new_job_id = None
+    model = None
+    if target == KREA_ENGINE:
+        # Krea 2 Identity Edit: same shape as the Klein branch below, minus the
+        # knobs it doesn't have. Its preflight raises KreaModelsMissing HERE,
+        # before the row transition — so the tile keeps its current image.
+        engine = KREA_ENGINE
+        from . import krea_edit_helper as _keh
+        ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
+        new_job_id = _keh.enqueue_krea_edit(
+            user_id=str(user_id), source_filename=ds.ref_filename,
+            source_path=ref_path,
+            edit_prompt=wrap_variation_krea(
+                prompt, nsfw=is_nsfw_label(img.variation_label),
+                framing=img.framing,
+                suffix=dataset_prompt_suffix(ds, img.framing),
+                subject_type=subject_type_of(ds),
+                label=img.variation_label or ''),
+            extra_metadata={'is_dataset': True, 'dataset_id': img.dataset_id,
+                            'variation_label': img.variation_label})
+    else:
+        try:
+            from .klein_edit_helper import enqueue_klein_edit, resolve_generation_lora_preset
+        except ImportError:
+            raise RuntimeError('ComfyUI is not configured')
+        # Klein target: keep the row's real model file when it has one. A row born
+        # on a removed API engine — or on Krea — holds an engine TAG here, not a
+        # model, so it must NOT be passed off as one: use the workspace's Klein
+        # pick instead (None = enqueue's default model). Testing against the tags
+        # rather than against the (empty) API_ENGINES is what keeps this correct
+        # on a local-only fork.
+        _tags = LEGACY_API_ENGINE_TAGS + (KREA_ENGINE,)
+        model = (img.klein_model if img.klein_model not in _tags
+                 else ((klein_model or '').strip() or None))
+        ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
+        extra_paths = [os.path.join(_dataset_path(ds.id), fn)
+                       for fn in extra_ref_filenames(ds)]
+        new_job_id = enqueue_klein_edit(
+            user_id=str(user_id), source_filename=ds.ref_filename,
+            source_path=ref_path,
+            edit_prompt=wrap_variation_klein(
+                prompt, nsfw=is_nsfw_label(img.variation_label),
+                framing=img.framing,
+                # CURRENT dataset suffix, applied at wrap: `prompt` is the raw
+                # stored/edited creative prompt, so this is the ONLY application.
+                suffix=dataset_prompt_suffix(ds, img.framing),
+                subject_type=subject_type_of(ds)),
+            klein_model=model,
+            lora_strength=lora_strength, extra_ref_paths=extra_paths,
+            generation_loras=resolve_generation_lora_preset(generation_lora_preset),
+            sampler_steps=_generation_steps(),
+            extra_metadata={'is_dataset': True, 'dataset_id': img.dataset_id,
+                            'variation_label': img.variation_label})
 
     # Persist the replacement state first. The old file remains in place until
     # this commit succeeds, eliminating rows that reference an already-moved file.
@@ -5074,7 +5454,9 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
         if edited:
             img.variation_prompt = stored_prompt
         _clear_watermark_metadata(img)
-        img.klein_model = model
+        # Engine TAG for Krea (it resolves its own model deterministically);
+        # the real model FILE for Klein.
+        img.klein_model = KREA_ENGINE if target == KREA_ENGINE else model
         img.filename = None
         img.caption = None
         img.status = 'pending'
@@ -5117,11 +5499,35 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     return new_job_id
 
 
-# Local-only fork: the Nano Banana / ChatGPT API engines were removed. Rows
-# created by them still exist in user databases with these TAGS stored in the
-# klein_model column (never real .safetensors names) — regenerate_image uses
-# this to swap in a real Klein model instead of a stale tag.
-LEGACY_API_ENGINE_TAGS = ('nanobanana', 'chatgpt')
+# --- Engine catalogue (LOCAL ONLY — fork Divergence 1) ----------------------
+# Local-only fork: the Nano Banana / ChatGPT / OpenRouter API engines were
+# removed. Rows created by them still exist in user databases with these TAGS
+# stored in the klein_model column (never real .safetensors names) —
+# regenerate_image uses this to swap in a real local model instead of a stale
+# tag. APPEND-ONLY: these values are persisted, never renamed or reordered.
+LEGACY_API_ENGINE_TAGS = ('nanobanana', 'chatgpt', 'openrouter')
+
+# No API engines on this fork. Kept as an EMPTY tuple rather than deleted: it is
+# what the "is this engine billable / does it refuse NSFW / does it queue behind"
+# logic derives from, and an empty tuple answers all of those correctly by
+# construction instead of by special case. Mirrors engineSelection.js
+# API_ENGINES. Adding an id here re-opens the surface Divergence 1 closes.
+API_ENGINES = ()
+
+# The LOCAL engines — they render on the user's own GPU through ComfyUI, cost
+# nothing, and are the only ones allowed to receive NSFW shots. Klein is the
+# historical one; Krea 2 Identity Edit is the second (krea_edit_helper).
+# APPEND-ONLY for the same reason as above: 'krea' is persisted in
+# FaceDatasetImage.klein_model as that row's engine tag.
+LOCAL_ENGINES = ('klein', 'krea')
+KREA_ENGINE = 'krea'
+# Human names, in the SAME wording as the frontend's ENGINE_LABELS
+# (frontend/src/components/dataset/engineSelection.js). Only used to word
+# messages — the ids above are the persisted values.
+LOCAL_ENGINE_LABELS = {'klein': 'Klein', 'krea': 'Krea 2 Edit'}
+# Every engine a generate/regenerate request may name. Local-only here, so the
+# concatenation is a no-op that keeps the upstream shape readable.
+KNOWN_ENGINES = LOCAL_ENGINES + API_ENGINES
 
 
 # --- Completion linking (called from the job queue) -------------------------

@@ -106,6 +106,17 @@ export default function SettingsPage() {
     setTestResults((prev) => ({ ...prev, [target]: result }))
   }
 
+  /* Tick/untick one of the LOCAL engines (Divergence 1: there are no others).
+     Both are free, so this is about what the machine actually has installed —
+     Krea 2 Edit needs its own node pack and weights. */
+  const toggleEngine = (id) => {
+    setConfig((prev) => {
+      const enabled = prev.engines.enabled || []
+      const next = enabled.includes(id) ? enabled.filter((e) => e !== id) : [...enabled, id]
+      return { ...prev, engines: { ...prev.engines, enabled: next } }
+    })
+  }
+
   // Clear a saved API key. Explicit action — the write-only field can't wipe a key
   // by going blank — so confirm, delete server-side, then refresh presence + caps
   // so any engine that depended on it flips to unavailable right away.
@@ -262,9 +273,7 @@ export default function SettingsPage() {
   const sectionProps = {
     config, setField, secretsPresence, secretInputs, setSecretInputs,
     testResults, recordTestResult, saveSecretIfPending, saveConfigSection, handleDeleteSecret,
-    // No toggleEngine: this fork generates on Klein only (Divergence 1), so
-    // there are no engine on/off switches to hand the Settings sections.
-    handleSave, saving, runtime, promptDefaults, promptDefaultsBySubject,
+    toggleEngine, handleSave, saving, runtime, promptDefaults, promptDefaultsBySubject,
     setIdentityPrompts, caps, refreshCaps: refresh, toast,
   }
 

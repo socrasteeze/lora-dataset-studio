@@ -5,6 +5,100 @@ import test from 'node:test';
 const graph = fs.readFileSync(new URL('./RunLineageGraph.jsx', import.meta.url), 'utf8');
 const cloud = fs.readFileSync(new URL('../../pages/CloudRunsPage.jsx', import.meta.url), 'utf8');
 const panel = fs.readFileSync(new URL('./TrainingPanel.jsx', import.meta.url), 'utf8');
+// The card, the pill and the edges are no longer private to this component —
+// they were extracted so the LoRA Canvas draws with the SAME ones (a lookalike
+// would drift the first time either surface was tweaked).
+const nodes = fs.readFileSync(new URL('./lineageNodes.jsx', import.meta.url), 'utf8');
+const edges = fs.readFileSync(new URL('./lineageEdges.jsx', import.meta.url), 'utf8');
+const canvas = fs.readFileSync(new URL('../canvas/LineageCanvas.jsx', import.meta.url), 'utf8');
+
+test('the drawing is shared with the canvas, not duplicated', () => {
+  // Both surfaces IMPORT the card/pill/edges; neither declares its own.
+  assert.match(graph, /import \{ GraphCard, CheckpointPill \} from '\.\/lineageNodes'/);
+  assert.match(graph, /import \{ LineageEdgeDefs, LineageEdges \} from '\.\/lineageEdges'/);
+  assert.match(canvas, /import \{ GraphCard, CheckpointPill \} from '\.\.\/dataset\/lineageNodes'/);
+  assert.match(canvas, /import \{ LineageEdgeDefs, LineageEdges \} from '\.\.\/dataset\/lineageEdges'/);
+  for (const src of [graph, canvas]) {
+    assert.doesNotMatch(src, /function GraphCard\(/);
+    assert.doesNotMatch(src, /function CheckpointPill\(/);
+    assert.doesNotMatch(src, /linearGradient id="lds-edge-/);
+  }
+  assert.match(nodes, /export function GraphCard\(/);
+  assert.match(nodes, /export function CheckpointPill\(/);
+  assert.match(edges, /export function LineageEdgeDefs\(/);
+  assert.match(edges, /export function LineageEdges\(/);
+});
+
+test('the canvas GENERATES through the Test Studio, it does not grow a second one', () => {
+  // Slice 3 opened this up (the guard used to lock the canvas OUT of generation
+  // so the earlier slices could not quietly grow half a feature). What is locked
+  // now is the shape of the opening: the canvas mounts the Studio's panel and the
+  // Studio's hooks. A canvas that re-declared a prompt field, a seed control or a
+  // launch call would be the drift this whole design exists to prevent.
+  const panel = fs.readFileSync(new URL('../canvas/CanvasGenerationPanel.jsx', import.meta.url), 'utf8');
+  assert.match(panel, /import RunSetupPanel from '\.\.\/dataset\/studio\/RunSetupPanel'/);
+  assert.match(panel, /useStudioForm/);
+  assert.match(panel, /useCanvasStudio/);
+  assert.doesNotMatch(panel, /<textarea/);          // the prompt field is PromptField's
+  assert.doesNotMatch(panel, /rollSeed|nextSeed\(\)/);
+  // The canvas ticks pills; the in-card graph keeps its own selection intact.
+  assert.match(canvas, /onToggleSelect=\{\(\) => onTogglePick\(/);
+  assert.match(graph, /onToggleSelect=\{\(pill\) => toggleCk\(/);
+});
+
+test('the canvas launch goes through ONE call site, so no setting can be dropped', () => {
+  const hook = fs.readFileSync(new URL('../../hooks/useCanvasStudio.js', import.meta.url), 'utf8');
+  const setup = fs.readFileSync(new URL('./studio/RunSetupPanel.jsx', import.meta.url), 'utf8');
+  // RunSetupPanel owns genSettings in local state and passes it to studio.launch.
+  // The canvas therefore swaps studio.launch — NOT the onLaunch handler, which
+  // would have silently lost the global generation settings from a canvas run.
+  assert.match(setup, /const onLaunch = async \(\) => \{/);
+  assert.match(setup, /studio\.launch\(/);
+  assert.doesNotMatch(setup, /onLaunchOverride/);
+  assert.match(hook, /genSettings = \{\}/);
+  assert.match(hook, /\.\.\.genSettings/);
+  assert.match(hook, /\/api\/train\/canvas\/generate/);
+});
+
+test('the canvas refuses mixed families and deploys before generating — in the pure layer', () => {
+  const rules = fs.readFileSync(new URL('../../utils/canvasGeneration.js', import.meta.url), 'utf8');
+  // Both decisions are arithmetic a test can check without a browser (behaviour
+  // covered in canvasGeneration.test.js); the component must USE them.
+  assert.match(canvas, /from '\.\.\/\.\.\/utils\/canvasGeneration'/);
+  assert.match(canvas, /describeCanvasLaunch\(picks\)/);
+  assert.match(rules, /cannot run together/);
+  assert.match(rules, /different base models/);
+  assert.match(rules, /Deploy \$\{n\} checkpoint/);
+  // A failed deploy ABORTS: half a comparison answers a different question.
+  assert.match(canvas, /Deploy failed — nothing was generated/);
+});
+
+test('the canvas moves cards through the PURE placement layer, not by hand', () => {
+  // The whole point of the layer is that "a new run moves nothing" is arithmetic
+  // a test can check without a browser. A component that recomputed positions
+  // inline would put that rule back out of reach.
+  assert.match(canvas, /from '\.\.\/\.\.\/utils\/canvasPlacement'/);
+  assert.match(canvas, /applyPlacement\(/);
+  assert.match(canvas, /pinSnapshot\(/);
+  assert.doesNotMatch(canvas, /function applyPlacement|function pinSnapshot/);
+});
+
+test('the canvas disambiguates the touch gesture with a long press', () => {
+  // Dragging a card and panning the board are the same finger. Without an
+  // explicit delay one of the two becomes impossible on a phone.
+  assert.match(canvas, /LONG_PRESS_MS/);
+  assert.match(canvas, /pointerType !== 'touch'/);
+  assert.match(canvas, /cancelLongPress\(\)/);
+});
+
+test('✦ Tidy up exists and is wired to the page, not to a local reset', () => {
+  const page = fs.readFileSync(new URL('../../pages/CanvasPage.jsx', import.meta.url), 'utf8');
+  assert.match(canvas, /Tidy up/);
+  assert.match(canvas, /onClick=\{onTidyUp\}/);
+  // It clears the SERVER's memory of the lane; a client-only reset would come
+  // back on the next reload.
+  assert.match(page, /del\(`\/api\/dataset\/\$\{id\}\/canvas\/positions`\)/);
+});
 
 test('the graph draws checkpoint pills with a download link (reused endpoint)', () => {
   assert.match(graph, /CheckpointPill/);
@@ -18,8 +112,8 @@ test('the graph draws checkpoint pills with a download link (reused endpoint)', 
 test('the graph opens for any run with a checkpoint, not only 2+ run lineages', () => {
   // button + body both gate on lineage OR a saved checkpoint
   assert.match(cloud, /run\.lineage\s*\|\|\s*run\.checkpoint_ready/);
-  // single-run graph is labelled ◉ Graph, a real lineage stays 🌳 Lineage
-  assert.match(cloud, /run\.lineage \? '🌳 Lineage' : '◉ Graph'/);
+  // single-run graph is labelled ◉ Graph, a real lineage stays Lineage
+  assert.match(cloud, /run\.lineage \? 'Lineage' : '◉ Graph'/);
 });
 
 test('continue-from-checkpoint is cloud-only by default and allows terminal (done OR failed) runs', () => {
@@ -90,7 +184,7 @@ test('the dataset graph renders INLINE inside the manager (no body-portal modal)
 });
 
 test('a pill can be imported straight from the graph, deployed pills say so', () => {
-  // 📦 Import → loras/<family> uses the CSRF-safe postJson and the list's exact
+  // Import → loras/<family> uses the CSRF-safe postJson and the list's exact
   // payload (via lineageImportPayload); an already-deployed pill shows ✓ Deployed.
   assert.match(graph, /lineageImportPayload/);
   assert.match(graph, /train\/import/);
@@ -104,18 +198,18 @@ test('a pill can be imported straight from the graph, deployed pills say so', ()
 test('a preview thumbnail opens LARGE in a lightbox, distinct from the popover', () => {
   assert.match(graph, /onZoomPreview/);
   // clicking the thumbnail must NOT open the popover (its own action)
-  assert.match(graph, /e\.stopPropagation\(\); onZoomPreview/);
+  assert.match(nodes, /e\.stopPropagation\(\); onZoomPreview/);
   assert.match(graph, /bigPreview/);
 });
 
-test('a persisted 🔍 Big-previews mode enlarges the generated tiles', () => {
+test('a persisted Big-previews mode enlarges the generated tiles', () => {
   // Toggle + persistence in the graph, geometry threaded to the layout.
-  assert.match(graph, /🔍 Big previews/);
+  assert.match(graph, /Big previews/);
   assert.match(graph, /localStorage\.getItem\('lds\.graphBigPreviews'\)/);
   assert.match(graph, /setItem\('lds\.graphBigPreviews'/);
   assert.match(graph, /buildLineageGraph\(shownTree, \{ bigPreviews \}\)/);
   // The pill sizes off the layout's per-mode geometry (pill.w/pill.h), not a const.
-  assert.match(graph, /width: pill\.w, height: pill\.h/);
+  assert.match(nodes, /width: pill\.w, height: pill\.h/);
 });
 
 test('the ◉ Graph button is the prominent (accent) view control', () => {
@@ -148,7 +242,7 @@ test('the pill delete aims at what the pill SHOWS — deployed copy vs training 
 
 test('undeploy is EXPLICIT and symmetric with deploy — and never confusable with delete', () => {
   const helpers = fs.readFileSync(new URL('./lineagePreview.js', import.meta.url), 'utf8');
-  // ⏏ Undeploy sits next to "✓ Deployed", where 📦 Import sits when it isn't —
+  // ⏏ Undeploy sits next to "✓ Deployed", where Import sits when it isn't —
   // no longer only reachable through the retreat row.
   assert.match(graph, /✓<\/span> Deployed/);
   assert.match(graph, /⏏<\/span> \{deleting \? 'Undeploying…' : undeploy\.label\}/);
@@ -157,7 +251,7 @@ test('undeploy is EXPLICIT and symmetric with deploy — and never confusable wi
   // file while the click posts another (the invariant of this popover).
   assert.match(helpers, /export function checkpointUndeployAction[^]*?checkpointDeleteTarget\(node, pill\)/);
   assert.match(helpers, /target\.kind !== 'deployed'\) return null;/);
-  // The 🗑 retreat row is now reserved for the one destructive action: the save.
+  // The retreat row is now reserved for the one destructive action: the save.
   assert.match(graph, /!target \|\| target\.kind !== 'save'\) return null;/);
   // Undeploy is presented as REVERSIBLE — the save survives and can be re-deployed.
   assert.match(helpers, /Reversible: the training save is kept/);

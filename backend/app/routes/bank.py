@@ -52,7 +52,11 @@ def bank_create():
                                         data.get('folder'))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
-    return jsonify({'ok': True, 'id': bank.id, 'added': added})
+    # Nested folders mean two banks over the same files: harmless while triaging
+    # (statuses are per bank), but Delete rejected in one amputates the other.
+    # Say it now, once, rather than at the destructive click only.
+    return jsonify({'ok': True, 'id': bank.id, 'added': added,
+                    'overlaps': banks.overlapping_banks(LOCAL_USER, bank.id)})
 
 
 @bp.post('/bank/split/preview')
@@ -138,6 +142,27 @@ def bank_delete(bank_id):
     if not banks.delete_bank(LOCAL_USER, bank_id):
         return jsonify({'error': 'not found'}), 404
     return jsonify({'ok': True})
+
+
+@bp.post('/bank/<int:bank_id>/relocate')
+def bank_relocate(bank_id):
+    """Point a bank at a new folder after the user moved it (another disk, a
+    rename). Two-step ON PURPOSE: {folder} alone only REPORTS how many of the
+    bank's files are in there, {folder, confirm: true} applies it. 400 when the
+    folder holds none of them (that is a different folder, not a moved one),
+    409 while a pass is running. Nothing is ever deleted — a partial match keeps
+    every row and its analysis."""
+    data = request.get_json(silent=True) or {}
+    try:
+        out = banks.relocate_bank(LOCAL_USER, bank_id, data.get('folder'),
+                                  confirm=bool(data.get('confirm')))
+    except bank_jobs.BankJobBusy as e:
+        return jsonify({'error': str(e)}), 409
+    except banks.BankRelocateMismatch as e:
+        return jsonify({'error': str(e), **e.preview}), 400
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **out})
 
 
 @bp.get('/bank/<int:bank_id>/images')
@@ -227,7 +252,7 @@ def bank_score(bank_id):
 
 @bp.post('/bank/<int:bank_id>/semantic-dedup')
 def bank_semantic_dedup(bank_id):
-    """Stage-2 semantic near-duplicate pass (crops/variants) over the ✨ Score
+    """Stage-2 semantic near-duplicate pass (crops/variants) over the Score
     embeddings — CPU, no GPU. {threshold: 0.95} overrides the config for an ad-hoc
     re-tri without a re-scan. 202/409; 400 with a "run Score first" hint when no
     embeddings exist yet."""
@@ -530,7 +555,7 @@ def _curation_filters(data):
 @bp.post('/bank/<int:bank_id>/select-diverse')
 def bank_select_diverse(bank_id):
     """Farthest-point selection of the N most VARIED images in the current filter,
-    reusing the ✨ Score embeddings (no GPU). Returns the chosen ids for the UI to
+    reusing the Score embeddings (no GPU). Returns the chosen ids for the UI to
     check — never mutates. 400 with a "run Score first" hint when unscored."""
     data = request.get_json(silent=True) or {}
     try:
@@ -549,7 +574,7 @@ def bank_select_diverse(bank_id):
 def bank_select_similar(bank_id):
     """Rank the current filter by CLIP similarity to a reference bank image
     ({ref_id}); returns the top-N ids (or everything ≥ {min_score}) for the UI to
-    check. Reuses the ✨ Score embeddings (no GPU). 400 when unscored / bad ref."""
+    check. Reuses the Score embeddings (no GPU). 400 when unscored / bad ref."""
     data = request.get_json(silent=True) or {}
     try:
         ref_id = int(data.get('ref_id'))
@@ -573,12 +598,23 @@ def bank_select_similar(bank_id):
     return jsonify({'ok': True, **out})
 
 
+@bp.get('/bank/<int:bank_id>/delete-rejected/preview')
+def bank_delete_rejected_preview(bank_id):
+    """What Delete rejected would really do, for the confirmation dialog: how
+    many files, where they would go, and which OTHER banks share them (nested
+    source folders make one bank's cleanup another bank's amputation)."""
+    out = banks.rejected_delete_preview(LOCAL_USER, bank_id)
+    if out is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(out)
+
+
 @bp.post('/bank/<int:bank_id>/delete-rejected')
 def bank_delete_rejected(bank_id):
     """Destructive: delete the SOURCE files of every rejected image from disk
-    (OS trash when send2trash is present, hard delete otherwise) and drop their
+    (OS trash, else the app's own trash, else a permanent delete) and drop their
     rows. The ONLY bank action that writes to the source folder — the front-end
-    gates it behind a type-DELETE confirmation."""
+    gates it behind a type-DELETE confirmation fed by the preview above."""
     try:
         out = banks.delete_rejected(LOCAL_USER, bank_id)
     except ValueError:
