@@ -9,7 +9,9 @@ import FolderPickerField from '../components/common/FolderPicker'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast } from '../components/bank/bankSync'
 import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
+import { overlapNotice } from '../components/bank/bankOverlap'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
+import RelocateBankDialog from '../components/bank/RelocateBankDialog'
 
 const CURRENT_KEY = 'bankCurrentId'
 const SORT_KEY = 'bankListSort'
@@ -172,6 +174,7 @@ export default function BankPage() {
   const [preview, setPreview] = useState(null)
   // The bank whose Launch-all dialog is open (queue or run-now from the list).
   const [dialogBankId, setDialogBankId] = useState(null)
+  const [relocating, setRelocating] = useState(null)   // the bank being repointed
 
   const refresh = useCallback(async () => {
     try {
@@ -247,6 +250,10 @@ export default function BankPage() {
       } else {
         const d = await postJson('/api/bank/create', { name, folder })
         toast.success(`Bank created — ${d.added} image(s) inventoried.`)
+        // Nested folders mean two banks over the same files. Harmless while
+        // triaging, destructive at Delete rejected — said once, up front.
+        const overlap = overlapNotice(d.overlaps)
+        if (overlap) toast.warning(overlap, 12000)
         setName(''); setFolder('')
         open(d.id)
       }
@@ -330,8 +337,8 @@ export default function BankPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-2">
+        {/* Beta chip retired here — it now marks the LoRA Canvas instead. */}
         <h1 className="text-xl font-bold text-content">Image bank</h1>
-        <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.625rem] font-semibold uppercase tracking-wide">Beta</span>
         <HelpBadge topic="page-bank" />
       </header>
       <p className="text-sm text-content-muted max-w-3xl">
@@ -426,13 +433,17 @@ export default function BankPage() {
             </select>
           </label>
         </div>
-        <ul className="grid gap-3 sm:grid-cols-2">
+        {/* grid-cols-1 (= minmax(0,1fr)), NOT the implicit auto column: an auto
+            column is sized on max-content, so the unbreakable source PATH inside
+            a card stretched it past the viewport and scrolled the whole page
+            sideways on a phone — with `truncate` never getting a chance to fire. */}
+        <ul className="grid gap-3 grid-cols-1 sm:grid-cols-2">
           {sortBanks(banks, sort).map((b) => {
             const qs = queueStateOf(b)
             return (
             <li key={b.id}
-              className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-              <div className="flex items-center gap-2">
+              className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+              <div className="flex min-w-0 items-center gap-2">
                 <BankTitle bank={b} onOpen={() => open(b.id)}
                   onRename={(newName) => rename(b, newName)} />
                 {b.activity && !b.activity.finished && (
@@ -443,8 +454,12 @@ export default function BankPage() {
                     {qs.state === 'running' ? 'running' : `queued · #${qs.position}`}
                   </span>
                 )}
+                <button type="button" onClick={() => setRelocating(b)}
+                  aria-label={`Move the folder of bank ${b.name}`}
+                  title="Moved this folder to another disk? Point the bank at its new location."
+                  className="ml-auto px-1.5 text-content-subtle hover:text-content"></button>
                 <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
-                  className="ml-auto px-1.5 text-content-subtle hover:text-rose-300">✕</button>
+                  className="px-1.5 text-content-subtle hover:text-rose-300">✕</button>
               </div>
               <p className="truncate font-mono text-xs text-content-subtle" title={b.source_path}>
                 {b.source_path}
@@ -453,7 +468,8 @@ export default function BankPage() {
               <p className="text-xs text-content-muted">
                 {b.total} image(s) · {b.scanned} scanned · <span className="text-emerald-300">{b.keep} kept</span> · <span className="text-rose-300">{b.reject} rejected</span>
               </p>
-              <FolderSyncNote sync={b.folder_sync} />
+              <FolderSyncNote sync={b.folder_sync}
+                onRelocate={() => setRelocating(b)} />
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => open(b.id)}
                   className="rounded-md border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-content hover:bg-surface">
@@ -463,7 +479,7 @@ export default function BankPage() {
                   <button type="button" onClick={() => setDialogBankId(b.id)} disabled={b.total === 0}
                     title="Run Launch all now, or add this bank to the queue"
                     className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
-                    🚀 Launch all…
+                    Launch all…
                   </button>
                 )}
               </div>
@@ -478,6 +494,12 @@ export default function BankPage() {
         <LaunchAllDialog caps={caps} visionReady={visionReady}
           onClose={() => setDialogBankId(null)}
           onLaunch={runNow} onQueue={enqueue} />
+      )}
+
+      {relocating && (
+        <RelocateBankDialog bankId={relocating.id} bankName={relocating.name}
+          sourcePath={relocating.source_path}
+          onClose={() => setRelocating(null)} onDone={refresh} />
       )}
     </div>
   )

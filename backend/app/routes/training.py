@@ -524,6 +524,14 @@ def dataset_train_base_info(dataset_id):
                     # Slider LoRA mode (Beta) : état + prompts persistés + knobs résolus
                     # (colonne dédiée train_slider — jamais écrasé par un preset).
                     'slider': lt.effective_slider_settings(ds),
+                    # Can this machine actually train Anima? The arch is an ai-toolkit
+                    # EXTENSION, so an older checkout simply doesn't have it (the launch
+                    # refuses with a 400). Exposed here rather than in /api/capabilities
+                    # because the check walks the extensions tree: base-info is fetched
+                    # when the training panel opens, capabilities is polled every 30s.
+                    # The panel uses it to stay quiet instead of recommending Anima to
+                    # someone who cannot run it.
+                    'anima_supported': lt._aitoolkit_supports_anima(),
                     'bases_by_type': {'zimage': bases, 'sdxl': sdxl_bases,
                                       'krea': krea_bases, 'flux': flux_bases,
                                       'flux2klein': flux2klein_bases}})
@@ -1154,7 +1162,7 @@ def dataset_train_cloud_purge():
 @bp.get('/dataset/train/cloud/staging-sizes')
 def dataset_train_cloud_staging_sizes():
     """How much disk each cloud run's staging dir still holds, so the Runs hub can
-    show "8.2 GB on disk" on a card and name that weight in the per-run 🧹
+    show "8.2 GB on disk" on a card and name that weight in the per-run
     confirmation. DELIBERATELY its own endpoint (and not a field of the runs
     payload): sizing means walking thousands of files, which must not ride the
     hub's 5 s poll. Optional ?run_ids=1,2,3 narrows the walk to the shown cards."""
@@ -1465,7 +1473,7 @@ def dataset_train_run_share(run_key):
 
 @bp.get('/dataset/train/runs/<int:record_id>/lineage')
 def dataset_train_run_lineage(record_id):
-    """🌳 Genealogy tree of the lineage a run belongs to: nodes (every launch
+    """Genealogy tree of the lineage a run belongs to: nodes (every launch
     linked by continuations, local + cloud) and parent→child edges. Addressed
     by TrainingRunRecord id — the universal run node key (cloud rows expose it
     as record_id too). Open like the other Runs-hub reads: unknown id → 404."""
@@ -1514,7 +1522,7 @@ def dataset_train_checkpoint_note(record_id, step):
 
 @bp.post('/dataset/<int:dataset_id>/lineage/previews')
 def dataset_lineage_generate_previews(dataset_id):
-    """🎨 Lab inline generation: render a same-prompt/same-seed preview for each
+    """Lab inline generation: render a same-prompt/same-seed preview for each
     selected checkpoint by reusing the Test-Studio engine pinned to those
     checkpoints at strength 1.0. Body: {prompt, seed, family,
     checkpoints:[{record_id, step}]}.
@@ -1575,8 +1583,18 @@ def dataset_train_cloud_progress(dataset_id):
 
 @bp.post('/dataset/train/cloud/stop')
 def dataset_train_cloud_stop():
+    """Stop a cloud run and report what really happened.
+
+    The answer is never a courtesy 'ok': when no monitor thread is in a state
+    to honour the request, request_stop terminates the pod itself, and if even
+    that fails the payload carries the instance id the user must destroy by
+    hand (HTTP stays 200 — the request was understood, the outcome is in the
+    body, which is what the UI renders)."""
     d = request.get_json(silent=True) or {}
-    return jsonify({'ok': ct.request_stop(d.get('run_id'))})
+    res = ct.request_stop(d.get('run_id'))
+    if not isinstance(res, dict):       # defensive: legacy bool contract
+        res = {'ok': bool(res)}
+    return jsonify(res)
 
 
 @bp.get('/dataset/<int:dataset_id>/train/cloud/sample/<path:filename>')
@@ -1650,9 +1668,114 @@ def dataset_train_checkpoint_file(dataset_id):
     return send_file(path, as_attachment=True)
 
 
+@bp.get('/train/activity')
+def train_activity():
+    """Live "something is training" signal for the nav indicator, local and
+    cloud. Ungated and free by design (one flag + one COUNT): every page polls
+    it, so it must never probe, touch the disk or reach the network. An
+    unconfigured cloud simply reports zero."""
+    return jsonify(ct.training_activity())
+
+
+@bp.get('/train/canvas/datasets')
+def train_canvas_datasets():
+    """◉ LoRA Canvas index: which datasets have runs worth drawing, how many, and
+    in which families. Cheap by design (no checkpoints, no disk) — the canvas
+    fetches each selected dataset's genealogy separately, so the board and its
+    filter appear immediately instead of after a full-library disk scan."""
+    return jsonify(ct.canvas_dataset_index(LOCAL_USER))
+
+
+@bp.post('/train/canvas/generate')
+def train_canvas_generate():
+    """◉ Generate from the LoRA Canvas — the same Test-Studio engine, driven by
+    the checkpoints ticked on the board instead of by a picker. Body:
+    {selections:[{dataset_id, checkpoint, record_id, step}], …every Studio
+    setting}. Selections MAY span several datasets (that is the point of the
+    canvas); they may NOT span several families — the engine refuses, and the
+    reason travels back so the button can say it. Same gates as the other launch
+    routes: ComfyUI not set up → 409/503, missing models/nodes → the actionable
+    409 the Studio already returns."""
+    from ._common import (_require_comfyui, _studio_arch_mismatch_response,
+                          _studio_missing_response)
+    gate = _require_comfyui()
+    if gate:
+        return gate
+    d = request.get_json(silent=True) or {}
+    try:
+        res = ct.canvas_generate(
+            LOCAL_USER, d.get('selections') or [],
+            strengths=d.get('strengths') or [1.0],
+            seed=d.get('seed'), prompt=d.get('prompt'), z_model=d.get('z_model'),
+            aspects=d.get('aspects'), cfgs=d.get('cfgs'), steps_list=d.get('steps'),
+            steps2_list=d.get('steps2'), count=d.get('count'),
+            permanent_loras=d.get('permanent_loras'), batch_loras=d.get('batch_loras'),
+            rebalance=d.get('rebalance'),
+            rebalance_strength=d.get('rebalance_strength'),
+            negative=d.get('negative'), sampler=d.get('sampler'),
+            scheduler=d.get('scheduler'), weight_dtype=d.get('weight_dtype'),
+            enhancer=d.get('enhancer'), enhancer_strength=d.get('enhancer_strength'),
+            detail_amount=d.get('detail_amount'),
+            resolution_tier=d.get('resolution_tier'),
+            resolution_multiplier=d.get('resolution_multiplier'),
+            init_image=d.get('init_image'), denoise=d.get('denoise'))
+    except Exception as e:
+        from ..services.lora_test_studio import StudioArchMismatch, StudioAssetsMissing
+        if isinstance(e, StudioArchMismatch):
+            return _studio_arch_mismatch_response(e)
+        if isinstance(e, StudioAssetsMissing):
+            return _studio_missing_response(e)
+        return _map_error(e)
+    return jsonify({'ok': True, **{k: res[k]
+                                   for k in ('created', 'seed', 'count', 'run_id')}})
+
+
+@bp.get('/train/checkpoint/<int:record_id>/<int:step>/images')
+def train_checkpoint_images(record_id, step):
+    """Everything this checkpoint ever generated, newest first — the gallery
+    the ◉ Canvas opens under a node. Reads the link written at generation time,
+    so it holds images made from any surface (Test Studio, canvas, comparison
+    grid). Open like the other Runs-hub reads; a checkpoint with no image simply
+    answers an empty list plus the `unlinked` counter."""
+    return jsonify(ct.checkpoint_gallery(
+        record_id, step, limit=request.args.get('limit', default=120, type=int)))
+
+
+@bp.get('/train/canvas/positions')
+def train_canvas_positions():
+    """◉ LoRA Canvas: every remembered card position, grouped by dataset id.
+    One request for the whole board — the lanes need their overrides before the
+    first paint, and N round-trips for a few dozen tiny rows would cost more
+    than the genealogy fetches they precede."""
+    return jsonify(ct.canvas_positions(LOCAL_USER))
+
+
+@bp.put('/dataset/<int:dataset_id>/canvas/positions')
+def dataset_canvas_positions_save(dataset_id):
+    """Remember where cards sit in ONE lane. Body: {positions:[{record_id,x,y}]}.
+    Upsert, so re-sending the same coordinates is a no-op — the canvas re-pins a
+    lane whenever it gains a run."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(ct.save_canvas_positions(
+            LOCAL_USER, dataset_id, data.get('positions')))
+    except LookupError:
+        return jsonify({'error': 'not found'}), 404
+
+
+@bp.delete('/dataset/<int:dataset_id>/canvas/positions')
+def dataset_canvas_positions_clear(dataset_id):
+    """✦ Tidy up one lane: forget every dragged position and fall back to the
+    automatic tree."""
+    try:
+        return jsonify(ct.clear_canvas_positions(LOCAL_USER, dataset_id))
+    except LookupError:
+        return jsonify({'error': 'not found'}), 404
+
+
 @bp.get('/dataset/<int:dataset_id>/train/lineage')
 def dataset_train_dataset_lineage(dataset_id):
-    """🌳 Genealogy forest of ALL this dataset's runs (every launch + its
+    """Genealogy forest of ALL this dataset's runs (every launch + its
     checkpoints), for the ◉ Graph the Checkpoints & LoRAs manager opens.
     Optionally scoped to the family/variant the panel shows (train_type/variant).
     Unlike the per-run lineage there is no single current run. Empty → 200 with

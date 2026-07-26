@@ -118,6 +118,14 @@ class FaceDatasetImage(db.Model):
     # both stay outside training until the user resolves the pair explicitly.
     parent_image_id = db.Column(Integer, nullable=True)
     derivation_kind = db.Column(String(32), nullable=True)
+    # The bank_image this row was promoted FROM (NULL for everything else). It is
+    # what makes "already promoted into this dataset" a fact we can re-check
+    # instead of a one-way flag: when the user deletes the image here, the row —
+    # and with it the link — disappears, so the bank offers the image again.
+    # Deliberately no ForeignKey, like parent_image_id: legacy databases cannot
+    # gain one, and a dangling id must read as "not promoted", never as a boot
+    # error. Additive column (migration in create_app).
+    bank_image_id = db.Column(Integer, nullable=True, index=True)
     # Ressemblance faciale vs la reference (face analyzer Lot A). face_score = cosinus
     # ArcFace brut (NULL si non note) ; face_state = scorable|no_face|low_det|too_small|
     # extreme_pose|unreadable|error. Score brut persiste -> seuils recalibrables cote UI.
@@ -220,7 +228,7 @@ class BankImage(db.Model):
     # same 64-bit dHash family (Hamming <= dup_distance).
     dup_group = db.Column(Integer, nullable=True, index=True)
     # Semantic near-duplicate group id (stage 2 — "same shot, different crop"):
-    # cosine of the CLIP embeddings the ✨ Score pass cached >= semantic_dup_threshold.
+    # cosine of the CLIP embeddings the Score pass cached >= semantic_dup_threshold.
     # Catches crops / re-compressed variants a dHash misses. Assigned by the
     # semantic-dedup pass over the scored images; NULL = no semantic near-dup /
     # the pass hasn't run. Distinct column from dup_group so the two stages
@@ -276,7 +284,7 @@ class BankImage(db.Model):
     # (Qwen3-VL, CLASSIFY_PROMPT). face = head close-up | bust = upper body |
     # body = full body | back = seen from behind | 'unknown' = a parseable answer
     # that wasn't one of the four | NULL = not classified yet (retryable). Powers
-    # the 📐 Framing filter chips AND the coverage advice. Additive column —
+    # the Framing filter chips AND the coverage advice. Additive column —
     # created by db.create_all(), no migration (see _SCHEMA_ADDITIONS).
     framing = db.Column(String(8), nullable=True, index=True)
     # Triage decision — same words as dataset images (pending|keep|reject).
@@ -350,6 +358,23 @@ class LoraTestImage(db.Model):
     # ('scorable'/'no_face'/'low_det'/…). NULL = cellule pas encore scorée.
     face_score = db.Column(Float, nullable=True)
     face_state = db.Column(String(16), nullable=True)
+    # WHICH training checkpoint produced this image — the run's record id and the
+    # step, written AT GENERATION TIME by every surface that launches (Test
+    # Studio, LoRA Canvas, comparison grid). Deliberately not a ForeignKey: run
+    # records outlive their dataset, exactly like canvas_node_position.
+    #
+    # This inverts a dependency. Membership used to be DERIVED, on every render,
+    # from the deployed LoRA's filename through comfyui._parse_trained_stem — the
+    # heuristic that already shipped a bug (multi-word triggers cut at the
+    # underscore, 2026-07-17). The parse now survives only in the one-shot
+    # backfill (services.checkpoint_link_backfill), never in the hot path.
+    #
+    # NULL means "not linked", never "unknown, guess it": a legacy row whose
+    # filename carries no run tag stays NULL and is simply absent from the
+    # checkpoint gallery, with a counter saying how many there are. Additive
+    # columns → existing databases keep their rows (see _SCHEMA_ADDITIONS).
+    record_id = db.Column(Integer, nullable=True, index=True)
+    step = db.Column(Integer, nullable=True)
     created_at = db.Column(DateTime, default=db.func.current_timestamp())
 
     def __repr__(self):
@@ -510,6 +535,11 @@ class CloudTrainingRun(db.Model):
     error = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # When the user asked this run to stop. Durable on purpose: an in-memory
+    # threading.Event does not survive a restart and cannot be enforced by
+    # anything but the monitor thread — which is exactly what may be dead.
+    # The supervisor uses this to terminate a pod whose stop was never honoured.
+    stop_requested_at = db.Column(db.DateTime)
     finished_at = db.Column(db.DateTime)
 
 
@@ -577,9 +607,19 @@ class CheckpointPreview(db.Model):
     the preview mapping lives here, keyed by (record_id, step). It does NOT store
     an image itself: the picture is produced by the reused Test-Studio engine and
     lands in the per-dataset folder as a LoraTestImage; `lora_test_image_id` points
-    at that row so the node reads the (async) filename + status live. Regenerating
-    a checkpoint replaces the pointer. New table -> created by db.create_all(),
-    no migration."""
+    at that row so the node reads the (async) filename + status live.
+
+    Previews ACCUMULATE. Until the LoRA Canvas there was a
+    ``UniqueConstraint('record_id', 'step')`` here and regenerating a checkpoint
+    REPLACED the pointer: the previous image stayed on disk but nothing pointed
+    at it any more, so a second look at the same epoch quietly erased the first.
+    A checkpoint now keeps every preview it was ever given, newest first, and the
+    node shows the newest one with the count beside it. Lifting a constraint on
+    SQLite means recreating the table — done once, row-count-guarded, in
+    ``services.checkpoint_preview_migration``.
+
+    New table -> created by db.create_all(); the constraint lift is the only
+    migration."""
     __tablename__ = 'checkpoint_preview'
     id = db.Column(db.Integer, primary_key=True)
     record_id = db.Column(db.Integer, nullable=False, index=True)
@@ -591,8 +631,11 @@ class CheckpointPreview(db.Model):
     prompt = db.Column(db.Text, nullable=False, default='')
     seed = db.Column(db.BigInteger, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    __table_args__ = (db.UniqueConstraint('record_id', 'step',
-                                          name='uq_checkpoint_preview'),)
+    # No UniqueConstraint on (record_id, step) — see the class docstring. The
+    # composite index replaces it: the reads are all "every preview of this
+    # checkpoint", which is exactly what the old unique index used to serve.
+    __table_args__ = (db.Index('ix_checkpoint_preview_record_step',
+                               'record_id', 'step'),)
 
 
 class TrainingPreset(db.Model):
@@ -615,3 +658,45 @@ class TrainingPreset(db.Model):
     variants = db.Column(db.Text, nullable=True)
     settings = db.Column(db.Text, nullable=False, default='{}')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CanvasNodePosition(db.Model):
+    """Where the user DRAGGED one run's card on the ◉ LoRA Canvas.
+
+    A display preference, never provenance: moving a card changes nothing about
+    which run continued which — that stays derived from ``parent_record_id`` /
+    ``resumed_from``. One row per (dataset, run); no row at all means "wherever
+    the automatic tree puts it", which is why ``✦ Tidy up`` is simply deleting
+    every row of the lane.
+
+    The rows also do a second, less obvious job. The automatic layout re-centres
+    a parent over its children, so a NEW fork would shove every ancestor
+    sideways and quietly destroy an arrangement the user had built. As soon as a
+    lane holds one dragged card, the canvas writes a row for every OTHER card of
+    that lane too, at the position it already occupied — from then on a new run
+    lands in free space and nothing already on the board moves.
+
+    ⚠ The ``dataset`` relationship is not decoration. Child models here declare
+    only a table-level ForeignKey, and without a mapper-level relationship the
+    unit of work has no ordering dependency: SQLAlchemy emits
+    ``DELETE FROM face_dataset`` first and a legacy database whose FK lacks
+    ON DELETE CASCADE answers HTTP 500. delete_dataset ALSO deletes these rows
+    explicitly and flushes before the parent — belt and braces, because that bug
+    has already shipped once in this project. New table -> created by
+    db.create_all(), no migration."""
+    __tablename__ = 'canvas_node_position'
+    id = db.Column(db.Integer, primary_key=True)
+    dataset_id = db.Column(
+        db.Integer, db.ForeignKey('face_dataset.id', ondelete='CASCADE'),
+        nullable=False, index=True)
+    # The training run's record id (training_run_record.id). Deliberately NOT a
+    # ForeignKey: run records OUTLIVE their dataset (history is kept on purpose,
+    # see delete_dataset), so a constraint here would fight that.
+    record_id = db.Column(db.Integer, nullable=False, index=True)
+    x = db.Column(Float, nullable=False, default=0.0)
+    y = db.Column(Float, nullable=False, default=0.0)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
+                           onupdate=datetime.utcnow)
+    dataset = db.relationship('FaceDataset')
+    __table_args__ = (db.UniqueConstraint('dataset_id', 'record_id',
+                                          name='uq_canvas_node_position'),)

@@ -12,6 +12,8 @@ import { serializeWatermarkRegions } from '../utils/watermarkRegions';
 import { summarizeScrapeImport } from '../utils/smallImageRescue';
 import { trainingRunSelection } from '../utils/checkpointBrowser';
 import { refreshDatasetIfActive } from '../utils/datasetRefresh';
+import { ENGINE_LABELS } from '../components/dataset/engineSelection.js';
+import { classifyResultMessage } from '../components/dataset/classifyFramingGate.js';
 
 function post(url, body, isForm) {
   // Routes through the shared fetchWithCsrfRetry: a token that aged out mid-session
@@ -482,7 +484,7 @@ export function useDataset() {
     return d;
   }, [refresh, toast]);
 
-  // Bulk ✨ Klein upscale & improve: ONE call that starts a SERVER job. The batch
+  // Bulk Klein upscale & improve: ONE call that starts a SERVER job. The batch
   // used to be a browser loop, so a selection bigger than the backend's fan-out cap
   // was mostly refused, ⏹ Stop could not reach it, and closing the tab killed it.
   // Progress now rides on `activity` (kind 'improve') and survives a reload.
@@ -495,11 +497,29 @@ export function useDataset() {
     return d;
   }, [currentId, refresh, toast]);
 
-  const classify = useCallback(() => wrap(async () => {
-    const d = await postJson(`/api/dataset/${currentId}/classify`);
-    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
-    toast.success(`${d.classified} classified`);
-    await refresh();
+  // `expected` = how many images the caller counted as classifiable. It turns the
+  // silent outcome into a diagnosis: the server answers ok/classified=0 when the
+  // vision backend never replied (Ollama down), and 0 on its own reads as success.
+  // Errors carry their `detail` too — "GPU busy" alone doesn't say training is running.
+  const classify = useCallback((expected = 0) => wrap(async () => {
+    const want = Number.isFinite(Number(expected)) ? Number(expected) : 0;
+    // The route answers only when the whole pass is done, so nothing would refetch
+    // the payload while it runs and its server-side `activity` (done/total) would
+    // surface only on a manual reload. One seeded refresh flips `hasActivity`, and
+    // the generic 3.5 s activity poll then drives the live progress from there.
+    const seed = setTimeout(() => { refresh(currentId); }, 1200);
+    try {
+      const d = await postJson(`/api/dataset/${currentId}/classify`);
+      if (!d.ok) {
+        toast.error([d.error, d.detail].filter(Boolean).join(' — ') || 'Unexpected error');
+        return;
+      }
+      const msg = classifyResultMessage(d.classified, want);
+      (toast[msg.tone] || toast.success)(msg.text);
+      await refresh();
+    } finally {
+      clearTimeout(seed);
+    }
   }), [wrap, currentId, refresh, toast]);
 
   const caption = useCallback((mode) => wrap(async () => {
@@ -594,6 +614,11 @@ export function useDataset() {
         const { kind, detail } = d.scoring_error;
         toast.error(kind === 'unavailable'
           ? 'Face scoring is not installed — run the Quality tools step in Setup.'
+          // The scorer can't read this KIND of image (a drawn face): the server's
+          // sentence already explains it and names the way out — pass it through
+          // verbatim rather than paraphrasing it into "failed".
+          : kind === 'subject_not_photographic'
+            ? detail
           : kind === 'ref_unusable'
             ? `The reference photo is not usable for scoring: ${detail}`
             : `Face scoring failed: ${detail}`);
@@ -945,7 +970,10 @@ export function useDataset() {
 
   const stopTraining = useCallback(async () => {
     const d = await postJson('/api/dataset/train/stop');
-    if (d.ok) toast.success('ComfyUI re-enabled'); else toast.error(d.error || 'Unexpected error');
+    // Say what happened (the run stopped) and what survived, not just the side
+    // effect — mirrors the Runs hub toast for the same endpoint.
+    if (d.ok) toast.success('Training stopped — checkpoints already saved are kept; ComfyUI is re-enabled.');
+    else toast.error(d.error || 'Unexpected error');
   }, [toast]);
 
   // baseModel/variant ciblent le run de la base SÉLECTIONNÉE (undefined → base
@@ -979,7 +1007,7 @@ export function useDataset() {
     return d;
   }, [currentId, toast]);
 
-  // ☁ The CLOUD lane of the same ▶ Continue gesture: the chosen LOCAL checkpoint is
+  // The CLOUD lane of the same ▶ Continue gesture: the chosen LOCAL checkpoint is
   // seeded onto a FRESH pod (the backend's resume_ckpt_path seam) instead of resuming
   // on this machine. Same payload as continueTraining — one dialog, two lanes — and
   // the same interactive-refusal contract, so TrainingPanel's confirm+retry helper

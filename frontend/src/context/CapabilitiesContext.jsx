@@ -10,7 +10,8 @@ const CapabilitiesContext = createContext(null)
 
 const EMPTY_CAPS = {
   configured: false,
-  engines: { klein: false },
+  // Local-only fork (Divergence 1): the two ComfyUI engines, nothing else.
+  engines: { klein: false, krea: false },
   comfyui: { reachable: false, api_url: '', models: {} },
   ollama: { reachable: false, installed: false, binary_path: '', url: '', vision_model: '', vision_model_ready: false },
   aitoolkit: { configured: false, valid: false },

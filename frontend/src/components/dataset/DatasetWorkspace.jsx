@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import CompositionBar from './CompositionBar';
+import ClassifyFramingButton from './ClassifyFramingButton';
 import ReferencePanel from './ReferencePanel';
 import VariationCatalog from './VariationCatalog';
 import TrainingPanel from './TrainingPanel';
@@ -9,6 +10,7 @@ import ImportDropzone from './ImportDropzone';
 import ConceptSourcesPanel from './ConceptSourcesPanel';
 import BankImportPanel from './BankImportPanel';
 import { isDatasetImportBlocked, isStopGenerationBlocked } from './scraperState';
+import { faceAnalysisState } from './faceScoringGate.js';
 import DatasetGrid from './DatasetGrid';
 import SmallImageRescueReview from './SmallImageRescueReview';
 import CaptionToolsBar from './CaptionToolsBar';
@@ -177,8 +179,16 @@ function GridFilterBar({
 export default function DatasetWorkspace({ ds, onBack }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { caps, refresh: refreshCaps } = useCapabilities();
+  const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities();
   const d = ds.data;
+  // Analyze faces: state + tooltip derived from the SERVER's verdict
+  // (`face_scoring_blocked`, a sentence or null) — see faceScoringGate.js. The UI
+  // never decides on its own which subjects InsightFace can read.
+  const faceAnalysis = faceAnalysisState({
+    blockedReason: d?.face_scoring_blocked,
+    hasRef: !!d?.ref_filename,
+    busy: ds.busy,
+  });
   const [cropImg, setCropImg] = useState(null);
   const [captionOptionsOpen, setCaptionOptionsOpen] = useState(false);
   // Frozen snapshot of the flagged queue when review mode opens (null = closed).
@@ -934,7 +944,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             </div>
           )}
 
-          {/* Stop is also the batch's Stop: a server-side ✨ improve run keeps feeding
+          {/* Stop is also the batch's Stop: a server-side improve run keeps feeding
               the queue, so the banner must stay reachable even between two waves
               (a moment when nothing is in flight). */}
           {(pending > 0 || act?.kind === 'improve') && (
@@ -1006,6 +1016,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   kleinAvailable={Boolean(caps.engines?.klein)}
                   eligibilityImages={images}
                   nonces={ds.nonces} faceThresholds={d.face_thresholds} datasetKind={d.kind || 'character'}
+                  faceScoringBlocked={d.face_scoring_blocked}
                   dualCaptions={Boolean(d.dual_captions)} />
               )}
             </div>
@@ -1044,6 +1055,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
 
                 <div id="gf-generate" className="scroll-mt-20 flex flex-col gap-2">
                   <CompositionBar composition={d.composition} upscaled={d.composition_upscaled} bodyFidelity={bodyFid} />
+                  {/* Images imported WITHOUT head-crop have no shot type, so they count
+                      for nothing in the bar above (the default on body-fidelity datasets:
+                      a whole drag-and-drop import can leave it at 0). The vision pass that
+                      fills them in lives right here, under the bar that shows the gap. */}
+                  <ClassifyFramingButton images={images} ollama={caps.ollama} capsLoading={capsLoading}
+                    busy={ds.busy} activity={act} onClassify={(n) => ds.classify(n)} />
                   <div id="ds-add-generate" tabIndex={-1} className="scroll-mt-20">
                     <VariationCatalog key={`vc-${d.id}-${bodyFid}`} busy={ds.busy}
                       generating={act && act.kind === 'generate' ? act : null}
@@ -1104,13 +1121,20 @@ export default function DatasetWorkspace({ ds, onBack }) {
               <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
                 {!isConceptual && (
                   <button id="ds-curation-face-analysis" type="button" data-workspace-focus
-                    onClick={ds.analyzeFaces} disabled={ds.busy || !d.ref_filename}
-                    title={d.ref_filename ? "Scores each image's facial resemblance vs the reference (deletes nothing)" : "Set a reference photo first"}
+                    onClick={ds.analyzeFaces} disabled={faceAnalysis.disabled}
+                    title={faceAnalysis.title}
                     className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border scroll-mt-20">
                     {ds.analyzing
                       ? `Analyzing…${act?.kind === 'analyze_faces' && act.total ? ` ${act.done}/${act.total}` : ''}`
                       : 'Analyze faces'}
                   </button>
+                )}
+                {/* A greyed button whose reason lives in a tooltip is invisible on a
+                    phone (no hover) — the pass must SAY why it can't run, in place. */}
+                {!isConceptual && faceAnalysis.blocked && (
+                  <p className="m-0 basis-full text-sky-300/90 text-[0.6875rem]">
+                    ℹ {d.face_scoring_blocked}
+                  </p>
                 )}
                 <div id="ds-curation-watermarks" tabIndex={-1}
                   className="flex items-center gap-2 flex-wrap scroll-mt-20">

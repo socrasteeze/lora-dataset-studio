@@ -15,6 +15,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-07-26 | *(merge)* | **Upstream sync** (94 commits: LoRA Canvas — every dataset's training lineage on one zoomable board, with card dragging, generate-from-the-board and a per-checkpoint gallery; a Classify-framing button under the Composition bar; bank relocate / overlap warnings / GPU-Python picker for Score / concurrent vision passes; a live training dot on Runs; unified run ids and lineage edge fixes; RTX-50 torch-arch crash diagnosis; anime subject type + Anima pointer; ComfyUI custom input/output folders; JSON shot-catalog import) — **the big adoption is Krea 2 Identity Edit as a SECOND LOCAL engine**, which is why this sync changes a divergence instead of just defending it: see the new **Divergence 1b**. `engineSelection.js` is no longer re-deleted — it is kept, trimmed to `ENGINES=['klein','krea']` with `API_ENGINES=[]`, `DEFAULT_ENGINE='klein'` and all-zero rates; `face_dataset_service` mirrors it (`API_ENGINES=()`, `KNOWN_ENGINES=LOCAL_ENGINES`). Settings regained a **Which engines to offer** card (so `SettingsPage` passes `toggleEngine` again) and `config.py` kept upstream's engine ledger with `LEGACY_KNOWN_ENGINES=('klein',)`, which is what makes Krea reach installs that already saved their settings. Rejected wholesale per Divergence 1: **OpenRouter as a third cloud engine** (`068732e`), the **Nano Banana / ChatGPT image-model pickers** (`3bad281`), and **reference editing with OpenRouter** (`ec5bf6b`) — deleting `openrouter.py`, `engine_errors.py` (its only consumers were the API engines), `chatgpt_image.py`, `nanobanana.py`, `referenceEdit*`, `ReferenceEditModal.jsx` and five test files. **Four of those test files merged with ZERO conflict markers** — `test_openrouter_engine.py`, `test_engine_model_choice.py`, `test_engine_lists_contract.py`, `test_config_new_engines.py` — exactly diagnostic 2, and three MORE clean-merged tests had been silently re-pointed at the cloud catalogue (`test_diagnostic.py`, `test_settings_api.py`, the new `capability-destinations-contract.test.mjs`, which expected 11 capability rows where this fork has 8). A clean-merged `import { editEngineNames } from './referenceEdit'` in `ReferencePanel.jsx` survived both the conflict pass AND the grep sweep — only `npm run build` caught it, which is the argument for building before calling a sync done. **Caught a real merge-interaction bug:** with `API_ENGINES` emptied, upstream's `model = img.klein_model if img.klein_model not in API_ENGINES else …` inverts to always-true and would have handed a legacy engine TAG to the Klein loader as if it were a model filename; now tested against `LEGACY_API_ENGINE_TAGS + (KREA_ENGINE,)`. Also restored `check_fanout_budget`/`fanout_in_flight` (dropped in the 2026-07-23 sync with the cloud fan-out, and load-bearing again now that two LOCAL engines dispatch as separate batches — without it `/generate` 500s on every multi-engine call). Divergence 3: re-stripped 404 lines of emoji across 172 merged files, keeping `🔞`; three upstream tests asserted on stripped glyphs and were re-pointed at the wording they actually guard. Divergence 4: dropped the resurrected vast.ai key guide in `TrainingSection.jsx`, the **Train in cloud** button and the cloud-run progress block in `TrainingPanel.jsx`. Settings' engine section went plural (`## Image engines`) with both help anchors and the docs realigned. README's "Seventeen researched presets" claim was NOT taken: both trees ship 13, so the number was corrected rather than propagated. |
 | 2026-07-25 | *(merge)* | **Upstream sync** (20 commits: bank review lightbox + two-level watermark cleaning + live folder re-walk + per-run staging cleanup + explicit Undeploy + Checkpoints-panel deployed state + per-subject identity prompts + Klein generation steps) — no rejected feature shipped in this window: the only cloud token the 20 commits add is one `face_single` description string in the SHARED `promptOverride.js` metadata, which the UI already filters out. Adopted as-is: the whole bank wave, the lineage/checkpoint Undeploy work, and both `2013790` features. Divergence work: `IdentityPromptModal.jsx` — upstream imports `readEngines` from `engineSelection.js`, **a file this fork deleted** (build breaker); kept upstream's per-subject storage (`readIdentityPrompt`/`writeIdentityPrompt`/`identityPromptPatch`/`identityDefaultsFor`, `subjectType` prop) but restored the fork's single-generator `activeExtraRefPromptKey(currentGenerator())`. `EnginesSection.jsx` — kept upstream's subject-type chip picker and switched to `identityPromptFields(subject)`, re-applying the fork's `.filter((f) => f.engines.includes('klein'))` and rewording the card copy from "three prompts" to one. `SettingsPage.jsx` — dropped upstream's `toggleEngine` prop (not defined in this fork → ReferenceError). `face_dataset_service.py` — dropped the re-added `API_ENGINES` regenerate branch but adopted its `sampler_steps=_generation_steps()`. `CloudRunsPage.jsx`/`whatsNew.js` — kept upstream's `TRASH_REMINDER` refactor, reworded rented-"pods" copy (Divergence 4). `helpRegistry.js` — kept the `klein.generation_steps` topic, dropped the API-engine `identity_prompts.face` topic, and repointed `runs-clean-one-run-staging` off the `#a-cloud-run-seems-stuck` H2 this fork does not carry. Divergence 3: re-stripped the badge pictographs upstream re-added in `BankWorkspace.jsx` (kept its `key=f` React fix) and the `🔎` in the guide; `⏏` kept as a monochrome state glyph, consistent with the `✓` the fork already keeps. **Caught a real merge-interaction bug:** upstream's new live folder re-walk (`refresh_bank`, forced on every `/api/banks`) is recursive, so the split's parent-rooted "(loose files)" bank absorbed every subfolder image its sibling banks own (1 → 4 in a 2-subfolder export). Fixed with a persisted `image_bank.root_only` marker (additive migration) that prunes the walk; two regression tests added. Also stopped `BankPage` polling `/api/banks` every 2.5 s — that route now force-re-walks every source folder and toasts, so the queue badge is derived from the cheap `/api/bank-queue` snapshot instead. |
 | 2026-07-24 | *(this wave)* | **Image-bank queue + split-by-subfolder** — two Bank additions. (1) A **cross-bank "Launch all" queue** (`backend/app/services/bank_queue.py`, an in-memory FIFO + single worker mirroring the `bank_jobs` contract): line up several banks and they run one at a time, each *waiting* for the GPU/bank to be free (reusing `start_pipeline` + `_gpu_busy_reason`) instead of the old busy-GPU **503** rejection. New routes `POST /bank/<id>/queue`, `GET/DELETE /bank-queue`, `POST /bank-queue/clear`; `list_banks` now carries `queue_state` for the card badge; UI is a queue panel + per-card "Add to queue" on `BankPage.jsx` (reusing `LaunchAllDialog` via a new `onQueue`). (2) **One bank per subfolder** — importing a folder-of-folders creates a separate bank per top-level subfolder (`split_folder_into_banks` / `split_folder_preview`, `create_bank` refactored to share `_register_bank`); loose root images get their own bank by default so nothing is dropped; routes `POST /bank/split[/preview]`, a create-form toggle + live preview. Local-only, no cloud surface touched. Tests: `test_bank_queue.py`, `test_bank_split.py`, `queue-split-ui.test.js`; What's-new + help topics (`bank-launch-queue`, `bank-split-subfolders`) added. |
 | 2026-07-24 | *(merge)* | **Upstream sync** (subject-type selector for generation — Human/Animal/Creature/Object/Other, steering the shot catalogue and identity lock for non-human LoRAs; case-insensitive whole-word Find & Replace in captions; Test Studio keeps every recent prompt instead of capping at ten; a form-dialog opacity contract test) — the big item to reject was upstream's **"edit the reference photo with a prompt"** feature, built entirely on ChatGPT/Nano Banana (`/ref/edit` routes, `reference_edit_jobs.py`, `ReferenceEditModal.jsx`, `referenceEdit.js` which imports the already-deleted `engineSelection.js`, `test_ref_edit.py`, the `✦ Edit` button in `ReferencePanel.jsx`, the `edit_reference` activity kind, and its What's New entry). Per Divergence 1 this was rejected wholesale: deleted every file above, stripped the routes/service functions/hooks that called them from `datasets.py`, `face_dataset_service.py`, `useDataset.js`, `DatasetWorkspace.jsx`. Also re-rejected upstream's recurring **multi-engine batch generation** rewrite of `VariationCatalog.jsx` (`EngineCard`, `MODE_CHOICES`, `engineSelection.js` imports) and `regenerate_image`'s API-engine branch/`generate_variations_nanobanana` fan-out in `face_dataset_service.py` — same pattern as the 2026-07-23 sync, upstream keeps developing this feature on top of the same rejected base. The subject-type feature's own wiring (`subjectTypes.js`, the `SUBJECT_TYPES` radio group, `normalize_subject_type`/`subject_type_of` on the backend, the `subject_type` DB column) merged in cleanly alongside the rejection and was kept — it has no cloud-engine dependency. Dropped the orphaned `dataset-engine-mode` help topic and the `action-edit-reference` help topic. |
@@ -59,22 +60,75 @@ as hostile until `npm run build` and the local-only contract test pass.
 - `backend/app/services/chatgpt_oauth.py`
 - `backend/app/services/reference_edit_jobs.py` (2026-07-24: "edit the reference
   photo with a prompt" — Klein deliberately excluded, ChatGPT/Nano Banana only)
+- `backend/app/services/openrouter.py` (2026-07-26: OpenRouter shipped upstream
+  as a THIRD cloud engine — same rejection as the other two)
+- `backend/app/services/engine_errors.py` — the shared EngineError/EngineFatal
+  taxonomy; its only consumers were the three API engines and the API fan-out
 - `backend/tests/test_engines.py`
 - `backend/tests/test_chatgpt_oauth.py`
 - `backend/tests/test_ref_edit.py`
-- `frontend/src/components/dataset/engineSelection.js` (+ `.test.js`) —
-  recurs across syncs as upstream keeps developing multi-engine batch
-  generation (see 2026-07-23 / 2026-07-24 changelog rows)
+- `backend/tests/test_openrouter_engine.py`, `test_engine_model_choice.py`,
+  `test_engine_lists_contract.py`, `test_config_new_engines.py` (2026-07-26 —
+  all four merged in with ZERO conflicts; the diagnostic-2 sweep is what caught
+  them)
 - `frontend/src/components/dataset/ReferenceEditModal.jsx`
-- `frontend/src/components/dataset/referenceEdit.js` (+ `.test.js`) — imports
-  `engineSelection.js` above
+- `frontend/src/components/dataset/referenceEdit.js` (+ `.test.js`) — imported
+  the (then absent) `engineSelection.js`; `ReferencePanel.jsx` kept a clean-merged
+  `import { editEngineNames }` of it that only the BUILD caught
+
+**`frontend/src/components/dataset/engineSelection.js` is no longer deleted** —
+see "Divergence 1b" below. It is now maintained in a LOCAL-ONLY form.
+
+### Divergence 1b: a SECOND local engine, and a local-only engine catalogue
+
+Adopted 2026-07-26. Upstream shipped **Krea 2 Identity Edit**, which renders on
+the user's own GPU through ComfyUI (the `comfyui-krea2edit` node pack) with no
+API key and no network call. Divergence 1 forbids CLOUD engines, not second
+engines, so this one is in scope for the fork and was taken.
+
+The consequence is that `engineSelection.js` — historically re-deleted on every
+sync — is now **kept and maintained**, trimmed to the local half:
+
+- `ENGINES = ['klein', 'krea']`, `LOCAL_ENGINES` identical to it.
+- `API_ENGINES = []` — kept as an EMPTY export rather than removed. Every
+  "is this engine billable / does it refuse NSFW / does it queue behind another"
+  helper derives from it, and an empty list makes them all answer correctly by
+  construction instead of by special case. **Never add an id to it.**
+- `DEFAULT_ENGINE = 'klein'` (upstream's is `'nanobanana'`).
+- `ENGINE_RATES` are all 0, so `estimateCost`/`billingEngines` are structurally
+  incapable of quoting a price; the cost confirm never fires.
+- Storage keys are upstream's, unchanged (`datasetGenerator` /
+  `datasetGenerators` / `datasetGeneratorMode`) — they are persisted, and
+  `canonicalEngines` is what quietly retires a stored `nanobanana`.
+
+Mirrored on the backend in `face_dataset_service.py`: `API_ENGINES = ()`,
+`LOCAL_ENGINES = ('klein', 'krea')`, `KNOWN_ENGINES = LOCAL_ENGINES + API_ENGINES`.
+`LEGACY_API_ENGINE_TAGS` gained `'openrouter'`.
+
+**Merge trap this created (bit once, 2026-07-26):** with `API_ENGINES` empty,
+every upstream `if x in API_ENGINES:` branch becomes dead but still REFERENCES
+functions this fork deleted (`_api_generate_fn`, `_all_ref_bytes`) — and
+`img.klein_model not in API_ENGINES` silently inverts to always-true, which
+would have passed a legacy engine TAG off as a real model filename. Do not
+leave those branches "harmlessly dead": delete them, and test row provenance
+against `LEGACY_API_ENGINE_TAGS`, never against the empty `API_ENGINES`.
+
+Settings gained a **"Which engines to offer"** card (`engines.default` /
+`engines.enabled`), so `SettingsPage.jsx` now DOES pass `toggleEngine` — the
+opposite of the 2026-07-25 note. `config.py` keeps upstream's `_merge_new_engines`
+ledger with `LEGACY_KNOWN_ENGINES = ('klein',)`: that single-entry tuple is what
+makes Krea reach installs that had already saved their Settings.
 
 ### Upstream files with fork edits (prefer fork side for engine UI)
 
-- `backend/app/config.py` — `SECRET_KEYS` without GEMINI/OPENAI;
-  `engines` defaults are `{default: 'klein', enabled: ['klein']}`.
-- `backend/app/capabilities.py` — no gemini/openai probes, `engines.klein` only,
-  no `chatgpt_subscription` block.
+- `backend/app/config.py` — `SECRET_KEYS` without GEMINI/OPENAI/OPENROUTER;
+  `engines` defaults are `{default: 'klein', enabled: ['klein', 'krea'],
+  known: []}`; `LEGACY_KNOWN_ENGINES = ('klein',)`; no `chatgpt_*`/`*_model` keys.
+- `backend/app/capabilities.py` — no gemini/openai/openrouter probes,
+  `engines` is `{klein, krea}` only, no `chatgpt_subscription` block. Keep
+  upstream's `_cached_import` refactor: the 2026-07-26 conflict interleaved it
+  with the three cloud probes in ONE hunk (diagnostic 4 — resolve per hunk, the
+  helper is load-bearing for face-scoring/masks/joycaption).
 - `backend/app/routes/settings.py` — no gemini/openai test targets, no
   chatgpt-oauth routes, diagnostic reports Klein only.
 - `backend/app/routes/datasets.py` — generate/regenerate are Klein-only
@@ -210,7 +264,21 @@ a decision, and don't miss the parts that merge with zero conflict markers.
    from a spot well outside the conflict hunk you're currently editing (this
    is how `_all_ref_bytes`-style orphans happen). Delete definitions only
    after every call site is gone.
-6. **A file with no conflict markers and no matches in step 2's grep is not
+6. **`npm run build` is a REQUIRED sweep step, not a packaging step.** A
+   rejected feature's last trace is often a plain `import` of a file this fork
+   deletes. It survives conflict resolution (nothing conflicted), it survives
+   the step-2 grep (2026-07-26: `import { editEngineNames } from './referenceEdit'`
+   in `ReferencePanel.jsx` — the deleted MODULE name matched the sweep pattern,
+   the imported SYMBOL did not, and the line sat nowhere near a conflict). Only
+   the bundler resolves imports, so run it BEFORE believing the sweep. The
+   backend equivalent is importing the app: `python -c "import app; app.create_app()"`.
+7. **Run the test suites BEFORE the merge and diff the results after.** This
+   repo has ~50 environment-dependent failures on a Linux container (Windows
+   drive letters, absent ML deps, no `xdg-open`) that have nothing to do with
+   any sync. Without a recorded baseline they are indistinguishable from merge
+   damage, and pytest's own reporter crashes mid-run when a test that patched
+   `os.name = 'nt'` fails — so run PER FILE and compare counts per file.
+8. **A file with no conflict markers and no matches in step 2's grep is not
    automatically clean** — run the standard test suites anyway (step 4 below);
    they catch what grep can't (renamed imports, prop-shape mismatches).
 

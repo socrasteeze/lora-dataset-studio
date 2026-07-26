@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import IdentityPromptModal from './IdentityPromptModal';
+// Engine names come from the derived edit list — spelling them out here is how
+// this tooltip ended up naming two engines while a third could already edit.
 
 // Cap identique à MAX_EXTRA_REFS côté backend (face_dataset_service).
 const MAX_EXTRA_REFS = 3;

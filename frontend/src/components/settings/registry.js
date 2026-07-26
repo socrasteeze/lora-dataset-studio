@@ -5,9 +5,10 @@ export const SETTINGS_SECTIONS = [
   { id: 'overview', title: 'Overview', icon: '', eyebrow: 'status',
     description: 'What is configured and what to do next.',
     keywords: ['status', 'summary', 'capabilities', 'ready'] },
-  { id: 'engines', title: 'Image engine', icon: '', eyebrow: 'generation',
-    description: 'The local Klein engine used to generate dataset images.',
-    keywords: ['klein', 'engine', 'comfyui', 'local', 'generation',
+  { id: 'engines', title: 'Image engines', icon: '', eyebrow: 'generation',
+    description: 'The local Klein and Krea 2 Edit engines used to generate dataset images.',
+    keywords: ['klein', 'krea', 'krea 2 edit', 'engine', 'engines', 'comfyui', 'local',
+      'generation', 'grounding',
       'lora', 'preset', 'texture', 'anatomy', 'nsfw', 'identity', 'prompt', 'guard', 'improve', 'upscale'] },
   { id: 'scraping', title: 'Scraping & sources', icon: '', eyebrow: 'sources',
     description: 'Credentials used when scanning image sources.',
@@ -38,7 +39,7 @@ export function sectionStatus(id, caps) {
   const e = c.engines || {}
   switch (id) {
     case 'engines':
-      return e.klein ? 'ready' : 'off'
+      return (e.klein || e.krea) ? 'ready' : 'off'
     case 'local-tools': {
       const parts = [
         !!(c.comfyui && c.comfyui.reachable),

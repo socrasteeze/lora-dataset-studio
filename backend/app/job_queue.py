@@ -282,6 +282,15 @@ class JobQueueManager:
             return True  # Job was cancelled/claimed while we were selecting
         db.session.refresh(job)
 
+        # A ComfyUI job is about to load models: hand back the vision model's
+        # 7.5 GB if an isolated call leased it warm. No live lease = a monotonic
+        # clock read and nothing else, so this is safe on the queue's hot path.
+        try:
+            from .services.vision_keepalive import revoke as _revoke_vision
+            _revoke_vision('ComfyUI job starting')
+        except Exception:
+            logger.exception('job_queue: vision keep-warm revoke failed')
+
         try:
             workflow = json.loads(job.workflow_data or '{}')
             prompt_id = _submit(workflow, job.job_id)
@@ -324,7 +333,11 @@ class JobQueueManager:
 
     # -- public API (verbatim surface; lifted services call these) --------
     def add_job(self, job_type='image', user_id='local', workflow_data=None, prompt='',
-               job_id=None, metadata=None, priority=10) -> str:
+               job_id=None, metadata=None, priority=10, *, commit=True) -> str:
+        """``commit=False`` leaves the queue row PENDING in the caller's session so a
+        fan-out (a Studio grid) can insert its own row and the job in ONE transaction
+        — one write lock per cell instead of three. The caller MUST then commit (or
+        roll back) itself; the worker only ever sees committed rows either way."""
         if job_type != 'image':
             raise ValueError(f'unsupported job_type: {job_type!r}')
         if not workflow_data:
@@ -340,7 +353,8 @@ class JobQueueManager:
             job_metadata=json.dumps(metadata) if metadata else None,
         )
         db.session.add(job)
-        db.session.commit()
+        if commit:
+            db.session.commit()
         return job_id
 
     def cancel_job(self, job_id, user_id=None, job_type='image', *, commit=True,

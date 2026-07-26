@@ -15,6 +15,10 @@ def test_diagnostic_ok_and_shape(client):
     assert isinstance(j['secrets_present'], dict)
     assert isinstance(j['capabilities'], dict)
     assert isinstance(j['capabilities']['engines'], dict)
+    # Every engine the formatter prints must be IN the payload — a missing key
+    # reads as a hard "no" in every pasted bug report. Local-only fork
+    # (Divergence 1): the two ComfyUI engines are the whole catalogue.
+    assert set(j['capabilities']['engines']) == {'klein', 'krea'}
     assert isinstance(j['config'], dict)
     assert isinstance(j['log_tail'], list)
     assert isinstance(j['generated_at'], int)

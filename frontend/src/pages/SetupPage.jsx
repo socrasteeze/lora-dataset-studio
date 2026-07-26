@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { apiFetch, putJson, postJson } from '../api/fetchClient'
 import { useToast } from '../components/common/Toast'
 import { useCapabilities } from '../context/CapabilitiesContext'
 import { deriveSetupSteps, deriveCapabilitySummary, SETUP_STEP_IDS, kleinMissingLabels,
-  comfyuiDirVerdict, COMFYUI_SKIP_LOST, COMFYUI_SKIP_KEPT, installAllPlan } from '../hooks/useSetupSteps'
+  comfyuiDirVerdict, COMFYUI_SKIP_LOST, COMFYUI_SKIP_KEPT, installAllPlan,
+  aitoolkitVerdict, AITOOLKIT_INSTALL_STEPS } from '../hooks/useSetupSteps'
+import SettingsLink from '../components/common/SettingsLink'
 import GuidedSteps from '../components/setup/GuidedSteps'
 import InstallRunner from '../components/setup/InstallRunner'
 import InstallEverything from '../components/setup/InstallEverything'
@@ -65,7 +67,16 @@ export default function SetupPage() {
   const [detected, setDetected] = useState(null)   // autodetect result (path suggestions)
   const [detecting, setDetecting] = useState(false)
   const [scanned, setScanned] = useState(false)     // the on-load scan has completed at least once
-  const [screen, setScreen] = useState(0)           // index into SCREENS
+  // Deep link: /setup?step=<tool id> opens that wizard screen straight away.
+  // The Settings ▸ Overview capability rows link here — "✗ Person masks" must
+  // land ON the install button, not on the welcome screen with 4 Next clicks in
+  // between. Applied to the INITIAL state (not an effect) so the wizard never
+  // flashes the welcome screen first; an unknown/absent step falls back to 0.
+  const [searchParams] = useSearchParams()
+  const [screen, setScreen] = useState(() => {
+    const i = SETUP_STEP_IDS.indexOf(searchParams.get('step'))
+    return i < 0 ? 0 : i + 1                        // welcome=0, tools=1..N
+  })
   const [advancing, setAdvancing] = useState(false) // Next is mid save-&-recheck
   const [startingOllama, setStartingOllama] = useState(false) // "Start Ollama" in flight
   const [dirCheck, setDirCheck] = useState(null)    // live classify of the typed ComfyUI dir
@@ -649,12 +660,32 @@ export default function SetupPage() {
         </div>
       )
     }
-    // Pointed at a folder that isn't usable yet (venv missing) → finish it, don't re-clone.
+    // Pointed at a folder that isn't usable yet → finish it, don't re-clone. The
+    // copy states what was OBSERVED (no interpreter in there) instead of asserting
+    // a venv is missing: portable/conda/uv/system installs have no venv and never
+    // will, and telling those users to make one is a dead end. Both routes are
+    // offered with the same weight, and when an interpreter is actually sitting in
+    // that folder it becomes one click — the same "found on disk → use it" move
+    // the directory suggestion above already makes.
     if (dir) {
+      const verdict = aitoolkitVerdict(step, dir)
       return (
         <div className="space-y-4">
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-content">
-            Pointed at <span className="font-mono">{dir}</span>, but it isn't usable yet — set up its Python venv per the README.
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-sm text-content space-y-2">
+            <p className="font-medium break-words">{verdict.headline}</p>
+            <p className="text-xs leading-relaxed text-content-muted">{verdict.body}</p>
+            {verdict.candidates.map((p) => (
+              <button key={p} type="button"
+                onClick={() => applyDetectedPath('aitoolkit', 'python', p)}
+                className="block w-full rounded-lg bg-gradient-primary px-3 py-2 text-left text-xs font-semibold text-white sm:w-auto">
+                Use this Python: <span className="font-mono break-all">{p}</span>
+              </button>
+            ))}
+            {verdict.action && (
+              <SettingsLink section={verdict.settingsSection} tone="warning" className="block">
+                {verdict.action}
+              </SettingsLink>
+            )}
           </div>
           {fields}
         </div>
@@ -662,10 +693,8 @@ export default function SetupPage() {
     }
     return (
       <GuidedSteps
-        intro="ai-toolkit trains the LoRA. Install it once, then point the app at its folder."
-        steps={[
-          { text: 'Clone ai-toolkit and set up its venv per its README.', command: 'git clone https://github.com/ostris/ai-toolkit' },
-        ]}
+        intro="ai-toolkit trains the LoRA. Install it once, give it a Python, then point the app at its folder."
+        steps={AITOOLKIT_INSTALL_STEPS}
         link={{ href: 'https://github.com/ostris/ai-toolkit', label: 'ai-toolkit on GitHub →' }}>
         {fields}
       </GuidedSteps>

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { getCsrfToken } from '../../api/fetchClient';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { postJson } from '../../hooks/useDataset';
+import { animeFamilyNote } from './animeFamilyNote.js';
 import {
   checkpointSelectionMatchesTraining,
   checkpointVariantLabel,
@@ -39,9 +40,12 @@ import { HelpBadge } from '../../help/HelpMode';
 import { requestHelpTip } from '../../help/helpTips';
 import { useToast } from '../common/Toast';
 import ContinueDialog from './ContinueDialog';
+import { graphContinueRefusal } from './lineageContinue.js';
 import RunLineageGraph from './RunLineageGraph';
 import TrainingProgress from './TrainingProgress';
 import PreflightModal from './PreflightModal';
+import { failureView } from './trainingFailure';
+import { stopOutcomeMessage } from '../../utils/runSilence';
 import SettingsLink from '../common/SettingsLink';
 import { DatasetVersionChip, RunIdChip } from './RunIdentityBadges';
 import {
@@ -918,7 +922,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     loadCheckpoints();
   };
   // ⏏ Undeploy, in place, next to the checkpoint it came from — the symmetric
-  // counterpart of 📦 Import and the SAME operation the ◉ Graph offers: the
+  // counterpart of Import and the SAME operation the ◉ Graph offers: the
   // route, body and target file all come from the shared helper (which derives
   // them from checkpointDeleteTarget), so no second undeploy logic exists here.
   // Only the ComfyUI copy goes to the trash; the training save stays, which is
@@ -939,7 +943,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       loadCheckpoints(checkpointBase, checkpointTrainType, checkpointVariant);
     }
   };
-  /* The ONE control that says where a checkpoint stands with ComfyUI: 📦 Import
+  /* The ONE control that says where a checkpoint stands with ComfyUI: Import
      when it isn't deployed, "✓ Deployed" + ⏏ Undeploy when it is. Rendered
      identically at both call sites (this run's saves and the cloud runs' saves)
      so the two lists cannot drift apart — and identically to the ◉ Graph pills,
@@ -1047,12 +1051,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // resume here: say so instead of silently falling back to the latest save.
   const continueFromGraphCheckpoint = (node, pill) => {
     const step = pill?.step ?? null;
-    if (step != null && !checkpoints.some((c) => c.step === step)) {
-      toast.warning(`Step ${step} is not in the active checkpoint set (${checkpointTypeLabel} · ${checkpointVariantDisplay}) `
-        + '— switch the Checkpoints selection to that run’s family, base and variant, '
-        + 'or continue that cloud run from the Runs page.');
-      return;
-    }
+    // The refusal must state the reason that is TRUE for this pill (a foreign
+    // run identity vs a save this machine simply doesn't hold) — the rule lives
+    // in lineageContinue.js, JSX-free and unit-tested.
+    const refusal = graphContinueRefusal(node, pill, {
+      steps: checkpoints.map((c) => c.step),
+      trainType: checkpointTrainType, variant: checkpointVariant, base: checkpointBase,
+      familyLabel: checkpointTypeLabel, variantLabel: checkpointVariantDisplay,
+    });
+    if (refusal) { toast.warning(refusal); return; }
     setContinueInitialStep(step);
     setContinueOpen(true);
   };
@@ -1095,6 +1102,21 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // ▶ Continue — WHERE it runs. Fork is local-only (FORK_NOTES Divergence 4): the
   // cloud lane is always closed here, each lane still states its own reason so
   // the dialog never shows a dead option without explaining why.
+  // Informational pointer for anime datasets (see animeFamilyNote.js). Reads the
+  // subject type straight off the dataset payload and Anima's real availability off
+  // base-info — no local rule, no forced selection, no launch blocked.
+  const animeNote = animeFamilyNote({
+    subjectType: ds.data?.subject_type,
+    trainType,
+    animaSupported: baseInfo?.anima_supported,
+  });
+
+  // ▶ Continue — WHERE it runs. A checkpoint is just a file: a run trained on this
+  // machine can be finished on a rented GPU (the file is seeded onto a fresh pod)
+  // and a cloud epoch mirrored here can be finished locally. Each lane states its
+  // own reason when it can't be used, so the dialog never shows a dead option.
+  // The cloud reason reuses cloudDisabledReason — the app's single source of truth
+  // for "why the cloud lane is closed" (family, custom weights, limits, budget).
   const continueLanes = {
     local: caps.aitoolkit?.valid === false
       ? { available: false,
@@ -1153,23 +1175,53 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           starts then dies just flips back to idle after the green "Training started"
           toast — the exact "shows confirmation but nothing happens" report (GH #3).
           Cleared automatically on the next launch (server resets training_error). */}
-      {status.error && (!status.error.dataset_id || status.error.dataset_id === ds.currentId) && (
+      {status.error && (!status.error.dataset_id || status.error.dataset_id === ds.currentId) && (() => {
+        const view = failureView(status.error);
+        return (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-200 text-[0.6875rem]">
-          <div className="font-semibold">
-            ⚠ The last training run failed{status.error.rc != null ? ` (ai-toolkit exited ${status.error.rc})` : ''} — nothing is training now.
-          </div>
-          {status.error.log_tail && (
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-1.5 font-mono text-[0.625rem] text-red-300/90">
-              {status.error.log_tail}
+          <div className="font-semibold">⚠ {view.title}</div>
+          {/* The GPU-architecture verdict is a PROVEN cause read from the venv
+              that trains — it goes first, above the log, with its remedy. */}
+          {view.gpuArch && (
+            <div className="mt-1.5 rounded border border-amber-400/40 bg-amber-500/10 p-2 text-amber-100">
+              <div className="font-semibold">This GPU needs a different PyTorch build</div>
+              <p className="m-0 mt-0.5 text-amber-200/90">{view.gpuArch.message}</p>
+              {view.gpuArch.command && (
+                <>
+                  <div className="mt-1 text-amber-200/80">Run this once, then Train again:</div>
+                  <pre className="mt-0.5 overflow-x-auto whitespace-pre-wrap break-all rounded bg-black/40 p-1.5 font-mono text-[0.625rem] text-amber-100">
+                    {view.gpuArch.command}
+                  </pre>
+                </>
+              )}
+            </div>
+          )}
+          {view.excerpt && (
+            <pre className={`mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-1.5 font-mono text-[0.625rem] ${
+              view.tone === 'error' ? 'text-red-300/90' : 'text-content-muted'}`}>
+              {view.excerpt}
             </pre>
           )}
-          <div className="mt-1 text-red-300/80">
-            Common first-run causes: ai-toolkit’s Python venv is missing packages
-            (re-run its install), or the base model is still downloading / needs a
-            Hugging Face token (gated models like Krea 2, FLUX.1 and FLUX.2 Klein). Fix the cause above, then Train again.
+          {/* One click to the log, right here. The other "Run folder" button
+              lives inside a collapsed disclosure further down — nobody looks for
+              a log under "checkpoints" (reported by wannadecryptor on Discord).
+              NO run selection is sent on purpose: the persisted base/family/
+              variant are those of the run that just died, whatever the checkpoint
+              browser happens to show. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <button type="button"
+              onClick={() => postTrain(`/api/dataset/${ds.currentId}/train/open-folder`,
+                { target: 'run' })}
+              title="Open the folder of the run that just failed — training.log is in it"
+              className="shrink-0 px-2 py-1 rounded-lg bg-red-500/20 border border-red-400/40 text-red-100 text-[0.6875rem] font-semibold">
+              Open run folder
+            </button>
+            <span className="min-w-0 text-red-300/80">{view.note}</span>
           </div>
+          {view.causes && <div className="mt-1 text-red-300/80">{view.causes}</div>}
         </div>
-      )}
+        );
+      })()}
 
       {/* Live progress of THIS dataset's run: bar + loss sparkline + sample
           previews. Only while it is the one training (queued/other runs: no poll). */}
@@ -1242,10 +1294,22 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </button>
         <HelpBadge topic="action-training-launch" />
         {status.in_progress && (
-          <button type="button" onClick={async () => { await ds.stopTraining(); refreshStatus(); }}
-            className="px-3 py-1.5 rounded-lg bg-red-600/80 text-white text-sm font-semibold">
-            Finish / re-enable ComfyUI
-          </button>
+          <>
+            <button type="button"
+              title="Stops this training run. Checkpoints already saved are kept — ComfyUI gets the GPU back."
+              onClick={async () => {
+                const who = status.current?.name ? `“${status.current.name}”` : 'this dataset';
+                if (!window.confirm(`Stop the training run for ${who}?\n\n`
+                  + 'The training process is terminated and the pending local training queue is cleared. '
+                  + 'Checkpoints already saved remain available, and ComfyUI gets the GPU back.')) return;
+                await ds.stopTraining();
+                refreshStatus();
+              }}
+              className="px-3 py-1.5 rounded-lg bg-red-600/80 text-white text-sm font-semibold">
+              ⏹ Stop training
+            </button>
+            <HelpBadge topic="action-training-stop" />
+          </>
         )}
         {status.in_progress && status.installed && (keptCount >= trainMinFloor || allowNotReady) && !sliderPromptsMissing && (
           <button type="button" disabled={queued || baseBlocksTrain} onClick={enqueue}
@@ -1371,6 +1435,33 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           </>
         )}
       </div>
+
+      {/* Anime dataset on a non-Anima family: a pointer, not a rule. Deliberately
+          NOT a warning (nothing is wrong — SDXL trains an anime character fine) and
+          deliberately not a preselection: Anima is local-only and needs an up-to-date
+          ai-toolkit, so forcing it would turn a description of the subject into a
+          launch failure. See animeFamilyNote.js — it also keeps quiet when this
+          machine cannot run Anima at all. */}
+      {animeNote && (
+        <p className="m-0 text-sky-300/90 text-[0.6875rem]">
+          ℹ {animeNote}
+        </p>
+      )}
+
+      {/* A disabled Train-in-cloud button always states WHY, right under the
+          button row — the tooltip alone was invisible until hovered, so a greyed
+          SDXL cloud button read as an unexplained limit (owner-reported). */}
+      {caps.cloud_training && cloudDisabledReason && (
+        <p className="m-0 text-sky-300/90 text-[0.6875rem]">
+          Cloud training unavailable — {cloudDisabledReason}
+        </p>
+      )}
+
+      {actives.length > 0 && (
+        <p className="m-0 text-content-subtle text-[0.625rem]">
+          {actives.length}/{cloudStatus.limit || 1} cloud runs — ${cloudStatus.total_price_per_hour || 0}/h total
+        </p>
+      )}
 
       {/* Pointeur visible quand le bouton Train est bloqué par un réglage qui
           vit dans la section repliée — sinon la cause resterait cachée. */}
@@ -2256,7 +2347,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {datasetGraph?.tree && (
                 Array.isArray(datasetGraph.tree.nodes) && datasetGraph.tree.nodes.length
                   ? <RunLineageGraph tree={datasetGraph.tree}
-                      // Same ★ best-settings guard-rail as the flat list's 🗑:
+                      // Same ★ best-settings guard-rail as the flat list's:
                       // the pill's delete warns loudly when it would unpin the
                       // Studio's saved winning combo.
                       bestSettingsLora={ds.data?.best_settings?.lora_filename || null}
@@ -2527,7 +2618,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
           {/* Every deployed file the lists above ALREADY account for is now
               actionable right next to its checkpoint (✓ Deployed / ⏏ Undeploy),
-              so repeating it here — under a red 🗑 that reads as destruction —
+              so repeating it here — under a red that reads as destruction —
               is exactly the contradiction this section used to create. What
               stays is what nothing above explains: LoRAs imported before run
               tagging ("run ?"), files dropped in the folder by hand, and any
@@ -2616,7 +2707,17 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </div>
       )}
 
-      {continueOpen && (
+      {/* Rendered at the BODY level, not in the panel's own subtree: this panel
+          is mounted once inside the Training section, which the workspace keeps
+          `display:none` while another section is shown — but its checkpoint
+          manager PORTALS into the Checkpoints section (CheckpointPortal above).
+          So the ▶ Continue buttons and the ◉ Graph pills are visible and
+          clickable from a section where everything this component renders on its
+          own is invisible: the dialog opened inside the hidden container and the
+          click looked completely dead (no dialog, no toast, no request — it only
+          appeared once the user navigated to Training). A modal must live where
+          it is seen, whichever section opened it. */}
+      {continueOpen && createPortal((
         <ContinueDialog
           context={`${checkpointBaseLabel} · ${checkpointVariantDisplay}`}
           where={laneOfStep(continueInitialStep)}
@@ -2631,7 +2732,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           // Local lane is disabled with its reason, the Cloud lane stays usable.
           busy={status.in_progress && !continueLanes.cloud.available}
           onResolve={runContinue} />
-      )}
+      ), document.body)}
 
     </div>
   );

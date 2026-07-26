@@ -1,4 +1,6 @@
 """Settings API: config/secrets CRUD + capability probes."""
+import sys
+
 from flask import Blueprint, current_app, jsonify, request
 
 from .. import capabilities
@@ -213,6 +215,64 @@ def loras_list():
         current_app.logger.exception('loras list scan failed')
         loras = []
     return jsonify({'loras': loras})
+
+
+@bp.get('/scoring-python')
+def scoring_python_list():
+    """Pythons on this machine that could run the Score pass, each with a
+    per-dependency verdict — the picker behind "use a GPU Python you already
+    have". ``?force=1`` re-probes (after the user pip-installed something);
+    ``?path=`` adds a hand-typed interpreter to the list. Read-only: nothing is
+    ever installed into an environment the app did not build.
+
+    Degrades rather than 500s, so the panel can never break the page — but it
+    says WHICH degradation it is. An empty list is also the legitimate verdict
+    'nothing to borrow on this machine', and returning that shape for a crash
+    left the user with no reason to press '↻ Check again' about a failure that
+    retrying might well fix. `detection_failed` separates the two, and
+    `default_python` stays filled in: it is the one thing we know regardless."""
+    from ..services import scoring_python
+    force = bool(request.args.get('force'))
+    if force:
+        # "↻ Check again" is what a user clicks right after installing a package
+        # by hand. Re-probing only OUR cache would leave the capability probes
+        # (10 min TTL) still saying "not installed" — two surfaces disagreeing
+        # about the same interpreter is exactly what makes a fix look broken.
+        capabilities.clear_import_cache()
+    try:
+        return jsonify(scoring_python.detect(
+            force=force, extra_path=request.args.get('path') or ''))
+    except Exception as e:
+        current_app.logger.exception('scoring interpreter detection failed')
+        try:
+            selected = (cfg.get('bank_scoring.python') or '').strip()
+        except Exception:      # noqa: BLE001 — a config read that also fails
+            selected = ''
+        return jsonify({
+            'selected': selected,
+            'default_python': sys.executable,
+            'interpreters': [],
+            'detection_failed': True,
+            'detection_error': str(e)[:300],
+        })
+
+
+@bp.post('/scoring-python')
+def scoring_python_select():
+    """Point Score at an interpreter (``{python: "<path>"}``), or back at the
+    app's own (``{python: ""}``). Refuses — 400, with the verdict attached — any
+    interpreter that could not be proven able to run the pass, so a bad pick can
+    never turn an hour of scoring into an import error."""
+    from ..services import scoring_python
+    body = request.get_json(silent=True) or {}
+    try:
+        result = scoring_python.select(body.get('python') or '')
+    except scoring_python.SelectionError as e:
+        return jsonify({'error': str(e), 'verdict': e.verdict}), 400
+    except Exception as e:
+        current_app.logger.exception('scoring interpreter selection failed')
+        return jsonify({'error': f'could not save the interpreter: {e}'}), 500
+    return jsonify(result)
 
 
 @bp.post('/settings/test/<target>')
@@ -540,6 +600,7 @@ def diagnostic():
     from ..version import APP_VERSION
     from ..services import updater
     from ..services import lineage_backfill as _lineage_backfill
+    from ..services import framing_backfill as _framing_backfill
     conf = cfg.load_config()
     caps = capabilities.probe()
     e = caps.get('engines') or {}
@@ -567,7 +628,8 @@ def diagnostic():
         'disk': _disk_free(),
         'secrets_present': _secret_presence(),
         'capabilities': {
-            'engines': {'klein': bool(e.get('klein'))},
+            # Local-only fork: the two ComfyUI engines are the whole catalogue.
+            'engines': {'klein': bool(e.get('klein')), 'krea': bool(e.get('krea'))},
             'comfyui_reachable': bool(comfy.get('reachable')),
             'klein_model': bool((comfy.get('models') or {}).get('klein')),
             # setup_installer action names for the Klein assets NOT yet on disk — the
@@ -616,6 +678,10 @@ def diagnostic():
         # lineage edge was persisted: how many edges it reconstructed (0 on a fresh
         # or fully-native database). Paste-safe — counts only, no paths.
         'lineage_backfill': _lineage_backfill.summary(),
+        # Same idea for the images promoted from a bank before the promotion
+        # carried their framing: how many rows the one-shot pass gave back to the
+        # Composition tally (0 on a fresh database). Counts only, no paths.
+        'framing_backfill': _framing_backfill.summary(),
         'log_tail': log_lines,
         'generated_at': int(time.time()),
     })

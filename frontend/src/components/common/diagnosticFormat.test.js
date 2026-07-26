@@ -14,7 +14,7 @@ function fullPayload() {
     disk: { free_gb: 45.2, total_gb: 931.0 },
     secrets_present: { VAST_API_KEY: true, PEXELS_API_KEY: false, HF_TOKEN: true },
     capabilities: {
-      engines: { klein: false },
+      engines: { klein: false, krea: false },
       comfyui_reachable: true,
       klein_model: false,
       klein_missing: ['klein_vae', 'klein_text_encoder'],
@@ -38,7 +38,7 @@ function fullPayload() {
     config: {
       captioning_backend: 'auto',
       default_engine: 'klein',
-      enabled_engines: ['klein'],
+      enabled_engines: ['klein', 'krea'],
       training_default_family: 'zimage',
       comfyui_base_dir_set: true,
       aitoolkit_dir_set: false,
@@ -69,7 +69,7 @@ function fullPayload() {
 
 test('renders every section header, most-discriminating first', () => {
   const out = formatDiagnostic(fullPayload());
-  const headers = ['── Engine ──', '── ComfyUI ──', '── Captioning (Ollama) ──',
+  const headers = ['── Engines ──', '── ComfyUI ──', '── Captioning (Ollama) ──',
     '── Environment ──', '── Recent generation failures ──',
     '── Last errors (with traceback) ──', '── Last log lines ──'];
   let last = -1;
@@ -135,7 +135,7 @@ test('empty optional sections are dropped so the healthy case stays short', () =
   assert.ok(!out.includes('── Recent generation failures ──'));
   assert.ok(!out.includes('── Last errors (with traceback) ──'));
   // core sections still render.
-  assert.ok(out.includes('── Engine ──') && out.includes('── ComfyUI ──'));
+  assert.ok(out.includes('── Engines ──') && out.includes('── ComfyUI ──'));
   // no git sha -> no trailing parenthesis on the header line.
   assert.match(out, /diagnostic — v2026\.07\.17\.1\n/);
   // Keys set line degrades to 'none' rather than blowing up.

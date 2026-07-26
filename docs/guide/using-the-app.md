@@ -100,6 +100,76 @@ Pick **Style** at creation. What changes:
 - **Step count switches to a sublinear √n scale** built for the large sets
   (hundreds of images) style LoRAs want.
 
+## Your own shot catalog (JSON import)
+
+The workspace ships a built-in shot catalog per subject type (53 shots for a
+human, ~59 for an animal, 55 for an anime character, and so on). If you want shots nobody wrote for you —
+40 breed-specific poses for a dog, a product line's signature angles — you don't
+have to type them one at a time. Open **📥 Shot catalog (JSON)** under the shot
+grid.
+
+**Export first.** The exported file is the format, and the example an LLM needs:
+
+```json
+{
+  "format": "lds-shots/1",
+  "subject_type": "animal",
+  "shots": [
+    {
+      "label": "Dog, zoomies on the lawn",
+      "framing": "body",
+      "prompt": "full body photo of the animal running fast across a lawn, side view, sunny day"
+    }
+  ],
+  "examples": []
+}
+```
+
+Then ask a chat assistant for more shots *in that exact shape*, and import the
+file it gives you.
+
+Each shot needs three things:
+
+- **`label`** — a short name, max 80 characters, shown on the card. It must be
+  unique: not a built-in label (of *any* subject type), and not one of your
+  existing shots. The app refuses a collision and tells you which label is at
+  fault — two shots sharing a label would make it resolve the wrong prompt the
+  day you regenerate one.
+- **`framing`** — exactly one of `face`, `bust`, `body`, `back`. Anything else is
+  refused; it is never quietly remapped.
+- **`prompt`** — the text sent to the image engine, max 500 characters.
+
+`nsfw: true` is optional and only has an effect when Klein is the only engine
+checked. Everything under **`examples`** is ignored on import — that's how the
+export can show you samples without them coming back as duplicates. Any other
+field (including `aspect`) is ignored too, and the import summary says so: an
+imported shot uses its framing's default aspect ratio.
+
+**Nothing is written until you confirm.** The app reads the file, lists what
+would land and what it refuses (naming the entry and the reason), and waits. A
+40-shot file whose 37th entry is broken never leaves 36 shots half-imported.
+
+Imported shots appear in their own **📥 Imported** group after the built-ins, one
+set per subject type. They never replace a built-in, you can delete them one by
+one or all at once, and they're stored with the app — not in the browser — so
+they survive a cache wipe, show up on your phone and ride along in the backup.
+
+### Keeping a shot you wrote by hand
+
+The **✨ Custom shot** box below the grid is the quick way to add one shot: type a
+prompt, pick a framing, Add. Those cards are stored **in your browser**, so
+clearing its data takes them with it.
+
+Any card you want to keep, press **Keep** on it. It moves into the 📥 Imported
+group and is saved with the app, exactly like an imported shot — surviving a
+cache wipe, following you to another device, included in the backup. The card
+keeps its identity, so a shot preset that had it selected still works. If its
+label happens to clash with a built-in shot or with one you already imported, the
+app says which label and refuses rather than creating a duplicate; rename the
+card (remove it and add it again) and press **Keep** once more.
+
+*Feature requested by ashish.sinha (Discord).*
+
 ## Back up everything
 
 The **Back up everything** button on the Datasets library packs your whole
@@ -243,11 +313,19 @@ still covers person mix, style spread and resolution and hints to run framing.
 "your source folder is never modified" rule, and it's opt-in. Once you're happy
 with your triage, it removes every image you marked ✕ rejected from its source
 folder — the actual files, not just the status. It asks you to type **DELETE**
-first, and sends the files to your OS trash when [`send2trash`](https://pypi.org/project/Send2Trash/)
-is installed (a permanent delete otherwise). This is **irreversible** — the
-app's own trash can't recover these, they live outside the app. Kept and
-undecided images are never touched, and a file it can't remove (locked,
-read-only) is reported and left alone rather than aborting the batch.
+first, and tells you where the files will go before you confirm: your OS trash
+when [`send2trash`](https://pypi.org/project/Send2Trash/) is installed, the
+app's own Trash otherwise (recoverable until you empty it from Settings), and a
+permanent delete only when neither can take the file. Kept and undecided images
+are never touched, and a file it can't remove (locked, read-only) is reported
+and left alone rather than aborting the batch.
+
+⚠️ A bank doesn't own its folder, so two banks can point at nested folders and
+list the **same files**. That's harmless while you triage — decisions live on
+the bank — but deleting from disk in one bank removes those files from the other
+too, along with every decision you made on them there. The app says so when you
+create such a bank, and the confirmation names the other bank and how many of
+its files are about to disappear.
 
 **🚀 Launch all** does the whole funnel for you in one go. Tick which passes
 run and how auto-reject behaves, hit Go, and walk away — it chains *scan →
@@ -327,6 +405,184 @@ If a bank was scanned by an older version, its flagged images carry no recorded
 mark position; the panel says so and one more **🚩 Find watermarks** run makes
 them cleanable.
 
+
+## Move a bank folder to another disk
+
+A bank points at a folder *in place*, but nothing it computes lives in that
+folder: the quality scores, duplicate groups, face clusters, captions and every
+keep/reject decision are stored against the image row, and each row remembers
+its file *relative* to the bank's folder. So moving a 30 000-image bank to
+another drive costs nothing — you just have to tell the app where it went.
+
+You can do this in either order. **📦 Move folder…** sits in the bank's header
+next to its path (and **📦** on the bank's card in the list), so you can open it
+before touching anything to see what the app will ask for; it also appears inside
+the warning shown once the app notices the folder is gone, if you moved first.
+Paste or browse to the new folder
+and press **🔍 Check this folder**. Nothing is written yet: the app walks the
+candidate folder and tells you how many of *this bank's* images are in there and
+how many are not. Paste it however you like — Windows' *Copy as path* wraps the
+path in quotes, and a trailing `\` or forward slashes are equally fine; the field
+then shows the folder the app actually resolved, so what you confirm is what it
+will use.
+
+- **All of them found** → confirm, and the bank is repointed with every score
+  and decision intact.
+- **Some found, some missing** → you can still confirm. Nothing is deleted:
+  rows whose file didn't come along keep their analysis and simply read as
+  missing until the file comes back.
+- **None found** → refused. That folder is a *different* folder, not a moved
+  one — the usual cause is picking the parent of the folder you moved.
+
+The app never deletes a row on its own, and an analysis pass run while the files
+are away no longer degrades them either: a file that is *absent* is not a file
+that is *broken*, so the pass stops and tells you the folder appears to have
+moved instead of marking thousands of images unusable.
+
+
+## Make Score use a GPU Python you already have
+
+The **✨ Score** pass (aesthetic · NSFW · style) runs in its own small Python
+environment, and that environment deliberately carries **CPU-only PyTorch**: a
+first install stays a few hundred megabytes instead of pulling ~2.5 GB of CUDA
+wheels onto machines that may have no card at all.
+
+On a machine that *does* have one, that default is expensive — CLIP measures
+about **336 ms per image on the CPU against ~15 ms on a recent card**, so a
+30 000-image bank is the difference between a coffee break and most of an
+afternoon. The bank says so: when Score is about to run on the CPU on a machine
+with an NVIDIA card, an amber note gives you the estimate and a button, **⚡ Use
+a GPU Python I already have**.
+
+That button is the point. If you train LoRAs or run ComfyUI, this machine
+*already* has a PyTorch with working CUDA. Score can simply borrow it — no
+download, no third environment to maintain.
+
+The dialog lists the interpreters the app knows about (the environment it built
+for scoring, ai-toolkit's, ComfyUI's, its own) and reports each one **package by
+package**:
+
+- **GPU ready** — everything the pass imports is there *and* PyTorch sees the
+  card. Pick it and the next Score run is minutes instead of hours.
+- **Missing packages** — the reason is named. The common one is an interpreter
+  with a perfect CUDA PyTorch but no **OpenCLIP**: Score needs `open_clip` and
+  `transformers`/`timm` too, so CUDA alone is not enough. Such an interpreter is
+  **refused**, on purpose — accepting it would trade slow-but-working scoring for
+  an import error an hour into the pass.
+- **CPU only** — it can run the pass, it just has no usable CUDA.
+- **No answer** — the path is not a working interpreter (moved venv, unplugged
+  drive). Nothing changes.
+
+**The app never installs anything into an environment it did not create.** Your
+ai-toolkit venv runs your training and ComfyUI's runs your generation; a silent
+`pip install` into either is not something a dataset tool gets to do. When a
+package is missing the dialog shows you the exact command and leaves the choice
+to you — run it in a terminal, then hit **↻ Check again** and the row updates.
+
+**Not listed? That field is not a fallback.** Most machines have neither
+ai-toolkit nor ComfyUI where the app looks — or at all — so entering a path
+yourself is a first-class route, checked exactly the same way. Paste an
+interpreter *or* the environment folder that contains it: a venv, a conda or
+miniconda env, a uv venv, a portable bundle, the system Python, something on a
+second disk. Spaces, accents and quotes around the path are fine ("Copy as path"
+on Windows wraps it in quotes; that is handled). The layout is never assumed —
+the app knocks on the shapes an environment can have and keeps whichever one
+actually answers.
+
+No version of PyTorch or CUDA is required. The only question asked is the one
+that matters: do the packages import, and does PyTorch see a card. An old card
+on cu118, a 50-series that only works on cu128, a nightly build — all fine.
+
+**No NVIDIA card?** Then there is nothing to fix, and the app says so plainly
+instead of suggesting a CUDA install you could not use. Borrowing an interpreter
+is still offered, for one honest reason: if another Python here already has the
+packages, you can skip installing them a second time. It will not be faster.
+
+**Back to the app default** puts everything back exactly as it was. The choice is
+reversible at any time, and the note under the passes always says which
+interpreter is in use. If you never open this dialog, nothing changes: an install
+that works today keeps working, untouched.
+
+## The LoRA Canvas (every run on one board)
+
+**Canvas** in the top bar opens a single board holding the training history of
+every dataset you have. Each dataset gets a lane; inside a lane, each run is a
+card and each save it wrote is a small pill underneath it. When a run continued
+from an earlier one, the line between them starts at the *exact* checkpoint it
+resumed from — so "where did this LoRA come from" is a thing you read, not a
+thing you reconstruct.
+
+**Choosing what is on the board.** Everything is on it by default. The
+**Datasets** control above the board unticks what you do not want to see; the
+choice is remembered. On a phone it opens folded, with the current state written
+on the button ("3 of 7") so you always know what you are looking at.
+
+**Moving around.** Drag the background to pan, use the wheel (or two fingers) to
+zoom, and **Fit** puts the whole board back in view. The board only fits itself
+automatically until you first touch it — after that a dataset finishing its load
+never yanks your view away.
+
+**Reading a run.** Click a run card to open its inspector: the settings it
+trained with, its notes, and a note per checkpoint. **Shift-click two** run cards
+to compare their settings side by side, with the differences highlighted — and
+because every dataset is on the same board, those two runs no longer have to
+belong to the same dataset.
+
+**Arranging the board.** Drag a run card and it stays where you put it, across
+reloads. On a phone, moving a card and scrolling the board are the same gesture,
+so a card is picked up with a **long press** — rest your finger on it for a
+moment and it lifts; a finger that slides straight away scrolls as usual.
+
+Once you have moved anything in a lane, that whole lane stops rearranging itself:
+a training run that finishes later lands in free space next to your layout
+instead of pushing everything sideways, which is what would otherwise happen —
+the automatic tree centres each run over its continuations, so one new branch
+re-flows the lane around it. Lanes you have never touched keep following the
+automatic tree, because there is no arrangement to protect there.
+
+**✦ Tidy up** is the way back: it forgets every card you have moved on the lanes
+currently shown and rebuilds the automatic tree. Positions are only ever a
+display preference — moving a card never changes which run continued which, and
+Tidy up never deletes a run, a checkpoint or a note.
+
+**Generating from the board.** Every checkpoint pill carries a small **✓** box.
+Tick one and the run settings open beside the board: the prompt, the seed, the
+format, the steps, the engine settings — the Test Studio's own panel, not a
+lookalike, so anything the Test Studio can do the board can do too.
+
+What the board adds is that your picks do not have to belong to the same
+dataset. Tick a checkpoint in one lane and two in another and they run together
+on one shared prompt and one shared seed, which is the only honest way to
+compare LoRAs against each other.
+
+Two things it will tell you rather than fail at:
+
+- **A checkpoint that is not in ComfyUI yet** is still pickable. The button then
+  says what it is about to do — *"Deploy 2 checkpoints, then generate"* — and
+  waits for you. Nothing is copied into your ComfyUI folder by a button that did
+  not announce it, and if a copy fails, nothing generates: half a comparison
+  answers a different question than the one you asked.
+- **Two different families in one selection** (say Krea and Z-Image) is refused,
+  and it says which two. This is not a restriction we chose: those families do
+  not share a base model or a workflow, so there is no single run that can render
+  both. Unpick one family and the button comes back.
+
+**The gallery under a checkpoint.** Images pile up. A checkpoint that has
+produced more than one shows a small **× N** badge; clicking it opens everything
+that checkpoint ever made, newest first — from the board, from the Test Studio,
+from a comparison run, it does not matter. Regenerating no longer replaces what
+was there.
+
+Which image belongs to which checkpoint is recorded when the image is generated.
+Images made before that was recorded are matched back where the evidence allows
+it (the run tag the deploy stamps into the LoRA's name); those that cannot be
+traced are **counted and left out** rather than shown under a checkpoint they
+might not belong to. The gallery says how many those are — they are still in the
+Test Studio, they simply have no node to sit under.
+
+The graph embedded in a dataset's *Checkpoints & LoRAs* panel is unchanged and
+still holds the per-checkpoint actions (download, deploy, continue from here,
+inline previews). The canvas is a second way in, not a replacement.
 
 ## Tips that save runs
 

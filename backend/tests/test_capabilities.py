@@ -34,7 +34,8 @@ def test_probe_all_off_when_unconfigured(app):
         from app import capabilities
         with patch('app.capabilities._http_ok', return_value=False):
             caps = capabilities.probe(force=True)
-    assert caps['engines'] == {'klein': False}
+    # Local-only fork (Divergence 1): the two ComfyUI engines and nothing else.
+    assert caps['engines'] == {'klein': False, 'krea': False}
     assert caps['training_visible'] is False and caps['studio_visible'] is False
 
 def test_python_ml_status_reports_version_and_range(app):
@@ -227,6 +228,63 @@ def test_probe_aitoolkit_valid(app, tmp_path):
         result = capabilities.probe_aitoolkit()
     assert result['ok'] is True
 
+# ── ai-toolkit without a venv (reported on Reddit by Psyko_2000) ─────────────
+# A community easy-install script sets ai-toolkit up with a `python_embeded`
+# folder and no venv at all. The wizard used to answer "set up its Python venv
+# per the README" — a remedy that install can never follow. The probe must state
+# what it FOUND, and hand back the interpreter sitting right there so the UI can
+# offer it in one click.
+
+def _portable_aitoolkit(tmp_path):
+    root = tmp_path / 'aitoolkit'
+    (root / 'python_embeded').mkdir(parents=True)
+    (root / 'python_embeded' / 'python.exe').write_text('fake')
+    (root / 'run.py').write_text('fake')
+    return root
+
+def test_probe_aitoolkit_finds_a_portable_interpreter_in_the_folder(app, tmp_path):
+    with app.app_context():
+        from app import capabilities, config
+        root = _portable_aitoolkit(tmp_path)
+        config.save_config({'aitoolkit': {'dir': str(root)}})
+        result = capabilities.probe_aitoolkit()
+    assert result['ok'] is False          # nothing is auto-applied
+    assert result['has_run'] is True      # ...but the checkout IS recognised
+    assert result['python_candidates'] == [str(root / 'python_embeded' / 'python.exe')]
+    # The detail names the observation and BOTH ways out — never "a venv is missing".
+    assert 'no Python interpreter found' in result['detail']
+    assert 'Settings' in result['detail']
+    assert 'no venv/.venv' not in result['detail']
+
+def test_probe_aitoolkit_degrades_cleanly_when_nothing_is_there(app, tmp_path):
+    with app.app_context():
+        from app import capabilities, config
+        root = tmp_path / 'aitoolkit'
+        (root / 'toolkit').mkdir(parents=True)     # a checkout, no interpreter anywhere
+        (root / 'run.py').write_text('fake')
+        config.save_config({'aitoolkit': {'dir': str(root)}})
+        result = capabilities.probe_aitoolkit()
+    assert result['ok'] is False
+    assert result['has_run'] is True
+    assert result['python_candidates'] == []      # empty, not a guess
+    assert 'no Python interpreter found' in result['detail']
+
+def test_aitoolkit_candidates_survive_an_unreadable_folder(app, tmp_path):
+    with app.app_context():
+        from app import capabilities
+        assert capabilities.aitoolkit_python_candidates(tmp_path / 'nope') == []
+
+def test_explicit_aitoolkit_python_makes_a_venv_less_install_valid(app, tmp_path):
+    """The one-click offer lands here: saving aitoolkit.python flips the step."""
+    with app.app_context():
+        from app import capabilities, config
+        root = _portable_aitoolkit(tmp_path)
+        config.save_config({'aitoolkit': {
+            'dir': str(root),
+            'python': str(root / 'python_embeded' / 'python.exe')}})
+        result = capabilities.probe_aitoolkit()
+    assert result['ok'] is True
+
 def test_probe_comfyui_unreachable(app):
     with app.app_context():
         from app import capabilities
@@ -329,9 +387,10 @@ def test_import_probe_result_is_cached(app, monkeypatch):
 
 def test_import_probe_timeout_is_not_cached_as_failure(app, monkeypatch):
     """_import_ok → None (subprocess TIMEOUT, e.g. rembg's first cold import
-    compiling numba caches) must report not-ready NOW but not poison the 10 min
-    cache: the next probe re-tries (warm import ~1 s → ✓). A real import error
-    (False) stays cached as before."""
+    compiling numba caches) must report not-ready NOW and must not poison the
+    10 min cache — but it is remembered BRIEFLY (_UNKNOWN_TTL), because the
+    caller polls: an uncached unknown re-spawned a 90 s subprocess on every
+    single call. A real import error (False) stays cached for the long TTL."""
     with app.app_context():
         from app import capabilities
         calls = []
@@ -340,12 +399,67 @@ def test_import_probe_timeout_is_not_cached_as_failure(app, monkeypatch):
         capabilities._import_cache.clear()
         assert capabilities.probe_masks()['ok'] is False
         assert capabilities.probe_masks()['ok'] is False
-        assert len(calls) == 2                       # re-probed: nothing cached
+        assert len(calls) == 1                       # the unknown is remembered…
+        # …but only briefly: past _UNKNOWN_TTL it re-tries, against what is by
+        # then a warm import. Age the entry rather than sleep.
+        for k, (ts, ok) in list(capabilities._import_cache.items()):
+            capabilities._import_cache[k] = (ts - capabilities._UNKNOWN_TTL - 1, ok)
+        assert capabilities.probe_masks()['ok'] is False
+        assert len(calls) == 2                       # re-probed after the short TTL
+        assert capabilities._UNKNOWN_TTL < capabilities._IMPORT_TTL
         monkeypatch.setattr(capabilities, '_import_ok',
                             lambda *a, **k: calls.append(1) or False)  # real failure
+        for k, (ts, ok) in list(capabilities._import_cache.items()):
+            capabilities._import_cache[k] = (ts - capabilities._UNKNOWN_TTL - 1, ok)
         assert capabilities.probe_masks()['ok'] is False
         assert capabilities.probe_masks()['ok'] is False
         assert len(calls) == 3                       # cached after the real False
+
+
+def test_import_probe_budget_matches_the_scoring_probe(app):
+    """60 s was not enough for a cold `import torch` behind an antivirus — the
+    repo says so itself in scoring_python.PROBE_TIMEOUT (90 s), and the two
+    probes disagreeing about the SAME interpreter is exactly the bug."""
+    from app import capabilities
+    from app.services import scoring_python
+    assert capabilities._IMPORT_TIMEOUT >= scoring_python.PROBE_TIMEOUT
+
+
+def test_unanswered_cuda_probe_does_not_read_as_no_cuda(app, monkeypatch):
+    """The GPU-exclusive window is decided by bank_scoring_gpu_available(). A
+    probe that never answered must not be reported as 'this interpreter has no
+    CUDA': the scoring child picks cuda on its own, so on a machine that HAS a
+    card the window has to be taken until we know better. A card-less machine
+    still gets False — it can never use a window."""
+    with app.app_context():
+        from app import capabilities
+        monkeypatch.setattr(capabilities, '_import_ok', lambda *a, **k: None)  # timeout
+        capabilities._import_cache.clear()
+        monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: 24.0)
+        assert capabilities.bank_scoring_gpu_available() is True
+        capabilities._import_cache.clear()
+        monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: None)
+        assert capabilities.bank_scoring_gpu_available() is False
+        # …and a probe that DID answer still rules, card or no card
+        capabilities._import_cache.clear()
+        monkeypatch.setattr(capabilities, '_import_ok', lambda *a, **k: False)
+        monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: 24.0)
+        assert capabilities.bank_scoring_gpu_available() is False
+
+
+def test_unanswered_cuda_probe_is_not_re_spawned_on_every_poll(app, monkeypatch):
+    """The Bank panel asks for the score device every ~2 s. Each unanswered
+    probe used to cost a fresh 90 s `import torch` subprocess."""
+    with app.app_context():
+        from app import capabilities
+        calls = []
+        monkeypatch.setattr(capabilities, '_import_ok',
+                            lambda *a, **k: calls.append(1) or None)
+        monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: None)
+        capabilities._import_cache.clear()
+        for _ in range(5):
+            capabilities.bank_scoring_gpu_available()
+        assert len(calls) == 1
 
 
 def test_import_probe_cache_key_includes_interpreter_path(app, monkeypatch):

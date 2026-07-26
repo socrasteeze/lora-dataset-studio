@@ -14,13 +14,21 @@ import SettingsPage from './pages/SettingsPage'
 import SetupPage from './pages/SetupPage'
 import GuidePage from './pages/GuidePage'
 import CloudRunsPage from './pages/CloudRunsPage'
+import CanvasPage from './pages/CanvasPage'
 import { recommendedMet } from './hooks/useSetupSteps'
 import { HelpModeProvider, useHelpMode, TipHost } from './help/HelpMode'
 import HeaderMenu from './components/common/HeaderMenu'
 import { versionLabel } from './utils/versionLabel'
+import { useTrainingActivity } from './hooks/useTrainingActivity'
+import { activityLabel } from './utils/trainingActivity'
 
+// px-2 up to `lg`: the desktop bar starts at `md` (768 px) and now carries five
+// workspaces (Datasets · Bank · Runs · Canvas · Test Studio) plus the utility
+// icons. At the old px-3 that row overflowed the viewport at exactly 768 and
+// clipped the What's-new button off the right edge. Nothing is hidden — the
+// items simply breathe less until there is room for it.
 const NAV_ITEM_BASE =
-  'px-3 py-1.5 rounded-md text-sm font-medium no-underline transition-colors'
+  'px-2 lg:px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap no-underline transition-colors'
 const navItemClass = ({ isActive }) =>
   `${NAV_ITEM_BASE} ${
     isActive ? 'bg-surface-raised text-content' : 'text-content-muted hover:text-content hover:bg-surface-raised'
@@ -125,6 +133,10 @@ function HelpModeToggle({ onToggle }) {
 
 function NavBar() {
   const { caps } = useCapabilities()
+  // Live indicator on Runs: a training can hold the GPU for hours (local) or
+  // bill by the minute (cloud), and from any other page nothing said so.
+  const activity = useTrainingActivity()
+  const activityTitle = activityLabel(activity)
   // Below `md` the horizontal link row has nowhere to go (it used to just wrap
   // mid-word, brand included) -- collapse it into a hamburger-triggered panel
   // instead. navLinks is shared markup: `hidden md:flex` on desktop, only
@@ -153,14 +165,38 @@ function NavBar() {
       {/* Bank sits right after Datasets: it FEEDS them (triage a big unsorted
           folder, then promote the keepers into a dataset). */}
       <NavLink to="/bank" className={navItemClass} onClick={() => setOpen(false)}>
-        <span className="inline-flex items-center gap-1.5 leading-none">
-          Bank
-          <span className="rounded border border-amber-400/50 bg-amber-500/10 px-1 text-[0.5625rem] font-semibold uppercase tracking-wide leading-none text-amber-300">Beta</span>
-        </span>
+        {/* The Beta chip moved from here to the LoRA Canvas: the Bank has been
+            in daily use for weeks, the canvas is the newest surface. */}
+        <span className="inline-flex items-center gap-1 leading-none">Bank</span>
       </NavLink>
       {caps.training_visible && (
         <NavLink to="/cloud" className={navItemClass} onClick={() => setOpen(false)}>
-          Runs
+          <span className="inline-flex items-center gap-1">Runs
+            {activity.running && (
+              /* Presence IS the message, so it must not be colour-only: the
+                 label is read out and shown on hover/long-press. */
+              <span title={activityTitle} aria-label={activityTitle} role="status"
+                className="relative inline-flex h-2 w-2 shrink-0">
+                <span aria-hidden className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
+                <span aria-hidden className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+            )}
+          </span>
+        </NavLink>
+      )}
+      {/* ◉ Canvas — the whole training history on one board. It lives next to
+          Runs because it answers the same question from the other end: Runs
+          lists what happened, the canvas shows how the runs descend from each
+          other, across every dataset at once. */}
+      {(caps.cloud_training || caps.training_visible) && (
+        <NavLink to="/canvas" className={navItemClass} onClick={() => setOpen(false)}>
+          <span className="inline-flex items-center gap-1"><span aria-hidden>◉</span> Canvas
+            {/* The Beta chip marks the newest surface, not the oldest: the Bank
+                has been in daily use for weeks, the canvas ships today. It is
+                the first thing to go when the bar is tight — a nuance, not a
+                destination. */}
+            <span className="hidden lg:inline px-1 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.5625rem] font-semibold uppercase tracking-wide leading-none">Beta</span>
+          </span>
         </NavLink>
       )}
       {caps.studio_visible && (
@@ -419,6 +455,7 @@ function AppInner() {
             <Route path="/studio" element={<StudioPage />} />
             <Route path="/dataset/studio/:id" element={<StudioPage />} />
             <Route path="/cloud" element={<CloudRunsPage />} />
+            <Route path="/canvas" element={<CanvasPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/:section" element={<SettingsPage />} />
             <Route path="/setup" element={<SetupPage />} />

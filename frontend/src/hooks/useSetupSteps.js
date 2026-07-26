@@ -1,5 +1,9 @@
 // Pure derivation of the guided Setup wizard state from live capabilities.
 // No I/O — deterministic, so it is the single source of truth for card status.
+// Pure JS on purpose (no JSX): node --test drives it directly, which is what
+// keeps the capability destinations below honest.
+import { getHelpTopic } from '../help/helpRegistry.js'
+import { SETTINGS_SECTIONS } from '../components/settings/registry.js'
 
 export const SETUP_STEP_IDS = ['comfyui', 'ollama', 'quality', 'training']
 
@@ -133,6 +137,61 @@ export function comfyuiDirVerdict(check) {
   }
 }
 
+// ── ai-toolkit: what the wizard says about the folder it was pointed at ───────
+// The old copy said one thing — "set up its Python venv per the README" — which
+// names a CAUSE the app never verified and a remedy that is a dead end for whole
+// families of installs: conda, uv, the system Python, and the portable/embedded
+// bundles that ship a `python_embeded\python.exe` instead of a venv. Someone
+// running one of those reasonably concluded the app REQUIRED a venv and went
+// asking in public (reported on Reddit by Psyko_2000) instead of filling in a
+// setting that was three clicks away. So the copy below states the OBSERVATION
+// ("no interpreter found here") and opens both doors with equal weight — make
+// one, or name the one you already have. Pure strings + a shape: node --test
+// locks the wording, which is the part that was wrong.
+export const AITOOLKIT_PYTHON_SETTING = 'Settings ▸ Local tools ▸ ai-toolkit Python interpreter'
+
+// The install path, before any folder is configured. Same rule: the venv is ONE
+// way to give ai-toolkit a Python, not the definition of a working install.
+export const AITOOLKIT_INSTALL_STEPS = [
+  { text: 'Clone ai-toolkit, or install it with the script of your choice.',
+    command: 'git clone https://github.com/ostris/ai-toolkit' },
+  { text: 'Give it a Python. Its README walks through creating a venv in that '
+      + 'folder — or, if you already run it with a conda or uv environment, the '
+      + 'system Python, or a portable/embedded build, keep that one and name it '
+      + `in ${AITOOLKIT_PYTHON_SETTING}.` },
+  { text: 'Point the app at the folder that holds run.py, below.' },
+]
+
+export function aitoolkitVerdict(step, dir) {
+  const s = step || {}
+  const path = (dir || '').trim()
+  const base = { candidates: [], settingsSection: 'local-tools' }
+  if (s.valid) {
+    return { ...base, kind: 'ready', tone: 'ok',
+      headline: `ai-toolkit is set up at ${path}.`, body: 'Nothing to do here.' }
+  }
+  if (!path) return { ...base, kind: 'unconfigured', tone: 'muted', headline: '', body: '' }
+  if (!s.dirValid) {
+    return { ...base, kind: 'not_a_checkout', tone: 'warn',
+      headline: `No run.py in ${path}, so this isn't an ai-toolkit folder.`,
+      body: "Point at the folder ai-toolkit was installed into — the one holding run.py." }
+  }
+  return {
+    ...base,
+    kind: 'no_interpreter',
+    tone: 'warn',
+    // The finding, not a diagnosis. True for every install shape.
+    headline: `ai-toolkit is here, but no Python interpreter was found in ${path}.`,
+    body: "The app doesn't know which Python to run it with. Two ways forward, "
+      + "both fine: create a venv inside that folder (ai-toolkit's README walks "
+      + 'through it), or keep the Python you already run ai-toolkit with — a conda '
+      + 'or uv environment, your system Python, or the python.exe of a portable / '
+      + 'embedded build (python_embeded) — and tell the app where it is.',
+    action: `Set the interpreter in ${AITOOLKIT_PYTHON_SETTING}`,
+    candidates: s.pythonCandidates || [],
+  }
+}
+
 function ollamaStep(caps) {
   const o = caps.ollama || {}
   const status = gateStatus(o.reachable, o.vision_model_ready)
@@ -173,6 +232,10 @@ function trainingStep(caps) {
     unlocks: ['LoRA training', 'JoyCaption captioning (bonus)'],
     status: a.valid ? 'ready' : 'available',
     valid: !!a.valid,
+    // dirValid = run.py is there. Told apart from `valid` so the wizard can say
+    // WHICH of the two problems it hit instead of one blanket sentence.
+    dirValid: !!a.dir_valid,
+    pythonCandidates: Array.isArray(a.python_candidates) ? a.python_candidates : [],
   }
 }
 
@@ -195,23 +258,71 @@ export function deriveCapabilitySummary(caps) {
   const cu = c.comfyui || {}
   const comfyOff = !!cu.dir_valid && !cu.reachable
   const NOTE = 'launch ComfyUI to enable'
+  // `topic` = the help-registry topic that OWNS the control turning this
+  // capability on. It is not a second navigation table: the route + focus id
+  // are read back from the registry (capabilityDestination below), so a field
+  // that moves section moves the tile with it. `waitingTopic` is the door for
+  // the pending state — "the install is fine, the process isn't up" is not the
+  // same problem as "it isn't installed", so it must not lead to the same page.
+  const WAITING = 'comfyui.api_url'
   return [
     { label: 'Klein (local)', ok: !!e.klein,
+      topic: 'setup-comfyui', waitingTopic: WAITING,
       ...(!e.klein && comfyOff ? { pending: true, note: NOTE } : {}) },
-    { label: 'Captioning', ok: !!(cap.joycaption || cap.ollama) },
-    { label: 'Auto-framing & head-crop', ok: !!(o.reachable && o.vision_model_ready) },
-    { label: 'Face-similarity scoring', ok: !!c.face_scoring },
-    { label: 'Person masks', ok: !!c.masks },
-    { label: 'Watermark inpainting', ok: !!c.watermark_inpaint },
-    { label: 'LoRA training', ok: !!c.training_visible },
+    { label: 'Captioning', ok: !!(cap.joycaption || cap.ollama), topic: 'setup-ollama' },
+    { label: 'Auto-framing & head-crop', ok: !!(o.reachable && o.vision_model_ready),
+      topic: 'setup-ollama' },
+    { label: 'Face-similarity scoring', ok: !!c.face_scoring, topic: 'setup-quality' },
+    { label: 'Person masks', ok: !!c.masks, topic: 'setup-quality' },
+    { label: 'Watermark inpainting', ok: !!c.watermark_inpaint, topic: 'setup-quality' },
+    { label: 'LoRA training', ok: !!c.training_visible, topic: 'setup-training' },
     { label: 'Test Studio', ok: !!c.studio_visible,
+      topic: 'setup-comfyui', waitingTopic: WAITING,
       ...(!c.studio_visible && comfyOff ? { pending: true, note: NOTE } : {}) },
   ]
 }
 
+// Human name of the screen a capability route lands on — derived, never typed
+// twice: the Settings rail owns its section titles, the wizard owns its own.
+function destinationName(route) {
+  const id = (route.match(/^\/settings\/([a-z0-9-]+)/) || [])[1]
+  if (id) {
+    const s = SETTINGS_SECTIONS.find((x) => x.id === id)
+    return s ? s.title : null
+  }
+  return route.startsWith('/setup') ? 'Setup wizard' : null
+}
+
+/* Resolve ONE capability row to the door that turns it on:
+     { topic, href, where, announce }
+   - href     in-app path, focus hint appended so the field is scrolled to and
+              ringed on arrival (SettingsPage's ?focus= deep-link);
+   - where    the screen's human name, for the visible/accessible wording;
+   - announce the full accessible label — state FIRST (the sr-only "(ready)" /
+              "(not available)" this replaces must not be lost), then where the
+              row leads, because a link whose name hides its destination is a
+              trap for anyone not looking at the grid.
+   `getTopic` is injectable so the contract test can drive it explicitly. */
+export function capabilityDestination(entry, getTopic = getHelpTopic) {
+  if (!entry) return null
+  const id = (entry.pending && entry.waitingTopic) ? entry.waitingTopic : entry.topic
+  const t = id ? getTopic(id) : null
+  if (!t || !t.app || !t.app.route) return null
+  const { route, focus } = t.app
+  const href = focus ? `${route}${route.includes('?') ? '&' : '?'}focus=${focus}` : route
+  const where = destinationName(route)
+  if (!where) return null
+  // Ready rows still lead somewhere — that screen is where the capability is
+  // managed (re-test a key, reinstall a helper), so "manage in" not "fix in".
+  const state = entry.pending ? (entry.note || 'waiting') : (entry.ok ? 'ready' : 'not available')
+  const verb = entry.pending || entry.ok ? 'manage in' : 'configure in'
+  return { topic: id, href, where, announce: `${entry.label} — ${state}, ${verb} ${where}` }
+}
+
 export function recommendedMet(caps) {
   const e = (caps && caps.engines) || {}
-  return !!e.klein
+  // Either LOCAL engine counts as "can generate" (Divergence 1: there are no others).
+  return !!(e.klein || e.krea)
 }
 
 // --- "Install everything" plan -------------------------------------------------

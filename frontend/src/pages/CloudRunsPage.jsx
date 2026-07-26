@@ -22,6 +22,7 @@ import {
   trainingRunVariantLabel,
 } from '../utils/trainingRuns';
 import { confirmableRetryFlag } from '../utils/trainingRefusals';
+import { runSilenceWarning, stopOutcomeMessage } from '../utils/runSilence';
 import { runsHubContinueLanes } from '../utils/runsHubContinueLanes';
 import {
   TRASH_REMINDER,
@@ -173,6 +174,23 @@ function RecipeWarning({ run }) {
   );
 }
 
+/* A rented pod bills even when nothing is happening. Surfaced on the card as
+   soon as a run goes quiet — well before the watchdog would act, and the only
+   signal at all when the user turned automatic termination off. */
+function SilenceWarning({ run }) {
+  const warning = runSilenceWarning(run);
+  if (!warning) return null;
+  const critical = warning.level === 'critical';
+  return (
+    <div role="alert"
+      className={`w-full rounded-md border px-2.5 py-2 text-[0.6875rem] leading-relaxed ${
+        critical ? 'border-red-400/50 bg-red-500/10 text-red-200'
+          : 'border-amber-400/40 bg-amber-500/10 text-amber-200'}`}>
+      <span className="font-semibold">{critical ? '' : '⚠'} Silent run:</span> {warning.text}
+    </div>
+  );
+}
+
 /* One compact line: the EFFECTIVE ai-toolkit settings this launch used
    (snapshotted at launch by the provenance registry). Absent on rows that
    predate the snapshot feature. Steps and variant are NOT repeated here —
@@ -246,7 +264,7 @@ export default function CloudRunsPage() {
   // tile instead of a broken-image glyph. Keyed by the run's share_key.
   const [brokenThumbs, setBrokenThumbs] = useState({});
 
-  // 🌳 Lineage: which run cards have their genealogy tree expanded, and the
+  // Lineage: which run cards have their genealogy tree expanded, and the
   // fetched tree per record id (loaded lazily on first expand; refetched only
   // if forced). Keyed by record_id — the universal run node key.
   const [lineageOpen, setLineageOpen] = useState({});   // record_id -> bool
@@ -288,7 +306,7 @@ export default function CloudRunsPage() {
     } catch { /* transient — next tick retries */ }
   }, [historyLimit]);
 
-  // How much disk each run's staging still holds — what the per-run 🧹 names
+  // How much disk each run's staging still holds — what the per-run names
   // before moving it. Sizing walks thousands of files per run, so it is fetched
   // ON DEMAND (mount, and again after a cleanup) and deliberately NOT folded
   // into the 5 s poll: the hub must stay as light as it is today.
@@ -304,7 +322,7 @@ export default function CloudRunsPage() {
   }, []);
   useEffect(() => { loadStagingSizes(); }, [loadStagingSizes]);
 
-  // Per-run 🧹. Same trash mechanism and the same sparing rule as the global
+  // Per-run. Same trash mechanism and the same sparing rule as the global
   // button (runStagingCleanup mirrors the backend), so a run one spares the
   // other can never take. Sizes are refetched so the card's weight disappears.
   const [purgingRun, setPurgingRun] = useState({});        // run_id -> bool
@@ -390,8 +408,11 @@ export default function CloudRunsPage() {
     setStopping((m) => ({ ...m, [run.run_id]: true }));
     try {
       const d = await postJson('/api/dataset/train/cloud/stop', { run_id: run.run_id });
-      if (d.ok === false) toast.error('Could not stop the run — it may have already finished.');
-      else toast.info('Stopping the run — the pod is winding down…');
+      const m = stopOutcomeMessage(d);
+      // A failed termination is the expensive case: keep it on screen (the
+      // instance id in the text is what the user needs in the vast console).
+      if (m.level === 'error') toast.error(m.text, 20000);
+      else toast.info(m.text, m.level === 'warn' ? 12000 : undefined);
       poll();
     } finally {
       setStopping((m) => ({ ...m, [run.run_id]: false }));
@@ -668,11 +689,11 @@ export default function CloudRunsPage() {
             )}
             {/* What this run still costs in DISK — the figure a targeted cleanup
                 needs. Absent when its staging is already gone (nothing to show,
-                and no 🧹 either). */}
+                and no either). */}
             {cleanup.size && (
               <span className="tabular-nums text-content-subtle"
                 title="Disk this run's staging folder still holds (dataset copy, samples, checkpoints)">
-                🗄 {cleanup.size} on disk
+                {cleanup.size} on disk
               </span>
             )}
             {run.gpu && <span>{run.gpu}</span>}
@@ -746,8 +767,8 @@ export default function CloudRunsPage() {
                     ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 '
                     : 'border-indigo-400/40 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 ')}>
                 {lineageOpen[run.record_id]
-                  ? (run.lineage ? '🌳 Hide lineage' : '◉ Hide graph')
-                  : (run.lineage ? '🌳 Lineage' : '◉ Graph')}
+                  ? (run.lineage ? 'Hide lineage' : '◉ Hide graph')
+                  : (run.lineage ? 'Lineage' : '◉ Graph')}
               </button>
             )}
             {run.share_key && (
@@ -760,13 +781,13 @@ export default function CloudRunsPage() {
             {/* Per-run cleanup, so a long history no longer forces the all-or-
                 nothing purge. Only shown when there IS something to move and the
                 run is not spared (active pod, kept pod) — the same rule the
-                global 🧹 applies, read from runStagingCleanup. */}
+                global applies, read from runStagingCleanup. */}
             {cleanup.available && (
               <button type="button" onClick={() => purgeRun(run)}
                 disabled={!!purgingRun[run.run_id]}
                 title={cleanup.title}
                 className={`rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-200 hover:bg-red-500/20 text-xs font-semibold disabled:opacity-40 ${run.share_key ? '' : 'ml-auto'}`}>
-                {purgingRun[run.run_id] ? '🧹 Cleaning…' : `🧹 Clean ${cleanup.size}`}
+                {purgingRun[run.run_id] ? 'Cleaning…' : `Clean ${cleanup.size}`}
               </button>
             )}
           </div>
@@ -869,10 +890,80 @@ export default function CloudRunsPage() {
         )}
         {!data ? (
           <p className="m-0 text-content-subtle text-sm">Loading…</p>
-        ) : !data.local_active && (
-          <p className="m-0 text-content-subtle text-sm">
-            No run in progress. Launch one from a dataset’s training panel.
-          </p>
+        ) : actives.length === 0 ? (
+          !data.local_active && (
+            <p className="m-0 text-content-subtle text-sm">
+              No run in progress. Launch one from a dataset’s training panel.
+            </p>
+          )
+        ) : (
+          actives.map((run) => (
+            <div key={run.run_id} id={runRowDomId('cloud', run.run_id)}
+              className="flex flex-col gap-2 rounded-xl border border-sky-500/30 bg-sky-500/5 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <RunIdChip source="cloud" id={run.run_id} />
+                <button type="button" onClick={() => openDataset(run.dataset_id)}
+                  title="Open this dataset"
+                  className="text-content font-semibold text-sm hover:underline">
+                  {run.dataset_name || run.run_name || `Dataset #${run.dataset_id}`}
+                </button>
+                <span className="rounded border border-border bg-surface px-1.5 py-0.5 text-content-muted text-[0.625rem] uppercase">
+                  {famLabel(run.train_type)}
+                </span>
+                {/* No variant shown on the active card, so spell the base in
+                    full here — official ("Z-Image Turbo") and custom alike. */}
+                <BaseModelChip label={runBaseModelLabel(run)} />
+                <DatasetVersionChip version={run.version} />
+                <StatusBadge status={run.status} />
+                <AutoRetryBadges run={run} />
+                <span className="text-content-subtle text-[0.625rem]">{timeAgo(run.created_at)}</span>
+                <span className="ml-auto text-content-muted text-[0.6875rem] tabular-nums">
+                  {run.gpu ? `${run.gpu} · ` : ''}{run.price_per_hour != null ? `$${run.price_per_hour}/h · ` : ''}
+                  ~${run.cost_estimate} so far
+                </span>
+              </div>
+
+              <RecipeWarning run={run} />
+              <SilenceWarning run={run} />
+              <TrainingProgress datasetId={run.dataset_id} trainType={run.train_type} variant={run.variant} cloud />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => stop(run)} disabled={stopping[run.run_id]}
+                  className="px-3 py-1.5 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
+                  {stopping[run.run_id] ? 'Stopping…' : 'Stop run'}
+                </button>
+                {run.checkpoint_ready && (
+                  <a href={checkpointHref(run)}
+                    className="px-3 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-200 text-xs font-semibold no-underline">
+                    ⬇ Download the LoRA
+                  </a>
+                )}
+                {run.share_key && (
+                  <button type="button" onClick={() => shareConfig(run)}
+                    title="Download this run's full settings as a paste-safe text file (recipe / help thread)"
+                    className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content-muted hover:text-content text-xs font-semibold">
+                    ⎘ Share config
+                  </button>
+                )}
+                <span className="ml-auto flex items-center gap-2">
+                  {/* Per-run escape hatch to this pod's provider console (billing,
+                      logs, manual destroy). The vast instance id, when known, goes
+                      in the tooltip so it's findable in the console's instance list. */}
+                  <a href="https://cloud.vast.ai/instances/" target="_blank" rel="noreferrer"
+                    title={run.vast_instance_id
+                      ? `vast.ai instance ${run.vast_instance_id} — provider console (billing, logs, manual destroy)`
+                      : 'vast.ai console — billing, logs, manual destroy'}
+                    className="px-2 py-1 rounded-lg text-sky-300 hover:text-sky-200 text-xs no-underline">
+                    vast.ai console ↗
+                  </a>
+                  <button type="button" onClick={() => openDataset(run.dataset_id)}
+                    className="px-2 py-1 rounded-lg text-content-muted hover:text-content text-xs">
+                    Open dataset ↗
+                  </button>
+                </span>
+              </div>
+            </div>
+          ))
         )}
       </div>
 

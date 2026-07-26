@@ -31,11 +31,23 @@ For containerized or scripted setups, a handful of environment variables overrid
 
 ## Overview
 
-The Overview section has **no settings of its own** — it's the at-a-glance dashboard for the rest of the page. If nothing is configured yet, it opens with a *Let's get you set up* banner. Below that, a **Capabilities** grid marks each feature ✓ or ✗ depending on what the app can currently see (a key, a reachable tool, an installed extra), and a **Where to fix it** list links straight to the section that turns each one on. Use it as your first stop to answer "why is this feature greyed out?" — then follow the link to the section that fixes it.
+The Overview section has **no settings of its own** — it's the at-a-glance dashboard for the rest of the page. If nothing is configured yet, it opens with a *Let's get you set up* banner. Below that, a **Capabilities** grid marks each feature ✓ or ✗ depending on what the app can currently see (a key, a reachable tool, an installed extra).
 
-## Image engine
+Every row is a **link to the control that turns that capability on**, not just to the right screen: picking *OpenRouter* lands on the OpenRouter key field with it scrolled to and highlighted; picking *Person masks* opens the Setup wizard step that installs it. Use the grid as your first stop to answer "why is this feature greyed out?" — the answer is one click away on the row itself.
 
-This fork generates exclusively on the local **Klein** engine (via ComfyUI) — free, private, NSFW-capable. The former cloud API engines (Nano Banana / ChatGPT) were removed; there are no engine API keys, no default/enabled-engine pickers, and no subscription login. ComfyUI itself is configured under **Local tools**; the Klein model weights install from the **Setup** page.
+A row marked **◐ in amber** is not broken: the tool is installed, it just isn't running (typically *launch ComfyUI to enable* for Klein and the Test Studio). Those rows lead to the **ComfyUI API URL** field and its **Test** button rather than to an install you have already done. The counter at the top reads `X/11 ready` plus, when it applies, how many are waiting on a process.
+
+If nothing on the grid tells you where to start, the line at the bottom opens the **Setup wizard**, which scans the machine and installs what it can.
+
+## Image engines
+
+This fork generates exclusively on **local** engines, both running through ComfyUI — free, private, NSFW-capable. There are two: **Klein**, the historical one, and **Krea 2 Edit**, which re-stages your reference photo while holding the identity from that one photo alone (no character LoRA needed). The former cloud API engines (Nano Banana / ChatGPT / OpenRouter) were removed: there are no engine API keys and no subscription login. **Which engines to offer** below picks which of the two appear in the generate panel and which one is preselected. ComfyUI itself is configured under **Local tools**; the model weights install from the **Setup** page.
+
+### Which engines to offer
+
+- **Default engine** → `engines.default`. The engine preselected in the workspace. Default **`klein`**.
+- **Enabled engines** → `engines.enabled`. Which engines appear as cards in the generate panel. Default **`['klein', 'krea']`**. Both are free local GPU passes, so this is about what you actually have installed — Krea 2 Edit needs its own custom-node pack and four model files, and its card names whatever is still missing.
+- `engines.known` is **not a setting**: it is the ledger of which engines the app was offering the last time you saved this list, and it is what tells "this engine did not exist yet" apart from "I unticked it on purpose". Written automatically; `[]` or absent means the app assumes Klein was the only engine on offer — which is what makes Krea 2 Edit reach installs that had already saved their Settings. Delete it to be re-offered every engine.
 
 ### Klein model files (optional)
 
@@ -54,6 +66,33 @@ How references resolve:
 - Native / bf16 UNETs (filename without `fp8`) run with `weight_dtype: default`; FP8 builds keep `fp8_e4m3fn`.
 - Generation-LoRA **preset rows** accept full paths the same way.
 - Pinning the wrong *kind* of file (e.g. another family's text encoder) is not validated — the generate will fail at sampling time with a shape error. The narrow auto-detection exists precisely to avoid that; only pin files you know are Klein-compatible.
+
+### Krea 2 Edit (local)
+
+The second local engine. Where Klein *restages* your reference with a general instruction-edit model, **Krea 2 Identity Edit** is trained specifically to keep an identity: from a **single** reference photo it holds the face, the body and the permanent markings while changing the angle, framing, light, background and clothes — **with no character LoRA**. That is what makes it useful *before* a LoRA exists, which is the whole point of building a dataset.
+
+It is not installed by the app. It needs, inside your own ComfyUI:
+
+- the **[comfyui-krea2edit](https://github.com/lbouaraba/comfyui-krea2edit)** custom-node pack in `custom_nodes/` (no Python dependencies), then a ComfyUI restart;
+- a **Krea 2 Raw or Turbo** base model under a `krea`-named folder in `models/diffusion_models` (or `models/unet`);
+- the **Krea 2 Identity Edit LoRA** in `models/loras`;
+- the **Qwen3-VL 4B** text encoder in `models/text_encoders` and the **Qwen Image VAE** in `models/vae`.
+
+The engine card in the workspace names whichever of these is still missing, one actionable line at a time, and the app never guesses a download URL for weights it cannot verify. Every path above is found by *searching* your ComfyUI model roots — including any `extra_model_paths.yaml` roots — so a non-standard layout works untouched.
+
+Settings:
+
+- **Reference grounding** → `krea.grounding_px`. Range `512`–`1536`, default **`1024`**. **The** dial of this engine: the resolution your reference is shown to the model's vision encoder at. **Lower** = it follows the shot description (more variety in pose, outfit and scene, looser likeness). **Higher** = it resembles the reference more closely, and starts copying the very pose and outfit you asked it to change. The node's own default is 768; 1024+ is recommended for people, and a character dataset is people.
+- **Sampler steps** → `krea.steps`. Default **`10`**, the value the model's own reference workflow uses. More is slower and rarely better on this pipeline.
+- **Base model file** → `krea.base_model`. Blank (default) = the app picks a Krea 2 **Turbo** then **Raw** build from your ComfyUI. Set it only if you own several. Checkpoints that merely carry "krea" in their name but are not Krea 2 bases are **skipped on purpose** — the identity LoRA renders pure noise on them, which looks like a broken app rather than a wrong file.
+- **Identity edit LoRA** → `krea.identity_lora`. Path relative to `models/loras`; if nothing is there under that name the app searches your LoRA folders for a `krea2_identity_edit` file, so a renamed download still works.
+
+Two behaviours worth knowing before you build a dataset with it:
+
+- **The output keeps the reference's aspect ratio** (capped at 2 MP). The shot catalog's aspect overrides do **not** apply to this engine — the model was trained on same-size pairs and preservation degrades when the frame changes shape.
+- **Extra reference images are ignored.** Identity comes from the primary reference alone. Klein and the API engines still use your extra refs.
+
+Outfits and expressions are steered differently here than on the other engines: this model preserves anything it is not *positively* told to change, so the catalog's "a different outfit (not the one in the reference)" phrasing is rewritten at generation time into a concrete garment ("wearing a red knit sweater"), picked from the shot's own name — so outfits genuinely differ across the dataset while regenerating one shot reproduces its own.
 
 ### Klein generation LoRA presets (optional)
 
@@ -135,7 +174,10 @@ Where you point the app at the local programs that unlock the full pipeline: **C
 
 - **ComfyUI API URL** → `comfyui.api_url`. The HTTP endpoint of your running ComfyUI. Default **`http://127.0.0.1:8188`**. **Test** confirms it answers.
 - **ComfyUI install directory** → `comfyui.base_dir`. The folder that contains `models/`, `output/`, `input/`. Default **empty**. This is what lets the app scan your checkpoints and LoRAs — set the API URL alone and there's nothing to scan. If you point it at a `..._windows_portable` folder, the app auto-corrects to the `ComfyUI` sub-folder inside it. In the **Setup wizard** this field is checked as you type: a wrong, empty or missing folder gets a specific reason, and pointing at the launcher/parent folder offers the real ComfyUI inside it in one click.
+- **Advanced: ComfyUI folder overrides** → `comfyui.output_dir`, `comfyui.input_dir`, `comfyui.models_dir`, `comfyui.loras_dir`. All default **empty**, and empty is what you want unless ComfyUI runs on folders of its own — a ComfyUI started with `--output-directory`, `--input-directory` or `--models-directory` does *not* keep its files under the install directory, so without an override here the app reads and writes in the wrong place. Each field **shows the folder it falls back to while empty**, computed with the very function the app uses at runtime, so the effective path is never something you have to work out; a path that isn't on disk is flagged in amber rather than failing silently mid-generation. If ComfyUI is running, the app asks it which folders it was launched with (it reports its own command line via `/system_stats`) and offers them in one click — nothing is ever guessed from a folder layout, so no suggestion appears when ComfyUI is unreachable, predates that field, or was started with no custom folders.
 - **Hugging Face token** → `HF_TOKEN` (secret, no Test button). Only needed to auto-download **license-gated** models — notably the Klein fp8 weights. Read access is enough for accepted gated models.
+
+**Overrides and `extra_model_paths.yaml`.** These two mechanisms stack rather than compete. `comfyui.models_dir`/`comfyui.loras_dir` set the app's *default* model roots; `extra_model_paths.yaml` is read **in addition**, from `<comfyui.base_dir>/extra_model_paths.yaml` — the same place ComfyUI itself looks. The yaml is therefore always located from the install directory, never from a models override, so the two can't end up pointing at different trees. For models and LoRAs the yaml usually already does the job; the override is for the case where the models folder itself moved.
 
 **Continuing without ComfyUI.** Leaving the install directory empty in the Setup wizard is a deliberate choice: it shows what turns off (local Klein generation including the NSFW lane, Klein watermark cleaning, the Test Studio, training on your own ComfyUI base models, and the on-disk LoRA preset picker) versus what stays on (scraping, curation, captioning, the API image engines, ai-toolkit/cloud training, Hugging Face publishing), then remembers the skip (`comfyui.setup_skipped`) so it stops nagging. Entering a directory at any point cancels the skip automatically and turns those features back on — the flag never hides a real problem with a ComfyUI you *have* configured.
 
@@ -148,12 +190,16 @@ The card shows Ollama's live state and, when the binary is installed but the ser
 - **Ollama URL** → `ollama.url`. Where Ollama is listening. Default **`http://127.0.0.1:11434`**.
 - **Ollama vision model** → `ollama.vision_model`. The vision model used for auto-captioning, framing auto-classify, head-crop and watermark detection. Default **`huihui_ai/qwen3-vl-abliterated:8b-instruct`** — the **abliterated** (uncensored) build, so it captions adult datasets instead of refusing them. **Trap:** keep the **`-instruct`** tag. The plain `:8b` tag is the *Thinking* variant, which reasons out loud instead of captioning and produces garbage here.
 
+- **Images analysed at once** → `ollama.vision_concurrency`. How many images a bank pass sends to Ollama at the same time. Default **4**. The passes that read every image in a bank — watermark scan, framing, captions — spend most of each request waiting on the round-trip rather than on the GPU, so overlapping them roughly **halves** a long pass (measured 2.0× at 4). Going higher gains little: 6 and 8 buy single-digit percentages unless your Ollama is configured for more parallel requests (`OLLAMA_NUM_PARALLEL`), and they make **Stop** take a few seconds longer because it waits for the calls already in flight. Set it to **1** to get the old strictly-one-at-a-time behaviour back. Any value the app can't read falls back to 4, and anything above 16 is clamped — a bad value costs you speed, never the pass.
+
+- **Keep the vision model warm** → `ollama.vision_keep_warm_seconds`. How long a *one-off* vision job may leave the model loaded once it's done. Default **120 s** (0 = off, capped at 600). Loading the model costs about **13 s**; describing an image once it's loaded costs about **0.5 s** — so a cold call is roughly **25×** a warm one, and the old behaviour (unload after every single image) made cropping five reference photos in a row pay that load five times. The catch is memory: the vision model really occupies about **7.5 GB**, and a loaded ComfyUI already sits near 19 GB of a 24 GB card, so they don't both fit — on Windows nothing errors out, the driver just pages silently and a vision pass measured **13.5× slower** in that state. Keeping it warm is therefore *conditional and revocable*: the app only leases it when neither a training run nor its own generation queue wants the card, and it hands the memory straight back the moment a generation is submitted or a training starts. If the app can't tell what's using the GPU, it unloads — the old behaviour. Bank passes (watermark / framing / captions) are unaffected: they already keep the model warm for their own duration and unload at the end. Set it to **Off** on a card that's tight on memory, or if you run generations from ComfyUI's own interface (work LDS never sees, so it can't revoke the lease for it — the exposure is bounded by this value). If you *want* ComfyUI and the vision model to genuinely coexist rather than take turns, the lever is on ComfyUI's side, not here: it accepts a `--reserve-vram <GB>` launch flag ("the amount of VRAM in GB to reserve for your OS/other software"), which defaults to a mere 0.7 GB on Windows — that default is exactly why a loaded ComfyUI leaves no room. Raising it caps ComfyUI and frees the headroom, at the cost of heavier video workflows. LDS never launches ComfyUI, so it can't set this for you.
+
 **Test** checks end-to-end: that Ollama is reachable *and* the configured model is actually pulled.
 
 ### ai-toolkit
 
 - **ai-toolkit directory** → `aitoolkit.dir`. The folder containing ai-toolkit's `run.py`. Default **empty**. **Test** validates it and unlocks training + JoyCaption captioning.
-- **Python interpreter (optional)** → `aitoolkit.python`. Default **empty = auto-detect** a `venv/` or `.venv/` next to `run.py`. Fill this with the full path to the right interpreter only if you installed ai-toolkit with **conda, uv or the system Python** (no venv folder for the app to find), e.g. `C:\miniconda3\envs\aitk\python.exe`.
+- **Python interpreter (optional)** → `aitoolkit.python`. Default **empty = auto-detect** a `venv/` or `.venv/` next to `run.py`. Fill this with the full path to the interpreter ai-toolkit should run with whenever there is no venv folder for the app to find — **conda, uv, the system Python**, or a **portable / embedded build** that ships its own `python_embeded\python.exe` (several community install scripts do exactly that). Examples: `C:\miniconda3\envs\aitk\python.exe`, `C:\ai-toolkit\python_embeded\python.exe`. A venv is one way to give ai-toolkit a Python, not a requirement — when Setup finds a plausible interpreter inside the ai-toolkit folder, it offers to fill this in for you in one click.
 
 Under **Advanced: ai-toolkit overrides**, three optional path overrides (all default empty → derived from the ai-toolkit directory):
 
@@ -192,6 +238,16 @@ Two thresholds on the 0–1 face-similarity score (InsightFace), which badge eac
 
 Raise them for a stricter set, lower them if good shots are being flagged too harshly.
 
+**These thresholds do nothing on an Anime dataset.** InsightFace is trained on
+photographs and cannot read a drawn face, so face similarity is refused outright
+when the dataset's **subject type** is *Anime* — the 🎭 Analyze faces button, 🎯
+Auto-triage, Best epoch and the Test Studio's face scoring all say so instead of
+producing numbers nobody could measure. There is no override, on purpose: the
+subject type *is* the switch. If the dataset really is photographic, set it back to
+*Human* and everything scores again — scores from an earlier pass are never
+deleted. Head-cropping a reference is unaffected: it runs on the vision model
+(Qwen3-VL), which reads a drawn head fine.
+
 ### Image bank triage
 
 Thresholds for the **Bank** quality flags. Every scanned image stores its
@@ -211,6 +267,9 @@ with **no rescan**. (The two exceptions are noted below.)
 - **Semantic duplicate similarity** → `bank.semantic_dup_threshold`. Cosine similarity on the *same* CLIP embeddings at or above which two scored images are grouped as a **semantic near-duplicate** — a crop or re-compressed variant of the *same shot* that the perceptual-hash **Duplicates** (stage 1) misses. Default **`0.96`** (much higher than the style threshold: a crop is far closer than merely "same style"). Needs the **Score** pass first (it reuses those embeddings — no extra GPU work). *Re-running at another threshold re-sorts instantly* from the cached embeddings, no re-scan.
 
 The **Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** extra (Setup ▸ Quality tools); **Find watermarks** reuses the vision model from **Captioning**. Both are GPU passes, serialized against training and captioning, and detection-only — the bank never edits your source files.
+- **Which Python runs ✨ Score** → `bank_scoring.python`. **Auto-managed:** leave it empty and Setup ▸ Quality tools builds a dedicated environment and fills it in. It carries **CPU-only PyTorch** on purpose (a first install stays small instead of pulling ~2.5 GB of CUDA wheels on machines with no card), which costs roughly **336 ms per image** instead of ~15 ms on a GPU. On a machine that already has a working CUDA PyTorch — ai-toolkit's venv, ComfyUI's, a conda env — you can point Score at it instead: open a bank and click **⚡ Use a GPU Python I already have** under the CPU warning. The picker checks each candidate *package by package* (`torch`, `open_clip`, `transformers`, `timm`, `numpy`, `Pillow`) and **refuses** any interpreter that can't run the whole pass — CUDA alone is not enough, and a missing `open_clip` would only surface an hour into a run. Nothing is ever installed into an environment the app did not build: a missing package is named with the exact command, for you to run. Reversible at any time (**Back to the app default**), and leaving it alone changes nothing — detection is an offer, never a prerequisite. The picker also accepts a path you type: an interpreter **or** the environment folder holding it (venv, conda/miniconda, uv, a portable bundle, the system Python, another disk), spaces and accents included. No torch or CUDA *version* is required — only that the modules import and `torch.cuda.is_available()` is true. On a machine with no NVIDIA card the picker says so and stops suggesting CUDA; it still lets you borrow an interpreter that already has the packages, to avoid installing them twice. The **Install / ↻ Reinstall** button in Setup ▸ Quality tools honours the same rule: while Score is pointed at a borrowed interpreter it installs nothing and prints the `pip install` command instead — clear the setting (**Back to the app default**) if you want the app to build and fill its own environment again. See *Using the app ▸ Make Score use a GPU Python you already have*.
+
+The **✨ Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** extra (Setup ▸ Quality tools); **🚩 Find watermarks** reuses the vision model from **Captioning**. Both are GPU passes, serialized against training and captioning, and detection-only — the bank never edits your source files.
 
 ## Training
 
@@ -262,7 +321,14 @@ Separate from everything above: these live **per dataset**, in the **Dataset set
   - Existing captions were written for the **old** kind and are **not** rewritten automatically — use **🔄 Re-caption** in the Captions section to apply the new strategy. The switch is refused while the dataset has work in progress (generation, captioning or a quality pass) — wait for it to finish.
 - **Trigger word** — the word you put in prompts to summon this LoRA (Character and Concept datasets). Safe to change anytime — it's added at export, so existing captions don't need redoing. It is also **the name everything this dataset produces carries** (the deployed LoRA, the training run folder, the export, the job config), so changing it **renames all of them to match** and repoints the Test Studio history and cloud runs at the new names — a toast tells you how many files moved. Two guards: if the new trigger is already used on disk by another dataset, **nothing** is renamed (never half a set) and the old names are kept; and the change is **refused while a training run is live**, because that run folder is what training resumes from — stop it or let it finish first. **Style datasets don't have one**: Style is always-on, and the modal shows a note reminding you to control the effect with the LoRA weight instead.
 - **Concept description** *(Concept datasets only)* — the thing the LoRA learns, i.e. exactly what captions must **omit**. Editing it rebuilds the caption avoid-list, so **re-caption** afterwards to apply the new list to images already captioned.
-- **Subject type** *(Human / Animal / Creature / Object / Other)* — **what your reference actually is**, chosen right in the **🎬 Generate variations** panel (it travels with the dataset). It is **orthogonal to the dataset kind**: a specific dog is *Character + Animal*, "dogs in general" is *Concept + Animal*. Anything other than **Human** switches two things so the generated shots stop assuming a person: the **shot catalogue** (an animal gets head / half-body / full-body / rear shots, an object gets front / angle / detail / rear views — the group headers relabel to match) and the **identity lock** the engine is given (a dog keeps its breed, coat and markings; a product keeps its shape, material and logo — instead of "same face, jawline, skin tone"). Each type ships its own balanced preset. **Human is the default and existing datasets are unchanged.** *(NSFW body shots stay Human-only.)* First-draft prompt sets — refine per subject as needed. Inspired by a community request.
+- **Subject type** *(Human / Animal / Creature / Object / Other / Anime)* — **what your reference actually is**, chosen right in the **🎬 Generate variations** panel (it travels with the dataset). It is **orthogonal to the dataset kind**: a specific dog is *Character + Animal*, "dogs in general" is *Concept + Animal*. Anything other than **Human** switches two things so the generated shots stop assuming a person: the **shot catalogue** (an animal gets head / half-body / full-body / rear shots, an object gets front / angle / detail / rear views — the group headers relabel to match) and the **identity lock** the engine is given (a dog keeps its breed, coat and markings; a product keeps its shape, material and logo — instead of "same face, jawline, skin tone"). Each type ships its own balanced preset. **Human is the default and existing datasets are unchanged.** *(NSFW body shots stay Human-only.)* First-draft prompt sets — refine per subject as needed. Inspired by a community request.
+
+  **Anime** is the one type where the *rendering* is part of the subject, so it behaves differently from the other five on purpose:
+
+  - Its **identity lock** protects a character *design* rather than a photographed body — hair colour, hairstyle and silhouette, eye shape and iris colour, the **signature outfit and its colours**, the accessories (ribbon, hairpin, glasses, ears, tail) and the distinctive marks — **plus the art style itself** (line work, cel shading, palette). It then does what no other lock does: it **explicitly forbids** turning the character into a photograph, a 3D render or a real person (no skin texture, no pores, no film grain). Every other type ends its prompt with *"professional realistic photograph"*; for a drawing that instruction destroys the subject, so for Anime the engine is asked for an **anime illustration** instead — in the opening command and in the closing style tag alike.
+  - The **signature outfit counts as identity**. For a Human dataset the app deliberately varies clothing on every shot (so a jacket never binds to the person); for a character the costume is half of what makes them recognisable, so the shots keep it. Two explicit *alternate outfit* cards let you vary it when you want to.
+  - Its **shot catalogue** (55 shots) uses the vocabulary of the medium — **bust-up**, **cowboy shot** (knee-up), full body, a full **expression sheet** (smile, laughing, angry, surprised, blushing, eyes closed) and a **front / side / back character-sheet turnaround** on a plain background that no other type offers. Four presets: *Balanced*, *Face & expressions*, *Full body focused* and *Character sheet*.
+  - It pairs naturally with the **Anima** training family (see *Default training family* above), though the two settings are independent — you can build an anime dataset and train it on any family.
 - **Prompt suffixes** *(collapsible — optional creative direction)* — free text appended to **generated** variations at generation time, to steer a global look without rewriting anything:
   - **All shots** → `prompt_suffix` — one global suffix (e.g. *"shot on 35mm film, warm tones"*), up to **300 characters**.
   - **Face / Bust / Body / Back shots** → `prompt_suffixes` — one suffix per framing, up to **300 characters** each. A framing suffix applies to that shot type first, then the global one.
@@ -275,14 +341,7 @@ Separate from everything above: these live **per dataset**, in the **Dataset set
 
 These have no UI control — they're for advanced users editing `config.json` by hand (copy `config.example.json` to `config.json` first). Most people never touch them; the defaults are tuned. Values below are the shipped defaults.
 
-**ComfyUI folder overrides** — explicit paths that override the folders otherwise derived from `comfyui.base_dir`:
-
-| Key | Default | Role |
-|---|---|---|
-| `comfyui.output_dir` | `''` | Override ComfyUI's output folder. |
-| `comfyui.input_dir` | `''` | Override ComfyUI's input folder. |
-| `comfyui.models_dir` | `''` | Override the models folder scanned for checkpoints/UNETs. |
-| `comfyui.loras_dir` | `''` | Override the LoRA folder. |
+*(The four ComfyUI folder overrides used to live here. They are now editable in **Settings → Local tools → ComfyUI → Advanced: ComfyUI folder overrides** — see that section above. Values set by hand in `config.json` are unaffected: the same keys, read the same way, now simply shown in the app.)*
 
 **Quality-tool interpreters and models:**
 
@@ -335,25 +394,33 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `paths.dataset_images_root` | Where dataset images are stored. Empty string defaults to `<data dir>/datasets`. |
 | `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |
 | `comfyui.base_dir` | ComfyUI install directory, used to derive `output`/`input`/`models`/`loras` dirs if those aren't set explicitly. |
-| `comfyui.output_dir` | Explicit override for ComfyUI's output folder. |
-| `comfyui.input_dir` | Explicit override for ComfyUI's input folder. |
-| `comfyui.models_dir` | Explicit override for ComfyUI's models folder (used to scan available checkpoints/UNETs). |
-| `comfyui.loras_dir` | Explicit override for ComfyUI's LoRA folder. |
+| `comfyui.output_dir` | Explicit override for ComfyUI's output folder. Set it when ComfyUI runs with `--output-directory`. Editable in Settings → Local tools. |
+| `comfyui.input_dir` | Explicit override for ComfyUI's input folder. Set it when ComfyUI runs with `--input-directory`. Editable in Settings → Local tools. |
+| `comfyui.models_dir` | Explicit override for ComfyUI's models folder (used to scan available checkpoints/UNETs). `extra_model_paths.yaml` is still read on top of it. Editable in Settings → Local tools. |
+| `comfyui.loras_dir` | Explicit override for ComfyUI's LoRA folder. Editable in Settings → Local tools. |
 | `ollama.url` | Base URL of your Ollama instance (default `http://127.0.0.1:11434`). |
 | `ollama.vision_model` | Ollama vision model used for auto-classify and auto head-crop (default `huihui_ai/qwen3-vl-abliterated:8b-instruct`, the uncensored **abliterated** build — use the Instruct, not Thinking, variant). |
+| `ollama.vision_concurrency` | How many images a bank vision pass (watermark / framing / captions) sends to Ollama at once (default `4`, clamped to 1-16). Higher overlaps more waiting; `1` restores the old one-at-a-time behaviour. |
+| `ollama.vision_keep_warm_seconds` | How long a one-off vision job (auto head-crop, Describe) may leave the model loaded when nothing else wants the GPU (default `120`, `0` = always unload, capped at 600). The lease is revoked as soon as a generation or a training starts. |
 | `aitoolkit.dir` | ai-toolkit install directory. |
 | `aitoolkit.datasets_dir` | Override for ai-toolkit's datasets folder (defaults to `<aitoolkit.dir>/datasets`). |
 | `aitoolkit.output_dir` | Override for ai-toolkit's output folder (defaults to `<aitoolkit.dir>/output`). |
 | `aitoolkit.hf_home` | Override for the Hugging Face cache directory ai-toolkit uses. |
 | `aitoolkit.python` | Full path to the Python interpreter to run ai-toolkit with. Empty = auto-detect a `venv/`/`.venv/` next to `run.py`; set it for conda/uv/system-Python installs that have no venv folder. |
-| `engines.default` | Image-generation engine (`klein` — the only engine on this fork). |
-| `engines.enabled` | List of engines shown as options in the UI (`['klein']` on this fork). |
+| `engines.default` | Image-generation engine preselected in the UI. Local-only on this fork: `klein` or `krea`. |
+| `engines.enabled` | List of engines shown as options in the UI (`['klein', 'krea']` on this fork). Doubles as the engine catalogue: an engine added by an update is merged into a stored list on read, so a new engine reaches installs that already have saved settings. An engine you unticked yourself is never added back. |
+| `engines.known` | Not a setting — the ledger of which engines the app was offering the last time this list was saved. Tells "this engine did not exist yet" apart from "I unticked it". Written automatically; `[]` or absent means the app assumes Klein alone. Delete it to be re-offered every engine. |
+| `krea.grounding_px` | Krea 2 Edit reference grounding, `512`–`1536` (default `1024`) — the consistency vs prompt-adherence dial. |
+| `krea.steps` | Krea 2 Edit sampler steps (default `10`). |
+| `krea.base_model` | Krea 2 Edit base model file. Blank = auto-resolve a Turbo then Raw build. |
+| `krea.identity_lora` | Krea 2 Edit identity LoRA, relative to `models/loras`. |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
 | `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, or `anima`). |
 | `cloud.max_concurrent_runs` | Simultaneous cloud pods allowed (default `1`, 1–10). Also in Settings → Training. |
 | `cloud.max_price_per_hour` | Safety cap on the hourly offer price in $ (default `0.80`); pricier hosts are skipped before launch. |
 | `cloud.monthly_budget_usd` | Hard monthly spend ceiling in $ (default `0` = unlimited); launches are blocked past it. |
 | `cloud.stall_timeout_minutes` | Kill + rescue a cloud run after this many minutes without step progress (default `30`, 5–240). |
+| `cloud.freeze_watchdog_minutes` | Terminate a training run that reports nothing at all for this long, from outside the run's own supervision (default `45`; `0` = warn on the card only). |
 | `cloud.min_reliability` | vast.ai host-reliability floor (default `0.98`, 0.9–0.999); lower surfaces cheaper, riskier hosts. |
 | `cloud.verified_only` | Restrict to vast.ai verified hosts (default `true`). |
 | `cloud.secure_cloud_only` | Restrict to vast.ai's Secure Cloud (datacenter) tier (default `false`; narrows the market, raises price). |
@@ -362,6 +429,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `face_scoring.green` | Similarity score threshold (0–1) above which an image is flagged "green" (strong match). |
 | `face_scoring.orange` | Similarity score threshold (0–1) above which an image is flagged "orange" (borderline match). |
 | `masks.python` | Python interpreter used to run the rembg subprocess (empty = current interpreter). |
+| `bank_scoring.python` | Python interpreter that runs the ✨ Score pass (empty = the app's own). Auto-filled by Setup with a CPU-only environment; repointable at any CUDA interpreter already on the machine via the bank's **⚡ Use a GPU Python I already have** picker, which verifies every dependency first and never installs into an environment it did not create. |
 | `watermark.python` | Python interpreter used to run the LaMa watermark-inpainting subprocess (empty = reuse `masks.python`, then the current interpreter). |
 | `watermark.device` | LaMa processing device: `auto` (CUDA when available, otherwise CPU), `cuda`, or `cpu`. |
 | `watermark.allow_crop` | When `true` (default), a border watermark is cropped off; when `false`, it is repainted instead. Also editable in the Clean bar. |

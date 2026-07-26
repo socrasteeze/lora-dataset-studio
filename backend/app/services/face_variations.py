@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import zlib
 
 # Verrou d'identité renforcé (deep-research 2026-06-14, source primaire Google AI) :
 # nommer les traits + interdire l'embellissement améliore la cohérence du visage.
@@ -73,7 +74,7 @@ _IDENTITY_PROMPT_DEFAULTS = {
 }
 
 
-# --- Subject type (Human / Animal / Creature / Object / Other) ----------------
+# --- Subject type (Human / Animal / Creature / Object / Other / Anime) --------
 # The identity locks above are written for a HUMAN subject ("facial identity …
 # eye shape, jawline, lips, skin tone"). A dataset now declares WHAT its subject
 # is, so the generation prompts stop assuming a person. `subject_type` is a
@@ -81,7 +82,12 @@ _IDENTITY_PROMPT_DEFAULTS = {
 # dog is character+animal, "dogs in general" is concept+animal. 'human' is the
 # default and every human default/prompt below stays byte-identical to the
 # pre-feature behaviour (a legacy dataset stores the column as NULL -> 'human').
-SUBJECT_TYPES = ('human', 'animal', 'creature', 'object', 'other')
+# APPEND-ONLY. `subject_type` is a STORED column (face_dataset.subject_type,
+# VARCHAR(16)) and this tuple is also the order the selector renders in, so a new
+# type goes at the END: renaming or reordering would re-point values that are
+# already in users' databases. 'anime' (added last) is the drawn-character type —
+# see IDENTITY_GUARD_ANIME for why it could not just be 'human'.
+SUBJECT_TYPES = ('human', 'animal', 'creature', 'object', 'other', 'anime')
 
 
 def normalize_subject_type(value) -> str:
@@ -182,6 +188,58 @@ IDENTITY_GUARD_OTHER_KLEIN = (
     "shape, colours, textures, proportions and any distinctive markings or features. Do not "
     "redesign or alter its defining details. Sharp focus, realistic lighting, high detail.")
 
+# --- Anime / drawn character --------------------------------------------------
+# The one subject type whose lock INVERTS a rule every other type takes for
+# granted. For a human, an animal or a product the rendering is a constant we can
+# safely hardcode ("realistic photograph") and the identity lives in physical
+# traits — skin texture, coat markings, material finish. A drawn character has
+# none of that: it is defined by its DESIGN (hair colour and shape, eye shape and
+# iris colour, the signature outfit, the accessories, the marks) and by the ART
+# STYLE it is drawn in. So this lock has to do two things no other lock does:
+#   1. name design traits instead of physical ones, and
+#   2. ACTIVELY FORBID the photorealism the other locks demand. Merely omitting
+#      "realistic photograph" is not enough: the edit engines default to photo,
+#      and the reference is the only thing holding the style — say it out loud.
+# The signature OUTFIT is deliberately listed as identity, the exact opposite of
+# the human path (which bakes OUTFIT_VARY into every shot so clothing does not
+# bind to the person). For a character, the costume IS the character.
+IDENTITY_GUARD_ANIME = (
+    "This is the SAME anime character as the reference image. Preserve their character "
+    "design EXACTLY: same hair colour, hairstyle and hair silhouette (bangs, ahoge, braids, "
+    "twintails), same eye shape and iris colour, same skin tone, same signature outfit and "
+    "its colours, the same accessories (ribbon, hairpin, glasses, earrings, headphones, "
+    "weapon, animal ears or tail) and the same distinctive marks (mole, scar, facial "
+    "marking). The ART STYLE IS PART OF THE CHARACTER: keep the same drawn anime rendering — "
+    "same line work, cel shading and colour palette. Do NOT redesign the character and do "
+    "NOT turn it into a photograph, a 3D render or a real person: no photographic skin "
+    "texture, no pores, no film grain, no lens artefacts. Use the reference ONLY to lock "
+    "the character design: take the pose, the expression, the framing and the setting from "
+    "the description below, and do NOT copy the pose or the background shown in the "
+    "reference image. Anime illustration, SFW.")
+IDENTITY_GUARD_ANIME_MULTI = (
+    "ALL the reference images show the SAME anime character (different angles, expressions "
+    "or framings). Use EVERY reference image together to lock the character design. Preserve "
+    "it EXACTLY: same hair colour, hairstyle and hair silhouette (bangs, ahoge, braids, "
+    "twintails), same eye shape and iris colour, same skin tone, same signature outfit and "
+    "its colours, the same accessories (ribbon, hairpin, glasses, earrings, headphones, "
+    "weapon, animal ears or tail) and the same distinctive marks (mole, scar, facial "
+    "marking). The ART STYLE IS PART OF THE CHARACTER: keep the same drawn anime rendering — "
+    "same line work, cel shading and colour palette. Do NOT redesign the character and do "
+    "NOT turn it into a photograph, a 3D render or a real person: no photographic skin "
+    "texture, no pores, no film grain, no lens artefacts. Take the pose, the expression, the "
+    "framing and the setting from the description below, and do NOT copy the pose or the "
+    "background shown in the reference images. Anime illustration, SFW.")
+IDENTITY_GUARD_ANIME_KLEIN = (
+    "Restage the shot to match this description — change the pose, camera angle, framing and "
+    "setting accordingly; do not copy the composition or the background of the reference "
+    "image (use it only for the character design). Keep the character design exactly the "
+    "same: same hair colour, hairstyle and hair silhouette, same eye shape and iris colour, "
+    "same skin tone, same signature outfit and its colours, the same accessories and the "
+    "same distinctive marks. Keep the same drawn anime art style: same line work, cel "
+    "shading and colour palette. Do not redesign the character and do not turn it into a "
+    "photograph, a 3D render or a real person — no photographic skin texture, no pores, no "
+    "film grain. Clean line art, flat cel shading, crisp details.")
+
 # Per-subject default registry. 'human' points at the ORIGINAL dict so the human
 # path is byte-identical; the others compose their guards with the shared,
 # subject-agnostic klein_improve instruction.
@@ -195,6 +253,8 @@ _IDENTITY_DEFAULTS_BY_SUBJECT = {
                  'klein_identity': IDENTITY_GUARD_CREATURE_KLEIN, 'klein_improve': KLEIN_IMAGE_IMPROVE_PROMPT},
     'other': {'face_single': IDENTITY_GUARD_OTHER, 'face_multi': IDENTITY_GUARD_OTHER_MULTI,
               'klein_identity': IDENTITY_GUARD_OTHER_KLEIN, 'klein_improve': KLEIN_IMAGE_IMPROVE_PROMPT},
+    'anime': {'face_single': IDENTITY_GUARD_ANIME, 'face_multi': IDENTITY_GUARD_ANIME_MULTI,
+              'klein_identity': IDENTITY_GUARD_ANIME_KLEIN, 'klein_improve': KLEIN_IMAGE_IMPROVE_PROMPT},
 }
 
 
@@ -350,7 +410,28 @@ _KLEIN_FRAMING_DETAIL = {
 # face/bust/body/back keys stay the internal framing enum (composition/aspect are
 # shared) — only the WORDING adapts to the subject.
 _KLEIN_SUBJECT_NOUN = {'human': 'person', 'animal': 'animal', 'creature': 'creature',
-                       'object': 'object', 'other': 'subject'}
+                       'object': 'object', 'other': 'subject', 'anime': 'character'}
+
+# THE MEDIUM AND THE RENDERING TAIL ARE PART OF THE PROMPT, AND THEY WERE HARDCODED.
+# `wrap_variation_klein` used to open with "Create a new photograph of the same …"
+# and close with "Professional realistic photograph, SFW." Neither string belongs to
+# the editable identity guard, so for the five photographic subject types nobody ever
+# had to think about them — and for 'anime' they would have overruled the anime lock
+# TWICE in the same prompt, at the two positions an instruction model weighs most
+# (the opening command and the final style tag). They are per-subject now. Every
+# pre-existing type reads the DEFAULT tuple, byte for byte what it used to inline, so
+# no existing dataset's prompt changes by a single character.
+_KLEIN_MEDIUM = {'anime': 'illustration'}
+_KLEIN_MEDIUM_DEFAULT = 'photograph'
+_KLEIN_RENDER_TAIL_DEFAULT = (
+    "Explicit nudity is allowed; render natural, anatomically correct forms. "
+    "Professional realistic photograph.",
+    "Professional realistic photograph, SFW.")
+_KLEIN_RENDER_TAIL = {
+    'anime': ("Explicit nudity is allowed; render natural, anatomically correct forms in the "
+              "same drawn anime art style. Anime illustration, same art style as the reference.",
+              "Anime illustration, same art style as the reference, SFW."),
+}
 _KLEIN_FRAMING_DETAIL_ANIMAL = {
     'face': 'Close-up of the head filling the frame, both eyes in sharp focus, gentle background separation.',
     'bust': 'Half-body framing: head, chest and front legs, natural pose.',
@@ -375,12 +456,23 @@ _KLEIN_FRAMING_DETAIL_OTHER = {
     'body': 'The ENTIRE subject in frame, well proportioned and evenly lit.',
     'back': 'Seen from behind: rear view of the subject.',
 }
+# Anime framing hints use DRAWN conventions, not photographic ones: "bust-up",
+# "cowboy shot" (knee-up) and "full body" are the vocabulary of the medium, and a
+# "85mm portrait lens look" would reintroduce exactly the photographic intent the
+# anime lock forbids.
+_KLEIN_FRAMING_DETAIL_ANIME = {
+    'face': 'Close-up of the face filling the frame, both eyes drawn in full detail, clean line work.',
+    'bust': 'Bust-up framing from the chest up, the collar and shoulders of the signature outfit visible.',
+    'body': 'Full body from head to feet including the shoes, the whole character well proportioned in the frame.',
+    'back': 'Seen from behind: the back of the head, the hair silhouette and the back of the outfit visible.',
+}
 _KLEIN_FRAMING_DETAIL_BY_SUBJECT = {
     'human': _KLEIN_FRAMING_DETAIL,
     'animal': _KLEIN_FRAMING_DETAIL_ANIMAL,
     'object': _KLEIN_FRAMING_DETAIL_OBJECT,
     'creature': _KLEIN_FRAMING_DETAIL_CREATURE,
     'other': _KLEIN_FRAMING_DETAIL_OTHER,
+    'anime': _KLEIN_FRAMING_DETAIL_ANIME,
 }
 
 
@@ -410,11 +502,11 @@ def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = 
     st = normalize_subject_type(subject_type)
     noun = _KLEIN_SUBJECT_NOUN.get(st, 'subject')
     detail = _KLEIN_FRAMING_DETAIL_BY_SUBJECT.get(st, _KLEIN_FRAMING_DETAIL).get(framing or '', '')
-    ending = ("Explicit nudity is allowed; render natural, anatomically correct forms. "
-              "Professional realistic photograph.") if nsfw else \
-             "Professional realistic photograph, SFW."
+    medium = _KLEIN_MEDIUM.get(st, _KLEIN_MEDIUM_DEFAULT)
+    nsfw_tail, sfw_tail = _KLEIN_RENDER_TAIL.get(st, _KLEIN_RENDER_TAIL_DEFAULT)
+    ending = nsfw_tail if nsfw else sfw_tail
     return (
-        f"Create a new photograph of the same {noun} as the reference image: {_append_suffix(prompt, suffix)}. "
+        f"Create a new {medium} of the same {noun} as the reference image: {_append_suffix(prompt, suffix)}. "
         + (f"{detail} " if detail else "")
         + f"{get_identity_prompt('klein_identity', st)} {ending}")
 
@@ -454,6 +546,123 @@ _HAS_OUTFIT = re.compile(
 _HAS_EXPRESSION = re.compile(
     r'\b(expression|smil\w*|serious|laugh\w*|surprised|pensive|grin\w*|'
     r'frown\w*|smirk\w*|pout\w*)\b', re.I)
+
+
+# --- Krea 2 Identity Edit wrapper --------------------------------------------
+# MEASURED on a live install (2026-07-25), single reference photo, NO character
+# LoRA:
+#   identity holds by itself — forehead/neck tattoos, five piercings, hoop
+#      earrings, body morphology, all carried from the one reference;
+#   the requested FRAMING is honoured (a real full-length shot when asked),
+#      which the API-engine wrapper never managed on this model — that wrapper
+#      leads with preservation ("change nothing"), and Krea answered with a
+#      close-up whatever the shot asked for. So Krea reuses the KLEIN wrapper's
+#      shape: imperative command first, full intended result, then the identity
+#      lock. Same model class (instruction edit + reference grounding), same
+#      winning structure.
+#   ⚠ the OUTFIT never changed, and the TATTOOS were REDRAWN each time (same
+#      spirit, different design) — the two things this wrapper has to fix.
+#
+# Krea reuses the `klein_identity` editable lock deliberately: it is the "local
+# edit engine" identity lock, already per-subject-type and already overridable in
+# Settings. A second copy of the same sentence would be one more thing for the
+# user to keep in sync, for no behavioural gain.
+
+# The model PRESERVES anything it is not positively ordered to change, so a
+# NEGATION is a no-op on it. These rules turn the catalog's negative outfit
+# phrasings into a concrete positive garment (see krea_edit_helper.outfit_for:
+# deterministic per shot label, so outfits vary across the dataset but a
+# regenerate of one shot reproduces its own). Applied at WRAP time only — the
+# stored `variation_prompt` keeps the raw catalog text, so the other engines are
+# untouched and a regenerate re-applies the current rules exactly once.
+_KREA_OUTFIT_GENERIC = (
+    re.compile(r'\bcasual clothes different from the reference outfit\b', re.I),
+    re.compile(r'\bdifferent outfit\b', re.I),
+)
+# Leftover negations after a NAMED garment ("wearing a jacket different from the
+# reference outfit") — the garment already carries the intent, the negation only
+# spends tokens on something this model ignores.
+_KREA_NEGATION = re.compile(r',?\s*different from the reference (?:image|outfit)\b', re.I)
+# EXPRESSION_NEUTRAL carries the same kind of dead negation. Not separately
+# measured — same mechanism, and dropping the clause loses nothing positive.
+_KREA_EXPRESSION_NEGATION = re.compile(
+    r',?\s*not copying the expression from the reference image\b', re.I)
+
+# Permanent markings were redrawn on every render (measured). A dataset built
+# from that teaches the LoRA an AVERAGE tattoo — the exact failure mode a
+# character LoRA must not have. This is a positive, explicit hold order. NOT yet
+# verified to fix it (no GPU run was allowed in this pass): it is a reasoned
+# counter-measure, and it costs nothing when the subject has no markings.
+KREA_MARKINGS_LOCK = (
+    "Reproduce every permanent marking exactly as it appears in the reference "
+    "image — tattoos with the same design, same placement and same size, and the "
+    "same scars, moles and piercings. Do not redraw, restyle or move them. ")
+
+
+# Concrete garments the negation is replaced BY. The pick is deterministic on the
+# shot label via crc32 — NOT hash(), whose PYTHONHASHSEED randomisation would give
+# the same shot a different outfit on every app restart. Three properties at once:
+# outfits genuinely differ across the dataset, one shot regenerates identically,
+# and no randomness ever leaks into a stored prompt.
+KREA_OUTFIT_PALETTE = (
+    'a plain white cotton t-shirt',
+    'a red knit sweater',
+    'a navy blue zip hoodie',
+    'a beige linen shirt',
+    'a black fitted turtleneck',
+    'an olive green utility jacket',
+    'a grey marl sweatshirt',
+    'a burgundy long-sleeve top',
+    'a light blue denim shirt',
+    'a mustard yellow cardigan',
+    'a dark green flannel shirt',
+    'a cream ribbed knit top',
+)
+
+
+def krea_outfit_for(label: str) -> str:
+    """A concrete garment for a shot label — stable across runs and processes."""
+    key = (label or '').encode('utf-8', 'replace')
+    return KREA_OUTFIT_PALETTE[zlib.crc32(key) % len(KREA_OUTFIT_PALETTE)]
+
+
+def krea_outfit_directive(prompt: str, label: str = '') -> str:
+    """Rewrite the catalog's NEGATIVE outfit/expression clauses into positive
+    ones for Krea. Idempotent (the substituted text contains none of the
+    patterns) and a no-op on any prompt that never carried them — which is every
+    non-human catalog, since `_augment_prompt` only runs on the human one."""
+    p = prompt or ''
+    garment = f'wearing {krea_outfit_for(label)}'
+    p = p.replace(OUTFIT_VARY, garment)
+    for rx in _KREA_OUTFIT_GENERIC:
+        p = rx.sub(garment, p)
+    p = _KREA_NEGATION.sub('', p)
+    p = _KREA_EXPRESSION_NEGATION.sub('', p)
+    return p
+
+
+def wrap_variation_krea(prompt: str, nsfw: bool = False, framing: str | None = None,
+                        suffix: str = '', subject_type: str = 'human',
+                        label: str = '') -> str:
+    """Full Krea 2 Identity Edit prompt for one shot.
+
+    Same four-part structure as `wrap_variation_klein` (command → full intended
+    result → identity lock → rendering tail), plus the two Krea-specific fixes:
+    the outfit negation becomes a concrete garment, and permanent markings get an
+    explicit hold order. `label` selects that garment deterministically — pass
+    the variation label so the same shot always renders the same outfit."""
+    st = normalize_subject_type(subject_type)
+    noun = _KLEIN_SUBJECT_NOUN.get(st, 'subject')
+    detail = _KLEIN_FRAMING_DETAIL_BY_SUBJECT.get(st, _KLEIN_FRAMING_DETAIL).get(framing or '', '')
+    medium = _KLEIN_MEDIUM.get(st, _KLEIN_MEDIUM_DEFAULT)
+    nsfw_tail, sfw_tail = _KLEIN_RENDER_TAIL.get(st, _KLEIN_RENDER_TAIL_DEFAULT)
+    ending = nsfw_tail if nsfw else sfw_tail
+    body = krea_outfit_directive(_append_suffix(prompt, suffix), label)
+    return (
+        f"Create a new {medium} of the same {noun} as the reference image: {body}. "
+        + (f"{detail} " if detail else "")
+        + KREA_MARKINGS_LOCK
+        + f"{get_identity_prompt('klein_identity', st)} {ending}")
 
 
 def _e(i, axis, framing, label, prompt, co=False, cb=False, aspect=None):
@@ -721,6 +930,106 @@ ANIMAL_CATALOG = [
        cb=True, aspect='4:3'),
     _e('animal_back', 'framing', 'back', 'Animal, from behind',
        'full body photo of the animal seen from behind, hindquarters and tail visible, natural setting', cb=True),
+    # --- Head: remaining angles, states and light directions -------------------
+    _e('animal_head_down', 'angle', 'face', 'Animal head, looking down',
+       'close-up photo of the animal, head lowered, looking downward, calm, soft indoor light', cb=True),
+    _e('animal_head_tilt', 'angle', 'face', 'Animal head, tilted',
+       'close-up photo of the animal, head tilted to one side, curious, ears forward, soft daylight', cb=True),
+    _e('animal_head_low', 'angle', 'face', 'Animal head, low angle',
+       'close-up photo of the animal, head seen from below, low camera angle, imposing, plain background', cb=True),
+    _e('animal_head_top', 'angle', 'face', 'Animal head, from above',
+       'close-up photo of the animal, head seen from directly above, looking up at the camera, floor background', cb=True),
+    _e('animal_head_open_mouth', 'expression', 'face', 'Animal head, mouth open',
+       'close-up photo of the animal, head, mouth open, tongue and teeth visible, relaxed, outdoor daylight', cb=True),
+    _e('animal_head_ears', 'expression', 'face', 'Animal head, ears alert',
+       'close-up photo of the animal, head, ears raised and alert, attentive gaze, plain background', cb=True),
+    _e('animal_head_eyes', 'framing', 'face', 'Animal eyes, extreme close-up',
+       'extreme close-up photo of the animal, eyes and surrounding fur in sharp focus, shallow depth of field', cb=True),
+    _e('animal_head_golden', 'lighting', 'face', 'Animal head, golden hour',
+       'close-up photo of the animal, head, warm golden hour light from the side, outdoor, blurred background', cb=True),
+    _e('animal_head_window', 'lighting', 'face', 'Animal head, window light',
+       'close-up photo of the animal, head, soft window light indoors, blurred room background', cb=True),
+    _e('animal_head_backlit', 'lighting', 'face', 'Animal head, backlit',
+       'close-up photo of the animal, head, backlit with a bright rim of light around the fur, dark background', cb=True),
+    _e('animal_head_night', 'lighting', 'face', 'Animal head, low light',
+       'close-up photo of the animal, head, dim night light, dark background, eyes catching the light', cb=True),
+    _e('animal_head_overcast', 'lighting', 'face', 'Animal head, overcast light',
+       'close-up photo of the animal, head, flat overcast daylight, even and shadowless, outdoor', cb=True),
+    _e('animal_head_wide', 'framing', 'face', 'Animal head, cinematic framing',
+       'close-up photo of the animal, head off-center, wide cinematic framing, blurred environment',
+       cb=True, aspect='16:9'),
+    _e('animal_head_tall', 'framing', 'face', 'Animal head, tall framing',
+       'close-up photo of the animal, head, tall vertical framing, plain background, soft light',
+       cb=True, aspect='9:16'),
+    _e('animal_detail_fur', 'framing', 'face', 'Animal detail, coat texture',
+       'extreme close-up photo of the animal, fur or skin texture and its markings, sharp focus, soft even light', cb=True),
+    _e('animal_detail_paw', 'framing', 'face', 'Animal detail, paw',
+       'close-up photo of the animal, one paw or foot, sharp focus, natural ground, soft light', cb=True),
+    _e('animal_detail_tail', 'framing', 'face', 'Animal detail, tail',
+       'close-up photo of the animal, tail, sharp focus, natural setting, soft daylight', cb=True),
+    # --- Half body -------------------------------------------------------------
+    _e('animal_half_side', 'framing', 'bust', 'Animal half-body, side',
+       'half-body photo of the animal, side view, head and chest visible, plain background, even light', cb=True),
+    _e('animal_half_studio', 'lighting', 'bust', 'Animal half-body, studio',
+       'half-body photo of the animal, studio lighting, plain seamless background', cb=True),
+    _e('animal_half_golden', 'lighting', 'bust', 'Animal half-body, golden hour',
+       'half-body photo of the animal, three-quarter view, warm golden hour light, outdoor', cb=True),
+    _e('animal_half_lying', 'framing', 'bust', 'Animal half-body, resting',
+       'half-body photo of the animal lying down with its head raised, front legs visible, indoor floor, soft light', cb=True),
+    _e('animal_half_look_up', 'angle', 'bust', 'Animal half-body, looking up',
+       'half-body photo of the animal sitting and looking upward, alert, blurred outdoor background', cb=True),
+    # --- Full body: poses ------------------------------------------------------
+    _e('animal_body_stand_34', 'framing', 'body', 'Animal body, standing three-quarter',
+       'full body photo of the animal, standing, three-quarter view, the whole body visible, natural setting', cb=True),
+    _e('animal_body_sit_front', 'framing', 'body', 'Animal body, sitting front',
+       'full body photo of the animal, sitting, front view, the entire body visible, plain background', cb=True),
+    _e('animal_body_sit_side', 'framing', 'body', 'Animal body, sitting side',
+       'full body photo of the animal, sitting, side profile, the whole body visible, natural ground', cb=True),
+    _e('animal_body_jump', 'framing', 'body', 'Animal body, jumping',
+       'full body photo of the animal mid-jump, all four legs off the ground, dynamic action, outdoor',
+       cb=True, aspect='16:9'),
+    _e('animal_body_play', 'framing', 'body', 'Animal body, playing',
+       'full body photo of the animal playing, lively pose, outdoor grass, daylight', cb=True),
+    _e('animal_body_sleep', 'framing', 'body', 'Animal body, sleeping',
+       'full body photo of the animal curled up asleep, eyes closed, soft indoor light, blanket or floor', cb=True),
+    _e('animal_body_drink', 'framing', 'body', 'Animal body, drinking',
+       'full body photo of the animal drinking, head lowered to a bowl or water, side view, natural light', cb=True),
+    _e('animal_body_stretch', 'framing', 'body', 'Animal body, stretching',
+       'full body photo of the animal stretching, elongated pose, side view, indoor floor, soft light', cb=True),
+    # --- Full body: settings and light ----------------------------------------
+    _e('animal_body_studio', 'lighting', 'body', 'Animal body, studio',
+       'full body photo of the animal, standing, studio lighting, plain seamless background, the whole body visible', cb=True),
+    _e('animal_body_golden', 'lighting', 'body', 'Animal body, golden hour',
+       'full body photo of the animal standing outdoors, warm golden hour backlight, long shadows',
+       cb=True, aspect='4:3'),
+    _e('animal_body_night', 'lighting', 'body', 'Animal body, night',
+       'full body photo of the animal outdoors at night, cool dim light, dark background', cb=True),
+    _e('animal_body_snow', 'background', 'body', 'Animal body, snow',
+       'full body photo of the animal walking in snow, white winter landscape, cold daylight',
+       cb=True, aspect='16:9'),
+    _e('animal_body_water', 'background', 'body', 'Animal body, water',
+       'full body photo of the animal at the edge of water, wet ground reflecting the light, outdoor daylight',
+       cb=True, aspect='4:3'),
+    _e('animal_body_forest', 'background', 'body', 'Animal body, forest',
+       'full body photo of the animal in a forest, trees and undergrowth around it, dappled light',
+       cb=True, aspect='4:3'),
+    _e('animal_body_field', 'background', 'body', 'Animal body, tall grass',
+       'full body photo of the animal standing in tall grass, meadow, warm daylight', cb=True, aspect='4:3'),
+    _e('animal_body_urban', 'background', 'body', 'Animal body, city street',
+       'full body photo of the animal on a city pavement, urban background, daylight',
+       cb=True, aspect='16:9'),
+    _e('animal_body_indoor', 'background', 'body', 'Animal body, indoors',
+       'full body photo of the animal on a sofa or indoor floor, home interior, warm lamp light', cb=True),
+    _e('animal_body_low', 'angle', 'body', 'Animal body, low angle',
+       'full body photo of the animal from a very low camera angle at ground level, the whole body visible, outdoor', cb=True),
+    _e('animal_body_top', 'angle', 'body', 'Animal body, from above',
+       'full body photo of the animal from directly above, top-down view, floor or ground background', cb=True),
+    # --- From behind -----------------------------------------------------------
+    _e('animal_back_34', 'framing', 'back', 'Animal, rear three-quarter',
+       'full body photo of the animal from a rear three-quarter angle, back and one flank visible, natural setting', cb=True),
+    _e('animal_back_walk', 'framing', 'back', 'Animal, walking away',
+       'full body photo of the animal walking away from the camera, seen from behind, outdoor path',
+       cb=True, aspect='16:9'),
 ]
 CREATURE_CATALOG = [
     _e('creature_face_front', 'expression', 'face', 'Creature face, front',
@@ -750,6 +1059,73 @@ CREATURE_CATALOG = [
        cb=True, aspect='4:3'),
     _e('creature_back', 'framing', 'back', 'Creature, from behind',
        'full body shot of the creature seen from behind, back silhouette and back-facing features visible', cb=True),
+    # --- Face: states, angles, light -------------------------------------------
+    _e('creature_face_menacing', 'expression', 'face', 'Creature face, menacing',
+       'close-up portrait of the creature, front view, menacing expression, hard directional light, dark background', cb=True),
+    _e('creature_face_calm', 'expression', 'face', 'Creature face, calm',
+       'close-up portrait of the creature, three-quarter view, calm and still expression, soft daylight', cb=True),
+    _e('creature_face_roar', 'expression', 'face', 'Creature face, roaring',
+       'close-up portrait of the creature, mouth wide open roaring, teeth visible, dramatic light', cb=True),
+    _e('creature_face_low', 'angle', 'face', 'Creature face, low angle',
+       'close-up of the creature seen from below, low heroic camera angle, sky or ceiling behind', cb=True),
+    _e('creature_face_top', 'angle', 'face', 'Creature face, high angle',
+       'close-up of the creature seen from above, high camera angle looking down at it, ground background', cb=True),
+    _e('creature_face_rim', 'lighting', 'face', 'Creature face, rim light',
+       'close-up portrait of the creature, cinematic rim light outlining its silhouette, dark background', cb=True),
+    _e('creature_face_fire', 'lighting', 'face', 'Creature face, firelight',
+       'close-up portrait of the creature lit by warm flickering firelight from below, deep shadows', cb=True),
+    _e('creature_face_mist', 'lighting', 'face', 'Creature face, mist',
+       'close-up portrait of the creature in cold mist, diffuse light, pale desaturated background', cb=True),
+    _e('creature_face_eyes', 'framing', 'face', 'Creature eyes, extreme close-up',
+       'extreme close-up of the creature, eyes and the surrounding skin in sharp focus, shallow depth of field', cb=True),
+    _e('creature_detail_skin', 'framing', 'face', 'Creature detail, skin texture',
+       'extreme close-up of the creature, skin, scale or fur texture and its markings, sharp focus, soft light', cb=True),
+    _e('creature_detail_hand', 'framing', 'face', 'Creature detail, hand or claw',
+       'close-up of the creature, one hand, claw or limb extremity, sharp focus, neutral background', cb=True),
+    _e('creature_face_tall', 'framing', 'face', 'Creature face, tall framing',
+       'close-up portrait of the creature, tall vertical framing, head and shoulders, plain background',
+       cb=True, aspect='9:16'),
+    # --- Bust ------------------------------------------------------------------
+    _e('creature_bust_side', 'framing', 'bust', 'Creature bust, side',
+       'upper body shot of the creature, side view, plain background, even light', cb=True),
+    _e('creature_bust_studio', 'lighting', 'bust', 'Creature bust, studio',
+       'upper body shot of the creature, studio lighting, plain seamless background', cb=True),
+    _e('creature_bust_dark', 'lighting', 'bust', 'Creature bust, low key',
+       'upper body shot of the creature, low key lighting, most of the frame in shadow, single light source', cb=True),
+    _e('creature_bust_gear', 'outfit', 'bust', 'Creature bust, gear visible',
+       'upper body shot of the creature, its armour, harness or gear clearly visible, three-quarter view', cb=True),
+    # --- Full body: poses ------------------------------------------------------
+    _e('creature_body_walk', 'framing', 'body', 'Creature body, walking',
+       'full body shot of the creature walking, side view, the entire body visible, natural environment',
+       cb=True, aspect='16:9'),
+    _e('creature_body_crouch', 'framing', 'body', 'Creature body, crouching',
+       'full body shot of the creature crouched low, coiled and ready to move, the whole body visible', cb=True),
+    _e('creature_body_leap', 'framing', 'body', 'Creature body, leaping',
+       'full body shot of the creature mid-leap, airborne, dynamic action, dramatic environment',
+       cb=True, aspect='16:9'),
+    _e('creature_body_rest', 'framing', 'body', 'Creature body, resting',
+       'full body shot of the creature at rest, seated or lying, calm, the entire body visible', cb=True),
+    _e('creature_body_scale', 'framing', 'body', 'Creature body, size reference',
+       'full body shot of the creature next to an ordinary doorway or vehicle that gives its true scale, wide shot',
+       cb=True, aspect='16:9'),
+    # --- Full body: settings and light -----------------------------------------
+    _e('creature_body_studio', 'lighting', 'body', 'Creature body, studio',
+       'full body shot of the creature, standing, studio lighting, plain seamless background, the whole body visible', cb=True),
+    _e('creature_body_ruins', 'background', 'body', 'Creature body, ruins',
+       'full body shot of the creature among stone ruins, overgrown architecture, moody daylight',
+       cb=True, aspect='4:3'),
+    _e('creature_body_forest', 'background', 'body', 'Creature body, forest',
+       'full body shot of the creature in a dense forest, dappled light through the trees', cb=True, aspect='4:3'),
+    _e('creature_body_night', 'lighting', 'body', 'Creature body, night',
+       'full body shot of the creature at night, cool moonlight, dark environment, the whole body still readable', cb=True),
+    _e('creature_body_low', 'angle', 'body', 'Creature body, low angle',
+       'full body shot of the creature from a low camera angle at ground level, towering over the viewer', cb=True),
+    # --- From behind -----------------------------------------------------------
+    _e('creature_back_34', 'framing', 'back', 'Creature, rear three-quarter',
+       'full body shot of the creature from a rear three-quarter angle, back and one side visible, natural setting', cb=True),
+    _e('creature_back_walk', 'framing', 'back', 'Creature, walking away',
+       'full body shot of the creature walking away from the camera, seen from behind, wide environment',
+       cb=True, aspect='16:9'),
 ]
 OBJECT_CATALOG = [
     _e('object_full_front', 'framing', 'body', 'Object, full front',
@@ -779,6 +1155,47 @@ OBJECT_CATALOG = [
        'photo of the object held in a hand for scale, neutral background, soft light', cb=True),
     _e('object_back', 'angle', 'back', 'Object, rear view',
        'product photo of the object from behind, rear view, plain background, even light', cb=True),
+    # --- Angles ----------------------------------------------------------------
+    _e('object_full_45', 'angle', 'body', 'Object, elevated three-quarter',
+       'product photo of the object from an elevated three-quarter angle, the full object visible, plain background', cb=True),
+    _e('object_bottom', 'angle', 'bust', 'Object, underside',
+       'product photo of the underside of the object, base and markings visible, plain background, even light', cb=True),
+    _e('object_back_34', 'angle', 'back', 'Object, rear three-quarter',
+       'product photo of the object from a rear three-quarter angle, back and one side visible, plain background', cb=True),
+    # --- Studio light ----------------------------------------------------------
+    _e('object_studio_soft', 'lighting', 'body', 'Object, soft studio light',
+       'product photo of the object, large softbox lighting, very soft shadows, white seamless background', cb=True),
+    _e('object_studio_hard', 'lighting', 'body', 'Object, hard light',
+       'product photo of the object, single hard light source, sharp defined shadow on the surface, plain background', cb=True),
+    _e('object_backlit', 'lighting', 'body', 'Object, backlit',
+       'product photo of the object backlit, bright rim along its edges, dark gradient background', cb=True),
+    _e('object_night', 'lighting', 'body', 'Object, night lighting',
+       'photo of the object at night, coloured ambient and neon light, dark surroundings', cb=True),
+    # --- In the real world -----------------------------------------------------
+    _e('object_table', 'background', 'body', 'Object, on a wooden table',
+       'photo of the object resting on a wooden table, home interior, soft daylight from a window', cb=True),
+    _e('object_floor', 'background', 'body', 'Object, on the ground',
+       'photo of the object on the ground outdoors, natural surface, overcast daylight', cb=True),
+    _e('object_shelf', 'background', 'body', 'Object, on a shelf',
+       'photo of the object on a shelf among ordinary items, indoor ambient light', cb=True),
+    _e('object_city', 'background', 'body', 'Object, city background',
+       'photo of the object outdoors with a city street behind it, daylight, shallow depth of field',
+       cb=True, aspect='16:9'),
+    _e('object_in_use', 'framing', 'body', 'Object, in use',
+       'photo of the object being used as intended, hands present but the object stays the focus, natural light', cb=True),
+    _e('object_scale', 'framing', 'bust', 'Object, size reference',
+       'photo of the object beside an everyday item that gives its true scale, plain background, even light', cb=True),
+    _e('object_medium_34', 'framing', 'bust', 'Object, medium three-quarter',
+       'medium photo of the object from a three-quarter angle, part of the surroundings visible, soft light', cb=True),
+    # --- Details ---------------------------------------------------------------
+    _e('object_detail_material', 'framing', 'face', 'Object, detail material',
+       'extreme close-up photo of the object, its material and surface finish, sharp focus, raking light', cb=True),
+    _e('object_detail_edge', 'framing', 'face', 'Object, detail seam',
+       'close-up photo of the object focusing on a seam, joint or edge where two parts meet, sharp focus', cb=True),
+    _e('object_detail_wear', 'framing', 'face', 'Object, detail wear',
+       'close-up photo of the object showing wear, scratches or patina from use, sharp focus, soft light', cb=True),
+    _e('object_detail_top', 'framing', 'face', 'Object, detail from above',
+       'close-up photo of the top surface of the object seen from directly above, sharp focus, even light', cb=True),
 ]
 OTHER_CATALOG = [
     _e('other_full_front', 'framing', 'body', 'Subject, full front',
@@ -801,6 +1218,208 @@ OTHER_CATALOG = [
        'photo of the subject from an elevated angle, plain background', cb=True),
     _e('other_back', 'angle', 'back', 'Subject, rear view',
        'photo of the subject from behind, rear view, plain background', cb=True),
+    _e('other_full_back34', 'angle', 'back', 'Subject, rear three-quarter',
+       'photo of the subject from a rear three-quarter angle, back and one side visible, plain background', cb=True),
+    _e('other_low', 'angle', 'bust', 'Subject, low angle',
+       'photo of the subject from a low camera angle, plain background, even light', cb=True),
+    _e('other_medium_side', 'framing', 'bust', 'Subject, medium side',
+       'medium shot of the subject from the side, simple background, soft light', cb=True),
+    _e('other_scale', 'framing', 'bust', 'Subject, size reference',
+       'photo of the subject beside an everyday item that gives its true scale, plain background', cb=True),
+    _e('other_studio', 'lighting', 'body', 'Subject, studio',
+       'photo of the subject, studio lighting, plain seamless background, the entire subject visible', cb=True),
+    _e('other_studio_hard', 'lighting', 'body', 'Subject, hard light',
+       'photo of the subject, single hard light source, sharp defined shadows, plain background', cb=True),
+    _e('other_backlit', 'lighting', 'body', 'Subject, backlit',
+       'photo of the subject backlit, bright rim along its edges, dark gradient background', cb=True),
+    _e('other_night', 'lighting', 'body', 'Subject, night',
+       'photo of the subject at night, dim ambient light, dark surroundings', cb=True),
+    _e('other_indoor', 'background', 'body', 'Subject, indoors',
+       'photo of the subject in an ordinary interior, home or workshop background, warm ambient light', cb=True),
+    _e('other_wide', 'framing', 'body', 'Subject, wide shot',
+       'wide photo of the subject off-center with plenty of environment around it, cinematic framing',
+       cb=True, aspect='16:9'),
+    _e('other_detail_3', 'framing', 'face', 'Subject, detail material',
+       'extreme close-up of the subject, its material and surface finish, sharp focus, raking light', cb=True),
+    _e('other_detail_marking', 'framing', 'face', 'Subject, detail marking',
+       'close-up of the subject focusing on a distinctive marking, text or feature, sharp focus', cb=True),
+]
+
+# --- Anime catalog ------------------------------------------------------------
+# Authored from the framing vocabulary of the MEDIUM, not of photography. Anime
+# and its booru tagging have their own shot language — bust-up, cowboy shot
+# (knee-up), full body, character-sheet turnaround, expression sheet — and those
+# are the crops a drawn character is actually published in, so they are the crops
+# a LoRA should see. Nothing here says "photo", "lens", "depth of field" or
+# "studio lighting": the identity lock spends its whole budget forbidding
+# photorealism and a catalog that whispered "close-up photo of" would undo it.
+#
+# Two deliberate departures from the human catalog:
+#   • the SIGNATURE OUTFIT is named as identity in almost every shot, where the
+#     human catalog bakes OUTFIT_VARY ("a different casual outfit") into every
+#     shot that names none. A real person's clothes must NOT bind to them; a
+#     character's costume is half of what makes them recognisable. Two shots do
+#     offer an alternate outfit — as an explicit, opt-in card, not the default.
+#   • the CHARACTER SHEET shots (front / side / back on a plain background) have
+#     no photographic equivalent. They are how character designs are published
+#     and they give the LoRA clean, unambiguous silhouette coverage.
+# `_augment_prompt` is NEVER run here (same rule as every non-human catalog).
+ANIME_CATALOG = [
+    # --- Face: angles ---------------------------------------------------------
+    _e('anime_face_front', 'angle', 'face', 'Anime face, front',
+       'close-up of the anime character, front view, neutral expression, clean line art, '
+       'flat cel shading, plain background', cb=True),
+    _e('anime_face_34l', 'angle', 'face', 'Anime face, three-quarter left',
+       'close-up of the anime character, three-quarter left view, soft even colour, simple background', cb=True),
+    _e('anime_face_34r', 'angle', 'face', 'Anime face, three-quarter right',
+       'close-up of the anime character, three-quarter right view, soft even colour, simple background', cb=True),
+    _e('anime_face_profile_l', 'angle', 'face', 'Anime face, profile left',
+       'close-up of the anime character, left profile view, the hair silhouette clearly readable', cb=True),
+    _e('anime_face_profile_r', 'angle', 'face', 'Anime face, profile right',
+       'close-up of the anime character, right profile view, the hair silhouette clearly readable', cb=True),
+    _e('anime_face_low', 'angle', 'face', 'Anime face, from below',
+       'close-up of the anime character seen from below, low angle looking up at the face, sky behind', cb=True),
+    _e('anime_face_high', 'angle', 'face', 'Anime face, from above',
+       'close-up of the anime character seen from above, high angle looking down at the face', cb=True),
+    _e('anime_face_tilt', 'angle', 'face', 'Anime face, head tilted',
+       'close-up of the anime character, head tilted to one side, three-quarter view, plain background', cb=True),
+    # --- Face: expressions (the anime expression sheet) -----------------------
+    _e('anime_face_smile', 'expression', 'face', 'Anime face, smile',
+       'close-up of the anime character, front view, warm smile, eyes slightly narrowed, simple background', cb=True),
+    _e('anime_face_laugh', 'expression', 'face', 'Anime face, laughing',
+       'close-up of the anime character, laughing with the mouth open and the eyes closed happily', cb=True),
+    _e('anime_face_angry', 'expression', 'face', 'Anime face, angry',
+       'close-up of the anime character, angry expression, brows drawn down, mouth set, tense', cb=True),
+    _e('anime_face_surprised', 'expression', 'face', 'Anime face, surprised',
+       'close-up of the anime character, surprised expression, eyes wide, mouth slightly open', cb=True),
+    _e('anime_face_sad', 'expression', 'face', 'Anime face, sad',
+       'close-up of the anime character, sad expression, eyes downcast, subdued colour', cb=True),
+    _e('anime_face_blush', 'expression', 'face', 'Anime face, blushing',
+       'close-up of the anime character, embarrassed, blush across the cheeks, looking away', cb=True),
+    _e('anime_face_closed_eyes', 'expression', 'face', 'Anime face, eyes closed',
+       'close-up of the anime character, eyes gently closed, calm and serene expression', cb=True),
+    _e('anime_face_smirk', 'expression', 'face', 'Anime face, confident smirk',
+       'close-up of the anime character, confident smirk, one brow raised, looking at the viewer', cb=True),
+    # --- Face: detail and light ----------------------------------------------
+    _e('anime_face_eyes', 'framing', 'face', 'Anime detail, eyes',
+       'extreme close-up of the anime character, both eyes and the iris pattern drawn in full detail, '
+       'highlights and eyelashes crisp', cb=True),
+    _e('anime_face_hair', 'framing', 'face', 'Anime detail, hair',
+       'close-up of the anime character, the hairstyle and its strands, colour and shape clearly readable, '
+       'plain background', cb=True),
+    _e('anime_face_accessory', 'framing', 'face', 'Anime detail, head accessory',
+       'close-up of the anime character, the ribbon, hairpin, glasses or headwear of the signature outfit '
+       'in full detail', cb=True),
+    _e('anime_face_backlit', 'lighting', 'face', 'Anime face, rim light',
+       'close-up of the anime character, strong rim light outlining the hair and shoulders, dark background', cb=True),
+    _e('anime_face_sunset', 'lighting', 'face', 'Anime face, sunset light',
+       'close-up of the anime character in warm orange sunset light, long shadows, golden sky behind', cb=True),
+    _e('anime_face_night', 'lighting', 'face', 'Anime face, night lighting',
+       'close-up of the anime character at night, cool blue and neon light on the face, dark background', cb=True),
+    _e('anime_face_tall', 'framing', 'face', 'Anime face, tall framing',
+       'close-up of the anime character, tall vertical framing, head and shoulders, plain background',
+       cb=True, aspect='9:16'),
+    _e('anime_face_wide', 'framing', 'face', 'Anime face, cinematic framing',
+       'close-up of the anime character, wide cinematic framing, face off-centre, simple background',
+       cb=True, aspect='16:9'),
+    # --- Bust-up and cowboy shot ---------------------------------------------
+    _e('anime_bust_front', 'framing', 'bust', 'Anime bust-up, front',
+       'bust-up shot of the anime character from the chest up, front view, wearing the signature outfit, '
+       'plain background', cb=True),
+    _e('anime_bust_34', 'framing', 'bust', 'Anime bust-up, three-quarter',
+       'bust-up shot of the anime character from the chest up, three-quarter view, wearing the signature '
+       'outfit, simple background', cb=True),
+    _e('anime_bust_side', 'framing', 'bust', 'Anime bust-up, side',
+       'bust-up shot of the anime character from the side, wearing the signature outfit, plain background', cb=True),
+    _e('anime_bust_arms_crossed', 'framing', 'bust', 'Anime bust-up, arms crossed',
+       'upper body shot of the anime character with the arms crossed, confident, wearing the signature '
+       'outfit, simple background', cb=True),
+    _e('anime_bust_hand_face', 'framing', 'bust', 'Anime bust-up, hand near face',
+       'upper body shot of the anime character with one hand raised near the face, fingers clearly drawn, '
+       'wearing the signature outfit', cb=True),
+    _e('anime_bust_collar', 'outfit', 'bust', 'Anime bust-up, outfit detail',
+       'upper body shot of the anime character showing the collar, emblem and upper details of the '
+       'signature outfit, three-quarter view, plain background', cb=True),
+    _e('anime_cowboy_front', 'framing', 'bust', 'Anime cowboy shot, front',
+       'cowboy shot of the anime character from the knees up, front view, standing, wearing the signature '
+       'outfit, simple background', cb=True),
+    _e('anime_cowboy_34', 'framing', 'bust', 'Anime cowboy shot, three-quarter',
+       'cowboy shot of the anime character from the knees up, three-quarter view, relaxed stance, wearing '
+       'the signature outfit', cb=True),
+    _e('anime_bust_outdoor', 'background', 'bust', 'Anime bust-up, outdoors',
+       'upper body shot of the anime character outdoors, wearing the signature outfit, sunny sky and '
+       'simple scenery behind', cb=True),
+    # --- Full body: character sheet ------------------------------------------
+    _e('anime_sheet_front', 'framing', 'body', 'Anime character sheet, front',
+       'full body character reference of the anime character, front view, standing straight, arms slightly '
+       'away from the body, wearing the signature outfit, plain white background, even flat colour',
+       cb=True, aspect='9:16'),
+    _e('anime_sheet_side', 'framing', 'body', 'Anime character sheet, side',
+       'full body character reference of the anime character, side view, standing straight, wearing the '
+       'signature outfit, plain white background, even flat colour', cb=True, aspect='9:16'),
+    # --- Full body: poses -----------------------------------------------------
+    _e('anime_body_stand_front', 'framing', 'body', 'Anime full body, standing front',
+       'full body shot of the anime character standing, front view, the entire body visible from head to '
+       'shoes, wearing the signature outfit, simple background', cb=True),
+    _e('anime_body_stand_34', 'framing', 'body', 'Anime full body, standing three-quarter',
+       'full body shot of the anime character standing, three-quarter view, the whole body visible, '
+       'wearing the signature outfit', cb=True),
+    _e('anime_body_walk', 'framing', 'body', 'Anime full body, walking',
+       'full body shot of the anime character walking, side view, mid stride, wearing the signature outfit', cb=True),
+    _e('anime_body_run', 'framing', 'body', 'Anime full body, running',
+       'full body shot of the anime character running, dynamic pose, hair and the signature outfit trailing '
+       'with the motion', cb=True, aspect='16:9'),
+    _e('anime_body_jump', 'framing', 'body', 'Anime full body, mid-air',
+       'full body shot of the anime character mid-jump, airborne, dynamic action pose, wearing the '
+       'signature outfit', cb=True, aspect='16:9'),
+    _e('anime_body_action', 'framing', 'body', 'Anime full body, action pose',
+       'full body shot of the anime character in a dramatic action pose, dynamic perspective, wearing the '
+       'signature outfit', cb=True, aspect='16:9'),
+    _e('anime_body_sit', 'framing', 'body', 'Anime full body, sitting',
+       'full body shot of the anime character sitting, legs visible, relaxed, wearing the signature outfit, '
+       'simple interior background', cb=True),
+    _e('anime_body_lying', 'framing', 'body', 'Anime full body, lying down',
+       'full body shot of the anime character lying down seen from above, the whole body visible, wearing '
+       'the signature outfit', cb=True, aspect='16:9'),
+    _e('anime_body_low', 'angle', 'body', 'Anime full body, low angle',
+       'full body shot of the anime character from a low angle at ground level, towering perspective, '
+       'wearing the signature outfit', cb=True),
+    # --- Full body: settings and light ---------------------------------------
+    _e('anime_body_city', 'background', 'body', 'Anime full body, city street',
+       'full body shot of the anime character standing on a city street, buildings and signage behind, '
+       'daylight, wearing the signature outfit', cb=True, aspect='4:3'),
+    _e('anime_body_indoor', 'background', 'body', 'Anime full body, indoors',
+       'full body shot of the anime character in an ordinary interior room, warm ambient colour, wearing '
+       'the signature outfit', cb=True),
+    _e('anime_body_nature', 'background', 'body', 'Anime full body, outdoors',
+       'full body shot of the anime character outdoors among trees and grass, soft daylight, wearing the '
+       'signature outfit', cb=True, aspect='4:3'),
+    _e('anime_body_night_neon', 'lighting', 'body', 'Anime full body, night neon',
+       'full body shot of the anime character at night, neon signs casting coloured light, dark street, '
+       'wearing the signature outfit', cb=True, aspect='16:9'),
+    # --- Alternate outfits: OPT-IN, never the default ------------------------
+    _e('anime_alt_casual', 'outfit', 'body', 'Anime full body, alternate casual outfit',
+       'full body shot of the anime character wearing an alternate casual everyday outfit instead of the '
+       'signature one, the character design otherwise unchanged, standing, simple background', cb=True),
+    _e('anime_alt_seasonal', 'outfit', 'body', 'Anime full body, alternate seasonal outfit',
+       'full body shot of the anime character wearing an alternate seasonal outfit (coat and scarf, or '
+       'summer clothes) instead of the signature one, the character design otherwise unchanged', cb=True),
+    # --- From behind ----------------------------------------------------------
+    _e('anime_back_stand', 'framing', 'back', 'Anime, from behind',
+       'full body shot of the anime character seen from behind, standing, the back of the hair and of the '
+       'signature outfit clearly visible, plain background', cb=True),
+    _e('anime_back_34', 'framing', 'back', 'Anime, rear three-quarter',
+       'full body shot of the anime character from a rear three-quarter angle, back and one side visible, '
+       'wearing the signature outfit', cb=True),
+    _e('anime_back_shoulder', 'framing', 'back', 'Anime, looking over the shoulder',
+       'shot of the anime character from behind looking back over one shoulder at the viewer, the face '
+       'partly visible, wearing the signature outfit', cb=True),
+    _e('anime_back_walk', 'framing', 'back', 'Anime, walking away',
+       'full body shot of the anime character walking away from the viewer, seen from behind, wide scenery',
+       cb=True, aspect='16:9'),
+    _e('anime_sheet_back', 'framing', 'back', 'Anime character sheet, back',
+       'full body character reference of the anime character, back view, standing straight, wearing the '
+       'signature outfit, plain white background, even flat colour', cb=True, aspect='9:16'),
 ]
 
 # subject_type -> catalog / nsfw / by-id. 'human' reuses the existing objects so
@@ -808,11 +1427,11 @@ OTHER_CATALOG = [
 # resolver searches (labels are globally unique across it).
 _SUBJECT_CATALOGS = {
     'human': VARIATION_CATALOG, 'animal': ANIMAL_CATALOG, 'creature': CREATURE_CATALOG,
-    'object': OBJECT_CATALOG, 'other': OTHER_CATALOG,
+    'object': OBJECT_CATALOG, 'other': OTHER_CATALOG, 'anime': ANIME_CATALOG,
 }
 _SUBJECT_NSFW = {'human': NSFW_VARIATION_CATALOG}   # only human has an uncensored catalog
 _ALL_CATALOGS = (VARIATION_CATALOG + NSFW_VARIATION_CATALOG + ANIMAL_CATALOG
-                 + CREATURE_CATALOG + OBJECT_CATALOG + OTHER_CATALOG)
+                 + CREATURE_CATALOG + OBJECT_CATALOG + OTHER_CATALOG + ANIME_CATALOG)
 
 
 # Legacy label aliases (old French persisted key -> current English catalog label).
@@ -982,32 +1601,158 @@ _PRESETS = {'balanced_25': _BALANCED_25, 'zimage_12': _ZIMAGE_12,
             'fullbody_focused': _FULLBODY_FOCUSED, 'body_emphasis': _BODY_EMPHASIS}
 _BY_ID = {e['id']: e for e in VARIATION_CATALOG}
 
-# Non-human presets (one balanced spread each — first draft). The frontend renders
-# these from `preset_meta_for` (returned by the /variations route) so it doesn't
-# need to know their keys ahead of time; the human path keeps its own hardcoded
-# PRESET_META untouched (so the human /variations response stays byte-identical).
-_ANIMAL_BALANCED = [e['id'] for e in ANIMAL_CATALOG]
-_CREATURE_BALANCED = [e['id'] for e in CREATURE_CATALOG]
-_OBJECT_BALANCED = [e['id'] for e in OBJECT_CATALOG]
-_OTHER_BALANCED = [e['id'] for e in OTHER_CATALOG]
+# Non-human presets. The frontend renders these from `preset_meta_for` (returned
+# by the /variations route) so it doesn't need to know their keys ahead of time;
+# the human path keeps its own hardcoded PRESET_META untouched (so the human
+# /variations response stays byte-identical).
+#
+# These used to be `[e['id'] for e in <CATALOG>]` — every shot of the type. That
+# was defensible on a 12-shot first draft; on the catalogs below it would mean a
+# single click queueing 59 images (and, on an API engine, billing them). So each
+# preset is now CURATED: a deliberate composition, the way the human presets are.
+# The KEYS are unchanged (`animal_balanced`…) — only their contents grew, which
+# is the safe direction: preset keys are transient, but the shot IDS they list are
+# persisted in the user's saved presets (`datasetCustomPresetsV1.selectedIds`), so
+# no existing id is ever renamed or dropped.
+_ANIMAL_BALANCED = [
+    'animal_head_front', 'animal_head_34', 'animal_head_profile_l', 'animal_head_up',
+    'animal_head_tilt', 'animal_head_studio', 'animal_head_golden', 'animal_detail_fur',
+    'animal_half_front', 'animal_half_34', 'animal_half_side', 'animal_half_studio',
+    'animal_half_look_up',
+    'animal_body_stand_side', 'animal_body_stand_front', 'animal_body_stand_34',
+    'animal_body_sit_front', 'animal_body_lying', 'animal_body_walk', 'animal_body_run',
+    'animal_body_outdoor', 'animal_body_studio',
+    'animal_back', 'animal_back_34',
+]
+_ANIMAL_HEAD = [
+    'animal_head_front', 'animal_head_34', 'animal_head_profile_l', 'animal_head_profile_r',
+    'animal_head_up', 'animal_head_down', 'animal_head_tilt', 'animal_head_studio',
+    'animal_head_window', 'animal_head_golden', 'animal_head_backlit', 'animal_head_eyes',
+]
+_ANIMAL_FULLBODY = [
+    'animal_body_stand_side', 'animal_body_stand_front', 'animal_body_stand_34',
+    'animal_body_sit_front', 'animal_body_lying', 'animal_body_walk', 'animal_body_run',
+    'animal_body_jump', 'animal_body_outdoor', 'animal_body_studio',
+    'animal_back', 'animal_back_34',
+]
+_CREATURE_BALANCED = [
+    'creature_face_front', 'creature_face_34l', 'creature_face_34r', 'creature_face_profile',
+    'creature_face_calm', 'creature_detail_skin',
+    'creature_bust_front', 'creature_bust_34', 'creature_bust_side', 'creature_bust_studio',
+    'creature_body_stand', 'creature_body_34', 'creature_body_walk', 'creature_body_crouch',
+    'creature_body_rest', 'creature_body_action', 'creature_body_outdoor', 'creature_body_studio',
+    'creature_back', 'creature_back_34',
+]
+_CREATURE_FACE = [
+    'creature_face_front', 'creature_face_34l', 'creature_face_34r', 'creature_face_profile',
+    'creature_face_calm', 'creature_face_menacing', 'creature_face_roar', 'creature_face_rim',
+    'creature_face_low', 'creature_face_eyes',
+]
+_CREATURE_FULLBODY = [
+    'creature_body_stand', 'creature_body_34', 'creature_body_walk', 'creature_body_action',
+    'creature_body_leap', 'creature_body_crouch', 'creature_body_rest', 'creature_body_outdoor',
+    'creature_back', 'creature_back_34',
+]
+_OBJECT_BALANCED = [
+    'object_full_front', 'object_full_34', 'object_full_side', 'object_full_45',
+    'object_hero', 'object_context', 'object_outdoor', 'object_studio_soft',
+    'object_top', 'object_low', 'object_hand', 'object_medium_34',
+    'object_detail', 'object_detail_marking', 'object_detail_material', 'object_detail_edge',
+    'object_back', 'object_back_34',
+]
+_OBJECT_STUDIO = [
+    'object_full_front', 'object_full_34', 'object_full_side', 'object_full_45',
+    'object_hero', 'object_studio_soft', 'object_studio_hard', 'object_backlit',
+    'object_top', 'object_back',
+]
+_OBJECT_CONTEXT = [
+    'object_context', 'object_outdoor', 'object_table', 'object_floor', 'object_shelf',
+    'object_city', 'object_in_use', 'object_hand', 'object_scale', 'object_night',
+]
+_OTHER_BALANCED = [
+    'other_full_front', 'other_full_34', 'other_full_side', 'other_context',
+    'other_outdoor', 'other_studio', 'other_indoor',
+    'other_medium', 'other_medium_side', 'other_top', 'other_low',
+    'other_detail', 'other_detail_2', 'other_detail_3',
+    'other_back', 'other_full_back34',
+]
+_OTHER_QUICK = [
+    'other_full_front', 'other_full_34', 'other_full_side', 'other_medium',
+    'other_detail', 'other_detail_2', 'other_context', 'other_back',
+]
+_ANIME_BALANCED = [
+    'anime_face_front', 'anime_face_34l', 'anime_face_profile_l', 'anime_face_smile',
+    'anime_face_angry', 'anime_face_eyes',
+    'anime_bust_front', 'anime_bust_34', 'anime_bust_collar', 'anime_cowboy_front',
+    'anime_sheet_front', 'anime_sheet_side', 'anime_body_stand_front', 'anime_body_stand_34',
+    'anime_body_walk', 'anime_body_action', 'anime_body_sit', 'anime_body_city',
+    'anime_back_stand', 'anime_sheet_back',
+]
+_ANIME_FACE = [
+    'anime_face_front', 'anime_face_34l', 'anime_face_34r', 'anime_face_profile_l',
+    'anime_face_smile', 'anime_face_laugh', 'anime_face_angry', 'anime_face_surprised',
+    'anime_face_blush', 'anime_face_closed_eyes', 'anime_face_eyes', 'anime_face_hair',
+]
+_ANIME_FULLBODY = [
+    'anime_sheet_front', 'anime_sheet_side', 'anime_sheet_back',
+    'anime_body_stand_front', 'anime_body_stand_34', 'anime_body_walk', 'anime_body_run',
+    'anime_body_action', 'anime_body_sit', 'anime_back_stand', 'anime_back_34',
+]
+# The character-sheet preset has no equivalent in any other subject type: three
+# clean turnaround views plus the neutral crops, on a plain background. It is the
+# cheapest set that teaches a LoRA a character's silhouette and outfit without
+# any scenery to memorise alongside it.
+_ANIME_SHEET = [
+    'anime_sheet_front', 'anime_sheet_side', 'anime_sheet_back',
+    'anime_face_front', 'anime_face_profile_l', 'anime_bust_front', 'anime_bust_side',
+    'anime_face_hair', 'anime_face_accessory', 'anime_bust_collar',
+]
 _SUBJECT_PRESETS = {
     'human': _PRESETS,
-    'animal': {'animal_balanced': _ANIMAL_BALANCED},
-    'creature': {'creature_balanced': _CREATURE_BALANCED},
-    'object': {'object_balanced': _OBJECT_BALANCED},
-    'other': {'other_balanced': _OTHER_BALANCED},
+    'animal': {'animal_balanced': _ANIMAL_BALANCED, 'animal_head_focused': _ANIMAL_HEAD,
+               'animal_fullbody_focused': _ANIMAL_FULLBODY},
+    'creature': {'creature_balanced': _CREATURE_BALANCED, 'creature_face_focused': _CREATURE_FACE,
+                 'creature_fullbody_focused': _CREATURE_FULLBODY},
+    'object': {'object_balanced': _OBJECT_BALANCED, 'object_studio': _OBJECT_STUDIO,
+               'object_context': _OBJECT_CONTEXT},
+    'other': {'other_balanced': _OTHER_BALANCED, 'other_quick': _OTHER_QUICK},
+    'anime': {'anime_balanced': _ANIME_BALANCED, 'anime_face_focused': _ANIME_FACE,
+              'anime_fullbody_focused': _ANIME_FULLBODY, 'anime_character_sheet': _ANIME_SHEET},
 }
 # Preset display metadata surfaced ONLY for non-human types (human uses the
 # frontend's hardcoded PRESET_META, keeping the human payload byte-identical).
 _SUBJECT_PRESET_META = {
     'animal': [{'key': 'animal_balanced', 'name': 'Balanced',
-                'hint': 'A balanced spread of head, half-body, full-body and rear shots for an animal.'}],
+                'hint': 'A balanced spread of head, half-body, full-body and rear shots for an animal.'},
+               {'key': 'animal_head_focused', 'name': 'Head focused',
+                'hint': 'Head angles, expressions and light directions — for a face the model must nail.'},
+               {'key': 'animal_fullbody_focused', 'name': 'Full body focused',
+                'hint': 'Standing, sitting, moving and rear shots — for the whole silhouette and proportions.'}],
     'creature': [{'key': 'creature_balanced', 'name': 'Balanced',
-                  'hint': 'Face, bust, full-body and rear shots for a creature or fictional character.'}],
+                  'hint': 'Face, bust, full-body and rear shots for a creature or fictional character.'},
+                 {'key': 'creature_face_focused', 'name': 'Face focused',
+                  'hint': 'Angles, expressions and dramatic light on the face alone.'},
+                 {'key': 'creature_fullbody_focused', 'name': 'Full body focused',
+                  'hint': 'Poses, action and rear views — for anatomy and silhouette.'}],
     'object': [{'key': 'object_balanced', 'name': 'Balanced',
-                'hint': 'Front, angle, detail and rear views for an object or product.'}],
+                'hint': 'Front, angle, detail and rear views for an object or product.'},
+               {'key': 'object_studio', 'name': 'Studio',
+                'hint': 'Clean product shots on a plain background, several angles and light setups.'},
+               {'key': 'object_context', 'name': 'In context',
+                'hint': 'The object in real settings and in use — teaches it apart from its backdrop.'}],
     'other': [{'key': 'other_balanced', 'name': 'Balanced',
-               'hint': 'Angles, framings and detail shots for any subject.'}],
+               'hint': 'Angles, framings and detail shots for any subject.'},
+              {'key': 'other_quick', 'name': 'Quick set',
+               'hint': 'Eight shots to test a subject before committing to a full run.'}],
+    'anime': [{'key': 'anime_balanced', 'name': 'Balanced',
+               'hint': 'Face, bust-up, cowboy shot, full body and rear views for a drawn character.'},
+              {'key': 'anime_face_focused', 'name': 'Face & expressions',
+               'hint': 'Angles plus the expression sheet — smile, angry, surprised, blush, eyes closed.'},
+              {'key': 'anime_fullbody_focused', 'name': 'Full body focused',
+               'hint': 'Standing, walking, running and action poses — for the silhouette and proportions.'},
+              {'key': 'anime_character_sheet', 'name': 'Character sheet',
+               'hint': 'Front, side and back turnaround on a plain background, plus hair, eyes and '
+                       'outfit details — teaches the design with no scenery to memorise.'}],
 }
 _SUBJECT_BY_ID = {st: {e['id']: e for e in cat} for st, cat in _SUBJECT_CATALOGS.items()}
 
@@ -1038,6 +1783,73 @@ def select_preset(name: str, subject_type: str = 'human'):
     st = normalize_subject_type(subject_type)
     by_id = _SUBJECT_BY_ID.get(st, _BY_ID)
     return [by_id[i] for i in presets_for(st).get(name, []) if i in by_id]
+
+
+# --- Custom shot catalogs (imported from JSON) --------------------------------
+# Idea by ashish.sinha (Discord): instead of typing 30-40 shots by hand, export
+# the catalog, have an LLM write more, import the result. The shots live in the
+# config (`custom_shots`), per subject type — NOT in localStorage: a catalog that
+# vanishes when the browser is cleared, after paying an LLM to write it, is a
+# feature that punishes its user, and the config is what makes the same shots
+# visible from a second device and part of the full backup.
+#
+# The frontend validates on import (`shotImport.js`) and never sends the aspect
+# (it is resolved server-side per label), so a custom shot is stored exactly as
+# {id, label, prompt, framing, nsfw?}. This sanitizer is the second line: config
+# .json is a plain file a user can hand-edit, and every shot that reaches it must
+# still satisfy the invariants — enum framing, and above all a label that does
+# NOT shadow a built-in one (see the by-label resolvers below).
+MAX_CUSTOM_SHOTS_PER_SUBJECT = 300
+_MAX_CUSTOM_LABEL = 80
+_MAX_CUSTOM_PROMPT = 500
+
+
+def all_catalog_labels() -> list:
+    """Every label the by-label resolvers can already answer for: the union of all
+    catalogs PLUS the legacy French aliases (still stored on pre-migration rows and
+    routed through `canonical_label`). This is the reserved set an imported shot may
+    never re-use — a collision would silently resolve to the built-in entry."""
+    return sorted({e['label'] for e in _ALL_CATALOGS} | set(LEGACY_LABEL_ALIASES))
+
+
+def sanitize_custom_shots(raw) -> dict:
+    """{subject_type: [shot]} keeping only well-formed, non-colliding shots.
+    Never raises: a malformed config must degrade to 'no custom shots', not 500
+    the workspace."""
+    if not isinstance(raw, dict):
+        return {}
+    reserved = {lbl.strip().lower() for lbl in all_catalog_labels()}
+    out = {}
+    for subject, shots in raw.items():
+        st = normalize_subject_type(subject)
+        if not isinstance(shots, list):
+            continue
+        seen_ids, seen_labels, kept = set(), set(), []
+        for shot in shots[:MAX_CUSTOM_SHOTS_PER_SUBJECT]:
+            if not isinstance(shot, dict):
+                continue
+            sid = shot.get('id')
+            label = shot.get('label')
+            prompt = shot.get('prompt')
+            framing = shot.get('framing')
+            if not all(isinstance(v, str) and v.strip() for v in (sid, label, prompt, framing)):
+                continue
+            sid, label, prompt = sid.strip(), label.strip(), prompt.strip()
+            framing = framing.strip().lower()
+            if framing not in ASPECT_BY_FRAMING:
+                continue
+            if len(label) > _MAX_CUSTOM_LABEL or len(prompt) > _MAX_CUSTOM_PROMPT:
+                continue
+            key = label.lower()
+            if key in reserved or key in seen_labels or sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            seen_labels.add(key)
+            kept.append({'id': sid, 'label': label, 'prompt': prompt, 'framing': framing,
+                         **({'nsfw': True} if shot.get('nsfw') is True else {}),
+                         'imported': True})
+        out.setdefault(st, []).extend(kept)
+    return {st: shots for st, shots in out.items() if shots}
 
 
 def prompt_by_label(label):
