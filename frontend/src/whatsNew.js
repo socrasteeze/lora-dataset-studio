@@ -58,6 +58,61 @@ export const WHATS_NEW = [
     to: '/datasets?section=add',
   },
   {
+    id: '2026-07-27-face-mask-preview-progress',
+    date: '2026-07-27',
+    title: 'The face-mask preview now shows what it is doing, and you can walk away from it',
+    blurb:
+      'Previewing what "Mask faces" would cover used to say "Looking for faces…" and nothing else, for as long as it took — and the longest part happens before the first image is even looked at, while the face detector loads (or, on a fresh install, downloads a few hundred megabytes). You now get the stage by name and a counter that climbs image by image, so a slow run no longer looks like a crashed one. If it does fail — detector missing, model that will not load, the pass dying — it says so instead of spinning forever, and finding no face at all is reported as the ordinary result it is. The detection also runs on the server now: leaving the training panel and coming back picks the same pass back up rather than starting a second one, and the last preview is still on screen when you return. If your kept images changed in the meantime, it tells you the preview is out of date instead of passing it off as current.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-27-delete-a-run-and-everything-it-produced',
+    date: '2026-07-27',
+    title: 'Delete a whole run — checkpoints, images and all — from the run panel',
+    blurb:
+      'Getting rid of an abandoned run used to mean deleting its checkpoints one by one, then its images, then the run entry. Open a run on the LoRA Canvas and the panel now ends with a Danger zone: one button deletes the run, its checkpoints and the images it produced. It tells you exactly what goes first — "14 checkpoints · 24.0 GB, 37 images" — and what stays: runs that continued from it are kept as their own roots, images you rated good survive, and LoRAs already deployed into ComfyUI are left alone so your workflows keep working. Files go to the recycle bin. A run that is training right now cannot be deleted, and if a file refuses to move the run is kept rather than half-deleted.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-mask-faces-installs-its-own-detector',
+    date: '2026-07-27',
+    title: 'Mask faces now installs what it needs, from where you tick it',
+    blurb:
+      'Face masking needs a face detector (InsightFace), and on most installs it simply is not there. Until now the option greyed itself out and sent you to the Setup tab to install something called "Face-similarity scoring" — which nobody ticking Mask faces would ever go looking for. The option now names the missing piece, says what it costs before you click (~400 MB, a few minutes), and installs it in place with a progress bar. It stays entirely optional: nothing downloads on its own, and declining leaves the app exactly as it is with just that one option off. If your Python is outside 3.10–3.12 it says so instead of offering an install that could only fail. And launching a run with Mask faces on while the detector is missing no longer silently trains unmasked — the pre-launch report tells you, and lets you install or continue on purpose.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-27-canvas-pinned-images',
+    date: '2026-07-27',
+    title: 'Put generated images ON the canvas, next to the checkpoint that made them',
+    blurb:
+      'Comparing two checkpoints meant opening their images one at a time in a modal — never side by side. Open any generated image and hit Pin to canvas: it becomes a node on the board, joined to its checkpoint by the same connector the board already uses for "this continued from that". Drag it, resize it from its corner, close it with ✕. Closing does not forget anything: pin the same image again and it comes back exactly where you left it, at exactly the size you left it — stored with your card positions, so it follows the dataset from one machine to the next. Arrow keys move a focused image and +/− resize it, so a mouse is not required.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-generated-image-facts',
+    date: '2026-07-27',
+    title: 'A generated image now tells you what it was made with — readably',
+    blurb:
+      'The full-screen view used to print step, seed, strength and the whole prompt as one paragraph stretched across your entire screen, with the three numbers you were looking for buried at the front of it. Now the facts are chips, the settings that decided the picture are a table — sampler, scheduler, CFG, steps, base model, LoRA file, always-on LoRAs, format, face similarity, all of it recorded per image and never shown until today — and the prompt is last, folded when it is long. The seed and the prompt copy in one click, because that is what you do with them.',
+  },
+  {
+    id: '2026-07-27-canvas-deployed-at-a-glance',
+    date: '2026-07-27',
+    title: 'See at a glance which checkpoints you can generate from',
+    blurb:
+      'On the LoRA Canvas, whether a checkpoint is deployed to ComfyUI — that is, usable right now — only showed up as small print AFTER you had picked it. Every pill now carries it on its left edge: a solid sky bar means deployed, a dashed grey bar means the file is on your disk but not deployed yet (the Generate button deploys it for you). The shape carries the message as much as the colour, a legend sits above the board, and hovering a pill spells it out in words.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-bank-diverse-skips-the-odd-ones-out',
+    date: '2026-07-27',
+    title: 'Pick diverse stops spending your first picks on memes and strangers',
+    blurb:
+      '"The 60 most diverse" was computed as "the 60 most isolated", and those are not the same thing: the image that is farthest from everything else in a collected bank is usually the botched frame, the meme, or the one photo of somebody else — so the first picks went to exactly what you would have rejected. A new "Skip the odd ones out" slider in the Pick diverse popover discounts an image for being alone in the bank, while leaving variety inside your subject completely untouched. HEADS UP: it is ON at 50% by default, so this selection is no longer the same set of images it used to be — set the slider to 0 for the exact previous behaviour, or push it to 100% to be ruthless. No rescan, no GPU: it reuses the ✨ Score embeddings you already have.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-27-gallery-select-moved-to-the-bottom-bar',
     date: '2026-07-27',
     title: 'Cleaning up a run\'s images no longer means reaching for the top of the panel',
