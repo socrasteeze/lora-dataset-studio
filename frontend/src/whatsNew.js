@@ -50,6 +50,46 @@ import { SETUP_STEP_IDS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-27-bank-real-detail-and-origin',
+    date: '2026-07-27',
+    title: 'The bank now tells you when an image’s size is a bluff, and where it came from',
+    blurb:
+      'A picture enlarged from 512 to 2048 walks into a dataset claiming 2048, and the LoRA learns interpolated mush. The quality scan now also measures how far real detail actually goes and says so in plain pixels — "2048 px stored · ~512 px of real detail" — with a Soft detail filter for the worst of them. It is a score, not an accusation: a soft focus or a heavy denoise reads the same way, so it points you at images to look at rather than deciding for you. The same pass reads the file’s own metadata and sorts the bank by Origin into AI, Camera and Unknown — three answers, never two, because scrapers and chat apps strip metadata and a silent file is genuinely unknown, not "definitely a real photo". Two more free filters come along: Black bars for video screenshots, and the JPEG quality of the last save. All of it is plain CPU work with no extra install, and a bank you already scanned picks the new numbers up on its next Scan — no full rescan.',
+    to: '/settings/captioning',
+  },
+  {
+    id: '2026-07-27-canvas-checkpoint-actions',
+    date: '2026-07-27',
+    title: 'Click a checkpoint on the LoRA Canvas and act on it — download, deploy, undeploy, delete',
+    blurb:
+      'On the board a checkpoint could only be ticked. It now opens the same actions the graph inside a run card has always had: ⬇ Download, Deploy → loras/…, ⏏ Undeploy, and the delete that names exactly which file it removes. It is literally the same popover, so the two screens can never drift apart. When an action is not possible the reason is written where the button would be — a save that left the disk — instead of a button that does nothing.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-canvas-details-on-demand',
+    date: '2026-07-27',
+    title: 'The run details drawer waits to be asked',
+    blurb:
+      'Touching a run on the canvas used to throw the configuration drawer open, so glancing at the board meant closing a panel. Clicking a run — or a checkpoint — now opens its actions, and the drawer is one of them: ⓘ Details, filed with deploy and the rest. Shift-click still compares two runs, and dragging a card still just moves it.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-canvas-generation-visible',
+    date: '2026-07-27',
+    title: 'A generation launched from the board can be found again — and it says where the images went',
+    blurb:
+      'Launch from the canvas and the progress now lives on the board itself: "1 generating · 0 queued", with its Stop. Close the settings panel, change page, reload — it is still there when you come back, instead of showing you an empty form while ComfyUI was still working. When it finishes it names the checkpoints it filled, and each one opens its gallery in a click. The board also refreshes itself as the images land, so the count on the checkpoint appears without a reload.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-checkpoint-pill-readable',
+    date: '2026-07-27',
+    title: 'Checkpoints now say how many images they made, instead of showing an unreadable one',
+    blurb:
+      'A checkpoint carried a 14-pixel copy of its last image. At that size a picture tells you nothing — not the framing, not the outfit, not whether the face holds — and the little counter next to it overlapped the neighbouring checkpoint\'s. Both are gone. A checkpoint now carries a clean image-count chip: how many images it has produced, and one click to open them at a size where they can actually be judged. Turn on Big previews in a run\'s graph when you want the images on the board itself.',
+    to: '/canvas',
+  },
+  {
     id: '2026-07-26-pick-which-local-engines-to-offer',
     date: '2026-07-26',
     title: 'A second local engine — and you choose which ones the generator offers',
