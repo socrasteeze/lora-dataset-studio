@@ -50,6 +50,14 @@ import { SETUP_STEP_IDS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-27-create-dataset-crash-fix',
+    date: '2026-07-27',
+    title: 'Creating a dataset no longer greets you with a full-screen error',
+    blurb:
+      'Clicking Create on a new dataset threw "An unexpected error occurred" — the dataset was actually created (it was there after a refresh), but the workspace crashed while opening it. The engine picker in the Generate variations panel lost a one-line helper during the last upstream sync, and any view that mounted the panel went down with it. Fixed; creating and opening datasets works normally again.',
+    to: '/datasets',
+  },
+  {
     id: '2026-07-27-krea-reference-shape-notice',
     date: '2026-07-27',
     title: 'Krea told you why your full-body shots came back as busts — before you generate them',

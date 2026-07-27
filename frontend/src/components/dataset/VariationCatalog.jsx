@@ -32,6 +32,10 @@ import {
   normalizeSubjectType, framingLabel, defaultPresetKey,
 } from './subjectTypes.js';
 
+/** localStorage, or null when it can't be touched (private mode / SSR) — the
+ *  engine helpers degrade to their defaults instead of throwing. */
+const storage = () => (typeof localStorage === 'undefined' ? null : localStorage);
+
 const FRAMING_LABEL = { face: 'Face', bust: 'Bust', body: 'Body', back: 'Back' };
 // The framings a prompt suffix can target (same buckets the backend wraps by).
 const SUFFIX_KEYS = ['face', 'bust', 'body', 'back'];
