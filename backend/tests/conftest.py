@@ -33,16 +33,27 @@ def _reset_inmemory_registries():
     Clear it around every test so in-memory activity never leaks across cases.
 
     The bank folder-sync cooldowns are process-global for the same reason: bank
-    id 1 of a prior test would make the next test's first walk a no-op."""
-    from app.services import bank_jobs, dataset_activity
+    id 1 of a prior test would make the next test's first walk a no-op.
+
+    The vision keep-warm lease is the sneakiest of the set: it is granted BEFORE
+    the vision call (even one that fails against a dead Ollama), lives 120 s in a
+    module global, and is read by launch_training's revoke() — so a test that
+    merely imported an image with crop=True poisons every training-launch test
+    that runs in the next two minutes with ~4 s of real HTTP retries against
+    127.0.0.1:11434 (Windows walks ::1 then 127.0.0.1 per attempt). That is how
+    test_dataset_service made test_stop_waits_until_launch_publishes_the_new_pid
+    fail on CI while both passed alone."""
+    from app.services import bank_jobs, dataset_activity, vision_keepalive
     from app.services import image_bank_service
     dataset_activity.reset()
     bank_jobs.reset()
     image_bank_service.reset_folder_sync()
+    vision_keepalive.forget_lease()
     yield
     dataset_activity.reset()
     bank_jobs.reset()
     image_bank_service.reset_folder_sync()
+    vision_keepalive.forget_lease()
 
 @pytest.fixture(autouse=True)
 def _isolate_user_state(tmp_path, monkeypatch):
