@@ -1115,8 +1115,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // machine can be finished on a rented GPU (the file is seeded onto a fresh pod)
   // and a cloud epoch mirrored here can be finished locally. Each lane states its
   // own reason when it can't be used, so the dialog never shows a dead option.
-  // The cloud reason reuses cloudDisabledReason — the app's single source of truth
-  // for "why the cloud lane is closed" (family, custom weights, limits, budget).
+  // Divergence 4: caps.cloud_training is forced off in this fork, so the cloud
+  // lane stays dead-but-visible with a static reason.
   const continueLanes = {
     local: caps.aitoolkit?.valid === false
       ? { available: false,
@@ -1445,21 +1445,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       {animeNote && (
         <p className="m-0 text-sky-300/90 text-[0.6875rem]">
           ℹ {animeNote}
-        </p>
-      )}
-
-      {/* A disabled Train-in-cloud button always states WHY, right under the
-          button row — the tooltip alone was invisible until hovered, so a greyed
-          SDXL cloud button read as an unexplained limit (owner-reported). */}
-      {caps.cloud_training && cloudDisabledReason && (
-        <p className="m-0 text-sky-300/90 text-[0.6875rem]">
-          Cloud training unavailable — {cloudDisabledReason}
-        </p>
-      )}
-
-      {actives.length > 0 && (
-        <p className="m-0 text-content-subtle text-[0.625rem]">
-          {actives.length}/{cloudStatus.limit || 1} cloud runs — ${cloudStatus.total_price_per_hour || 0}/h total
         </p>
       )}
 

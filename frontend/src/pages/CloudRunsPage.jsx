@@ -43,6 +43,9 @@ const FAMILY_LABEL = { zimage: 'Z-Image', krea: 'Krea 2', sdxl: 'SDXL', flux: 'F
 // (same lazy-init + effect pattern as `datasetGridTileSize` in DatasetGrid.jsx /
 // `datasetGenerator` in VariationCatalog.jsx). Default open = today's behavior.
 const RECENT_COLLAPSED_KEY = 'cloudRunsRecentCollapsed';
+// Module scope so its identity is stable across renders — it sits in a
+// useMemo dependency list (the continue lanes).
+const NO_CLOUD_ACTIVES = Object.freeze([]);
 // Per-dataset collapse of the Recent GROUPS (a JSON map dataset_id -> 1),
 // persisted like the section collapse above so the fold survives reloads.
 const GROUPS_COLLAPSED_KEY = 'cloudRunsGroupsCollapsed';
@@ -584,6 +587,14 @@ export default function CloudRunsPage() {
 
   // Fork is local-only: ignore remote actives/history (backend may still return them).
   const recent = (data?.recent || []).filter((r) => r.source !== 'cloud');
+  // Divergence 4 (local-only UI): the hub never shows cloud actives. Upstream
+  // reads these three off its cloud-status poll; here they stay pinned to their
+  // "no cloud" values so every downstream consumer — the continue lanes, the
+  // active-run rows, the empty-state copy — renders the local-only truth
+  // without needing its own fork of the logic.
+  const actives = NO_CLOUD_ACTIVES;
+  const configured = false;
+  const limit = 1;
 
   // ▶ Continue — WHERE it runs, for the run the dialog is open on. The rule lives
   // in utils/runsHubContinueLanes.js (JSX-free, unit-tested): local is gated by
