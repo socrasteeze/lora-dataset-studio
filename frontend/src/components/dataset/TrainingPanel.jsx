@@ -45,6 +45,10 @@ import RunLineageGraph from './RunLineageGraph';
 import TrainingProgress from './TrainingProgress';
 import PreflightModal from './PreflightModal';
 import { failureView } from './trainingFailure';
+import {
+  MEMORY_KEYS, MEMORY_LABELS, memoryAdviceText, memoryIsOverridden, memoryPatchFor,
+  memoryStateLabel,
+} from './memorySavingAdvice';
 import { stopOutcomeMessage } from '../../utils/runSilence';
 import SettingsLink from '../common/SettingsLink';
 import { DatasetVersionChip, RunIdChip } from './RunIdentityBadges';
@@ -430,6 +434,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const advEma = adv?.ema ?? 0;
   const advEmaChoices = adv?.ema_choices ?? [0.99, 0.999];
   const advDualCaptions = Boolean(adv?.dual_captions);
+  // Memory strategy (issue #14). Tri-state per key: null = "Auto" (the family's
+  // calibrated default), true/false = an explicit choice. `advMemEff` is what the
+  // run will actually send, so the checkboxes show the truth whether or not the
+  // user has touched anything.
+  const advMemDefault = adv?.memory_saving_default ?? { quantize: true, quantize_te: true, low_vram: true };
+  const advMemEff = adv?.memory_saving_effective ?? advMemDefault;
+  const advMemTouched = memoryIsOverridden(adv?.memory_saving);
+  const advMemStateLabel = memoryStateLabel(advMemEff);
+  const advMemAdviceText = memoryAdviceText(adv?.memory_advice);
   const LR_SCHED_LABELS = { constant: 'Constant (default)', constant_with_warmup: 'Warmup → constant', linear: 'Linear decay', cosine: 'Cosine decay', cosine_with_restarts: 'Cosine + restarts' };
   // The resolution the next run will actually train at. Slider mode defaults to
   // 768 only (the slider loss makes several prediction passes per step — much
@@ -909,9 +922,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const removeImported = async (filename, label) => {
     // Guard-rail: this LoRA may be the one the Studio's ★ best settings point to —
     // deleting it silently breaks the saved winning combo.
-    const best = ds.data?.best_settings;
-    const isBest = best?.lora_filename
-      && String(best.lora_filename).split(/[\\/]/).pop() === String(filename).split(/[\\/]/).pop();
+    // The pin is stored PER FAMILY, so the payload flattens it to a list — reading
+    // `best_settings.lora_filename` only ever matched the legacy flat shape, which
+    // meant this warning had quietly stopped firing on modern pins.
+    const tail = (s) => String(s).split(/[\\/]/).pop();
+    const isBest = (ds.data?.best_settings_loras || [])
+      .some((p) => tail(p) === tail(filename));
     // It goes to the TRASH (delete_imported_checkpoint), so the confirmation must
     // not claim a permanent deletion — and must say what it does NOT touch.
     const msg = isBest
@@ -1194,6 +1210,30 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   </pre>
                 </>
               )}
+            </div>
+          )}
+          {/* Gated Hugging Face base: 401 (no valid token) and 403 (licence not
+              accepted) look identical in the raw HF sentence and have OPPOSITE
+              fixes — reported by SurpassHR (GitHub) on Krea 2. Shown above the
+              log with the remedy that matches the status code. */}
+          {view.hfGated && (
+            <div className="mt-1.5 rounded border border-amber-400/40 bg-amber-500/10 p-2 text-amber-100">
+              <div className="font-semibold">{view.hfGated.title}</div>
+              <p className="m-0 mt-0.5 break-words text-amber-200/90">{view.hfGated.message}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                {view.hfGated.status === 401 && (
+                  <a href="#/settings/local-tools"
+                    className="text-amber-300 underline decoration-amber-300/50">
+                    Settings ▸ API keys →
+                  </a>
+                )}
+                {view.hfGated.repo && (
+                  <a href={view.hfGated.url} target="_blank" rel="noreferrer"
+                    className="min-w-0 break-all text-amber-300 underline decoration-amber-300/50">
+                    {view.hfGated.repo} on Hugging Face →
+                  </a>
+                )}
+              </div>
             </div>
           )}
           {view.excerpt && (
@@ -1856,7 +1896,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               <span aria-hidden className="text-indigo-300 transition-transform group-open:rotate-90">▸</span>
               <span aria-hidden></span>
               <span>Expert — last-mile levers</span>
-              <span className="ml-auto hidden sm:inline normal-case font-normal tracking-normal text-indigo-300/50">network · alpha · dropout{advTimestepSupported ? ' · timestep' : ''} · optimizer · schedule · EMA</span>
+              <span className="ml-auto hidden sm:inline normal-case font-normal tracking-normal text-indigo-300/50">network · alpha · memory{advTimestepSupported ? ' · timestep' : ''} · optimizer · schedule · EMA</span>
             </summary>
             <div className="flex flex-col px-2.5 pb-2.5 divide-y divide-indigo-400/10 [&>div]:py-2.5 [&>div:first-child]:pt-1 [&>div:last-child]:pb-0">
               {/* Network variant — LoRA (default) or LoKr. LoKr is arch-generic in
@@ -1918,6 +1958,45 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   <b className="text-content-muted font-medium"> How:</b> the short variant is derived from the long one
                   when you (re-)caption — same rules (no trigger, identity/concept/aesthetic kept out); edit it per image in
                   the ⛶ caption editor. Cloud runs ignore this and train on the long caption only for now.
+                </span>
+              </div>
+              {/* Memory saving — quantisation + low-VRAM streaming (issue #14).
+                  The recipes are calibrated for 24 GB; on a bigger card that is a
+                  tax nobody asked for. Defaults are UNCHANGED — this only makes
+                  them a choice. Sending 'auto' when a box returns to its family
+                  default keeps an untouched-again dataset byte-identical. */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+                    Memory saving<HelpBadge topic="training.memory_saving" />
+                  </span>
+                  <span className="text-content-subtle text-[0.6875rem]">
+                    {advMemStateLabel}
+                  </span>
+                  {advMemTouched && (
+                    <button type="button"
+                      onClick={() => saveAdv(Object.fromEntries(MEMORY_KEYS.map((k) => [k, 'auto'])))}
+                      className="ml-auto text-[0.625rem] text-content-subtle hover:text-content underline underline-offset-2">
+                      Reset to default
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:gap-x-4">
+                  {MEMORY_KEYS.map((k) => (
+                    <label key={k} className="flex items-center gap-2 cursor-pointer min-w-0">
+                      <input type="checkbox" checked={Boolean(advMemEff[k])}
+                        onChange={(e) => saveAdv(memoryPatchFor(k, e.target.checked, advMemDefault))}
+                        aria-label={MEMORY_LABELS[k]}
+                        className="h-4 w-4 shrink-0 rounded border-border bg-surface accent-indigo-500" />
+                      <span className="text-content-muted text-[0.75rem] truncate">{MEMORY_LABELS[k]}</span>
+                    </label>
+                  ))}
+                </div>
+                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                  <b className="text-content-muted font-medium">Why:</b> the recipes are tuned so a 12B model fits in
+                  24 GB — quantisation costs precision and low-VRAM streaming costs a lot of speed. If your card is
+                  bigger than the target, you are paying for nothing.
+                  <b className="text-content-muted font-medium"> How:</b> {advMemAdviceText}
                 </span>
               </div>
               {/* Decoupled alpha */}
@@ -2335,7 +2414,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       // Same ★ best-settings guard-rail as the flat list's:
                       // the pill's delete warns loudly when it would unpin the
                       // Studio's saved winning combo.
-                      bestSettingsLora={ds.data?.best_settings?.lora_filename || null}
+                      bestSettingsLora={ds.data?.best_settings_loras || null}
                       // Same pill gesture as the Runs hub, served by this panel's
                       // Continue dialog: 'any' lets a local run's save offer it too.
                       // Gated on the checkpoint selection matching Training (the

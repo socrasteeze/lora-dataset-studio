@@ -468,6 +468,67 @@ after the other:
 The ▶ button on a tile starts the same review **at that image**. A plain click
 on a tile still selects it for the bulk ✓/✕/⬆ bar, so both ways of working stay.
 
+## Promote a shortlist into a new bank
+
+**⬆ Promote…** has two destinations, and picking the right one saves you a mess.
+
+- **An existing dataset** — the end of the funnel. The images are normalized
+  to webp, deduplicated against what the dataset already holds, and become
+  training material.
+- **A new image bank** — for when you are not there yet. A 9 000-image dump,
+  200 candidates isolated out of it, and you want to keep working on those 200
+  apart: give the new bank a name and the selection lands in it, **un-triaged**,
+  with every bank tool available again (scan, dedup, framing, captions, review).
+  Nothing is committed to training.
+
+With images selected in the grid, those are the ones that go; with nothing
+selected, every **kept** image does.
+
+Either way this is a **copy**. Banks never share their files, deliberately: the
+app rewrites images in place (a re-crop, a watermark clean), so two banks reading
+one file would stop being two banks at the first edit. The dialog therefore
+states, before you click, **how many megabytes** the copy costs — a measured
+figure for that exact selection, not an average. For photographs it is usually a
+footnote; the line is there for the day a bank holds something heavier.
+
+Your source bank is untouched by all this. It keeps every image, now marked ⬆
+promoted, and your original folder is never written to — the copies live in the
+app's own data folder, and deleting the new bank takes them with it.
+
+If the copy cannot be written — a full disk, a drive pulled out — the new bank is
+**discarded** rather than left holding half the shortlist and looking finished.
+You are told what happened and nothing has changed.
+## Sort a grid to review faster
+
+Filters answer *which images*; sorting answers *which one first*. Both grids
+have a **Sort** control, and it changes nothing but the order — the same images
+match, the counts stay put, and every bulk action keeps operating on exactly
+what the filters left.
+
+In a **bank** (View ▸ Sort, next to the tile size):
+
+- **Resolution ↓ / ↑** — megapixels, so a 900×900 outranks a wider 1200×300.
+- **Aesthetic ↓ / ↑** — the 1–10 rating from **✨ Score**. ↓ puts your keepers on
+  the first page; ↑ puts the duds there, which is usually the faster way to prune.
+- **Sharpness ↓ / ↑** — the Laplacian variance from **🔎 Scan quality**. ↑ brings
+  the blurry misses to you instead of making you hunt for them.
+
+In a **dataset** (above the grid, next to the decision chips): **Face similarity
+↓ / ↑**, the ArcFace cosine against your reference photo computed by **🎭 Analyze
+faces**. ↓ is "who looks most like my subject", ↑ is the shortlist to cut.
+
+Two things worth knowing:
+
+- **Images a pass never reached always go last**, in both directions. An
+  un-analysed image has no score — putting it first would bury the very images
+  you asked to see.
+- **A sort you have no data for is greyed out** and says which pass to run,
+  rather than pretending to reorder. Run the pass, and it lights up.
+
+In a bank the ordering is done by the database over the *whole* filter, not just
+the page you can see — so **Select all in filter** and **▶ Review one by one**
+walk the same order you are looking at.
+
 ## Clean the watermarks a bank found
 
 **🚩 Find watermarks** flags the images carrying an overlaid logo, URL or

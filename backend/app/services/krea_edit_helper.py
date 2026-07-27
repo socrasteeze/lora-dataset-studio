@@ -41,23 +41,52 @@ MEASURED CONSTRAINTS (2026-07-25, live install — do not "simplify" these away)
   * `BigLoveKreaEdit1_fp8mixed` renders PURE NOISE with this LoRA (it is not a
     Krea 2 Raw/Turbo checkpoint). It is excluded from base-model resolution.
 
-NOTHING HERE IS AUTO-DOWNLOADABLE (yet). Unlike Klein's assets — public,
-direct-link Hugging Face files wired into `setup_installer` — the Krea 2 pieces
-are a git-cloned node pack and weights we have no verified direct URL for. So the
-preflight is the `_studio_missing_response` shape: name every gap, its expected
-path inside the user's ComfyUI, and the page to get it from. Never a silent
-failure, never an inert button, never an invented installer.
+EVERY PIECE IS NOW AUTO-INSTALLED (setup_installer: `krea_model`,
+`krea_text_encoder`, `krea_vae`, `krea_identity_lora` and `krea_nodes` — the
+first custom-node pack this app clones). Selecting the engine and pressing
+Generate fires them, exactly like Klein; Setup ▸ Install has the same button.
+This module keeps only the JUDGEMENT (what is missing, what is present but not
+loadable, which node classes are absent) — the fetching lives in setup_installer.
+The state of the world behind that decision, RE-MEASURED 2026-07-27 (read this
+before re-quoting it — the previous version of this paragraph was a photograph of
+one moment that became an architecture decision for weeks):
+
+  * The original claim — "weights we have no verified direct URL for" — is
+    OBSOLETE. All three Hugging Face pieces live in ONE public, NON-GATED repo,
+    `Comfy-Org/Krea-2`, under the exact canonical filenames the resolvers below
+    look for: `diffusion_models/krea2_turbo_fp8_scaled.safetensors` (13.1 GB),
+    `text_encoders/qwen3vl_4b_fp8_scaled.safetensors` (5.2 GB) and
+    `vae/qwen_image_vae.safetensors` (254 MB). Measured: anonymous HTTP 200 on
+    each, no token, `gated=false`.
+  * The identity LoRA (Civitai 2761113) also downloaded anonymously on that date
+    — 307 to a signed CDN URL, then real safetensors bytes, no API key.
+  * The node pack declares `dependencies = []`, so installing it is a clone, not
+    a pip run.
+
+None of it sits behind a licence checkbox a human has to tick in a browser. That
+said, an OPEN download today is not a guarantee: the installer sends a Civitai
+key when the user has one, tries without when they do not, and turns a 401/403
+into instructions — because Civitai gates part of its catalogue with rules that
+have changed before and vary by country.
+
+The preflight still publishes the full `_studio_missing_response` shape (every
+gap, its expected path inside the user's ComfyUI, the page it comes from): a
+machine that cannot download — offline, proxied, no valid ComfyUI folder — must
+still get a complete answer. Never a silent failure, never an inert button.
+
+If you are about to conclude "Krea can't be auto-installed", re-run the
+measurement first — that sentence has already been wrong once, for weeks.
 """
 from __future__ import annotations
 import logging
 import os
 import random
-import shutil
 import time
 import uuid
 
 from .. import config as cfg
 from . import comfy_model_paths
+from ..utils import comfy_fs
 from ..job_queue import queue_manager
 
 logger = logging.getLogger(__name__)
@@ -84,7 +113,7 @@ KREA_ASSETS = {
     'krea_model': {
         'kind': 'Krea 2 base model (Raw or Turbo)',
         'path': 'models/diffusion_models/Krea/',
-        'source': 'https://huggingface.co/krea/krea-2',
+        'source': 'https://huggingface.co/Comfy-Org/Krea-2/tree/main/diffusion_models',
     },
     'krea_identity_lora': {
         'kind': 'Krea 2 Identity Edit LoRA',
@@ -94,12 +123,12 @@ KREA_ASSETS = {
     'krea_text_encoder': {
         'kind': 'Qwen3-VL 4B text encoder',
         'path': 'models/text_encoders/qwen3vl_4b_fp8_scaled.safetensors',
-        'source': 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI',
+        'source': 'https://huggingface.co/Comfy-Org/Krea-2/tree/main/text_encoders',
     },
     'krea_vae': {
         'kind': 'Qwen Image VAE',
         'path': 'models/vae/qwen_image_vae.safetensors',
-        'source': 'https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI',
+        'source': 'https://huggingface.co/Comfy-Org/Krea-2/tree/main/vae',
     },
 }
 # Every asset is graph-critical: unlike Klein there is no "quality only" piece —
@@ -298,6 +327,85 @@ def krea_missing_assets():
     return missing
 
 
+# --- Present-but-INVALID assets ---------------------------------------------
+# Exactly Klein's mechanism (klein_edit_helper.klein_invalid_assets), because
+# nothing about the failure is Klein-specific. The reason WHY was wrong until
+# 2026-07-27: this used to say the Krea 2 base sits behind a Hugging Face licence
+# gate and the identity LoRA behind a Civitai login. Re-measured — neither is
+# true (see the module docstring: both download anonymously). The check stays,
+# because the failure it catches never depended on that story: any interrupted,
+# proxied, rate-limited or error-page download saves HTML or a half file to
+# <name>.safetensors. It passes krea_missing_assets ("the file is there")
+# and then dies at generate time on a raw ComfyUI
+# `UNETLoader: Expecting value: line 1 column 1 (char 0)`. A truncated download
+# is worse still — it renders silently distorted images with no error anywhere.
+#
+# Advisory `too_small` floors: deliberately far under the real sizes so a
+# legitimate file can never trip them. The identity LoRA is genuinely small
+# (tens of MB) and the VAE ~250 MB, so their floors only catch a near-empty stub;
+# the structural cases (HTML page, truncation) need no floor at all.
+KREA_MIN_BYTES = {
+    'krea_model': 1024 ** 3,                # 1 GB   (real ≈ 12-20 GB)
+    'krea_text_encoder': 256 * 1024 ** 2,   # 256 MB (real ≈ 4-5 GB)
+    'krea_vae': 8 * 1024 ** 2,              # 8 MB   (real ≈ 250 MB)
+    'krea_identity_lora': 512 * 1024,       # 512 KB (real ≈ tens of MB)
+}
+
+
+def _abs_under_roots(comfy_type, rel_name):
+    """Absolute path of a <comfy_type>-relative model name under the FIRST search
+    root that holds it, else None. Mirrors how ComfyUI itself resolves a loader
+    value, so the file we validate is exactly the one the loader node would open."""
+    if not rel_name:
+        return None
+    for root in comfy_model_paths.search_roots(comfy_type):
+        cand = os.path.join(root, rel_name)
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
+def _krea_asset_paths():
+    """{KREA_ASSETS key: absolute path} for each Krea asset PRESENT on disk. The
+    resolvers return ComfyUI-relative loader names; this maps each back to the
+    concrete file so model_integrity can read its header. Absent assets are
+    omitted — krea_missing_assets owns 'missing', this owns 'present'."""
+    paths = {}
+    for key, comfy_type, rel in (
+            ('krea_model', 'diffusion_models', resolve_krea_unet()),
+            ('krea_text_encoder', 'text_encoders', resolve_krea_text_encoder()),
+            ('krea_vae', 'vae', resolve_krea_vae())):
+        p = _abs_under_roots(comfy_type, rel)
+        if p:
+            paths[key] = p
+    _rel, lora_path = resolve_krea_identity_lora()
+    if lora_path:
+        paths['krea_identity_lora'] = lora_path
+    return paths
+
+
+def krea_invalid_assets():
+    """Krea assets that ARE on disk under the resolved name but are NOT real,
+    loadable weights — the state BETWEEN 'missing' and 'ready'.
+
+    Returns ``[{asset, filename, verdict, blocking, reason}]``, the same shape
+    klein_invalid_assets publishes, so the front end needs no second format.
+    Header-only + cached (model_integrity), so it is cheap enough for the
+    readiness probe. ``blocking`` True means the file cannot load at all
+    (html_or_text / truncated) → the actionable 'delete & re-download'; False is
+    the advisory ``too_small``."""
+    from . import model_integrity
+    out = []
+    for asset, path in _krea_asset_paths().items():
+        res = model_integrity.validate_model_file(path, min_bytes=KREA_MIN_BYTES.get(asset))
+        if res['ok']:
+            continue
+        out.append({'asset': asset, 'filename': res['filename'],
+                    'verdict': res['verdict'], 'blocking': res['blocking'],
+                    'reason': res['reason']})
+    return out
+
+
 # --- Custom-node preflight ---------------------------------------------------
 # Success-only TTL cache, same contract as klein_missing_nodes: /object_info is
 # the heaviest probe in the app, node packs don't uninstall mid-session, and a
@@ -322,6 +430,35 @@ def krea_missing_nodes():
     if not out:
         _nodes_ok_until = time.time() + _NODES_OK_TTL_S
     return out
+
+
+def clear_nodes_cache():
+    """Drop the success-TTL so the next probe re-asks /object_info. Called right
+    after the node pack is installed: the cache only ever holds a POSITIVE result,
+    but a stale positive would hide a pack the user removed, and clearing costs
+    one probe."""
+    global _nodes_ok_until
+    _nodes_ok_until = 0.0
+
+
+def krea_node_pack_installed():
+    """Is the pack's folder present in this ComfyUI's custom_nodes? Disk-only.
+
+    This is what separates "you have to install the pack" from "the pack is
+    installed, ComfyUI just hasn't been restarted yet" — ComfyUI registers nodes
+    at STARTUP, so /object_info keeps reporting them missing until then, and
+    without this distinction the app would tell someone to install what they just
+    installed. False whenever ComfyUI's folder isn't configured/valid: we then
+    genuinely do not know."""
+    from .. import capabilities
+    r = capabilities.resolve_comfyui_base(cfg.get('comfyui.base_dir') or '')
+    if not r['valid']:
+        return False
+    folder = os.path.join(r['resolved'], 'custom_nodes', KREA_NODE_PACK['pack'])
+    try:
+        return os.path.isdir(folder) and any(os.scandir(folder))
+    except OSError:
+        return False
 
 
 def krea_node_hints(nodes):
@@ -528,10 +665,12 @@ def enqueue_krea_edit(user_id, source_filename, edit_prompt, source_path=None,
     vae = resolve_krea_vae()
     lora_name, _lora_path = resolve_krea_identity_lora()
 
-    comfy_input_dir = _comfy_input_dir()
+    # Same filesystem hand-off (and the same guard) as the Klein lane: the URL
+    # being up says nothing about ComfyUI's input folder being reachable from here.
+    comfy_input_dir = comfy_fs.ensure_input_usable(_comfy_input_dir())
     uid = uuid.uuid4().hex[:8]
     comfy_input = f'krea_source_{uid}_{source_filename}'
-    shutil.copy2(source_path, os.path.join(comfy_input_dir, comfy_input))
+    comfy_fs.stage_input_copy(source_path, comfy_input, comfy_input_dir)
 
     width, height = fit_output_size(*_source_size(source_path))
     workflow = build_workflow(

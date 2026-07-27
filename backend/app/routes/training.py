@@ -1517,13 +1517,30 @@ def dataset_run_archive_blob(sig):
     return send_file(path, max_age=31536000)
 
 
+@bp.get('/dataset/train/runs/<int:record_id>/deletion-impact')
+def dataset_train_run_deletion_impact(record_id):
+    """What deleting this run would take with it, counted — read by the
+    confirmation dialog so a destructive action is announced BEFORE it happens.
+
+    Returns checkpoint notes, preview links, generated images that would lose
+    their provenance (they are unlinked, never deleted), canvas positions,
+    children that would be detached, and archived source images this run is the
+    last referrer of. Unknown id → 404."""
+    impact = ct.run_deletion_impact(record_id)
+    if impact is None:
+        return jsonify({'error': 'unknown run'}), 404
+    return jsonify(impact)
+
+
 @bp.delete('/dataset/train/runs/<int:record_id>')
 def dataset_train_run_delete(record_id):
-    """Remove a GONE run (no checkpoints on disk) from the lineage graph — metadata
-    only: the record, its checkpoint notes, and its lineage edge (disk untouched;
-    the checkpoints are already gone). A run whose checkpoints are still on disk is
-    refused with 409 (delete those first) — never a silent erase. Children that
-    resumed from it are detached, not deleted. Unknown id → 404."""
+    """Remove a GONE run (no checkpoints on disk) from the lineage graph with
+    everything that only existed for it: the record, its checkpoint notes, its
+    preview links and its canvas position. Generated images are UNLINKED, not
+    deleted; archived source blobs are freed only when no other run references
+    them. A run whose checkpoints are still on disk is refused with 409 (delete
+    those first) — never a silent erase. Children that resumed from it are
+    detached, not deleted. Unknown id → 404."""
     status = ct.delete_run_record(record_id)
     if status == 'not_found':
         return jsonify({'error': 'unknown run'}), 404
@@ -1773,6 +1790,31 @@ def train_checkpoint_images(record_id, step):
     answers an empty list plus the `unlinked` counter."""
     return jsonify(ct.checkpoint_gallery(
         record_id, step, limit=request.args.get('limit', default=120, type=int)))
+
+
+@bp.post('/train/checkpoint/<int:record_id>/<int:step>/images/delete')
+def train_checkpoint_images_delete(record_id, step):
+    """🗑 Delete generated images from a checkpoint's gallery. Body:
+    {image_ids: [id, …]}.
+
+    A real delete: these rows are the Test Studio's cells, so they leave both
+    surfaces — the confirmation says so before arming the button. Files are
+    disposed of the recoverable way (OS recycle bin, else the app trash, else a
+    permanent unlink only when both refuse); the mode used rides back in the
+    answer, and `checkpoint_gallery` announces it beforehand. Ids not linked to
+    this checkpoint are refused rather than deleted, and per-image failures are
+    reported in `skipped` without aborting the batch — an empty selection is a
+    no-op, never an error."""
+    ids = (request.get_json(silent=True) or {}).get('image_ids') or []
+    if not isinstance(ids, list):
+        return jsonify({'error': 'image_ids must be a list'}), 400
+    try:
+        out = ct.delete_checkpoint_images(record_id, step, ids)
+    except OSError as e:
+        current_app.logger.warning('checkpoint gallery delete failed: %s', e)
+        return jsonify({'error': 'Could not delete these images — a file is '
+                                 'locked or unreachable. Try again.'}), 500
+    return jsonify({'ok': True, **out})
 
 
 @bp.get('/train/canvas/positions')

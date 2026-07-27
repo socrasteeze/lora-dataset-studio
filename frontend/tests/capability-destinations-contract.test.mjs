@@ -40,9 +40,12 @@ const RIGS = [
 test('every capability row carries a destination, in every rig', () => {
   for (const [name, caps] of RIGS) {
     const rows = deriveCapabilitySummary(caps)
-    // 8, not upstream's 11: the three cloud API engines are not capabilities
-    // on this fork (Divergence 1) — see deriveCapabilitySummary.
-    assert.equal(rows.length, 8, `${name}: expected 8 capabilities`)
+    // 9, not upstream's 12: the three cloud API engines are not capabilities on
+    // this fork (Divergence 1) - see deriveCapabilitySummary. Upstream's count
+    // moved 11 -> 12 when Krea 2 Edit joined the list; that fix is adopted here
+    // (an absent capability must be visible and counted, never dropped from the
+    // denominator), so the fork's own count moves 8 -> 9 in step.
+    assert.equal(rows.length, 9, `${name}: expected 9 capabilities`)
     for (const row of rows) {
       const dest = capabilityDestination(row)
       assert.ok(dest, `${name}: "${row.label}" has no destination`)

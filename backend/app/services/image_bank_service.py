@@ -668,6 +668,9 @@ def _image_dict(row: BankImage, th: dict, promoted_by: dict | None = None) -> di
         'framing': row.framing,
         'status': row.status, 'reject_reason': row.reject_reason,
         'promoted_dataset_id': promoted,
+        # The OTHER destination. Kept as its own key rather than overloading the
+        # dataset one, which is stored in user databases and read as a dataset id.
+        'promoted_bank_id': row.promoted_bank_id,
         'caption': row.caption,
     }
 
@@ -808,6 +811,43 @@ def _res_bucket_counts(bank_id) -> dict:
     return {bid: int(got.get(bid, 0)) for bid, _lo, _hi in _RES_BUCKETS}
 
 
+# --- explicit grid sorts -----------------------------------------------------
+# The grid can ORDER on what the passes already MEASURED, instead of only
+# filtering on it (asked for by nofaceman on Discord). One entry per sortable
+# quantity; the UI offers each in both directions as '<key>_desc' / '<key>_asc'.
+# Ids are user-facing query values — treat them like catalog labels and never
+# rename one without an alias.
+#   res       megapixels (width×height) — the original sort, kept as-is.
+#   aesthetic the ✨ Score pass's 1–10 rating: ↓ surfaces the keepers, ↑ the duds.
+#   sharp     the 🔎 Scan pass's Laplacian variance: ↑ surfaces the blurry misses.
+# Deliberately NOT here: noise / uniformity / bars / detail_ratio / NSFW. Each
+# already has a chip that filters AND orders worst-first, so a sort entry would
+# duplicate an existing gesture — and a fifteen-line menu slows the review down
+# more than the missing order costs.
+_SORT_KEYS = {
+    'aesthetic': lambda: BankImage.aesthetic_score,
+    'sharp': lambda: BankImage.blur_score,
+    'res': lambda: BankImage.width * BankImage.height,
+}
+GRID_SORTS = tuple(f'{k}_{d}' for k in ('res', 'aesthetic', 'sharp')
+                   for d in ('desc', 'asc'))
+
+
+def _sort_order(sort):
+    """The ORDER BY tuple for an explicit grid sort, or None for 'default' and
+    for anything unknown (an unrecognised value must degrade to the server's own
+    order, never 500). Rows the relevant pass never reached carry NULL and sink
+    to the END in BOTH directions — ordering by "is NULL" first (0 before 1)
+    — because a sort that opens on the un-measured pile is worse than no sort.
+    Tie-break on id so a page boundary is stable."""
+    key, _, direction = (sort or '').rpartition('_')
+    if direction not in ('asc', 'desc') or key not in _SORT_KEYS:
+        return None
+    col = _SORT_KEYS[key]()
+    ranked = col.desc() if direction == 'desc' else col.asc()
+    return (col.is_(None).asc(), ranked, BankImage.id.asc())
+
+
 def bank_payload(user_id, bank_id) -> dict | None:
     """Everything the bank workspace needs on one poll: counts, flag totals,
     duplicate/cluster summaries, live job, thresholds."""
@@ -828,6 +868,9 @@ def bank_payload(user_id, bank_id) -> dict | None:
         # advertising copies the user had since deleted.
         'promoted': base.filter(or_(
             BankImage.promoted_dataset_id.isnot(None),
+            # ...or into another BANK, the second destination. Counted here so
+            # the "promoted" stat and the ⬆ badge on the tiles never disagree.
+            BankImage.promoted_bank_id.isnot(None),
             BankImage.id.in_(db.session.query(FaceDatasetImage.bank_image_id)
                              .filter(FaceDatasetImage.bank_image_id.isnot(None))),
         )).count(),
@@ -1003,9 +1046,13 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
     caption AND the relpath — so captions double as searchable tags for a big dump
     ("red dress"), combinable with every other filter. Flag filters sort by the
     relevant score (worst first) so the review reads top-down.
-    ``sort`` ('res_desc'/'res_asc') overrides the order by image resolution
-    (megapixels = width×height, so 900×900 outranks 1200×300); unscanned rows
-    (width/height NULL) always sink to the end. It composes with every filter.
+    ``sort`` (a GRID_SORTS id — resolution / aesthetic / sharpness, each way)
+    overrides that order: resolution ranks on megapixels (width×height, so
+    900×900 outranks 1200×300), aesthetic on the ✨ Score rating, sharpness on
+    the 🔎 Scan Laplacian variance. Rows the matching pass never reached (NULL)
+    always sink to the end, in BOTH directions. It composes with every filter,
+    and — since "Select all in filter" / ▶ Review page this SAME endpoint — the
+    selection walks the order the user is looking at.
     ``res_bucket`` (a _RES_BUCKETS id) narrows to one resolution tier — a
     half-open [lo, hi) megapixel band — and composes with every filter AND the
     sort (the tier + Resolution↑/↓ combo is the mixed-dump cleanup flow).
@@ -1127,14 +1174,11 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
             q = q.filter(area >= lo)
         if hi is not None:
             q = q.filter(area < hi)
-    if sort in ('res_desc', 'res_asc'):
-        # Explicit resolution sort wins over the flag worst-first order. Rank by
-        # megapixels (width×height), tie-break on id for a stable page boundary.
-        # Unscanned rows (either dimension NULL → NULL product) sink to the end
-        # in BOTH directions: order by "is NULL" first (0 before 1 in SQLite).
-        area = BankImage.width * BankImage.height
-        area_dir = area.desc() if sort == 'res_desc' else area.asc()
-        order = (area.is_(None).asc(), area_dir, BankImage.id.asc())
+    explicit = _sort_order(sort)
+    if explicit is not None:
+        # An explicit sort (resolution / aesthetic / sharpness) wins over the flag
+        # worst-first order; see _sort_order for the NULL-sinks-last contract.
+        order = explicit
     total = q.count()
     order_by = order if isinstance(order, tuple) else (order,)
     rows = q.order_by(*order_by).offset(max(0, int(offset))) \
@@ -1627,7 +1671,7 @@ def semantic_dup_groups_payload(user_id, bank_id, offset=0, limit=50) -> dict | 
 
 def _best_of(rows):
     """'Keep best' heuristic for a duplicate group. When the aesthetic pass has
-    run it leads (Jeremy's ask: keep the NICE copy, not merely the biggest); a
+    run it leads (the ask: keep the NICE copy, not merely the biggest); a
     scored image always outranks an unscored one (sentinel -1 < the ~1..10 range).
     Then most pixels, sharpest, heaviest file — a Telegram dump's duplicates are
     mostly re-compressed or downscaled copies, so surface area is the honest
@@ -1938,32 +1982,11 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
     return {'results': results, 'image_ids': [ids[k] for k in keep],
             'pool': len(ids), 'ref_id': int(ref_id)}
 def _trash_or_remove(path: str) -> str:
-    """Get a source file out of the user's folder, keeping it recoverable.
-
-    Order of preference: the OS trash (send2trash — real, familiar, restores in
-    place), then the app's own trash (a MOVE into data/trash, recoverable until
-    the user empties it from Settings). A permanent unlink is the last resort,
-    when neither can take the file. send2trash is an OPTIONAL dependency and is
-    absent from a default install, so the app trash is the branch most people
-    actually get — deleting thousands of a user's own photos with no way back
-    was never an acceptable default. Returns the mode used:
-    'trash' | 'app_trash' | 'delete'."""
-    try:
-        from send2trash import send2trash   # optional dependency
-    except Exception:
-        pass
-    else:
-        send2trash(path)
-        return 'trash'
-    try:
-        trash.send_to_trash(path, context='bank-rejected')
-        return 'app_trash'
-    except OSError:
-        # Cross-device copy refused, locked file, unwritable trash… the file is
-        # still in the user's folder at this point, so a plain remove is the only
-        # way to honour the request. It raises on its own failure.
-        os.remove(path)
-        return 'delete'
+    """Get a rejected source file out of the user's folder, keeping it
+    recoverable (OS trash → app trash → permanent unlink). The policy itself is
+    app-wide and lives in ``services.trash``; this is the bank's entry point into
+    it, kept as a name because the tests and the delete sweep both address it."""
+    return trash.dispose(path, context='bank-rejected')
 
 
 def _bank_folders(user_id, exclude_id=None) -> list:
@@ -2050,13 +2073,9 @@ def rejected_delete_preview(user_id, bank_id) -> dict | None:
 
 
 def _delete_mode() -> str:
-    """Where a deleted source file WOULD go, without deleting anything: mirrors
-    _trash_or_remove's preference order so the confirmation can say it."""
-    try:
-        import send2trash          # noqa: F401  (probe only)
-    except Exception:
-        return 'app_trash'
-    return 'trash'
+    """Where a deleted source file WOULD go, without deleting anything, so the
+    confirmation can say it. Same probe as ``services.trash.disposal_mode``."""
+    return trash.disposal_mode()
 
 
 def delete_rejected(user_id, bank_id) -> dict:
@@ -3257,7 +3276,7 @@ def _caption_job(bank_id, ids, force, vocabulary=None):
 # --- "Launch all" pipeline --------------------------------------------------
 # The overnight funnel: the user configures it once, hits Launch all, and comes
 # back to a triaged, optionally pre-captioned bank. It chains the EXISTING passes
-# in the order Jeremy validated. Each pass already filters status != 'reject', so
+# in the validated order. Each pass already filters status != 'reject', so
 # running auto-reject BEFORE the heavy passes means score/watermark/person only
 # ever touch the SURVIVORS — the costly work never pays for images we just
 # dropped (the deliberate cost/quality trade-off: duplicate "keep best" therefore
@@ -3267,7 +3286,22 @@ PIPELINE_STEPS = ('scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark',
 # Auto-reject inside the pipeline runs right after the quality scan, so it can
 # only act on the CPU-scan flags (and duplicates). The score-derived flags
 # (low_aesthetic/nsfw/watermark) have no data yet at that point.
-PIPELINE_REJECT_FLAGS = _QUALITY_FLAGS
+#
+# NOT every quality flag, though. `soft_detail` and `bars` are excluded ON
+# PURPOSE — they are provenance HINTS, not verdicts, and their own documentation
+# says so: a crisp watermark rescues an enlargement's detail ratio while a
+# motion-blurred native shot sinks it, and `bars` fires on any dark-themed
+# screenshot. The standalone 🧹 Auto-reject button still offers them, because
+# there a human is looking at the flagged count, can undo on the spot, and the
+# hint under the checkbox says "check before mass-rejecting". The pipeline is the
+# opposite situation: unattended, and auto-reject runs FIRST, so anything it
+# drops never reaches the score / watermark / caption passes at all — the mistake
+# becomes invisible instead of reviewable. Offering a non-verdict as an overnight
+# bulk rejection contradicts the measurement it is built on.
+# The pipeline UI never offered these two; this makes the API agree with it.
+_PIPELINE_EXCLUDED_REJECT_FLAGS = ('soft_detail', 'bars')
+PIPELINE_REJECT_FLAGS = tuple(f for f in _QUALITY_FLAGS
+                              if f not in _PIPELINE_EXCLUDED_REJECT_FLAGS)
 
 
 def _sanitize_pipeline_steps(steps) -> list:
@@ -3874,6 +3908,193 @@ def _dataset_import_job(bank_id, src_dir, filenames):
             detail += f', {missing} missing on disk'
         if failed:
             detail += f', {failed} failed'
+        bank_jobs.progress(job, detail=detail)
+    return run
+
+
+# --- ⬆ Promote, second destination: a NEW BANK -------------------------------
+# Promotion used to lead exactly one place: a dataset. A dataset is the strict,
+# training-bound container — isolating 200 candidates out of a 9 000-image dump
+# to keep working on them is a different intent, and forcing it through a dataset
+# commits material the user has not decided on yet.
+#
+# Built on the SAME machinery as "Import to bank" (start_dataset_import): a name,
+# a folder of its own under bank_sources_root, a background job, and the new
+# bank's id back so the UI can jump to it. What is deliberately NOT reused is
+# hardlinking: run_archive.py already settled that question for this app — the
+# app rewrites images IN PLACE (re-crop, "Reset to auto", watermark cleaning) and
+# an in-place rewrite reuses the inode, so two "independent" banks would become
+# one at the first edit. Banks never share their files. It costs the bytes.
+def _promote_source_rows(bank_id, ids) -> list:
+    """The rows a promotion would carry: the explicit selection, or every KEPT
+    image when the selection is empty (same rule as promoting to a dataset).
+
+    Ordered by relpath so the copy, the count and the size preview all describe
+    the same set in the same order."""
+    if ids:
+        wanted = [int(i) for i in ids]
+        rows = []
+        for i0 in range(0, len(wanted), _SQL_IN_CHUNK):
+            rows.extend(BankImage.query.filter(
+                BankImage.bank_id == bank_id,
+                BankImage.id.in_(wanted[i0:i0 + _SQL_IN_CHUNK])).all())
+    else:
+        rows = BankImage.query.filter_by(bank_id=bank_id, status='keep').all()
+    rows.sort(key=lambda r: r.relpath)
+    return rows
+
+
+def selection_size(user_id, bank_id, ids) -> dict | None:
+    """{'count', 'bytes'} for what a promotion would COPY — the honest weight the
+    confirmation shows BEFORE the click.
+
+    Real bytes, not an order of magnitude: today's images average ~300 KB, so
+    200 of them are ~60 MB and nobody needs warning; a video bank is three orders
+    of magnitude above that and the same dialog must not lie about it. Reads the
+    size the scan already recorded (one column, no disk hit), and only stats the
+    watermark-CLEANED blobs, which are what a promotion actually copies for those
+    rows and whose size the column does not describe. None = bank gone."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    rows = _promote_source_rows(bank_id, ids)
+    total = 0
+    for r in rows:
+        if r.watermark_clean_method:
+            try:
+                total += os.path.getsize(resolved_image_path(bank, r))
+                continue
+            except (OSError, TypeError):
+                pass            # fall back to the recorded source size
+        total += int(r.file_size or 0)
+    return {'count': len(rows), 'bytes': total}
+
+
+def start_bank_promote(app, user_id, bank_id, ids, name):
+    """Copy a selection into a BRAND NEW bank named ``name``. 202 + background
+    job, like every other pass; returns the new bank's id so the UI can jump to
+    the bank being filled.
+
+    The job is registered against the SOURCE bank — that is the bank the user is
+    looking at, the one whose rows get marked, and the one a concurrent scan
+    would race. So an already-busy source bank is the established 409, and the
+    progress bar appears where the user clicked.
+
+    Raises ValueError (-> 400) on a missing bank, a blank name or an empty
+    selection, BankJobBusy (-> 409) while another pass runs on the source."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    name = (name or '').strip()
+    if not name:
+        raise ValueError('name is required')
+    rows = _promote_source_rows(bank_id, ids)
+    if not rows:
+        raise ValueError('nothing to promote — keep or select some images first')
+    if len(rows) > BANK_MAX_FILES:
+        raise ValueError(f'too many images (max {BANK_MAX_FILES})')
+    # Checked BEFORE anything is created: bank_jobs.start would raise the same
+    # 409 a moment later, having already left a folder and a row behind.
+    if bank_jobs.running(bank_id):
+        raise bank_jobs.BankJobBusy(bank_jobs.get(bank_id)['kind'])
+    folder = _import_folder_for(name)
+    os.makedirs(folder, exist_ok=True)
+    dest = ImageBank(user_id=user_id, name=name, source_path=folder)
+    db.session.add(dest)
+    db.session.commit()
+    try:
+        bank_jobs.start(app, bank_id, 'bank_promote',
+                        _bank_promote_job(user_id, bank_id, dest.id,
+                                          [r.id for r in rows]),
+                        total=len(rows))
+    except bank_jobs.BankJobBusy:
+        _discard_promoted_bank(user_id, dest.id)   # lost the race: leave nothing
+        raise
+    return dest.id
+
+
+def _discard_promoted_bank(user_id, dest_bank_id):
+    """Unmake a destination bank that never became one. Uncommitted rows are
+    rolled back first, then delete_bank takes the row, the working data and the
+    copy folder (it is under bank_sources_root, so it is OURS to remove)."""
+    try:
+        db.session.rollback()
+    except Exception:  # noqa: BLE001 — teardown must not mask the real failure
+        logger.warning('bank promote: rollback failed', exc_info=True)
+    try:
+        delete_bank(user_id, dest_bank_id)
+    except Exception:  # noqa: BLE001
+        logger.warning('bank promote: could not discard the partial bank',
+                       exc_info=True)
+
+
+def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
+    def run(job):
+        src = db.session.get(ImageBank, src_bank_id)
+        dest = db.session.get(ImageBank, dest_bank_id)
+        if not src or not dest:
+            return
+        rows = _promote_source_rows(src_bank_id, ids)
+        bank_jobs.progress(job, done=0, total=len(rows), detail='copying')
+        copied, unreadable = [], 0
+        for r in rows:
+            if bank_jobs.cancelled(job):
+                break
+            # RESOLVED path: a watermark-cleaned image must land cleaned, same
+            # rule as promoting to a dataset.
+            p = resolved_image_path(src, r)
+            try:
+                with open(p, 'rb'):       # prove the SOURCE is the readable one
+                    pass
+            except (OSError, TypeError):
+                # One unreadable/locked source costs one image, never the run.
+                unreadable += 1
+                bank_jobs.bump(job)
+                continue
+            target = os.path.join(dest.source_path, r.relpath)
+            try:
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                shutil.copy2(p, target)
+                size = os.path.getsize(target)
+            except OSError as e:
+                # The source opened, so this is the DESTINATION refusing: disk
+                # full, read-only, drive unplugged. Carrying on would leave a
+                # bank holding half the selection and presenting as finished —
+                # the one outcome worse than failing. Unmake it and say so.
+                logger.warning('bank promote: writing the copy failed',
+                               exc_info=True)
+                _discard_promoted_bank(user_id, dest_bank_id)
+                bank_jobs.fail(job, 'Could not write the copies — the new bank '
+                                    'was discarded and nothing was changed. '
+                                    'Check the free space on the drive holding '
+                                    "the app's data, then try again. "
+                                    f'({e.strerror or "write failed"})')
+                return
+            db.session.add(BankImage(bank_id=dest_bank_id, relpath=r.relpath,
+                                     file_size=size))
+            copied.append(r.id)
+            if len(copied) % 200 == 0:
+                db.session.commit()
+            bank_jobs.bump(job)
+        if not copied:
+            _discard_promoted_bank(user_id, dest_bank_id)
+            bank_jobs.fail(job, 'Nothing could be copied — the new bank was '
+                                'discarded. The selected files could not be read.')
+            return
+        db.session.commit()
+        # Marked LAST, and only for what really landed: the source keeps its rows
+        # (a promotion never removes anything from the bank it came from) and now
+        # says where they went, exactly like a promotion to a dataset.
+        for i0 in range(0, len(copied), _SQL_IN_CHUNK):
+            (BankImage.query
+             .filter(BankImage.bank_id == src_bank_id,
+                     BankImage.id.in_(copied[i0:i0 + _SQL_IN_CHUNK]))
+             .update({'promoted_bank_id': dest_bank_id},
+                     synchronize_session=False))
+        db.session.commit()
+        detail = f'{len(copied)} image(s) copied into "{dest.name}"'
+        if unreadable:
+            detail += f', {unreadable} unreadable'
         bank_jobs.progress(job, detail=detail)
     return run
 

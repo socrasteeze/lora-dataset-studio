@@ -106,6 +106,87 @@ def _jobs_dir():
     return d
 
 
+def _machine_hf_token_files() -> list:
+    """Every place `hf auth login` may have written a token on THIS machine, best
+    first. Mirrors `huggingface_hub.constants` (read from 0.36): `$HF_HOME/token`,
+    `$XDG_CACHE_HOME/huggingface/token`, `~/.cache/huggingface/token`.
+
+    All three are listed rather than only the first: the app's own process may
+    already run with `HF_HOME` pointed at the ai-toolkit cache, while the shell
+    where the user typed `hf auth login` had none — the CLI token is then in the
+    plain default home and only the last candidate finds it.
+
+    Pure string math; huggingface_hub is NOT imported (it lives in the ai-toolkit
+    venv, not necessarily in ours), and no home path is assumed — Linux, macOS
+    and Windows all fall out of `expanduser`."""
+    def _norm(p):
+        return os.path.expanduser(os.path.expandvars(p))
+
+    homes = []
+    env_home = (os.environ.get('HF_HOME') or '').strip()
+    if env_home:
+        homes.append(_norm(env_home))
+    xdg = (os.environ.get('XDG_CACHE_HOME') or '').strip()
+    if xdg:
+        homes.append(os.path.join(_norm(xdg), 'huggingface'))
+    homes.append(os.path.join(_norm('~'), '.cache', 'huggingface'))
+
+    out = []
+    for h in homes:
+        cand = os.path.join(h, 'token')
+        if cand not in out:
+            out.append(cand)
+    return out
+
+
+def training_subprocess_env(hf_home=None) -> dict:
+    """The environment the LOCAL ai-toolkit process is launched with.
+
+    `HF_HOME` routes base/adapter weights onto the configured disk and
+    `PYTHONIOENCODING` keeps unicode logs from dying on cp1252.
+
+    Hugging Face authentication, in the order huggingface_hub itself resolves it:
+
+    1. the token saved in Settings ▸ API keys is injected EXPLICITLY, exactly
+       like the cloud lane does (`cloud_training`) — the local lane used to rely
+       on it happening to sit in this process's `os.environ`, which is an
+       implementation detail of `cfg.secret`, not a contract;
+    2. failing that, whatever the machine already carries is preserved: an
+       `HF_TOKEN` in the environment (ai-toolkit's own `.env`, loaded by its
+       `run.py`, is how this worked for the people it worked for) …
+    3. … and, crucially, the token file `hf auth login` wrote. huggingface_hub
+       reads it at `$HF_HOME/token`, so overriding `HF_HOME` for the cache HID
+       a perfectly valid login and produced a 401 on gated bases (Krea 2,
+       FLUX.1-dev, FLUX.2 Klein) — reported by SurpassHR on GitHub. `HF_TOKEN_PATH`
+       is a separate variable that wins over `HF_HOME`, so we pin it at the real
+       file. Relocating a CACHE must never log the user out.
+
+    Never logs, and never copies a token anywhere but into this env dict.
+    """
+    env = dict(os.environ, HF_HOME=str(hf_home if hf_home is not None else _hf_home()),
+               PYTHONIOENCODING='utf-8')
+    token = (cfg.secret('HF_TOKEN') or '').strip()
+    if token:
+        env['HF_TOKEN'] = token
+        return env
+    if (env.get('HF_TOKEN') or '').strip():
+        return env                                   # already authenticated by env
+    if (env.get('HF_TOKEN_PATH') or '').strip():
+        return env                                   # user pinned it: respect it
+    try:
+        ours = os.path.join(env['HF_HOME'], 'token')
+        # A login made WITH our HF_HOME already resolves — never redirect it away.
+        if os.path.isfile(ours):
+            return env
+        for cand in _machine_hf_token_files():
+            if cand != ours and os.path.isfile(cand):
+                env['HF_TOKEN_PATH'] = cand
+                break
+    except OSError:
+        pass                                         # unreadable home: change nothing
+    return env
+
+
 # ComfyUI-side destinations (deploy target for a trained LoRA, and the SDXL base
 # checkpoint pool). Distinct error message from the aitoolkit accessors above:
 # a dataset can be trainable (aitoolkit OK) while ComfyUI itself is unconfigured,
@@ -895,6 +976,124 @@ _GRAD_ACCUM_CHOICES = (1, 2, 4)
 _NETWORK_TYPE_CHOICES = ('lora', 'lokr')
 _EMA_CHOICES = (0.99, 0.999)
 
+# --- Memory-saving levers (quantisation + low-VRAM streaming) --------------------
+# Community request (GitHub issue #14, bobba84): the recipes hard-coded quantize /
+# quantize_te / low_vram, calibrated so a 12B DiT fits in 24 GB. On a card with MORE
+# than the target, that calibration is a tax nobody asked for — quantisation costs
+# precision and low_vram costs a lot of speed (it streams blocks CPU↔GPU).
+#
+# VÉRIFIÉ dans l'ai-toolkit installé : `quantize`, `quantize_te`, `qtype` et
+# `low_vram` sont des champs de ModelConfig (toolkit/config_modules.py L658-662),
+# arch-agnostiques, tous à False/'qfloat8' par défaut. Donc AUCUNE whitelist par
+# famille : le levier existe partout, et sa valeur par défaut reste celle que la
+# recette de CHAQUE famille a calibrée (table ci-dessous). Un utilisateur qui n'y
+# touche pas obtient un job-config byte-for-byte identique à avant.
+#
+# `qtype` n'est PAS exposé : il ne s'applique que quand la quantisation est ON, et
+# 'qfloat8' est déjà l'option la plus fidèle qu'ai-toolkit offre là (int8/uint8
+# échangent de la qualité contre de la place). Un knob qui ne peut que dégrader
+# n'est pas un choix, c'est un piège.
+_MEMORY_SETTING_KEYS = ('quantize', 'quantize_te', 'low_vram')
+
+# Ce que chaque famille émet quand l'utilisateur ne choisit rien. NE PAS TOUCHER :
+# la majorité du parc est à 24 Go ou moins et c'est ce qui fait tenir l'entraînement.
+_DEFAULT_MEMORY_SAVING = {
+    'zimage':     {'quantize': True,  'quantize_te': True,  'low_vram': True},
+    'krea':       {'quantize': True,  'quantize_te': True,  'low_vram': True},
+    'flux':       {'quantize': True,  'quantize_te': True,  'low_vram': True},
+    'flux2klein': {'quantize': True,  'quantize_te': True,  'low_vram': True},
+    # 2B DiT — les defaults options.ts d'ai-toolkit sont déjà « pas de quantisation ».
+    # Le levier reste offert dans l'AUTRE sens : une petite carte peut l'activer.
+    'anima':      {'quantize': False, 'quantize_te': False, 'low_vram': False},
+    'sdxl':       {'quantize': False, 'quantize_te': False, 'low_vram': False},
+}
+
+# VRAM (Gio) qu'il faut RAISONNABLEMENT pour entraîner cette famille sans
+# quantisation ni streaming basse-VRAM. ESTIMÉ, pas mesuré carte par carte :
+# poids du DiT en bf16 (2 octets × paramètres) + ~6 Gio d'activations/optimiseur
+# LoRA/marge. Sert UNIQUEMENT à formuler un conseil ; ne bloque jamais rien.
+#   zimage 6B → ~12 + 6      krea/flux 12B → ~24 + 6
+#   flux2klein 9B → ~18 + 6  flux2klein 4B → ~8 + 6
+_UNQUANTISED_VRAM_GB = {'zimage': 18, 'krea': 30, 'flux': 30,
+                        'flux2klein': 24, 'flux2klein_4b': 14,
+                        'anima': 10, 'sdxl': 10}
+
+
+def _memory_saving_defaults(ds, family) -> dict:
+    """Les trois défauts calibrés de la famille (copie — l'appelant les mute)."""
+    return dict(_DEFAULT_MEMORY_SAVING.get(family or '',
+                                           _DEFAULT_MEMORY_SAVING['zimage']))
+
+
+def _memory_flag_eff(ds, key: str, default: bool) -> bool:
+    """Valeur EFFECTIVE d'un levier mémoire : le booléen stocké s'il y en a un,
+    sinon le défaut de la famille. Tri-état volontaire — `False` STOCKÉ doit
+    survivre (c'est précisément la demande « disable »), donc on teste le type et
+    jamais la véracité, contrairement à `dual_captions` où falsy = clé retirée."""
+    v = _train_settings(ds).get(key)
+    return v if isinstance(v, bool) else default
+
+
+def _model_memory_block(ds, family) -> dict:
+    """Fragment `model` à fusionner dans la recette de chaque famille.
+
+    Forme d'émission choisie pour que le défaut reste BYTE-IDENTIQUE à l'existant :
+      * `quantize` / `quantize_te` : toujours émis (les 6 recettes les émettaient
+        déjà, dans les deux sens) ;
+      * `low_vram` : émis SEULEMENT quand True — le défaut ModelConfig est False,
+        donc omettre == False, et anima/sdxl (qui ne l'émettaient pas) ne gagnent
+        pas une clé ;
+      * `qtype` : émis seulement si au moins une quantisation est active — sans
+        quantisation la clé ne veut rien dire.
+    """
+    d = _memory_saving_defaults(ds, family)
+    q = _memory_flag_eff(ds, 'quantize', d['quantize'])
+    qte = _memory_flag_eff(ds, 'quantize_te', d['quantize_te'])
+    lv = _memory_flag_eff(ds, 'low_vram', d['low_vram'])
+    out = {'quantize': q, 'quantize_te': qte}
+    if lv:
+        out['low_vram'] = True
+    if q or qte:
+        out['qtype'] = 'qfloat8'
+    return out
+
+
+def _unquantised_vram_need(ds, family) -> int:
+    """Estimation Gio pour tourner sans quantisation. FLUX.2 Klein a deux tailles
+    de base (9B/4B) : le 4B tient beaucoup plus bas, le dire serait faux sinon."""
+    if family == 'flux2klein' and not _flux2klein_is_9b(ds):
+        return _UNQUANTISED_VRAM_GB['flux2klein_4b']
+    return _UNQUANTISED_VRAM_GB.get(family or '', 24)
+
+
+def _memory_saving_advice(ds, family) -> dict:
+    """Conseil INDEXÉ SUR LA CARTE RÉELLE pour les leviers mémoire.
+
+    `verdict` :
+      * 'unknown'  — pas de nvidia-smi, GPU non-NVIDIA, machine sans carte, ou
+                     famille non quantisée par défaut : texte générique côté UI ;
+      * 'can_disable' — la VRAM détectée couvre le besoin estimé sans quantisation ;
+      * 'keep_on'  — elle ne le couvre pas.
+
+    Conseiller n'est PAS décider : rien ici n'écrit dans train_settings, rien ne
+    bloque un lancement, et un échec de sonde (fail-open, mémoïsé 10 min côté
+    run_environment) retombe simplement sur 'unknown'."""
+    try:
+        from . import run_environment
+        vram = run_environment.local_vram_gb()
+        gpu = (run_environment.gpu_info() or {}).get('name')
+    except Exception:                                   # sonde absolument jamais fatale
+        vram, gpu = None, None
+    need = _unquantised_vram_need(ds, family)
+    if not vram:
+        verdict = 'unknown'
+    elif vram + 0.5 >= need:        # 0.5 Gio : nvidia-smi rapporte 23.99 pour « 24 Go »
+        verdict = 'can_disable'
+    else:
+        verdict = 'keep_on'
+    return {'verdict': verdict, 'vram_gb': vram, 'gpu': gpu,
+            'unquantised_vram_gb': need}
+
 
 def _train_settings(ds) -> dict:
     """Parse le blob JSON `train_settings` en dict (jamais lève ; {} si absent/cassé)."""
@@ -1250,7 +1449,7 @@ def _effective_resolution(ds) -> list:
 
     Slider mode defaults to 768 only: the concept_slider loss runs several
     prediction passes per step, so its VRAM peak sits far above a normal run —
-    multi-scale 768+1024 really OOMs on 24 GB (Jeremy's first slider run died
+    multi-scale 768+1024 really OOMs on 24 GB (the first reported slider run died
     with 'bad allocation' at step 21 when Discord grabbed some VRAM). This is a
     DEFAULT, not a clamp: an explicit user resolution is always obeyed."""
     if slider_mode_enabled(ds) and not _resolution_is_explicit(ds):
@@ -1490,6 +1689,13 @@ def launch_settings_snapshot(ds, family=None) -> dict:
     # being 1, the runs on either side of the change have to be comparable.
     snap['batch_size'] = 1
     snap['dual_captions'] = bool(s.get('dual_captions'))
+    # Memory strategy — stamped with its EFFECTIVE value for the same reason as
+    # `ema` above: two runs of the same dataset can differ only by these, and a
+    # quantised run and a full-precision one are NOT the same experiment. Absent
+    # would be indistinguishable from "recorded before the keys existed".
+    _memdef = _memory_saving_defaults(ds, fam)
+    for _k in _MEMORY_SETTING_KEYS:
+        snap[_k] = _memory_flag_eff(ds, _k, _memdef[_k])
     return snap
 
 
@@ -1543,6 +1749,19 @@ def effective_train_settings(ds, family=None) -> dict:
             # default OFF. Local training only for now (the cloud pod's dataset upload
             # skips the JSON caption file), so the recipe strips it on the cloud path.
             'dual_captions': bool(s.get('dual_captions')),
+            # --- Memory strategy (issue #14) -----------------------------------
+            # `memory_saving` = le choix STOCKÉ par clé (None = « Auto », le panel
+            # recoche le défaut de la famille) ; `memory_saving_default` = ce que
+            # la recette calibrée émet ; `memory_saving_effective` = ce qui partira
+            # vraiment. `memory_advice` porte le conseil indexé sur la carte réelle
+            # (verdict/vram_gb/gpu) — purement consultatif, jamais appliqué seul.
+            'memory_saving': {k: (s.get(k) if isinstance(s.get(k), bool) else None)
+                              for k in _MEMORY_SETTING_KEYS},
+            'memory_saving_default': _memory_saving_defaults(ds, fam),
+            'memory_saving_effective': {
+                k: _memory_flag_eff(ds, k, _memory_saving_defaults(ds, fam)[k])
+                for k in _MEMORY_SETTING_KEYS},
+            'memory_advice': _memory_saving_advice(ds, fam),
             'resolution': res if res in _RES_CHOICES else '768,1024',
             # `resolution` above is the STORED choice (default label when unset);
             # these two report what the run will actually train at — slider mode
@@ -1697,6 +1916,19 @@ def update_train_settings(user_id, dataset_id, patch: dict) -> dict:
             cur['dual_captions'] = True
         else:
             cur.pop('dual_captions', None)
+    for _mk in _MEMORY_SETTING_KEYS:
+        if _mk not in patch:
+            continue
+        v = patch[_mk]
+        # Tri-state: an explicit False is a VALUE (the whole point of issue #14),
+        # so it must be stored, not dropped like a falsy `dual_captions`. Only
+        # None/'auto'/'' clear the key back to the family's calibrated default.
+        if isinstance(v, bool):
+            cur[_mk] = v
+        elif v in (None, 'auto', ''):
+            cur.pop(_mk, None)
+        else:
+            raise ValueError(f'{_mk} must be true, false or auto')
     if 'learning_rate' in patch:
         # Not a general Advanced-options control: the family-fixed 1e-4 (or the
         # Prodigy lr=1 convention) is the default, and only the ▶ Continue dialog's
@@ -1720,7 +1952,7 @@ TRAIN_SETTING_KEYS = ('rank', 'resolution', 'save_every', 'max_step_saves',
                       'sample_every', 'sample_prompts', 'dropout', 'alpha',
                       'timestep_type', 'optimizer', 'lr_scheduler', 'warmup',
                       'grad_accum', 'network_type', 'ema', 'dual_captions',
-                      'learning_rate')
+                      'learning_rate', *_MEMORY_SETTING_KEYS)
 
 # The ONLY settings a resume/continue may change. ai-toolkit rebuilds the job
 # config from scratch on every launch, so a re-read setting is honored on resume —
@@ -1739,6 +1971,18 @@ TRAIN_SETTING_KEYS = ('rank', 'resolution', 'save_every', 'max_step_saves',
 # only (½ polish / ⅒ gentle finish — the LR pendant of the low-noise timestep
 # recipe), touches no weight shape, and resolves to an explicit `learning_rate`
 # via resolve_resume_lr (refused on a Prodigy run, whose LR is self-adaptive).
+#
+# The memory-saving levers (quantize / quantize_te / low_vram) are deliberately
+# NOT in this list, and that is a decision, not an oversight. They ARE harmless to
+# a resume — VÉRIFIÉ: quantisation is applied to the BASE modules, which are frozen
+# (`param.requires_grad = False` + `freeze(orig_module)` in ai-toolkit's
+# util/quantize.py), while the resumed checkpoint holds only the LoRA weights,
+# whose shape is fixed by `network` (rank/alpha/type) and untouched here. But this
+# tuple is the whitelist of what the ▶ Continue DIALOG may send, and the dialog has
+# no control for them; the persisted Advanced-options value is already re-read on
+# every resume (ai-toolkit rebuilds the job config from scratch), so a user who
+# turns quantisation off and hits ▶ Continue already gets it. Listing them would
+# add untested surface with no caller.
 RESUME_SAFE_SETTING_KEYS = ('save_every', 'sample_every', 'sample_prompts',
                             'timestep_type', 'lr_factor')
 
@@ -2581,7 +2825,9 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
     l'UI ai-toolkit (ui/src/app/jobs/new/options.ts) + structure LoRA 24 Go de
     référence - vérifiées au runtime contre la version installée (cf. spec §3).
     Points non négociables : arch='zimage', base/adapter résolus uniquement par
-    ``zimage_training_recipe``, quantize qfloat8 + low_vram pour tenir sur 24 Go.
+    ``zimage_training_recipe``, quantize qfloat8 + low_vram pour tenir sur 24 Go
+    — ces trois-là sont désormais les DÉFAUTS (inchangés) d'un tri-état surchargeable
+    par dataset (_model_memory_block), pas des constantes : cf. issue #14.
 
     SDXL (train_type='sdxl') part dans une branche dédiée (_build_job_config_sdxl) -
     le chemin zimage ci-dessous reste strictement inchangé.
@@ -2625,8 +2871,7 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
     recipe = zimage_training_recipe(getattr(ds, 'train_variant', None), base_model)
 
     # Base : officielle (repo HF diffusers) OU merge ComfyUI converti en diffusers.
-    model = {'arch': 'zimage', 'quantize': True, 'quantize_te': True,
-             'low_vram': True, 'qtype': 'qfloat8'}
+    model = {'arch': 'zimage', **_model_memory_block(ds, 'zimage')}
     if recipe['custom_base']:
         from .zimage_convert import converted_dir
         model['name_or_path'] = converted_dir(base_model)       # dossier diffusers converti
@@ -2709,7 +2954,8 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
     - TURBO (opt-in, VRAM-friendly) : name_or_path='krea/Krea-2-Turbo' + l'adapter de
       training Ostris (retiré à l'inférence, comme Z-Image), previews CFG 1 / 8 steps.
 
-    Commun : quantize qfloat8 + low_vram pour tenir sur 24 Go. ⚠ Requiert ai-toolkit
+    Commun : quantize qfloat8 + low_vram pour tenir sur 24 Go (défauts surchargeables,
+    cf. _model_memory_block — 12B non quantisé = ~30 Gio). ⚠ Requiert ai-toolkit
     À JOUR (commit « Add support for Krea2 », arch 'krea2') sinon l'arch est inconnue
     (garde _aitoolkit_supports_krea). Réseau = 'lora' : VÉRIFIÉ canonique 2026-06-26.
     Résolution KREA_TRAIN_RESOLUTION (1024, TE déchargé) car 768 seul tenait sinon."""
@@ -2723,7 +2969,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
         'arch': 'krea2',
         'name_or_path': (_kbase if _is_custom_weights(_kbase)
                          else ('krea/Krea-2-Raw' if is_raw else 'krea/Krea-2-Turbo')),
-        'quantize': True, 'quantize_te': True, 'low_vram': True, 'qtype': 'qfloat8',
+        **_model_memory_block(ds, 'krea'),
     }
     # Adapter de dé-distillation : Turbo UNIQUEMENT (le Raw est déjà non distillé →
     # rien à retirer ; le charger dessus dégraderait le training).
@@ -2810,7 +3056,7 @@ def _build_job_config_flux(ds, dataset_folder: str, steps: int, training_folder=
         'arch': 'flux',
         'name_or_path': (_fbase if _is_custom_weights(_fbase)
                          else 'black-forest-labs/FLUX.1-dev'),
-        'quantize': True, 'quantize_te': True, 'low_vram': True, 'qtype': 'qfloat8',
+        **_model_memory_block(ds, 'flux'),
     }
     return {
         'job': 'extension',
@@ -2899,7 +3145,7 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
         'name_or_path': (_fkbase if _is_custom_weights(_fkbase)
                          else ('black-forest-labs/FLUX.2-klein-base-9B' if is_9b
                                else 'black-forest-labs/FLUX.2-klein-base-4B')),
-        'quantize': True, 'quantize_te': True, 'low_vram': True, 'qtype': 'qfloat8',
+        **_model_memory_block(ds, 'flux2klein'),
         'model_kwargs': {'match_target_res': False},
     }
     return {
@@ -2986,7 +3232,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
     model = {
         'arch': 'anima',
         'name_or_path': (_abase if _is_custom_weights(_abase) else ANIMA_BASE),
-        'quantize': False, 'quantize_te': False,
+        **_model_memory_block(ds, 'anima'),
     }
     return {
         'job': 'extension',
@@ -3057,7 +3303,7 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
     # preflight, so it bypasses the basename whitelist deliberately).
     name_or_path = base_model if _is_custom_weights(base_model) else _sdxl_base_path(base_model)
     model = {'arch': 'sdxl', 'name_or_path': name_or_path,
-             'quantize': False, 'quantize_te': False}
+             **_model_memory_block(ds, 'sdxl')}
     # SDXL is the only family where ai-toolkit honours these top-level overrides
     # (stable_diffusion_model.py). Emitted only when set; TE may be a local path
     # or a HF repo id (AutoModel.from_pretrained accepts both).
@@ -4464,12 +4710,22 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
     says so, the GPU-architecture verdict that turns "exited 1" into something
     the user can act on. Best-effort throughout: nothing here may raise inside
     the watcher thread, and an unknown probe adds no key at all."""
-    from ..utils.redact import redact_user_paths
-    from .training_diagnostics import extract_error_excerpt, torch_arch_verdict
+    from ..utils.redact import redact_tokens, redact_user_paths
+    from .training_diagnostics import (extract_error_excerpt, gated_repo_verdict,
+                                       torch_arch_verdict)
     wide = _log_tail(log_path, _ERROR_SCAN_LINES)
     payload = {'dataset_id': dataset_id, 'rc': rc,
-               'log_tail': redact_user_paths(_log_tail(log_path))[-1500:],
+               'log_tail': redact_tokens(redact_user_paths(_log_tail(log_path)))[-1500:],
                'excerpt': extract_error_excerpt(wide)}
+    # A gated-base refusal is a PROVEN cause with a precise remedy — and 401 and
+    # 403 have opposite remedies, which the raw HF sentence conflates.
+    try:
+        gated = gated_repo_verdict(wide, token_configured=bool(cfg.secret('HF_TOKEN')))
+        if gated:
+            payload['hf_gated'] = {k: gated[k] for k in ('status', 'repo', 'url',
+                                                         'title', 'message')}
+    except Exception:
+        pass
     try:
         from .. import capabilities
         arch = torch_arch_verdict(capabilities.aitoolkit_torch_info(),
@@ -4686,9 +4942,9 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
     # job-config passe en masked training (fond 10 %). OFF ou indispo = historique.
     dataset_folder = export_dataset_to_aitoolkit(user_id, dataset_id, masked=masked)
     config_path = write_job_config(ds, dataset_folder, steps=steps)
-    # HF_HOME route les poids base/adapter sur le disque configuré. PYTHONIOENCODING
-    # évite les crashs cp1252 sur les logs unicode. Jamais shell=True ; args en liste.
-    env = dict(os.environ, HF_HOME=str(_hf_home()), PYTHONIOENCODING='utf-8')
+    # Environnement du sous-process d'entraînement (HF_HOME + auth Hugging Face,
+    # cf. training_subprocess_env). Jamais shell=True ; args en liste.
+    env = training_subprocess_env()
     run_dir = _run_root(ds, base_model=base_model, family=launch_fam, variant=variant)
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = _run_log_path(ds, base_model=base_model, family=launch_fam,
@@ -4700,8 +4956,36 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
     # under `_queue_lock` stays a single short write; the launch path has
     # already lost cloud runs to `database is locked` once.
     from . import checkpoint_registry
+    # Re-ask the cheap question BEFORE the freeze. The same check already runs at
+    # the top of this function, but the dataset export in between takes minutes on
+    # a real dataset — long enough for another launch to have won the process slot.
+    # Without this, that loser still paid for a full freeze (hashing every image,
+    # probing nvidia-smi and the ai-toolkit revision) before the authoritative
+    # check under `_queue_lock` refused it. Two reads of an in-memory flag; the
+    # copy inside the lock stays the authority, this one only saves the work.
+    if (queue_manager._get_system_state('training_in_progress', False)
+            and _pid_alive(queue_manager._get_system_state('training_pid', None))):
+        raise ValueError(
+            'a training is already in progress - wait for it to finish or '
+            'queue this dataset')
     _prepared = checkpoint_registry.prepare_launch(
         user_id, dataset_id, base_model=base_model)
+    # ai-toolkit is about to claim the card. Give back the vision model's
+    # 7.5 GB if an isolated call leased it warm (no-op without a live lease).
+    #
+    # OUTSIDE `_queue_lock`, and it must stay outside: a live lease makes this an
+    # HTTP POST to Ollama with `timeout=(10, 30)` retried once — up to ~80 s of
+    # blocking. Held under the lock, that froze Stop, enqueue/dequeue and queue
+    # advancement for as long as Ollama took to answer: pressing Stop during a
+    # launch did nothing until the unload returned. Nothing here depends on the
+    # lock (the vision-pass guard already ran above), and the ordering that
+    # matters — VRAM handed back BEFORE Popen — is unchanged.
+    try:
+        from .vision_keepalive import revoke as _revoke_vision
+        _revoke_vision('training starting')
+    except Exception:
+        logger.warning('vision keep-warm revoke failed before training start',
+                       exc_info=True)
     # The authoritative live-run check, identity state and PID publication are
     # one transition under the SAME lock used by Stop and queue advancement.
     # This closes both races: two launches spawning together, and a stale Stop
@@ -4749,14 +5033,6 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
         for key, value in identity.items():
             queue_manager._set_system_state(
                 key, value, ttl_seconds=_TRAIN_STATE_TTL)
-        # ai-toolkit is about to claim the card. Give back the vision model's
-        # 7.5 GB if an isolated call leased it warm (no-op without a live lease).
-        try:
-            from .vision_keepalive import revoke as _revoke_vision
-            _revoke_vision('training starting')
-        except Exception:
-            logger.warning('vision keep-warm revoke failed before training start',
-                           exc_info=True)
         logf = None
         try:
             logf = open(log_path, 'w', encoding='utf-8')
