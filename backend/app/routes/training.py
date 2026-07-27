@@ -18,6 +18,7 @@ from ..config import LOCAL_USER
 from ..services import cloud_training as ct
 from ..services import face_dataset_service as svc
 from ..services import face_mask
+from ..services import face_mask_preview as fmp
 from ..models import FaceDatasetImage
 from ..services import lora_training as lt
 from ..services import zimage_convert as zc
@@ -459,57 +460,122 @@ def dataset_train_best_epoch(dataset_id):
         return _map_error(e)
 
 
-@bp.post('/dataset/<int:dataset_id>/train/face-mask-preview')
-def dataset_face_mask_preview(dataset_id):
-    """Detect the faces of the kept set and return them as NORMALISED boxes, so the
-    training panel can draw what face masking would cover before anything is trained.
+def _face_preview_kept(dataset_id):
+    """The kept set as PLAIN data — {path: (image_id, filename)} — plus a
+    fingerprint of it. Plain on purpose: the detection runs in a worker thread and
+    ORM rows must not travel across the session that loaded them."""
+    kept = (FaceDatasetImage.query
+            .filter_by(dataset_id=dataset_id, status='keep')
+            .filter(FaceDatasetImage.filename.isnot(None)).all())
+    by_path, stamps = {}, []
+    for img in kept:
+        p = os.path.join(svc._dataset_dir(dataset_id), img.filename)
+        try:
+            st = os.stat(p)
+        except OSError:
+            continue        # deleted under us — not part of what would be trained
+        by_path[p] = (img.id, img.filename)
+        stamps.append((img.id, img.filename, st.st_size, st.st_mtime_ns))
+    return by_path, fmp.fingerprint(stamps)
 
-    Detection only — no generation, no training, nothing written to disk.
 
-    RAW boxes are returned, not grown ones: the expand factor is applied in the
-    browser (utils/faceMaskBox.js mirrors infer/face_mask_infer.dilate_box), so
-    dragging the slider redraws instantly instead of paying for another InsightFace
-    pass. One pass, then the knob is free.
+def _face_preview_payload(results, by_path, limit):
+    """Fold a detection result map into what the panel draws.
 
-    The SAMPLE is deliberately failure-first: images where no face was found are the
-    instructive ones (profile, cropped, too small) — a preview of successes only
-    would hide exactly what the user needs to see. `coverage` is computed over the
-    WHOLE kept set regardless, because a partially masked set is the bad case."""
+    The SAMPLE is deliberately failure-first: images where no face was found are
+    the instructive ones (profile, cropped, too small) — a preview of successes
+    only would hide exactly what the user needs to see. `coverage` is computed
+    over the WHOLE kept set regardless, because a partially masked set is the bad
+    case."""
+    missed = [p for p, r in results.items() if (r or {}).get('state') != 'masked']
+    found = [p for p, r in results.items() if (r or {}).get('state') == 'masked']
+    samples = [{'image_id': by_path[p][0], 'filename': by_path[p][1],
+                'state': (results[p] or {}).get('state'),
+                'boxes': (results[p] or {}).get('boxes') or []}
+               for p in (missed + found)[:limit] if p in by_path]
+    return {'samples': samples, 'coverage': face_mask.coverage_summary(results),
+            'expand': face_mask.expand_factor()}
+
+
+def _face_preview_guard(dataset_id, require_tool=True):
+    """Shared gate. Returns an error response, or None."""
     ds = svc.get_dataset(LOCAL_USER, dataset_id)
     if not ds:
         return jsonify({'error': 'not found'}), 404
     if not svc.is_concept(ds):
         return jsonify({'ok': False, 'error': 'face masking is for concept datasets'}), 400
-    if not face_mask.is_available():
-        # Degrade by SAYING SO. The option itself is disabled in the UI on the same
-        # capability, so this is the belt to that brace, never a crash.
+    if require_tool and not face_mask.is_available():
+        # Degrade by SAYING SO, INSTANTLY. The option itself is disabled in the UI
+        # on the same capability, so this is the belt to that brace — and an install
+        # without face detection must hear it now, not after a timeout.
         return jsonify({'ok': False, 'error': 'face detection unavailable',
                         'reason': 'face_scoring'}), 409
+    return None
+
+
+@bp.post('/dataset/<int:dataset_id>/train/face-mask-preview')
+def dataset_face_mask_preview(dataset_id):
+    """START (or JOIN) the face detection behind the training panel's mask preview,
+    so it can draw what face masking would cover before anything is trained.
+
+    Detection only — no generation, no training, nothing written to disk.
+
+    Asynchronous on purpose. A blocking request could show nothing while it ran
+    (the InsightFace model load alone is tens of seconds before image 1) and could
+    not be rejoined: leaving the page threw the pass away and coming back offered
+    to start a second one. The job lives in face_mask_preview, so a second click —
+    or a return to the page — joins the pass in flight instead of duplicating it.
+
+    RAW boxes are returned, not grown ones: the expand factor is applied in the
+    browser (utils/faceMaskBox.js mirrors infer/face_mask_infer.dilate_box), so
+    dragging the slider redraws instantly instead of paying for another InsightFace
+    pass. One pass, then the knob is free."""
+    gate = _face_preview_guard(dataset_id)
+    if gate:
+        return gate
     limit = max(1, min(12, int((request.get_json(silent=True) or {}).get('limit') or 6)))
-    kept = (FaceDatasetImage.query
-            .filter_by(dataset_id=dataset_id, status='keep')
-            .filter(FaceDatasetImage.filename.isnot(None)).all())
-    by_path = {}
-    for img in kept:
-        p = os.path.join(svc._dataset_dir(dataset_id), img.filename)
-        if os.path.isfile(p):
-            by_path[p] = img
+    by_path, fp = _face_preview_kept(dataset_id)
     if not by_path:
-        return jsonify({'ok': True, 'samples': [], 'coverage': face_mask.coverage_summary({})})
-    data = face_mask.detect_faces(list(by_path))
-    if not data:
-        return jsonify({'ok': False, 'error': 'face detection failed'}), 409
-    results = data.get('results') or {}
-    coverage = face_mask.coverage_summary(results)
-    missed = [p for p, r in results.items() if (r or {}).get('state') != 'masked']
-    found = [p for p, r in results.items() if (r or {}).get('state') == 'masked']
-    sample_paths = (missed + found)[:limit]
-    samples = [{'image_id': by_path[p].id, 'filename': by_path[p].filename,
-                'state': (results[p] or {}).get('state'),
-                'boxes': (results[p] or {}).get('boxes') or []}
-               for p in sample_paths if p in by_path]
-    return jsonify({'ok': True, 'samples': samples, 'coverage': coverage,
-                    'expand': face_mask.expand_factor()})
+        # Nothing kept is a valid answer, not a job. Publish it so a return to the
+        # page shows the same thing rather than an inviting button.
+        fmp.set_result(dataset_id, _face_preview_payload({}, {}, limit), fp)
+        return jsonify({'ok': True, 'started': False, **fmp.snapshot(dataset_id, fp)})
+
+    paths = list(by_path)
+    app = current_app._get_current_object()
+
+    def _work(job):
+        data = face_mask.detect_faces(
+            paths, on_progress=lambda rec: fmp.progress(job, rec))
+        if not data.get('ok'):
+            # An operation that failed must LOOK failed. The reason travels all the
+            # way to the panel instead of dying in a log line.
+            fmp.fail(job, data.get('error') or 'face detection failed')
+            return
+        # Zero faces is a RESULT, not a failure: a concept dataset may legitimately
+        # hold no people. It publishes like any other pass.
+        fmp.set_result(dataset_id, _face_preview_payload(
+            data.get('results') or {}, by_path, limit), fp)
+
+    job, started = fmp.start(app, dataset_id, _work, total=len(paths), fp=fp)
+    return jsonify({'ok': True, 'started': started, **fmp.snapshot(dataset_id, fp)}), 202
+
+
+@bp.get('/dataset/<int:dataset_id>/train/face-mask-preview')
+def dataset_face_mask_preview_status(dataset_id):
+    """Rebind: the running pass (phase + i/M) and the last preview computed for
+    this dataset. Called on mount and while polling, so leaving the page and
+    coming back picks the pass back up instead of restarting it.
+
+    `result.stale` is the honest half: the stored preview describes the kept set
+    it was computed from, and if that set moved since, showing it as fresh would
+    be worse than showing nothing."""
+    gate = _face_preview_guard(dataset_id, require_tool=False)
+    if gate:
+        return gate
+    _, fp = _face_preview_kept(dataset_id)
+    return jsonify({'ok': True, 'available': face_mask.is_available(),
+                    **fmp.snapshot(dataset_id, fp)})
 
 
 @bp.get('/dataset/<int:dataset_id>/train/base-info')
@@ -1595,7 +1661,18 @@ def dataset_train_run_delete(record_id):
     deleted; archived source blobs are freed only when no other run references
     them. A run whose checkpoints are still on disk is refused with 409 (delete
     those first) — never a silent erase. Children that resumed from it are
-    detached, not deleted. Unknown id → 404."""
+    detached, not deleted. Unknown id → 404.
+
+    `?cascade=1` is the OPT-IN destructive mode the run panel's "Delete run"
+    asks for: the checkpoints go to the trash, the generated images with them,
+    then the row. It is a query flag rather than a new default so no existing
+    caller of this route starts shredding files because the semantics moved
+    under it. Even then children are DETACHED, rated-good images and LoRAs already
+    deployed into ComfyUI are KEPT — see services.run_cascade_delete. A dataset
+    that is training right now → 409; a checkpoint that could not be moved →
+    409 with the counts of what did go, and the run row left in place."""
+    if (request.args.get('cascade') or '').lower() in ('1', 'true', 'yes'):
+        return _dataset_train_run_delete_cascade(record_id)
     status = ct.delete_run_record(record_id)
     if status == 'not_found':
         return jsonify({'error': 'unknown run'}), 404
@@ -1606,6 +1683,32 @@ def dataset_train_run_delete(record_id):
         return jsonify({'error': 'This run is still referenced and could not be '
                                  'removed. Refresh and try again.'}), 409
     return jsonify({'ok': True})
+
+
+def _dataset_train_run_delete_cascade(record_id):
+    """The `?cascade=1` branch. Split out so the conservative path above reads
+    exactly as it did — the two modes share a URL, never a body of code.
+
+    A PARTIAL result is an error (409), not a 200 with a sad number: the run row
+    is still there and its remaining weights are still on disk, so telling the
+    user "deleted" would be a lie he only discovers on the next refresh. The
+    message is already path-redacted by the service."""
+    from ..services import run_cascade_delete
+    out = run_cascade_delete.delete_run_cascade(record_id)
+    status = out.get('status')
+    if status == 'not_found':
+        return jsonify({'error': 'unknown run'}), 404
+    if status == 'training':
+        where = ('a cloud pod' if out.get('error') == 'cloud' else 'this dataset')
+        return jsonify({**out, 'error': f'{where} is training right now — stop the '
+                                        'run before deleting it.'}), 409
+    if status == 'partial':
+        return jsonify({**out, 'error': 'Some files could not be removed, so the run '
+                                        'was kept. ' + (out.get('error') or '')}), 409
+    if status == 'conflict':
+        return jsonify({**out, 'error': 'This run is still referenced and could not be '
+                                        'removed. Refresh and try again.'}), 409
+    return jsonify({**out, 'ok': True})
 
 
 @bp.put('/dataset/train/runs/<int:record_id>/note')
@@ -1936,6 +2039,41 @@ def dataset_canvas_positions_clear(dataset_id):
     automatic tree."""
     try:
         return jsonify(ct.clear_canvas_positions(LOCAL_USER, dataset_id))
+    except LookupError:
+        return jsonify({'error': 'not found'}), 404
+
+
+@bp.get('/train/canvas/images')
+def train_canvas_images():
+    """Every image pinned on the ◉ LoRA Canvas, grouped by dataset id, with
+    the image row alongside its geometry — one request for the whole board, like
+    the card positions it sits next to. Rows whose image is gone are pruned
+    server-side rather than answered."""
+    return jsonify(ct.canvas_image_nodes(LOCAL_USER))
+
+
+@bp.put('/dataset/<int:dataset_id>/canvas/images')
+def dataset_canvas_images_save(dataset_id):
+    """Remember pinned images of ONE lane.
+    Body: {nodes:[{image_id,x,y,w,h,visible}]}.
+
+    Closing a pinned image is this call with ``visible: false`` — the geometry
+    stays, so re-opening puts the picture back exactly where and at the size it
+    was closed at."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(ct.save_canvas_image_nodes(
+            LOCAL_USER, dataset_id, data.get('nodes')))
+    except LookupError:
+        return jsonify({'error': 'not found'}), 404
+
+
+@bp.delete('/dataset/<int:dataset_id>/canvas/images')
+def dataset_canvas_images_clear(dataset_id):
+    """Forget every pinned image of one lane, geometry included. Deliberately
+    NOT what ✦ Tidy up calls — see clear_canvas_image_nodes."""
+    try:
+        return jsonify(ct.clear_canvas_image_nodes(LOCAL_USER, dataset_id))
     except LookupError:
         return jsonify({'error': 'not found'}), 404
 
