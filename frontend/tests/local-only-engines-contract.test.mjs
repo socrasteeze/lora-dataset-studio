@@ -128,3 +128,74 @@ test('frontend/dist (served bundle) has no remote GPU rental / cloud training UI
     `rebuild with: cd frontend && npm run build  (see FORK_NOTES.md).\n${hits.join('\n')}`,
   )
 })
+
+/* ── Cloud-engine IDENTIFIERS (not just marketing phrases) ──────────────────
+   The FORBIDDEN_* lists above are exact UI sentences. They are precise but
+   narrow, and the 2026-07-27 sync proved how narrow: upstream shipped a new
+   PromptPreview whose engine picker listed Nano Banana / ChatGPT / OpenRouter
+   and branched on an `API_ENGINES` membership test, plus six API-key help
+   topics and a `PREVIEW_ENGINES` tuple on the backend — none of which contains
+   a single forbidden PHRASE, so every one of them merged green.
+
+   This guards the identifiers themselves. A handful of legitimate references
+   survive by design (LEGACY_API_ENGINE_TAGS so old rows still regenerate
+   through Klein, explanatory comments, historical what's-new entries naming a
+   feature that was removed), so the contract is a per-file BUDGET rather than
+   a ban: the count may not grow, and a file not listed may not gain one at all.
+
+   WHEN THIS FAILS after a merge: look at the new occurrence. If it is live
+   plumbing for a removed engine, strip it (that is the whole point). If it is
+   genuinely historical — a what's-new blurb about a feature this fork dropped,
+   a comment explaining the divergence — bump that file's number here and say
+   why in the commit. Never delete the entry to make it pass. */
+const CLOUD_ENGINE_IDENTIFIERS = /nanobanana|chatgpt|openrouter/gi
+
+const ALLOWED_SRC_CLOUD_REFS = {
+  // The API-engine prompt metadata upstream shares with Klein; kept so the
+  // identity-prompt shapes do not fork, filtered out of the UI instead.
+  'components/common/promptOverride.js': 7,
+  // Comment: why an unknown/legacy generator resolves to Klein.
+  'components/dataset/IdentityPromptModal.jsx': 1,
+  // canonicalEngines' comment about quietly retiring a stored cloud id.
+  'components/dataset/engineSelection.js': 3,
+  'components/dataset/scraperState.js': 1,
+  'help/helpRegistry.js': 1,
+  // Historical entries announcing engines this fork later removed.
+  'whatsNew.js': 21,
+}
+
+async function cloudRefCounts(dir) {
+  const counts = {}
+  for (const file of await walkJs(dir)) {
+    const rel = file.slice(dir.length + 1).split(/[\\/]/).join('/')
+    const hits = (await readFile(file, 'utf8')).match(CLOUD_ENGINE_IDENTIFIERS)
+    if (hits) counts[rel] = hits.length
+  }
+  return counts
+}
+
+test('no NEW cloud-engine identifier reaches frontend/src', async () => {
+  const counts = await cloudRefCounts(SRC_DIR)
+  const problems = []
+  for (const [file, n] of Object.entries(counts)) {
+    const allowed = ALLOWED_SRC_CLOUD_REFS[file]
+    if (allowed === undefined) {
+      problems.push(`${file}: ${n} cloud-engine reference(s) in a file that should have none`)
+    } else if (n > allowed) {
+      problems.push(`${file}: ${n} cloud-engine references, was ${allowed}`)
+    }
+  }
+  assert.deepEqual(problems, [],
+    `Cloud-engine identifiers (Nano Banana / ChatGPT / OpenRouter) grew in frontend/src.\n`
+    + `${problems.join('\n')}\n`
+    + `See FORK_NOTES.md Divergence 1. Strip live plumbing; only bump the budget\n`
+    + `in this file for a genuinely historical mention, and say why in the commit.`)
+})
+
+test('the cloud-reference budget has no stale entries', async () => {
+  // A file that drops to zero (or is deleted) should lose its entry, or the
+  // budget silently re-authorises a future reintroduction.
+  const counts = await cloudRefCounts(SRC_DIR)
+  const stale = Object.keys(ALLOWED_SRC_CLOUD_REFS).filter((f) => !counts[f])
+  assert.deepEqual(stale, [], `remove these from ALLOWED_SRC_CLOUD_REFS: ${stale.join(', ')}`)
+})
