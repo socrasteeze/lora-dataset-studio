@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-27-promoted-badge-visible-again',
+    date: '2026-07-27',
+    title: 'Bank tiles show again which images you already sent onward',
+    blurb:
+      'On a bank grid, the little badge marking an image as already promoted to a dataset had gone invisible - the marker had been emptied of its icon, so the pill rendered blank and there was no way to tell at a glance what had already left. It is back, and it now also covers images promoted into another bank, not just into a dataset.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-27-extra-ref-prompt-badge-points-at-klein',
     date: '2026-07-27',
     title: 'The "used by your current engine" badge now points at the prompt your images actually use',
