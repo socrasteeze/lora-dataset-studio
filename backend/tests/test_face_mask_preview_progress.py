@@ -20,6 +20,7 @@ import json
 import os
 import sys
 
+import pytest
 from PIL import Image
 
 from app.extensions import db
@@ -29,6 +30,24 @@ from app.services import face_mask, face_mask_preview as fmp
 from app.config import LOCAL_USER, save_config
 
 PREVIEW = '/api/dataset/{}/train/face-mask-preview'
+
+
+# FORK DIVERGENCE (2026-07-28), upstream bug: the `app` fixture in conftest.py
+# yields the application WITHOUT pushing an application context, and every
+# DB-touching helper below (`_dataset`, the direct `db.session` writes) runs
+# outside a request — so as upstream shipped it, nine of these ten tests die on
+# `RuntimeError: Working outside of application context` before their first
+# assertion. Reproduced on a clean upstream/main worktree, so it is not a merge
+# artefact and not this machine.
+#
+# The sibling suite (test_face_mask_install_gate.py) solves it with an explicit
+# `with app.app_context():` inside each test. Doing it once, autouse, keeps every
+# test body EXACTLY as upstream wrote it, so this stays a single-hunk divergence
+# the next sync can re-apply — or drop, if upstream fixes it their way.
+@pytest.fixture(autouse=True)
+def _app_context(app):
+    with app.app_context():
+        yield
 
 
 def _dataset(tmp_path, n=3, kind='concept'):
