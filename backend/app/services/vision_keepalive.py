@@ -158,6 +158,13 @@ def keep_alive_for_isolated_call():
 
     Batch passes do NOT go through here: they already know they are about to
     issue N calls and pass their own `keep_alive`, then unload in a `finally`.
+
+    The lease is recorded BEFORE the call it covers ships (`keep_alive` rides in
+    the request payload, so there is no later moment to decide it). If that call
+    then fails at the connection level — Ollama gone, nothing resident — the
+    grant would be a phantom: `describe_image_ollama` hands it back via
+    `_forget_lease_if_unreachable`, keeping `revoke()` a no-op for the next GPU
+    contender instead of a doomed unload against a dead socket.
     """
     seconds = warm_seconds()
     if seconds <= 0:
