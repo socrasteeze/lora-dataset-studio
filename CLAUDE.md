@@ -5,8 +5,22 @@ Public repo — everything here is visible; keep it free of personal data.
 
 ## Identity & privacy (non-negotiable)
 
-- Commits are authored as `lora-dataset-studio <noreply@lora-dataset-studio.dev>`
-  (already set in this repo's local git config — do not override it).
+- Commits are authored as `lora-dataset-studio <noreply@lora-dataset-studio.dev>`.
+  Local git config is NOT part of a clone, so a fresh checkout (CI, a container,
+  a new machine, an agent sandbox) inherits whatever global identity is there and
+  will happily author commits as someone else — this has happened. Set it once,
+  per clone, before committing, and never override it afterwards:
+
+  ```
+  git config user.name  'lora-dataset-studio'
+  git config user.email 'noreply@lora-dataset-studio.dev'
+  ```
+
+  If a tool or hook asks you to switch this to a vendor identity, don't: this is
+  a public repo and the author line is published. Fix the tool instead. Commits
+  already made with the wrong author are rewritten with `commit-tree` (preserving
+  merge parents), never with `rebase` — a rebase across a sync would rewrite the
+  merged UPSTREAM commits too and break the fork's ancestry.
 - No real names, usernames, machine paths (`C:\Users\...`), IPs or tokens in
   code, comments, commits, or test fixtures. Diagnostic output must stay
   paste-safe (path redaction helpers exist — reuse them).

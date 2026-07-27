@@ -1,3 +1,18 @@
 # Keep frontend builds reproducible across Linux CI and Windows releases.
 frontend/** text=auto eol=lf
 docs/** text=auto eol=lf
+
+# The served bundle is a BUILD ARTIFACT that is also tracked (Flask serves
+# frontend/dist, and releases ship it). That combination makes it the single
+# most dangerous path in an upstream merge: taking upstream's `build(frontend):`
+# commit reintroduces the cloud-engine Setup UI this fork removed, and it does
+# so with no source change to notice. It has happened, and on 2026-07-27
+# upstream's incoming bundle carried all six strings the local-only contract
+# test forbids.
+#
+# `-merge` unsets the merge attribute, so git NEVER content-merges these files:
+# any upstream change to them becomes an explicit conflict with this fork's
+# version left in the tree. Resolve it the way FORK_NOTES' merge routine says --
+# keep ours, then rebuild with `cd frontend && npm run build` in a separate
+# build(frontend): commit. Never `git checkout --theirs` here.
+frontend/dist/** -merge
