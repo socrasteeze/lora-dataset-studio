@@ -130,6 +130,136 @@ def test_unloading_clears_the_lease(app):
     assert vk.lease_is_live() is False
 
 
+# -- the failure path: a lease must not outlive the call it was granted for --
+
+def test_an_unreachable_ollama_hands_back_the_lease(app):
+    """The lease is recorded BEFORE the call ships (keep_alive rides in the
+    payload). If Ollama turns out to be unreachable, the grant is a phantom —
+    left in place, the next launch_training within warm_seconds() would pay
+    unload_vision_model()'s doomed retries against the same dead socket before
+    the trainer spawns."""
+    import requests
+    from app.services import vision_ollama
+
+    def _down(*a, **k):
+        raise requests.exceptions.ConnectionError('connection refused')
+
+    with app.app_context(), \
+            patch('app.services.vision_ollama.requests.post', _down):
+        keep = vk.keep_alive_for_isolated_call()
+        assert keep == f'{vk.DEFAULT_WARM_SECONDS}s'
+        assert vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep) == ''
+    assert vk.lease_is_live() is False
+
+
+def test_head_crop_failure_does_not_leave_a_lease(app):
+    """Same guarantee end-to-end through the production call site: an upload's
+    head-crop with Ollama down must not tax the next training launch."""
+    import requests
+    from app.services import face_dataset_service as fds
+
+    def _down(*a, **k):
+        raise requests.exceptions.ConnectionError('connection refused')
+
+    with app.app_context(), \
+            patch('app.services.vision_ollama.requests.post', _down):
+        assert fds.detect_head_bbox(b'not-an-image') is None
+    assert vk.lease_is_live() is False
+
+
+def test_an_http_rejection_keeps_the_lease(app):
+    """The server ANSWERED — it is reachable and may have loaded the model
+    before rejecting the request, so the lease stays: revoking against a live
+    server is one cheap POST, and forgetting here could leave a resident model
+    with nobody to hand it back."""
+    import requests
+    from app.services import vision_ollama
+
+    class _Reject:
+        status_code = 400
+        text = 'bad image'
+
+        def json(self):
+            return {'error': 'bad image'}
+
+        def raise_for_status(self):
+            raise requests.HTTPError('400 Client Error', response=self)
+
+    with app.app_context(), \
+            patch('app.services.vision_ollama.requests.post',
+                  lambda *a, **k: _Reject()):
+        keep = vk.keep_alive_for_isolated_call()
+        assert vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep) == ''
+    assert vk.lease_is_live() is True
+
+
+def test_a_read_timeout_keeps_the_lease(app):
+    """Connect succeeded: Ollama is alive and likely mid-load or mid-inference
+    with the model resident — exactly the state the lease exists to hand back."""
+    import requests
+    from app.services import vision_ollama
+
+    def _slow(*a, **k):
+        raise requests.exceptions.ReadTimeout('read timed out')
+
+    with app.app_context(), \
+            patch('app.services.vision_ollama.requests.post', _slow):
+        keep = vk.keep_alive_for_isolated_call()
+        assert vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep) == ''
+    assert vk.lease_is_live() is True
+
+
+def test_auto_start_failure_hands_back_the_lease(app):
+    """The Studio describe path (auto_start_local=True): Ollama unreachable AND
+    unstartable raises to the user — the lease must not survive the wreck."""
+    import requests
+    from app.services import ollama_control, vision_ollama
+
+    def _down(*a, **k):
+        raise requests.exceptions.ConnectionError('connection refused')
+
+    with app.app_context(), \
+            patch('app.services.vision_ollama.requests.post', _down), \
+            patch.object(ollama_control, 'ensure_captioning_ready',
+                         return_value={'ok': False, 'error': 'not installed'}):
+        keep = vk.keep_alive_for_isolated_call()
+        with pytest.raises(RuntimeError, match='not installed'):
+            vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep,
+                                                auto_start_local=True)
+    assert vk.lease_is_live() is False
+
+
+def test_auto_start_retry_success_keeps_the_lease(app):
+    """Server restarted and the retry captioned: the model IS warm under the
+    granted keep_alive, so the lease must survive for revoke() to hand it back."""
+    import requests
+    from app.services import ollama_control, vision_ollama
+    calls = []
+
+    def _post(*a, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            raise requests.exceptions.ConnectionError('server stopped')
+
+        class _Ok:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {'response': 'a caption'}
+        return _Ok()
+
+    with app.app_context(), \
+            patch('app.services.vision_ollama.requests.post', _post), \
+            patch.object(ollama_control, 'ensure_captioning_ready',
+                         return_value={'ok': True, 'reachable': True}):
+        keep = vk.keep_alive_for_isolated_call()
+        out = vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep,
+                                                  auto_start_local=True)
+    assert out == 'a caption' and len(calls) == 2
+    assert vk.lease_is_live() is True
+
+
 # -- the wiring: the paths that take the GPU actually revoke -----------------
 
 def test_the_comfyui_queue_revokes_before_submitting(app):
