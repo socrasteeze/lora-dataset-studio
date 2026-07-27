@@ -3,6 +3,8 @@ import { INPUT_CLASS, Card } from './primitives'
 import KleinLoraCombobox, { useKleinGenerationLoras } from './KleinLoraCombobox'
 import PromptOverrideField from '../common/PromptOverrideField'
 import PromptPreview from './PromptPreview'
+import ResetToDefault from './ResetToDefault'
+import { defaultValueAt } from './settingDefaults.js'
 import {
   identityPromptFields, PROMPT_SUBJECT_TYPES,
   readIdentityPrompt, writeIdentityPrompt, subjectHasOverride,
@@ -179,8 +181,12 @@ const KLEIN_MODEL_SLOTS = [
    steps, which drive a different pass. */
 const KLEIN_GENERATION_STEPS_MAX = 50   // face_dataset_service._IMPROVE_MAX_STEPS
 
-function KleinGenerationCard({ config, setField }) {
-  const steps = config.klein?.generation_steps ?? 5
+function KleinGenerationCard({ config, setField, configDefaults }) {
+  // The shipped 5 is read from the server payload, never retyped here: it used
+  // to be a literal `?? 5` in this file, i.e. a second copy of a backend default
+  // that nothing kept in sync.
+  const shipped = defaultValueAt(configDefaults, 'klein', 'generation_steps')
+  const steps = config.klein?.generation_steps ?? shipped
   return (
     <Card
       id="klein-generation"
@@ -199,14 +205,16 @@ function KleinGenerationCard({ config, setField }) {
           step={1}
           value={steps}
           onChange={(e) => setField('klein', 'generation_steps',
-            e.target.value === '' ? 5 : Number(e.target.value))}
+            e.target.value === '' ? shipped : Number(e.target.value))}
           className={INPUT_CLASS}
         />
         <p className="mt-1 text-[0.6875rem] text-content-subtle">
-          5 = the shipped value. More steps = slower, usually cleaner; 1–{KLEIN_GENERATION_STEPS_MAX}.
+          {shipped} = the shipped value. More steps = slower, usually cleaner; 1–{KLEIN_GENERATION_STEPS_MAX}.
           Applies to variations, regenerations and the small-image rescue — not to
           “Upscale &amp; improve”, which has its own Steps below.
         </p>
+        <ResetToDefault label="Generation steps" section="klein" field="generation_steps"
+          config={config} configDefaults={configDefaults} setField={setField} />
       </div>
     </Card>
   )
@@ -223,9 +231,11 @@ const KREA_GROUNDING_MIN = 512      // mirrors krea_edit_helper.GROUNDING_PX_MIN
 const KREA_GROUNDING_MAX = 1536     // mirrors krea_edit_helper.GROUNDING_PX_MAX
 const KREA_STEPS_MAX = 50
 
-function KreaCard({ config, setField }) {
+function KreaCard({ config, setField, configDefaults }) {
   const krea = config.krea || {}
-  const grounding = Number(krea.grounding_px ?? 1024)
+  const reset = { config, configDefaults, setField }
+  const dflt = (key) => defaultValueAt(configDefaults, 'krea', key)
+  const grounding = Number(krea.grounding_px ?? dflt('grounding_px'))
   return (
     <Card
       id="krea-engine"
@@ -253,6 +263,7 @@ function KreaCard({ config, setField }) {
           the reference more, but starts copying the pose and outfit you asked it to change.
           1024 px is the recommended balance for people; the node&rsquo;s own default is 768.
         </p>
+        <ResetToDefault label="Reference grounding" section="krea" field="grounding_px" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
@@ -265,15 +276,16 @@ function KreaCard({ config, setField }) {
           min={1}
           max={KREA_STEPS_MAX}
           step={1}
-          value={krea.steps ?? 10}
+          value={krea.steps ?? dflt('steps')}
           onChange={(e) => setField('krea', 'steps',
-            e.target.value === '' ? 10 : Number(e.target.value))}
+            e.target.value === '' ? dflt('steps') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
         <p className="mt-1 text-[0.6875rem] text-content-subtle">
-          10 is the value the model&rsquo;s own reference workflow uses. More is slower and
-          rarely better on this pipeline.
+          {dflt('steps')} is the value the model&rsquo;s own reference workflow uses. More is
+          slower and rarely better on this pipeline.
         </p>
+        <ResetToDefault label="Sampler steps" section="krea" field="steps" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
@@ -293,6 +305,11 @@ function KreaCard({ config, setField }) {
           Turbo then Raw model from your ComfyUI. Non-Krea-2 checkpoints that merely carry
           &ldquo;krea&rdquo; in their name are skipped: the identity LoRA renders pure noise on them.
         </p>
+        {/* The default here is the EMPTY string, and resetting writes exactly
+            that: blank means "resolve it yourself", and a reset must give that
+            state back rather than freeze whichever file the app happens to
+            pick today. */}
+        <ResetToDefault label="Base model file" section="krea" field="base_model" {...reset} />
       </div>
 
       <div className="mt-3 sm:max-w-md">
@@ -312,6 +329,7 @@ function KreaCard({ config, setField }) {
           name, the app searches your LoRA folders for a krea2_identity_edit file, so a
           renamed download still works.
         </p>
+        <ResetToDefault label="Identity edit LoRA" section="krea" field="identity_lora" {...reset} />
       </div>
     </Card>
   )
@@ -344,26 +362,31 @@ function KreaCard({ config, setField }) {
 
 // Bounds mirror the server-side clamps in face_dataset_service._improve_float /
 // _improve_int — the UI should not offer a value the backend will silently pull back.
+// The `fallback` numbers this list used to carry (2 / 0 / 0 / 4) are gone: they
+// were a hand-kept copy of config.DEFAULTS['klein'], and one of them (0 for the
+// consistency strength) had ALREADY drifted from the backend's 1.0. Both the
+// displayed value and "Reset to default" now read the server's `config_defaults`.
 const IMPROVE_KNOBS = [
-  { key: 'improve_megapixels', label: 'Output size (MP)', fallback: 2,
+  { key: 'improve_megapixels', label: 'Output size (MP)',
     min: 0.5, max: 8, step: 0.5,
-    hint: 'The result’s resolution. 2 = the shipped value.' },
-  { key: 'improve_base_lora_strength', label: 'Enhancement LoRA', fallback: 0,
+    hint: 'The result’s resolution.' },
+  { key: 'improve_base_lora_strength', label: 'Enhancement LoRA',
     min: 0, max: 2, step: 0.05,
     hint: '0 = off (the shipped behaviour). Try 0.5–0.8. Needs klein/realistic.safetensors.' },
   // Drives klein.consistency_strength, which enqueue_klein_edit clamps to 1.5 — the
   // UI must not offer a value the engine pulls back. It anchors COMPOSITION, not
   // identity: it was mislabelled "Character LoRA" when these knobs first shipped.
-  { key: 'improve_consistency_strength', label: 'Consistency LoRA', fallback: 0,
+  { key: 'improve_consistency_strength', label: 'Consistency LoRA',
     min: 0, max: 1.5, step: 0.05,
     hint: 'Holds the composition and background. High values resist the edit.' },
-  { key: 'improve_steps', label: 'Steps', fallback: 4,
+  { key: 'improve_steps', label: 'Steps',
     min: 1, max: 50, step: 1, hint: 'More steps = slower, usually cleaner.' },
 ]
 
 function IdentityPromptsCard({ config, setField, promptDefaults, promptDefaultsBySubject,
-                               setIdentityPrompts }) {
+                               setIdentityPrompts, configDefaults }) {
   const ip = config.identity_prompts || {}
+  const kleinDefault = (key) => defaultValueAt(configDefaults, 'klein', key)
   // Subject type being edited. This screen has NO dataset context, so without an
   // explicit picker it edited "the" identity prompt — which is exactly how an
   // animal-tuned lock ended up on human generations (ashish.sinha, Discord).
@@ -543,7 +566,12 @@ function IdentityPromptsCard({ config, setField, promptDefaults, promptDefaultsB
           much the pass actually changes were hardcoded — including both LoRA
           strengths at 0, which meant the workflow's own realistic LoRA never
           applied. Defaults here are those historical values. */}
-      <div className="border-t border-border pt-4">
+      {/* id spelled out literally: it is the deep-link target of the lightbox's
+          "Adjust improve strength →" link, and the contract tests find targets by
+          scanning this file for id="…". The BLOCK is the target, not one knob:
+          "strength" here is the four values together, and ringing the group is
+          the honest answer to what that label promises. */}
+      <div id="klein-improve-strength" className="scroll-mt-24 border-t border-border pt-4">
         <h4 className="text-sm font-medium text-content">Upscale &amp; improve — strength</h4>
         <p className="mt-1 mb-2 text-xs text-content-muted">
           Output resolution, and how much the pass is allowed to change the image. All four
@@ -568,12 +596,16 @@ function IdentityPromptsCard({ config, setField, promptDefaults, promptDefaultsB
                 min={k.min}
                 max={k.max}
                 step={k.step}
-                value={config.klein?.[k.key] ?? k.fallback}
+                value={config.klein?.[k.key] ?? kleinDefault(k.key)}
                 onChange={(e) => setField('klein', k.key,
-                  e.target.value === '' ? k.fallback : Number(e.target.value))}
+                  e.target.value === '' ? kleinDefault(k.key) : Number(e.target.value))}
                 className={INPUT_CLASS}
               />
-              <p className="mt-1 text-[0.6875rem] text-content-subtle">{k.hint}</p>
+              <p className="mt-1 text-[0.6875rem] text-content-subtle">
+                {k.hint} Default {String(kleinDefault(k.key))}.
+              </p>
+              <ResetToDefault label={k.label} section="klein" field={k.key}
+                config={config} configDefaults={configDefaults} setField={setField} />
             </div>
           ))}
         </div>
@@ -628,7 +660,7 @@ function KleinModelFilesCard({ config, setField, caps }) {
 }
 
 export default function EnginesSection(props) {
-  const { config, setField, caps, toggleEngine } = props
+  const { config, setField, toggleEngine, caps, configDefaults } = props
   return (
     <div className="space-y-6">
       <Card title="Engines"
@@ -651,6 +683,8 @@ export default function EnginesSection(props) {
           >
             {ENGINE_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
+          <ResetToDefault label="Default engine" section="engines" field="default"
+            config={config} configDefaults={configDefaults} setField={setField} />
         </div>
 
         <fieldset id="engines-enabled" className="scroll-mt-24">
@@ -669,20 +703,26 @@ export default function EnginesSection(props) {
               </label>
             ))}
           </div>
+          {/* The only LIST with a reset. Ticking the boxes back one by one means
+              knowing which five shipped enabled — and the catalog grows with
+              releases, so that knowledge goes stale. Order is not compared: a
+              re-ticked selection is the same selection. */}
+          <ResetToDefault label="Enabled engines" section="engines" field="enabled"
+            config={config} configDefaults={configDefaults} setField={setField} />
         </fieldset>
       </Card>
 
       <KleinModelFilesCard config={config} setField={setField} caps={caps} />
 
-      <KleinGenerationCard config={config} setField={setField} />
+      <KleinGenerationCard config={config} setField={setField} configDefaults={configDefaults} />
 
       <KleinLorasCard config={config} setField={setField} />
 
-      <KreaCard config={config} setField={setField} />
+      <KreaCard config={config} setField={setField} configDefaults={configDefaults} />
 
       <IdentityPromptsCard config={config} setField={setField} promptDefaults={props.promptDefaults}
         promptDefaultsBySubject={props.promptDefaultsBySubject}
-        setIdentityPrompts={props.setIdentityPrompts} />
+        setIdentityPrompts={props.setIdentityPrompts} configDefaults={configDefaults} />
     </div>
   )
 }
