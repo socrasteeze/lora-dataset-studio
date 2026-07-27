@@ -323,7 +323,13 @@ const TOPICS = [
   action('lineage-compare-runs', 'Compare two runs side by side',
     ['compare runs', 'compare two runs', 'diff', 'difference', 'what changed',
      'side by side', 'shift click', 'lineage compare', 'ab compare', 'settings diff',
-     'which setting changed', 'experiment', 'lab'],
+     'which setting changed', 'experiment', 'lab',
+     // The compare drawer now answers dataset and machine questions too, so the
+     // words a user would actually type for those must reach this topic.
+     'caption changed', 'which captions changed', 'caption diff', 'which images',
+     'image added', 'image removed', 'deleted image', 'which image did i delete',
+     'dataset changed', 'ai-toolkit version', 'torch version', 'cuda', 'gpu',
+     'base model changed', 'snapshot', 'provenance', 'reproduce a run'],
     '/cloud', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('lineage-remove-gone-run', 'Remove a gone run from the graph',
     ['remove run', 'delete run', 'gone', 'tidy graph', 'clean up runs',
@@ -549,6 +555,15 @@ const TOPICS = [
      'face', 'bust', 'body', 'back', 'sort shots', 'imported', 'import', 'drag and drop',
      'no crop', 'head crop off', 'ollama', 'vision', 'qwen'],
     '/datasets?section=add', 'dataset-guide', '2-how-many-images-and-which-ones'),
+  // Krea's one structural quirk: it reproduces the REFERENCE's aspect ratio, so
+  // a square reference squeezes every body/back shot. Reached from the ⚠ notice
+  // in the generation panel — the only place the trade-off can be acted on.
+  action('krea-reference-shape', 'Krea and the shape of your reference photo',
+    ['krea', 'krea 2', 'krea 2 edit', 'reference', 'reference photo', 'aspect',
+     'aspect ratio', 'shape', 'square', 'portrait', 'landscape', 'crop', 'recrop',
+     'body', 'back', 'full body', 'full length', 'framing', 'cropped', 'tight',
+     'too close', 'zoomed in', 'bust instead of body', '3:4'],
+    '/datasets?section=add', 'using-the-app', 'krea-and-the-shape-of-your-reference-photo'),
   action('action-caption-generate', 'Generate captions',
     ['caption', 'generate', 'joycaption', 'ollama', 'text'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
