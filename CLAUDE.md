@@ -21,6 +21,10 @@ Run through this before calling a wave done:
    Frontend: `node --test` from `frontend/` — includes the help-registry,
    what's-new, and **local-only-engines** contract tests (the last one fails if
    Nano Banana / OpenAI Setup UI reappears in `src` or stale `frontend/dist`).
+   Also `npm run lint` from `frontend/` (ESLint `no-undef` only): it catches
+   the bare-identifier merge leftovers the bundler and tests can't (three
+   workspace-crashing `ReferenceError`s shipped this way — see FORK_NOTES
+   merge diagnostic 6).
 2. **Source-only commits.** Never commit `frontend/dist/**` alongside sources;
    the dist rebuild is a separate consolidated `build(frontend):` commit at the
    end of the wave.
