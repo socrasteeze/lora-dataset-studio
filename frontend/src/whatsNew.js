@@ -50,6 +50,30 @@ import { SETUP_STEP_IDS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-27-krea-reference-shape-notice',
+    date: '2026-07-27',
+    title: 'Krea told you why your full-body shots came back as busts — before you generate them',
+    blurb:
+      'Krea 2 Edit reproduces the shape of your reference photo; that is how the identity LoRA was trained, and no prompt overrides it. So a square reference cannot hold a standing figure, and the model resolves the conflict by moving in — measured: the same shot, same seed, came back a bust from a 1024×1024 reference and a full figure from an 835×1024 one. The generation panel now says so the moment you tick Krea: "18 of your 20 selected shots are body or back framings", what will happen to them, and a ✂ Crop reference to 3:4 button that opens the usual crop editor already set to a portrait ratio. It is a heads-up, not a wall — those shots still generate, they just land closer in. It only shows up for Krea (Klein and the API engines follow each shot), only when your reference really is square or wide, and only when wide shots are actually selected.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-27-face-score-the-triage-pile',
+    date: '2026-07-27',
+    title: '\u{1F3AD} Analyze faces now scores the images waiting for your ✓/✕ — the ones you cannot judge by eye',
+    blurb:
+      'On a face with no distinctive marking, restaged from a bad photo, "is this still her?" is not a question your eye can answer — it needs a number. The face pass had one, and it was pointed at the wrong pile: it only scored images you had already kept, so freshly generated variations, the exact set you are trying to triage, never got a score. Now they do, and the 🎯 Auto-triage slider that was built for them finally has something to act on: set a threshold, keep what resembles the reference, reject what drifted. The button also tells you what it is about to do ("🎭 Analyze faces (42 · 7 new)") instead of running a mystery pass. Still on demand, still CPU-only — it never runs by itself and never touches your GPU. And if InsightFace is not installed, the button now says so with a link to Setup instead of failing after the click.',
+    to: '/datasets?section=curation',
+  },
+  {
+    id: '2026-07-27-run-freeze-and-real-compare',
+    date: '2026-07-27',
+    title: 'Comparing two runs now shows what the captions actually said — and which image you deleted',
+    blurb:
+      'Every launch, local or cloud, now freezes the whole thing: the text of every caption, a real content hash of every image, the dataset’s kind and reference photo, and the machine itself — ai-toolkit revision, PyTorch/CUDA, GPU, and the identity of the base-model file. Shift-click two runs and the compare drawer answers in full: which images arrived, which left, which captions were edited with the changed words highlighted word by word, and which images were quietly re-cropped or re-masked behind an unchanged id. Deleted images stay lookable — a deduplicated copy is kept at launch, so "+2 images, 3 captions edited" finally comes with pictures. The recipe table grew up too: steps, base model, masked training, EMA, network type, scheduler and warmup are all compared now, where before three of the most important rows silently matched nothing. Runs trained before today say so instead of pretending nothing changed.',
+    to: '/canvas',
+  },
+  {
     id: '2026-07-26-no-phantom-vision-lease',
     date: '2026-07-26',
     title: 'Training starts promptly even if Ollama was down a moment ago',

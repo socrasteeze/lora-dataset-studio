@@ -853,6 +853,14 @@ def launch_cloud_training(user_id, dataset_id, steps=None, base_model=_UNSET,
     # custom-base run keeps its own folder/prefix (combo-hash suffix, exactly
     # like local runs) and Base/De-Turbo cannot share Turbo's run path.
     run_name = lt._run_name(ds, base_model=base_model, family=fam, variant=variant)
+    # Freeze the dataset (manifest + caption text + image content hashes +
+    # environment) BEFORE the reservation lock, exactly like the local path: the
+    # only file I/O of the registration happens here, so the registration itself
+    # stays one short write and neither the reservation window nor the launch
+    # response grows a second writer competing for the database lock.
+    from . import checkpoint_registry
+    _prepared = checkpoint_registry.prepare_launch(
+        user_id, dataset_id, base_model=base_model)
     with _launch_reservation_lock:
         # Authoritative re-check + insert. Keeping the commit inside this
         # process-wide critical section means a second request always sees the
@@ -938,13 +946,13 @@ def launch_cloud_training(user_id, dataset_id, steps=None, base_model=_UNSET,
                 params['resume_step'] = int(resume_step)
         # Provenance registry (same as local launches): dataset version at
         # launch time, stamped into the params so payloads can expose it.
-        from . import checkpoint_registry
         rec = checkpoint_registry.register_launch(
             user_id, dataset_id, family=fam, source='cloud',
             variant=variant, masked=bool(masked), steps=n_steps,
             cloud_run_id=run.id,
             settings=lt.launch_settings_snapshot(
                 _run_config_dataset(ds, params), fam),
+            prepared=_prepared,
             parent_record_id=parent_record_id, resumed_from=resumed_from)
         if rec is not None:
             params['version'] = rec.version
@@ -3137,11 +3145,24 @@ def _testable_by_step(dataset_id, family, run_tag=None, final_step=None) -> dict
     except Exception:
         return {}
     for c in cands:
-        s = _step_of_testable(c.get('filename'))
+        fn = c['filename']
+        s = _step_of_testable(fn)
         if s is not None:
-            out[s] = c['filename']
+            # A NUMBERED save must belong to the run we are answering for.
+            # Without this, two runs of the same dataset+family that both saved
+            # at step 2500 shared one key: importing run A's 2500 lit up "✓
+            # Deployed" on run B's 2500 too, and B's Undeploy would have removed
+            # A's file. Reported after importing step 2500 of one run and seeing
+            # every other run's 2500 turn green.
+            # Untagged files (imported before run tagging) still match on the
+            # step alone — refusing them would un-deploy every legacy import.
+            if run_tag and run_tag[1]:
+                tag = lt.parse_deployed_run(fn)
+                if tag[1] is not None and tag != tuple(run_tag):
+                    continue
+            out[s] = fn
         else:
-            stepless.append(c['filename'])
+            stepless.append(fn)
     # Deterministic on collision: a file that NAMES the step always wins over a
     # step-less one claiming the same step, and among several step-less deploys
     # of the same run the highest `_v<N>` wins.
