@@ -127,6 +127,32 @@ def _ensure_ollama_decodable(image_bytes: bytes) -> bytes:
         return image_bytes
 
 
+def _forget_lease_if_unreachable(exc: Exception) -> None:
+    """Hand back any keep-warm lease after a CONNECTION-level failure.
+
+    A lease is granted BEFORE the vision call (it has to be — `keep_alive` rides
+    in the request payload), so a call that never reached Ollama leaves a lease
+    pointing at a server that is not holding anything. Left in place, the next
+    GPU contender's `revoke()` would pay `unload_vision_model()`'s retries
+    against the same dead socket (~4 s before a training spawn on Windows, where
+    each connect walks ::1 then 127.0.0.1) instead of being the no-lease no-op
+    it is designed to be.
+
+    Only connection-level failures qualify (both requests' ConnectionError —
+    which covers ConnectTimeout — and the builtin): no HTTP response means the
+    server itself is gone. A read timeout or an HTTP rejection keeps the lease —
+    the server answered, may well have the model resident, and revoking against
+    a live server is one cheap POST. Never raises: lease bookkeeping must not
+    mask the original failure."""
+    if not isinstance(exc, (requests.exceptions.ConnectionError, ConnectionError)):
+        return
+    try:
+        from .vision_keepalive import forget_lease
+        forget_lease()
+    except Exception:
+        pass
+
+
 def get_vision_model() -> str:
     """Resolve the Ollama vision model: env ``VISION_OLLAMA_MODEL`` > config
     ``ollama.vision_model`` (defaults to 'huihui_ai/qwen3-vl-abliterated:8b-instruct', see
@@ -247,6 +273,7 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
             from . import ollama_control
             ready = ollama_control.ensure_captioning_ready()
             if not ready.get('ok'):
+                _forget_lease_if_unreachable(e)
                 raise RuntimeError(ready.get('error') or 'Ollama is unavailable') from e
             retried = describe_image_ollama(
                 image_bytes, prompt, ollama_url=ollama_url, model=model,
@@ -261,6 +288,7 @@ def describe_image_ollama(image_bytes: bytes, prompt: str, *,
         # Best-effort call: contract is to return "" — but still log the concrete
         # reason (previously only the opaque status code reached the log).
         logger.warning('vision_ollama: describe skipped: %s', reject or e)
+        _forget_lease_if_unreachable(e)
         return ''
 
 
