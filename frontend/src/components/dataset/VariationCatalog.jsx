@@ -1466,18 +1466,24 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
         {!hasRef && (
           <span className="text-amber-300 text-[0.6875rem]">Set a reference photo first</span>
         )}
+        {/* Never a silently empty batch: an unchecked engine grid, an empty shot
+            selection or a run over the server's per-batch cap all SAY why the
+            button is dead instead of just greying it out. */}
+        {blockedReason && hasRef && (
+          <span className="text-amber-300 text-[0.6875rem]">{blockedReason}</span>
+        )}
         {/* Disabled for the WHOLE batch, not just the launch request: `busy` is the
             hook's busyLive (local flag OR any server-side activity, restored on
             reload), so a generation already in flight keeps this locked with a
             visible reason. */}
-        <button type="button" onClick={go} disabled={busy || !selected.size || !hasRef || !currentAvailable}
-          title={generating ? 'A generation batch is already running' : undefined}
+        <button type="button" onClick={go} disabled={busy || !hasRef || !!blockedReason}
+          title={generating ? 'A generation batch is already running' : (blockedReason || undefined)}
           className="ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
           {busy
             ? (generating
                 ? `Generating…${generating.total ? ` ${generating.done}/${generating.total}` : ''}`
                 : '…')
-            : `Generate (${selected.size * multiplier})`}
+            : `Generate (${totalImages(selected.size, engines, engineMode, multiplier)})`}
         </button>
       </div>
     </div>

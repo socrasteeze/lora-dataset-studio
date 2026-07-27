@@ -50,6 +50,13 @@ import { SETUP_STEP_IDS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-27-merge-leftover-crash-sweep',
+    date: '2026-07-27',
+    title: 'Swept out three more hidden crashes of the same kind as the create-dataset one',
+    blurb:
+      'The create-dataset crash had siblings: the Runs page crashed on open, Settings › Image engines crashed on open, and the Generate button would have crashed the workspace the moment you had a reference and shots selected — all from the same upstream sync, all the same pattern (a line kept while the one-line definition it needs was dropped). A new automatic check now scans for exactly this pattern on every change, so this whole class of crash gets caught before it ships instead of by you.',
+  },
+  {
     id: '2026-07-27-create-dataset-crash-fix',
     date: '2026-07-27',
     title: 'Creating a dataset no longer greets you with a full-screen error',
