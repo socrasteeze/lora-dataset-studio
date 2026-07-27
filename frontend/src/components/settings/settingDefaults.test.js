@@ -134,11 +134,12 @@ test('no Settings section hardcodes a config default as a display fallback', () 
 });
 
 test('the sources read the defaults through the shared lookup', () => {
-  // TrainingSection.jsx is absent from this list on purpose (Divergence 4): the
-  // only settings upstream resets there are the cloud-rental ones, so this fork
-  // has no reason to import the lookup into it.
+  // TrainingSection.jsx joined this list when concept face masking landed
+  // (issue #15): its two face_mask knobs are the first NON-cloud settings this
+  // fork resets there. The seven cloud.* rental settings upstream resets in the
+  // same file stay out — Divergence 4 removes the card that owns them.
   for (const name of ['EnginesSection.jsx', 'CaptioningSection.jsx',
-    'LocalToolsSection.jsx']) {
+    'LocalToolsSection.jsx', 'TrainingSection.jsx']) {
     assert.match(sources[name], /import \{ defaultValueAt \} from '\.\/settingDefaults\.js'/,
       `${name} must read defaults from the payload`);
   }
@@ -171,9 +172,13 @@ const COVERED = [
   ...['sharpness_min', 'noise_max', 'uniformity_min', 'min_side', 'detail_min', 'bars_max',
     'dup_distance', 'face_threshold', 'aesthetic_min', 'nsfw_max', 'style_threshold',
     'semantic_dup_threshold'].map((k) => ['CaptioningSection.jsx', 'bank', k]),
-  // Divergence 4: upstream covers seven cloud.* rental settings in
+  // Divergence 4: upstream also covers seven cloud.* rental settings in
   // TrainingSection.jsx. This fork has no cloud-rental card, so there is
   // nothing to reset there and no cloud section in its settings UI.
+  // Concept face masking (issue #15) — both knobs are user-tunable, so both must
+  // have a way back to the shipped value.
+  ['TrainingSection.jsx', 'face_mask', 'expand'],
+  ['TrainingSection.jsx', 'face_mask', 'min_weight'],
   ['LocalToolsSection.jsx', 'ollama', 'vision_concurrency'],
   ['LocalToolsSection.jsx', 'ollama', 'vision_keep_warm_seconds'],
   ['ServerSection.jsx', 'server', 'port'],

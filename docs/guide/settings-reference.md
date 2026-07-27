@@ -313,6 +313,31 @@ Defaults for new local training runs.
 
 This fork's Settings → Training keeps only **Defaults** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
 
+### Concept face masking
+
+Used **only** by Concept datasets that switched **Mask faces** on in *Advanced
+training options* (see the dataset guide, §8). It re-weights the training loss over
+detected faces so the concept learns the act rather than the identities in your
+photos — it never alters your images. Both knobs are exposed rather than frozen
+because no published measurement exists for the right value; preview the effect on
+your own images from the training panel.
+
+- **Head coverage (face box ×)** → `face_mask.expand`. Face detection returns a box
+  running from the eyes to the chin; this grows it around its centre (biased upward,
+  to catch hair) into a head. Default **2.0**, clamped to **1.0–3.0**. Higher covers
+  hair and jaw, lower stays tight on the face. 2.0 matches the only published default
+  for this detector/mask combination.
+- **Loss weight kept on faces** → `face_mask.min_weight`. How much the masked area
+  still counts, from 0 (nothing) to 1 (unmasked). Default **0.1**, clamped to
+  **0.05–1.0**. Lower pushes identity out harder. **It deliberately cannot reach
+  zero**: an area worth nothing isn't ignored, it's *unpenalised* — the model may
+  render anything there at no cost, degraded anatomy is reported right below this
+  floor, and a fully masked close-up would divide by zero in the trainer's own mask
+  normalisation and kill the run.
+
+Changing these does **not** affect the person-masking used by Character datasets;
+that keeps its own historical weight.
+
 ### Advanced options (per run)
 
 These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. Two are worth calling out because of a caveat:
