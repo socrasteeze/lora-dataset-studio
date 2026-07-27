@@ -317,11 +317,14 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
         {img.status === 'reject' && badge(`✕ ${img.reject_reason || ''}`.trim(), 'bg-rose-500/80 text-white')}
         {/* This image left for somewhere: a dataset, another bank, or both. One
             badge for both destinations — the tile says THAT it went, the tooltip
-            and the review lightbox say where. Divergence 3: upstream's pictograph
-            is replaced by a monochrome arrow, not stripped to an EMPTY badge.
+            and the review lightbox say where. The glyph matches this file's own
+            "⬆ Promote…" button and its toasts, which is the gesture the badge is
+            reporting; the fork previously carried a bare `badge('')` here, an
+            over-strip that rendered an INVISIBLE badge (Divergence 3 keeps a
+            glyph when removing it would leave nothing to see).
             key=f: these badges are the only mapped ones here. */}
         {(img.promoted_dataset_id != null || img.promoted_bank_id != null)
-          && badge('↑', 'bg-indigo-500/80 text-white')}
+          && badge('⬆', 'bg-indigo-500/80 text-white')}
         {img.flags.map((f) => badge(FLAG_LABEL[f]?.slice(0, 2) || f, 'bg-black/60 text-amber-200', f))}
         {img.face_cluster != null && badge(`${img.face_cluster}`, 'bg-black/60 text-sky-200')}
         {img.framing && badge(`${img.framing}`, 'bg-black/60 text-teal-200')}
