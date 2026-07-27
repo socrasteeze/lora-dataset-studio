@@ -75,10 +75,15 @@ test('the "used by your current engine" badge follows the selected generator', (
   assert.equal(activeExtraRefPromptKey('nanobanana'), 'face_multi');
   assert.equal(activeExtraRefPromptKey('chatgpt'), 'face_multi');
   assert.equal(activeExtraRefPromptKey('klein'), 'klein_identity');
-  // MIRRORS VariationCatalog: nothing stored yet = its 'nanobanana' default...
-  assert.equal(activeExtraRefPromptKey(''), 'face_multi');
-  assert.equal(activeExtraRefPromptKey(null), 'face_multi');
-  assert.equal(activeExtraRefPromptKey(undefined), 'face_multi');
-  // ...and any other value is Klein (its isKlein = "neither API engine")
+  assert.equal(activeExtraRefPromptKey('krea'), 'klein_identity');
+  // Divergence 1: nothing stored yet MIRRORS this fork's DEFAULT_ENGINE
+  // ('klein'), not upstream's 'nanobanana'. Taking upstream's default badged
+  // face_multi — an API-engine prompt this fork never surfaces and no local
+  // generation reads — so a user who had not yet opened the Generate panel was
+  // pointed at a box that could not affect their images.
+  assert.equal(activeExtraRefPromptKey(''), 'klein_identity');
+  assert.equal(activeExtraRefPromptKey(null), 'klein_identity');
+  assert.equal(activeExtraRefPromptKey(undefined), 'klein_identity');
+  // ...and any other value is Klein (it is "neither API engine")
   assert.equal(activeExtraRefPromptKey('legacy-engine'), 'klein_identity');
 });

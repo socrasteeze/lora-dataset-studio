@@ -50,6 +50,13 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-27-extra-ref-prompt-badge-points-at-klein',
+    date: '2026-07-27',
+    title: 'The "used by your current engine" badge now points at the prompt your images actually use',
+    blurb:
+      'On the extra-references prompt editor, the badge marking which box your generations really read could land on the wrong one - it fell back to an engine this app does not have, so on a fresh install it highlighted a prompt that has no effect here. Edit that box and nothing changed in your images. It now follows Klein, the engine you are actually generating with.',
+  },
+  {
     id: '2026-07-27-klein-workflow-runs-on-a-stock-comfyui',
     date: '2026-07-27',
     title: 'Klein generation now works on a normal ComfyUI — and its images will look slightly different',
