@@ -15,6 +15,18 @@ or a future change reintroduces a custom node the target ComfyUI lacks, the rout
 answers one actionable "install pack X, restart ComfyUI" 409 instead of ComfyUI's
 raw 400 'missing_node_type'.
 
+Widget VALUES are part of that portability, and this is where it was missed
+(2026-07-27, reported by IndependentProcess0 on Reddit). Node 77 used to sample
+with `scheduler: "beta57"`, which is NOT a ComfyUI scheduler: the RES4LYF pack
+appends it to the CORE list at import (`SCHEDULER_NAMES.append("beta57")`), so on
+the machine this workflow was captured on even a plain KSampler accepted it — and
+on every install without that pack, generation died with ComfyUI's raw
+"Value not in list: scheduler". The graph contained no third-party NODE, so the
+preflight above saw nothing wrong. It now uses `simple`, which every ComfyUI has
+and which four other shipped graphs already use. Do not "improve" it back to a
+value that works on your machine without checking it against a stock install —
+`backend/tests/test_workflow_portability.py` enforces exactly that, offline.
+
 Lifted from the parent project's app/services/klein_edit_helper.py for LoRA
 Dataset Studio: SRC's module-level COMFYUI_INPUT_DIR/COMFYUI_OUTPUT_DIR constants
 become live `cfg.comfyui_dir(...)` calls (config.json changes take effect without
@@ -27,12 +39,12 @@ import hashlib
 import logging
 import os
 import random
-import shutil
 import time
 import uuid
 
 from .. import config as cfg
 from . import comfy_model_paths
+from ..utils import comfy_fs
 from ..utils.comfyui import load_workflow_local
 from ..job_queue import queue_manager
 
@@ -631,6 +643,42 @@ def klein_missing_nodes(workflow=None):
     return out
 
 
+_enums_ok_until = 0.0
+
+
+def klein_unsupported_enums(workflow=None):
+    """[{node_id, class_type, input, value, pack, url}] for every widget value the
+    Klein edit workflow pins that the target ComfyUI does NOT accept. Loads the
+    shipped 'improve skin.json' when no `workflow` is given.
+
+    Sibling of `klein_missing_nodes`, and the gap it leaves: that one compares
+    class_types, so a graph built entirely from CORE nodes passes it — and then
+    dies on a core KSampler because one of its VALUES (the `beta57` scheduler,
+    which the RES4LYF pack registers into core) isn't there. Same probe, same
+    /object_info payload, one level deeper into it.
+
+    Same success-only TTL as the node verdict, and for the same reason: the
+    capabilities probe calls this every 30 s, /object_info is a multi-MB payload,
+    and its own cache is only 60 s — without this the app would re-download it
+    every minute, forever, on a machine that is perfectly fine. Only an
+    "everything supported" verdict is cached; a gap or an unreachable probe is
+    never cached, so installing the missing pack and restarting ComfyUI clears the
+    warning immediately instead of after a delay.
+
+    FAIL-OPEN: [] when /object_info can't be fetched."""
+    global _enums_ok_until
+    from ..utils.comfyui import unsupported_enum_values
+    shipped = workflow is None
+    if shipped:
+        if time.time() < _enums_ok_until:
+            return []
+        workflow = load_workflow_local(str(WORKFLOW_IMPROVE_SKIN_PATH)) or {}
+    found = unsupported_enum_values(workflow)
+    if shipped and not found:
+        _enums_ok_until = time.time() + _NODES_OK_TTL_S
+    return found
+
+
 def format_missing_nodes_message(missing_nodes):
     """Human sentence for a Klein node-missing 409: each missing class_type with the
     pack that provides it + its GitHub link, then the fix instruction. Reused by
@@ -728,10 +776,14 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     if any(a in missing for a in KLEIN_REQUIRED):
         raise KleinModelsMissing(missing)
 
-    comfy_input_dir = _comfy_input_dir()
+    # The source image reaches ComfyUI over the FILESYSTEM, not the API — see
+    # utils/comfy_fs.py. Staged through the guard so a folder that isn't shared
+    # with ComfyUI's container/host says so (409) instead of raising a bare OSError
+    # the routes can only turn into a detail-free 500 (reported by nofaceman).
+    comfy_input_dir = comfy_fs.ensure_input_usable(_comfy_input_dir())
     uid = uuid.uuid4().hex[:8]
     comfy_input = f"edit_source_{uid}_{source_filename}"
-    shutil.copy2(source_path, os.path.join(comfy_input_dir, comfy_input))
+    comfy_fs.stage_input_copy(source_path, comfy_input, comfy_input_dir)
 
     workflow["52"]["inputs"]["image"] = comfy_input
     # Prompt into the CLIPTextEncode widget directly (node 6). The old RES4LYF
@@ -772,7 +824,7 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
             logger.warning(f"klein multi-ref: extra ref missing on disk: {ref_path}")
             continue
         ref_input = f"edit_ref{i}_{uid}_{os.path.basename(ref_path)}"
-        shutil.copy2(ref_path, os.path.join(comfy_input_dir, ref_input))
+        comfy_fs.stage_input_copy(ref_path, ref_input, comfy_input_dir)
         load_id, scale_id = f"ds_ref{i}_load", f"ds_ref{i}_scale"
         enc_id, lat_id = f"ds_ref{i}_encode", f"ds_ref{i}_latent"
         workflow[load_id] = {"class_type": "LoadImage", "inputs": {"image": ref_input},

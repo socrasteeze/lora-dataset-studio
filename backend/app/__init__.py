@@ -203,6 +203,10 @@ _SCHEMA_ADDITIONS = (
     ('bank_image', 'jpeg_quality', 'REAL'),
     ('bank_image', 'origin', 'VARCHAR(8)'),
     ('bank_image', 'origin_evidence', 'VARCHAR(24)'),
+    # ⬆ Promote's second destination: the bank a selection was copied into.
+    # Additive and independent of promoted_dataset_id — a database that never
+    # gains it simply never shows the "promoted to a bank" badge.
+    ('bank_image', 'promoted_bank_id', 'INTEGER'),
     ('image_bank', 'pipeline_report', 'TEXT'),
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).

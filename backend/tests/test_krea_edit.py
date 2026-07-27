@@ -17,6 +17,7 @@ NOTHING here renders anything: not one GPU second, not one paid call.
 """
 import importlib
 import os
+import struct
 
 import pytest
 
@@ -43,9 +44,17 @@ def _comfy_tree(tmp_path):
     return base
 
 
-def _write(path, size=16):
+# Smallest structurally-valid safetensors header (8-byte LE length + '{}'), so a
+# fixture file reads as REAL (if tiny) weights. Krea now validates the header of
+# every present asset (a licence-gate HTML page saved as .safetensors is the
+# failure this catches), and the readiness gate keys off it — the default here
+# keeps every "asset present" fixture honest without writing multi-GB test data.
+_VALID_ST = struct.pack('<Q', 2) + b'{}'
+
+
+def _write(path, data=_VALID_ST):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b'\0' * size)
+    path.write_bytes(data)
     return path
 
 
@@ -212,6 +221,36 @@ def test_preflight_raises_with_both_halves_and_stays_actionable(krea, monkeypatc
         assert hint['pack'] and hint['url'].startswith('https://')
 
 
+# The three Hugging Face weights all live in ONE public, non-gated Comfy-Org repo
+# (measured 2026-07-27), under the exact canonical filenames the resolvers look
+# for. Pinning the repo here is what stops the `source` links from drifting back
+# to a page the user cannot act on: the previous values pointed at
+# huggingface.co/krea/krea-2 (401 "Invalid username or password" — not a licence
+# gate, a wall) and at Comfy-Org/Qwen-Image_ComfyUI, which holds qwen_2.5_vl_*
+# and NOT the qwen3vl_4b encoder this engine needs — an install that followed
+# that link downloaded a file `resolve_krea_text_encoder` deliberately refuses.
+KREA_WEIGHTS_REPO = 'https://huggingface.co/Comfy-Org/Krea-2'
+# Values that are known-bad: a source must never come back to one of these.
+KREA_DEAD_SOURCES = ('huggingface.co/krea/krea-2', 'Qwen-Image_ComfyUI')
+
+
+def test_every_asset_source_points_at_the_canonical_repo(krea):
+    """A `source` is the ONLY thing a user has to go on when an asset is missing —
+    a link that 401s or that lands in a repo without the file is worse than no
+    link, because it costs a download before the app still says 'missing'."""
+    keh, _base, _ = krea
+    for key in ('krea_model', 'krea_text_encoder', 'krea_vae'):
+        src = keh.KREA_ASSETS[key]['source']
+        assert src.startswith(KREA_WEIGHTS_REPO), (
+            f'{key} source {src!r} is not in the canonical weights repo')
+    # The identity LoRA is the one piece that is NOT on Hugging Face.
+    assert keh.KREA_ASSETS['krea_identity_lora']['source'].startswith(
+        'https://civitai.com/')
+    for meta in keh.KREA_ASSETS.values():
+        for dead in KREA_DEAD_SOURCES:
+            assert dead not in meta['source'], f'{dead} is a dead end for a user'
+
+
 def test_the_node_probe_fails_OPEN_when_comfyui_cannot_be_reached(krea, monkeypatch):
     """A transient probe failure must never look like a missing node pack — the
     user would be sent to install something they already have."""
@@ -226,7 +265,51 @@ def test_a_complete_install_preflights_clean(krea, monkeypatch):
     monkeypatch.setattr('app.utils.comfyui.fetch_object_info_classes',
                         lambda *a, **k: set(keh.KREA_NODE_CLASSES) | {'KSampler'})
     assert keh.krea_missing_assets() == []
+    # Valid (if tiny) headers: only the ADVISORY too_small may show up, never a
+    # blocking verdict — an advisory must not keep a working engine dark.
+    assert all(not i['blocking'] for i in keh.krea_invalid_assets())
     keh.preflight()   # must not raise
+
+
+# --- Present-but-INVALID: the state between "missing" and "ready" ------------
+def test_a_licence_gate_page_saved_as_safetensors_is_named_not_silently_run(krea):
+    """The Krea base sits behind a Hugging Face licence gate and the identity
+    LoRA behind a Civitai login: a browser download that skipped either saves the
+    HTML gate PAGE to <name>.safetensors. It is ON DISK, so krea_missing_assets
+    says nothing — and until now the only symptom was ComfyUI's raw
+    `UNETLoader: Expecting value: line 1 column 1 (char 0)` at generate time."""
+    from app.services import model_integrity
+    keh, base, _ = krea
+    _install_everything(base)
+    _write(base / 'models' / 'diffusion_models' / 'Krea' / 'krea2_turbo_fp8.safetensors',
+           data=b'<!doctype html><html>You need to accept the licence</html>')
+    model_integrity.clear_cache()
+    assert 'krea_model' not in keh.krea_missing_assets()      # it IS on disk
+    inv = {i['asset']: i for i in keh.krea_invalid_assets()}
+    assert 'krea_model' in inv
+    assert inv['krea_model']['blocking'] is True
+    assert inv['krea_model']['verdict'] == 'html_or_text'
+    assert 'krea2_turbo_fp8.safetensors' in inv['krea_model']['reason']
+
+
+def test_a_truncated_identity_lora_is_flagged_too(krea):
+    """Not just the base: a half-downloaded LoRA renders SILENTLY distorted
+    images, with no error anywhere to point at."""
+    from app.services import model_integrity
+    keh, base, _ = krea
+    _install_everything(base)
+    _write(base / 'models' / 'loras' / 'krea' / 'krea2_identity_edit_v1_2.safetensors',
+           data=b'\0' * 16)
+    model_integrity.clear_cache()
+    inv = {i['asset']: i for i in keh.krea_invalid_assets()}
+    assert 'krea_identity_lora' in inv and inv['krea_identity_lora']['blocking'] is True
+
+
+def test_invalid_assets_is_empty_on_an_install_with_nothing(krea):
+    """Nothing on disk = 'missing', which krea_missing_assets owns. This one must
+    stay silent rather than double-report every gap."""
+    keh, _base, _ = krea
+    assert keh.krea_invalid_assets() == []
 
 
 # --- output geometry --------------------------------------------------------
@@ -527,6 +610,58 @@ def test_a_missing_node_pack_is_named_in_the_same_409(client, monkeypatch):
     assert body['krea_missing']['node_packs'], 'name the pack, not just the class'
 
 
+def test_picking_krea_and_pressing_generate_installs_it(client, tmp_path, monkeypatch):
+    """The whole point of the wave: selecting the engine and hitting Generate is
+    the request to install it — the same trigger Klein has had. The 409 must fire
+    the installs itself and SAY so, including the restart nobody can guess."""
+    from app import setup_installer, config
+    base = tmp_path / 'ComfyUI'
+    (base / 'models').mkdir(parents=True)
+    (base / 'main.py').write_text('# fake', encoding='utf-8')
+    config.save_config({'comfyui': {'base_dir': str(base)}})
+    monkeypatch.setattr('app.utils.comfyui.fetch_object_info_classes',
+                        lambda *a, **k: {'KSampler'})
+    from app.services import krea_edit_helper as keh
+    monkeypatch.setattr(keh, '_nodes_ok_until', 0.0, raising=False)
+    started = []
+    monkeypatch.setattr(setup_installer, 'start',
+                        lambda action: started.append(action))
+    ds = client.post('/api/dataset/create',
+                     json={'name': 'KI', 'trigger_word': 'kitrig'}).get_json()['id']
+    r = client.post(f'/api/dataset/{ds}/generate', json={
+        'engine_batches': [{'generator': 'krea',
+                            'variations': [{'label': 'Bust, front', 'framing': 'bust',
+                                            'prompt': 'upper body portrait'}]}]})
+    assert r.status_code == 409
+    body = r.get_json()
+    assert 'krea_nodes' in started
+    assert {'krea_model', 'krea_text_encoder', 'krea_vae',
+            'krea_identity_lora'} <= set(started)
+    assert set(body['downloading']) == set(started)
+    assert 'started downloading' in body['error']
+    assert 'RESTART ComfyUI' in body['error']
+
+
+def test_without_a_comfyui_folder_the_krea_409_still_explains_by_hand(client, monkeypatch):
+    """Nothing can be installed with nowhere to install it — the message then has
+    to keep the manual paths AND say which setting unlocks the automatic path."""
+    monkeypatch.setattr('app.utils.comfyui.fetch_object_info_classes',
+                        lambda *a, **k: {'KSampler'})
+    from app.services import krea_edit_helper as keh
+    monkeypatch.setattr(keh, '_nodes_ok_until', 0.0, raising=False)
+    ds = client.post('/api/dataset/create',
+                     json={'name': 'KJ', 'trigger_word': 'kjtrig'}).get_json()['id']
+    r = client.post(f'/api/dataset/{ds}/generate', json={
+        'engine_batches': [{'generator': 'krea',
+                            'variations': [{'label': 'Bust, front', 'framing': 'bust',
+                                            'prompt': 'upper body portrait'}]}]})
+    body = r.get_json()
+    assert r.status_code == 409
+    assert body['downloading'] == []
+    assert 'Setup ▸ ComfyUI' in body['error']
+    assert 'models/vae' in body['error']       # the by-hand paths survive
+
+
 def test_an_unknown_engine_is_still_refused(client):
     ds = client.post('/api/dataset/create',
                      json={'name': 'K2', 'trigger_word': 'k2trig'}).get_json()['id']
@@ -579,7 +714,7 @@ def test_a_krea_row_is_badged_krea_and_a_legacy_klein_row_still_reads_klein():
 
 
 # --- The markings hold order must not SUMMON what it protects -----------------
-# Reported by Jeremy within hours of shipping: "why do my Krea 2 generations
+# Reported within hours of shipping: "why do my Krea 2 generations
 # always add tattoos?". The first version of KREA_MARKINGS_LOCK enumerated the
 # features to preserve ("tattoos with the same design..., scars, moles and
 # piercings") and was assumed to "cost nothing when the subject has no
@@ -616,3 +751,67 @@ def test_no_krea_prompt_names_a_summonable_feature():
                                      label=entry.get('label', '')).lower()
         named = [w for w in _SUMMONABLE if w in prompt]
         assert not named, f"shot {entry['id']} names {named} in its Krea prompt"
+
+
+def test_no_klein_prompt_names_a_summonable_feature():
+    """Klein carries the same hold order since 2026-07-27, so it inherits the
+    same trap: whatever a garment or a shot is renamed to, no composed Klein
+    prompt may name a feature the encoder would paint on a subject who has none.
+    ('scarf' contains 'scar' — that is the kind of addition this catches.)"""
+    from app.services.face_variations import VARIATION_CATALOG, wrap_variation_klein
+    for entry in VARIATION_CATALOG:
+        prompt = wrap_variation_klein(entry['prompt'], nsfw=False,
+                                      framing=entry.get('framing'),
+                                      label=entry.get('label', '')).lower()
+        named = [w for w in _SUMMONABLE if w in prompt]
+        assert not named, f"shot {entry['id']} names {named} in its Klein prompt"
+
+
+# --- Klein inherits the two local-edit fixes (measured 2026-07-27) ------------
+
+def test_klein_holds_the_skin_and_gets_a_concrete_garment():
+    """MEASURED, same seed, one factor at a time. The hold order: on a subject
+    with NO markings it invented none (3/3), and on the tattooed one it kept a
+    forehead piece that vanished without it. The concrete garment: obeyed 5/5,
+    and it broke the "every wide shot ends in blue jeans" collapse the bare
+    negation produced in 3/3."""
+    from app.services import face_variations as fv
+    out = fv.wrap_variation_klein('upper body portrait, ' + fv.OUTFIT_VARY,
+                                  framing='bust', label='Bust, studio')
+    assert fv.KREA_MARKINGS_LOCK.strip() in out
+    assert fv.OUTFIT_VARY not in out and 'not the outfit' not in out
+    assert any(g in out for g in fv.KREA_OUTFIT_PALETTE)
+    # Same shot, same garment, run after run and process after process.
+    assert out == fv.wrap_variation_klein('upper body portrait, ' + fv.OUTFIT_VARY,
+                                          framing='bust', label='Bust, studio')
+
+
+def test_the_shared_variation_wrapper_is_left_alone():
+    """The two local-edit fixes must not reach `wrap_variation`, the shared
+    guard-first wrapper. On this fork that wrapper is retained DEAD CODE (see
+    FORK_NOTES Divergence 1) so the identity-prompt plumbing keeps upstream's
+    shape; this pins that the Klein/Krea work does not silently rewrite it."""
+    from app.services import face_variations as fv
+    out = fv.wrap_variation('upper body portrait, ' + fv.OUTFIT_VARY)
+    assert fv.OUTFIT_VARY in out, 'the API wrapper must keep the raw catalog text'
+    assert fv.KREA_MARKINGS_LOCK.strip() not in out
+
+
+def test_the_outfit_palette_spreads_over_the_catalog():
+    """A palette too short trades a uniform for a quasi-uniform: at 12 garments
+    the worst one carried 6 of the 41 eligible shots and only 11 were ever used.
+    crc32-modulo means the load histogram depends on the palette SIZE, so this
+    pins the OUTCOME — a catalog or palette edit that re-concentrates the picks
+    fails here instead of silently shipping."""
+    import collections
+    from app.services import face_variations as fv
+    # Only the shots that actually RECEIVE a garment: krea_outfit_directive also
+    # strips the dead expression negation, which is not an outfit decision.
+    eligible = [e for e in fv.VARIATION_CATALOG
+                if any(g in fv.krea_outfit_directive(e['prompt'], e['label'])
+                       for g in fv.KREA_OUTFIT_PALETTE)]
+    assert len(eligible) > 30, 'catalog shrank — re-measure before relaxing this'
+    counts = collections.Counter(fv.krea_outfit_for(e['label']) for e in eligible)
+    assert max(counts.values()) <= 4, (
+        f'garment overload: {counts.most_common(3)} over {len(eligible)} shots')
+    assert len(counts) >= 20, f'only {len(counts)} distinct garments used'

@@ -5,6 +5,8 @@ the presets target a balanced training composition (see the design spec).
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import json
 import re
 import zlib
@@ -66,6 +68,28 @@ KLEIN_IMAGE_IMPROVE_PROMPT = (
 # existing wrapper tests lock). The config read is lazy: this module stays
 # import-pure (no Flask), and a caller with no config configured gets the default.
 IDENTITY_PROMPT_KINDS = ('face_single', 'face_multi', 'klein_identity', 'klein_improve')
+
+# The identity locks were only ONE of the six sources the local-edit prompt is
+# assembled from. The other five were hardcoded and shipped in every prompt with
+# no way to see or change them: the markings hold order, the two directives baked
+# into every human shot (outfit / expression), the concrete-garment palette, the
+# per-framing detail block and the photographic rendering tail. They ride the
+# SAME mechanism as the four above — one config key, blank means "shipped
+# default", non-blank wins — deliberately: a second override system would be a
+# second set of rules to learn and a second place for the default path to rot.
+#
+# `outfit_palette` is a LIST stored as TEXT, one garment per line. Same field,
+# same "Restore default", same blank-means-default contract; `outfit_palette()`
+# parses it and falls back to the shipped tuple when the user leaves nothing
+# usable behind.
+PROMPT_PART_KINDS = ('markings_lock', 'outfit_vary', 'expression_neutral',
+                     'outfit_palette', 'render_tail_sfw', 'render_tail_nsfw',
+                     'framing_face', 'framing_bust', 'framing_body', 'framing_back')
+
+# The framings that own a detail block. An unknown/absent framing yields no block
+# at all (historical behaviour), so this set is also what stops a bogus framing
+# from reaching identity_prompt_default and raising KeyError.
+PROMPT_FRAMINGS = ('face', 'bust', 'body', 'back')
 _IDENTITY_PROMPT_DEFAULTS = {
     'face_single': IDENTITY_GUARD,
     'face_multi': IDENTITY_GUARD_MULTI,
@@ -289,7 +313,18 @@ def identity_prompt_defaults_by_subject() -> dict:
 # NOT one of them: it is a subject-agnostic quality instruction ("add texture and
 # detail"), identical in every default table, so splitting it per subject would
 # multiply a setting nobody would want to keep in sync.
-PER_SUBJECT_PROMPT_KINDS = ('face_single', 'face_multi', 'klein_identity')
+#
+# The render tail and the framing detail join them: the anime tail says "Anime
+# illustration, same art style as the reference" where every photographic subject
+# says "Professional realistic photograph", and the framing blocks are already six
+# different tables. One shared text for all six would be a regression.
+# The other four parts (markings lock, the two directives, the garment palette)
+# stay FLAT/global on purpose: `_augment_prompt` only ever runs on the human
+# catalog, so the directives and the garments have no non-human meaning to split,
+# and the markings order is one sentence about not inventing detail.
+PER_SUBJECT_PROMPT_KINDS = ('face_single', 'face_multi', 'klein_identity',
+                            'render_tail_sfw', 'render_tail_nsfw',
+                            'framing_face', 'framing_bust', 'framing_body', 'framing_back')
 
 
 def identity_prompt_config_key(kind: str, subject_type: str = 'human') -> str:
@@ -311,6 +346,51 @@ def identity_prompt_config_key(kind: str, subject_type: str = 'human') -> str:
     return f'identity_prompts.by_subject.{st}.{kind}'
 
 
+def read_prompt_override(identity_prompts, kind: str, subject_type: str = 'human'):
+    """The override for (kind, subject_type) inside a PLAIN `identity_prompts`
+    dict — the same tree `config.get('identity_prompts.…')` walks, but read from a
+    dict handed in by a caller instead of from the saved config. Mirrors
+    identity_prompt_config_key exactly (human = flat legacy key, others under
+    `by_subject`); returns None for anything missing or malformed, so a
+    hand-edited config file or a truncated request body degrades to the default
+    instead of raising."""
+    if not isinstance(identity_prompts, dict):
+        return None
+    st = normalize_subject_type(subject_type)
+    if st == 'human' or kind not in PER_SUBJECT_PROMPT_KINDS:
+        return identity_prompts.get(kind)
+    by = identity_prompts.get('by_subject')
+    if not isinstance(by, dict):
+        return None
+    node = by.get(st)
+    return node.get(kind) if isinstance(node, dict) else None
+
+
+# --- Preview overrides (Settings ▸ Image engines composed preview) ------------
+# The Settings screen saves on an explicit button, so a preview that read the
+# SAVED config would show the previous text while the user edits — the one moment
+# the preview exists for. Instead the screen posts its in-flight `identity_prompts`
+# object and the preview composes with it, through the REAL wrappers: the point of
+# the panel is to show the string the engine receives, and a second composition
+# path in JavaScript would drift from this one on the first change made here.
+#
+# A ContextVar (not a module global) so a preview request can never leak its
+# unsaved text into a generation running on another thread. Default None = "no
+# preview in flight", which is every code path except the preview route.
+_PREVIEW_OVERRIDES = contextvars.ContextVar('lds_preview_prompt_overrides', default=None)
+
+
+@contextlib.contextmanager
+def preview_prompt_overrides(identity_prompts):
+    """Compose prompts against `identity_prompts` (an unsaved Settings tree)
+    instead of the saved config, for the duration of the block."""
+    token = _PREVIEW_OVERRIDES.set(identity_prompts if isinstance(identity_prompts, dict) else None)
+    try:
+        yield
+    finally:
+        _PREVIEW_OVERRIDES.reset(token)
+
+
 def get_identity_prompt(kind: str, subject_type: str = 'human') -> str:
     """Effective identity/quality prompt for `kind` and `subject_type`: the user's
     Settings override FOR THAT SUBJECT TYPE when it holds non-blank text, else the
@@ -321,6 +401,12 @@ def get_identity_prompt(kind: str, subject_type: str = 'human') -> str:
     The override is scoped per subject type — see identity_prompt_config_key for
     the storage layout and why human stays on the legacy flat key."""
     default = identity_prompt_default(kind, subject_type)
+    pending = _PREVIEW_OVERRIDES.get()
+    if pending is not None:
+        # A preview shows the editor's state, WHOLE: no fall-through to the saved
+        # config, or a field the user just cleared would still look overridden.
+        override = read_prompt_override(pending, kind, subject_type)
+        return override if isinstance(override, str) and override.strip() else default
     try:
         from .. import config as cfg
         override = cfg.get(identity_prompt_config_key(kind, subject_type))
@@ -383,7 +469,7 @@ def wrap_variation(prompt: str, ref_count: int = 1, suffix: str = '',
     picks the human/animal/object/creature/other identity lock (default 'human' =
     byte-identical to the historical output)."""
     guard = get_identity_prompt('face_multi' if ref_count > 1 else 'face_single', subject_type)
-    return f"{guard} {_append_suffix(prompt, suffix)}"
+    return f"{guard} {apply_directive_overrides(_append_suffix(prompt, suffix))}"
 
 
 # Enrichissement PAR CADRAGE pour Klein (étude prompts 2026-07-10, sources :
@@ -477,7 +563,8 @@ _KLEIN_FRAMING_DETAIL_BY_SUBJECT = {
 
 
 def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = None,
-                         suffix: str = '', subject_type: str = 'human') -> str:
+                         suffix: str = '', subject_type: str = 'human',
+                         label: str = '') -> str:
     """Klein (FLUX.2, Kontext-lineage) is an INSTRUCTION-edit model: it follows
     imperative edit commands (the consistency LoRA's own usage example is "Turn
     this cat into a dog"). A preservation-first wrapper — preservation order
@@ -498,17 +585,14 @@ def wrap_variation_klein(prompt: str, nsfw: bool = False, framing: str | None = 
     to the creative prompt, before the framing detail): instruction-first means
     the description IS the command, so the suffix steers the intended result and
     never touches the restage/identity constraints that follow. Empty suffix ->
-    byte-identical output."""
-    st = normalize_subject_type(subject_type)
-    noun = _KLEIN_SUBJECT_NOUN.get(st, 'subject')
-    detail = _KLEIN_FRAMING_DETAIL_BY_SUBJECT.get(st, _KLEIN_FRAMING_DETAIL).get(framing or '', '')
-    medium = _KLEIN_MEDIUM.get(st, _KLEIN_MEDIUM_DEFAULT)
-    nsfw_tail, sfw_tail = _KLEIN_RENDER_TAIL.get(st, _KLEIN_RENDER_TAIL_DEFAULT)
-    ending = nsfw_tail if nsfw else sfw_tail
-    return (
-        f"Create a new {medium} of the same {noun} as the reference image: {_append_suffix(prompt, suffix)}. "
-        + (f"{detail} " if detail else "")
-        + f"{get_identity_prompt('klein_identity', st)} {ending}")
+    byte-identical output.
+    `label` (the variation label) picks this shot's concrete garment — see the
+    two Krea-born fixes below, both MEASURED on Klein before being applied here,
+    which is why Klein passes the same two flags as Krea.
+    """
+    return _compose_edit_prompt(prompt, nsfw=nsfw, framing=framing, suffix=suffix,
+                                subject_type=subject_type, label=label,
+                                concrete_outfit=True, markings_lock=True)
 
 
 # --- Anti-fuite tenue / expression (constat terrain 2026-07-14) ---------------
@@ -575,6 +659,23 @@ _HAS_EXPRESSION = re.compile(
 # regenerate of one shot reproduces its own). Applied at WRAP time only — the
 # stored `variation_prompt` keeps the raw catalog text, so the other engines are
 # untouched and a regenerate re-applies the current rules exactly once.
+#
+# ALSO APPLIED TO KLEIN since 2026-07-27, on measurement, and to the two LOCAL
+# edit engines ONLY. What Klein actually does with the negation (5 pairs, same
+# seed, one factor changed):
+#   • it is NOT copying the reference garment — the negation IS followed, and the
+#     "colour leaks in tight shots" reading did NOT reproduce: the two fresh bust
+#     shots came back beige and grey-green knits, muted neutrals, not the
+#     reference's olive. That symptom is written off.
+#   • what DOES collapse is the lower half: all three wide shots answered the
+#     negation with blue jeans and pale sneakers, whatever the top. A dataset of
+#     that teaches the LoRA "this person wears blue jeans".
+#   • the concrete garment was obeyed exactly in 5/5 and broke the collapse in
+#     3/3 (grey denim / black trousers / black trousers) with three visibly
+#     different tops. That is the reason it ships here — not the colour claim.
+# Scoped to the local engines this fork ships (Divergence 1): the measurement
+# was made on Klein, and a Klein result is not evidence about a different model
+# family.
 _KREA_OUTFIT_GENERIC = (
     re.compile(r'\bcasual clothes different from the reference outfit\b', re.I),
     re.compile(r'\bdifferent outfit\b', re.I),
@@ -603,6 +704,15 @@ _KREA_EXPRESSION_NEGATION = re.compile(
 # So the order now holds the SKIN, without naming a single feature. What is on
 # the reference is carried by the reference conditioning, not by this sentence —
 # whose only job is to forbid invention and redrawing.
+#
+# The re-worded order had only ever been checked in TEXT (the word was gone from
+# the prompt). It was verified IN IMAGE on 2026-07-27, on Klein, before being
+# extended to it — three shots on a subject with no markings at all, with and
+# without the sentence, same seed: nothing invented in 3/3, the pairs are
+# near-identical. And on the tattooed subject it earns its place: on the outdoor
+# bust the forehead piece VANISHED without it and is fully there with it, same
+# seed; the jaw work is preserved on both sides on the close-up; the wide shot is
+# a draw. Hence: applied to Klein too, and to the local edit engines only.
 KREA_MARKINGS_LOCK = (
     "Keep the skin exactly as it is in the reference image: do not add anything "
     "to it, and do not redraw, restyle, move or remove what is already there. ")
@@ -613,6 +723,19 @@ KREA_MARKINGS_LOCK = (
 # the same shot a different outfit on every app restart. Three properties at once:
 # outfits genuinely differ across the dataset, one shot regenerates identically,
 # and no randomness ever leaks into a stored prompt.
+#
+# SIZE IS MEASURED, not decorative. With crc32 modulo N, the load histogram over
+# the shipped catalog depends only on N, so the count was chosen by measuring it:
+# at 12 garments, 41 eligible shots collapsed onto 11 distinct ones with the
+# worst garment carrying 6 (a dataset that trades one uniform for another); at 25
+# they spread over 23 distinct ones with the worst carrying 4. Neighbouring sizes
+# are NOT monotonically better (24 peaks at 5, 22 at 6) — hence the pinned
+# distribution test, which fails if a catalog change re-concentrates the picks.
+# Every entry differs from the others on at least two of colour / cut / sleeve
+# length / material, so two shots that DO share a garment still look apart, and
+# all of them are neutral, everyday and plausible from a face crop to a full
+# body. Nothing here may name a summonable skin feature (see _SUMMONABLE in the
+# tests): 'scarf' contains 'scar'.
 KREA_OUTFIT_PALETTE = (
     'a plain white cotton t-shirt',
     'a red knit sweater',
@@ -626,13 +749,94 @@ KREA_OUTFIT_PALETTE = (
     'a mustard yellow cardigan',
     'a dark green flannel shirt',
     'a cream ribbed knit top',
+    'a charcoal wool blazer',
+    'a rust orange corduroy shirt',
+    'a teal cotton polo shirt',
+    'a soft pink oversized sweatshirt',
+    'a striped navy and white long-sleeve top',
+    'a camel wool coat',
+    'a black leather biker jacket',
+    'a lilac short-sleeve blouse',
+    'a chocolate brown suede jacket',
+    'a sky blue gingham shirt',
+    'a plum velvet top',
+    'a silver grey satin blouse',
+    'a coral sleeveless linen top',
 )
+
+
+# --- Editable defaults for the five parts that were hardcoded ----------------
+# Registered into the SAME per-subject tables the four identity locks live in, so
+# `get_identity_prompt`, the Settings payload, the config-key layout and "Restore
+# default" all work on them with no second mechanism. Done here, after the
+# constants exist, rather than at the table literal 400 lines above — the tables
+# are built before the framing/tail/directive constants are defined.
+#   • the two SUBJECT-scoped parts (render tail, framing detail) take that
+#     subject's own text, so anime keeps its illustration tail and its drawn
+#     framing vocabulary;
+#   • the flat ones repeat identically in every table — that is what makes them
+#     read the flat legacy-style key through identity_prompt_config_key.
+# The markings lock is registered STRIPPED: its constant carries a trailing space
+# because it used to be concatenated raw, and a trailing space in a textarea is
+# invisible and impossible to preserve through an edit. `_compose_edit_prompt`
+# re-adds the separator, so the composed bytes do not move.
+def _register_prompt_part_defaults():
+    for st, table in _IDENTITY_DEFAULTS_BY_SUBJECT.items():
+        nsfw_tail, sfw_tail = _KLEIN_RENDER_TAIL.get(st, _KLEIN_RENDER_TAIL_DEFAULT)
+        detail = _KLEIN_FRAMING_DETAIL_BY_SUBJECT.get(st, _KLEIN_FRAMING_DETAIL)
+        table['markings_lock'] = KREA_MARKINGS_LOCK.strip()
+        table['outfit_vary'] = OUTFIT_VARY
+        table['expression_neutral'] = EXPRESSION_NEUTRAL
+        table['outfit_palette'] = '\n'.join(KREA_OUTFIT_PALETTE)
+        table['render_tail_sfw'] = sfw_tail
+        table['render_tail_nsfw'] = nsfw_tail
+        for f in PROMPT_FRAMINGS:
+            table[f'framing_{f}'] = detail.get(f, '')
+
+
+_register_prompt_part_defaults()
+
+
+def outfit_palette(subject_type: str = 'human') -> tuple:
+    """The concrete garments in use — the user's list when they wrote one, else
+    the shipped tuple. Stored as one garment per line; blank lines and stray
+    whitespace are dropped, and a palette the user emptied entirely falls back to
+    the shipped one rather than producing a prompt with no garment in it at all.
+
+    ⚠️ `krea_outfit_for` picks by crc32(label) % len(palette), so the LENGTH of
+    this list decides which shot gets which garment. Adding or removing one entry
+    reshuffles every shot's outfit — same shots, different clothes. That is
+    surfaced in the field's help text, because it looks like a bug otherwise."""
+    raw = get_identity_prompt('outfit_palette', subject_type)
+    items = tuple(line.strip() for line in (raw or '').splitlines() if line.strip())
+    return items or KREA_OUTFIT_PALETTE
+
+
+def apply_directive_overrides(text: str) -> str:
+    """Swap the SHIPPED outfit / expression directives for the user's overrides,
+    at wrap time.
+
+    They cannot be applied where they are injected: `_augment_prompt` bakes them
+    into the catalog at IMPORT time, with no Flask app and no config yet, and the
+    augmented text is then PERSISTED in `variation_prompt`. Doing the swap here
+    instead has the property that matters — an edit reaches datasets that were
+    built before it, on their next generation, instead of only new ones.
+    No override (or a prompt that never carried the directive) -> the text comes
+    back byte-identical."""
+    out = text or ''
+    for kind, shipped in (('outfit_vary', OUTFIT_VARY),
+                          ('expression_neutral', EXPRESSION_NEUTRAL)):
+        current = get_identity_prompt(kind)
+        if current != shipped and shipped in out:
+            out = out.replace(shipped, current)
+    return out
 
 
 def krea_outfit_for(label: str) -> str:
     """A concrete garment for a shot label — stable across runs and processes."""
+    palette = outfit_palette()
     key = (label or '').encode('utf-8', 'replace')
-    return KREA_OUTFIT_PALETTE[zlib.crc32(key) % len(KREA_OUTFIT_PALETTE)]
+    return palette[zlib.crc32(key) % len(palette)]
 
 
 def krea_outfit_directive(prompt: str, label: str = '') -> str:
@@ -659,18 +863,57 @@ def wrap_variation_krea(prompt: str, nsfw: bool = False, framing: str | None = N
     result → identity lock → rendering tail), plus the two Krea-specific fixes:
     the outfit negation becomes a concrete garment, and permanent markings get an
     explicit hold order. `label` selects that garment deterministically — pass
-    the variation label so the same shot always renders the same outfit."""
+    the variation label so the same shot always renders the same outfit.
+
+    Both fixes were re-measured on Klein (2026-07-27) and held there too, so both
+    wrappers now pass the same two flags and compose an identical prompt. Kept as
+    a named entry point because the two engines are separate product surfaces and
+    only one of them may need to move next — the flags are where that split would
+    reappear, which is why they stay parameters even while both are True."""
+    return _compose_edit_prompt(prompt, nsfw=nsfw, framing=framing, suffix=suffix,
+                                subject_type=subject_type, label=label,
+                                concrete_outfit=True, markings_lock=True)
+
+
+def _compose_edit_prompt(prompt: str, *, nsfw: bool, framing, suffix: str,
+                         subject_type: str, label: str,
+                         concrete_outfit: bool, markings_lock: bool) -> str:
+    """The ONE assembly of a local-edit prompt, shared by Klein and Krea — the two
+    wrappers had drifted into two copies of the same six-part concatenation, and
+    every part of it is now user-editable, which is five more chances for the
+    copies to disagree. The two flags are where the engines COULD differ (name a
+    concrete garment / hold the skin); both are True today because the two fixes
+    were born on Krea and then measured to hold on Klein too. They stay
+    parameters rather than duplicated bodies precisely so one engine can move
+    without the other silently following.
+
+    Order is load-bearing and unchanged: command + description, framing detail,
+    markings hold, identity lock, rendering tail. Every part is read through
+    get_identity_prompt, so with no override the output is byte-identical to the
+    hardcoded version — including the single spaces between parts, which is why
+    the markings lock is re-joined with an explicit space instead of relying on
+    the trailing one its constant carries (a textarea cannot hold a trailing
+    space the user can see)."""
     st = normalize_subject_type(subject_type)
     noun = _KLEIN_SUBJECT_NOUN.get(st, 'subject')
-    detail = _KLEIN_FRAMING_DETAIL_BY_SUBJECT.get(st, _KLEIN_FRAMING_DETAIL).get(framing or '', '')
+    detail = (get_identity_prompt(f'framing_{framing}', st)
+              if framing in PROMPT_FRAMINGS else '').strip()
     medium = _KLEIN_MEDIUM.get(st, _KLEIN_MEDIUM_DEFAULT)
-    nsfw_tail, sfw_tail = _KLEIN_RENDER_TAIL.get(st, _KLEIN_RENDER_TAIL_DEFAULT)
-    ending = nsfw_tail if nsfw else sfw_tail
-    body = krea_outfit_directive(_append_suffix(prompt, suffix), label)
+    ending = get_identity_prompt('render_tail_nsfw' if nsfw else 'render_tail_sfw', st)
+    body = apply_directive_overrides(_append_suffix(prompt, suffix))
+    if concrete_outfit:
+        # AFTER the overrides, never before: the substitution keys on the SHIPPED
+        # outfit directive, so running it first consumed that text and the user's
+        # own directive silently never landed. This order means "a concrete
+        # garment replaces the default negation, and yields to anything you wrote
+        # yourself" — the only reading under which the Settings box does what it
+        # says on the two engines that name a garment.
+        body = krea_outfit_directive(body, label)
+    lock = get_identity_prompt('markings_lock', st).strip() if markings_lock else ''
     return (
         f"Create a new {medium} of the same {noun} as the reference image: {body}. "
         + (f"{detail} " if detail else "")
-        + KREA_MARKINGS_LOCK
+        + (f"{lock} " if lock else "")
         + f"{get_identity_prompt('klein_identity', st)} {ending}")
 
 
@@ -1769,6 +2012,73 @@ _SUBJECT_BY_ID = {st: {e['id']: e for e in cat} for st, cat in _SUBJECT_CATALOGS
 def variation_catalog(subject_type: str = 'human'):
     """The SFW variation catalog for a subject type ('human' = the historical one)."""
     return _SUBJECT_CATALOGS.get(normalize_subject_type(subject_type), VARIATION_CATALOG)
+
+
+# --- Composed-prompt preview -------------------------------------------------
+# The prompt an engine actually receives is ~1000 characters assembled from six
+# sources, and nothing in the app ever showed it. Editing one of those sources
+# without seeing the whole was editing blind — and reading one required writing a
+# throwaway script. This composes a real shot through the REAL wrappers, so the
+# preview cannot drift from what generation does: any future change to the
+# assembly shows up here for free, and a preview that were re-implemented in the
+# UI would have shown yesterday's structure forever.
+#
+# It is a PURE text composition: no model, no GPU, no network, nothing enqueued.
+# Divergence 1: local engines only. Mirrors LOCAL_ENGINES in
+# face_dataset_service.py and ENGINES in the frontend's engineSelection.js.
+# A legacy cloud tag is not listed here and resolves to Klein through
+# compose_preview's own unknown-engine fallback, exactly like a stored
+# LEGACY_API_ENGINE_TAGS row does everywhere else.
+PREVIEW_ENGINES = ('klein', 'krea')
+
+
+def preview_shot(subject_type: str = 'human', framing: str = 'bust', nsfw: bool = False):
+    """A REAL catalog entry to preview with — the first one matching `framing`
+    (and the NSFW catalog when asked), so the preview shows the directives that
+    are actually baked into shipped shots rather than a made-up sentence. Falls
+    back to the first entry of whatever catalog is non-empty, and finally to a
+    minimal synthetic entry, so no subject type can make the preview blank."""
+    st = normalize_subject_type(subject_type)
+    pools = ([nsfw_variation_catalog(st), variation_catalog(st)] if nsfw
+             else [variation_catalog(st)])
+    for pool in pools:
+        for entry in pool:
+            if entry.get('framing') == framing:
+                return entry
+    for pool in pools:
+        if pool:
+            return pool[0]
+    return {'id': 'preview', 'label': 'Preview', 'framing': framing,
+            'prompt': 'a portrait, front view'}
+
+
+def compose_preview(engine: str, subject_type: str = 'human', framing: str = 'bust',
+                    nsfw: bool = False, suffix: str = '', overrides=None) -> dict:
+    """The exact text `engine` would be sent for one shot, plus what it was made
+    from. `overrides` is an UNSAVED `identity_prompts` tree (see
+    preview_prompt_overrides) — pass None to preview the saved configuration.
+
+    Returns {engine, subject_type, framing, nsfw, shot_id, shot_label,
+             shot_prompt, prompt, length}. Unknown engine -> Klein, the same
+    fallback activeExtraRefPromptKey uses on the client, so the two surfaces
+    cannot disagree about what a legacy engine id means."""
+    eng = str(engine or '').strip().lower()
+    st = normalize_subject_type(subject_type)
+    fr = framing if framing in PROMPT_FRAMINGS else 'bust'
+    entry = preview_shot(st, fr, nsfw)
+    raw = entry.get('prompt', '')
+    label = entry.get('label', '')
+    with preview_prompt_overrides(overrides):
+        if eng == 'krea':
+            text = wrap_variation_krea(raw, nsfw=nsfw, framing=fr, suffix=suffix,
+                                       subject_type=st, label=label)
+        else:
+            eng = eng if eng == 'klein' else 'klein'
+            text = wrap_variation_klein(raw, nsfw=nsfw, framing=fr, suffix=suffix,
+                                        subject_type=st)
+    return {'engine': eng, 'subject_type': st, 'framing': fr, 'nsfw': bool(nsfw),
+            'shot_id': entry.get('id', ''), 'shot_label': label,
+            'shot_prompt': raw, 'prompt': text, 'length': len(text)}
 
 
 def nsfw_variation_catalog(subject_type: str = 'human'):

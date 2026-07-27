@@ -9,7 +9,7 @@ import {
 import { markdownHeadingId } from '../src/utils/headingId.js'
 import { SETTINGS_SECTIONS } from '../src/components/settings/registry.js'
 import { WORKSPACE_SECTIONS } from '../src/components/dataset/workspaceSections.js'
-import { SETUP_STEP_IDS } from '../src/hooks/useSetupSteps.js'
+import { SETUP_DEEP_LINK_STEPS } from '../src/hooks/useSetupSteps.js'
 import { getWorkspacePanel } from '../src/components/dataset/workspaceNavigation.js'
 import { buildGuideTextIndex, matchGuideAnchors } from '../src/help/guideTextIndex.js'
 import { shouldShowTip, markTipSeen } from '../src/help/helpTips.js'
@@ -55,7 +55,7 @@ const routeValid = (route) => {
   }
   if (path === '/setup') {
     const params = new URLSearchParams(qs)
-    return SETUP_STEP_IDS.includes(params.get('step'))
+    return SETUP_DEEP_LINK_STEPS.includes(params.get('step'))
   }
   if (path !== '/datasets') return false
   const params = new URLSearchParams(qs)
@@ -148,7 +148,7 @@ test('(5) each Settings section and Workspace section has its topic', () => {
 
 test('(6) tips have unique triggers and non-empty text', () => {
   const tips = helpTips()
-  assert.equal(tips.length, 9, 'expected exactly 9 one-time tips')
+  assert.equal(tips.length, 10, 'expected exactly 10 one-time tips')
   const triggers = new Set()
   for (const tip of tips) {
     assert.ok(tip.trigger, 'tip missing trigger')

@@ -35,16 +35,21 @@ def _reset_inmemory_registries():
     The bank folder-sync cooldowns are process-global for the same reason: bank
     id 1 of a prior test would make the next test's first walk a no-op.
 
-    The vision keep-warm lease is the sneakiest of the set: it is granted BEFORE
+    The vision keep-warm LEASE is the sneakiest of the set: it is granted BEFORE
     the vision call (even one that fails against a dead Ollama), lives 120 s in a
-    module global, and is read by launch_training's revoke() — so a test that
-    merely imported an image with crop=True poisons every training-launch test
-    that runs in the next two minutes with ~4 s of real HTTP retries against
-    127.0.0.1:11434 (Windows walks ::1 then 127.0.0.1 per attempt). That is how
-    test_dataset_service made test_stop_waits_until_launch_publishes_the_new_pid
-    fail on CI while both passed alone."""
-    from app.services import bank_jobs, dataset_activity, vision_keepalive
-    from app.services import image_bank_service
+    module global, and every later test whose code path is "about to take the
+    GPU" calls revoke() -> a REAL HTTP POST to whatever answers on the Ollama
+    URL. Both known symptoms come from that one lease: a test that merely
+    imported an image with crop=True poisoned every training-launch test for the
+    next two minutes with ~4 s of real HTTP retries against 127.0.0.1:11434
+    (Windows walks ::1 then 127.0.0.1 per attempt) -- how test_dataset_service
+    made test_stop_waits_until_launch_publishes_the_new_pid fail on CI while both
+    passed alone; and the launch under test paid for a live unload of a real
+    Ollama, which can take tens of seconds -- how test_training_queue_atomic
+    failed once in a full suite and never alone. The suite must never depend on a
+    lease left behind by an earlier test, nor talk to a live Ollama by accident."""
+    from app.services import bank_jobs, dataset_activity
+    from app.services import image_bank_service, vision_keepalive
     dataset_activity.reset()
     bank_jobs.reset()
     image_bank_service.reset_folder_sync()

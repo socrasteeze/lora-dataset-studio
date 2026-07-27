@@ -74,9 +74,9 @@ The second local engine. Where Klein *restages* your reference with a general in
 It is not installed by the app. It needs, inside your own ComfyUI:
 
 - the **[comfyui-krea2edit](https://github.com/lbouaraba/comfyui-krea2edit)** custom-node pack in `custom_nodes/` (no Python dependencies), then a ComfyUI restart;
-- a **Krea 2 Raw or Turbo** base model under a `krea`-named folder in `models/diffusion_models` (or `models/unet`);
-- the **Krea 2 Identity Edit LoRA** in `models/loras`;
-- the **Qwen3-VL 4B** text encoder in `models/text_encoders` and the **Qwen Image VAE** in `models/vae`.
+- a **Krea 2 Raw or Turbo** base model under a `krea`-named folder in `models/diffusion_models` (or `models/unet`) — from [Comfy-Org/Krea-2 ▸ diffusion_models](https://huggingface.co/Comfy-Org/Krea-2/tree/main/diffusion_models) (public, no account needed; `krea2_turbo_fp8_scaled.safetensors` is the usual pick);
+- the **Krea 2 Identity Edit LoRA** in `models/loras` — from [Civitai](https://civitai.com/models/2761113);
+- the **Qwen3-VL 4B** text encoder in `models/text_encoders` and the **Qwen Image VAE** in `models/vae` — both from the same [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2) repo, under `text_encoders/` and `vae/`. Keep the filenames as published: `qwen3vl_4b_fp8_scaled.safetensors` and `qwen_image_vae.safetensors`. The other Qwen encoders (`qwen_2.5_vl_*`, `qwen_3_8b_*`) belong to different models and are deliberately never picked up here.
 
 The engine card in the workspace names whichever of these is still missing, one actionable line at a time, and the app never guesses a download URL for weights it cannot verify. Every path above is found by *searching* your ComfyUI model roots — including any `extra_model_paths.yaml` roots — so a non-standard layout works untouched.
 
@@ -150,6 +150,33 @@ Storage follows that split, and nothing was renamed or migrated: the **Human** o
 
 Each field is a plain textarea; there's no Test button — you see the effect on your next generation. If an override ever makes results worse, hit **Restore default**.
 
+### The rest of the prompt (Klein & Krea)
+
+The identity lock is only **one of six** sources a local-edit prompt is assembled from. The other five shipped hardcoded and invisible until this wave — including the one that caused a live incident, where a hold order that *listed* what to preserve ("tattoos, scars, moles…") had the model painting tattoos on subjects who have none. All of them follow the same contract as the locks above: **blank means the shipped default**, non-blank wins, **Restore default** on every box.
+
+Two of them follow the **subject type** chips, because their text genuinely differs per type:
+
+- **Rendering tail (SFW)** → `identity_prompts.render_tail_sfw`. The last thing Klein and Krea read on a safe-for-work shot: the medium and the clamp. For photographic subjects this is `Professional realistic photograph, SFW.`; for **Anime** it asks the model to stay a drawing in the reference's art style.
+- **Rendering tail (uncensored)** → `identity_prompts.render_tail_nsfw`. The same position on an uncensored shot: the SFW clamp is dropped and anatomically correct forms are requested. Only the **local** engines ever see it — the API engines refuse this content.
+- **Shot detail per framing** → `identity_prompts.framing_face` / `.framing_bust` / `.framing_body` / `.framing_back`. Klein and Krea under-fill a short tag prompt and invent the rest, so each shot carries a concrete description of the framing — this is where "85mm portrait lens look" and "the ENTIRE body visible from head to toe" live. If your full-body shots keep coming back cropped, this is the box.
+
+Non-human overrides for those six live under `identity_prompts.by_subject.<type>.<kind>` like the locks; Human keeps the flat key.
+
+Four more are **global** — one text for every subject type, because they have no per-subject meaning (the two directives are only ever injected into human shots):
+
+- **Hold the skin (Krea)** → `identity_prompts.markings_lock`. Sent with every Krea prompt: it forbids adding marks to the skin, and forbids redrawing, restyling, moving or removing the ones the reference already has. ⚠️ **This is the delicate one.** Naming a body feature in this box is enough to make the model paint it — that is exactly what the first version did. Describe what *not* to do, without naming a single feature.
+- **Outfit directive** → `identity_prompts.outfit_vary`. Added to every human shot that does not already name a garment, so clothing comes from the description instead of being copied off the reference (which teaches the LoRA that the person owns one outfit). Note that **Krea replaces it** with a concrete garment from the palette below, so editing this text does not change what Krea sends.
+- **Expression directive** → `identity_prompts.expression_neutral`. Added to every human shot that does not already name an expression, so the reference's smile does not ride on all 40 variations.
+- **Concrete garments** → `identity_prompts.outfit_palette`, **one garment per line**. Krea preserves anything it is not positively ordered to change, so "a different outfit" is a no-op on it; each shot is handed a real garment from this list instead. ⚠️ The garment is chosen from the shot's name **by position in the list**, so **adding or removing a line reshuffles which garment every shot gets** — same shots, different clothes. Editing the wording of one line only affects that line. Clear the box entirely to go back to the shipped list (an empty list never produces a prompt with no outfit in it).
+
+Both directives are baked into the shot catalog and **stored** with each variation, so the override is applied when the prompt is sent rather than when the shot is created — which means an edit reaches datasets you built **before** you made it, on their next generation.
+
+### What actually gets sent
+
+At the bottom of the card, a live preview of the **composed** prompt: pick an engine, a framing and SFW/uncensored, and it shows the full ~1000 characters a real catalog shot would be sent, assembled from every box on the card, **including edits you have not saved yet**. It is composed by the server through the same functions generation uses, so it cannot drift from reality — and it generates nothing: no model is loaded, no GPU is touched, nothing is billed.
+
+It is also the fastest way to answer "why did it do *that*": read the prompt, find the sentence, edit the box it came from.
+
 ## Scraping & sources
 
 Credentials for the built-in web scraper. **All of these apply immediately — no restart** — because sources read their key at request time.
@@ -173,9 +200,11 @@ Where you point the app at the local programs that unlock the full pipeline: **C
 ### ComfyUI
 
 - **ComfyUI API URL** → `comfyui.api_url`. The HTTP endpoint of your running ComfyUI. Default **`http://127.0.0.1:8188`**. **Test** confirms it answers.
-- **ComfyUI install directory** → `comfyui.base_dir`. The folder that contains `models/`, `output/`, `input/`. Default **empty**. This is what lets the app scan your checkpoints and LoRAs — set the API URL alone and there's nothing to scan. If you point it at a `..._windows_portable` folder, the app auto-corrects to the `ComfyUI` sub-folder inside it. In the **Setup wizard** this field is checked as you type: a wrong, empty or missing folder gets a specific reason, and pointing at the launcher/parent folder offers the real ComfyUI inside it in one click.
+- **ComfyUI install directory** → `comfyui.base_dir`. The folder that contains `models/`, `output/`, `input/`. Default **empty**. This is what lets the app scan your checkpoints and LoRAs — set the API URL alone and there's nothing to scan. If you point it at a `..._windows_portable` folder, the app auto-corrects to the `ComfyUI` sub-folder inside it. In the **Setup wizard** this field is checked as you type: a wrong, empty or missing folder gets a specific reason, and pointing at the launcher/parent folder offers the real ComfyUI inside it in one click. The wizard additionally checks that the app can actually **put a file in that install's `input/` folder** (honouring an `input_dir` override if you set one) — the half it used to certify without testing. A failure there is a **warning, never a blocker**: configuring the app before mounting your volumes is a perfectly normal order of operations.
 - **Advanced: ComfyUI folder overrides** → `comfyui.output_dir`, `comfyui.input_dir`, `comfyui.models_dir`, `comfyui.loras_dir`. All default **empty**, and empty is what you want unless ComfyUI runs on folders of its own — a ComfyUI started with `--output-directory`, `--input-directory` or `--models-directory` does *not* keep its files under the install directory, so without an override here the app reads and writes in the wrong place. Each field **shows the folder it falls back to while empty**, computed with the very function the app uses at runtime, so the effective path is never something you have to work out; a path that isn't on disk is flagged in amber rather than failing silently mid-generation. If ComfyUI is running, the app asks it which folders it was launched with (it reports its own command line via `/system_stats`) and offers them in one click — nothing is ever guessed from a folder layout, so no suggestion appears when ComfyUI is unreachable, predates that field, or was started with no custom folders.
-- **Hugging Face token** → `HF_TOKEN` (secret, no Test button). Only needed to auto-download **license-gated** models — notably the Klein fp8 weights. Read access is enough for accepted gated models.
+
+  Each field is also checked for **usability, not just existence**: the app *writes* into `input/` (and into the LoRA folder when it installs a trained LoRA), so a folder that is there but cannot be written to from the app's process is flagged in amber with the reason. This is the case that used to be invisible — a ComfyUI in a **separate container, in WSL, or on another machine** answers on its URL while its `input/`/`output/` folders are not shared, so everything looked configured and the first generation died on a detail-free `500` (reported on Discord by nofaceman). The app hands ComfyUI its source images **through the filesystem**, not over the API: `input/` and `output/` must be visible to both sides **at the same path**. See *Troubleshooting → ComfyUI runs in another container*.
+- **Hugging Face token** → `HF_TOKEN` (secret, no Test button). Only needed to auto-download **license-gated** models — notably the Klein fp8 weights, and the gated training bases (Krea 2, FLUX.1-dev, FLUX.2 Klein). Read access is enough for accepted gated models. This token is handed to the local training subprocess explicitly, so what you save here is what training authenticates with. **If you leave it empty**, a login already on the machine (`hf auth login`, i.e. a token file under `~/.cache/huggingface`, `$XDG_CACHE_HOME` or `$HF_HOME`) is found and used instead — the *Hugging Face cache override* below relocates the cache without logging you out. **When a download is refused, read the status code, not the sentence**: `401` means Hugging Face saw no valid token (paste one here), `403` means the token is valid but that account has not accepted the model licence yet (open the model page and accept it). The raw Hugging Face message says "you must have access to it and be authenticated" in both cases; the failure block in the training panel separates them for you.
 
 **Overrides and `extra_model_paths.yaml`.** These two mechanisms stack rather than compete. `comfyui.models_dir`/`comfyui.loras_dir` set the app's *default* model roots; `extra_model_paths.yaml` is read **in addition**, from `<comfyui.base_dir>/extra_model_paths.yaml` — the same place ComfyUI itself looks. The yaml is therefore always located from the install directory, never from a models override, so the two can't end up pointing at different trees. For models and LoRAs the yaml usually already does the job; the override is for the case where the models folder itself moved.
 
@@ -205,7 +234,7 @@ Under **Advanced: ai-toolkit overrides**, three optional path overrides (all def
 
 - **Datasets directory override** → `aitoolkit.datasets_dir` (defaults to `<dir>/datasets`).
 - **Output directory override** → `aitoolkit.output_dir` (defaults to `<dir>/output`).
-- **Hugging Face cache override** → `aitoolkit.hf_home` (defaults to a cache under the ai-toolkit folder). Point this at an existing HF cache to avoid re-downloading base models.
+- **Hugging Face cache override** → `aitoolkit.hf_home` (defaults to a cache under the ai-toolkit folder). Point this at an existing HF cache to avoid re-downloading base models. It moves the *cache* only: a `hf auth login` token stored in your default Hugging Face home stays in use, so relocating the cache never de-authenticates you on gated bases.
 
 ## Captioning & quality
 
@@ -285,7 +314,9 @@ This fork's Settings → Training keeps only **Defaults** — there is no rental
 
 ### Advanced options (per run)
 
-These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. One is worth calling out because of a caveat:
+These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. Two are worth calling out because of a caveat:
+
+- **Memory saving** — three switches (`quantize`, `quantize_te`, `low_vram`) that used to be hard-coded. **The defaults have not changed:** Z-Image, Krea 2, FLUX.1 and FLUX.2 Klein quantise the base model and the text encoder to `qfloat8` and stream blocks between CPU and GPU, which is what makes a 12B model train on a 24 GB card; Anima and SDXL are small enough to run without any of it. Turning them **off** trades VRAM for precision and speed — worth it only if your card is bigger than the target. As a rough order of magnitude with the savers off: **Z-Image ≈ 18 GB**, **FLUX.2 Klein 4B ≈ 14 GB**, **FLUX.2 Klein 9B ≈ 24 GB**, **Krea 2 / FLUX.1 ≈ 30 GB** (estimates: bf16 weights plus headroom, not a measurement on your exact card). The panel detects your GPU and says which side of that line you are on; if it can't (no NVIDIA card, `nvidia-smi` missing), it falls back to a generic note and blocks nothing. ⚠ **The failure mode is slowness, not a crash.** On Windows there is no clean out-of-memory error: the driver silently pages to system RAM and the run creeps along for hours. If a run that used to take 40 minutes is still going after three, put the switches back. The setting also works the other way — a small card can turn quantisation **on** for Anima or SDXL. It's recorded in each run's snapshot and in the Share config, so two runs can be compared honestly.
 
 - **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor.
 
@@ -446,6 +477,12 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `klein.consistency_strength` | Strength (0–1) applied to the Klein consistency LoRA. |
 | `klein.generation_steps` | Sampler steps for Klein **generation** (variations, regenerate, small-image rescue). Default `5` = the value hardcoded in the shipped workflow; 1–50. Not the improve pass (`klein.improve_steps`). |
 | `klein.generation_lora_presets` | Named generation-LoRA stacks (default empty) picked per run in Klein tuning; each has a name and up to 8 `{file, strength}` rows. Managed in Settings → Image engines. |
+| `identity_prompts.markings_lock` | Krea's “hold the skin” order — forbids inventing or redrawing marks. Blank = shipped default. Naming a body feature here summons it. |
+| `identity_prompts.outfit_vary` | The outfit directive injected into every human shot with no named garment. Blank = shipped default. |
+| `identity_prompts.expression_neutral` | The neutral-expression directive injected into every human shot with no named expression. Blank = shipped default. |
+| `identity_prompts.outfit_palette` | Krea's concrete garments, **one per line**. Blank (or nothing but blank lines) = the shipped list. The list's LENGTH decides which shot gets which garment. |
+| `identity_prompts.render_tail_sfw` / `.render_tail_nsfw` | The Klein/Krea rendering tail, SFW and uncensored. Per subject type (`by_subject.<type>.<kind>` for non-human). Blank = shipped default. |
+| `identity_prompts.framing_face` / `.framing_bust` / `.framing_body` / `.framing_back` | The per-framing shot-detail block for Klein/Krea. Per subject type. Blank = shipped default. |
 | `identity_prompts.by_subject.<type>.<kind>` | Identity-lock overrides for a **non-human** subject type (`animal`, `creature`, `object`, `other`) × kind (`face_single`, `face_multi`, `klein_identity`). Human overrides stay on the flat `identity_prompts.<kind>` keys. Blank/absent = the shipped default for that subject. |
 | `klein.small_image_prompt` | Optional shared instruction for scraper rescue and single/bulk image improvement (empty = reference image only). |
 | `updates.repo` | GitHub repo the update checker reads its release feed from (default `perfectgf/lora-dataset-studio`). |

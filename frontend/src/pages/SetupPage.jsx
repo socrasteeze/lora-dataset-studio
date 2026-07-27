@@ -11,6 +11,7 @@ import GuidedSteps from '../components/setup/GuidedSteps'
 import InstallRunner from '../components/setup/InstallRunner'
 import InstallEverything from '../components/setup/InstallEverything'
 import { HelpBadge } from '../help/HelpMode'
+import { comfyEnumUnavailableReason } from '../utils/comfyEnumSupport.js'
 
 const INPUT_CLASS =
   'mt-1 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 text-sm text-content ' +
@@ -74,8 +75,14 @@ export default function SetupPage() {
   // flashes the welcome screen first; an unknown/absent step falls back to 0.
   const [searchParams] = useSearchParams()
   const [screen, setScreen] = useState(() => {
-    const i = SETUP_STEP_IDS.indexOf(searchParams.get('step'))
-    return i < 0 ? 0 : i + 1                        // welcome=0, tools=1..N
+    const raw = searchParams.get('step')
+    const i = SETUP_STEP_IDS.indexOf(raw)
+    if (i >= 0) return i + 1                        // welcome=0, tools=1..N
+    // The screens that are NOT tool steps are addressable too: the install /
+    // repair menu is where the one-click engine installs live (Krea 2 Edit), and
+    // a help topic pointing at ?step=install must land there, not on welcome.
+    const j = SCREENS.indexOf(raw)
+    return j > 0 ? j : 0
   })
   const [advancing, setAdvancing] = useState(false) // Next is mid save-&-recheck
   const [startingOllama, setStartingOllama] = useState(false) // "Start Ollama" in flight
@@ -265,6 +272,9 @@ export default function SetupPage() {
       const kleinMissing = step.kleinMissing || []
       const missingLabels = kleinMissingLabels(kleinMissing)
       const missingSummary = missingLabels.length ? missingLabels.join(' + ') : ''
+      // Null on a capable install AND on an unreachable one (the probe fails open),
+      // so this line only ever appears when we actually proved the gap.
+      const kleinEnumReason = comfyEnumUnavailableReason(step.unsupportedEnums)
       const installBtn = (action, label) => kleinMissing.includes(action)
         ? <InstallRunner action={action} buttonLabel={label} onDone={() => refresh(true)} />
         : <p className="text-xs text-emerald-400">✓ Installed</p>
@@ -286,6 +296,13 @@ export default function SetupPage() {
             return (
               <div className="space-y-1.5">
                 <p className={`text-xs ${cls}`}>{glyph} {v.message}</p>
+                {/* Non-blocking: the folder IS a ComfyUI install, but this process
+                    cannot hand files to it (another container, a read-only mount).
+                    Wraps freely — the message names a path and must stay readable
+                    at 400px. */}
+                {v.note && (
+                  <p className="break-words text-xs text-amber-400">⚠ {v.note}</p>
+                )}
                 {v.suggestion && (
                   <button type="button" onClick={() => setField('comfyui', 'base_dir', v.suggestion)}
                     className="rounded-md border border-border-strong px-2.5 py-1 text-xs font-medium text-primary hover:bg-surface-raised">
@@ -307,6 +324,25 @@ export default function SetupPage() {
               replaces the old "Save & re-check to validate" placeholder — the check
               runs as you type, and the folder it judged is pinned to the field value. */}
           {dirVerdictNode}
+          {/* Capability gap on the GRAPH's widget values, not on the files: this
+              ComfyUI doesn't offer a value the Klein workflow pins. That is what
+              the `beta57` scheduler did — added to ComfyUI's core list by the
+              RES4LYF node pack, so it ran on the machine the graph was captured on
+              and nowhere else (reported by IndependentProcess0 on Reddit). The
+              shipped graph no longer does this; the line stays for the next one and
+              for workflow files a user has edited. Deliberately NOT substituted
+              with a near-equivalent: a scheduler changes the render, and two users
+              with identical settings must not get different images. Rendered ahead
+              of the weights block — no download fixes this. */}
+          {kleinEnumReason && (
+            <p className="text-xs text-rose-300 break-words">
+              {kleinEnumReason}.{' '}
+              {(step.unsupportedEnums || []).filter((i) => i && i.url).map((i) => (
+                <a key={i.url} href={i.url} target="_blank" rel="noreferrer"
+                  className="underline break-all">{i.url}</a>
+              ))}
+            </p>
+          )}
           {step.reachable && !step.hasKlein && (
             <div className="space-y-1 text-xs text-content-muted">
               {missingSummary && (

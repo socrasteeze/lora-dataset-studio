@@ -40,15 +40,49 @@ export const KREA_NODE_PACK_URL = 'https://github.com/lbouaraba/comfyui-krea2edi
  *  file in place. */
 export function kreaUnavailableReason({
   enabledInSettings = true, comfyuiReachable = true,
-  missingAssets = [], missingNodes = [],
+  missingAssets = [], missingNodes = [], invalidAssets = [],
+  nodePackInstalled = false,
 } = {}) {
   if (!enabledInSettings) return '⚠ Krea 2 Edit is disabled in Settings (engines)';
   if (!comfyuiReachable) return '⚠ Configure ComfyUI in Settings';
   if (Array.isArray(missingNodes) && missingNodes.length) {
+    // The pack is ON DISK but ComfyUI hasn't loaded it: ComfyUI registers custom
+    // nodes at STARTUP only. Now that the app installs the pack itself, this is
+    // the common state right after the install — and telling someone to install
+    // what they just watched install is how a working feature reads as broken.
+    if (nodePackInstalled) {
+      return '⚠ The comfyui-krea2edit node pack is installed but ComfyUI has not loaded '
+        + 'it yet — restart ComfyUI';
+    }
     return '⚠ Install the comfyui-krea2edit node pack in ComfyUI, then restart it';
   }
   const words = kreaMissingLabels(missingAssets);
-  if (words.length) return `⚠ Krea ${words.join(' + ')} missing — see Setup for where to place it`;
+  // This line has now been wrong in BOTH directions, which is why the test next
+  // to it pins the reason rather than the wording. It first said "see Setup"
+  // while Setup covered Klein only and never said the word Krea -- a pointer to
+  // a page about something else. It was then changed to name the Guide, correct
+  // at the time: reading was all a user could do. Since the app installs these
+  // files itself, the Guide is no longer the best answer -- Setup is, because it
+  // now ACTS instead of explaining. The invariant is not "say Setup" or "say
+  // Guide": it is that this message names a place that both exists and covers
+  // Krea. Re-check that before rewording it again.
+  if (words.length) {
+    return `⚠ Krea ${words.join(' + ')} missing — Setup can download them for you`;
+  }
+  // Present but NOT weights: an interrupted, proxied or error-page download saves
+  // HTML or a half file as .safetensors. The file exists, which is why "missing"
+  // says nothing — and without this the only symptom was ComfyUI's raw
+  // "Expecting value: line 1 column 1 (char 0)" at generate time.
+  const broken = (Array.isArray(invalidAssets) ? invalidAssets : []).filter((i) => i && i.blocking);
+  if (broken.length) {
+    const b = broken[0];
+    const what = KREA_ASSET_LABELS[b.asset] || b.asset;
+    const why = b.verdict === 'html_or_text'
+      ? 'it is a web page, not weights — the download skipped the licence/login step'
+      : 'the file is truncated or corrupt';
+    return `⚠ Krea ${what} (${b.filename}) cannot be loaded: ${why}. `
+      + 'Delete it and download it again.';
+  }
   return null;
 }
 

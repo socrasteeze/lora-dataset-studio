@@ -86,15 +86,52 @@ def enabled() -> bool:
     return max_bytes() > 0
 
 
+def sweep_partials() -> int:
+    """Delete leftover `.part` files and return how many went.
+
+    `store` copies to `<blob>.part` then renames, so a crash (or a kill) mid-copy
+    leaves an orphan that nothing will ever finish or address — `path_for` only
+    ever looks for the final names. They still counted towards the ceiling, so a
+    few interrupted runs could quietly shrink the usable archive until the user
+    hit "Clear archive" and wiped everything, including the good blobs. Run at
+    the start of a store pass, where a `.part` can only be stale: the copy that
+    would own one has not started yet, and the pass holds `_lock`.
+
+    Never raises — a failed cleanup must not stop the archiving it precedes."""
+    removed = 0
+    try:
+        for dirpath, _dirs, files in os.walk(_root_only()):
+            for fn in files:
+                if not fn.endswith('.part'):
+                    continue
+                try:
+                    os.remove(os.path.join(dirpath, fn))
+                    removed += 1
+                except OSError:
+                    logger.debug('could not remove the stale %s', fn, exc_info=True)
+    except OSError:
+        logger.debug('could not sweep stale .part files', exc_info=True)
+    if removed:
+        logger.info('run image archive: removed %d interrupted copy/copies', removed)
+        _size_cache['bytes'] = None
+    return removed
+
+
 def size_bytes(refresh=False) -> int:
     """Bytes currently held by the archive. Cached: the Settings card asks for it
-    on every open and walking thousands of small files each time is wasteful."""
+    on every open and walking thousands of small files each time is wasteful.
+
+    `.part` files are EXCLUDED: an interrupted copy is not archive content — it
+    is addressable by nothing and about to be swept — and counting it towards the
+    ceiling would slowly starve the archive on a machine that gets killed a lot."""
     if not refresh and _size_cache['bytes'] is not None:
         return _size_cache['bytes']
     total = 0
     try:
         for dirpath, _dirs, files in os.walk(archive_root()):
             for fn in files:
+                if fn.endswith('.part'):
+                    continue
                 try:
                     total += os.path.getsize(os.path.join(dirpath, fn))
                 except OSError:
@@ -131,6 +168,51 @@ def path_for(sig, ext=None):
     return None
 
 
+def release(sigs) -> dict:
+    """Delete the blobs of `sigs` — the LAST step of removing a run, once the
+    caller has PROVEN no other run references them.
+
+    The store is content-addressed and therefore SHARED: ten runs on an unchanged
+    dataset all point at the same blob, which is exactly why a whole training
+    history fits in well under a gigabyte. Deleting "the images of this run"
+    naively would blank the comparison of every run that shares them, so this
+    function refuses to do the accounting itself — it deletes precisely what it
+    is handed, and the reference count is the caller's job (see
+    `cloud_training._releasable_blob_sigs`, which subtracts every other run's
+    snapshot signatures before calling here).
+
+    Returns `{'deleted', 'freed_bytes'}`. Never raises: a blob we cannot remove
+    (locked, already gone) is simply left in place — wasted space, never a failed
+    deletion."""
+    deleted = 0
+    freed = 0
+    with _lock:
+        for sig in (sigs or ()):
+            path = path_for(sig)
+            if not path:
+                continue
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = 0
+            try:
+                os.remove(path)
+            except OSError:
+                logger.debug('could not release archived blob %s', sig, exc_info=True)
+                continue
+            deleted += 1
+            freed += size
+        if deleted and _size_cache['bytes'] is not None:
+            _size_cache['bytes'] = max(0, _size_cache['bytes'] - freed)
+    return {'deleted': deleted, 'freed_bytes': freed}
+
+
+def stored_count(sigs) -> int:
+    """How many of `sigs` currently have a blob on disk — what the confirmation
+    dialog announces as "N archived source images released"."""
+    return sum(1 for sig in (sigs or ()) if path_for(sig))
+
+
 def store(plan) -> dict:
     """Copy every `(source_path, sig, filename)` of `plan` that isn't stored yet.
     Synchronous; returns `{'added', 'skipped', 'full'}`. Never raises."""
@@ -141,6 +223,9 @@ def store(plan) -> dict:
     ceiling = max_bytes()
     archive_root()                      # the one place the folder is created
     with _lock:
+        # Under the lock, so any `.part` present is necessarily an orphan from a
+        # past interrupted pass — this one has not written its own yet.
+        sweep_partials()
         current = size_bytes()
         for src, sig, filename in (plan or ()):
             if not src or not sig:

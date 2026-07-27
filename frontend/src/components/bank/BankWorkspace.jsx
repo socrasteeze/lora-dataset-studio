@@ -23,6 +23,8 @@ import { VOCABULARY_OPTIONS } from '../dataset/CaptionOptionsPopover'
 import { BANK_ZONES, nextBankStep } from './bankGuide.js'
 // Provenance wording (effective resolution, origin, black bars) — pure/testable.
 import { ORIGIN_CHIPS, PROVENANCE_FLAG_LABEL, detailSummary } from './bankProvenance.js'
+// Grid ordering menu (which sorts exist, and which ones have data) — pure/testable.
+import { bankSortOptions } from '../../utils/gridSort.js'
 
 const PAGE_SIZE = 120
 
@@ -37,8 +39,13 @@ const FLAG_LABEL = {
 const FLAG_HINT = {
   soft_detail: 'The picture stops before the pixels do — usually an enlargement. '
     + 'A soft or out-of-focus shot reads the same, so check before mass-rejecting.',
-  bars: 'Flat black letterbox/pillarbox bars — video screenshots and padded stills.',
+  bars: 'Flat black letterbox/pillarbox bars — video screenshots and padded stills. '
+    + 'A dark-themed screenshot reads the same, so check before mass-rejecting.',
 }
+// These two are measurements of PROVENANCE, not quality verdicts, which is why
+// the overnight pipeline does not offer them (backend PIPELINE_REJECT_FLAGS) and
+// why the standalone button prints their caveat instead of hiding it in a
+// tooltip. Here you can see the count, undo, and look at the pile first.
 // Quality flags the CPU scan produces vs the ones the ML scoring/watermark
 // passes add — auto-reject only offers a flag whose pass has actually run.
 const QUALITY_REJECT_FLAGS = ['blur', 'noise', 'uniform', 'small', 'soft_detail', 'bars']
@@ -106,7 +113,8 @@ function ProgressBar({ activity, onCancel }) {
             ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${STEP_SHORT[pipe.current] || pipe.current}`
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
               semantic_dedup: 'Crops & variants', watermark: 'Watermark scan',
-              framing: 'Framing pass', caption: 'Captioning', promote: 'Promotion' }[kind] || 'Job') + ' running'}
+              framing: 'Framing pass', caption: 'Captioning', promote: 'Promotion',
+              bank_promote: 'Copying into the new bank' }[kind] || 'Job') + ' running'}
           {' — '}{done}{total ? ` / ${total}` : ''}{detail ? ` · ${detail}` : ''}
         </span>
         {pct != null && (
@@ -307,9 +315,13 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
       <span className="absolute left-1 top-1 flex flex-wrap gap-0.5 max-w-[85%]">
         {img.status === 'keep' && badge('✓', 'bg-emerald-500/80 text-white')}
         {img.status === 'reject' && badge(`✕ ${img.reject_reason || ''}`.trim(), 'bg-rose-500/80 text-white')}
-        {img.promoted_dataset_id != null && badge('', 'bg-indigo-500/80 text-white')}
-        {/* key=f: these badges are the only mapped ones here (Divergence 3 keeps
-            the labels emoji-free; upstream's pictographs are stripped). */}
+        {/* This image left for somewhere: a dataset, another bank, or both. One
+            badge for both destinations — the tile says THAT it went, the tooltip
+            and the review lightbox say where. Divergence 3: upstream's pictograph
+            is replaced by a monochrome arrow, not stripped to an EMPTY badge.
+            key=f: these badges are the only mapped ones here. */}
+        {(img.promoted_dataset_id != null || img.promoted_bank_id != null)
+          && badge('↑', 'bg-indigo-500/80 text-white')}
         {img.flags.map((f) => badge(FLAG_LABEL[f]?.slice(0, 2) || f, 'bg-black/60 text-amber-200', f))}
         {img.face_cluster != null && badge(`${img.face_cluster}`, 'bg-black/60 text-sky-200')}
         {img.framing && badge(`${img.framing}`, 'bg-black/60 text-teal-200')}
@@ -426,8 +438,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // whenever it isn't null, empty string included.
     if (f.subfolder != null) params.subfolder = f.subfolder
     if (f.search) params.search = f.search
-    // Resolution sort — sent to the grid AND to fetchAllIds so "Select all in
-    // filter" walks the same order. 'default' keeps the server's flag order.
+    // Grid sort (resolution / aesthetic / sharpness, each way) — sent to the grid
+    // AND to fetchAllIds so "Select all in filter" and > Review walk the SAME
+    // order the user is looking at. 'default' keeps the server's flag order.
     if (f.sort && f.sort !== 'default') params.sort = f.sort
     // Resolution tier — a facet like the flags; also flows to fetchAllIds so
     // "Select all in filter" stays scoped to the active tier.
@@ -1040,7 +1053,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           </FilterGroup>
 
           {/* Resolution tiers — one active at a time; re-click clears.
-              Composes with every filter and with the Resolution ↑/↓ sort. */}
+              Composes with every filter and with the Sort menu below. */}
           {shownResBuckets.length > 0 && (
             <FilterGroup label="Resolution">
               {shownResBuckets.map((b) => (
@@ -1095,13 +1108,23 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <GroupLabel>View</GroupLabel>
           <label className="flex items-center gap-1 text-xs text-content-muted">
             Sort
+            {/* Order the grid on what the passes MEASURED — resolution, aesthetic
+                rating, sharpness — so a review opens on what it is looking for.
+                Images the matching pass never reached sink to the end (never the
+                top), and an entry whose pass has produced nothing yet is greyed
+                out saying which pass to run. The value rides to the server, which
+                sorts in SQL: it applies to the WHOLE filter, not this page, so
+                "Select all in filter" and ▶ Review walk the same order.
+                max-w keeps the control inside a 400 px toolbar. */}
             <select value={filter.sort} onChange={(e) => setSort(e.target.value)}
-              title="Order the grid by image resolution (megapixels). Unscanned images sink to the end."
+              title="Order the grid by resolution, aesthetic rating or sharpness. Images a pass never reached sink to the end."
               aria-label="Sort the grid"
-              className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-content">
-              <option value="default">Default</option>
-              <option value="res_desc">Resolution ↓</option>
-              <option value="res_asc">Resolution ↑</option>
+              className="max-w-[11rem] rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-content">
+              {bankSortOptions(counts).map((o) => (
+                <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </label>
           <span className="ml-auto" />
@@ -1152,15 +1175,26 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   Rejects the UNDECIDED images with these flags. Your manual ✓/✕ are never changed;
                   everything stays reversible (nothing is deleted from disk).
                 </p>
+                {/* The caveat is printed, not left in a title= tooltip: soft_detail
+                    and bars are provenance HINTS, not verdicts, and this is the one
+                    screen that offers to act on them in bulk. A tooltip is invisible
+                    on a phone and to anyone who does not hover. */}
                 {[...QUALITY_REJECT_FLAGS, ...availableScoreFlags].map((f) => (
-                  <label key={f} className="flex items-center gap-2 text-sm text-content">
-                    <input type="checkbox" checked={rejectFlags.has(f)}
-                      onChange={(e) => setRejectFlags((prev) => {
-                        const next = new Set(prev)
-                        if (e.target.checked) next.add(f); else next.delete(f)
-                        return next
-                      })} />
-                    {FLAG_LABEL[f]} <span className="text-content-subtle">({flags[f] ?? 0} flagged)</span>
+                  <label key={f} className="block text-sm text-content">
+                    <span className="flex items-center gap-2">
+                      <input type="checkbox" checked={rejectFlags.has(f)}
+                        onChange={(e) => setRejectFlags((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(f); else next.delete(f)
+                          return next
+                        })} />
+                      {FLAG_LABEL[f]} <span className="text-content-subtle">({flags[f] ?? 0} flagged)</span>
+                    </span>
+                    {FLAG_HINT[f] && (
+                      <span className="mt-0.5 block pl-6 text-[0.6875rem] leading-snug text-amber-200/80">
+                        ⚠ {FLAG_HINT[f]}
+                      </span>
+                    )}
                   </label>
                 ))}
                 <button type="button" onClick={applyAutoReject} disabled={!rejectFlags.size}
@@ -1296,9 +1330,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       <ZoneSection zone={promoteZone} accented={activeStep === 'promote'}>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
-          title={canPromote ? 'Copy the kept selection into a dataset' : 'Keep some images first'}
+          title={canPromote
+            ? 'Copy the kept selection into a dataset — or into a brand-new bank, to keep working on a shortlist apart'
+            : 'Keep some images first'}
           className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-          ⬆ Promote to dataset…
+          ⬆ Promote…
         </button>
         <button type="button" onClick={() => setDeleteRejectedOpen(true)}
           disabled={live || !(counts?.reject > 0)}
@@ -1355,7 +1391,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <PromoteDialog bankId={bankId}
           selectedIds={[...selected]}
           onClose={() => setPromoteOpen(false)}
-          onStarted={() => { setPromoteOpen(false); refreshPayload() }} />
+          // refreshImages too: a promotion marks the rows it carried, and the ⬆
+          // badge lives on the TILES — refreshing only the counters left the
+          // header saying "3 promoted" over a grid showing none.
+          onStarted={() => { setPromoteOpen(false); refreshPayload(); refreshImages() }} />
       )}
 
       {deleteRejectedOpen && (

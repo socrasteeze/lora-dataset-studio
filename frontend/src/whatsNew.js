@@ -45,10 +45,145 @@
 // =====================================================================
 import { SETTINGS_SECTIONS } from './components/settings/registry.js';
 import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
-import { SETUP_STEP_IDS } from './hooks/useSetupSteps.js';
+import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
+  {
+    id: '2026-07-27-klein-workflow-runs-on-a-stock-comfyui',
+    date: '2026-07-27',
+    title: 'Klein generation now works on a normal ComfyUI — and its images will look slightly different',
+    blurb:
+      'If Klein variations or watermark cleaning never worked for you, this was almost certainly why: our Klein workflows asked ComfyUI for a sampling scheduler called "beta57", which ComfyUI does not have. It comes from a community node pack (RES4LYF) that quietly adds it to ComfyUI\'s own list — so the graph ran on the machine it was built on and refused everywhere else, with the real reason buried in ComfyUI\'s console ("Value not in list: scheduler"). Nothing in the workflow hinted at the dependency. Both Klein workflows now use "simple", which every ComfyUI ships and which four of our other workflows already used. Being straight with you: this is a genuine change to how Klein images render, not just a fix — if you were among the few who could already generate, your results will shift a little. That is the deliberate price of everyone running the same pipeline instead of a lucky minority running one nobody else can reproduce. Two safety nets came with it: the app now checks our graphs against what YOUR ComfyUI actually offers and names any missing value (and the pack it comes from) on the Setup screen and the engine card, instead of letting you discover it mid-batch; and a test blocks any future workflow that depends on someone\'s custom nodes without saying so. Reported by IndependentProcess0 (Reddit).',
+    to: '/setup',
+  },
+  {
+    id: '2026-07-27-sort-grids-by-score-and-similarity',
+    date: '2026-07-27',
+    title: 'Sort a bank or a dataset by score, sharpness or face similarity — reviewing gets a lot faster',
+    blurb:
+      'Both grids already measured plenty (aesthetic rating, sharpness, face similarity to your reference) and let you filter on it, but nothing could put the best — or the worst — in front of you first. The bank\'s Sort menu now offers Aesthetic ↓/↑ and Sharpness ↓/↑ next to Resolution, and the dataset grid gains its own Sort with Face similarity ↓/↑. Sorting only reorders: it composes with every filter and chip you already had, and in a bank it is done over the whole filter rather than the page on screen, so "Select all in filter" and ▶ Review walk the same order you see. Images a pass never reached always sink to the end, in both directions — a "worst first" sort that opened on un-analysed images would hide exactly what you asked for. And a sort with no data behind it is greyed out naming the pass to run, instead of silently doing nothing. Suggested by nofaceman (Discord).',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-07-27-comfyui-input-folder-failures-explained',
+    date: '2026-07-27',
+    title: 'ComfyUI in Docker: the blank 500 on Generate now tells you what went wrong',
+    blurb:
+      'Running ComfyUI in a separate container (or in WSL, or on another machine) could pass every setup check and then fail at the first generation with a bare "500" and no detail. The reason is that the app talks to ComfyUI over TWO channels, and only one is the network: the URL you configure, and the FILESYSTEM — every local engine hands its source image over by copying it into ComfyUI\'s input folder. That folder is not shared between containers by default, so the copy failed and nothing said so. Now that failure names the operation, the folder and the cause, and says what it needs: input/ and output/ must be visible to both sides at the same path. Settings shows the same warning on the folder overrides, and the Setup wizard checks it while you are configuring instead of letting you find out an hour later — as a warning, never a blocker, since mounting the volumes afterwards is perfectly normal. Reported by nofaceman (Discord).',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-27-promote-a-bank-selection-into-a-new-bank',
+    date: '2026-07-27',
+    title: 'Pull a shortlist out of a huge bank — into a new bank, not a dataset',
+    blurb:
+      'Promoting a selection had exactly one destination: a dataset. But when you dump 9 000 scraped images into a bank and isolate 200 candidates, a dataset is the wrong container — it is the training end of the funnel, and you are not there yet. ⬆ Promote now asks where to send the selection: an existing dataset, or a brand-new image bank you name on the spot. The new bank arrives un-triaged with every bank tool available again (scan, duplicates, framing, captions, review), and the bank you came from keeps all its images, marked as promoted. The files are COPIED on purpose — banks never share, so curating one can never mutate the other — and the dialog tells you how many megabytes that costs for your exact selection before you click, measured, not guessed. If the disk fills up mid-copy the new bank is discarded rather than left half-full and looking finished.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-27-hugging-face-token-reaches-training',
+    date: '2026-07-27',
+    title: 'Gated models train again — your Hugging Face login is no longer lost on the way',
+    blurb:
+      'Training on a license-gated base (Krea 2, FLUX.1-dev, FLUX.2 Klein) could die on "401 — you must have access to it and be authenticated", even for people who were signed in and could download the very same weights by hand. Cause: training runs with its own Hugging Face cache folder, and that override also hid the login `hf auth login` had written — so the download went out with no token at all. Now the token from Settings ▸ API keys is handed to the trainer explicitly, and if you have none saved there, the login already on your machine is found and used instead of being shadowed. And when Hugging Face does refuse, the failure block finally tells you which of the two problems you have: 401 means it saw no valid token (paste one in Settings), 403 means your token is fine but the model licence has not been accepted yet (open the model page and accept it). Those have opposite fixes and the raw error text conflates them. Reported by SurpassHR (GitHub).',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-27-stop-responds-while-a-training-starts',
+    date: '2026-07-27',
+    title: 'Stop answers immediately, even in the seconds a training is starting',
+    blurb:
+      'Starting a run hands the vision model\'s VRAM back to Ollama first. That handover is a network call, and it was made while the training queue was locked — so if Ollama was slow to answer (busy loading a model, for instance), Stop, queueing and un-queueing all sat waiting behind it, for up to a minute and a half in the worst case. Pressing Stop looked like nothing happened. The handover now runs before the queue is locked: it still frees the card before the trainer claims it, but it can no longer freeze the buttons while it waits.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-27-install-krea-in-one-click',
+    date: '2026-07-27',
+    title: 'Krea 2 Edit now installs itself — no more five manual steps',
+    blurb:
+      'Klein has always downloaded itself; Krea 2 Edit asked you to find a GitHub repo, clone it into custom_nodes and hunt down four model files by hand. It does not any more. Setup ▸ Install now has an “Install Krea 2 Edit” button that fetches the comfyui-krea2edit node pack straight into YOUR ComfyUI (git, or a ZIP when git is not installed) plus the base model, the text encoder, the VAE and the identity LoRA — and picking Krea in the workspace and pressing Generate starts the same install for you. Files you already placed yourself are detected and never re-downloaded, and a download that turns out to be a login page instead of weights is now caught and deleted instead of crashing ComfyUI hours later. It stays out of “Install everything” on purpose: it is ~20 GB and Klein alone builds datasets. Setup also stops pretending Krea does not exist: it now has its own rows in the install list and counts as a capability, so the last screen says “11 of 12 ready” instead of congratulating you with “11 of 11” on a machine missing a whole engine. One thing no installer can do for you — ComfyUI only loads custom nodes when it starts, so the node pack shows “⟳ Restart ComfyUI” until you do, then the engine card turns green by itself.',
+    to: '/setup?step=install',
+  },
+  {
+    id: '2026-07-27-tile-engine-badge-readable',
+    date: '2026-07-27',
+    title: 'You can read which engine made a photo again, phone and tablet included',
+    blurb:
+      'In the dataset grid, the little "generated · face · Krea 2 Edit" label sat in the same top corner as the 🔄 ✏️ ⇆ ✂ 🗑 buttons. On a narrow tile — a phone, a tablet, or simply the S/M thumbnail sizes — the buttons covered it and the engine name was cut in half, which is exactly the part you need when a batch ran on several engines at once. The label now drops to the bottom-right corner of the thumbnail whenever the top row is too tight, and stays in its usual top-left spot when there is room. It reacts to the THUMBNAIL width, not the window, so large tiles on a phone keep the label at the top and small tiles on a big screen move it down. It never covers the ✓/✕ buttons or the selection tickbox, and hovering it still shows the full text.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-27-krea-download-links-that-work',
+    date: '2026-07-27',
+    title: 'Setting up Krea 2 Edit: the links now lead to the actual files',
+    blurb:
+      'If you tried to install the Krea 2 Edit engine, two of the three download links the app handed you were dead ends: one asked Hugging Face for an account and refused, the other opened a repository that does not contain the text encoder this engine needs — so you downloaded the wrong Qwen file and the app still said "text encoder missing". All three now point straight at the public Comfy-Org/Krea-2 repository, which holds the base model, the text encoder and the VAE together, with no account and no licence to accept. The Guide (Settings ▸ Image engines ▸ Krea 2 Edit) lists every path and filename in one place, and the engine card sends you there instead of to a Setup page that never mentioned Krea.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-27-see-and-edit-the-whole-prompt',
+    date: '2026-07-27',
+    title: 'See the prompt your engine actually receives — and edit every sentence of it',
+    blurb:
+      'A Klein or Krea prompt is about a thousand characters assembled from six sources, and until now you could see none of it. Settings ▸ Image engines now ends with a live preview of the COMPOSED prompt: pick an engine, a framing and SFW/uncensored, and read the exact text a real shot would be sent — including edits you have not saved yet. It generates nothing and costs nothing. Five more parts became editable next to it, with Restore default on each: the “hold the skin” order Krea sends with every shot, the outfit and expression directives injected into every human shot, the list of concrete garments Krea dresses each shot in, the rendering tail (“Professional realistic photograph” — an illustration on Anime datasets), and the per-framing shot detail, which is the box to open when your full-body shots keep coming back cropped. Leave a box alone and nothing changes: blank still means the shipped text, byte for byte.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-27-delete-images-from-checkpoint-gallery',
+    date: '2026-07-27',
+    title: 'Throw away the misses without leaving the board',
+    blurb:
+      'The 🖼 gallery under a checkpoint could only show what that epoch produced — and a checkpoint you keep testing ends up holding thirty-odd renders, most of them tries you never want to see again. It deletes now: hit Select in the panel header, tap the misses (several at once), then 🗑 Delete. Nothing is destroyed on a stray tap — outside Select mode a tap still just zooms — and nothing is destroyed for good either: the files go to your system Recycle Bin, or to the app’s own Trash under Settings ▸ Storage when that is not available, and the confirmation tells you which one BEFORE you click. It also tells you the part that would otherwise be a nasty surprise: these are the same rows as the Test Studio grid, so they leave both places at once.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-remove-run-takes-everything',
+    date: '2026-07-27',
+    title: 'Removing a run now clears everything it left behind — and tells you what that is first',
+    blurb:
+      'Deleting a leftover run used to drop the run entry and its notes, and quietly leave the rest: its checkpoint previews, its card position on the canvas, and the provenance link on every image you generated from it. Those strays stayed in the database forever. A removal now clears all of them in one go, and the confirmation counts what it takes before you click — "12 checkpoint notes, 8 preview links, 6 archived source images". Two things it does NOT take: the images you generated stay in the Test Studio (they only lose the link to the run), and an archived source image is freed only when no other run still uses it, so cleaning up one run can never blank another run\'s comparison.',
+  },
+  {
+    id: '2026-07-27-klein-outfits-and-skin-hold',
+    date: '2026-07-27',
+    title: 'Klein datasets stop landing in the same jeans — and stop redrawing your tattoos',
+    blurb:
+      'Two fixes that Krea 2 Edit already had are now measured on Klein and shipped there too. Every shot gets a named garment instead of "a different outfit": asked that way, Klein answered three wide shots with three different tops but the same blue jeans and pale sneakers every time — a LoRA trained on that learns the jeans. And the shot keeps its skin: on the outdoor bust, a forehead tattoo simply vanished without the hold order and is fully there with it, same seed. Checked in both directions — on a subject with no markings at all, the hold order invents none. The wardrobe grew from 12 garments to 25, so a 40-shot dataset now spreads over 23 of them instead of repeating one six times.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-27-memory-saving-levers',
+    date: '2026-07-27',
+    title: 'A bigger card no longer pays a 24 GB tax — quantisation and low-VRAM streaming are now yours to switch off',
+    blurb:
+      'Every training recipe was tuned so a 12B model fits in 24 GB: the base model and the text encoder are quantised and the trainer streams blocks between CPU and GPU. That is what makes training fit on most cards — and it is pure loss on a card that never needed it, costing precision and a lot of speed. Advanced options → Memory saving now exposes the three switches, and the help line is indexed on YOUR card: a 32 GB GPU is told it can turn them off and roughly what the family needs without them, a 12 GB one is told to leave them on. Nothing changed for anyone who does not touch it — the defaults are exactly what they were, on every family. One honest warning if you go too far: on Windows there is no clean out-of-memory error, the run just crawls for hours while the driver pages to system RAM. Thanks to bobba84 (GitHub) for asking.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-07-27-lineage-panels-fit-a-phone',
+    date: '2026-07-27',
+    title: 'The run details panel no longer swallows the graph on a phone',
+    blurb:
+      'Tapping a run in the lineage graph opened a fixed-width drawer that covered most of a 400-px screen: you could read the run\'s settings, but not see the run they belonged to. It is now a bottom sheet on a phone — capped at 70% of the height, so the graph stays visible above it — and the same side drawer as before from a tablet up. The checkpoint image gallery already worked this way; the two now match.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-27-face-scoring-shows-its-progress',
+    date: '2026-07-27',
+    title: 'Face scoring counts up instead of sitting at zero',
+    blurb:
+      'The scorer had been announcing every image it finished all along — nothing was reading it, so a pass over a few hundred images showed 0 for several minutes and then jumped straight to done. That is indistinguishable from a hang, and more than one run got killed for looking stuck. The indicator now moves image by image, so you can tell a slow pass from a dead one.',
+    to: '/datasets?section=curation&panel=face-analysis',
+  },
+  {
+    id: '2026-07-27-krea-names-a-broken-download',
+    date: '2026-07-27',
+    title: 'A half-downloaded Krea model now says so, instead of crashing ComfyUI',
+    blurb:
+      'The Krea 2 base sits behind a Hugging Face licence gate and the identity LoRA behind a Civitai login. Download either from a browser without going through that step and you get the web page saved as a .safetensors file — the right name, the right extension, no weights inside. Setup went green and the first generation died on a raw "Expecting value: line 1 column 1". Krea now checks each file it is about to load, names the broken one and tells you to re-download it. Truncated downloads are caught the same way. Klein has worked like this for a while; Krea now does too.',
+    to: '/datasets?section=add',
+  },
   {
     id: '2026-07-27-merge-leftover-crash-sweep',
     date: '2026-07-27',
@@ -1738,7 +1873,7 @@ export function isValidTarget(to) {
   // Overview capability rows use it to open the screen that installs them).
   if (path === '/setup') {
     if (section || panel) return false;
-    return step === null || SETUP_STEP_IDS.includes(step);
+    return step === null || SETUP_DEEP_LINK_STEPS.includes(step);
   }
   if (step) return false; // ?step= is meaningless anywhere but the wizard
 

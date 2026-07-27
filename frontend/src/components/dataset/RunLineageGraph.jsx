@@ -6,7 +6,7 @@ import LineageDetailPanel from './LineageDetailPanel';
 import LineageDiffPanel from './LineageDiffPanel';
 import CheckpointActionsPopover from './CheckpointActionsPopover';
 import PreviewLightbox from './PreviewLightbox';
-import CheckpointGalleryPanel from '../canvas/CheckpointGalleryPanel';
+import CheckpointGalleryPanel from '../shared/CheckpointGalleryPanel';
 import { checkpointPopoverPlacement, POPOVER_H, POPOVER_W } from './checkpointPopover.js';
 import { noteBadge, toggleDiffSelection } from './lineageDetail.js';
 import { removeRunFromTree } from '../../utils/runDeletable.js';
@@ -448,7 +448,8 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
     <PreviewLightbox target={bigPreview} onClose={() => setBigPreview(null)} />
     {/* Everything one checkpoint ever produced — the same panel the canvas
         opens, so the results of a generation are reachable from either surface. */}
-    <CheckpointGalleryPanel target={gallery} onClose={() => setGallery(null)} />
+    <CheckpointGalleryPanel target={gallery} onClose={() => setGallery(null)}
+      onDeleted={() => { Promise.resolve(refetchTree?.()).catch(() => {}); }} />
     </>
   );
 }

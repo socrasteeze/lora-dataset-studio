@@ -3305,9 +3305,13 @@ def checkpoint_gallery(record_id, step, limit=120) -> dict:
     total = q.count()
     rows = q.limit(max(1, min(int(limit or 120), 500))).all()
     from .checkpoint_link_backfill import unlinked_count
+    from . import trash
     return {
         'record_id': record_id, 'step': step, 'count': total,
         'unlinked': unlinked_count(),
+        # Where a deleted image WOULD land, resolved the same way the deletion
+        # resolves it, so the confirmation never promises the wrong thing.
+        'delete_mode': trash.disposal_mode(),
         'images': [{
             'id': r.id,
             'dataset_id': r.dataset_id,
@@ -3319,6 +3323,127 @@ def checkpoint_gallery(record_id, step, limit=120) -> dict:
             'created_at': r.created_at.isoformat() if r.created_at else None,
         } for r in rows],
     }
+
+
+def delete_checkpoint_images(record_id, step, image_ids) -> dict:
+    """🗑 Delete generated images from a checkpoint's gallery — file AND row.
+
+    These rows ARE the Test Studio's cells: one image lives in exactly one place
+    in the database and is shown by two surfaces. So "remove it from this
+    gallery" and "delete it" cannot both be true, and hiding it here while it
+    stays in the Studio grid would only move the confusion. The gallery deletes
+    for real, and the confirmation says the Test Studio loses them too — the
+    consequence is stated BEFORE the click, not discovered after it.
+
+    Nothing is destroyed outright: the file goes through ``trash.dispose`` (OS
+    recycle bin → the app's own trash → a permanent unlink only if both refuse),
+    exactly like the bank's rejected sweep. ``checkpoint_gallery`` reports the
+    mode up front and this returns the mode actually used.
+
+    Scoped to the checkpoint: an id that is not linked to (record_id, step) is
+    refused, so this route cannot be turned into "delete any image by id".
+
+    Degrades instead of failing, because the gallery of a real install is never
+    tidy:
+      • a row still generating keeps its file (skipped 'generating') — cancelling
+        someone's running job is not what a delete click asked for;
+      • a row whose file is already gone from disk still loses its row;
+      • a file another surviving row also points at is unlinked from THIS row but
+        left on disk (no surface loses a picture it still lists);
+      • a file that cannot be moved keeps its row, so it stays visible and
+        retryable rather than vanishing from the UI while it sits on disk.
+
+    ``CheckpointPreview`` rows pointing at a deleted image are removed in the
+    same transaction. The reader already drops a dangling pointer, but leaving
+    one behind means a checkpoint silently falls back to an older preview with no
+    trace of why — and the row would outlive every image it could ever resolve.
+
+    Returns {'mode', 'deleted', 'trashed', 'already_absent', 'rows_removed',
+    'previews_removed', 'dataset_ids', 'skipped': [{'id', 'reason'}]}."""
+    from ..models import CheckpointPreview, LoraTestImage
+    from . import trash
+    wanted = []
+    for i in (image_ids or []):
+        try:
+            wanted.append(int(i))
+        except (TypeError, ValueError):
+            continue
+    out = {'mode': None, 'deleted': 0, 'trashed': 0, 'already_absent': 0,
+           'rows_removed': 0, 'previews_removed': 0, 'dataset_ids': [],
+           'skipped': []}
+    if not wanted:
+        return out
+    rows = (LoraTestImage.query
+            .filter(LoraTestImage.record_id == record_id,
+                    LoraTestImage.step == step,
+                    LoraTestImage.id.in_(wanted)).all())
+    found = {r.id for r in rows}
+    for i in wanted:
+        if i not in found:
+            # Either a stale gallery (already deleted elsewhere) or an id that
+            # belongs to another checkpoint. Same answer: not ours to delete.
+            out['skipped'].append({'id': i, 'reason': 'not_in_gallery'})
+
+    # A file can be pointed at by more than one row (a preview reuses an existing
+    # cell). Only unlink from disk what nothing else still lists.
+    keys = {(r.dataset_id, r.filename) for r in rows if r.filename}
+    still_used = set()
+    if keys:
+        others = (LoraTestImage.query
+                  .filter(LoraTestImage.dataset_id.in_({k[0] for k in keys}),
+                          LoraTestImage.filename.in_({k[1] for k in keys}),
+                          LoraTestImage.id.notin_(list(found))).all())
+        still_used = {(o.dataset_id, o.filename) for o in others}
+
+    remove_ids, modes_used, datasets = [], set(), set()
+    disposed = set()                       # (dataset_id, filename) done this pass
+    for row in rows:
+        if row.status not in ('done', 'failed', 'cancelled'):
+            out['skipped'].append({'id': row.id, 'reason': 'generating'})
+            continue
+        datasets.add(row.dataset_id)
+        if not row.filename:
+            # A failed/cancelled cell never wrote a file: only the row goes.
+            remove_ids.append(row.id)
+            continue
+        key = (row.dataset_id, row.filename)
+        path = os.path.join(fds._dataset_path(row.dataset_id), row.filename)
+        if key in still_used or key in disposed:
+            remove_ids.append(row.id)      # someone else still shows this picture
+            continue
+        if not os.path.exists(path):
+            out['already_absent'] += 1
+            remove_ids.append(row.id)
+            continue
+        try:
+            mode = trash.dispose(path, context=f'checkpoint-{record_id}-{step}')
+        except OSError as e:
+            out['skipped'].append({'id': row.id, 'reason': str(e)})
+            continue
+        disposed.add(key)
+        modes_used.add(mode)
+        if mode == 'delete':
+            out['deleted'] += 1
+        else:
+            out['trashed'] += 1            # OS trash or app trash — recoverable
+        remove_ids.append(row.id)
+
+    if remove_ids:
+        out['previews_removed'] = CheckpointPreview.query.filter(
+            CheckpointPreview.lora_test_image_id.in_(remove_ids)
+        ).delete(synchronize_session=False)
+        LoraTestImage.query.filter(
+            LoraTestImage.id.in_(remove_ids)).delete(synchronize_session=False)
+        out['rows_removed'] = len(remove_ids)
+        db.session.commit()
+    out['dataset_ids'] = sorted(datasets)
+    # Report the WORST outcome: one permanently removed file makes the whole run
+    # 'delete', whatever the rest did. The UI wording follows this.
+    for mode in ('delete', 'app_trash', 'trash'):
+        if mode in modes_used:
+            out['mode'] = mode
+            break
+    return out
 
 
 def generate_checkpoint_previews(user_id, dataset_id, checkpoints, prompt=None,
@@ -3414,46 +3539,160 @@ def _record_checkpoints_on_disk(rec) -> int:
         return 0
 
 
-def delete_run_record(record_id) -> str:
-    """Remove a GONE run (no checkpoints on disk) from the lineage graph — its
-    TrainingRunRecord, its checkpoint notes, and (by detaching) its lineage edge.
-    METADATA ONLY: the checkpoints are already gone, so nothing on disk is touched.
+def _releasable_blob_sigs(rec) -> set:
+    """Content hashes archived for `rec` that NO OTHER run references.
 
-    Guards instead of deleting silently:
-      • a run whose checkpoints are still on disk is REFUSED ('has_saves') so a
-        recoverable run is never discarded from under the user;
-      • children that resumed FROM this run are DETACHED (parent_record_id → NULL),
-        keeping them in the graph as honest "origin unknown" roots rather than
-        breaking the tree on a dangling edge.
+    `run_archive` is content-addressed and therefore shared on purpose: an
+    unchanged dataset trained ten times stores its images ONCE, which is why a
+    whole training history stays small. So "free this run's archived images"
+    can only mean the blobs whose last referrer is this run — anything else
+    would blank the image comparison of a run nobody asked to touch.
+
+    The reference is the run snapshot (`run_snapshot.signatures`). Every path
+    that cannot be accounted for cleanly returns an EMPTY set — nothing is
+    deleted — rather than guessing:
+      • this run has no snapshot (legacy run): its blobs are unattributable;
+      • the `snapshot` column doesn't exist yet (a database whose boot migration
+        hasn't run): the sweep would raise, so it is caught and yields nothing.
+    Extra archived bytes are cheap; a hole in the archive is not."""
+    from ..models import TrainingRunRecord
+    from . import run_snapshot
+    try:
+        mine = run_snapshot.signatures(run_snapshot.loads(rec))
+        if not mine:
+            return set()
+        rows = db.session.query(TrainingRunRecord.snapshot).filter(
+            TrainingRunRecord.id != rec.id).all()
+        for (raw,) in rows:
+            mine -= run_snapshot.signatures_of_raw(raw)
+            if not mine:
+                break
+        return mine
+    except Exception:
+        logger.debug('archive reference accounting failed — releasing nothing',
+                     exc_info=True)
+        return set()
+
+
+def run_deletion_impact(record_id) -> dict | None:
+    """What removing this run would actually take with it, COUNTED — the payload
+    the confirmation dialog reads so a destructive action is announced before it
+    happens, not discovered after.
+
+    Every count degrades to 0 on its own rather than failing the preview: a
+    fresh install with empty tables, a run that was never previewed or tested,
+    an archive that doesn't exist. `None` when the run is unknown."""
+    from ..models import (TrainingRunRecord, CheckpointNote, CheckpointPreview,
+                          LoraTestImage, CanvasNodePosition)
+    from . import run_archive
+    rec = db.session.get(TrainingRunRecord, int(record_id))
+    if rec is None:
+        return None
+
+    def _count(model):
+        try:
+            return int(model.query.filter_by(record_id=rec.id).count())
+        except Exception:
+            logger.debug('deletion impact count failed for %s', model, exc_info=True)
+            return 0
+
+    try:
+        released = run_archive.stored_count(_releasable_blob_sigs(rec))
+    except Exception:
+        released = 0
+    return {
+        'record_id': rec.id,
+        'has_saves': _record_checkpoints_on_disk(rec) > 0,
+        'notes': _count(CheckpointNote),
+        'previews': _count(CheckpointPreview),
+        'images_unlinked': _count(LoraTestImage),
+        'canvas_positions': _count(CanvasNodePosition),
+        'children_detached': _count_children(rec),
+        'archived_images_released': released,
+    }
+
+
+def _count_children(rec) -> int:
+    from ..models import TrainingRunRecord
+    try:
+        return int(TrainingRunRecord.query
+                   .filter_by(parent_record_id=rec.id).count())
+    except Exception:
+        return 0
+
+
+def delete_run_record(record_id) -> str:
+    """Remove a GONE run from the lineage graph, with EVERYTHING that only
+    existed because of it. Five tables carry a `record_id`; leaving three of
+    them behind is how a "deleted" run keeps haunting the canvas and the
+    checkpoint gallery.
+
+    What goes, and why it goes that way:
+      • `TrainingRunRecord` + its `CheckpointNote`s + its `CheckpointPreview`
+        links (a checkpoint may hold several previews since the uniqueness
+        constraint was lifted) + its `CanvasNodePosition` (a board coordinate
+        for a card that no longer exists);
+      • children that resumed FROM this run are DETACHED (parent_record_id →
+        NULL), staying in the graph as honest "origin unknown" roots;
+      • `LoraTestImage` rows are UNLINKED (`record_id`/`step` → NULL), never
+        deleted. Those are real generated pictures that also live in the Test
+        Studio and the canvas gallery; removing a run is a tidying of lineage,
+        not an order to destroy images the user never said to destroy. They lose
+        their provenance, and the confirmation dialog says so up front;
+      • archived source blobs are released ONLY when this run was their last
+        referrer (`_releasable_blob_sigs`) — the store is shared between runs and
+        a naive delete would blank another run's comparison.
+
+    Guards kept: a run whose checkpoints are still on disk is REFUSED
+    ('has_saves') so a recoverable run is never discarded from under the user.
 
     Returns 'not_found' | 'has_saves' | 'deleted' | 'conflict'. The FK children
-    (CheckpointNote — no relationship cascade in this schema) are deleted and
-    FLUSHED before the parent row so SQLite never raises the repo's "delete 500"
-    IntegrityError; a stray one is caught and reported as 'conflict', never a 500."""
-    from ..models import TrainingRunRecord, CheckpointNote
+    (no relationship cascade in this schema) are deleted and FLUSHED before the
+    parent row so SQLite never raises the repo's "delete 500" IntegrityError; a
+    stray one is caught and reported as 'conflict', never a 500. Blobs are
+    touched only AFTER the commit succeeds — a filesystem hiccup must never roll
+    back a database deletion, and vice versa."""
+    from ..models import (TrainingRunRecord, CheckpointNote, CheckpointPreview,
+                          LoraTestImage, CanvasNodePosition)
+    from . import run_archive
     from sqlalchemy.exc import IntegrityError
     rec = db.session.get(TrainingRunRecord, int(record_id))
     if rec is None:
         return 'not_found'
     if _record_checkpoints_on_disk(rec) > 0:
         return 'has_saves'
+    # Computed BEFORE the row is gone — the snapshot that names the blobs lives
+    # on the record itself.
+    releasable = _releasable_blob_sigs(rec)
     try:
         # Detach any run that resumed from this one BEFORE deleting it: the child
         # stays displayed (as a root), the parent edge just disappears.
         (TrainingRunRecord.query
          .filter_by(parent_record_id=rec.id)
          .update({'parent_record_id': None}, synchronize_session=False))
+        # Generated images survive their run: only the provenance link is cut.
+        (LoraTestImage.query
+         .filter_by(record_id=rec.id)
+         .update({'record_id': None, 'step': None}, synchronize_session=False))
         # Delete FK children first and flush, so deleting the parent row can't hit
         # an IntegrityError (the "delete 500" trap — no cascade on these tables).
         CheckpointNote.query.filter_by(record_id=rec.id).delete(
             synchronize_session=False)
+        CheckpointPreview.query.filter_by(record_id=rec.id).delete(
+            synchronize_session=False)
+        CanvasNodePosition.query.filter_by(record_id=rec.id).delete(
+            synchronize_session=False)
         db.session.flush()
         db.session.delete(rec)
         db.session.commit()
-        return 'deleted'
     except IntegrityError:
         db.session.rollback()
         return 'conflict'
+    try:
+        run_archive.release(releasable)
+    except Exception:
+        logger.debug('archived blobs could not be released', exc_info=True)
+    return 'deleted'
 
 
 def _lineage_node(rec, crun, requested_id, failed_local_id):
@@ -3690,6 +3929,7 @@ def canvas_dataset_index(user_id) -> dict:
     Ordered newest-run-first, so the board opens on what was trained recently."""
     from sqlalchemy import func
     from ..models import TrainingRunRecord
+    from . import lora_test_studio as studio
     datasets = {d.id: d for d in fds.list_datasets(user_id)}
     if not datasets:
         return {'datasets': []}
@@ -3717,6 +3957,13 @@ def canvas_dataset_index(user_id) -> dict:
             'runs': int(runs or 0),
             'families': sorted(fams.get(ds_id) or ()),
             'last_run_at': last_at.isoformat() if last_at else None,
+            # The ★ pinned LoRA(s), one per family. Read off the dataset row we
+            # ALREADY hold — no extra query, no disk. Without it a canvas delete
+            # of the pinned checkpoint was confirmed with the plain wording, and
+            # the ⚠ "this is your saved winning combo" line never appeared:
+            # same route, same trash, but the user was not told what they were
+            # about to break.
+            'best_settings_loras': studio.best_settings_lora_filenames(ds),
         })
     out.sort(key=lambda d: (d['last_run_at'] or '', d['id']), reverse=True)
     return {'datasets': out}
