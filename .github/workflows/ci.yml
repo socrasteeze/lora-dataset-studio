@@ -139,6 +139,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Lint (merge-leftover tripwire)
+        # no-undef only. Three upstream syncs in a row left a bare identifier
+        # behind in a hunk that merged clean (isKlein, gptViaSub, storage) --
+        # a ReferenceError the bundler cannot catch and tests only catch if
+        # the exact component mounts. See frontend/eslint.config.js.
+        run: npm run lint
+
       - name: Run all frontend tests
         run: npm test
 

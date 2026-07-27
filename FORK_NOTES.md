@@ -275,6 +275,15 @@ a decision, and don't miss the parts that merge with zero conflict markers.
    the imported SYMBOL did not, and the line sat nowhere near a conflict). Only
    the bundler resolves imports, so run it BEFORE believing the sweep. The
    backend equivalent is importing the app: `python -c "import app; app.create_app()"`.
+   **What the bundler canNOT catch: a bare identifier whose definition the
+   merge dropped.** `npm run build` resolves imports, not variables — a hunk
+   that keeps `readEngines(storage())` while the resolution loses the one-line
+   `const storage = …` helper builds clean and throws `ReferenceError` the
+   moment the component mounts (three real cases: `isKlein` 2026-07-22,
+   `gptViaSub` 2026-07-26, `storage` 2026-07-27 — the last one crashed the
+   workspace on every dataset open/create). `npm run lint` (ESLint `no-undef`
+   only, see `frontend/eslint.config.js`) catches this class statically; it is
+   as REQUIRED a sweep step as the build, and CI runs it on every push.
 7. **Run the test suites BEFORE the merge and diff the results after.** This
    repo has ~50 environment-dependent failures on a Linux container (Windows
    drive letters, absent ML deps, no `xdg-open`) that have nothing to do with
@@ -299,7 +308,9 @@ git merge upstream/main
 #    (diagnostics 2-3), not just conflicted files.
 # 4. If frontend/dist or Setup/engines UI came from upstream, wipe their effect:
 cd frontend && npm run build
-# 5. Prove local-only did not regress:
+# 5. Prove local-only did not regress, and no merged hunk references an
+#    identifier whose definition the resolution dropped (diagnostic 6):
+cd frontend && npm run lint
 cd frontend && node --test tests/local-only-engines-contract.test.mjs
 python -m pytest
 cd frontend && node --test
