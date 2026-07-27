@@ -21,7 +21,15 @@ captioning rules and a few guards change with the dataset kind.
    style; you can change it later).
 2. **Upload the reference photo.** The app head-crops it automatically; use the
    crop editor (or *Reset to auto*) if the framing is off. Up to 3 extra angles
-   can be added for multi-view consistency.
+   can be added for multi-view consistency. **Edit** retouches the reference
+   itself from a prompt ("plain studio-grey background", "add glasses") and shows
+   you a Before/After to Keep or Discard. It runs on **Klein** or **Krea 2 Edit**,
+   on your own ComfyUI: free, private, and safe to repeat until it looks right.
+   The two engines read different photos, and the dialog says which before you
+   press Generate — Klein also takes the dataset's extra references, Krea edits
+   the main reference only. An engine appears only when your ComfyUI can actually
+   run it, and names the one missing thing when it nearly can. The edit runs on
+   the server, so you can close the tab and come back to the Before/After.
 3. **Generate variations** — fire the **variation catalog** on the local Klein
    engine: 53 shots across expression,
    angle, lighting, framing, outfit and background, each wrapped in an identity

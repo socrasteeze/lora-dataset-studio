@@ -17,6 +17,9 @@ import CaptionToolsBar from './CaptionToolsBar';
 import CaptionOptionsPopover from './CaptionOptionsPopover';
 import { recaptionConfirmation } from './captionCategory';
 import CropModal from './CropModal';
+import ReferenceEditModal from './ReferenceEditModal';
+import { defaultEditEngine } from './referenceEdit';
+import { localEngineUnavailableReason, hasComfyui } from '../../utils/localEngineReason.js';
 import { extraRefCropSource } from './extraRefs';
 import DatasetLightbox from './DatasetLightbox';
 import DatasetSettingsModal from './DatasetSettingsModal';
@@ -235,6 +238,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const [reviewQueue, setReviewQueue] = useState(null);
   const zipInput = useRef(null);   // hidden input for "Import dataset (ZIP)"
   const [refCrop, setRefCrop] = useState(false);
+  const [refEdit, setRefEdit] = useState(false);
   // Filename of the extra reference being cropped (extras have no numeric id).
   const [extraRefCrop, setExtraRefCrop] = useState(null);
   const [viewImg, setViewImg] = useState(null);
@@ -1113,7 +1117,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       one clear photo of the face — every generated variation starts from it
                     </span>
                     <ReferencePanel refFilename={d.ref_filename} datasetId={d.id} onSetRef={ds.setRef}
-                      onCropRef={() => setRefCrop(true)} busy={ds.busy} importBusy={importBusy} visionBusy={visionImportBusy} nonce={ds.refNonce}
+                      onCropRef={() => setRefCrop(true)} onEditRef={() => setRefEdit(true)} busy={ds.busy} importBusy={importBusy} visionBusy={visionImportBusy} nonce={ds.refNonce}
                       extraRefs={d.ref_extra_filenames || []}
                       onAddExtraRef={ds.addExtraRef} onRemoveExtraRef={ds.removeExtraRef}
                       onCropExtraRef={(fn) => setExtraRefCrop(fn)}
@@ -1809,6 +1813,22 @@ export default function DatasetWorkspace({ ds, onBack }) {
           onReset={d.ref_original_filename
             ? async () => { await ds.recropRefAuto(); setRefCrop(false); }
             : undefined} />
+      )}
+      {refEdit && d.ref_filename && (
+        <ReferenceEditModal datasetId={d.id} refFilename={d.ref_filename} nonce={ds.refNonce}
+          // The engines are free but not universal: the modal is handed the SAME
+          // capabilities the generation panel reads, so it can offer them when this
+          // ComfyUI can run them, explain the one missing action when it nearly
+          // can, and drop them entirely on an install that has no ComfyUI.
+          defaultEngine={defaultEditEngine(window.localStorage,
+            (e) => !localEngineUnavailableReason(e, caps))}
+          comfyuiConfigured={hasComfyui(caps)}
+          engineAvailable={caps.engines || {}}
+          engineReason={(e) => localEngineUnavailableReason(e, caps)}
+          datasetExtraCount={(d.ref_extra_filenames || []).length}
+          liveActivity={ds.activity} referenceEdit={d.reference_edit}
+          onEdit={ds.editReference} onKeep={ds.keepEditedReference} onDiscard={ds.discardEditedReference}
+          onClose={() => setRefEdit(false)} />
       )}
       {extraRefCrop && extraRefCropSource(d.ref_extra_filenames, d.ref_extra_crop_sources, extraRefCrop) && (
         // Same editor as the primary reference, fed the extra's full-frame ORIGINAL

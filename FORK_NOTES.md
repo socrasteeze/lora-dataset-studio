@@ -15,6 +15,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-07-28 | *(this wave)* + dist | **Reference editing, adopted local-only — the fork's first ADOPTION of a feature it had previously rejected** (new **Divergence 1c**). Upstream `47508ab` rebuilt Edit-reference to run on Klein and Krea 2 Edit as a ComfyUI queue job: free, private, no key. That retires the only objection this fork ever had — the deleted-file note said it outright, "Klein deliberately excluded, ChatGPT/Nano Banana only" — so by the Divergence-1b principle the local half was always in scope. It was rejected hours earlier **in the sync itself**, on sequencing rather than policy (a ~1,400-line resurrection inside a merge being judged by diffing test counts against a baseline is how leftovers ship), then taken here on a clean, green base. Restored trimmed: `reference_edit_jobs.py` (imports no cloud module), `ReferenceEditModal.jsx`, `referenceEdit.js`, the three `/ref/edit` routes, the service section, the `is_reference_edit` dispatch branch in `job_queue`, the `edit_reference` activity kind, and the `editReference`/`keepEditedReference`/`discardEditedReference` trio in `useDataset.js` **including its slot in the returned object** — the exact hiding spot diagnostic 3 names, and the exact list whose absence would have been a bare-identifier `ReferenceError` had the previous sync shipped upstream's version of it. **Every API branch DELETED, not left dead** (the 1b trap): `start_reference_edit` loses its `if engine in LOCAL_ENGINES` lane split, `_edit_engine_call` and `_run_reference_edit` go entirely, and `editCostNote`/`editKeepNote` lose the paid halves — a price quoted on a free render damages trust as much as one hidden on a paid one. **`editable_engines()` is upstream's `LOCAL_ENGINES + API_ENGINES` verbatim and is local-only BY CONSTRUCTION**, the payoff for keeping `API_ENGINES` as an empty export; the new test asserts the OUTCOME rather than the expression, so a sync that ever refilled that tuple would fail here instead of quietly handing the fork a paid edit lane. **Two upstream defaults recomputed, not inherited** (diagnostic 10): `defaultEditEngine` falls back to a cloud id upstream-side, which would open the modal on an engine no route accepts — repointed at `DEFAULT_ENGINE`; and the unknown-engine `EDIT_REF_SUPPORT` default is `'primary_only'` here rather than upstream's `'all'`, which would have promised transient-upload support nothing implements. **The transient-upload picker is absent rather than present-and-ignored** — no local graph can take request-scoped bytes, so the picker, its state and `editReference`'s `files` argument are gone and the route refuses uploads loudly. **`invalidate_reference_edit` re-wired into `crop_reference`/`recrop_reference_auto`**; those hooks had left with the feature, and without them a pending Before/After survives a crop and compares against a reference that no longer exists (regression-tested). **An upstream bug was found and NOT copied**: upstream's `/ref/edit/keep` calls `logger.exception(...)` in a module that never defines `logger`, so its error path raises `NameError` inside the very `except` meant to return an honest 500. **Caught by the guards, not by review**: the local-only contract's identifier budget went red on a single cloud engine name in one of my own explanatory comments — reworded rather than budget-bumped, which is what that guard asks for. Divergence 3: the `✦` on the button and heading stripped (the button reads `Edit` — real text, not an empty control); `⚠ → ✕` kept as glyphs this fork already carries. Also **merge diagnostic 11**: `frontend/node_modules` can exist while ESLint is absent from it, and `npm run lint` then fails with `'eslint' is not recognized` — non-zero, so not silent, but it reads as a broken toolchain rather than as "the tripwire for this fork's worst failure class never fired". It happened this session; CI is unaffected (`npm ci` runs first). Gates: lint clean; build clean; local-only contract 8/8 against the rebuilt dist; `app.create_app()` OK; frontend 1211 -> **1231/1231**; backend 3089 -> **3107 passed** (+18, exactly the new suite) with the SAME single pre-existing environment failure and the same skip. |
 | 2026-07-28 | *(merge)* + dist | **Upstream sync** (11 commits: Concept LoRAs can mask the FACES out of the training loss so they stop fighting your character LoRAs — reported by shivdbz2010, GitHub issue #15; a model ComfyUI cannot load now names itself before the job is queued instead of failing with "value not in list"; the resolvers never AUTO-pick an unloadable file — a `.gguf` dropped into a krea folder mid-session had the app choosing a model core ComfyUI cannot read, reported by naniii2352 on Discord; the checkpoint-gallery Select moved into the pinned bottom bar). **The judgement call this sync was upstream `47508ab`: reference editing became LOCAL** (Klein + Krea 2 Edit, a ComfyUI queue job, free) — which retires the ONLY objection this fork ever had to it, since the deleted-file note says in as many words "Klein deliberately excluded, ChatGPT/Nano Banana only". By the Divergence-1b principle the local half is genuinely IN SCOPE here. **Rejected anyway, on scheduling not policy** (owner decision): adopting it means resurrecting six deleted files plus the `/ref/edit` routes, the service section, the `editReference`/`keepEditedReference`/`discardEditedReference` trio rejected only last sync, the modal wiring and an activity kind, each trimmed of the API half it interleaves with — a feature wave, not something to bury in a merge that has to be diffed against a test baseline. Recorded as its own section under Divergence 1 (with the adoption checklist) so the next sync does not re-derive it. Re-deleted: the six conflicted ref-edit files plus TWO that merged with zero conflict markers (`test_ref_edit_local_engines.py`, `ReferenceEditModal.contract.test.js`). **Three clean-merge leftovers caught by the sweep, none flagged by git**: `job_queue._dispatch_completion` gained an `is_reference_edit` branch calling a `link_completed_reference_edit` that no longer exists (the backend's own bare-identifier class — an `AttributeError` on every local edit-shaped completion); `test_dataset_job_dispatch.py` gained a test `monkeypatch.setattr`-ing that same absent function; and `whatsNew.js` gained the entry ANNOUNCING the rejected feature, the documented hiding spot. **A real bare-identifier trap was defused in `TrainingSection.jsx`**: upstream's conflict hunk carried `VastKeyGuide` + `VAST_SECRET` + `CloudOfferFilter` + `CloudTrainingCard` (Divergence 4, rejected AGAIN) interleaved with the legitimate `ConceptFaceMaskCard` — but the file's IMPORT line auto-merged as the fork's, so keeping the concept card alone would have left `ResetToDefault` and `defaultValueAt` undefined and crashed Settings › Training on open. Resolved per hunk and both imports added (not `SecretField`/`useState`/`useEffect`, which only the cloud cards needed). `settingDefaults.test.js`: dropped upstream's seven `cloud.*` reset rows, KEPT the two `face_mask` ones — and **reversed last sync's note** that `TrainingSection.jsx` is deliberately absent from the "reads the shared lookup" list, because concept masking just gave it its first non-cloud resets (diagnostic 10: a fork invariant that MOVED). **`utils/localEngineReason.js` was adopted even though it arrived in the ref-edit commit** — it is not ref-edit plumbing but the extraction of Klein's four-cause availability answer out of `VariationCatalog.jsx`, whose GENERATION panel is its caller here; its ref-edit comments were reworded and its API-engine test re-pointed at `LEGACY_API_ENGINE_TAGS`. Upstream's `chore(release)` dist was reverted unmerged and rebuilt from fork src; `.gitattributes` `-merge` again turned `dist/index.html` into an explicit conflict rather than a silent content merge. Divergence 3: stripped 📌 🗑 👁 👍 and the `⚠️` variation-selector form from the merge's ADDED lines only (`ConceptFaceMaskField.jsx`, `CheckpointGalleryPanel.jsx`, `gallerySelection.js`/`.test.js`, `lineagePanelsResponsive.test.js`, one What's-new blurb); the gallery Select toggle's `✓`/`☑` pair was dropped rather than replaced, since the button's own Select/Done label and `aria-pressed` already carry the state — no invisible-badge repeat. `→ ▸ ⚠ ✕` kept (glyphs this fork already carries), `README.md` deliberately not stripped. Gates: lint clean; build clean; local-only contract 8/8 against the rebuilt dist; `app.create_app()` OK; backend guard 3/3; frontend 1189 -> **1211/1211**; backend 3060 -> **3089 passed with the SAME single pre-existing failure** (`test_prefill_falls_back_to_telea_when_lama_absent`) and the same skip — baseline recorded before the fetch, one pass, on Windows (where only that one environment failure occurs, not the Linux container's 57). |
 | 2026-07-28 | *(merge)* + dist | **Upstream sync** (19 commits: re-run Upscale & improve from the SOURCE image with today's settings; judge an improvement side by side with its parent, at the same scale; click a run on the Canvas to see everything it made, by step (the checkpoint gallery grew a second scope); put any setting back to its default from the server's own value; a settings deep link that names one setting now lands on that setting; release notes generated from What's-new instead of shipped empty; README screenshots collapsed behind details) — **Divergence 1 work again, and again with no cloud-engine FILE touched**: the new reset-to-default feature enumerates the removed engines. Rejected: upstream's `ImageModelsCard` (three `ModelField`s for nanobanana/chatgpt/openrouter model slugs) and the ENTIRE `ChatgptSubscriptionCard` — device-code OAuth login, poll/import-codex/logout calls and `CHATGPT_AUTH_OPTIONS`, which FORK_NOTES already named as staying dropped — plus their renders and the `refreshCaps`/`toast` props that existed only for them. KEPT from the same hunks: `configDefaults`, because `ResetToDefault` is legitimate and is already wired to the Klein/Krea settings that survive here (verified live: changing Klein generation steps makes the button appear reading 'Reset to default: Generation steps, 5'). **The dangerous one was `useDataset.js`** — the documented hiding spot: upstream's returned object both DROPPED the fork's `renameDataset` and ADDED `editReference`/`keepEditedReference`/`discardEditedReference`, the rejected reference-edit-via-API trio whose backend this fork deleted. Undefined here, so shipping that list would have been a bare-identifier `ReferenceError` on every dataset page — the sixth instance of the class. Kept the fork's list, added only the legitimate `reimproveImage`. **Divergence 4**: upstream's `VastKeyGuide` (a 'how to get a vast.ai API key' walkthrough), the `Cloud GPU (vast.ai)` secret card and `CloudTrainingCard` all arrived in `TrainingSection.jsx`; rejected, and the four imports they alone needed (`useEffect`/`useState`/`SecretField`/`ResetToDefault`/`defaultValueAt`) reverted with them rather than left as unused leftovers. **Two new upstream contract tests pinned the rejected surface**: `settingDefaults.test.js` asserted `EnginesSection.jsx` offers resets for `chatgpt_auth`/`nanobanana_model`/`chatgpt_image_model`/`openrouter_model` (id anchors that do not exist here) and that `TrainingSection.jsx` covers seven `cloud.*` rental settings and imports the shared lookup — all re-pointed at this fork's real surface; `test_settings_api.py` asserted `config_defaults['engines']['nanobanana_model']`, a key this fork's `engines` section does not have, and probed secret-leakage with `OPENAI_API_KEY`, which is not in this fork's `SECRET_KEYS` and so proved nothing — re-pointed at `krea.base_model` and `HF_TOKEN`. Upstream's dist again carried ALL SIX forbidden strings and was deleted unmerged; `.gitattributes` `-merge` (added last wave) did its job — `dist/index.html` came through as an explicit conflict instead of auto-merging. Divergence 3: re-stripped `CheckpointGalleryPanel.jsx` (👍/👎 back to ✓/✗, 🗑/📝 dropped — the file the fork keeps emoji-free, stripped for the second sync running), `CaptioningSection.jsx` (🎨/👥/💔 and the four bank-flag glyphs), `DatasetGridItem.jsx`'s new re-run button (🔄✨ -> the fork's own ↻, NOT stripped to an empty button — the bank-badge lesson), `LineageCanvas.jsx`, `runGallery.js`, `improveRerun.js` and three test comments. Gates: lint clean (no bare-identifier leftover); build clean; local-only contract 8/8 against the rebuilt dist; `app.create_app()` OK; frontend 1088 -> **1189/1189**; backend 2953 -> **2975 pass with the SAME 57 failures and ZERO files changing their failure count** (one-pass baseline recorded before the fetch); all ten routes drive clean in a real browser and Settings shows no cloud engine. |
 | 2026-07-27 | `2d66f9d`..`37c57a8` (+ `908e043`, dist `c5987f4`, `37c57a8`) | **Sync hardening: turn what the 2026-07-27 merge caught BY HAND into gates** — that sync found four cloud-engine leftovers, a moved file that silently un-stripped itself, and two upstream tests pinning the rejected surface, all of it manually. Four guards now cover that ground. (1) **Cloud-engine identifier budgets**: the local-only contract only ever matched exact UI sentences ('Powers Nano Banana'), which is why a whole `PromptPreview` engine picker, an `API_ENGINES` branch, six API-key help topics and a backend `PREVIEW_ENGINES` tuple all merged green — none contains a forbidden phrase, and `backend/app` had no guard of any kind. Per-file budgets on the IDENTIFIERS now cover `frontend/src` (in the existing contract test) and `backend/app` (new `test_local_only_engines.py`); a budget rather than a ban because `LEGACY_API_ENGINE_TAGS` is load-bearing, so that test also asserts the tags still EXIST and `API_ENGINES` stays empty — the budget can never be satisfied by deleting the compatibility path. Both verified by replanting this sync's real leftovers. (2) **The backend suite runs in ONE pass again**: a global `monkeypatch.setattr(os, 'name', 'nt')` made pytest's own traceback formatter build a `WindowsPath` on Linux whenever a test failed in that window, aborting the session — which is why diagnostic 7 demanded 174 per-file subprocesses (~15 min) twice per sync. A `makereport` hookwrapper restores the real `os.name` while a report is built: 2950 passed / 57 failed, zero INTERNALERROR, and the failure set reconciles exactly with the old method (51 counted per-file + 6 in `test_capabilities.py` that the old method could not SEE). (3) **`frontend/dist/** -merge`** in `.gitattributes`: the served bundle is a tracked build artifact and the one path that reintroduces the cloud Setup UI with no source change to notice — it arrived carrying all six forbidden strings this sync. Git now never content-merges it. (4) **Docs**: CLAUDE.md's identity rule claimed the author was 'already set in this repo's local git config' — it is not part of a clone, and this session authored two commits as the wrong author before it was caught; it now gives the commands, says to fix the TOOL not the author line, and records that wrong-author commits are repaired with `commit-tree`, never `rebase` (a rebase across a sync rewrites the merged UPSTREAM commits). Merge diagnostics 9 (a `modify/delete` conflict usually means upstream MOVED a file and the fork's edits did not follow) and 10 (never read counts/defaults off upstream — recompute them) added. **Two real bugs found while measuring whether a fifth guard was worth building**: `activeExtraRefPromptKey` still fell back to upstream's `'nanobanana'` default, badging `face_multi` — an API-engine prompt this fork does not surface and no local generation reads — as 'used by your current engine' on any profile that had not yet opened the Generate panel, with the unit test PINNING that behaviour rather than catching it; and the bank tile's promoted badge was `badge('')`, an over-strip that rendered an INVISIBLE pill (restored to the `⬆` that same file's own '⬆ Promote…' button uses). **Deliberately NOT built: an emoji (Divergence 3) contract test.** Measured first: `frontend/src` already carries ~40 distinct pictographs across dozens of files, and 5 of the 7 glyphs this sync stripped (`⬆ 🗃 🖼 👍 👎`) still live elsewhere in the tree — so a character allowlist would catch 2 of 7 and a per-file baseline is brittle (the gallery panel changed paths mid-sync). D3 is applied per merged hunk historically, not enforced tree-wide; enforcing it is a deliberate ~40-glyph cleanup, not something to smuggle into a sync. Gates: lint clean, frontend 1088/1088, local-only contract 8/8 against the rebuilt dist, backend guards green, `app.create_app()` OK. |
@@ -66,69 +67,94 @@ as hostile until `npm run build` and the local-only contract test pass.
 - `backend/app/services/nanobanana.py`
 - `backend/app/services/chatgpt_image.py`
 - `backend/app/services/chatgpt_oauth.py`
-- `backend/app/services/reference_edit_jobs.py` (2026-07-24: "edit the reference
-  photo with a prompt" — Klein deliberately excluded, ChatGPT/Nano Banana only).
-  **The reason for this one EXPIRED on 2026-07-28** — see "Reference editing"
-  below before re-deleting it on autopilot.
 - `backend/app/services/openrouter.py` (2026-07-26: OpenRouter shipped upstream
   as a THIRD cloud engine — same rejection as the other two)
 - `backend/app/services/engine_errors.py` — the shared EngineError/EngineFatal
   taxonomy; its only consumers were the three API engines and the API fan-out
 - `backend/tests/test_engines.py`
 - `backend/tests/test_chatgpt_oauth.py`
-- `backend/tests/test_ref_edit.py`
 - `backend/tests/test_openrouter_engine.py`, `test_engine_model_choice.py`,
   `test_engine_lists_contract.py`, `test_config_new_engines.py` (2026-07-26 —
   all four merged in with ZERO conflicts; the diagnostic-2 sweep is what caught
   them)
-- `frontend/src/components/dataset/ReferenceEditModal.jsx`
-- `frontend/src/components/dataset/referenceEdit.js` (+ `.test.js`) — imported
-  the (then absent) `engineSelection.js`; `ReferencePanel.jsx` kept a clean-merged
-  `import { editEngineNames }` of it that only the BUILD caught
 
 **`frontend/src/components/dataset/engineSelection.js` is no longer deleted** —
 see "Divergence 1b" below. It is now maintained in a LOCAL-ONLY form.
 
-### Reference editing: rejected, but NOT on Divergence-1 grounds any more
+**The whole reference-EDIT stack is no longer deleted either** (2026-07-28):
+`reference_edit_jobs.py`, `ReferenceEditModal.jsx`, `referenceEdit.js` (+ its
+test), `test_ref_edit_local_engines.py` and the three `/ref/edit` routes are
+MAINTAINED here in local-only form — see Divergence 1c. Do not re-delete them on
+autopilot from a stale reading of this list. `backend/tests/test_ref_edit.py`
+stays deleted: it is upstream's API-lane suite, replaced here by
+`test_ref_edit_local_engines.py`.
 
-Upstream `47508ab` (2026-07-28) rebuilt ✦ Edit-reference to run on **Klein and
-Krea 2 Edit**: a ComfyUI queue job answered by its completion callback, no API
-call, no key, free. That removes the one thing this fork ever objected to — the
-deleted-file note above says it in as many words ("Klein deliberately excluded,
-ChatGPT/Nano Banana only"). By the Divergence-1b principle (D1 forbids CLOUD
-engines, not second engines or local features), the LOCAL half is **in scope for
-this fork**.
+### Divergence 1c: reference editing is ADOPTED, local-only
 
-It was still rejected in the 2026-07-28 sync, and the reason is scheduling, not
-policy: adopting it means resurrecting six deleted files plus the `/ref/edit`
-routes, the service section, the `editReference`/`keepEditedReference`/
-`discardEditedReference` trio in `useDataset.js` (rejected as recently as the
-previous sync), the modal wiring and an activity kind — each trimmed of the API
-half it is interleaved with. That is a feature wave, and burying ~1,400 lines of
-resurrection inside a merge that has to be diffed against a test baseline is how
-leftovers ship. **Owner decision, recorded so the next sync does not re-litigate
-it from scratch: keep re-deleting it during syncs; adopt it, if at all, as its
-own wave.** What that wave would take:
+**Status: adopted 2026-07-28** — rejected earlier the same day during the sync
+itself, then taken as its own wave. The sequencing was deliberate, not a change
+of mind: see the changelog rows.
 
-- Re-add trimmed: `reference_edit_jobs.py` (imports no cloud module — checked),
-  `ReferenceEditModal.jsx`, `referenceEdit.js` (+ tests), the three `/ref/edit`
-  routes, `start_reference_edit`/`link_completed_reference_edit`/
-  `keep_reference_edit`/`discard_reference_edit`, and the `is_reference_edit`
-  branch in `job_queue._dispatch_completion`.
-- Free wins already here: `referenceEdit.js` derives `EDIT_ENGINES = [...ENGINES]`,
-  which with this fork's `ENGINES`/empty `API_ENGINES` is local-only **by
-  construction**; `utils/localEngineReason.js` (adopted 2026-07-28, see below) is
-  the availability half and is already in-tree and unit-tested.
-- Watch: `defaultEditEngine`'s `|| 'chatgpt'` fallback is upstream's default and
-  must be recomputed (diagnostic 10), and `editCostNote`/`LOCAL_EDIT_REF_SUPPORT`
-  carry API-engine branches that must be DELETED, not left dead (the 1b trap).
+Upstream `47508ab` rebuilt Edit-reference to run on **Klein and Krea 2 Edit**: a
+ComfyUI queue job answered by its completion callback, no API call, no key, free.
+That removed the one thing this fork ever objected to — the deleted-file note
+above says it in as many words ("Klein deliberately excluded, ChatGPT/Nano Banana
+only"). By the Divergence-1b principle (D1 forbids CLOUD engines, not second
+engines or local features) the local half is in scope, so it is here.
 
-**`frontend/src/utils/localEngineReason.js` is KEPT** (adopted 2026-07-28) even
-though it arrived in the ref-edit commit. It is not ref-edit plumbing: it is the
-extraction of Klein's four-cause "why can't I pick this" answer out of
-`VariationCatalog.jsx`, sitting next to Krea's in `kreaEngine.js`, and the
-GENERATION panel is its caller here. Its ref-edit-specific comments were reworded
-so the fork carries no dead references to a feature it does not ship.
+**What this fork ships, and how it differs from upstream's:**
+
+- `reference_edit_jobs.py` — restored as-is (it imports no cloud module), with its
+  docstrings reworded: upstream describes TWO lanes filling one registry, and
+  there is only one here.
+- `face_dataset_service.py` — `start_reference_edit` has **no lane branch**.
+  Upstream's `if engine in LOCAL_ENGINES` would be dead in the always-true
+  direction, which is the 1b trap; it is deleted, along with `_edit_engine_call`
+  and `_run_reference_edit` (the API worker thread). `app` stays in the signature
+  so the route and the tests keep upstream's shape.
+- `editable_engines()` is upstream's `LOCAL_ENGINES + API_ENGINES` **verbatim**,
+  and is local-only BY CONSTRUCTION because `API_ENGINES` is empty. That is the
+  payoff for keeping the empty export instead of deleting it.
+  `test_ref_edit_local_engines.py` asserts the OUTCOME (`editable_engines() ==
+  LOCAL_ENGINES`, no `LEGACY_API_ENGINE_TAGS` member), never the expression — a
+  sync that refilled `API_ENGINES` would otherwise hand this fork a paid edit lane
+  with no other code change, and nothing else would notice.
+- `referenceEdit.js` uses the same derivation (`EDIT_ENGINES = [...ENGINES]`).
+  `defaultEditEngine`'s fallback is **recomputed**: upstream hardcodes one of its
+  removed cloud engine ids there, which would open the modal on an id no route
+  accepts (diagnostic 10). `editCostNote`/`editKeepNote` lost their paid branches
+  — a price quoted on a free render damages trust as much as one hidden on a paid
+  render.
+- **No transient-upload picker.** Upstream's third `EDIT_REF_SUPPORT` value,
+  `'all'`, exists for API engines that also accept images uploaded in the modal.
+  No engine here can (both graphs want file PATHS; the route refuses
+  request-scoped bytes), so the picker, its state and the `files` argument of
+  `editReference` are absent rather than present-and-ignored — and the
+  unknown-engine default is `'primary_only'`, NOT upstream's `'all'`, so the UI
+  cannot promise a capability nothing implements.
+- The `editReference`/`keepEditedReference`/`discardEditedReference` trio is back
+  in `useDataset.js` **and in its returned object** — the slot diagnostic 3 names
+  as a hiding spot, called out here because that is where it will go missing next.
+- `invalidate_reference_edit` is wired into `crop_reference` and
+  `recrop_reference_auto`. Those hooks left the fork when the feature did; without
+  them a pending Before/After survives a crop and compares against a reference
+  that no longer exists.
+- Divergence 3: the `✦` upstream puts on the button and heading is stripped —
+  the button reads `Edit`, which is real text, not an empty control.
+
+**Upstream bug NOT copied:** upstream's `/ref/edit/keep` route calls
+`logger.exception(...)` in a module that never defines `logger` (it uses
+`logging.getLogger(__name__)` inline elsewhere), so its error path raises
+`NameError` inside the very `except` that exists to turn a failed Keep into an
+honest 500. This fork uses the inline form.
+
+**`frontend/src/utils/localEngineReason.js`** was adopted 2026-07-28 in the sync
+itself, ahead of the feature it arrived with, because it is not ref-edit plumbing:
+it is the extraction of Klein's four-cause "why can't I pick this" answer out of
+`VariationCatalog.jsx`, sitting next to Krea's in `kreaEngine.js`. The GENERATION
+panel was its only caller for one commit; the edit modal is now the second, which
+is the point of the file — one gap must not be explained two different ways two
+clicks apart.
 
 ### Divergence 1b: a SECOND local engine, and a local-only engine catalogue
 
@@ -419,6 +445,17 @@ a decision, and don't miss the parts that merge with zero conflict markers.
     this fork does not even surface, and the unit test PINNED that behaviour
     rather than catching it. When a merged test asserts a number or a default,
     check it against this fork's own source before believing it.
+
+11. **Confirm the lint gate actually RAN, not just that it "didn't complain".**
+    `frontend/node_modules` can exist while ESLint is absent from it (a checkout
+    whose `npm install` predates the dev-dependency, a partial install). `npm run
+    lint` then exits NON-zero — it does not silently pass — but what it prints is
+    `'eslint' is not recognized as an internal or external command`, which reads
+    as a broken toolchain rather than as "the tripwire for this fork's worst
+    failure class never fired". That happened on 2026-07-28. CI is unaffected (it
+    runs `npm ci` first); this is a local-checkout trap. If lint's output is
+    anything other than ESLint's own, run `npm install` in `frontend/` and run it
+    again before believing Gate 1.
 
 ## Merge routine (every upstream sync)
 
