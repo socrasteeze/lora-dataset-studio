@@ -832,6 +832,46 @@ export function useDataset() {
     setRefNonce((n) => n + 1);
   }, [currentId, refresh, toast]);
 
+  // Edit the reference. STARTS a server-side background job and returns at once
+  // (202) — the render is slow, so it must NOT ride the client's fetch (a
+  // backgrounded mobile tab would kill it and lose the result). The candidate is
+  // rediscovered through the payload's `reference_edit`; refresh() here starts the
+  // activity poll that tracks it. Returns false (with a toast) on a start error;
+  // true once the job is queued.
+  //
+  // No `files` parameter, unlike upstream: every engine here renders locally from
+  // file PATHS and the route refuses request-scoped bytes, so there is no transient
+  // upload to forward and the modal has no picker to produce one.
+  const editReference = useCallback(async (prompt, engine) => {
+    const fd = new FormData();
+    fd.append('prompt', prompt);
+    fd.append('engine', engine);
+    const d = await postJson(`/api/dataset/${currentId}/ref/edit`, fd, true);
+    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return false; }
+    await refresh();
+    return true;
+  }, [currentId, refresh, toast]);
+
+  // Keep the ready candidate: the server atomically swaps the reference (old files
+  // removed only after the new ones are on disk) and deletes the candidate.
+  const keepEditedReference = useCallback(async () => {
+    const d = await postJson(`/api/dataset/${currentId}/ref/edit/keep`, {});
+    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return false; }
+    toast.success('Reference updated');
+    await refresh();
+    setRefNonce((n) => n + 1);
+    return true;
+  }, [currentId, refresh, toast]);
+
+  // Discard a pending edit (running=abandon or ready) — deletes the candidate and
+  // cancels the render, which on this fork is always possible: it is our own GPU.
+  const discardEditedReference = useCallback(async () => {
+    const d = await postJson(`/api/dataset/${currentId}/ref/edit/discard`, {});
+    if (!d.ok) { toast.error(d.error || 'Unexpected error'); return false; }
+    await refresh();
+    return true;
+  }, [currentId, refresh, toast]);
+
   const deleteImage = useCallback(async (imageId) => {
     const d = await postJson(`/api/dataset/image/${imageId}/delete`);
     if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
@@ -1229,7 +1269,8 @@ export function useDataset() {
            nonces, mirroringIds, refNonce, recaptioningIds, create, open,
            deleteDataset, renameDataset, updateSettings, setCurrentId, setRef, addExtraRef, removeExtraRef,
            generate, importFiles, scrapeImport, resolveSmallImageRescue, improveImage, reimproveImage, improveBatch, classify, caption, recaption, recaptionImages,
-           setStatus, setCaption, mirrorImage, crop, cropRef, cropExtraRef, recropRefAuto, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces,
+           setStatus, setCaption, mirrorImage, crop, cropRef, cropExtraRef, recropRefAuto,
+           editReference, keepEditedReference, discardEditedReference, setDatasetTrainType, setDatasetFidelity, deleteImage, batchImages, replaceCaptions, writeCaptionFiles, openDatasetFolder, cancelPending, cancelCaption, regenerate, analyzeFaces,
            findWatermarks, cleanWatermarks, cleanWatermarkImages, restoreWatermarkImage, dismissWatermarks, saveWatermarkRegions,
            purgeUnused, exportZip, exportBackup, exportZipFor, exportBackupFor, importBackup, importDatasetZip, importDatasetFolder,
            backupEverything, backupJob, downloadBackup, openBackupsFolder, dismissBackup, restoreJob, dismissRestore,

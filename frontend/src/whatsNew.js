@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-28-edit-the-reference-on-your-own-gpu',
+    date: '2026-07-28',
+    title: 'Retouch your reference photo from a prompt — on your own GPU, for free',
+    blurb:
+      'The reference photo is the one image everything else is built from, and until now the only way to change it was to go and edit it somewhere else, then re-upload. There is now an Edit button on the reference card: describe what should change ("plain studio-grey background", "add glasses", "warmer lighting"), and you get a Before/After to Keep or Discard. It runs on Klein or Krea 2 Edit, on your own ComfyUI — no key, no bill, nothing leaving your machine — so trying the prompt five times until it looks right costs nothing but GPU time. The two engines read different photos and the dialog says which BEFORE you press Generate: Klein also uses the dataset\'s extra reference angles, Krea edits the main reference only. An engine shows up only when your ComfyUI can actually run it, and when it nearly can, it names the one thing to fix in the same words the generation panel uses. The render happens on the server, so you can close the tab and come back to it; Discard cancels the render instead of leaving your GPU busy on a result you no longer want. Keeping an edit replaces the reference for FUTURE variations only — images already generated are untouched — and cropping the reference afterwards drops a pending edit rather than showing you a Before/After that no longer matches.',
+    to: '/datasets?section=add',
+  },
+  {
     id: '2026-07-27-gallery-select-moved-to-the-bottom-bar',
     date: '2026-07-27',
     title: 'Cleaning up a run\'s images no longer means reaching for the top of the panel',

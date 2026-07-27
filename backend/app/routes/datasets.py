@@ -376,6 +376,79 @@ def dataset_ref_recrop_auto(dataset_id):
     return jsonify(resp)
 
 
+@bp.post('/dataset/<int:dataset_id>/ref/edit')
+def dataset_ref_edit(dataset_id):
+    """START a background reference-edit job and return AT ONCE (202). The edit is
+    a slow (1-3 min) render, and running it in the client's fetch let a
+    backgrounded mobile tab kill it ('Failed to fetch') AND lose the result. Now
+    the job fills a server-side CANDIDATE and the client rediscovers it through the
+    dataset payload's `reference_edit` (survives a tab sleep and a reload).
+
+    Editable engines are svc.editable_engines(), DERIVED — not a second hardcoded
+    list. A private copy here is a route that refuses an engine the service already
+    supports: exactly what kept both LOCAL engines out of the Edit modal upstream,
+    the two that cost nothing to run, on the most exploratory gesture in the app.
+
+    A missing weight or node pack comes back as the same actionable 409 the
+    generate route returns, not as a spinner that dies three minutes later."""
+    if not svc.get_dataset(LOCAL_USER, dataset_id):
+        return jsonify({'error': 'not found'}), 404
+    prompt = (request.form.get('prompt') or '').strip()
+    engine = (request.form.get('engine') or '').strip()
+    if engine not in svc.editable_engines():
+        return jsonify({'error': svc.edit_engine_choice_message()}), 400
+    # Transient edit-reference images: every engine here renders on the local GPU
+    # and wants file PATHS, so none of them can take request-scoped bytes. The
+    # modal hides the picker; the service refuses them loudly rather than dropping
+    # them silently (see svc.LOCAL_EDIT_REF_SUPPORT).
+    extra_bytes = [f.read() for f in request.files.getlist('ref') if f and f.filename]
+    try:
+        svc.start_reference_edit(current_app._get_current_object(), LOCAL_USER,
+                                 dataset_id, engine, prompt, extra_edit_ref_bytes=extra_bytes)
+    except Exception as e:
+        from ..services.klein_edit_helper import KleinModelsMissing
+        from ..services.krea_edit_helper import KreaModelsMissing
+        if isinstance(e, KleinModelsMissing):
+            return _klein_missing_response(e.missing)
+        if isinstance(e, KreaModelsMissing):
+            return _krea_missing_response(e)
+        return _map_error(e)
+    return jsonify({'ok': True, 'status': 'running'}), 202
+
+
+@bp.post('/dataset/<int:dataset_id>/ref/edit/keep')
+def dataset_ref_edit_keep(dataset_id):
+    """Keep the ready candidate: promote it to BE the reference via the atomic,
+    fail-safe commit (writes+verifies the new files before unlinking the old ones),
+    then delete the candidate. 409 when there is no ready candidate to keep."""
+    if not svc.get_dataset(LOCAL_USER, dataset_id):
+        return jsonify({'error': 'not found'}), 404
+    try:
+        fn = svc.keep_reference_edit(LOCAL_USER, dataset_id)
+    except Exception:
+        # NOT `logger.exception` — this module has no module-level `logger`, and
+        # upstream's copy of this line would raise NameError inside the very
+        # except block that exists to turn a failed Keep into an honest 500.
+        logging.getLogger(__name__).exception(
+            'reference edit keep failed (dataset %s)', dataset_id)
+        return jsonify({'error': "Couldn't save the edited reference — the previous "
+                                 'reference is unchanged.'}), 500
+    if fn is None:
+        return jsonify({'error': 'no edited reference is ready to keep'}), 409
+    return jsonify({'ok': True, 'ref_filename': fn})
+
+
+@bp.post('/dataset/<int:dataset_id>/ref/edit/discard')
+def dataset_ref_edit_discard(dataset_id):
+    """Discard a pending edit (running=abandon or ready) and delete its candidate.
+    A render still in flight is CANCELLED — it is our own GPU, so nothing is owed
+    for it and nothing keeps the card busy."""
+    if not svc.get_dataset(LOCAL_USER, dataset_id):
+        return jsonify({'error': 'not found'}), 404
+    svc.discard_reference_edit(dataset_id)
+    return jsonify({'ok': True})
+
+
 _KLEIN_ASSET_LABELS = {
     'klein_model': 'Klein model', 'klein_text_encoder': 'text encoder',
     'klein_vae': 'VAE', 'klein_lora': 'consistency LoRA',
