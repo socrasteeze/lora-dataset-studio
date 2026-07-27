@@ -50,6 +50,13 @@ import { SETUP_STEP_IDS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-26-no-phantom-vision-lease',
+    date: '2026-07-26',
+    title: 'Training starts promptly even if Ollama was down a moment ago',
+    blurb:
+      'When Ollama was unreachable during a reference upload (the head-crop already degrades gracefully to a centered crop), launching a training in the next two minutes could stall a few seconds trying to hand back a vision model that was never actually loaded. That phantom keep-warm lease is now dropped the moment a vision call fails to reach Ollama, so training spawns without the detour.',
+  },
+  {
     id: '2026-07-27-bank-real-detail-and-origin',
     date: '2026-07-27',
     title: 'The bank now tells you when an image’s size is a bluff, and where it came from',
