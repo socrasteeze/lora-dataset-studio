@@ -50,6 +50,29 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-27-gallery-select-moved-to-the-bottom-bar',
+    date: '2026-07-27',
+    title: 'Cleaning up a run\'s images no longer means reaching for the top of the panel',
+    blurb:
+      'In a checkpoint or run gallery, Select opened the picking mode from the panel header, while everything it leads to — Select all, Delete, the count — sat in a bar at the bottom. On a phone that was the most expensive reach in the panel. Select now lives in that same bottom bar, in indigo rather than grey so it is actually findable, and the bar is there from the moment the gallery has images. Deleting is no harder to reach by accident than before: Select sits at one end of the bar and Delete at the other, Delete stays greyed out until you have tapped at least one image, and the confirmation still spells out what leaves and where it goes. An empty gallery shows no bar at all.',
+  },
+  {
+    id: '2026-07-27-model-not-in-comfyui-list',
+    date: '2026-07-27',
+    title: 'A model ComfyUI cannot load now says so, instead of a cryptic "value not in list"',
+    blurb:
+      'Picking a model your ComfyUI does not actually accept used to fail with a raw ComfyUI error listing other filenames — no cause, no fix. The app now checks your models against what your ComfyUI publishes, before starting anything, and names the reason. Two cases it can finally explain: a .gguf (quantised) model, which ComfyUI cannot read at all without the ComfyUI-GGUF pack and which the standard loader will never open, so no amount of moving it between folders helps — use a .safetensors build; and a model that is on your disk but belongs to a DIFFERENT ComfyUI install, which happens easily with ComfyUI Desktop since it keeps a shared models folder as well as one in its install directory. Thanks to naniii2352 (Discord) for the report and the digging.',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-27-mask-faces-on-concept-loras',
+    date: '2026-07-27',
+    title: 'Concept LoRAs can now leave the faces out',
+    blurb:
+      'A Concept LoRA quietly learns the faces of the people in its dataset, so stacking it with a Character LoRA left the two fighting over whose face to render. Concept datasets now have a Mask faces option in Advanced training options: the detected faces are weighed down in the training loss, so the concept binds to the act instead of to your models. Your images are never altered — nothing is blurred or painted over, which matters, because a blurred face would be exactly what the model learns to reproduce. Preview it on your own shots before training: the mask is drawn over the photos, the head coverage redraws live as you drag it, and images where no face was found are shown first so you can see what would slip through. Two knobs in Settings ▸ Training let you tune how much of the head is covered and how hard identity is pushed out. Off by default, and existing datasets are untouched. Reported by shivdbz2010 (GitHub).',
+    to: '/datasets?section=training',
+  },
+  {
     id: '2026-07-27-rerun-upscale-and-improve',
     date: '2026-07-27',
     title: 'Tuned the Upscale & improve settings? Re-run the pass on a tile in one click',

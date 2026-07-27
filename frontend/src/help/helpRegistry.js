@@ -333,6 +333,7 @@ const TOPICS = [
     ['delete an image', 'delete images', 'remove a photo', 'remove images',
      'delete test images', 'clean up a checkpoint', 'too many images',
      'bad renders', 'failed test images', 'select images', 'select mode',
+     'where is the select button', 'select button moved', 'no delete button',
      'delete several images', 'where do deleted images go', 'undo a delete',
      'restore a deleted image', 'does it delete from the test studio'],
     '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
@@ -435,7 +436,11 @@ const TOPICS = [
     ['krea', 'steps', 'sampler', 'quality', 'slower', 'local engine']),
   setting('krea.base_model', 'engines', 'krea-base-model', 'Krea 2 Edit base model',
     ['krea', 'base model', 'turbo', 'raw', 'checkpoint', 'unet', 'diffusion model',
-     'noise', 'biglove', 'incompatible', 'local engine']),
+     'noise', 'biglove', 'incompatible', 'local engine',
+     // A GGUF quantised base is a dead end ComfyUI reports as a bare
+     // "value_not_in_list" — these terms are what someone stuck on it searches for.
+     'gguf', 'quant', 'quantised', 'quantized', 'q4_k_m', 'q8', 'value not in list',
+     'not in list', 'not detecting', 'model not found', 'unet_name', 'safetensors']),
   setting('krea.identity_lora', 'engines', 'krea-identity-lora', 'Krea 2 Edit identity LoRA',
     ['krea', 'identity', 'edit lora', 'lora', 'krea2_identity_edit', 'civitai',
      'node pack', 'comfyui-krea2edit', 'missing', 'local engine']),
@@ -481,7 +486,14 @@ const TOPICS = [
   setting('comfyui.api_url', 'local-tools', 'comfyui-api-url', 'ComfyUI API URL',
     ['comfyui', 'api', 'url', 'klein', 'studio', 'local']),
   setting('comfyui.base_dir', 'local-tools', 'comfyui-base-dir', 'ComfyUI install directory',
-    ['comfyui', 'directory', 'path', 'install', 'base dir', 'models', 'loras']),
+    ['comfyui', 'directory', 'path', 'install', 'base dir', 'models', 'loras',
+     // ComfyUI Desktop keeps a SHARED models folder and one inside its install
+     // directory, so pointing the API address at one install and the models
+     // override at another is easy and silent — the app then lists models the
+     // running ComfyUI does not serve.
+     'comfyui desktop', 'desktop', 'two folders', 'shared models', 'multiple installs',
+     'wrong install', 'value not in list', 'not in list', 'model not found',
+     'models folder', 'override']),
   setting('comfyui.output_dir', 'local-tools', 'comfyui-output-dir', 'ComfyUI output folder override',
     ['comfyui', 'output', 'directory', 'folder', 'override', 'path', 'custom', 'output-directory']),
   setting('comfyui.input_dir', 'local-tools', 'comfyui-input-dir', 'ComfyUI input folder override',
@@ -567,6 +579,25 @@ const TOPICS = [
     app: { route: '/datasets?section=training' },
     tip: { trigger: 'dual-captions-advanced',
       text: 'New: train each image on a long AND a short caption (Advanced options → Dual captions) so the LoRA leans less on any single wording.' } },
+  // Concept face masking (issue #15) is a per-DATASET Advanced training option,
+  // so like Dual captions it points at the dataset guide rather than
+  // settings-reference. Its two tuning knobs live in Settings > Training and are
+  // covered by the settings topics below.
+  { id: 'training.mask_faces', kind: 'setting', title: 'Mask faces (Concept datasets)',
+    keywords: ['mask faces', 'face mask', 'masking', 'concept', 'identity', 'bleed',
+      'identity bleed', 'face bleed', 'character lora', 'combine loras', 'act',
+      'anonymise', 'anonymize', 'advanced', 'training'],
+    guide: { chapter: 'dataset-guide', anchor: '8-concept-loras-keeping-faces-out' },
+    app: { route: '/datasets?section=training' },
+    tip: { trigger: 'mask-faces-advanced',
+      text: 'New for Concept datasets: mask the faces while training so the concept learns the act, not the people in your photos.' } },
+  setting('face_mask.expand', 'training', 'face-mask-expand', 'Head coverage (face box x)',
+    ['face mask', 'head', 'coverage', 'expand', 'dilate', 'hair', 'jaw', 'concept',
+     'mask faces', 'tight', 'wide']),
+  setting('face_mask.min_weight', 'training', 'face-mask-min-weight',
+    'Loss weight kept on faces',
+    ['face mask', 'weight', 'loss', 'min weight', 'concept', 'mask faces', 'zero',
+     'strength', 'how hard']),
   // Memory saving (quantisation + low-VRAM streaming) is a per-run Advanced
   // training option like Dual captions, so it points at the settings-reference
   // section that documents the Advanced panel rather than a global Settings card.
