@@ -43,6 +43,7 @@ import {
   filterSmallImageRescueGrid,
   isSmallImageRescueRow,
 } from '../../utils/smallImageRescue';
+import { describeDerivedComparison } from '../../utils/derivedCompare';
 import { WORKSPACE_SECTIONS, SECTION_FOR_TARGET } from './workspaceSections';
 import { postJson, putJson } from '../../api/fetchClient';
 import { HelpBadge } from '../../help/HelpMode';
@@ -652,6 +653,12 @@ export default function DatasetWorkspace({ ds, onBack }) {
       && image.status === 'pending'
       && !!image.filename
   )) : false;
+  // A candidate (manual improve, small-image rescue) can be judged NEXT TO the
+  // original it was made from. Resolved here because the parent is another row
+  // of the same payload, which the lightbox never receives.
+  const viewImgComparison = viewImgLive
+    ? describeDerivedComparison(viewImgLive, images)
+    : null;
   const canImproveViewImg = !!viewImgLive
     && !viewImgLive._rescueReviewPreview
     && !isSmallImageRescueRow(viewImgLive)
@@ -1070,7 +1077,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <DatasetGrid images={gridImages} datasetId={d.id} onStatus={ds.setStatus} onCaption={ds.setCaption}
                   onCrop={setCropImg} onDelete={ds.deleteImage}
                   onMirror={ds.mirrorImage} mirroringIds={ds.mirroringIds}
-                  onRegenerate={(id, loraStrength, prompt) => ds.regenerate(id, loraStrength, prompt)} onView={setViewImg}
+                  onRegenerate={(id, loraStrength, prompt) => ds.regenerate(id, loraStrength, prompt)}
+                  onReimprove={ds.reimproveImage} onView={setViewImg}
                   onBatch={ds.batchImages} busy={ds.busy}
                   onImproveBatch={ds.improveBatch} activity={act}
                   kleinAvailable={Boolean(caps.engines?.klein)}
@@ -1816,6 +1824,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
       {viewImgLive && (
         <DatasetLightbox img={viewImgLive} datasetId={d.id}
           nonce={(ds.nonces && ds.nonces[viewImgLive.id]) || 0}
+          compare={viewImgComparison}
+          parentNonce={(ds.nonces && viewImgComparison?.parent
+            && ds.nonces[viewImgComparison.parent.id]) || 0}
           onClose={() => setViewImg(null)}
           onMirror={viewImgLive._rescueReviewPreview ? undefined : ds.mirrorImage}
           mirrorBusy={Boolean(ds.mirroringIds?.has(viewImgLive.id))}

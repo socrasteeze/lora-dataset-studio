@@ -5,7 +5,7 @@ import { INPUT_CLASS, Card } from './primitives'
 const FAMILY_OPTIONS = ['zimage', 'sdxl', 'krea', 'flux', 'flux2klein', 'anima']
 
 export default function TrainingSection(props) {
-  const { config, setField } = props
+  const { config, setField, configDefaults } = props
   return (
     <div className="space-y-6">
       <Card title="Defaults" help="Preselected model family for new training runs — each dataset can still override it.">
