@@ -316,11 +316,16 @@ export const EXTRA_REF_PROMPT_KEYS = ['face_multi', 'klein_identity'];
 /** Which of the two the currently selected engine actually uses.
  *  `generator` is the workspace's persisted engine id (localStorage
  *  `datasetGenerator`, the same source VariationCatalog reads). The mapping
- *  MIRRORS VariationCatalog exactly, or the badge would point at the wrong box:
- *  nothing stored yet falls back to 'nanobanana' (its useState default), and any
- *  other value — including a legacy/unknown one — is Klein (its `isKlein` is
- *  "neither API engine"). */
+ *  MIRRORS the workspace's own default, or the badge points at the wrong box.
+ *  Divergence 1: that default is `DEFAULT_ENGINE` ('klein') in
+ *  dataset/engineSelection.js — NOT upstream's 'nanobanana'. Falling back to
+ *  upstream's value badged `face_multi`, an API-engine prompt this fork does not
+ *  even surface in Settings and that no local generation consumes, so a user who
+ *  had never opened the Generate panel (nothing in localStorage yet) was invited
+ *  to edit a box with zero effect on their images. Any other value — including a
+ *  legacy/unknown one — is Klein, same as `canonicalEngines` retiring a stored
+ *  cloud id. */
 export function activeExtraRefPromptKey(generator) {
-  const g = String(generator || 'nanobanana').toLowerCase();
+  const g = String(generator || 'klein').toLowerCase();
   return API_PROMPT_ENGINES.includes(g) ? 'face_multi' : 'klein_identity';
 }
