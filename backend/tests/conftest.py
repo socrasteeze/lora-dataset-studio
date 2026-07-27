@@ -1,6 +1,45 @@
+import os
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import pytest
+
+# The interpreter's REAL os.name, captured before any test can patch it.
+_REAL_OS_NAME = os.name
+
+
+@pytest.hookimpl(wrapper=True, trylast=True)
+def pytest_runtest_makereport(item, call):
+    """Restore the real ``os.name`` while pytest BUILDS a test report.
+
+    Several tests exercise Windows-only branches with
+    ``monkeypatch.setattr(os, 'name', 'nt')``. That patch is global -- there is
+    one ``os`` module -- and ``pathlib.Path(...)`` dispatches on it. So if such a
+    test FAILS, pytest's own traceback formatter (``_repr_failure_py`` ->
+    ``Path(os.getcwd())``) builds a ``WindowsPath`` on Linux and raises
+    ``NotImplementedError``, which pytest reports as INTERNALERROR and which
+    ABORTS THE WHOLE SESSION at that point.
+
+    The cost was not one lost test but the whole suite: on this container ~50
+    tests fail for environment reasons (Windows drive letters, absent ML extras),
+    so a full ``pytest`` run died partway and the only way to get complete
+    results was to invoke pytest once per FILE -- 174 subprocesses, ~15 minutes,
+    every time an upstream merge needed a before/after baseline (FORK_NOTES merge
+    diagnostic 7). The session-finish ``tmp_path`` cleanup crash was the same bug
+    downstream: the abort skipped monkeypatch teardown, leaving ``os.name`` as
+    'nt' for the cleanup walk.
+
+    Restoring the real value only for the duration of report construction is
+    safe: the test body has already run by then, and the patched value is put
+    back immediately so teardown and the test's own assertions are untouched.
+    """
+    patched = os.name
+    if patched != _REAL_OS_NAME:
+        os.name = _REAL_OS_NAME
+    try:
+        return (yield)
+    finally:
+        if patched != _REAL_OS_NAME:
+            os.name = patched
 
 @pytest.fixture(autouse=True)
 def _restore_secret_env():
