@@ -8,6 +8,9 @@ import { useEffect, useState } from 'react';
 
 export default function PreflightModal({ report, datasetId, ds, onResolve }) {
   const { warnings = [], leak_images: leaks = [], dup_pairs: dups = [] } = report || {};
+  // Divergence 4: upstream also renders a "this run is billed per hour on a rented
+  // GPU" variant here, keyed off report.lane === 'cloud'. This fork has no rental
+  // lane to reach it, so the copy is absent rather than present-and-unreachable.
   const [rejected, setRejected] = useState({});   // imageId -> true (rejected in place)
   const imgUrl = (fn) => `/api/dataset/${datasetId}/img/${encodeURIComponent(fn)}`;
 
@@ -24,16 +27,18 @@ export default function PreflightModal({ report, datasetId, ds, onResolve }) {
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Before training"
+    <div role="dialog" aria-modal="true"
+      aria-label="Before training"
       className="fixed inset-0 z-[9990] bg-black/80 flex items-center justify-center p-3"
       onClick={(e) => { if (e.target === e.currentTarget) onResolve(false); }}>
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-amber-400/40 bg-app p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-amber-300 font-semibold"><span aria-hidden>⚠</span> Before training</span>
+        <div className="flex items-start gap-2">
+          <span className="text-amber-300 font-semibold text-sm">
+            <span aria-hidden>⚠</span> Before training
+          </span>
           <button type="button" onClick={() => onResolve(false)}
-            className="ml-auto text-content-subtle hover:text-content" aria-label="Cancel">✕</button>
+            className="ml-auto text-content-subtle hover:text-content shrink-0" aria-label="Cancel">✕</button>
         </div>
-
         {/* Summary — the aggregate message, kept verbatim. */}
         {warnings.length > 0 && (
           <ul className="m-0 pl-4 flex flex-col gap-1 text-content-muted text-[0.8125rem] list-disc">

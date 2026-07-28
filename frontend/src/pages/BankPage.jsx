@@ -12,6 +12,7 @@ import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../
 import { overlapNotice } from '../components/bank/bankOverlap'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
 import RelocateBankDialog from '../components/bank/RelocateBankDialog'
+import BankScrapePanel from '../components/bank/BankScrapePanel'
 
 const CURRENT_KEY = 'bankCurrentId'
 const SORT_KEY = 'bankListSort'
@@ -413,6 +414,9 @@ export default function BankPage() {
       </form>
 
       <QueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued} onClear={clearQueue} />
+      {/* Second way in: the scraper's own destination. A bank no longer needs a
+          folder you prepared by hand — you can fill one straight from the web. */}
+      <BankScrapePanel banks={banks} onDone={refresh} />
 
       {banks == null ? (
         <p className="text-sm text-content-muted">Loading…</p>

@@ -1250,7 +1250,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       onClick={() => setWatermarkMethod('klein')} disabled={ds.busy || !caps.watermark_klein}
                       title={caps.watermark_klein
                         ? 'Klein: masked Flux.2 inpaint (crop-and-stitch). Better on skin/fabric/busy backgrounds and can clean marks ON the subject. Uses the GPU via ComfyUI — slower.'
-                        : 'Klein inpaint needs ComfyUI running + the Klein models installed (Setup ▸ ComfyUI).'}
+                        : (localEngineUnavailableReason('klein', caps)
+                          || 'Klein inpaint needs ComfyUI running + the Klein models installed (Setup ▸ ComfyUI).')}
                       className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${watermarkMethod === 'klein'
                         ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                       Klein <span className="font-normal opacity-70">quality</span>
@@ -1849,6 +1850,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             && ds.nonces[viewImgComparison.parent.id]) || 0}
           onClose={() => setViewImg(null)}
           onMirror={viewImgLive._rescueReviewPreview ? undefined : ds.mirrorImage}
+          onRotate={viewImgLive._rescueReviewPreview ? undefined : ds.rotateImage}
           mirrorBusy={Boolean(ds.mirroringIds?.has(viewImgLive.id))}
           onImprove={canImproveViewImg ? ds.improveImage : undefined}
           improvePending={viewImgImproving}

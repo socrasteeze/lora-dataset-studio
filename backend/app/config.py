@@ -50,7 +50,19 @@ DEFAULTS = {
                 # capability. Setting base_dir annuls it (see settings.put_settings and
                 # the DERIVED comfyui.skipped in capabilities.probe), so it can never
                 # mask a real error of a configured ComfyUI.
-                'setup_skipped': False},
+                'setup_skipped': False,
+                # Seconds ComfyUI is allowed to spend ANSWERING the /object_info
+                # enumeration (the heaviest probe in the app). It is a READ budget
+                # only: the connection itself still has to be accepted in
+                # `utils.comfyui._OBJECT_INFO_CONNECT_TIMEOUT` seconds, so a ComfyUI
+                # that is genuinely OFF never costs this. This has to be a setting
+                # rather than a constant because the /object_info payload grows with
+                # the number of custom nodes and model files INSTALLED — the richer
+                # the install, the longer it takes, which is exactly why the old
+                # hardcoded 8 s broke the people who had invested the most in their
+                # ComfyUI (reported by j_o_e_l. on Discord, who measured ~15 s on his
+                # own install). Clamped to 5-300 by utils.comfyui.object_info_timeout().
+                'object_info_timeout_s': 45},
     'ollama': {'url': 'http://127.0.0.1:11434', 'vision_model': 'huihui_ai/qwen3-vl-abliterated:8b-instruct',  # -instruct, NOT ':8b' (=thinking): see get_vision_model()
                # How many vision calls a bank pass keeps in flight. 4 is the
                # measured knee; see services/vision_pool.py for the numbers.
@@ -292,6 +304,15 @@ DEFAULTS = {
         # How hard the source latent is pushed back into the model each step.
         'ref_boost': 4.0,
     },
+    # Z-Image pipeline — the two loader refs the shipped Test Studio workflow used
+    # to hardcode from the developer's own ComfyUI (reported by bobba84, GitHub #18).
+    # BLANK = "find it yourself": services/zimage_model_resolver scans every
+    # registered vae / text_encoders root, sub-folders included, case- and
+    # separator-insensitively (z_ae, z ae, z-ae, ae.safetensors; qwen_3_4b in any
+    # sub-folder). Set either to a filename to PIN it — a pinned value is used as-is
+    # and is never second-guessed, which is also the escape hatch when a shared
+    # ComfyUI carries several plausible files (a FLUX.1 `ae.safetensors`, say).
+    'zimage': {'vae': '', 'text_encoder': ''},
     # Editable identity / quality prompts (feature request by @bbsorry / 雨田壹).
     # The identity "locks" that ride ahead of every generated variation used to be
     # hardcoded and invisible; these overrides expose them without touching the
@@ -627,6 +648,22 @@ def comfyui_dir(kind: str):
     return resolve_comfyui_dir(kind, get('comfyui.base_dir') or '',
                                get(f'comfyui.{key}') or '')
 
+def aitoolkit_derived_python(root):
+    """The interpreter an ai-toolkit checkout carries, ignoring any explicit
+    `aitoolkit.python`. Both venv layouts exist: ai-toolkit's docs say `venv`,
+    plenty of setups use `.venv`. Pick whichever actually exists; when neither
+    does, return the historical default path so callers keep a concrete path to
+    name in their "invalid" details (never None)."""
+    root = Path(root)
+    for env_dir in ('venv', '.venv'):
+        p = (root / env_dir / 'Scripts' / 'python.exe' if os.name == 'nt'
+             else root / env_dir / 'bin' / 'python')
+        if p.exists():
+            return p
+    win = root / 'venv' / 'Scripts' / 'python.exe'
+    return win if os.name == 'nt' else root / 'venv' / 'bin' / 'python'
+
+
 def aitoolkit_path(kind: str):
     root = get('aitoolkit.dir') or ''
     if not root:
@@ -646,17 +683,14 @@ def aitoolkit_path(kind: str):
         explicit = (get('aitoolkit.python') or '').strip()
         if explicit:
             return Path(explicit)
-        # Both venv layouts exist: ai-toolkit's docs say `venv`, plenty of
-        # setups use `.venv`. Pick whichever actually exists.
-        for env_dir in ('venv', '.venv'):
-            p = (root / env_dir / 'Scripts' / 'python.exe' if os.name == 'nt'
-                 else root / env_dir / 'bin' / 'python')
-            if p.exists():
-                return p
-        # Nothing found: return the historical default path so callers keep a
-        # concrete path to name in their "invalid" details.
-        win = root / 'venv' / 'Scripts' / 'python.exe'
-        return win if os.name == 'nt' else root / 'venv' / 'bin' / 'python'
+        return aitoolkit_derived_python(root)
+    if kind == 'venv_python_derived':
+        # What the app WOULD run without the explicit override. Only useful when
+        # an explicit one is set and turns out to be broken: it is the working
+        # interpreter we can then offer to switch to (GitHub #19, strouder —
+        # a `aitoolkit.python` pointing at a torch-less Python silently beat a
+        # perfectly good venv sitting right next to run.py).
+        return aitoolkit_derived_python(root)
     if kind == 'jobs':
         return root / 'config' / 'generated'
     raise KeyError(kind)
