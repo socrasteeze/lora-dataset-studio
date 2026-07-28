@@ -796,6 +796,18 @@ const TOPICS = [
     // the panel already shows a targeted notice to the only browsers it affects
     // (the ones that had turned masking off). A third surface would be nagging.
     app: { route: '/datasets?section=training' } },
+  // WHICH Klein model runs — a per-DATASET setting since 28/07. Improve took no
+  // model at all (the server resolved one silently) and generation's picker was a
+  // per-BROWSER localStorage value that improve never read, so "which model made
+  // this?" had no answer on any screen. One setting now serves both.
+  { id: 'dataset.klein_model', kind: 'setting', title: 'Klein model for this dataset',
+    keywords: ['klein', 'model', 'base model', 'unet', 'diffusion model', 'which model',
+      'choose model', 'pick model', 'improve', 'upscale', 'upscale & improve',
+      'generation', 'flux2', 'flux 2', 'kv', '9b', '4b', 'safetensors', 'auto',
+      'auto-detected', 'detected', 'comfyui models', 'model missing', 'moved',
+      'not on disk', 'per browser', 'localstorage'],
+    guide: { chapter: 'settings-reference', anchor: 'image-engines' },
+    app: { route: '/datasets' } },
   // Concept face masking (issue #15) is a per-DATASET Advanced training option,
   // so like Dual captions it points at the dataset guide rather than
   // settings-reference. Its two tuning knobs live in Settings > Training and are
@@ -826,7 +838,11 @@ const TOPICS = [
   { id: 'training.memory_saving', kind: 'setting', title: 'Memory saving (quantisation, low VRAM)',
     keywords: ['quantise', 'quantize', 'quantisation', 'qfloat8', 'fp8', 'low vram', 'lowvram',
       'vram', 'memory', 'oom', 'out of memory', '5090', '4090', '24 gb', '32 gb', 'slow',
-      'speed', 'precision', 'text encoder', 'advanced', 'training'],
+      'speed', 'precision', 'text encoder', 'advanced', 'training',
+      // The cross-family trap: these three flags are global while their
+      // calibrated default is per family, so people search for why a run that
+      // "worked on Anima" crawls or dies on Krea 2 / FLUX.
+      'model family', 'switched family', 'lora type', 'carried over', 'crawl'],
     guide: { chapter: 'settings-reference', anchor: 'training' },
     app: { route: '/datasets?section=training' },
     tip: { trigger: 'memory-saving-advanced',

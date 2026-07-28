@@ -35,6 +35,29 @@ class FaceDataset(db.Model):
     # honore top-level que pour SDXL) : chemin VAE et chemin/te repo-id du TE.
     train_vae_path = db.Column(Text, nullable=True)
     train_te_path = db.Column(Text, nullable=True)
+    # Per-FAMILY memory of (base, variant). `train_base_model`/`train_variant`
+    # above stay the ACTIVE selection — every reader keeps reading them — and
+    # this JSON only remembers what each family was last set to:
+    #   {"zimage": {"base": "z image\\merge.safetensors", "variant": "turbo"},
+    #    "krea":   {"base": "", "variant": "base"}}
+    # Switching train_type stashes the outgoing family's pair here and restores
+    # the incoming one (cf. face_dataset_service.set_train_type). Without it a
+    # base chosen for Z-Image stayed attached to a Krea run: the selector read
+    # the family, the summary read the column, and both told the truth about
+    # different things. Additive + nullable migration in create_app; NULL simply
+    # means "nothing remembered yet", which is what every existing dataset is.
+    train_family_bases = db.Column(Text, nullable=True)
+    # Same idea, for the handful of `train_settings` keys whose MEANING is bound
+    # to the family (lora_training._FAMILY_SCOPED_SETTING_KEYS — today
+    # `timestep_type`). `train_settings` above stays the ACTIVE blob every reader
+    # reads; this JSON only remembers what each family was last set to:
+    #   {"zimage": {"timestep_type": "sigmoid"}, "flux2klein": {}}
+    # An empty dict for a family means "that family rides its own default", which
+    # is NOT the same as "never configured" (absent). Without it, a `sigmoid`
+    # picked under Z-Image overwrote the canonical `weighted` of FLUX.2 Klein and
+    # Anima on a family switch — silently, and it changes the LoRA that comes out.
+    # Additive + nullable migration in create_app; NULL = nothing remembered yet.
+    train_family_settings = db.Column(Text, nullable=True)
     # Réglages ai-toolkit avancés éditables par dataset (JSON) : rank, resolution,
     # save_every. NULL = défauts family-aware. Cf. lora_training._train_settings.
     train_settings = db.Column(Text, nullable=True)
@@ -85,6 +108,15 @@ class FaceDataset(db.Model):
     # so captioning never has to depend on the ai-toolkit gate. Read via
     # face_dataset_service.caption_options; additive migration in create_app.
     caption_options = db.Column(Text, nullable=True)
+    # Which Klein UNET this dataset's Klein work runs on — the BARE file name as the
+    # picker lists it (the subfolder prefix is the resolver's job). NULL = auto: let
+    # klein_edit_helper.resolve_klein_unet choose, which is byte-for-byte what every
+    # dataset did before this column existed. Read by ✨ Upscale & improve (all three
+    # lanes) and used as the default of the generation picker. A dedicated column
+    # (NOT train_settings) so applying a training preset — which REPLACES that blob —
+    # cannot wipe it, and because it is not a training setting at all. Additive
+    # migration in create_app.
+    klein_model = db.Column(String(255), nullable=True)
     created_at = db.Column(DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
@@ -135,6 +167,17 @@ class FaceDatasetImage(db.Model):
     # affiché sur la tuile — sinon l'échec est muet et l'utilisateur relance à
     # l'aveugle. Nettoyé au regenerate. Colonne additive (migration create_app).
     fail_reason = db.Column(Text, nullable=True)
+    # Ce que fail_reason raconte, en UN mot machine — pour COMPTER les échecs par
+    # nature sans relire la phrase (une phrase se réécrit, une clé non) :
+    #   'refused' = le fournisseur a répondu normalement et a refusé l'image
+    #               (filtre de sortie) — ce n'est pas une panne ;
+    #   'empty'   = 200 sans image, sans raison exploitable (moteurs qui ne
+    #               savent pas distinguer refus et hoquet) ;
+    #   'error'   = vraie panne (réseau, clé, quota, 5xx, sauvegarde, queue).
+    # NULL = ligne d'avant la colonne, ou échec non classé : l'UI ne compte alors
+    # que ce qu'elle sait, elle ne devine pas. Colonne additive (migration
+    # create_app). Valeurs = clés stockées en base : ne jamais les renommer.
+    fail_kind = db.Column(String(16), nullable=True)
     # De combien la box recadrée (head-crop auto à l'import OU recadrage manuel) est
     # en-dessous de la résolution d'entraînement : size / côté_de_la_box. NULL =
     # jamais croppé (import plein cadre) ou pas encore recalculé (anciennes lignes).

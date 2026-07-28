@@ -142,11 +142,24 @@ _SCHEMA_ADDITIONS = (
     ('face_dataset', 'train_slider', 'TEXT'),
     ('face_dataset', 'train_vae_path', 'TEXT'),
     ('face_dataset', 'train_te_path', 'TEXT'),
+    # Per-family memory of (base, variant) — see models.FaceDataset. Additive and
+    # nullable: a dataset that predates it simply has nothing remembered yet, and
+    # keeps the base/variant it already had on the family it already had.
+    ('face_dataset', 'train_family_bases', 'TEXT'),
+    # Per-family memory of the family-SCOPED train_settings keys (timestep_type).
+    # Additive and nullable, same contract: a dataset that predates it has
+    # nothing remembered and keeps exactly the settings it already had.
+    ('face_dataset', 'train_family_settings', 'TEXT'),
     ('face_dataset', 'prompt_suffix', 'TEXT'),
     ('face_dataset', 'prompt_suffixes', 'TEXT'),
     ('face_dataset', 'caption_options', 'TEXT'),
+    ('face_dataset', 'klein_model', 'VARCHAR(255)'),
     ('face_dataset_image', 'caption_short', 'TEXT'),
     ('face_dataset_image', 'fail_reason', 'TEXT'),
+    # Nature de l'échec ('refused' | 'empty' | 'error') pour compter les refus
+    # fournisseur séparément des pannes. Les lignes existantes restent NULL :
+    # elles gardent leur phrase, et les compteurs ne les rangent nulle part.
+    ('face_dataset_image', 'fail_kind', 'VARCHAR(16)'),
     ('face_dataset_image', 'parent_image_id', 'INTEGER'),
     ('face_dataset_image', 'derivation_kind', 'VARCHAR(32)'),
     ('face_dataset_image', 'upscale_ratio', 'REAL'),

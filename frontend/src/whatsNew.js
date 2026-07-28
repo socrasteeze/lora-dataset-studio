@@ -50,6 +50,59 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-28-memory-savers-and-timestep-per-family',
+    date: '2026-07-28',
+    title: 'Switching model family no longer changes your run behind your back',
+    blurb:
+      'Turning quantisation or low-VRAM streaming off on a small family (Anima, SDXL — where off is the normal setting) and then switching to Krea 2, FLUX or Z-Image quietly built an unquantised 12B run: no warning, and hours of GPU — or rented cloud time — before anything went wrong. Advanced options and the pre-launch check now both say which saver is off, what that family actually needs, and what your card has. Timestep weighting is remembered per family instead, so a value picked for Z-Image stops overwriting the recipe of FLUX.2 Klein or Anima. Nothing changes for a dataset that stays on one family.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-mask-faces-says-why-it-is-off',
+    date: '2026-07-28',
+    title: '"Mask faces" tells you why it does not apply instead of vanishing',
+    blurb:
+      'On a character or style dataset the option disappeared entirely, so it read as a missing feature rather than one that does not apply — people went looking for it. It is now shown, greyed out, with the reason: a character LoRA has to learn the face, so weighing faces down would erase what you are training.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-comfyui-input-copies-cleaned-up',
+    date: '2026-07-28',
+    title: 'Improve and Edit stop filling your ComfyUI input folder',
+    blurb:
+      'Every Klein or Krea job copies your source image into ComfyUI\'s input folder, and nothing ever deleted those copies: a three-month-old install had 3,896 of them sitting there, 0.67 GB. Each job now removes its own copies the moment it ends — finished, failed or stopped — and a sweep at startup clears what earlier versions left behind. Images you dropped in that folder yourself are never touched.',
+  },
+  {
+    id: '2026-07-28-training-base-is-per-family',
+    date: '2026-07-28',
+    title: 'Your training base now belongs to its model family',
+    blurb:
+      'Picking a custom base for Z-Image and then switching the LoRA type to Krea 2 left that Z-Image file attached: the selector said Krea 2, the line below it said the Z-Image file, and the only cure was changing the family and coming back — which fixed the screen but nothing else, so it was back on the next reload. The base and the variant are now remembered per family: switching hands you that family\'s own base, coming back finds yours exactly where you left it, and nothing is thrown away. The cloud dialog stops offering to upload another family\'s weights to your Hugging Face account, and no longer calls a file "missing" when it is sitting safely on your disk.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-lightbox-actions-use-the-side-space',
+    date: '2026-07-28',
+    title: 'A portrait photo now fills the screen, with the actions beside it',
+    blurb:
+      'Opening a portrait image full-screen on a wide monitor left two thirds of the width black while Crop, Mirror, Rotate and Upscale & improve queued on one line underneath — on the one axis the photo was short of. Those actions now move into a labelled rail in that empty space, and the photo gets the height back. Landscape images keep the bar at the bottom, where there is no side space to take, and phones are unchanged. The rail keeps full wording, not mute icons.',
+  },
+  {
+    id: '2026-07-28-choose-the-klein-model-improve-runs-on',
+    date: '2026-07-28',
+    title: 'Choose which Klein model ✨ Upscale & improve runs on',
+    blurb:
+      'Improve never asked which model to use: it picked one for you, silently, and nothing on the screen said which. It now names the model it will run — even when there is only one — and lets you choose it when your ComfyUI has several. The choice is saved on the dataset (not in one browser), it is the same model Klein generation uses, and it applies to the single pass, the re-run and the whole batch alike. Models are detected automatically wherever ComfyUI can load them, and if the one you chose is later moved away the run says so by name instead of quietly swapping in another.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-refused-save-keeps-what-you-typed',
+    date: '2026-07-28',
+    title: 'A refused save no longer throws away what you just typed',
+    blurb:
+      'Four dialogs closed themselves before the server had answered, so a refusal deleted your work: the expanded caption editor lost the long AND short caption you had just written, the ✏ edit-prompt bubble lost a rewritten prompt, Launch all reset its seven pass checkboxes, and the folder browser dropped you back to the drive list. They now stay open, keep every field exactly as you left it, and show the reason next to the input that caused it. Escape and clicking outside still close them — only the server keeps them open.',
+  },
+  {
     id: '2026-07-28-bank-watermark-mask-editing',
     date: '2026-07-28',
     title: 'Fix a wrong watermark box without leaving the bank',

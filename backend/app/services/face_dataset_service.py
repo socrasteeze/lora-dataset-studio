@@ -783,6 +783,40 @@ def set_caption_options(user_id, dataset_id, patch) -> dict:
     return cur
 
 
+# --- Which Klein model this dataset runs on ----------------------------------
+# Stored on the DATASET, not in localStorage: it describes what the dataset is
+# made of, so it must survive a browser change and be the same from a phone. The
+# generation picker had a per-browser value (editPage_flux2KleinModel_v1) that
+# improve never even read — hence "no option anywhere to choose the model used
+# for improve". NULL = auto (resolve_klein_unet decides), which is exactly what
+# every improve did before this setting existed.
+def dataset_klein_model(ds):
+    """The bare Klein model file name this dataset chose, or None for auto."""
+    name = (getattr(ds, 'klein_model', None) or '').strip() if ds else ''
+    return name or None
+
+
+def set_dataset_klein_model(user_id, dataset_id, name):
+    """Persist the dataset's Klein model pick. '' / None clears it back to auto —
+    un-choosing has to be a real gesture, not a value you can never take back.
+
+    Only a BARE file name is accepted: the picker lists bare names (the loader
+    prefix is resolve_klein_unet's job), so a value carrying a path separator is
+    never something the UI produced. Existence is deliberately NOT checked here —
+    a model can be moved away long after it was chosen, and the honest place to
+    say so is the run (KleinModelGone names the file), not a settings write that
+    would silently drop the user's answer."""
+    ds = get_dataset(user_id, dataset_id)
+    if not ds:
+        raise ValueError('dataset not found')
+    value = (name or '').strip()
+    if value and (os.path.basename(value) != value or value in ('.', '..')):
+        raise ValueError('a Klein model is named by its file name, without a folder')
+    ds.klein_model = value or None
+    db.session.commit()
+    return dataset_klein_model(ds)
+
+
 def _resolve_caption_backend(ds) -> str:
     """The engine a caption run uses: the dataset override when set, else the global
     captioning.backend (default 'auto')."""
@@ -1006,13 +1040,130 @@ def create_dataset(user_id, name, trigger_word, kind=None, concept_desc=None, tr
     return ds
 
 
+def family_base_memory(ds) -> dict:
+    """Parsed `train_family_bases` — {family: {'base': str, 'variant': str|None}}.
+
+    Anything unparsable/foreign reads as {} (same discipline as _train_settings):
+    a corrupted blob must degrade to "nothing remembered", never to a crash."""
+    raw = getattr(ds, 'train_family_bases', None)
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    for fam, entry in data.items():
+        if fam in TRAIN_TYPES and isinstance(entry, dict):
+            out[fam] = {'base': entry.get('base') or '',
+                        'variant': entry.get('variant') or None}
+    return out
+
+
+def remembered_family_base(ds, family):
+    """(base, variant) this dataset last used on `family`, or (None, None) when
+    that family has never been configured here. `None` is deliberately distinct
+    from `''` (= "officially chose the official base")."""
+    entry = family_base_memory(ds).get(normalize_train_type(family))
+    if entry is None:
+        return None, None
+    return entry['base'], entry['variant']
+
+
+def family_settings_memory(ds) -> dict:
+    """Parsed `train_family_settings` — {family: {setting: value}}, restricted to
+    the family-scoped keys. Same degrade-to-{} discipline as family_base_memory:
+    a corrupted blob means "nothing remembered", never a crash."""
+    from . import lora_training as _lt
+    raw = getattr(ds, 'train_family_settings', None)
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    for fam, entry in data.items():
+        if fam in TRAIN_TYPES and isinstance(entry, dict):
+            out[fam] = {k: v for k, v in entry.items()
+                        if k in _lt._FAMILY_SCOPED_SETTING_KEYS}
+    return out
+
+
+def remembered_family_settings(ds, family):
+    """The family-scoped settings this dataset last used on `family`, or None
+    when that family was never configured here. `{}` (configured, everything on
+    Auto) is deliberately distinct from None (never configured)."""
+    return family_settings_memory(ds).get(normalize_train_type(family))
+
+
 def set_train_type(user_id, dataset_id, train_type) -> bool:
     """Change the target model family later (kept in sync with the TrainingPanel
-    selector so the menu re-groups). Normalizes; unknown -> zimage. False if absent."""
+    selector so the menu re-groups). Normalizes; unknown -> zimage. False if absent.
+
+    The base and the variant are FAMILY-SCOPED even though `train_base_model` /
+    `train_variant` are single columns: a Z-Image merge is not a thing a Krea run
+    can load, and 'turbo' means a different checkpoint on each family. So the
+    outgoing family's pair is stashed in `train_family_bases` and the incoming
+    family's remembered pair takes its place — a family never yet configured
+    starts from the official base, and coming back to Z-Image finds the merge
+    exactly where it was left. Nothing is destroyed and nothing is asked.
+
+    The SAME treatment is given to the handful of `train_settings` keys whose
+    meaning is bound to the family (lora_training._FAMILY_SCOPED_SETTING_KEYS —
+    `timestep_type`, whose canonical value differs per family): stashed in
+    `train_family_settings`, restored on the way back, and CLEARED (back to the
+    incoming family's own default) when that family has nothing remembered. The
+    other advanced settings stay global on purpose — see the comment on
+    _FAMILY_SCOPED_SETTING_KEYS for why quantisation and resolution are not
+    here."""
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return False
-    ds.train_type = normalize_train_type(train_type)
+    new_fam = normalize_train_type(train_type)
+    old_fam = normalize_train_type(getattr(ds, 'train_type', None))
+    if new_fam == old_fam:
+        db.session.commit()
+        return True
+    memory = family_base_memory(ds)
+    # Never remember a base the OUTGOING family provably cannot load. Datasets
+    # created before this column exist in exactly that state (a Z-Image merge
+    # left attached to a Krea 2 dataset); stashing it under 'krea' would freeze
+    # the bug into the memory and hand it back on the way home.
+    from . import lora_training as _lt
+    outgoing = ds.train_base_model or ''
+    if _lt.foreign_base_reason(old_fam, outgoing):
+        outgoing = ''
+    memory[old_fam] = {'base': outgoing,
+                       'variant': ds.train_variant or None}
+    remembered = memory.get(new_fam)
+    ds.train_base_model = (remembered or {}).get('base') or None
+    ds.train_variant = (remembered or {}).get('variant') or None
+    ds.train_family_bases = json.dumps(memory)
+
+    # --- family-scoped train_settings keys, same stash/restore contract --------
+    scoped = _lt._FAMILY_SCOPED_SETTING_KEYS
+    settings = _lt._train_settings(ds)
+    smemory = family_settings_memory(ds)
+    smemory[old_fam] = {k: settings[k] for k in scoped if k in settings}
+    incoming = smemory.get(new_fam)
+    for k in scoped:
+        if incoming is not None and k in incoming:
+            settings[k] = incoming[k]
+        else:
+            # Never configured on the incoming family (or explicitly left on
+            # Auto there) → drop the key so the family's own canonical default
+            # applies. Dropping is what makes it byte-identical to a dataset
+            # that never touched the setting, exactly like update_train_settings.
+            settings.pop(k, None)
+    ds.train_settings = json.dumps(settings) if settings else None
+    ds.train_family_settings = json.dumps(smemory)
+
+    ds.train_type = new_fam
     db.session.commit()
     return True
 
@@ -2039,7 +2190,7 @@ _BACKUP_IMG_FIELDS = ('filename', 'source', 'framing', 'variation_label', 'statu
                       'caption', 'caption_short', 'variation_prompt', 'face_score', 'face_state',
                       'upscale_ratio', 'watermark_state', 'watermark_bbox',
                       'watermark_regions', 'parent_image_id', 'derivation_kind',
-                      'fail_reason', 'source_metadata')
+                      'fail_reason', 'fail_kind', 'source_metadata')
 
 
 def _backup_basename(value):
@@ -3098,6 +3249,10 @@ def dataset_payload(user_id, dataset_id):
                     'status': i.status, 'caption': i.caption,
                     'caption_short': i.caption_short,
                     'fail_reason': i.fail_reason,
+                    # 'refused' | 'empty' | 'error' | None — de quelle NATURE est
+                    # l'échec, pour que l'UI puisse compter les refus fournisseur
+                    # sans relire la phrase (cf. models.FaceDatasetImage).
+                    'fail_kind': i.fail_kind,
                     'parent_image_id': i.parent_image_id,
                     'derivation_kind': i.derivation_kind,
                     'source_metadata': normalize_source_metadata(i.source_metadata),
@@ -5656,7 +5811,7 @@ def _sync_generate_activity(dataset_id):
     dataset_activity.sync_pending(dataset_id, 'generate', pending, engine=engine)
 
 
-def generate_variations(user_id, dataset_id, variations, multiplier, klein_model,
+def generate_variations(user_id, dataset_id, variations, multiplier, klein_model=None,
                         lora_strength=None, generation_lora_preset=None):
     """For each (variation x multiplier), enqueue a Klein edit of the reference
     and create a pending FaceDatasetImage. Returns the created image ids.
@@ -5680,6 +5835,12 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
         raise ValueError('dataset not found')
     if not ds.ref_filename:
         raise ValueError('reference image required')
+    # No model named by the caller → the DATASET's pick (None = auto, i.e. exactly
+    # what generation resolved before the setting existed). An explicit request
+    # value still wins: it is what the workspace picker sends, and a legacy browser
+    # that still holds editPage_flux2KleinModel_v1 must keep generating with it.
+    if not klein_model:
+        klein_model = dataset_klein_model(ds)
     # Preflight the Klein model files BEFORE creating any rows: a missing model
     # then surfaces as one actionable "downloading, retry" 409 (route handler) —
     # not a dataset full of failed tiles, each doomed by a ComfyUI validation
@@ -5848,9 +6009,15 @@ def _improve_candidate_label(source) -> str:
     return (f'{base_label} · {source_label}' if source_label else base_label)[:120]
 
 
-def _improve_enqueue_profile() -> dict:
-    """Profile reproduced from the user-provided ComfyUI PNG metadata: keep the
-    selected/default Klein model, override only sampling/LoRA/resolution.
+def _improve_enqueue_profile(ds=None) -> dict:
+    """Profile reproduced from the user-provided ComfyUI PNG metadata: the
+    dataset's Klein model plus the sampling/LoRA/resolution overrides.
+
+    `ds` is the dataset the improved image belongs to. Reading its model HERE is
+    what makes the choice reach all three improve lanes at once: the single pass,
+    the re-run, and the batch (which drains through improve_existing_image).
+    None / a dataset that never chose yields klein_model=None — the exact value
+    every improve sent before this setting existed.
 
     The defaults (1.0 / 4 / 0.0 / 2.0) are the values that were once hardcoded,
     so an untouched install behaves exactly as before. Clamped, because a bad
@@ -5859,6 +6026,7 @@ def _improve_enqueue_profile() -> dict:
     default" as "the user has not set this", which is what lets a value saved
     under the old key name speak for it."""
     return {
+        'klein_model': dataset_klein_model(ds),
         'lora_strength': _improve_float('improve_consistency_strength', 1.0, 1.5),
         'sampler_steps': _improve_int('improve_steps', 4),
         'base_lora_strength': _improve_float('improve_base_lora_strength', 0.0),
@@ -5961,7 +6129,7 @@ def _improve_existing_image_locked(user_id, image_id):
         job_id = keh.enqueue_klein_edit(
             user_id=str(user_id), source_filename=img.filename,
             source_path=source_path, edit_prompt=prompt,
-            **_improve_enqueue_profile(),
+            **_improve_enqueue_profile(get_dataset(user_id, img.dataset_id)),
             extra_metadata=_improve_extra_metadata(img, label),
         )
     except Exception:
@@ -6063,14 +6231,14 @@ def _reimprove_image_locked(user_id, image_id):
     # refusal must leave the current result on screen, not a broken tile.
     from ..job_queue import queue_manager
     old_state = {field: getattr(img, field) for field in (
-        'filename', 'caption', 'status', 'fail_reason', 'job_id',
+        'filename', 'caption', 'status', 'fail_reason', 'fail_kind', 'job_id',
         'variation_label', 'variation_prompt', 'framing',
         'watermark_state', 'watermark_bbox', 'watermark_regions')}
     old_path = _img_path(img) if img.filename else None
     job_id = keh.enqueue_klein_edit(
         user_id=str(user_id), source_filename=parent.filename,
         source_path=source_path, edit_prompt=prompt,
-        **_improve_enqueue_profile(),
+        **_improve_enqueue_profile(get_dataset(user_id, img.dataset_id)),
         extra_metadata=_improve_extra_metadata(parent, label),
     )
 
@@ -6087,6 +6255,7 @@ def _reimprove_image_locked(user_id, image_id):
         img.status = 'pending'
         img.job_id = job_id
         img.fail_reason = None
+        img.fail_kind = None
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -6362,7 +6531,7 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     from ..job_queue import queue_manager
     old_state = {
         field: getattr(img, field) for field in (
-            'filename', 'caption', 'status', 'fail_reason', 'job_id',
+            'filename', 'caption', 'status', 'fail_reason', 'fail_kind', 'job_id',
             'klein_model', 'variation_prompt', 'watermark_state',
             'watermark_bbox', 'watermark_regions')
     }
@@ -6401,7 +6570,7 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
         # on a local-only fork.
         _tags = LEGACY_API_ENGINE_TAGS + (KREA_ENGINE,)
         model = (img.klein_model if img.klein_model not in _tags
-                 else ((klein_model or '').strip() or None))
+                 else ((klein_model or '').strip() or dataset_klein_model(ds)))
         ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
         extra_paths = [os.path.join(_dataset_path(ds.id), fn)
                        for fn in extra_ref_filenames(ds)]
@@ -6441,6 +6610,7 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
         img.status = 'pending'
         img.job_id = new_job_id
         img.fail_reason = None
+        img.fail_kind = None
         db.session.commit()
     except Exception:
         db.session.rollback()
