@@ -1469,13 +1469,23 @@ def dataset_train_retry():
     """↻ Retry a FAILED LOCAL run (Runs page): relaunch training with the exact
     identity params stamped for that launch. A real launch_training — normal
     preflight, GPU-collision refusal, no bypass — replaying the live dataset
-    (slider settings included), not a resurrection of the dead process."""
+    (slider settings included), not a resurrection of the dead process.
+
+    The confirmable refusals are answered HERE, in the payload, exactly like the
+    Start handlers above — not inherited from the failed launch. Retry re-exports
+    the LIVE dataset, so the guards run against today's images: a consent given
+    for "1 image has no caption" must not silently wave through the twelve that
+    lost their caption since. Same reason the flags default to False: a retry is
+    a launch, and a launch asks. Reported by 1Tomber (GitHub #23), whose retry
+    was refused with no way to confirm and no way to see why."""
     gate = _require_aitoolkit()
     if gate:
         return gate
     d = request.get_json(silent=True) or {}
     try:
-        res = lt.retry_local_run(LOCAL_USER, int(d.get('record_id') or 0))
+        res = lt.retry_local_run(
+            LOCAL_USER, int(d.get('record_id') or 0),
+            **{k: bool(d.get(k)) for k in lt.CONFIRMATION_FLAGS})
     except Exception as e:
         return _map_error(e)
     return jsonify({'ok': True, **res})
@@ -2019,6 +2029,82 @@ def train_run_images_delete(record_id):
         return jsonify({'error': 'Could not delete these images — a file is '
                                  'locked or unreachable. Try again.'}), 500
     return jsonify({'ok': True, **out})
+
+
+def _zip_ids_arg():
+    """The optional `ids=1,2,3` selection. Absent → the whole scope; present but
+    unparseable → an empty selection, which the plan then refuses out loud. A
+    silently-ignored malformed argument would hand over the WHOLE gallery to a
+    click that meant "these three"."""
+    raw = request.args.get('ids')
+    if raw is None:
+        return None
+    return [p for p in raw.split(',') if p.strip()]
+
+
+def _gallery_zip(record_id, step):
+    """Shared body of the two ZIP routes — see services.gallery_download for why
+    the file NAME is the whole feature. The plan runs first so a scope with
+    nothing left on disk is refused with a reason instead of answering an empty
+    archive; `_zip_download` (routes.datasets) owns the spool whose lifetime has
+    to outlive this function."""
+    from ..services import gallery_download as gdl
+    from .datasets import _zip_download
+    plan = gdl.gallery_download_plan(record_id, step, image_ids=_zip_ids_arg())
+    if not plan['ok']:
+        return jsonify({'error': plan['note']}), 404
+    response = _zip_download(lambda out: gdl.write_gallery_zip(plan['entries'], out),
+                             plan['filename'])
+    # Readable by a fetch() caller, so the panel can state what actually went in
+    # even when the archive itself is handed straight to the browser.
+    response.headers['X-Lds-Zip-Images'] = str(plan['included'])
+    response.headers['X-Lds-Zip-Total'] = str(plan['total'])
+    return response
+
+
+@bp.get('/train/image/<int:image_id>/download')
+def train_image_download(image_id):
+    """⬇ ONE generated image, under a name that still says where it came from.
+
+    Resolved here rather than left to `<a download>` on the image URL: a file
+    that has been cleaned off the disk would otherwise be saved as a 404 page
+    wearing a .png name, and the user would find out by opening it."""
+    from flask import send_file
+    from ..services import gallery_download as gdl
+    path, name = gdl.single_image_download(image_id)
+    if path is None:
+        return jsonify({'error': name}), 404
+    return send_file(path, as_attachment=True, download_name=name)
+
+
+@bp.get('/train/run/<int:record_id>/images/zip')
+def train_run_images_zip(record_id):
+    """⬇ A whole RUN's gallery as one ZIP — optional `?ids=` for a selection."""
+    return _gallery_zip(record_id, None)
+
+
+@bp.get('/train/run/<int:record_id>/images/zip/plan')
+def train_run_images_zip_plan(record_id):
+    """What that ZIP would hold, without building it: counts, the cap, and how
+    many files have gone missing. The panel asks this BEFORE it downloads so
+    every cut is on screen rather than discovered inside the archive."""
+    from ..services import gallery_download as gdl
+    plan = gdl.gallery_download_plan(record_id, None, image_ids=_zip_ids_arg())
+    return jsonify({k: v for k, v in plan.items() if k != 'entries'})
+
+
+@bp.get('/train/checkpoint/<int:record_id>/<int:step>/images/zip')
+def train_checkpoint_images_zip(record_id, step):
+    """⬇ One CHECKPOINT's gallery as a ZIP — the run route, narrowed to a step."""
+    return _gallery_zip(record_id, step)
+
+
+@bp.get('/train/checkpoint/<int:record_id>/<int:step>/images/zip/plan')
+def train_checkpoint_images_zip_plan(record_id, step):
+    """The checkpoint-scoped preflight — same answer, narrower scope."""
+    from ..services import gallery_download as gdl
+    plan = gdl.gallery_download_plan(record_id, step, image_ids=_zip_ids_arg())
+    return jsonify({k: v for k, v in plan.items() if k != 'entries'})
 
 
 @bp.get('/train/canvas/positions')

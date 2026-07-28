@@ -5896,14 +5896,39 @@ def failed_local_run() -> tuple | None:
     return rec_id, local_error_message(last_local_error())
 
 
-def retry_local_run(user_id, record_id) -> dict:
+# The confirmable pre-flight refusals a launch can be waved through, and the ONE
+# list the local retry lane forwards. Every one of them is a refusal the Start
+# flow already lets the user answer; a retry that could not answer them was a
+# dead button (GitHub #23). Mirrors cloud_training._CONFIRMATION_FLAGS — the
+# cloud lane replays them from the run's stored pod params, the local lane asks
+# again (its record stores no consent, and the dataset it re-exports is live).
+CONFIRMATION_FLAGS = (
+    'allow_caption_mismatch',
+    'allow_uncaptioned',
+    'allow_caption_quality',
+    'allow_unverified_weights',
+    'allow_not_ready',
+)
+
+
+def retry_local_run(user_id, record_id, **confirmations) -> dict:
     """↻ Retry a FAILED local run: a REAL launch_training replaying the identity
     params stamped for that launch (family / variant / base / masked / steps) —
     same guardrails as any launch (GPU-collision refusal, normal preflight, no
     bypass), not a resurrection of a dead process. The live dataset (images,
     captions, advanced + slider settings) is the source of truth and is replayed
     as-is, so a slider run re-emits its slider recipe — now with the 768-only
-    default that keeps its VRAM peak under 24 GB."""
+    default that keeps its VRAM peak under 24 GB.
+
+    ``**confirmations`` = the CONFIRMATION_FLAGS the caller answered for THIS
+    retry (all False by default). They are not read back from the failed record:
+    the record stores no consent, and the dataset being re-exported is the live
+    one, so an answer given at the first launch describes a dataset that may no
+    longer exist. Unknown keys are refused rather than silently dropped — a
+    typo'd flag name must not read as "the user did not confirm"."""
+    unknown = set(confirmations) - set(CONFIRMATION_FLAGS)
+    if unknown:
+        raise ValueError(f'unknown confirmation flag(s): {", ".join(sorted(unknown))}')
     from ..models import TrainingRunRecord
     rec = fds.db.session.get(TrainingRunRecord, int(record_id))
     if rec is None:
@@ -5920,7 +5945,8 @@ def retry_local_run(user_id, record_id) -> dict:
     return launch_training(
         user_id, rec.dataset_id, steps=rec.steps,
         base_model=(rec.base_model or None), variant=rec.variant,
-        train_type=rec.family, masked=bool(rec.masked))
+        train_type=rec.family, masked=bool(rec.masked),
+        **{k: bool(confirmations.get(k)) for k in CONFIRMATION_FLAGS})
 
 
 # --- Suivi de progression (log tail + loss curve + samples) -------------------
@@ -6034,6 +6060,41 @@ def parse_download_progress(text: str) -> dict | None:
             'eta': None if '?' in last.group('eta') else last.group('eta'),
             'speed': (None if '?' in last.group('speed')
                       else last.group('speed').strip())}
+
+
+_DOWNLOAD_UNIT = {'': 1.0, 'k': 1e3, 'K': 1e3, 'M': 1e6,
+                  'G': 1e9, 'T': 1e12, 'P': 1e15}
+
+
+def download_bytes_seen(text: str) -> float | None:
+    """Total bytes downloaded across EVERY bar in the log, or None when the log
+    holds no download bar at all. Same regex, same log, different question from
+    parse_download_progress(): that one answers "what do I SHOW the user" and
+    therefore reports the last bar verbatim; this one answers "did the pod
+    MOVE", which no single bar can answer.
+
+    Why a sum and not the last bar: huggingface_hub fetches several files at
+    once, so consecutive tails end on DIFFERENT bars. A watchdog comparing the
+    last bar alone would read A(1.0G), B(2.0G), A(1.0G)… as endless movement
+    while both files sit frozen — the exact false progress a kill decision must
+    never be built on. Keyed by label, summed, so only a file that genuinely
+    advanced can raise the total.
+
+    The unit divisor is assumed decimal. That is a guess about a producer's
+    formatting choice (see parse_download_progress), so the result is used for
+    two things only — a `>` comparison against the previous poll, and a rounded
+    human label in a failure message — never as an exact byte count."""
+    per_label = {}
+    for seg in re.split(r'[\r\n]+', text or ''):
+        for m in _DOWNLOAD_PROG_RE.finditer(seg):
+            raw = m.group('done').strip()
+            unit = raw[-1] if raw and raw[-1] in _DOWNLOAD_UNIT else ''
+            try:
+                value = float(raw[:-1] if unit else raw) * _DOWNLOAD_UNIT[unit]
+            except ValueError:
+                continue                      # not a number we can compare
+            per_label[m.group('label').strip()] = value
+    return sum(per_label.values()) if per_label else None
 
 
 def _samples_dir(user_id, dataset_id, base_model=_PERSISTED, family=None,

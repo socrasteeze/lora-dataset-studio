@@ -50,6 +50,44 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-28-notifications-are-no-longer-hidden-behind-dialogs',
+    date: '2026-07-28',
+    title: 'Notifications no longer disappear behind an open dialog',
+    blurb:
+      'Every message the app raises — a refusal, a confirmation, an error — was drawn underneath any open dialog or full-screen viewer, so it simply never reached you: the app answered, and the answer was covered up. Notifications now sit above everything, and a check makes sure no future panel can climb over them again.',
+  },
+  {
+    id: '2026-07-28-cloud-watchdog-counts-a-downloading-pod-as-progress',
+    date: '2026-07-28',
+    title: 'A cloud run is no longer killed while its pod is downloading normally',
+    blurb:
+      'The run card now shows the bytes a pod is fetching — but the watchdog guarding that phase was still only watching the training step counter, so a run on a slow host was killed at 45 minutes for "no progress" while the card beside it showed the download working perfectly (a 26.3 GB model at the 2.6 MB/s some hosts give you takes nearly 3 hours). The watchdog now reads the same counter the card does: bytes moving is progress, and the clock restarts. A pod that reports no bytes at all still dies as fast as before, a hard ceiling still stops a host that will never finish, and the failure message finally says what was measured instead of guessing. The idle budget and that ceiling are now in Settings → Training. Thanks to j_o_e_l. (Discord) for the report.',
+    to: '/settings/training',
+  },
+  {
+    id: '2026-07-28-retry-asks-instead-of-doing-nothing',
+    date: '2026-07-28',
+    title: 'Retry no longer looks dead when a run needs your confirmation',
+    blurb:
+      'On the Runs page, ↻ Retry could do nothing at all: no job, no error, no toast. It happened whenever the run needed a confirmation Start had already asked for — an image with no caption, a dataset under the image floor, captions in the wrong style — because Retry never carried your answer, and the refusal that came back was thrown away before it reached the screen. Retry now asks the same question Start asks, relaunches once you confirm, and says out loud why it stopped when it stops. Stop and Clean finished runs on the same page were silent in the same way and now speak too. Reported by 1Tomber (GitHub #23).',
+    to: '/cloud',
+  },
+  {
+    id: '2026-07-28-download-canvas-images-one-or-the-whole-gallery',
+    date: '2026-07-28',
+    title: 'Download your generated images — one, or a whole run as a ZIP',
+    blurb:
+      'The board can now hand the pictures over: ⬇ on a pinned image and in the full-screen viewer saves that one, and ⬇ ZIP in a gallery saves the lot (turn on Select first to take only the ones you tick). Every file keeps its lineage in its NAME — dataset, run, step and seed — so a render is still identifiable a month later instead of becoming another out_00042_.png. Big galleries say up front how many the archive holds, and a file that has left the disk is named rather than quietly dropped.',
+  },
+  {
+    id: '2026-07-28-canvas-fuse-pinned-images',
+    date: '2026-07-28',
+    title: 'Drop one pinned image onto another and compare them edge to edge',
+    blurb:
+      'Comparing two checkpoints on the canvas meant lining two pinned pictures up by hand and squinting at the gap between their frames. Now dropping one onto another fuses them into a single node: the pictures sit side by side with nothing drawn between them, and there is no limit — add a third, a tenth. Drag the title bar to move the whole strip, hover a picture for its own and ✕, and drag one off the group to take it back out at the size it had before.',
+    to: '/canvas',
+  },
+  {
     id: '2026-07-28-scrape-straight-into-a-bank',
     date: '2026-07-28',
     title: 'Scrape the web straight into a bank — no throwaway dataset first',
@@ -86,6 +124,14 @@ export const WHATS_NEW = [
     blurb:
       'Turning on dual captions before a Krea 2 or Anima run made training die at the first step with a NoneType error — after the weights download and the whole caching pass. Those two families pre-cache their text embeddings and unload the text encoder to fit in VRAM, so there is no encoder left to read a second caption. The app now says so on the toggle and in the pre-launch check, and trains on the long caption alone instead of building a config that cannot run. Reported by 1Tomber (GitHub #22).',
     to: '/datasets?section=training',
+  },
+  {
+    id: '2026-07-28-continue-training-from-the-canvas',
+    date: '2026-07-28',
+    title: 'Continue training straight from a checkpoint on the Canvas',
+    blurb:
+      'Click any checkpoint on the LoRA Canvas and ▶ Continue from here now opens the real launch dialog on that exact save — how many extra steps, cadence, preview prompts, timestep weighting and learning rate, all prefilled from the run you clicked. It used to be a greyed line telling you to go find the run on another page. It resumes the step you actually clicked, never an implicit \'latest\', and a checkpoint whose file is gone says so instead of failing at launch.',
+    to: '/canvas',
   },
   {
     id: '2026-07-28-comfyui-slow-is-not-comfyui-stopped',

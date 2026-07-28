@@ -79,6 +79,72 @@ def test_parse_download_progress_degrades_on_anything_else():
         assert parse_download_progress(text) is None, text
 
 
+# --- the same bar, asked a different question -----------------------------
+# parse_download_progress answers "what do I SHOW"; download_bytes_seen answers
+# "did the pod MOVE". One regex, two projections — the watchdog that kills a
+# paid run must not get its own reading of the log.
+
+def test_download_bytes_seen_reads_the_counter_not_the_percent():
+    from app.services.lora_training import download_bytes_seen
+    assert download_bytes_seen(RUN121_TAIL) == pytest.approx(1.95e9, rel=1e-6)
+
+
+def test_download_bytes_seen_sums_files_in_flight():
+    """huggingface_hub fetches several files at once, so consecutive tails end
+    on DIFFERENT bars. Summing per label is what makes the signal usable: the
+    total can only rise when a file genuinely advanced, while the card's
+    last-bar reading would alternate between two frozen files and look like
+    endless movement."""
+    from app.services.lora_training import download_bytes_seen
+    a = ('vae.safetensors:  50%|▌    | 100M/200M [00:10<00:10, 10.0MB/s]\n'
+         'text_enc.safetensors:  25%|▎  | 1.00G/4.00G [00:10<00:30, 100MB/s]\n')
+    b = ('text_enc.safetensors:  25%|▎  | 1.00G/4.00G [00:40<01:30, 33.0MB/s]\n'
+         'vae.safetensors:  50%|▌    | 100M/200M [00:40<00:40, 2.50MB/s]\n')
+    assert download_bytes_seen(a) == pytest.approx(1.1e9, rel=1e-6)
+    # Both frozen, last bar swapped: the SUM is unchanged, so no false progress.
+    assert download_bytes_seen(b) == download_bytes_seen(a)
+
+
+def test_download_bytes_seen_is_blind_to_the_moving_line():
+    """MEASURED on run #121: tqdm reprints the bar with an advancing elapsed
+    and a decaying rate long after the transfer died. The line moves, the bytes
+    do not — and only the bytes may count as progress."""
+    from app.services.lora_training import download_bytes_seen
+    frozen_a = 'raw.safetensors:   7%|▋| 1.95G/26.3G [15:11<2:37:06, 2.58MB/s]'
+    frozen_b = 'raw.safetensors:   7%|▋| 1.95G/26.3G [41:02<9:12:44, 0.98MB/s]'
+    assert download_bytes_seen(frozen_a) == download_bytes_seen(frozen_b)
+
+
+def test_download_bytes_seen_degrades_exactly_like_its_sibling():
+    """Same guard rails as the card's parser: a step bar, an item bar, a bar
+    with no rate, and ordinary prose holding a size ratio are all NOT downloads.
+    The prose case matters most — a gauge that CLIMBS ('Using 8G/16G VRAM')
+    would rearm the first-step watchdog on something that is not a download,
+    which is exactly the masking this signal must never add."""
+    from app.services.lora_training import download_bytes_seen
+    for text in ('', 'Running 1 job\n{"type": "diffusion_trainer"}',
+                 STEP_TAIL,                                  # a STEP bar
+                 'raw.safetensors: 7% 1.95G/26.3G',          # no tqdm bar
+                 'raw.safetensors:   7%|x| 1.95G/26.3G [15:30<2:37:06]',  # no rate
+                 'weights: 42%|x| 12/30 [00:10<00:12, 1.4it/s]',          # items
+                 'Using 8G/16G VRAM', 'cache 12.0G/40.0G on disk'):
+        assert download_bytes_seen(text) is None, text
+
+
+def test_download_bytes_seen_handles_the_unit_range():
+    from app.services.lora_training import download_bytes_seen
+    assert download_bytes_seen(
+        'w.safetensors:  10%|x| 2.00G/20.0G [01:00<09:00, 30.0MB/s]'
+    ) == pytest.approx(2e9)
+    assert download_bytes_seen(
+        'w.safetensors:  10%|x| 512k/5.00M [00:01<00:09, 500kB/s]'
+    ) == pytest.approx(512e3)
+    # A bar that has not moved off zero is 0 bytes, NOT "no bar at all" — the
+    # watchdog message distinguishes "stopped at 1.9 GB" from "never started".
+    assert download_bytes_seen(
+        'raw.safetensors:   0%|          | 0.00/26.3G [00:00<?, ?B/s]') == 0.0
+
+
 def test_a_byte_bar_is_no_longer_misread_as_a_training_step():
     """'0.00/26.3G' used to match the step regex as step 0 of 26 — a
     plausible-looking number that was pure noise."""
@@ -227,3 +293,41 @@ def test_monitor_responsiveness_still_reads_updated_at(ct, app, tmp_path):
             assert ct._monitor_is_responsive(run) is False
         finally:
             ct._monitor_threads.pop(int(run.id), None)
+
+
+def test_two_frozen_files_are_not_mistaken_for_progress(ct, app, tmp_path):
+    """The freeze clock read the LAST bar of the log. huggingface_hub fetches
+    several files at once, so consecutive tails end on DIFFERENT bars — and a
+    fingerprint built on the last one alone flips A → B → A forever while both
+    files sit frozen. A dead pod would have reported movement every poll, and
+    the freeze watchdog would never have fired on the one case it exists for.
+
+    Nothing here advances: both files hold their byte count and only the
+    elapsed column moves, exactly as tqdm re-prints it."""
+    with app.app_context():
+        two_files = (
+            'text_enc.safetensors:  50%|x| 1.00G/2.00G [10:00<10:00, 1.70MB/s]\n'
+            'vae.safetensors:      20%|x| 100M/500M [10:00<40:00, 170kB/s]\n'
+        )
+        run = _mkrun(ct, tmp_path, log=two_files,
+                     updated_at=datetime.utcnow() - timedelta(minutes=50))
+        ct.note_progress(run, datetime.utcnow() - timedelta(minutes=50))
+
+        # Same two frozen files, the tail now ending on the OTHER bar and with
+        # a bumped elapsed — the shape that used to read as progress.
+        swapped = (
+            'vae.safetensors:      20%|x| 100M/500M [10:20<40:00, 170kB/s]\n'
+            'text_enc.safetensors:  50%|x| 1.00G/2.00G [10:20<10:00, 1.70MB/s]\n'
+        )
+        (tmp_path / 'run_j1' / 'training.log').write_text(swapped, encoding='utf-8')
+        ct.note_progress(run)
+        assert ct._silent_seconds(run) > 45 * 60
+
+        # And the mirror image: one of the two genuinely advances -> alive.
+        moved = (
+            'text_enc.safetensors:  50%|x| 1.00G/2.00G [10:40<10:00, 1.70MB/s]\n'
+            'vae.safetensors:      60%|x| 300M/500M [10:40<02:00, 1.70MB/s]\n'
+        )
+        (tmp_path / 'run_j1' / 'training.log').write_text(moved, encoding='utf-8')
+        ct.note_progress(run)
+        assert ct._silent_seconds(run) < 60
