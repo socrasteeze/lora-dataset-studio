@@ -86,18 +86,29 @@ def _reset_inmemory_registries():
     passed alone; and the launch under test paid for a live unload of a real
     Ollama, which can take tens of seconds -- how test_training_queue_atomic
     failed once in a full suite and never alone. The suite must never depend on a
-    lease left behind by an earlier test, nor talk to a live Ollama by accident."""
-    from app.services import bank_jobs, dataset_activity
+    lease left behind by an earlier test, nor talk to a live Ollama by accident.
+
+    The text-search query cache is a third one, and it bites the same way in
+    reverse: it is keyed by PHRASE only (a CLIP vector depends on the checkpoint,
+    not on the bank), so a query encoded by one test would be served from memory
+    to the next — whose LDS_DATA_DIR is a different empty tmp dir. A test proving
+    "the encoder is invoked exactly once" would then see zero calls and fail, and
+    one proving "no ML python ⇒ 503" would silently get a cache hit and a 200.
+    Both did, before this line existed."""
+    from app.services import bank_jobs, clip_text_encoder, dataset_activity
     from app.services import image_bank_service, vision_keepalive
     dataset_activity.reset()
     bank_jobs.reset()
     image_bank_service.reset_folder_sync()
     vision_keepalive.forget_lease()
+    clip_text_encoder.forget_memory_cache()
     yield
     dataset_activity.reset()
     bank_jobs.reset()
     image_bank_service.reset_folder_sync()
     vision_keepalive.forget_lease()
+    clip_text_encoder.forget_memory_cache()
+    clip_text_encoder.release()
 
 @pytest.fixture(autouse=True)
 def _isolate_user_state(tmp_path, monkeypatch):
