@@ -112,6 +112,38 @@ Pick **Style** at creation. What changes:
 - **Step count switches to a sublinear √n scale** built for the large sets
   (hundreds of images) style LoRAs want.
 
+## Caption your images in another tool
+
+You are not locked into the captioners shipped here. The round trip is:
+
+1. **⬇ Export ZIP** from *Import & export*. The archive is a plain kohya layout —
+   one folder of `image.png` + same-name `image.txt` pairs. If some kept images
+   have no caption yet, the app asks before exporting instead of refusing:
+   confirm and their `.txt` files come out empty, ready to be filled.
+2. **Caption them wherever you like.** Any tool that writes a `<image>.txt`
+   sidecar next to each image works — that is the convention this app reads,
+   whatever the file names are and whatever folder depth you use.
+3. **Import dataset (ZIP)** (or **Import from folder…**) with the same
+   images and their new `.txt` files. Images already in the dataset are **not
+   duplicated**: their caption lands on the row that already holds them, and the
+   toast says how many were applied.
+
+Two things worth knowing before you start:
+
+- **A caption you already wrote here is never overwritten.** Re-importing only
+  fills the empty ones; the toast reports the rest as *"kept the caption written
+  here"*. Clear a caption in the app first if you want the external one to win.
+- **Only the caption travels back.** Statuses, scores and framing stay as they
+  are here — the returning archive is read as captions for images you already
+  have, not as a replacement dataset.
+
+**A Style dataset asks louder, on purpose.** A Style LoRA learns everything its
+captions do *not* name, so an empty `.txt` teaches it nothing; the export
+confirmation says so before letting you through. Cancelling takes you straight
+to the captions instead.
+
+*Requested by Qeeyana (Reddit).*
+
 ## Krea and the shape of your reference photo
 
 **Krea 2 Edit reproduces the shape of your reference photo** (capped at 2 MP).
@@ -955,6 +987,73 @@ flips a sample between the cleaned version and your untouched original.
 If a bank was scanned by an older version, its flagged images carry no recorded
 mark position; the panel says so and one more **🚩 Find watermarks** run makes
 them cleanable.
+
+
+## Fix a watermark mask in a bank
+
+The detector draws **one** box, and it is a guess: it can miss a second logo,
+swallow half the face, or land beside the mark. Open **▶ Review**, walk to a
+flagged image and press **Edit mask** (shortcut `M`) — the same zone editor
+the datasets use, on the bank image, right there.
+
+- **+ Add zone**, then drag on the photo to draw a rectangle over the mark. Up
+  to 32 zones; drag a zone to move it, its corners to resize.
+- **Delete zone** removes the selected one, **Reset to detected** throws your
+  zones away and puts the detector's box back.
+- Every edit saves as you draw. If a save fails it says so and offers a retry —
+  the zones on screen are never silently unsaved.
+
+What the two cleaning steps then do with your mask:
+
+- **Inpaint repaints exactly the zones you drew** — all of them, including a
+  zone sitting on the subject, which is precisely what a hand mask is for.
+- **✂ Auto-crop skips a hand-masked image.** A crop can only cut one border
+  band; it cannot express several zones or a mark on the subject, so cropping
+  the old box would remove pixels you did not point at.
+- **An empty mask cleans nothing.** Delete every zone and you have said "there
+  is nothing to repaint here": neither step touches that image, and the panel
+  says how many are in that state instead of leaving them looking unhandled.
+
+A flagged image an older scan left *without* a box becomes cleanable as soon as
+you draw the zones yourself — that drawing is the missing information. And as
+everywhere else in a bank, **your own file is never modified**: cleaning writes
+a separate copy. A rotated image is shown unrotated here, because the whole
+watermark lane works on your original file, which the ↻ turn never changed.
+
+
+## A bank and a dataset never share files
+
+A dataset and an image bank can hand images to each other in both directions,
+and both directions **copy**. That is not an implementation detail — it is the
+rule the whole flow rests on:
+
+- **Bank → dataset** (**⬆ Promote…**) writes new files into the dataset.
+- **Dataset → bank** (**Import to bank**, on the dataset) copies the dataset's
+  kept images into a folder of the bank's own.
+
+Neither ever *points* at the other's files. The reason is that the two containers
+have opposite contracts. A dataset **owns** its images; a bank merely **points**
+at a live folder it does not own — which is exactly why **Delete rejected** is
+allowed to remove files from it. Put a bank on a dataset's folder and that button
+stops deleting your rejects and starts deleting the dataset's training images.
+
+So the app refuses it. If you paste a dataset's image folder into **➕ Create
+bank** — or into **Move folder…** for an existing bank — you get a refusal
+that names the dataset and points you at **Import to bank** instead. The check
+looks through the disguises: a subfolder of the dataset, the folder *containing*
+all datasets, a different letter case, forward slashes instead of backslashes,
+and symlinks or Windows junctions that resolve to the same place.
+
+**If you already have such a bank** (it was possible before this check existed),
+nothing is repaired or deleted behind your back. Opening it shows a red banner
+naming the dataset, and Delete rejected is refused on that bank — everything
+else keeps working, so you can finish triaging. When you are ready, either
+**Move folder…** to point the bank at a folder of its own, or remove the bank
+(removing a bank never touches files).
+
+The dataset's own folder is shown at the top of the dataset, with a **⧉ Copy**
+button, so you never have to go hunting for it in a file manager — which is how
+this trap was found in the first place.
 
 
 ## Move a bank folder to another disk

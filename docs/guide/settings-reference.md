@@ -127,7 +127,7 @@ Separate from **Upscale & improve ▸ Steps** (`klein.improve_steps`), which dri
 
 **One set per subject type.** *(Reported by ashish.sinha.)* The three identity locks are scoped to the dataset's **subject type** — Human, Animal, Creature, Object, Other. Pick the type with the chips at the top of the card; a small dot marks every type you have already customised. A prompt you write for Animal applies to **animal datasets only** and never to a human one. Before this, the override was one global text: someone who adapted it for animals then saw their human variations come back with tails, extra limbs and odd footwear.
 
-Storage follows that split, and nothing was renamed or migrated: the **Human** overrides stay on the original flat keys (`identity_prompts.face_single`, `.face_multi`, `.klein_identity`), which is where every override written before this change was stored, so yours keeps applying to your human datasets. The other types live under `identity_prompts.by_subject.<type>.<kind>` and never fall back to the flat key. `identity_prompts.klein_improve` and its toggle stay **global** on purpose — "add texture and detail" means the same thing for a person, a dog or a car.
+Storage follows that split, and nothing was renamed or migrated: the **Human** overrides stay on the original flat keys (`identity_prompts.face_single`, `.face_multi`, `.klein_identity`), which is where every override written before this change was stored, so yours keeps applying to your human datasets. The other types live under `identity_prompts.by_subject.<type>.<kind>` and never fall back to the flat key. `identity_prompts.klein_improve` and its toggle stay **global** on purpose — "add texture and detail" means the same thing for a person, a dog or a car. **It does not mean the same thing for a drawing**, and that is a known rough edge: the shipped text asks for photographic detail, so on an **Anime** dataset the improve pass works against the very art style every other prompt in the app protects. Until that is settled, edit the box (or turn it off) for drawn datasets — see *Troubleshooting → "Upscale & improve" makes my anime look realistic*.
 
 > If you had adapted the identity prompt for a non-human subject before this change, your text is now sitting in the **Human** set (that is where it was saved). Open the card, check the Human boxes, and move the text to the right subject type — nothing was discarded.
 
@@ -140,7 +140,7 @@ Storage follows that split, and nothing was renamed or migrated: the **Human** o
 **Shortcut from the workspace.** The multi-reference instruction is also reachable from **Add images ▸ Extra refs ▸ ✎**, without opening Settings. That modal shows **both** `identity_prompts.face_multi` and `identity_prompts.klein_identity` — the shared config carries both keys, but only `klein_identity` actually drives generation on this fork's Klein-only engine, and it's the one badged. It edits the prompts of the **open dataset's subject type**, and says which one in its title and intro; edits made there are the same settings as here, for that subject.
 
 - **Klein — restage & face-identity block** → `identity_prompts.klein_identity`. The instruction block the local **Klein** engine uses to restage the shot (pose, framing, outfit, expression) while keeping the face identical. This is the only identity prompt shown in Settings — the `face_single`/`face_multi` keys exist in the shared config for the removed cloud engines and are not surfaced here.
-- **Klein upscale & improve prompt** → `identity_prompts.klein_improve`, with an on/off toggle `identity_prompts.klein_improve_enabled` (default **on**). The fixed instruction the manual **Klein upscale & improve** action sends to add texture and detail. **Turn the toggle off** to run that action with **no prompt at all** — a pure upscale with no added styling.
+- **Klein upscale & improve prompt** → `identity_prompts.klein_improve`, with an on/off toggle `identity_prompts.klein_improve_enabled` (default **on**). The fixed instruction the manual **Klein upscale & improve** action sends to add texture and detail. The shipped text is `add detailed texture, add sharp details, add candid shot, add soft focus effect` — read it before you blame the model: those four clauses describe a **photograph**, and they are applied to every dataset, drawn ones included. **Turn the toggle off** to run that action with **no prompt at all** — a pure upscale with no added styling. Both the text in force and these two levers are now quoted and linked from the ✨ **Upscale & improve** button itself (lightbox and bulk toolbar), so you no longer have to know this setting exists to find it.
 - **Upscale & improve — strength** → `klein.improve_megapixels`, `klein.improve_base_lora_strength`, `klein.improve_consistency_strength`, `klein.improve_steps`. The output resolution, and how much that pass is allowed to change the image. Until these were exposed the whole profile was hardcoded — **both LoRA strengths pinned to 0**, so the *enhancement* LoRA baked into the workflow never applied at all, and the size was fixed at 2 MP whatever the source was worth. Defaults are those same historical values (**2 MP / 0 / 0 / 4 steps**), so leaving them alone keeps today's result exactly. These are read at each run, so to try a new value on an image you already improved, use the **🔄✨** button on that tile: it re-runs the pass on the same source image with the settings as they are now, and replaces the result in place. (The ordinary 🔄 stays hidden there — it would restart from the dataset's reference photo and make an unrelated image.)
   - **Output size (MP)** (0.5–8, default **2**) — the source is rescaled to this pixel budget before sampling, so it *is* the result's resolution. This is the knob that makes "Upscale" actually upscale.
   - **Enhancement LoRA** (0–2, default **0**) — the workflow's own detail LoRA. At 0 it does nothing; try **0.5–0.8**. It needs its weights file (`klein/realistic.safetensors`): when that file is missing the node is skipped entirely and this value changes nothing. **Setup ▸ Install everything downloads it** with the other Klein assets (from [dx8152/Flux2-Klein-9B-Enhanced-Details](https://huggingface.co/dx8152/Flux2-Klein-9B-Enhanced-Details), Apache-2.0) — run it first if the slider seems inert.
@@ -243,6 +243,47 @@ Under **Advanced: ai-toolkit overrides**, three optional path overrides (all def
 ## Captioning & quality
 
 Settings for how captions are produced and how the quality tools behave.
+
+### Dataset import
+
+What happens to a photo the **moment it enters a dataset**. Until this pair
+existed, both numbers were hardcoded and nothing on screen said so — reported by
+**Qeeyana (Reddit)**: *"Images added to 'dataset' are automatically normalized to
+1024. Why? Let me choose not to."*
+
+- **Stored resolution** → `dataset_import.max_side`. Longest side kept, in px.
+  Default **`1024`**. Options: `1024`, `1536`, `2048`, `4096`, or `0` = **keep
+  the original size**. The aspect ratio is always preserved (no square padding)
+  and an image is **never enlarged** — this only ever shrinks.
+  *Why 1024 by default:* every mainstream trainer buckets and downscales on its
+  own, so pixels above what you train at cost disk and nothing else. Raise it if
+  you train at a higher resolution, or if the dataset folder is also your
+  archive.
+- **Stored encoding** → `dataset_import.encoding`. Default **`standard`**.
+  | Value | What is written |
+  |---|---|
+  | `standard` *(default)* | WebP quality 92 — the shipped behaviour. |
+  | `high` | WebP quality 100. Still lossy, visually indistinguishable. |
+  | `lossless` | WebP lossless: pixel-identical to what you handed in. |
+  This is the **other half** of the loss: raising the resolution while leaving
+  quality 92 in place still re-encodes every import. Measured on a noisy 800×600
+  frame: q92 **158 KB**, q100 **243 KB**, lossless **797 KB** — roughly **5×**
+  the disk for lossless.
+
+**The hard ceiling is 8192 px, and it is not a preference.** Pillow's WebP
+encoder refuses any side past **16383 px** ("Image size exceeds WebP limit"), so
+an uncapped *original size* would turn a large panorama into a failed import
+rather than a big one. Anything above 8192 px is downscaled to it, and a
+configured value above the ceiling is clamped rather than silently ignored.
+
+**Changing this is not retroactive.** It applies to images imported *from now
+on*, so a dataset imported at 1024 and topped up at 2048 holds both — harmless
+for training (trainers bucket per image) but the folder is no longer uniform.
+Re-importing the originals is the only way to change what is already stored.
+
+**What it does NOT touch**: generated images, the ≤2048 px copies handed to an
+image API, and any image you have already curated (crop, rotate, watermark
+clean) — those lanes keep their own fixed sizes on purpose.
 
 ### Captioning
 
@@ -383,6 +424,9 @@ These live under **Advanced options** in a dataset's training panel — rank, re
 - **Memory saving** — three switches (`quantize`, `quantize_te`, `low_vram`) that used to be hard-coded. **The defaults have not changed:** Z-Image, Krea 2, FLUX.1 and FLUX.2 Klein quantise the base model and the text encoder to `qfloat8` and stream blocks between CPU and GPU, which is what makes a 12B model train on a 24 GB card; Anima and SDXL are small enough to run without any of it. Turning them **off** trades VRAM for precision and speed — worth it only if your card is bigger than the target. As a rough order of magnitude with the savers off: **Z-Image ≈ 18 GB**, **FLUX.2 Klein 4B ≈ 14 GB**, **FLUX.2 Klein 9B ≈ 24 GB**, **Krea 2 / FLUX.1 ≈ 30 GB** (estimates: bf16 weights plus headroom, not a measurement on your exact card). The panel detects your GPU and says which side of that line you are on; if it can't (no NVIDIA card, `nvidia-smi` missing), it falls back to a generic note and blocks nothing. ⚠ **The failure mode is slowness, not a crash.** On Windows there is no clean out-of-memory error: the driver silently pages to system RAM and the run creeps along for hours. If a run that used to take 40 minutes is still going after three, put the switches back. The setting also works the other way — a small card can turn quantisation **on** for Anima or SDXL. It's recorded in each run's snapshot and in the Share config, so two runs can be compared honestly.
 
 - **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Not available on Krea 2 or Anima:** those families pre-cache their text embeddings and unload the text encoder, so no second caption can be encoded — the toggle is reported as ignored on the training panel and in the pre-launch check, and the run trains on the long caption alone (issue #22, reported by 1Tomber).
+- **Masked training (background at 10%)** — **on by default**, and since the 28/07 wave it is stored **on the dataset** instead of in the browser you set it in. A person mask is generated for every image (rembg, CPU) and the background only weighs 10% of the loss, so the LoRA binds the identity to the subject rather than to the room. What changed and why it matters: the toggle used to be a `localStorage` preference (`trainMasked_v1`) that reached the server only as a launch parameter, so **the readiness badge could not warn about it**, opening the app **from a phone or another machine** silently reverted to the default, and the value appeared in **no run snapshot** — two runs differing only by masking looked identical when compared. All three are fixed: it is patched like any other advanced option, stamped into every run's snapshot (local **and** cloud), and the pre-flight badge now carries a **Masked training ready** row that says *rembg is not installed — this dataset is set to masked but the run trains unmasked* **before** you open the launch dialog. It is a **warning, never a blocker** (a run without masks is a valid run), and it is **not** filtered out on the cloud lane: the masks are generated locally and uploaded with the images, so rembg missing here means the run trains unmasked. **Concept and Style datasets force it off** (a person mask erases the recurring concept, and a style must be learned across the whole frame), and **slider mode** ignores masks entirely — the panel says so instead of hiding the control. **Existing datasets do not change behaviour:** an untouched dataset resolves to the historical default (on). A browser that had explicitly turned masking **off** is asked once, in the training panel, whether to carry that choice onto the dataset or keep masking on — nothing is written until you answer, in either direction.
+
+- **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Local training only for now:** the cloud pod's dataset upload doesn't carry the JSON caption file the short is read from, so cloud runs train on the long caption alone. **Not available on Krea 2 or Anima:** those families pre-cache their text embeddings and unload the text encoder, so no second caption can be encoded — the toggle is reported as ignored on the training panel and in the pre-launch check, and the run trains on the long caption alone (issue #22, reported by 1Tomber).
 
 ## Server & access
 
@@ -404,7 +448,7 @@ Housekeeping and diagnostics. Only one true setting lives here; the rest are act
 - **Trash** — **Open folder** and **Empty trash**. Everything the app deletes goes here first; emptying is the one destructive action, and it asks for confirmation.
 - **Run image archive** — its size, its ceiling, and **Clear archive**. When a training run is launched, a **deduplicated** copy of the images it trains on is kept so that comparing two runs can still *show* an image you have since deleted from its dataset. Copies are **content-addressed**: relaunching an unchanged dataset stores nothing the second time, and only images that were added or re-edited cost anything. Clearing it keeps your runs, their settings and their caption text — you only lose the ability to look at images that are no longer in their dataset. The ceiling is `provenance.archive_max_gb` (see *Config-file-only settings*); past it, nothing more is stored and the compare panel says the picture is unavailable instead of showing a wrong one.
 - **Back up everything** — not on this page but on the **Datasets library**: one button archives every dataset, its **training history** and your settings into a single file (download or open folder), and the library's **Import backup** restores it — datasets come back under **Trained**, not "Not trained yet". Tick **Include trained LoRAs** to bundle the (large) trained `.safetensors` too. **API keys and tokens are never included** — re-enter them on the new install. See *Using the app → Back up everything*.
-- **Dataset images root** → `paths.dataset_images_root`. Where dataset images are stored. Default **empty → `<data dir>/datasets`**. Point it at a bigger or faster drive if your default data directory is tight on space.
+- **Dataset images root** → `paths.dataset_images_root`. Where dataset images are stored. Default **empty → `<data dir>/datasets`**. Point it at a bigger or faster drive if your default data directory is tight on space. This folder (and every dataset folder under it) is refused as an **image bank** source: a bank points at a live folder and can delete from it, so the two must never share files — see *Using the app → A bank and a dataset never share files*. Moving this root onto a folder an existing bank already uses is not blocked here, but that bank will say so the next time you open it, and its Delete rejected will be refused.
 - **Diagnostic report** — a one-click, **paste-safe** report for bug reports: it carries the version, capability status and a log tail, with **no secrets** and file paths reduced to booleans (present/absent). Safe to drop into Discord or a GitHub issue.
 - **Server log** — a live tail of the server log, with **Copy all**, for when you need to see what just happened.
 
@@ -458,8 +502,10 @@ These have no UI control — they're for advanced users editing `config.json` by
 | `cloud.pod_overhead_minutes` | `35` | Boot + model download + quantize time built into cost estimates. |
 | `cloud.min_inet_down_mbps` | `400` | Skip hosts too slow to pull the image. |
 | `cloud.min_disk_bw_mbps` | `500` | Skip hosts too slow to extract it. |
-| `cloud.host_blacklist_days` | `3` | How long to skip a host whose pod never became ready. |
-| `cloud.ready_timeout_minutes` | `25` | Boot budget: image pull + services up. |
+| `cloud.host_blacklist_days` | `3` | How long to skip a host whose pod showed no sign of booting. |
+| `cloud.slow_boot_blacklist_hours` | `6` | Shorter skip for a host that was still visibly booting when the boot ceiling cut it — slow, not broken. |
+| `cloud.ready_timeout_minutes` | `25` | **Idle** boot budget: the clock restarts every time the pod shows a boot fact it had never shown before (a new vast status, the UI port getting published, a moving host progress line), so an honest multi-gigabyte image pull is never cut. Only a pod that shows nothing new for this long is terminated. |
+| `cloud.boot_budget_minutes` | `90` | **Absolute** ceiling on the boot phase. Because progress restarts the timeout above, a host too slow to ever finish would keep your rental alive; past this it is terminated regardless (`0` = no ceiling). |
 | `cloud.disk_gb` | `60` | Instance disk (base model + dataset + checkpoints). |
 | `cloud.min_vram_gb` | `{zimage:24, sdxl:16, krea:24, flux2klein:32}` | Minimum VRAM **per family**. flux2klein uses 32 (the 9B is the cloud-first lane; a 32 GB pod also trains the 4B). |
 | `cloud.onstart` | `''` | Optional startup command for the raw-image fallback. |
@@ -531,6 +577,8 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `server.port` | Port the server listens on (default `5050`). |
 | `server.require_token` | On a non-loopback bind, require remote clients to present an access token (default `false` — a trusted LAN needs none). Toggle and token also live in Settings → Server & access. |
 | `paths.dataset_images_root` | Where dataset images are stored. Empty string defaults to `<data dir>/datasets`. |
+| `dataset_import.max_side` | Longest side kept for an image imported into a dataset, in px (default `1024`; `0` = original size). Ratio always preserved, never enlarged, hard ceiling 8192 px (WebP's own limit is 16383). Not retroactive. Editable in Settings → Captioning & quality. |
+| `dataset_import.encoding` | How an imported image is written: `standard` (WebP q92, default), `high` (WebP q100), `lossless` (pixel-identical, ~5x the disk). Editable in Settings → Captioning & quality. |
 | `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |
 | `comfyui.base_dir` | ComfyUI install directory, used to derive `output`/`input`/`models`/`loras` dirs if those aren't set explicitly. |
 | `comfyui.output_dir` | Explicit override for ComfyUI's output folder. Set it when ComfyUI runs with `--output-directory`. Editable in Settings → Local tools. |

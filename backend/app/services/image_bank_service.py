@@ -50,9 +50,10 @@ from .. import config as cfg
 from ..extensions import db
 from ..models import BankImage, FaceDataset, FaceDatasetImage, ImageBank
 from ..utils.dbbusy import write_with_retry
-from . import bank_jobs, bank_queue, bank_undo, trash
+from . import bank_jobs, bank_queue, bank_undo, path_guard, trash
 from .face_dataset_service import (SCRAPE_IMPORT_MAX, _dhash, _download_scrape_item,
-                                   _hamming, _SCRAPE_DL_WORKERS, import_images)
+                                   _hamming, _SCRAPE_DL_WORKERS, _watermark_regions_payload,
+                                   import_images, normalize_watermark_regions)
 from .image_quality import ANALYSIS_MAX_SIDE, quality_metrics
 from .image_provenance import ORIGINS, provenance_metrics
 
@@ -242,6 +243,13 @@ def create_bank(user_id, name, folder):
         raise ValueError('name is required')
     if not folder or not os.path.isdir(folder):
         raise ValueError(f'folder not found or not readable: {folder or "(empty)"}')
+    # A bank and a dataset only ever TRANSIT images (by copy) — they never share
+    # them. This folder is the one place that door was open: a dataset's storage
+    # folder pasted here made a bank over the dataset's LIVE files, and this
+    # bank's Delete rejected then deleted images out of the dataset.
+    conflict = path_guard.dataset_folder_conflict(folder)
+    if conflict:
+        raise ValueError(conflict['message'])
     folder = os.path.realpath(folder)
     rels = []
     for root, _dirs, files in os.walk(folder):
@@ -536,6 +544,12 @@ def _relocate_target(folder) -> str:
         raise ValueError('a folder is required')
     if not os.path.isdir(folder):
         raise ValueError(f'folder not found or not readable: {folder}')
+    # Relocation is the SAME door as creation, just later: repointing a bank at a
+    # dataset's storage folder shares the files exactly as creating it there
+    # would. Refused in the dry run too, so the dialog never offers the move.
+    conflict = path_guard.dataset_folder_conflict(folder)
+    if conflict:
+        raise ValueError(conflict['message'])
     return os.path.realpath(folder)
 
 
@@ -730,7 +744,20 @@ def _image_dict(row: BankImage, th: dict, promoted_by: dict | None = None) -> di
     rotation = int(row.rotation or 0) % 360
     width, height = ((row.height, row.width) if rotation in (90, 270)
                      else (row.width, row.height))
+    # The mask editor's seed, carried ONLY on the rows that can open it: a bank
+    # page is thousands of images and the other 99% would pay for three null keys.
+    mask = {}
+    if row.watermark_state == 'detected' or row.watermark_regions is not None:
+        import json as _json
+        try:
+            bbox = _json.loads(row.watermark_bbox or '')
+        except (ValueError, TypeError):
+            bbox = None
+        mask = {'watermark_bbox': bbox if isinstance(bbox, list) and len(bbox) == 4
+                else None,
+                **_watermark_regions_payload(row)}
     return {
+        **mask,
         'id': row.id,
         'name': os.path.basename(row.relpath),
         'relpath': row.relpath,
@@ -1039,6 +1066,10 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'undo': bank_undo.peek(bank_id),
         'pipeline_report': _load_pipeline_report(bank),
         'score_device': score_device_info(bank_id),
+        # Non-null only on a bank created before the create-time guard, whose
+        # folder IS a dataset's storage. The workspace turns it into a standing
+        # banner and disables Delete rejected, which the server refuses anyway.
+        'dataset_conflict': bank_dataset_conflict(user_id, bank_id),
         'thresholds': th,
     }
 
@@ -2846,6 +2877,33 @@ def overlapping_banks(user_id, bank_id) -> list:
     return sorted(out, key=lambda o: o['id'])
 
 
+class BankSharesDataset(ValueError):
+    """A destructive action was asked of a bank whose folder IS a dataset's.
+
+    A subclass of ValueError so nothing that already catches ValueError starts
+    500-ing, but a distinct type so the one route that answers 404 to "bank not
+    found" can tell this apart and answer 400 with the explanation instead."""
+
+
+def bank_dataset_conflict(user_id, bank_id) -> dict | None:
+    """Does THIS bank already sit on a dataset's storage folder? None when it
+    does not — which is every bank the guard in create_bank/_relocate_target has
+    ever seen.
+
+    The guard alone protects nobody who already has such a bank: it was created
+    before the guard existed, it is in their database right now, and the click
+    that hurts is Delete rejected. So the conflict is DETECTED at open time
+    (it rides in the workspace payload, which is also the 2 s poll — one
+    realpath, no walk) and the destructive action refuses. Deliberately nothing
+    else: the bank stays fully readable and fully triageable, and NOTHING is
+    ever removed on the app's own initiative. Only the user can decide whether
+    that bank should be relocated or dropped."""
+    bank = get_bank(user_id, bank_id)
+    if not bank or not bank.source_path:
+        return None
+    return path_guard.dataset_folder_conflict(bank.source_path)
+
+
 def rejected_delete_preview(user_id, bank_id) -> dict | None:
     """What a Delete rejected would actually destroy — the honest warning the
     confirmation needs. Counts the rejected files of this bank that ANOTHER bank
@@ -2881,7 +2939,10 @@ def rejected_delete_preview(user_id, bank_id) -> dict | None:
         if n:
             shared.append({'id': other['id'], 'name': other['name'],
                            'relation': other['relation'], 'files': n})
-    return {'rejected': len(rows), 'mode': _delete_mode(), 'shared': shared}
+    return {'rejected': len(rows), 'mode': _delete_mode(), 'shared': shared,
+            # The hard stop, next to the soft warnings: another BANK losing files
+            # is a warning the user may accept, a DATASET losing them is not.
+            'dataset_conflict': bank_dataset_conflict(user_id, bank_id)}
 
 
 def _delete_mode() -> str:
@@ -2916,6 +2977,16 @@ def delete_rejected(user_id, bank_id) -> dict:
         raise ValueError('bank not found')
     if bank_jobs.running(bank_id):
         raise RuntimeError('a job is running on this bank — stop it first')
+    # An install that predates the create-time guard can still hold a bank whose
+    # folder IS a dataset's. Here, and only here, that stops being cosmetic: these
+    # "rejects" are the dataset's images. Refuse — never silently delete, never
+    # silently clean up on the user's behalf.
+    conflict = bank_dataset_conflict(user_id, bank_id)
+    if conflict:
+        raise BankSharesDataset(
+            'This bank points at a dataset\'s own image folder, so deleting its '
+            'rejected files would delete images out of the dataset. Nothing was '
+            f'deleted. {conflict["message"]}')
 
     rows = BankImage.query.filter_by(bank_id=bank_id, status='reject').all()
     out = {'mode': 'trash', 'deleted': 0, 'trashed': 0, 'already_absent': 0,
@@ -3544,20 +3615,27 @@ def _watermark_job(bank_id, rescan):
 # Both reuse the dataset routing/engines verbatim; nothing about the decision
 # logic is re-implemented here.
 def _clean_pool_query(bank_id):
-    """Images a cleaning level can act on: still flagged, with a stored bbox,
-    not rejected. 'cleaned'/'dismissed'/'none' rows are out by construction."""
+    """Images a cleaning level can act on: still flagged, with SOMETHING to act
+    on, not rejected. 'cleaned'/'dismissed'/'none' rows are out by construction.
+
+    "Something to act on" is the stored bbox OR a hand-drawn mask: a row the
+    detector left without a box (an older build) becomes cleanable the moment
+    the user draws the zones themselves — that drawing IS the missing box."""
     return (BankImage.query.filter_by(bank_id=bank_id,
                                       watermark_state='detected')
             .filter(BankImage.status != 'reject')
-            .filter(BankImage.watermark_bbox.isnot(None)))
+            .filter(or_(BankImage.watermark_bbox.isnot(None),
+                        BankImage.watermark_regions.isnot(None))))
 
 
 def _needs_rescan_count(bank_id) -> int:
     """Rows flagged by an older build that kept no bbox — nothing can route them
-    until a scan re-adopts them (see _watermark_scan_query)."""
+    until a scan re-adopts them (see _watermark_scan_query). A row the user has
+    masked by hand is NOT one of them: it no longer needs the detector."""
     return (BankImage.query.filter_by(bank_id=bank_id, watermark_state='detected')
             .filter(BankImage.status != 'reject')
-            .filter(BankImage.watermark_bbox.is_(None)).count())
+            .filter(BankImage.watermark_bbox.is_(None))
+            .filter(BankImage.watermark_regions.is_(None)).count())
 
 
 def _discard_clean_blob(bank_id, row) -> None:
@@ -3585,6 +3663,34 @@ def _clean_bbox(row):
         return tuple(float(v) for v in box)
     except (TypeError, ValueError):
         return None
+
+
+def _clean_regions(row):
+    """THE mask both cleaning levels must act on — ``(boxes, manual, problem)``.
+
+    A hand-drawn mask WINS over the detector's bbox. That is the entire point of
+    letting the user edit it: a correction the cleaning pass then ignores is
+    worse than no editor at all, because the user believes the fix landed.
+
+    ``manual`` says the boxes came from the user (drives the routing: a hand mask
+    is a REPAINT instruction — it can hold several zones and zones on the subject,
+    neither of which a border crop can express, exactly like the dataset lane).
+    An EMPTY manual mask returns ``([], True, None)``: an explicit "nothing to
+    repaint here", never a silent fall back to the box. ``problem`` is set only
+    when the stored JSON cannot be read as a mask (a genuine failure)."""
+    if row.watermark_regions is not None:
+        import json as _json
+        try:
+            stored = _json.loads(row.watermark_regions or '')
+        except (ValueError, TypeError):
+            return [], True, 'unreadable watermark regions'
+        try:
+            regions = normalize_watermark_regions(stored, allow_null=False)
+        except ValueError as e:
+            return [], True, f'invalid watermark regions: {e}'
+        return [tuple(box) for box in regions], True, None
+    bbox = _clean_bbox(row)
+    return ([bbox] if bbox else []), False, None
 
 
 def _source_size(bank, row):
@@ -3616,8 +3722,15 @@ def start_watermark_crop(app, user_id, bank_id):
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    total = _clean_pool_query(bank_id).count()
+    # Hand-masked rows are level 2's, so they don't count as work for this level:
+    # launching a crop that can only skip them would report "0 cropped" and read
+    # as a broken button.
+    total = (_clean_pool_query(bank_id)
+             .filter(BankImage.watermark_regions.is_(None)).count())
     if not total:
+        if _clean_pool_query(bank_id).count():
+            raise ValueError('the flagged images all carry a hand-edited mask — '
+                             'use Inpaint, which repaints the zones you drew')
         raise ValueError('no flagged image to clean — run the watermark scan first')
     return bank_jobs.start(app, bank_id, 'watermark_crop',
                            _watermark_crop_job(bank_id), total=total)
@@ -3636,7 +3749,16 @@ def _watermark_crop_job(bank_id):
             for row in rows:
                 if bank_jobs.cancelled(job):
                     break
-                bbox = _clean_bbox(row)
+                boxes, manual, _problem = _clean_regions(row)
+                if manual:
+                    # A hand mask is level 2's material, mask emptied or not. It
+                    # can carry several zones and zones on the subject; cropping
+                    # cannot express either, and quietly cropping the detector's
+                    # old box would clean pixels the user did NOT point at.
+                    left += 1
+                    bank_jobs.bump(job)
+                    continue
+                bbox = boxes[0] if boxes else None
                 src, width, height = _source_size(bank, row)
                 if not bbox or not src:
                     failed += 1
@@ -3721,7 +3843,8 @@ def _watermark_inpaint_job(bank_id, method):
             return
         rows = _clean_pool_query(bank_id).order_by(BankImage.id.asc()).all()
         bank_jobs.progress(job, done=0, total=len(rows), detail='inpainting')
-        counts = {'inpainted': 0, 'klein': 0, 'review': 0, 'failed': 0, 'skipped': 0}
+        counts = {'inpainted': 0, 'klein': 0, 'review': 0, 'failed': 0,
+                  'skipped': 0, 'empty': 0}
         error = None
         lama_ok = watermark_lama.is_available()
         klein_ok = method == 'klein' and watermark_klein.is_available()
@@ -3737,16 +3860,37 @@ def _watermark_inpaint_job(bank_id, method):
                 for row in rows:
                     if bank_jobs.cancelled(job):
                         break
-                    bbox = _clean_bbox(row)
+                    boxes, manual, problem = _clean_regions(row)
                     src, width, height = _source_size(bank, row)
-                    if not bbox or not src:
+                    if problem or not src:
+                        counts['failed'] += 1
+                        error = error or (
+                            {'kind': 'failed', 'detail': problem} if problem else None)
+                        bank_jobs.bump(job)
+                        continue
+                    if manual and not boxes:
+                        # The user deleted every zone. That is an ANSWER, not a
+                        # missing value: repaint nothing, and never fall back to
+                        # the detector's box. The row stays flagged (and visible)
+                        # so it can be masked again or dismissed.
+                        counts['empty'] += 1
+                        bank_jobs.bump(job)
+                        continue
+                    if not boxes:
                         counts['failed'] += 1
                         bank_jobs.bump(job)
                         continue
-                    # allow_crop=False: level 2 REPAINTS what is left, including a
-                    # border mark the user chose not to crop.
-                    route, _box = _route_watermark(bbox, width, height, allow_crop=False)
-                    engine = _clean_inpaint_engine(route, method)
+                    if manual:
+                        # Hand-drawn zones bypass the router entirely — same rule
+                        # as the dataset: what the user drew IS the decision, and
+                        # every zone is repainted with the selected engine.
+                        engine = 'klein' if method == 'klein' else 'lama'
+                    else:
+                        # allow_crop=False: level 2 REPAINTS what is left, including a
+                        # border mark the user chose not to crop.
+                        route, _box = _route_watermark(boxes[0], width, height,
+                                                       allow_crop=False)
+                        engine = _clean_inpaint_engine(route, method)
                     if engine == 'review':
                         counts['review'] += 1       # stays flagged, needs Klein or a human
                         bank_jobs.bump(job)
@@ -3759,7 +3903,7 @@ def _watermark_inpaint_job(bank_id, method):
                     dst = _stage_clean_copy(bank_id, row, src)
                     if engine == 'klein':
                         ok, err = watermark_klein.inpaint_watermark_klein(
-                            bank.user_id, str(dst), [list(bbox)])
+                            bank.user_id, str(dst), [list(b) for b in boxes])
                         if ok:
                             row.watermark_state = 'cleaned'
                             row.watermark_clean_method = 'klein'
@@ -3773,7 +3917,7 @@ def _watermark_inpaint_job(bank_id, method):
                         db.session.commit()
                         bank_jobs.bump(job)
                         continue
-                    pending.append((row, dst, [list(bbox)]))
+                    pending.append((row, dst, [list(b) for b in boxes]))
                     bank_jobs.bump(job)
                 if pending and bank_jobs.cancelled(job):
                     # Stop means stop: the staged copies of rows we never got to
@@ -3809,6 +3953,11 @@ def _watermark_inpaint_job(bank_id, method):
         if counts['review']:
             detail += (f", {counts['review']} on the subject "
                        '(switch the engine to Klein to repaint those)')
+        if counts['empty']:
+            # NOT lumped in with 'review': "on the subject" would send the user to
+            # Klein for images where the honest answer is "your mask is empty".
+            detail += (f", {counts['empty']} with an empty mask (draw a zone in "
+                       '▶ Review, or dismiss them)')
         if counts['skipped']:
             detail += f", {counts['skipped']} skipped (engine unavailable)"
         if counts['failed']:
@@ -3817,6 +3966,43 @@ def _watermark_inpaint_job(bank_id, method):
                 detail += f" — {error['detail']}"
         bank_jobs.progress(job, detail=detail)
     return run
+
+
+def set_watermark_regions(user_id, bank_id, image_id, regions) -> dict | None:
+    """Replace one flagged image's hand-drawn watermark mask (reported missing in
+    the Bank by Qeeyana on Reddit — the Dataset had it, the Bank did not).
+
+    ``regions`` is None (drop the override, go back to the detected box) or a list
+    of normalized boxes — validated by the DATASET's validator, deliberately: one
+    definition of a legal mask means the two lanes cannot drift apart. Returns the
+    same payload shape the dataset route returns, None when the bank/image is
+    unknown, ValueError on an illegal mask and RuntimeError when the image is no
+    longer flagged (already cleaned/dismissed — an edit there would be a no-op).
+
+    The mask is NOT cleared when a clean succeeds, unlike the dataset: the Bank's
+    ↩ Undo is a first-class action (it only deletes our own blob), and handing an
+    image back with its hand-drawn zones erased would mean redrawing them."""
+    if not get_bank(user_id, bank_id):
+        return None
+    owned = BankImage.query.filter_by(id=image_id, bank_id=bank_id)
+    row = owned.one_or_none()
+    if not row:
+        return None
+    if row.watermark_state != 'detected':
+        raise RuntimeError('this image is no longer flagged — nothing to mask')
+    normalized = normalize_watermark_regions(regions)
+    import json as _json
+    stored = _json.dumps(normalized) if normalized is not None else None
+    updated = (BankImage.query
+               .filter_by(id=row.id, bank_id=bank_id, watermark_state='detected')
+               .update({'watermark_regions': stored}, synchronize_session=False))
+    if updated != 1:
+        db.session.rollback()
+        if owned.one_or_none() is None:
+            return None
+        raise RuntimeError('this image is no longer flagged — nothing to mask')
+    db.session.commit()
+    return _watermark_regions_payload(row)
 
 
 def undo_watermark_clean(user_id, bank_id, image_ids=None) -> int:
@@ -3871,17 +4057,25 @@ def watermark_levels(user_id, bank_id) -> dict | None:
     from .face_dataset_service import _route_watermark
     bank = db.session.get(ImageBank, bank_id)
     base = BankImage.query.filter_by(bank_id=bank_id)
-    flagged = croppable = 0
+    flagged = croppable = hand_masked = empty_masks = 0
     for row in _clean_pool_query(bank_id).all():
         flagged += 1
-        bbox = _clean_bbox(row)
+        boxes, manual, _problem = _clean_regions(row)
+        if manual:
+            # A hand mask never routes to the crop level (see _watermark_crop_job),
+            # so it must not be counted as croppable — the ✂ button would offer
+            # work it will then skip.
+            hand_masked += 1
+            if not boxes:
+                empty_masks += 1
+            continue
         # Dimensions from the scan when we have them (this runs over every flagged
         # image of a possibly huge bank — no file is opened unless it has to be).
         width, height = row.width, row.height
         if not (width and height):
             _path, width, height = _source_size(bank, row)
-        if bbox and width and _route_watermark(bbox, width, height,
-                                               allow_crop=True)[0] == 'crop':
+        if boxes and width and _route_watermark(boxes[0], width, height,
+                                                allow_crop=True)[0] == 'crop':
             croppable += 1
     return {
         'scanned': base.filter(BankImage.watermark_state.isnot(None)).count(),
@@ -3894,6 +4088,12 @@ def watermark_levels(user_id, bank_id) -> dict | None:
         'flagged': flagged,
         'croppable': croppable,
         'inpaintable': flagged - croppable,
+        # Flagged images whose mask the user drew by hand, and how many of those
+        # were deliberately emptied. Both are surfaced: an empty mask repaints
+        # nothing, and a level that silently skips images is how a user ends up
+        # believing a watermark was removed when it was not.
+        'hand_masked': hand_masked,
+        'empty_masks': empty_masks,
         'cropped': base.filter_by(watermark_clean_method='crop').count(),
         'inpainted': base.filter(
             BankImage.watermark_clean_method.in_(('lama', 'klein'))).count(),
@@ -4739,6 +4939,15 @@ def scrape_import_to_bank(user_id, items, bank_id=None, name=None) -> dict:
         folder = bank.source_path
         if not folder or not os.path.isdir(folder):
             raise ValueError('this bank\'s folder is unavailable — relocate it first')
+        # Appending here WRITES into the bank's folder. On a legacy bank sitting
+        # on a dataset that means downloading scraped files straight into the
+        # dataset's training images — not destructive, but exactly the sharing
+        # this guard exists to end.
+        conflict = path_guard.dataset_folder_conflict(folder)
+        if conflict:
+            raise ValueError(
+                'This bank points at a dataset\'s own image folder, so scraping '
+                f'into it would drop files inside the dataset. {conflict["message"]}')
     else:
         name = (name or '').strip()
         if not name:
