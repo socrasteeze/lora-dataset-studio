@@ -1135,6 +1135,36 @@ Two things it will tell you rather than fail at:
   not share a base model or a workflow, so there is no single run that can render
   both. Unpick one family and the button comes back.
 
+**▶ Continue training from a checkpoint.** Clicking a pill's body opens its
+actions — Download, Deploy, Details, Delete — and **▶ Continue from here**. It
+opens the *same* launch dialog the Checkpoints panel and the Runs page open, on
+*that exact save*: pick where it runs (**Local** or **☁ Cloud**), how many
+extra steps, and — folded under *Adjust settings* — the checkpoint cadence, the
+preview prompts, the timestep weighting and the learning rate. Rank, base and
+optimizer are locked to the checkpoint being continued; they are not things a
+resume can change.
+
+Read the step field as **extra** steps, not a total: the line beside it spells
+out where you land ("→ target step 3500") and so does the button. Resuming step
+2500 of a run that ended at 3500 is the whole point of opening this from a pill
+— a later epoch can be over-cooked, and the earlier one is often the better
+LoRA.
+
+What is *not* possible is stated rather than hidden — a lane you cannot use
+stays visible, greyed, with its reason:
+
+- *"Local training needs ai-toolkit"* / *"A training is already running on this
+  machine"* — local training is single-flight for the whole machine.
+- *"Cloud training needs a rental key set up in Settings"* — **this build trains
+  locally only**, so the cloud lane is always closed here, on this board exactly
+  as in the dataset's own Continue dialog. It is shown rather than removed so the
+  two screens never disagree about why an option is unavailable.
+- *"This save is no longer on this machine"* — there is no copy anywhere, so the
+  lane that needs the file says so instead of failing at launch.
+
+If the save vanished between the board being drawn and the click, the launch is
+refused with the steps that *are* available, named — never a silent failure.
+
 **The gallery under a checkpoint.** Images pile up. A checkpoint that has
 produced more than one shows a small **× N** badge; clicking it opens everything
 that checkpoint ever made, newest first — from the board, from the Test Studio,
@@ -1198,6 +1228,49 @@ picture and decide it belongs on the board.
 - The **✕**, the **** and the resize corner keep a finger-sized target **at
   every zoom level**: they are drawn at a constant size on screen rather than at
   the board's, so a board fitted to twenty runs is still one you can tap.
+
+**Fuse pinned images side by side.** Comparing two renders across a gap and
+two frames is comparing two frames. **Drop one pinned image onto another and
+they become a single node**, pictures edge to edge with nothing drawn between
+them. There is **no limit**: drop a third, a tenth, they all join the strip.
+
+- **Where it lands.** While you drag, the picture you are about to join lights up
+  with a dashed outline, a bar marks the exact slot yours would take, and a label
+  says how many pictures the group would then hold. Let go anywhere else and it
+  is an ordinary move — nothing fuses by surprise.
+- **Which side.** Drop on the left half of a picture to land before it, on the
+  right half to land after it. The same gesture **re-orders** a group: drag a
+  member out and back onto the slot you want.
+- **Move the whole group** by its **title bar** (`⠿ N images`), which is also
+  where its **✕** lives. That bar is the only thing that moves a group, on
+  purpose: dragging a *picture* inside a group means something else entirely.
+- **Take one back out** by dragging it **off the group**. That is the whole rule
+  — while it is still over the strip nothing has happened, and letting go there
+  puts it back. Once it is clear of the strip it becomes a node of its own again,
+  **at the size it had before it joined**, wherever you dropped it. Joining a
+  group never rewrites a picture's own size; the strip only borrows it.
+- **The pictures that stay do not move.** Take the first one out and the strip
+  keeps its place and its height; the rest simply close the gap. A group left
+  with a single picture stops being a group.
+- **Which ✕ am I about to press?** At rest a group is nothing but photographs.
+  Hover (or Tab to) one and *that* picture lights up and shows its own step
+  label, its and its ✕ — the group's own ✕ is the one on the title bar, and it
+  carries the count (`✕3`) precisely so the two can never be confused. Closing a
+  group closes all of its pictures, undoes the group, and each one keeps its own
+  remembered size; re-pinning one from its gallery brings back **that one**, not
+  the strip.
+- **Every picture in a strip is the same height**, each scaled to keep its own
+  shape — that is what makes the band continuous instead of a row of letterboxed
+  tiles. Resize the group from its corner and the whole strip scales.
+- **A strip has no width limit, and that is the honest consequence of "no
+  limit".** Ten pictures side by side is ten times as wide as one; the board
+  zooms and pans, so **✦ Fit** is the answer. It deliberately does *not* wrap
+  onto a second row — a strip that quietly stopped being a strip at some
+  invisible threshold would be worse than a wide one. On a phone, expect to zoom.
+- **✦ Tidy up leaves groups alone.** It rebuilds the automatic tree and re-flows
+  the pictures you have *not* grouped; a strip is something you assembled on
+  purpose, and taking it apart is not tidying. The way out is the group's ✕, or
+  dragging its pictures back off it.
 
 **Pin all — the whole lot in one gesture.** When a generation launched from
 the board finishes, the green bar says how many images are ready and names the

@@ -441,6 +441,29 @@ These have no UI control — they're for advanced users editing `config.json` by
 
 *(The four ComfyUI folder overrides used to live here. They are now editable in **Settings → Local tools → ComfyUI → Advanced: ComfyUI folder overrides** — see that section above. Values set by hand in `config.json` are unaffected: the same keys, read the same way, now simply shown in the app.)*
 
+**Imported shot catalogs** — written by the workspace, not meant to be hand-edited (see *Using the app → Your own shot catalog*), but this is where they live so you know what to back up:
+
+| Key | Default | Role |
+|---|---|---|
+| `custom_shots` | `{}` | `{subject_type: [{id, label, prompt, framing, nsfw?}]}` — the shots you imported from JSON, one list per subject type. Kept here rather than in the browser so they survive a cache wipe, follow you to another device and ride along in the backup. Entries are re-checked on read: a bad `framing`, a missing field, or a `label` that already belongs to a built-in shot is dropped (two shots sharing a label would resolve to the wrong prompt when one is regenerated). |
+
+**Cloud (vast.ai) internals** — knobs for after the real-world smoke test. This fork exposes no cloud settings in the UI at all, so these sit alongside the `cloud.*` guard-rails above rather than behind them:
+
+| Key | Default | Role |
+|---|---|---|
+| `cloud.template_hash` | `471ed5903d8cdb8e63b0d0e50f6cd519` | The official vast.ai "Ostris AI Toolkit" template. Clearing it falls back to a raw-image launch. |
+| `cloud.ui_port` | `18675` | Container port the pod UI is proxied on. |
+| `cloud.image` | `vastai/ostris-ai-toolkit:…` | Raw-image fallback (used only when the template is cleared). |
+| `cloud.offer_scan_limit` | `100` | How many offers are fetched when listing GPU speed tiers. |
+| `cloud.pod_overhead_minutes` | `35` | Boot + model download + quantize time built into cost estimates. |
+| `cloud.min_inet_down_mbps` | `400` | Skip hosts too slow to pull the image. |
+| `cloud.min_disk_bw_mbps` | `500` | Skip hosts too slow to extract it. |
+| `cloud.host_blacklist_days` | `3` | How long to skip a host whose pod never became ready. |
+| `cloud.ready_timeout_minutes` | `25` | Boot budget: image pull + services up. |
+| `cloud.disk_gb` | `60` | Instance disk (base model + dataset + checkpoints). |
+| `cloud.min_vram_gb` | `{zimage:24, sdxl:16, krea:24, flux2klein:32}` | Minimum VRAM **per family**. flux2klein uses 32 (the 9B is the cloud-first lane; a 32 GB pod also trains the 4B). |
+| `cloud.onstart` | `''` | Optional startup command for the raw-image fallback. |
+
 **Quality-tool interpreters and models:**
 
 | Key | Default | Role |
@@ -537,6 +560,9 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `cloud.max_price_per_hour` | Safety cap on the hourly offer price in $ (default `0.80`); pricier hosts are skipped before launch. |
 | `cloud.monthly_budget_usd` | Hard monthly spend ceiling in $ (default `0` = unlimited); launches are blocked past it. |
 | `cloud.stall_timeout_minutes` | Kill + rescue a cloud run after this many minutes without step progress (default `30`, 5–240). |
+| `cloud.first_step_timeout_minutes` | Kill a run that reaches no training step **and** reports no new downloaded bytes for this long (default `45`, 5–240). Also in Settings → Training. |
+| `cloud.first_step_download_budget_minutes` | Absolute ceiling on the pre-training base-model download, even while it is progressing (default `180`; `0` = no ceiling). Also in Settings → Training. |
+| `cloud.max_runtime_minutes` | Hard stop on the whole run (default `480`, 30–1440); the newest checkpoint is rescued first. Enforced by the out-of-run supervisor too. Also in Settings → Training. |
 | `cloud.freeze_watchdog_minutes` | Terminate a training run whose **pod** shows no progress for this long (step, download bytes or a new checkpoint), from outside the run's own supervision; the clock is durable and survives an app restart (default `45`; `0` = warn on the card only). |
 | `cloud.min_reliability` | vast.ai host-reliability floor (default `0.98`, 0.9–0.999); lower surfaces cheaper, riskier hosts. |
 | `cloud.verified_only` | Restrict to vast.ai verified hosts (default `true`). |
