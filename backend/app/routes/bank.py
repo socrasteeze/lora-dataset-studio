@@ -24,6 +24,20 @@ def _app():
     return current_app._get_current_object()
 
 
+def _busy(e):
+    """The ONE shape of a "this bank is occupied" refusal.
+
+    `error` stays what it always was (an English sentence, for anything that
+    only knows how to print a message), but `busy_kind` is the machine-readable
+    half the UI actually needs: it names the pass that holds the bank, so the
+    click can be refused in the user's vocabulary — "✨ Score pass is running —
+    137/412, press Stop above" — instead of echoing our sentence back at them.
+    It matters that this rides on the 409 itself: the refusal often arrives
+    BEFORE the first 2 s progress poll, so at that instant the response body is
+    the only thing that knows which pass is in the way."""
+    return jsonify({'error': str(e), 'busy_kind': e.kind}), 409
+
+
 @bp.get('/banks')
 def banks_list():
     """Every bank + its card previews. ?dataset_id=<id> additionally embeds each
@@ -99,13 +113,40 @@ def bank_from_dataset():
         bank_id = banks.start_dataset_import(_app(), LOCAL_USER,
                                              data.get('dataset_id'), data.get('name'))
     except bank_jobs.BankJobBusy as e:
-        return jsonify({'error': str(e)}), 409
+        return _busy(e)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except RuntimeError as e:
         return jsonify({'error': str(e)}), 503
     # the id rides back so the UI can jump straight to the bank being filled
     return jsonify({'ok': True, 'id': bank_id}), 202
+
+
+@bp.post('/bank/scrape-import')
+def bank_scrape_import():
+    """Scrape → BANK — the scraper's second destination, next to the dataset one.
+
+    Body: {items:[{url,title}], bank_id?} to APPEND to an existing bank (resume),
+    or {items, name} to create one. Synchronous like the dataset outlet (the same
+    per-request cap bounds it), and it stores what it downloaded: the resolution /
+    ratio / near-duplicate verdicts belong to the bank's own passes, not to the
+    download. 409 when a pass already owns the target bank."""
+    data = request.get_json(silent=True) or {}
+    raw_bank_id = data.get('bank_id')
+    bank_id = None
+    if raw_bank_id is not None:
+        try:
+            bank_id = int(raw_bank_id)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'bank_id must be a number'}), 400
+    try:
+        res = banks.scrape_import_to_bank(LOCAL_USER, data.get('items'),
+                                          bank_id=bank_id, name=data.get('name'))
+    except bank_jobs.BankJobBusy as e:
+        return _busy(e)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **res})
 
 
 @bp.get('/bank/<int:bank_id>')
@@ -137,6 +178,29 @@ def bank_rename(bank_id):
     return jsonify({'ok': True, 'id': bank.id, 'name': bank.name})
 
 
+@bp.post('/bank/<int:bank_id>/flag-preview')
+def bank_flag_preview(bank_id):
+    """How many images each flag WOULD hold at the thresholds in the body —
+    the live effect readout under the Bank's threshold controls.
+
+    Read-only and cheap: verdicts are recomputed from persisted raw scores, so
+    this is one COUNT per flag, the same queries the workspace payload already
+    runs. Nothing is saved — the user still has to press Save.
+
+    POST (not GET) because it carries the UNSAVED candidate thresholds, exactly
+    like /settings/prompt-preview carries unsaved prompt text. A junk body
+    degrades to "the saved thresholds" instead of 400: a preview that answers
+    'error' while you are mid-keystroke is worth less than one that answers with
+    what is currently in effect."""
+    body = request.get_json(silent=True) or {}
+    overrides = body.get('thresholds')
+    out = banks.flag_preview(LOCAL_USER, bank_id,
+                             overrides if isinstance(overrides, dict) else None)
+    if out is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(out)
+
+
 @bp.delete('/bank/<int:bank_id>')
 def bank_delete(bank_id):
     if not banks.delete_bank(LOCAL_USER, bank_id):
@@ -157,7 +221,7 @@ def bank_relocate(bank_id):
         out = banks.relocate_bank(LOCAL_USER, bank_id, data.get('folder'),
                                   confirm=bool(data.get('confirm')))
     except bank_jobs.BankJobBusy as e:
-        return jsonify({'error': str(e)}), 409
+        return _busy(e)
     except banks.BankRelocateMismatch as e:
         return jsonify({'error': str(e), **e.preview}), 400
     except ValueError as e:
@@ -225,7 +289,7 @@ def _start(fn, *args, **kwargs):
     try:
         fn(*args, **kwargs)
     except bank_jobs.BankJobBusy as e:
-        return jsonify({'error': str(e)}), 409
+        return _busy(e)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except RuntimeError as e:
@@ -389,7 +453,12 @@ def bank_queue_add(bank_id):
             reject_flags=data.get('reject_flags') or None,
             resolve_dups=bool(data.get('resolve_dups')))
     except bank_queue.BankAlreadyQueued as e:
-        return jsonify({'error': str(e)}), 409
+        # Same 409 SHAPE as _busy() even though no pass holds the bank: the UI
+        # reads busy_kind to decide whether it can reword the refusal in the
+        # user's vocabulary, and an unlabelled 409 is the one case it cannot.
+        # None says "occupied, but not by a running pass" — the server sentence
+        # ("already in the queue") is then the right thing to show.
+        return jsonify({'error': str(e), 'busy_kind': None}), 409
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'position': position}), 202
@@ -446,7 +515,7 @@ def bank_promote_to_bank(bank_id):
                                           data.get('image_ids') or [],
                                           data.get('name'))
     except bank_jobs.BankJobBusy as e:
-        return jsonify({'error': str(e)}), 409
+        return _busy(e)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'id': new_id}), 202
@@ -558,6 +627,50 @@ def bank_images_status(bank_id):
     return jsonify({'ok': True, 'changed': n})
 
 
+@bp.post('/bank/<int:bank_id>/undo')
+def bank_undo_last(bank_id):
+    """↩ Put the last BULK decision back — the net under the bank's biggest
+    gesture. Synchronous: it rewrites two columns on ids we already hold.
+
+    The reply is deliberately an honest ledger, not an "ok": {restored, missing,
+    conflicts, conflict_names} so a partial restore can SAY it restored 340 of
+    400 and name what it left alone. 400 = there is nothing to undo (no offer,
+    or it expired); 409 = a pass is running on this bank.
+
+    Only the status-flipping bulk actions are ever offered here. Delete
+    rejected and ⬆ Promote are not undoable cleanly, so they publish no offer —
+    see ``services.bank_undo``."""
+    try:
+        out = banks.undo_last(LOCAL_USER, bank_id)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except RuntimeError as e:
+        # Same occupied-bank refusal as everywhere else, so the UI rephrases it
+        # through the same path instead of echoing our sentence. Raised as a
+        # RuntimeError rather than BankJobBusy, so the kind comes from the
+        # registry — same shape as delete-rejected below.
+        snap = bank_jobs.get(bank_id)
+        return jsonify({'error': str(e),
+                        'busy_kind': (snap or {}).get('kind')}), 409
+    return jsonify({'ok': True, **out})
+
+
+@bp.post('/bank/<int:bank_id>/rotate')
+def bank_rotate(bank_id):
+    """Turn {ids} by {degrees} CLOCKWISE (90/180/270, negative = left).
+
+    Idea by 1Tomber (GitHub #17). Synchronous and cheap: it writes ONE integer
+    per row — the user's own files are never touched, the turned copy is built
+    lazily by the resolver on the next read."""
+    data = request.get_json(silent=True) or {}
+    try:
+        result = banks.rotate_images(LOCAL_USER, bank_id, data.get('ids'),
+                                     data.get('degrees'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **result})
+
+
 @bp.post('/bank/<int:bank_id>/apply-flags')
 def bank_apply_flags(bank_id):
     data = request.get_json(silent=True) or {}
@@ -613,6 +726,35 @@ def bank_select_diverse(bank_id):
     try:
         out = banks.select_diverse(LOCAL_USER, bank_id, n=n, typicality=typ,
                                    filters=_curation_filters(data))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **out})
+
+
+@bp.post('/bank/<int:bank_id>/select-balanced')
+def bank_select_balanced(bank_id):
+    """Select N images SPREAD OVER the framing labels (optionally × person)
+    instead of the top of one ranking — the answer to "does my set cover what I
+    want to generate?". Same embeddings and same typicality guard as
+    select-diverse, applied inside each bucket. Never mutates.
+
+    {axis} 'framing' (default) | 'framing+person'. 400 with the exact missing
+    pass when Score hasn't run or nothing in the filter carries the label."""
+    data = request.get_json(silent=True) or {}
+    try:
+        n = int(data.get('n') or 60)
+    except (TypeError, ValueError):
+        n = 60
+    typ = data.get('typicality')
+    try:
+        typ = banks._TYPICALITY_DEFAULT if typ in (None, '') else float(typ)
+    except (TypeError, ValueError):
+        typ = banks._TYPICALITY_DEFAULT
+    try:
+        out = banks.select_balanced(LOCAL_USER, bank_id, n=n,
+                                    axis=data.get('axis') or 'framing',
+                                    typicality=typ,
+                                    filters=_curation_filters(data))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **out})
@@ -716,7 +858,12 @@ def bank_delete_rejected(bank_id):
     except ValueError:
         return jsonify({'error': 'not found'}), 404
     except RuntimeError as e:
-        return jsonify({'error': str(e)}), 409
+        # Same refusal as every other occupied-bank 409, so the UI rephrases it
+        # through the same path. This one is raised as a RuntimeError rather than
+        # BankJobBusy, so the kind is read back from the registry here.
+        snap = bank_jobs.get(bank_id)
+        return jsonify({'error': str(e),
+                        'busy_kind': (snap or {}).get('kind')}), 409
     return jsonify({'ok': True, **out})
 
 

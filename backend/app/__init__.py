@@ -207,6 +207,9 @@ _SCHEMA_ADDITIONS = (
     # Additive and independent of promoted_dataset_id — a database that never
     # gains it simply never shows the "promoted to a bank" badge.
     ('bank_image', 'promoted_bank_id', 'INTEGER'),
+    # Manual quarter-turn of a bank image (degrees clockwise, NULL = untouched).
+    # Additive: a database that never gains it simply has no rotated images.
+    ('bank_image', 'rotation', 'INTEGER'),
     ('image_bank', 'pipeline_report', 'TEXT'),
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).

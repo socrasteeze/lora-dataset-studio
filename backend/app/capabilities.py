@@ -84,11 +84,24 @@ _ZIMAGE_RE = re.compile(r'z[ -]?image', re.IGNORECASE)
 _MODEL_SUFFIXES = ('.safetensors', '.gguf', '.sft')
 
 
-def _http_ok(url, timeout=3) -> bool:
+def _http_ok(url, timeout=3, reason=None) -> bool:
+    """True when `url` answers with anything below 500.
+
+    `reason`, when a dict is passed, is FILLED with why a False was returned:
+    'timeout' (the server accepted the connection and then didn't answer in time —
+    it is up, it is slow) or 'unreachable' (nothing answered). It is an out-param
+    rather than a richer return type on purpose: this function is the single
+    network seam the whole test suite patches (`lambda *a, **k: False`), and a
+    stub that ignores the dict simply leaves the reason unknown instead of
+    breaking. Callers must treat an unfilled dict as "don't know"."""
     try:
         resp = requests.get(url, timeout=timeout)
         return resp.status_code < 500
-    except Exception:
+    except Exception as e:
+        if isinstance(reason, dict):
+            reason['why'] = ('timeout' if isinstance(e, requests.exceptions.Timeout)
+                             else 'unreachable')
+            reason['waited'] = timeout
         return False
 
 
@@ -138,12 +151,65 @@ def _cached_import(key: str, python: str, module_expr: str) -> bool:
     return _cached_import_state(key, python, module_expr) is True
 
 
+def _object_info_timeout() -> int:
+    """The /object_info read budget, published so the UI can quote it. Lazy import:
+    utils.comfyui imports config, not capabilities, and this keeps it that way."""
+    from .utils import comfyui as _cu
+    return _cu.object_info_timeout()
+
+
+def comfyui_down_message(status, waited) -> str:
+    """THE sentence for a ComfyUI that isn't answering. Two causes, two remedies —
+    never one fits-all line.
+
+    'ComfyUI isn't running' used to be said for BOTH, and it is a lie in one of
+    them: a heavily-customised ComfyUI is up and simply takes longer than the
+    budget to enumerate its nodes and models. Someone who has just started ComfyUI
+    and reads "it isn't running" goes and checks the one thing they already know is
+    true, and finds nothing (j_o_e_l., Discord — he then measured the real number
+    himself). So the slow case names the delay, says the server IS up, and points
+    at the knob that fixes it."""
+    if status == 'timeout':
+        return (f'ComfyUI took more than {waited}s to answer. It is running — it is '
+                f'slow to enumerate its nodes and model files, which is normal on an '
+                f'install with many custom nodes. Raise "ComfyUI response timeout" in '
+                f'Settings ▸ Local tools ▸ ComfyUI.')
+    return ('No answer from ComfyUI — nothing is listening at that address. Start '
+            'ComfyUI, or correct the ComfyUI API URL in Settings ▸ Local tools.')
+
+
 def probe_comfyui() -> dict:
+    """{ok, detail, status, hint}. `status` is 'ok' / 'slow' / 'unreachable' /
+    'unconfigured' — the two failure modes are published SEPARATELY so every
+    surface (Test button, engine cards, the 409 on a blocked generation) can say
+    the true one instead of the convenient one.
+
+    The verdict itself still rides on the cheap `/history` probe. When that one
+    can't tell us why (it is the patched seam in tests, and a 3 s budget is short
+    enough to trip on a busy server), the LAST /object_info attempt is consulted:
+    that probe knows the difference first-hand, because it is the one that spends
+    the long budget."""
     api_url = (cfg.get('comfyui.api_url') or '').rstrip('/')
     if not api_url:
-        return {'ok': False, 'detail': 'comfyui.api_url not configured'}
-    ok = _http_ok(f'{api_url}/history')
-    return {'ok': ok, 'detail': api_url if ok else f'unreachable: {api_url}'}
+        return {'ok': False, 'detail': 'comfyui.api_url not configured',
+                'status': 'unconfigured',
+                'hint': 'Set the ComfyUI API URL in Settings ▸ Local tools.'}
+    reason = {}
+    ok = _http_ok(f'{api_url}/history', reason=reason)
+    if ok:
+        return {'ok': True, 'detail': api_url, 'status': 'ok', 'hint': ''}
+    from .utils import comfyui as _cu
+    health = _cu.object_info_health()
+    why, waited = reason.get('why'), reason.get('waited', 3)
+    if why != 'timeout' and health['status'] == 'timeout':
+        # /history gave up after 3 s while the heavy probe proved the server is
+        # THERE and merely slow. Believe the probe that waited longer.
+        why, waited = 'timeout', health['waited']
+    status = 'slow' if why == 'timeout' else 'unreachable'
+    return {'ok': False, 'status': status,
+            'detail': (f'slow: {api_url} (>{waited}s)' if status == 'slow'
+                       else f'unreachable: {api_url}'),
+            'hint': comfyui_down_message('timeout' if status == 'slow' else 'down', waited)}
 
 
 def probe_ollama() -> dict:
@@ -434,6 +500,85 @@ def probe_aitoolkit() -> dict:
                 'python_candidates': found}
     return {'ok': False, 'detail': f'invalid aitoolkit dir: {d}',
             'has_run': False, 'python_candidates': []}
+
+
+def _torch_import_state(python: str):
+    """`import torch` on this interpreter: True / False / None (unknown).
+
+    Stricter than `_cached_import_state` about what counts as a FAILED IMPORT.
+    That helper's seam reports False for anything that goes wrong, including a
+    path that cannot be executed at all — and "this file is not a working Python"
+    is a different problem from "this Python has no torch", with a different
+    sentence and, above all, one we must not state as a fact when a training
+    launch hangs on it. So a failed import is confirmed by a second, trivial
+    `pass` probe: if the interpreter cannot even run that, the answer is UNKNOWN.
+    The extra subprocess only ever runs in the already-failing case, and both
+    answers go through the same cache."""
+    state = _cached_import_state('aitoolkit_torch', python, 'import torch')
+    if state is not False:
+        return state
+    if _cached_import_state('aitoolkit_alive', python, 'pass') is not True:
+        return None
+    return False
+
+
+def aitoolkit_interpreter_report() -> dict:
+    """Can the interpreter ai-toolkit is configured with actually `import torch`?
+
+    {'python': str, 'torch': True|False|None, 'alternative': str}.
+
+    `torch` is THREE-valued on purpose and reuses the same cached subprocess seam
+    every other ML capability goes through: True = proven importable, False =
+    proven not, None = we did not find out (no interpreter on disk, or a cold
+    import that timed out). None must never be treated as a refusal — a first
+    `import torch` on a cold venv behind an antivirus takes tens of seconds.
+
+    `alternative` is the venv the checkout carries (`venv/`, `.venv/`) when an
+    EXPLICIT `aitoolkit.python` is set, is broken, and that venv works — the
+    swap we can then offer instead of leaving the user to guess. Empty
+    otherwise; it costs a second probe only in the already-broken case.
+
+    Deliberately NOT part of probe(): probe() is polled and must stay cheap and
+    never spawn a torch import. This is called from a launch attempt, from the
+    Test button, and from a crash report — moments where the answer is worth
+    paying for."""
+    out = {'python': '', 'torch': None, 'alternative': ''}
+    python = cfg.aitoolkit_path('venv_python')
+    if not python or not Path(python).is_file():
+        return out
+    out['python'] = str(python)
+    out['torch'] = _torch_import_state(str(python))
+    if out['torch'] is not False:
+        return out
+    # Broken, and only because of an explicit override? Then the checkout's own
+    # venv is the obvious way out — but only claim it after PROVING it works.
+    if not (cfg.get('aitoolkit.python') or '').strip():
+        return out
+    derived = cfg.aitoolkit_path('venv_python_derived')
+    if derived and Path(derived).is_file() and os.path.normcase(str(derived)) \
+            != os.path.normcase(str(python)):
+        if _torch_import_state(str(derived)) is True:
+            out['alternative'] = str(derived)
+    return out
+
+
+def probe_aitoolkit_test() -> dict:
+    """The Settings ▸ Local tools "Test" button for ai-toolkit. Same folder checks
+    as probe_aitoolkit, plus the one the folder checks cannot see: does the chosen
+    interpreter have torch? A Test that goes green on a Python without torch is
+    the exact trap of GitHub #19 (strouder) — everything configured, every run
+    dead on `No module named 'torch'`. An UNKNOWN probe keeps the green: we refuse
+    to fail a test on an answer we do not have."""
+    result = probe_aitoolkit()
+    if not result.get('ok'):
+        return result
+    from .services.training_diagnostics import interpreter_verdict
+    report = aitoolkit_interpreter_report()
+    verdict = interpreter_verdict(report['python'], report['torch'],
+                                  alternative=report['alternative'])
+    if verdict:
+        return {**result, 'ok': False, 'detail': verdict['message']}
+    return result
 
 
 # JoyCaption's runtime deps that ai-toolkit does NOT ship: the training venv has
@@ -1157,8 +1302,6 @@ def probe(force=False) -> dict:
     # green (advisory too_small does not gate) — an honest badge points the user at
     # the broken file instead of letting a doomed generate crash ComfyUI.
     klein_invalid = _keh.klein_invalid_assets()
-    klein_blocking_invalid = any(
-        i['blocking'] and i['asset'] in _keh.KLEIN_REQUIRED for i in klein_invalid)
     # Capability gap on the graph's WIDGET VALUES, not its nodes. The shipped Klein
     # workflow used to pin `scheduler: "beta57"`, a value the third-party RES4LYF
     # pack injects into ComfyUI's CORE list — so a stock install passed every asset
@@ -1171,11 +1314,13 @@ def probe(force=False) -> dict:
     # this fails OPEN — an unreachable ComfyUI reports no gap, `reachable` already
     # says that.
     klein_unsupported_enums = _keh.klein_unsupported_enums() if comfy['ok'] else []
-    klein_ready = (comfy['ok'] and not klein_unsupported_enums
-                   and bool(_keh.resolve_klein_unet())
-                   and bool(_keh.resolve_klein_vae())
-                   and bool(_keh.resolve_klein_text_encoder())
-                   and not klein_blocking_invalid)
+    # The verdict itself lives in klein_edit_helper so the watermark cleaner reads
+    # the SAME four conditions instead of its own laxer copy; the ingredients are
+    # already computed here for the payload, so they are handed over rather than
+    # re-probed.
+    klein_ready = _keh.klein_engine_ready(
+        comfy['ok'], missing=klein_missing, invalid=klein_invalid,
+        unsupported_enums=klein_unsupported_enums)
     # Krea 2 Identity Edit — the second LOCAL engine. Readiness is honest and
     # four-part (base model + identity LoRA + text encoder + VAE) AND depends on
     # a custom-node pack, unlike Klein whose graph is core-nodes-only. Both gaps
@@ -1223,6 +1368,16 @@ def probe(force=False) -> dict:
         },
         'comfyui': {
             'reachable': comfy['ok'],
+            # WHY it isn't reachable, when it isn't: 'ok' | 'slow' | 'unreachable'
+            # | 'unconfigured'. `reachable` alone made every screen say "ComfyUI
+            # isn't running" at a ComfyUI that was running and busy; `hint` is the
+            # matching sentence, so the wording lives in ONE place instead of being
+            # re-invented per card. See probe_comfyui / comfyui_down_message.
+            'status': comfy.get('status', 'ok' if comfy['ok'] else 'unreachable'),
+            'hint': comfy.get('hint', ''),
+            # Read budget currently granted to the heavy /object_info enumeration,
+            # so a screen can quote the number the user would raise.
+            'object_info_timeout_s': _object_info_timeout(),
             'api_url': cfg.get('comfyui.api_url') or '',
             'base_dir': base_dir,
             'dir_configured': bool(base_dir),

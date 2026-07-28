@@ -30,7 +30,7 @@ from ..extensions import db
 from ..models import (CanvasImageNode, CanvasNodePosition, FaceDataset,
                       FaceDatasetImage, LoraTestImage)
 from .. import config as cfg
-from . import dataset_activity, reference_edit_jobs, trash
+from . import dataset_activity, image_encoding, reference_edit_jobs, trash
 from .dataset_storage import dataset_path, ensure_dataset_dir
 
 # Garde le modèle vision chaud entre les images d'un même batch caption/classify
@@ -289,10 +289,13 @@ _SMALL_IMAGE_DERIVATIONS = (SMALL_IMAGE_SOURCE, KLEIN_SMALL_IMAGE)
 # section.  In particular, a second simultaneous lightbox click waits until the
 # first row has its job_id, then takes the idempotent return path below.
 _IMAGE_IMPROVE_LOCKS = tuple(threading.Lock() for _ in range(64))
-# A mirror is a toggle: two requests for the same image must run in order (two
-# clicks restore the original orientation), not both read the same source pixels
-# and race to promote an identical result.  Stripes avoid an unbounded lock map.
-_IMAGE_MIRROR_LOCKS = tuple(threading.Lock() for _ in range(64))
+# An in-place pixel edit is a fold on the CURRENT file: two requests for the same
+# image must run in order (two mirror clicks restore the original orientation,
+# four rotate-right clicks come back round), not both read the same source pixels
+# and race to promote a result computed from the same "before".  Mirror and
+# rotation deliberately share ONE stripe set so they serialize against each other
+# too.  Stripes avoid an unbounded lock map.
+_IMAGE_PIXEL_EDIT_LOCKS = tuple(threading.Lock() for _ in range(64))
 
 
 class KleinNodesMissing(Exception):
@@ -375,7 +378,8 @@ def add_extra_ref(user_id, dataset_id, image_bytes) -> str:
 
 
 def crop_extra_ref(user_id, dataset_id, filename, x, y, w, h) -> bool:
-    """Manually crop ONE extra reference to (x,y,w,h), long side resized to 1024.
+    """Manually crop ONE extra reference to (x,y,w,h), long side capped at 1024
+    (never enlarged - a smaller box keeps its own pixels).
     The box is in the crop SOURCE's pixel space (what extra_ref_crop_source names,
     i.e. what the editor displayed) and the result overwrites the extra only — the
     original stays untouched, so re-crops widen as freely as they tighten.
@@ -1390,37 +1394,81 @@ def set_image_caption(user_id, image_id, caption, short=_UNSET):
 
 
 def _crop_resize_file(path, x, y, w, h, size=1024, dst=None):
-    """Crop the file at `path` to (x,y,w,h) and resize the crop so its LONG side
-    equals `size`, PRESERVING the box's aspect ratio: a square box keeps the
-    historical size x size output, a 2:3 box yields 683x1024 — no padding, no
-    distortion (ai-toolkit buckets handle non-square training images). Writes to
-    `dst` (default: overwrite `path`). Passing a distinct `dst` lets the reference
-    crop read the untouched full-frame ORIGINAL and write the derived crop — so a
-    re-crop can widen back out instead of only tightening the previous crop.
+    """Crop the file at `path` to (x,y,w,h) and normalise the crop's LONG side DOWN
+    to at most `size`, PRESERVING the box's aspect ratio: a 2000x1500 box yields
+    1024x768, a 2:3 box yields 683x1024 — no padding, no distortion (ai-toolkit
+    buckets handle non-square training images). Writes to `dst` (default: overwrite
+    `path`). Passing a distinct `dst` lets the reference crop read the untouched
+    full-frame ORIGINAL and write the derived crop — so a re-crop can widen back
+    out instead of only tightening the previous crop.
 
-    Returns (ok, upscale_ratio) — ratio is size / long_side_of_box (>1 means the
-    box was smaller than `size` and got enlarged), or None on failure."""
+    A box SMALLER than `size` is left at its own size. The resize used to be
+    unconditional, so a 240x180 crop was blown up to 1024x768 — and that upscale
+    carried essentially nothing: shrinking the result back to 240 recovers the
+    original at 48.96 dB (max channel error 10), for 2.3x the bytes. Since the
+    encoder went lossless that is close to a megabyte of interpolated pixels per
+    small crop, and it hands the trainer a tile whose apparent resolution is a
+    fiction. Cropping in cannot create detail; it should not pretend to.
+
+    Returns (ok, upscale_ratio), or (False, None) on failure. The ratio is
+    unchanged in value and meaning — `size / long_side_of_box`, i.e. how far the
+    box sits under the training resolution (>1 = under it) — because it is a
+    STORED column (`FaceDatasetImage.upscale_ratio`) feeding the composition
+    warning, and capping it along with the pixels would silently retire that
+    warning. Only the pixels stopped pretending; the measurement did not move.
+
+    ENCODING: the source format is preserved and written under
+    `image_encoding.LOSSLESS`. This used to be an unconditional lossy WEBP q92, so
+    cropping a PNG degraded it AND left PNG-named files holding WEBP bytes.
+
+    Crop is the one operation for which lossless was a real trade rather than an
+    obvious win — it RESAMPLES, so it destroys information whatever the encoder does,
+    and lossless costs 4.59x the bytes. It was chosen on measurement, not principle:
+    lossy WEBP has an error floor (chroma subsampled to 4:2:0 at every quality, so
+    q100 still leaves max channel error 16 for 1.74x the size), and that error
+    COMPOUNDS — five successive crops land at PSNR 45 dB whether they are q92 or
+    q100, while lossless stays byte-identical to the first crop. See the measurement
+    table in `image_encoding`'s module docstring.
+
+    ⚠ What this does NOT claim: only the ENCODING is lossless. A box longer than
+    `size` is still resampled down, which destroys information whatever the encoder
+    does. A box at or under `size` is now a pure cut, so it IS lossless end to end —
+    as is the watermark crop (`_apply_watermark_crop`), which never resizes."""
     if not os.path.exists(path):
         return False, None
-    src = Image.open(path).convert('RGB')
+    with Image.open(path) as opened:
+        # The DESTINATION name decides (it may differ from the source: the reference
+        # editor reads the kept full frame and writes the derived crop), so the file
+        # written always contains what its extension promises.
+        fmt = image_encoding.format_for_path(dst or path, opened)
+        opened.load()
+        icc = _valid_icc_profile(opened.info.get('icc_profile'))
+        # Narrow the mode BEFORE resampling: Pillow silently drops to nearest-neighbour
+        # on paletted images, which would undo the point of removing the lossy encoder.
+        src = opened.convert(image_encoding.resample_mode(opened))
     box = (max(0, int(x)), max(0, int(y)), min(src.width, int(x + w)), min(src.height, int(y + h)))
     if box[2] <= box[0] or box[3] <= box[1]:
         return False, None
     bw, bh = box[2] - box[0], box[3] - box[1]
+    # Normalise DOWN only: `long` is what we actually render, `size` stays the
+    # reference the reported ratio is measured against (see the docstring).
+    long = min(size, max(bw, bh))
     if bw >= bh:
-        out_w, out_h = size, max(1, round(size * bh / bw))
+        out_w, out_h = long, max(1, round(long * bh / bw))
     else:
-        out_w, out_h = max(1, round(size * bw / bh)), size
+        out_w, out_h = max(1, round(long * bw / bh)), long
     scale = size / max(bw, bh)
     out = io.BytesIO()
-    src.crop(box).resize((out_w, out_h), Image.LANCZOS).save(out, 'WEBP', quality=92)
+    image_encoding.save_edit(src.crop(box).resize((out_w, out_h), Image.LANCZOS),
+                             out, fmt, image_encoding.LOSSLESS, icc_profile=icc)
     with open(dst or path, 'wb') as fh:
         fh.write(out.getvalue())
     return True, scale
 
 
 def crop_image(user_id, image_id, x, y, w, h):
-    """Crop a dataset image to (x,y,w,h), resized to 1024 (no pad). Returns bool."""
+    """Crop a dataset image to (x,y,w,h), long side capped at 1024, no pad (a box
+    smaller than that keeps its own size). Returns bool."""
     img = _owned_image(user_id, image_id)
     if not img or not img.filename:
         return False
@@ -1450,46 +1498,51 @@ def _valid_icc_profile(raw):
     return bytes(raw)
 
 
-def _mirrored_image_bytes(path):
-    """Prepare a horizontal mirror fully in memory without touching ``path``.
+def transformed_image_bytes(path, transform):
+    """Apply ``transform`` (a PIL image -> PIL image callable) fully in memory,
+    without touching ``path``, and return the re-encoded bytes.
 
-    Dataset rows normally point at WEBP files, but restored/legacy datasets may
-    contain PNG or JPEG bytes (even under a misleading extension).  Preserve the
-    format Pillow actually detects: PNG stays lossless, WEBP is rewritten lossless
-    so repeated toggles do not accumulate damage, and JPEG uses high-quality 4:4:4.
+    THE shared encoder of every in-place pixel edit that REORDERS pixels without
+    rebuilding any (mirror, rotation). Dataset rows normally point at WEBP files,
+    but restored/legacy datasets may contain PNG or JPEG bytes (even under a
+    misleading extension). Preserve the format Pillow actually detects and encode
+    it under `image_encoding.LOSSLESS` — the policy this operation REQUIRES, passed
+    explicitly so that tuning another operation's encoder can never silently
+    degrade this one.
+
+    ⚠ Only JPEG loses anything here, and it loses it on EVERY edit — Pillow has
+    no DCT-domain (jpegtran-style) path, so a 90° turn of a JPEG is a re-encode,
+    not a lossless block transform. PNG and WEBP round-trip pixel-exact, which is
+    what dataset files actually are in practice (imports normalise to WEBP).
+
+    The format is read from the CONTENT, not the file name: a mirror/rotation has
+    no business converting a legacy extension mismatch it did not create. Crop,
+    which rewrites the file wholesale and may write to a DIFFERENT destination,
+    uses `image_encoding.format_for_path` instead.
     """
     try:
         with Image.open(path) as src:
             fmt = (src.format or '').upper()
-            if fmt not in {'PNG', 'WEBP', 'JPEG'}:
+            if fmt not in image_encoding.EDITABLE_FORMATS:
                 raise ValueError(f'unsupported image format: {fmt or "unknown"}')
             if getattr(src, 'n_frames', 1) != 1:
                 raise ValueError('animated images are not supported')
             src.load()
             icc = _valid_icc_profile(src.info.get('icc_profile'))
+            # EXIF orientation is baked into the pixels FIRST, so the edit the
+            # user asked for is applied to the image they were shown — and the
+            # tag is dropped (never reattached), so nothing rotates it twice.
             oriented = ImageOps.exif_transpose(src)
-            mirrored = ImageOps.mirror(oriented)
-
-            save_kwargs = {}
-            if icc:
-                save_kwargs['icc_profile'] = icc
-            if fmt == 'PNG':
-                # Keep the native PNG mode/bit depth and use only lossless DEFLATE.
-                save_kwargs.update(compress_level=6)
-            elif fmt == 'WEBP':
-                # WEBP input can carry alpha; RGB(A) preserves it while avoiding
-                # encoder-dependent conversions for unusual legacy modes.
-                has_alpha = 'A' in mirrored.getbands()
-                mirrored = mirrored.convert('RGBA' if has_alpha else 'RGB')
-                save_kwargs.update(lossless=True, quality=100, method=6)
-            else:  # JPEG
-                mirrored = mirrored.convert('RGB')
-                save_kwargs.update(quality=95, subsampling=0, optimize=True)
+            edited = transform(oriented)
 
             out = io.BytesIO()
-            mirrored.save(out, fmt, **save_kwargs)
+            edited, save_kwargs = image_encoding.save_params(
+                edited, fmt, image_encoding.LOSSLESS, icc_profile=icc)
+            edited.save(out, fmt, **save_kwargs)
             payload = out.getvalue()
-            expected_size = mirrored.size
+            # Read AFTER save_params: it may have converted the mode, and the
+            # self-check below compares the decoded size against this.
+            expected_size = edited.size
     except ValueError:
         raise
     except (UnidentifiedImageError, OSError, SyntaxError) as e:
@@ -1500,22 +1553,74 @@ def _mirrored_image_bytes(path):
         with Image.open(io.BytesIO(payload)) as check:
             check.load()
             if (check.format or '').upper() != fmt or check.size != expected_size:
-                raise OSError('encoded mirror validation failed')
+                raise OSError('encoded edit validation failed')
     except (UnidentifiedImageError, OSError, SyntaxError) as e:
-        raise ValueError('could not encode mirrored image') from e
+        raise ValueError('could not encode the edited image') from e
     return payload
 
 
-def mirror_image(user_id, image_id):
-    """Permanently mirror one owned dataset image horizontally.
+def _mirrored_image_bytes(path):
+    """Horizontal mirror — kept as a named wrapper for the mirror lane."""
+    return transformed_image_bytes(path, ImageOps.mirror)
 
-    Returns ``None`` for an unknown/foreign row, otherwise a cache-bust payload.
-    The filename and all semantic/provenance metadata remain stable.  Only
-    watermark metadata is cleared because its pixel coordinates are no longer
-    valid after a horizontal flip.
+
+#: The only turns we offer, in degrees CLOCKWISE. Anything else is refused: a
+#: free-angle rotation would need padding or cropping (it invents or drops
+#: pixels), which is a different feature from "this photo is on its side".
+ROTATION_DEGREES = (90, 180, 270)
+
+#: Clockwise degrees -> Pillow transpose op. Pillow's ROTATE_* names are
+#: COUNTER-clockwise, so 90 clockwise is ROTATE_270. These are exact pixel
+#: permutations: no resampling, no interpolation, no pixel invented.
+_ROTATE_OPS = {
+    90: Image.Transpose.ROTATE_270,
+    180: Image.Transpose.ROTATE_180,
+    270: Image.Transpose.ROTATE_90,
+}
+
+
+def normalize_rotation(degrees):
+    """Fold any int to 0/90/180/270 clockwise, or raise ValueError.
+
+    Accepts negatives (-90 == 270) and multiples of 360 so callers can pass a
+    delta without doing the modulo themselves.
     """
-    lock = _IMAGE_MIRROR_LOCKS[
-        hash((str(user_id), image_id)) % len(_IMAGE_MIRROR_LOCKS)]
+    try:
+        value = int(degrees)
+    except (TypeError, ValueError):
+        raise ValueError('rotation must be 90, 180 or 270 degrees') from None
+    value %= 360
+    if value % 90:
+        raise ValueError('rotation must be 90, 180 or 270 degrees')
+    return value
+
+
+def rotate_transform(degrees):
+    """The PIL transform for a normalised clockwise angle (0 => identity)."""
+    op = _ROTATE_OPS.get(normalize_rotation(degrees))
+    if op is None:
+        return lambda image: image
+    return lambda image: image.transpose(op)
+
+
+def _rotated_image_bytes(path, degrees):
+    """Rotate ``path`` clockwise by ``degrees`` in memory, format preserved."""
+    if normalize_rotation(degrees) == 0:
+        raise ValueError('rotation must be 90, 180 or 270 degrees')
+    return transformed_image_bytes(path, rotate_transform(degrees))
+
+
+def _edit_image_in_place(user_id, image_id, make_payload, *, tag):
+    """Promote a re-encoded copy of one owned dataset image over its own file.
+
+    ``make_payload(path) -> bytes`` prepares the new bytes; this owns everything
+    that makes the swap safe — the per-image lock, the "did something else touch
+    the file while we worked" check, the atomic replace and the watermark
+    metadata rollback. Mirror and rotation share it verbatim so a fix to one is
+    a fix to both.
+    """
+    lock = _IMAGE_PIXEL_EDIT_LOCKS[
+        hash((str(user_id), image_id)) % len(_IMAGE_PIXEL_EDIT_LOCKS)]
     with lock:
         img = _owned_image(user_id, image_id)
         if not img:
@@ -1528,7 +1633,7 @@ def mirror_image(user_id, image_id):
 
         try:
             before = os.stat(path)
-            payload = _mirrored_image_bytes(path)
+            payload = make_payload(path)
         except ValueError:
             raise
         except OSError as e:
@@ -1538,7 +1643,7 @@ def mirror_image(user_id, image_id):
         try:
             try:
                 fd, tmp_path = tempfile.mkstemp(
-                    prefix=f'.{os.path.basename(path)}.mirror-', suffix='.tmp',
+                    prefix=f'.{os.path.basename(path)}.{tag}-', suffix='.tmp',
                     dir=os.path.dirname(path),
                 )
                 with os.fdopen(fd, 'wb') as fh:
@@ -1549,16 +1654,17 @@ def mirror_image(user_id, image_id):
                 with Image.open(tmp_path) as check:
                     check.verify()
             except (UnidentifiedImageError, OSError, SyntaxError) as e:
-                raise RuntimeError('could not prepare mirrored image') from e
+                raise RuntimeError(f'could not prepare the {tag} result') from e
 
             # Do not overwrite a crop/clean that raced this preparation outside
-            # the mirror lock.  (All mirror requests themselves are serialized.)
+            # the edit lock.  (Mirror and rotation share the SAME stripe, so two
+            # pixel edits of one image can never read the same source twice.)
             try:
                 current = os.stat(path)
             except OSError as e:
                 raise RuntimeError('image file missing') from e
             if (current.st_mtime_ns, current.st_size) != (before.st_mtime_ns, before.st_size):
-                raise RuntimeError('image changed while mirroring; retry')
+                raise RuntimeError('image changed while editing; retry')
 
             watermark_snapshot = (
                 img.watermark_state, img.watermark_bbox, img.watermark_regions)
@@ -1585,7 +1691,7 @@ def mirror_image(user_id, image_id):
                     except Exception:
                         db.session.rollback()
                         logger.exception(
-                            'failed to restore watermark metadata after mirror promotion failure')
+                            'failed to restore watermark metadata after %s promotion failure', tag)
                 raise RuntimeError('could not update image file') from e
 
             return {
@@ -1599,7 +1705,39 @@ def mirror_image(user_id, image_id):
                 try:
                     os.remove(tmp_path)
                 except OSError:
-                    logger.warning('could not remove mirror temp file %s', tmp_path)
+                    logger.warning('could not remove %s temp file %s', tag, tmp_path)
+
+
+def mirror_image(user_id, image_id):
+    """Permanently mirror one owned dataset image horizontally.
+
+    Returns ``None`` for an unknown/foreign row, otherwise a cache-bust payload.
+    The filename and all semantic/provenance metadata remain stable.  Only
+    watermark metadata is cleared because its pixel coordinates are no longer
+    valid after a horizontal flip.
+    """
+    return _edit_image_in_place(
+        user_id, image_id, _mirrored_image_bytes, tag='mirror')
+
+
+def rotate_image(user_id, image_id, degrees):
+    """Permanently rotate one owned dataset image by 90/180/270° CLOCKWISE.
+
+    Same contract as :func:`mirror_image` — ``None`` for an unknown/foreign row,
+    otherwise a cache-bust payload; the filename and every semantic/provenance
+    field stay put, and only the watermark metadata is cleared (its normalised
+    bbox is expressed in the OLD frame and a quarter turn invalidates it).
+
+    A quarter turn is an exact pixel permutation, so nothing is resampled; what
+    it costs is the re-encode of the container (see ``transformed_image_bytes``),
+    which is pixel-exact for PNG/WEBP and lossy for JPEG.
+    """
+    turn = normalize_rotation(degrees)
+    if turn == 0:
+        raise ValueError('rotation must be 90, 180 or 270 degrees')
+    return _edit_image_in_place(
+        user_id, image_id, lambda path: _rotated_image_bytes(path, turn),
+        tag='rotate')
 
 
 def delete_image(user_id, image_id):
@@ -2373,7 +2511,8 @@ def _ref_crop_source_path(ds) -> str:
 
 
 def crop_reference(user_id, dataset_id, x, y, w, h):
-    """Manually crop the dataset reference to (x,y,w,h), resized to 1024. The box is
+    """Manually crop the dataset reference to (x,y,w,h), long side capped at 1024
+    (never enlarged). The box is
     in the ORIGINAL's pixel space (the editor shows the original), and we write the
     derived square to ref_filename WITHOUT touching the original — so the user can
     re-crop wider or tighter any number of times."""
@@ -2800,11 +2939,12 @@ def dataset_payload(user_id, dataset_id):
             .order_by(FaceDatasetImage.id.desc()).all())
     ref_size = image_pixel_size(_ref_path(ds)) if ds.ref_filename else None
     comp = {'face': 0, 'bust': 0, 'body': 0, 'back': 0}
-    # Combien, PAR bucket, sont des crops fortement agrandis (upscale_ratio >=
-    # UPSCALE_WARN_THRESHOLD) plutôt que du natif : le compte `comp` seul traite un
-    # gros plan natif et un gros plan upscalé x3 comme équivalents vis-à-vis de la
-    # cible — ce sous-compte permet à l'UI de signaler un dataset qui « remplit »
-    # sa cible face/bust surtout avec de la texture fabriquée par le resize.
+    # Combien, PAR bucket, viennent d'une box bien plus petite que la résolution
+    # d'entraînement (upscale_ratio >= UPSCALE_WARN_THRESHOLD) plutôt que d'une prise
+    # native : le compte `comp` seul traite un gros plan natif et un gros plan
+    # recadré x3 comme équivalents vis-à-vis de la cible — ce sous-compte permet à
+    # l'UI de signaler un dataset qui « remplit » sa cible face/bust surtout en
+    # recadrant (texture agrandie à l'import, ou tuile sous-résolue en manuel).
     comp_upscaled = {'face': 0, 'bust': 0, 'body': 0, 'back': 0}
     for i in imgs:
         # Composition counts only usable images: rejected and failed ones don't
@@ -2977,7 +3117,14 @@ def write_image_atomic(path, data: bytes) -> None:
 def normalize_to_webp(image_bytes: bytes, size: int = 1024) -> bytes:
     """Resize so the longest side ≤ `size`, KEEP the aspect ratio (no square pad),
     return WEBP. Un plan corps reste en portrait (pas de bandes noires que le
-    LoRA apprendrait). ai-toolkit gère le bucketing."""
+    LoRA apprendrait). ai-toolkit gère le bucketing.
+
+    DERIVATIVE ON PURPOSE — this is INGEST/TRANSPORT (the downscaled copy handed to
+    a generation engine, and the normalisation of freshly generated bytes), not an
+    edit of an image the user already curated. It must NOT be routed through
+    `image_encoding`: inflating an ingest copy 4x to protect pixels the generator
+    re-encodes anyway buys nothing. See the module docstring of `image_encoding`
+    for the split."""
     im = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     im.thumbnail((size, size), Image.LANCZOS)
     out = io.BytesIO()
@@ -3096,7 +3243,12 @@ def face_crop_to_square_webp(image_bytes: bytes, size: int = 1024, pad: float = 
     `return_detected` so existing 2-tuple callers (the /ref route) are unaffected.
 
     `use_vision=False` -> skip the bbox detection entirely (fast pure-PIL centered
-    square, no GPU window needed) — the manual-first reference flow."""
+    square, no GPU window needed) — the manual-first reference flow.
+
+    INGEST, not an edit: this runs once on the bytes being IMPORTED, and its name is
+    part of its contract (callers write the result to a `.webp`). Re-cropping that
+    reference afterwards goes through `_crop_resize_file`, which does preserve the
+    format losslessly."""
     im = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     W, H = im.size
     norm = detect_head_bbox(image_bytes) if use_vision else None
@@ -4966,11 +5118,21 @@ def _preserve_original(path) -> None:
 
 
 def _apply_watermark_crop(path, box) -> bool:
-    """Crop `path` to `box` (left,top,right,bottom px) and re-save WEBP q92 WITHOUT
-    resizing -- the whole point of the crop route is that it invents no pixel (the
-    aspect-ratio change is absorbed by ai-toolkit's bucketing). Returns bool."""
+    """Crop `path` to `box` (left,top,right,bottom px) WITHOUT resizing -- the whole
+    point of the crop route is that it invents no pixel (the aspect-ratio change is
+    absorbed by ai-toolkit's bucketing). Returns bool.
+
+    Because nothing is resampled here, and the source format is now preserved and
+    re-encoded without loss (`image_encoding`), this is the one edit that is exactly
+    lossless end to end: the surviving pixels come out byte-identical. It used to be
+    re-saved as WEBP q92, which quietly re-compressed the ENTIRE image to remove a
+    band at its edge."""
     try:
-        im = Image.open(path).convert('RGB')
+        with Image.open(path) as opened:
+            fmt = image_encoding.format_for_path(path, opened)
+            opened.load()
+            icc = _valid_icc_profile(opened.info.get('icc_profile'))
+            im = opened.copy()
     except (OSError, ValueError):
         return False
     box = (max(0, int(box[0])), max(0, int(box[1])),
@@ -4978,7 +5140,8 @@ def _apply_watermark_crop(path, box) -> bool:
     if box[2] - box[0] < 1 or box[3] - box[1] < 1:
         return False
     out = io.BytesIO()
-    im.crop(box).save(out, 'WEBP', quality=92)
+    image_encoding.save_edit(im.crop(box), out, fmt, image_encoding.LOSSLESS,
+                             icc_profile=icc)
     with open(path, 'wb') as fh:
         fh.write(out.getvalue())
     return True

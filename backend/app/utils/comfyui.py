@@ -36,6 +36,8 @@ import requests
 from flask import current_app
 
 from .. import config as cfg
+from . import comfy_names
+from .comfy_names import local_model_path
 
 logger = logging.getLogger(__name__)
 
@@ -430,6 +432,30 @@ def queue_prompt_to_comfyui(prompt_workflow, client_id, worker_url=None):
         except Exception as e:
             logger.error(f"Error checking for Ollama dependency: {e}")
 
+    # Model-file widgets: respell them the way THIS ComfyUI spells them, because
+    # its validator does an exact string match and nothing else (execution.py:
+    # `val not in combo_options`). The separator is a property of ComfyUI's HOST,
+    # never of ours: measured, a Windows ComfyUI publishes
+    # 'Krea\krea2_turbo_fp8.safetensors' and a Linux one 'Krea/krea2…' — so both
+    # a hardcoded backslash (which is what shipped, and made Linux generate
+    # NOTHING: GitHub #21, 1Tomber) and a hardcoded forward slash (which would
+    # take out every Windows install) are wrong. `/object_info` already tells us,
+    # and it is the same cached payload the two preflights below read, so this
+    # costs no extra request.
+    #
+    # Local only for the LIST — /object_info is fetched from api_address(), so a
+    # remote worker must not be judged against the local install's models. It
+    # still gets the os.sep fallback, which is what it had before.
+    try:
+        listed = fetch_object_info_model_files() if is_local else None
+        prompt_workflow, respelled = comfy_names.canonical_model_widgets(
+            prompt_workflow, listed)
+        if respelled:
+            logger.info('Model widget names respelled for the target ComfyUI: %d',
+                        respelled)
+    except Exception as e:      # a naming helper must never be what blocks a job
+        logger.warning(f"Model-name canonicalisation skipped: {e}")
+
     # Capability preflight on the graph itself, LOCAL only. Our workflows pin widget
     # values (a scheduler, a sampler, a dtype) that a given install only accepts if
     # it is recent enough or loaded the node pack that registers them. Left alone,
@@ -690,6 +716,105 @@ _OBJECT_INFO_TTL = 60
 _object_info_cache = {"data": None, "timestamp": 0, "key": None, "enums": None,
                       "files": None}
 
+# --- /object_info timeout budget --------------------------------------------
+# WHY ONLY THIS ONE IS A SETTING (the other ComfyUI timeouts in this file were
+# audited at the same time, and deliberately left alone):
+#
+#   /object_info   ~MB, and GROWS with the install — every node class and every
+#                  model file the user has. THE defect: any constant is wrong for
+#                  somebody, and wrong for exactly the people with the richest
+#                  ComfyUI. Fixed below.
+#   /prompt (10s)  request is the graph, response is one id. Size is bounded by
+#                  OUR workflow, not by the user's install. Also a WRITE: a longer
+#                  budget on a retry-capable path buys duplicate submissions, not
+#                  reliability.
+#   /history/<id>  one prompt's outputs. Bounded.
+#   /queue, /interrupt, /free   constant-size control calls.
+#   /view (60s, streamed)       an image download; already generous.
+#   capabilities._http_ok on /history (3s)  the reachability VERDICT. It has to
+#                  stay snappy — it runs on every capability poll and gates the
+#                  whole UI. Its problem was never the number, it was that a
+#                  3 s miss was reported as "ComfyUI isn't running"; it now asks
+#                  this probe (the one that waited long enough to know) instead.
+#
+# So: one honest knob, not five guessed ones.
+# Two DIFFERENT budgets, because "ComfyUI is off" and "ComfyUI is slow" are two
+# different failures and one number cannot serve both:
+#
+#   * CONNECT — how long we wait for the TCP handshake. A ComfyUI that isn't
+#     running refuses the connection instantly on loopback, and a wrong host /
+#     firewalled port fails here. This is the ONLY budget an absent ComfyUI ever
+#     pays, which is what makes the read budget below safe to make generous: the
+#     old single 8 s number had to be small *because* it was also the price of a
+#     stopped ComfyUI. Splitting them removes that trade-off entirely.
+#   * READ — how long ComfyUI may spend BUILDING the answer once it has accepted
+#     the connection. This is the number that has to scale with the install: the
+#     /object_info payload lists every node class and every model file, so it
+#     grows with the custom-node packs and the weights the user has installed.
+#     Configurable (`comfyui.object_info_timeout_s`) because no constant can be
+#     right for every install — that is the whole lesson of this bug.
+_OBJECT_INFO_CONNECT_TIMEOUT = 3
+_OBJECT_INFO_TIMEOUT_MIN = 5
+_OBJECT_INFO_TIMEOUT_MAX = 300
+
+# A FAILED probe is cached too, for a much shorter window than a successful one.
+# It used to be cached not at all ("fail-open, retried at once"), which is a fine
+# intention and a bad mechanism: nothing retried the SAME call, but every other
+# caller re-fired the full payload. On an install where /object_info takes 15 s,
+# the capability poll, the Studio preflight and each generate therefore each paid
+# it in full, back to back — and because ComfyUI builds that answer on its own
+# event loop, our own storm of probes is what kept the cheap `/history`
+# reachability check timing out. THAT is how a slow ComfyUI came to be reported
+# as a stopped one. One failure now silences the storm for a few seconds; every
+# consumer still fails OPEN, so this can only ever make the app decide FASTER,
+# never differently, and `clear_model_caches()` drops it on demand.
+_OBJECT_INFO_FAIL_TTL = 20
+# Outcome of the last real ATTEMPT (a cache hit is not an attempt and never
+# rewrites it). Doubles as the negative cache: `status != 'ok'` within
+# _OBJECT_INFO_FAIL_TTL of `timestamp`, for the same api address, is served
+# without a request.
+_object_info_last = {"timestamp": 0, "key": None, "status": "unknown", "waited": 0}
+
+
+def object_info_timeout() -> int:
+    """Seconds ComfyUI may spend answering /object_info, from
+    `comfyui.object_info_timeout_s`, clamped to 5-300.
+
+    Total by construction (never raises, never returns None): an unreadable or
+    absurd value falls back to the shipped default rather than disabling a probe
+    the whole app leans on."""
+    default = 45
+    try:
+        default = int((cfg.DEFAULTS.get('comfyui') or {}).get('object_info_timeout_s', 45))
+    except (TypeError, ValueError):      # pragma: no cover - DEFAULTS is ours
+        pass
+    raw = cfg.get('comfyui.object_info_timeout_s')
+    if raw is None or isinstance(raw, bool):
+        return default
+    try:
+        value = int(float(raw))
+    except (TypeError, ValueError):
+        logger.warning('ignoring unusable comfyui.object_info_timeout_s %r', raw)
+        return default
+    return max(_OBJECT_INFO_TIMEOUT_MIN, min(_OBJECT_INFO_TIMEOUT_MAX, value))
+
+
+def object_info_health() -> dict:
+    """What the LAST /object_info attempt did, so a caller can tell the two causes
+    apart instead of collapsing them into "ComfyUI isn't running":
+
+      status 'ok'          — answered.
+      status 'timeout'     — the connection was ACCEPTED and ComfyUI then took
+                             longer than `waited` seconds to produce the payload.
+                             It is running; it is slow at enumerating itself.
+      status 'unreachable' — nothing accepted the connection (or it died mid-read).
+      status 'unknown'     — never probed since startup / a cache clear.
+
+    `waited` is the read budget that was in force, so a message can quote the
+    number the user would raise."""
+    return {'status': _object_info_last['status'],
+            'waited': _object_info_last['waited'] or object_info_timeout()}
+
 # Widget inputs whose accepted values describe what a ComfyUI install CAN DO — a
 # capability that depends on its version and on the node packs it loaded — as
 # opposed to what it HAPPENS TO HAVE on disk (`ckpt_name`, `unet_name`,
@@ -736,15 +861,12 @@ ENUM_VALUE_SOURCES = {
 # lists ONLY for the loader classes our own graphs actually emit, not for every
 # pack installed. `UnetLoaderGGUF` is listed so its presence is observable — NOT
 # because our graphs use it (they do not; see `_GGUF_PACK`).
-_MODEL_FILE_CLASSES = frozenset({
-    'UNETLoader', 'CheckpointLoaderSimple', 'VAELoader', 'CLIPLoader',
-    'DualCLIPLoader', 'LoraLoaderModelOnly', 'LoraLoader', 'ControlNetLoader',
-    'UnetLoaderGGUF', 'UnetLoaderGGUFAdvanced', 'CLIPLoaderGGUF', 'DualCLIPLoaderGGUF',
-})
-_MODEL_FILE_INPUTS = frozenset({
-    'unet_name', 'ckpt_name', 'vae_name', 'clip_name', 'clip_name1', 'clip_name2',
-    'lora_name', 'control_net_name', 'style_model_name',
-})
+#
+# Defined in utils.comfy_names, which also owns the emit-time canonicaliser: the
+# preflight ("does this install list the name?") and the rewrite ("spell it the
+# way this install does") must read the same two sets or they drift apart.
+_MODEL_FILE_CLASSES = comfy_names.MODEL_FILE_CLASSES
+_MODEL_FILE_INPUTS = comfy_names.MODEL_FILE_INPUTS
 
 # Reported by naniii2352 (Discord, displayed name Dexter): a Krea 2 model
 # quantised to GGUF (`krea2_turbo-Q4_K_M.gguf`) that no folder would make work.
@@ -791,22 +913,23 @@ def _distill_object_info(data):
     return out
 
 
-def _normalise_model_name(name):
-    """Comparison key for a ComfyUI model file name.
-
-    ComfyUI joins a subfolder with the HOST's os.sep (backslash on Windows,
-    forward slash in a Linux container) while several of our resolvers
-    backslash-join their own names; Windows model folders are case-insensitive.
-    Comparing raw strings would therefore report a perfectly loadable model as
-    missing on half the installs — a false positive here BLOCKS a working setup,
-    so both separators and case are flattened before deciding."""
-    return name.replace('\\', '/').casefold()
+# Comparison key for a ComfyUI model file name — see comfy_names for the why.
+# ComfyUI joins a subfolder with its OWN host's os.sep (measured: backslash on a
+# live Windows 0.27.0, forward slash on the Linux install of GitHub #21), and the
+# two ends of the wire need not be the same host, so raw comparison is never
+# right in either direction.
+_normalise_model_name = comfy_names.normalise_model_name
 
 
 def _distill_model_files(data):
-    """{class_type: {input_name: frozenset(names)}} for the FILE inputs of the
-    loader classes we ship (`_MODEL_FILE_CLASSES` / `_MODEL_FILE_INPUTS`), with
-    names normalised by `_normalise_model_name`.
+    """{class_type: {input_name: {normalised_name: PUBLISHED name}}} for the FILE
+    inputs of the loader classes we ship (`_MODEL_FILE_CLASSES` /
+    `_MODEL_FILE_INPUTS`).
+
+    A mapping and not a set of keys: since GitHub #21 we do not only ask "does
+    this install list the model?", we also need to WRITE BACK the exact string it
+    published, because that is the only spelling its validator accepts. `in`
+    still reads the keys, so every existing caller is unchanged.
 
     Restricted to those classes on purpose: this is the half of /object_info the
     enum view drops wholesale for size, and a node-rich install repeats the same
@@ -827,41 +950,64 @@ def _distill_model_files(data):
                         continue
                     choices = decl[0] if isinstance(decl, (list, tuple)) and decl else None
                     if isinstance(choices, list) and all(isinstance(v, str) for v in choices):
-                        combos[name] = frozenset(_normalise_model_name(v) for v in choices)
+                        combos[name] = {_normalise_model_name(v): v for v in choices}
         if combos:
             out[cls] = combos
     return out
 
 
-def _fetch_object_info(timeout=8):
+def _fetch_object_info(timeout=None):
     """(classes, enums, model_files) from ONE `GET /object_info`, all three served
     by the same short TTL cache — the payload is the heaviest probe in the app, so
     the checks below must never cost a second request. (None, None, None) on any
-    failure."""
+    failure.
+
+    `timeout` is the READ budget in seconds; None (the normal case) reads
+    `object_info_timeout()`. The connect budget is separate and fixed — see
+    _OBJECT_INFO_CONNECT_TIMEOUT."""
     addr = api_address()
     now = time.time()
     if (_object_info_cache["data"] is not None and _object_info_cache["key"] == addr
             and now - _object_info_cache["timestamp"] < _OBJECT_INFO_TTL):
         return (_object_info_cache["data"], _object_info_cache["enums"],
                 _object_info_cache["files"])
+    if (_object_info_last["status"] not in ('ok', 'unknown')
+            and _object_info_last["key"] == addr
+            and now - _object_info_last["timestamp"] < _OBJECT_INFO_FAIL_TTL):
+        # Negative cache: one failure answers the burst behind it. See
+        # _OBJECT_INFO_FAIL_TTL — every consumer of this already fails OPEN.
+        return None, None, None
+    read_budget = int(timeout) if timeout else object_info_timeout()
     try:
-        resp = requests.get(urljoin(addr, '/object_info'), timeout=timeout)
+        resp = requests.get(urljoin(addr, '/object_info'),
+                            timeout=(_OBJECT_INFO_CONNECT_TIMEOUT, read_budget))
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
-        logger.warning(f"fetch_object_info_classes failed: {e}")
-        # a failed probe is never cached (fail-open, retried at once)
+        # 'timeout' = the connection was accepted and ComfyUI then took too long to
+        # build the payload — it IS running, it is slow at enumerating itself. Any
+        # other failure means nothing answered. Collapsing the two is the bug this
+        # split exists to kill: a user was sent to check whether ComfyUI was started
+        # while it was, in fact, started and busy (j_o_e_l., Discord).
+        status = 'timeout' if isinstance(e, requests.exceptions.ReadTimeout) else 'unreachable'
+        _object_info_last.update(timestamp=now, key=addr, status=status,
+                                 waited=read_budget)
+        logger.warning('fetch_object_info failed (%s, %ss budget): %s',
+                       status, read_budget, e)
         return None, None, None
     if not isinstance(data, dict):
+        _object_info_last.update(timestamp=now, key=addr, status='unreachable',
+                                 waited=read_budget)
         return None, None, None
     classes, enums = set(data.keys()), _distill_object_info(data)
     files = _distill_model_files(data)
     _object_info_cache.update(data=classes, timestamp=now, key=addr, enums=enums,
                               files=files)
+    _object_info_last.update(timestamp=now, key=addr, status='ok', waited=read_budget)
     return classes, enums, files
 
 
-def fetch_object_info_classes(timeout=8):
+def fetch_object_info_classes(timeout=None):
     """Set of node `class_type` names the target ComfyUI exposes = the KEYS of
     `GET /object_info`. Used by the Studio preflight to tell a required CUSTOM
     node (e.g. the Krea rebalance / detail-daemon nodes a workflow
@@ -877,11 +1023,15 @@ def fetch_object_info_classes(timeout=8):
     Studio run asks for it twice (grid preflight + per-run class resolution). The node
     set only changes when ComfyUI restarts or a pack is installed; the refresh-models
     button (`clear_model_caches`) drops the cache, so a freshly installed node is
-    visible on demand rather than after the TTL."""
+    visible on demand rather than after the TTL.
+
+    HOW LONG it may take is a setting, not a constant: 8.8 MB / ~5 s is one
+    install's number, and the payload grows with every node pack and every model
+    file the user adds. See `object_info_timeout()`."""
     return _fetch_object_info(timeout)[0]
 
 
-def fetch_object_info_model_files(timeout=8):
+def fetch_object_info_model_files(timeout=None):
     """{class_type: {input_name: frozenset(normalised names)}} for the model-FILE
     inputs of the loader classes we ship, from the SAME cached /object_info as the
     class and enum views — never a second request.
@@ -890,7 +1040,7 @@ def fetch_object_info_model_files(timeout=8):
     return _fetch_object_info(timeout)[2]
 
 
-def fetch_object_info_enums(timeout=8):
+def fetch_object_info_enums(timeout=None):
     """{class_type: {input_name: frozenset(accepted values)}} for the capability
     inputs (see `_VERSION_SENSITIVE_INPUTS`), from the SAME cached /object_info as
     `fetch_object_info_classes` — never a second request.
@@ -1149,20 +1299,24 @@ def family_of_lora(filename: str) -> str | None:
     entraînés atterrissent dans ``loras/sdxl``, ``loras/krea`` ou ``loras/z image``
     (cf. lora_training._lora_dest_dir). La famille est donc une fonction du chemin —
     pas besoin de la stocker en base. Renvoie None si pas de préfixe de dossier connu."""
-    low = (filename or '').replace('/', '\\').lower()
-    if low.startswith('sdxl\\'):
+    # Comparaison, pas un chemin : le nom arrive dans l'une OU l'autre convention
+    # (Windows, Linux, valeur relue d'une config écrite sur l'autre OS), donc on
+    # aplatit d'abord sur '/' — le même pivot que comfy_names.normalise_model_name,
+    # pour qu'il n'y ait qu'UNE forme normalisée dans toute l'app.
+    low = (filename or '').replace('\\', '/').lower()
+    if low.startswith('sdxl/'):
         return 'sdxl'
-    if low.startswith('krea\\'):
+    if low.startswith('krea/'):
         return 'krea'
-    # flux2klein AVANT flux par lisibilité seulement : « flux\\ » exige le backslash
-    # juste après « flux », donc « flux2klein\\x » ne le matche pas — pas d'ambiguïté.
-    if low.startswith('flux2klein\\'):
+    # flux2klein AVANT flux par lisibilité seulement : « flux/ » exige le séparateur
+    # juste après « flux », donc « flux2klein/x » ne le matche pas — pas d'ambiguïté.
+    if low.startswith('flux2klein/'):
         return 'flux2klein'
-    if low.startswith('flux\\'):
+    if low.startswith('flux/'):
         return 'flux'
-    if low.startswith('anima\\'):
+    if low.startswith('anima/'):
         return 'anima'
-    if low.startswith(('z image\\', 'zimage\\', 'z-image\\')):
+    if low.startswith(('z image/', 'zimage/', 'z-image/')):
         return 'zimage'
     return None
 
@@ -1494,15 +1648,21 @@ def resolve_checkpoint_ckpt_name(name):
     """Map a checkpoint BASENAME (as returned by get_checkpoint_models, which strips
     the folder via os.path.basename) to the path RELATIVE to models/checkpoints that
     ComfyUI's CheckpointLoaderSimple expects, e.g. 'bigLove_photo5.safetensors' ->
-    'Biglove\\bigLove_photo5.safetensors', but 'sam3.1_…' stays at the root.
+    'Biglove/bigLove_photo5.safetensors' on Linux, 'Biglove\\bigLove_photo5.safetensors'
+    on Windows, but 'sam3.1_…' stays at the root.
 
     Without this the loader rejects the prompt (400 'value_not_in_list'). Names that
-    already contain a separator (already a relative path) are returned unchanged;
-    unknown names — or an unconfigured ComfyUI output dir — fall back to themselves."""
+    already contain a separator (already a relative path) keep their segments;
+    unknown names — or an unconfigured ComfyUI output dir — fall back to themselves.
+
+    The separator is the one of the tree we WALKED (os.sep), never a hardcoded
+    backslash: it used to be, and on Linux that made every subfoldered checkpoint
+    unloadable (GitHub #21, 1Tomber). `queue_prompt_to_comfyui` has the last word
+    and respells this against the target install's published list."""
     if not name:
         return name
     if "\\" in name or "/" in name:
-        return name.replace("/", "\\")
+        return local_model_path(name)
     out_dir = _out_dir()
     if not out_dir:
         return name
@@ -1510,8 +1670,7 @@ def resolve_checkpoint_ckpt_name(name):
         ck_dir = os.path.normpath(os.path.join(out_dir, "..", "models", "checkpoints"))
         for root, _dirs, files in os.walk(ck_dir):
             if name in files:
-                rel = os.path.relpath(os.path.join(root, name), ck_dir)
-                return rel.replace("/", "\\")
+                return os.path.relpath(os.path.join(root, name), ck_dir)
     except OSError:
         pass
     return name
@@ -1523,8 +1682,10 @@ _zimage_models_cache = {"data": None, "timestamp": 0}
 def get_zimage_models():
     """List Z-Image UNET checkpoints: .safetensors files under a 'z image'
     subfolder of models/unet or models/diffusion_models. Returns names in the
-    UNETLoader form (relative to the base dir, backslash-joined), e.g.
-    'z image\\bigLove_zt3.safetensors'. Cached with the shared TTL. Returns []
+    UNETLoader form — relative to the base dir, joined with the separator of the
+    tree we walked (os.sep), e.g. 'z image\\bigLove_zt3.safetensors' on Windows
+    and 'z image/bigLove_zt3.safetensors' on Linux; the queue respells it against
+    the target ComfyUI's own list. Cached with the shared TTL. Returns []
     when ComfyUI's output dir isn't configured yet."""
     current_time = time.time()
     if (_zimage_models_cache["data"] is not None
@@ -1546,8 +1707,7 @@ def get_zimage_models():
                         continue
                     for f in files:
                         if f.lower().endswith((".safetensors", ".gguf", ".sft")):
-                            rel = f if rel_dir == "." else os.path.join(rel_dir, f)
-                            out.append(rel.replace("/", "\\"))
+                            out.append(f if rel_dir == "." else os.path.join(rel_dir, f))
             out = sorted(set(out))
         except Exception as e:
             logger.error(f"get_zimage_models error: {e}")
@@ -1563,7 +1723,9 @@ def get_krea_models():
     """List Krea 2 UNET checkpoints: le défaut du workflow (krea2_turbo_fp8.safetensors
     à la racine de models/unet ou models/diffusion_models) + tout .safetensors/.gguf
     sous un sous-dossier 'krea' (ex. 'Krea\\monKrea.safetensors'). Noms en forme
-    UNETLoader (relatifs au dossier de base, backslash). Cache TTL partagé. Vide si
+    UNETLoader (relatifs au dossier de base, séparateur de l'arbre parcouru =
+    os.sep ; la file d'attente les réécrit selon la liste publiée par le ComfyUI
+    ciblé). Cache TTL partagé. Vide si
     ComfyUI n'est pas encore configuré."""
     current_time = time.time()
     if (_krea_models_cache["data"] is not None
@@ -1587,7 +1749,7 @@ def get_krea_models():
                         continue
                     for f in files:
                         if f.lower().endswith((".safetensors", ".gguf", ".sft")):
-                            out.append(os.path.join(rel_dir, f).replace("/", "\\"))
+                            out.append(os.path.join(rel_dir, f))
             out = sorted(set(out))
         except Exception as e:
             logger.error(f"get_krea_models error: {e}")
@@ -1613,6 +1775,9 @@ def clear_model_caches() -> None:
             c["key"] = None
         if "enums" in c:      # the enum view rides the same /object_info payload
             c["enums"] = None
+    # The NEGATIVE /object_info cache goes with them: "I just started ComfyUI /
+    # just changed the URL, refresh" must re-probe now, not in 20 s.
+    _object_info_last.update(timestamp=0, key=None, status='unknown', waited=0)
 
 
 def get_zimage_loras():
@@ -1633,7 +1798,7 @@ def get_zimage_loras():
                 for f in sorted(files):
                     if not f.lower().endswith(".safetensors"):
                         continue
-                    rel = (f if rel_dir == "." else os.path.join(rel_dir, f)).replace("/", "\\")
+                    rel = f if rel_dir == "." else os.path.join(rel_dir, f)
                     triggers = _extract_klein_triggers(f)
                     grp, stp = trained_lora_group(f, 'zimage')
                     out.append({
@@ -1670,7 +1835,7 @@ def get_sdxl_loras():
                 for f in sorted(files):
                     if not f.lower().endswith(".safetensors"):
                         continue
-                    rel = (f if rel_dir == "." else os.path.join(rel_dir, f)).replace("/", "\\")
+                    rel = f if rel_dir == "." else os.path.join(rel_dir, f)
                     triggers = _extract_klein_triggers(f)
                     grp, stp = trained_lora_group(f, 'sdxl')
                     out.append({
@@ -1708,7 +1873,7 @@ def get_krea_loras():
                 for f in sorted(files):
                     if not f.lower().endswith(".safetensors"):
                         continue
-                    rel = (f if rel_dir == "." else os.path.join(rel_dir, f)).replace("/", "\\")
+                    rel = f if rel_dir == "." else os.path.join(rel_dir, f)
                     triggers = _extract_klein_triggers(f)
                     grp, stp = trained_lora_group(f, 'krea')
                     out.append({

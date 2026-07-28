@@ -20,9 +20,24 @@ models/text_encoders/Z image/qwen_3_4b.safetensors
 models/vae/z ae.safetensors
 ```
 
+**The text encoder and the VAE are flexible** — only the base model needs that
+sub-folder. The app resolves those two itself: any capitalisation, any separator
+and any sub-folder work, so `models/vae/z_ae.safetensors`, `models/vae/ae.safetensors`
+(the name ComfyUI's own Z-Image page uses), `text_encoders/Z Image/qwen_3_4b.safetensors`
+and a bare `text_encoders/qwen_3_4b.safetensors` are all found, including under an
+`extra_model_paths.yaml` root. **Do not rename your files to match the layout above.**
+If the app still says one is missing, the message lists what it accepted and where it
+looked; you can also pin either file by hand with the `zimage.vae` /
+`zimage.text_encoder` settings (see *Settings reference → Config-file-only settings*).
+
 A Z-Image LoRA only works on a Z-Image base — a regular SD/SDXL graph
-(20–30 steps, CFG 7) renders garbage; Z-Image-Turbo wants euler / simple /
-**8 steps / CFG 1.0** (the app's workflows already do this).
+(20–30 steps, CFG 7) renders garbage. The two Z-Image builds then want opposite
+sampler settings, and the Test Studio proposes the right pair per base model:
+**Z-Image-Turbo** is guidance-distilled and wants euler / simple / **8 steps /
+CFG 1.0**, while the non-distilled **Z-Image Base** needs roughly **30–50 steps at
+CFG 3–5** (ComfyUI's own recommendation) — run Base at CFG 1 and it renders mush.
+Those are starting points on a sweepable axis, not measured optima: the Studio grid
+exists to let you find yours.
 
 ## "No SDXL checkpoint found" on a fresh install
 
@@ -161,6 +176,32 @@ captioning through Ollama, training, and Hugging Face publishing. Only the
 ComfyUI engines need the filesystem.
 
 *(Reported by nofaceman on Discord.)*
+
+## "Value not in list" on every model, on Linux (fixed)
+
+**Symptom:** on a Linux install, nothing generated at all. ComfyUI's console showed,
+for every workflow:
+
+```
+Failed to validate prompt for output 28:
+* UNETLoader 20:
+  - Value not in list: unet_name: 'Krea\krea2_turbo_fp8.safetensors'
+    not in ['Krea/krea2_turbo_fp8.safetensors']
+```
+
+**Why:** ComfyUI builds its model lists with the separator of **its own** host —
+backslash on Windows, forward slash on Linux — and validates a model widget by
+exact string match. The app spelled those names with a Windows backslash whatever
+the platform, and it keeps every model in a subfolder (`Krea`, `klein`,
+`z image`, and every LoRA you train), so on Linux the answer was "nothing works"
+rather than "one model is missing".
+
+**Fixed:** the app now reads the spelling from the ComfyUI it is actually talking
+to and matches it. This also covers the reverse case — the app on Windows driving
+a ComfyUI in WSL, Docker or on another machine, which needs forward slashes — so
+there is nothing to configure either way.
+
+*(Found and diagnosed by 1Tomber, [GitHub #21](https://github.com/perfectgf/lora-dataset-studio/issues/21).)*
 
 ## Klein engine stays greyed out
 

@@ -272,6 +272,28 @@ touching the folder itself:
    keep/reject decisions, scores and captions are never touched. Files you
    removed from the folder are reported at the top of the bank, never deleted
    from it, so an unplugged drive can't wipe your triage.
+1bis. **Scrape the web into a bank** — you don't need a folder you prepared
+   by hand. Unfold **Scrape the web into a bank** on the bank list, choose a
+   destination (a **new bank**, or **add to an existing one**), then scan a
+   gallery URL and pick images exactly as you would for a dataset. They are
+   downloaded into that bank's own folder and inventoried on the spot.
+
+   Two things are worth knowing, because they are the whole point:
+
+   - **Nothing is filtered on the way in.** Scraping straight into a *dataset*
+     applies training-grade gates (short side ≥ 768 px, ratio ≤ 3:1, perceptual
+     de-duplication) *before* anything is stored. A bank is the step **before**
+     that judgement: "too small", "near-duplicate" and "wrong framing" are
+     verdicts its own passes produce, with thresholds you move. So the bank
+     stores what it downloaded and lets you decide. If you already know what you
+     are collecting, scraping straight into a dataset is still the shorter road.
+   - **A second scrape resumes the same bank.** Pick *Add to an existing bank*
+     and the new images join the pile — nothing is replaced, and no triage
+     decision you already made is reset. Re-downloading the exact same file
+     lands on the same name instead of piling up copies; that is file identity,
+     not a duplicate verdict (the bank's own passes own that word).
+
+   The rest of the funnel is unchanged: scan, cull, promote into a dataset.
 2. **Scan quality** — a background pass (CPU only, a few minutes even on
    thousands of images) scores every file: sharpness, noise, flat/empty
    frames, resolution — and groups **near-duplicates**. The flags follow the
@@ -347,6 +369,9 @@ the selection bar offers two selectors that cost no extra GPU time:
   behaviour the button had before this setting existed. On a very large bank the
   first click takes a few seconds (it reads every image's neighbourhood once);
   the button says *Sampling…* while it does.
+- **⚖ Balanced pick** — see [Pick a balanced set](#pick-a-balanced-set) below: the
+  same sampling, but spread evenly over your **framings** instead of taken off
+  the top of one ranking.
 - **🎯 Similar to selected** — select **one** image as a reference, and it ranks
   everything by how much it looks like that image and selects the closest N — the
   fast way to pull one person or one look out of a mixed export.
@@ -372,6 +397,10 @@ families want 20+"*. It's **advice only** — nothing is kept or rejected — an
 pure maths on data the passes already computed, so it costs no GPU. The
 framing-balance line needs the 📐 Framing pass to have run; without it the panel
 still covers person mix, style spread and resolution and hints to run framing.
+
+The advice becomes a gesture with **⚖ Pick a balanced set…** at the bottom of
+the panel — see [Pick a balanced set](#pick-a-balanced-set).
+
 **🗑 Delete rejected from disk** (next to Promote) is the one exception to the
 "your source folder is never modified" rule, and it's opt-in. Once you're happy
 with your triage, it removes every image you marked ✕ rejected from its source
@@ -410,6 +439,42 @@ turn for the GPU rather than failing when another bank — or a training run —
 using it. A panel on the Banks page shows what's running and what's lined up, and
 lets you cancel a bank or clear the whole queue. Queue three exports before bed
 and they'll be triaged by morning.
+## Pick a balanced set
+
+Advice is only half the gesture, so **Coverage advice** ends with **Pick a
+balanced set…** (the same button sits in the **Curate** row). It answers a
+question no per-image score can ask: *does my set cover what I want to be able to
+generate?*
+
+Ask **Pick diverse** for 20 images out of a bank that is 47% full body, 35%
+bust, 12% face and 6% back views, and you get roughly those proportions — on a
+synthetic reproduction of exactly that shape it returned **0 face shots and 0
+back views**. The LoRA then renders one shot type well and the rest badly, and
+nothing ever said so. **Balanced pick** returns **5 face, 5 bust, 5 body, 5
+back** out of the same pool, each bucket filled with the *same* most-varied
+sampling — and the same **Skip the odd ones out** guard — that Pick diverse
+uses.
+
+- **Balance on** — **Framing** by default. It is the axis that carries real
+  information: on a one-subject bank, person groups are sparse and split into
+  many small, arbitrary clusters, so balancing on them spreads a selection over
+  noise. **Framing × person** is there for a dump that genuinely holds several
+  subjects.
+- **When an axis can't be satisfied**, it says so instead of quietly filling the
+  gap: *"Only 3 back images exist in this filter — an even split wanted 15"*. The
+  freed picks go to the buckets that have room, so asking for 60 still gives you
+  60 — the deficit is reported as a number, never hidden. If even that isn't
+  enough, it says how many you actually got and why.
+- **The result is always stated** — *"Selected 60 of 60 requested, spread over
+  framing: 15 face, 15 bust, 15 body, 15 back"* — as text, per bucket, next to
+  what each bucket had available. There is no chart you have to read.
+- **An unlabelled bank is the normal state**, not an error. Nothing has a framing
+  until the Framing pass has run, so the button says which pass is missing and
+  how many images it would bring in, rather than returning an empty or misleading
+  selection. Pick diverse keeps working without it.
+
+Like the other selectors it honours the current filter and search, and it only
+**selects** — nothing is kept, rejected or deleted.
 
 ## Is this image really what it says it is?
 
@@ -617,6 +682,53 @@ app's own data folder, and deleting the new bank takes them with it.
 If the copy cannot be written — a full disk, a drive pulled out — the new bank is
 **discarded** rather than left holding half the shortlist and looking finished.
 You are told what happened and nothing has changed.
+## Undo the last bulk decision
+
+A bank lets you mark hundreds of images with one click: select the whole filter
+and press ✕, apply an auto-reject at a threshold, collapse every duplicate group,
+or run Launch all. That is the point of a bank — and it is also the click you
+most want back when the threshold was wrong or the filter was not the one you
+thought.
+
+After any of those, an **↩ Undo** bar appears above the grid saying what
+happened and how many images it moved. Press it and every one of those images
+goes back to exactly what it was: its previous ✓/✕/undecided state *and* the
+reason it carried. Images the action never touched are not touched here either —
+if you had already kept a photo by hand and the bulk reject flipped it, undo puts
+it back to **kept**, not to undecided.
+
+The bar does not disappear on a timer, and it survives a page reload: the
+decision it takes back lives in the app's database, not in your browser tab. It
+stays until you use it, dismiss it, or run another bulk action.
+
+**Its limits, stated plainly.**
+
+- **One step.** Only the most recent bulk action is remembered. Run a second one
+  and it replaces the first — this is a net under the click you just made, not a
+  history of your session.
+- **Until the app restarts.** The memory is in the running app. Restart it and
+  the offer is gone; the decisions themselves are safely saved, as always.
+- **It never over-claims.** If some of the images have left the bank since (a
+  re-scan noticed the files were gone), or if you changed some of them yourself
+  in the meantime — in ▶ Review, or in another tab — those are *not* overwritten.
+  The result tells you exactly how many it restored out of how many, how many
+  are gone, and names the ones a newer decision now owns.
+
+**What is deliberately NOT offered.** Two bank actions have no undo, because a
+half-working one would be worse than none:
+
+- **Delete rejected** sends your source files to the recycle bin and drops
+  their rows with everything the passes had computed about them. Files in the
+  recycle bin are yours to restore, from your file manager — the app cannot do
+  it for you, and it will not pretend otherwise. This action also withdraws any
+  pending ↩ offer, since the images it pointed at are the ones just removed.
+- **⬆ Promote** copies images into a dataset (or a new bank) through the normal
+  import path. Un-promoting would mean deleting images in a dataset you may have
+  already captioned, cropped or trained on. Delete them there if you want them
+  gone.
+
+The rotate button needs no undo entry: turn the other way and the image is
+byte-for-byte the original again.
 ## Sort a grid to review faster
 
 Filters answer *which images*; sorting answers *which one first*. Both grids
@@ -677,6 +789,144 @@ old rows), there is no button — a short amber note says why instead, so a
 missing control can't be mistaken for a bug. Everything else in the lightbox —
 ✂ Crop, ⇄ Mirror, ✨ Upscale & improve — is unchanged and still acts on the
 image you opened.
+
+## Tune the Bank filter thresholds
+
+The filter chips (Blurry, Small, ≈ Duplicates…) are verdicts, and every
+verdict comes from a number. Those numbers used to live only in
+*Settings ▸ Captioning & quality*, three screens away from the bank you were
+triaging. They are now also under the chips themselves: open **Filter
+thresholds** above the grid.
+
+It is the **same setting in both places** — one value, seen twice — so anything
+you change here applies to **every bank**, and the panel says so at the top.
+
+The twelve knobs are grouped by the question they answer: **Image quality**,
+**Duplicates**, **Size & framing**, **Content**, **Style**. The first two are
+open by default; the rest fold away, and a folded group tells you how many of
+its values you have moved off the default.
+
+Three things each control tells you that a bare number cannot:
+
+- **Which way catches more.** "Stricter" is not a direction. *Duplicate
+  distance* is a distance in hash bits — **raise** it to catch more
+  near-duplicates. *Semantic duplicate similarity* is a similarity — **lower**
+  it to catch more. They sit side by side and they move opposite ways, so each
+  field spells its own direction out in a sentence next to the input.
+- **When it takes effect.** Eight of them re-sort the bank the moment you save,
+  because the scan stores raw measurements and the verdicts are recomputed on
+  every read — no rescan, ever. The other four are baked into stored groups by a
+  pass, so they carry a button that re-runs that pass on the spot. Re-grouping
+  duplicates is cheap: it walks the stored hashes and decodes nothing.
+- **How many images it would touch.** As you change a read-time value, the panel
+  asks the server how many images that number *would* flag and shows
+  `1 240 → 3 019 images flagged` before you save anything. Nothing is written
+  until you press **Save**.
+
+Every field has **↺ Reset to default** (it only appears when the value is not
+the default), and the header carries **↺ Reset all to defaults**. The defaults
+come from the server, so they are always the real shipped values.
+
+### What editing an image costs it
+
+Crop, ✂ Mirror, ↺ Rotate and the watermark cleaners **overwrite** the file the
+trainer will later copy verbatim, so whatever they discard is discarded for good.
+They all follow one rule: **keep the file's format and re-encode it without losing
+pixels.** A PNG stays a PNG, a WebP is rewritten losslessly (crop it ten times and the tenth
+is identical to the first), and the file keeps a name that matches what is inside
+it. JPEG is the exception nobody can fix — it has no lossless mode — so a JPEG is
+re-saved at the highest practical quality with no chroma subsampling rather than
+converted to something heavier to protect pixels that were already lossy.
+
+Two honest caveats:
+
+- **A large crop still resamples.** A box longer than 1024 px is normalised *down*
+  to a 1024 px long side, and only the *encoding* is lossless — that downscale
+  never can be. A box at or under 1024 px is a pure cut, so it is lossless end to
+  end, as is the watermark **✂ auto-crop**, which only cuts and never resizes.
+- **Files get bigger.** A cropped photo that used to weigh ~200 KB now weighs
+  ~950 KB. That is the price of not throwing pixels away. Thumbnails and the
+  copies uploaded to a generation API are unaffected: they stay small on purpose.
+
+### A crop is never enlarged
+
+A crop used to be stretched *up* to a 1024 px long side as well: select 240×180
+and the file stored was 1024×768. That enlargement invented no detail — shrinking
+such a file back recovers the real crop almost exactly — and since the encoder
+went lossless it cost roughly **6× the bytes** for nothing. A crop now keeps its
+own size, and only comes *down* to 1024 px.
+
+Two consequences worth stating plainly:
+
+- **Your dataset can end up mixing image sizes.** That is fine — training buckets
+  images by size — but a tile cropped out of a small area really does carry less
+  detail than a native shot of the same framing, and it always did; it just used
+  to look like 1024 px.
+- **The composition meter says so.** The old ⚠ *Upscaled* line is now
+  ⚠ *Under training resolution*. It fires on the same measurement and means the
+  same thing it always meant: this framing bucket is filled by cropping far into
+  photos rather than by native shots — add native shots for it. (Images imported
+  with the automatic head-crop *are* still enlarged to 1024, so both shapes land
+  under the same warning.)
+
+Images cropped **before** this change keep the enlarged pixels they have.
+
+Images you cropped **before** this changed keep the pixels they have — nothing is
+re-processed retroactively, and re-cropping an already-degraded file cannot bring
+back what the old encoder removed.
+
+## Why a ↻ re-run button is greyed out
+
+A bank runs **one pass at a time**. While a ✨ Score, a Quality scan or a
+Launch all is walking it, the ↻ buttons in this panel are disabled — and each
+one says which pass is holding the bank and how far it has got, for example
+*✨ Score pass is running on this bank — 137 / 412*. Wait for it to land, or
+press **Stop** in the ⏳ progress bar at the top of the bank; the buttons come
+back by themselves the moment the bank is free.
+
+When a re-run does start, the button reports what the pass produced right where
+you pressed it: **`Done — 12 duplicate groups · 34 images (was 9 · 26)`**. If
+your new value groups exactly the same images it says so — *unchanged* — rather
+than leaving you unable to tell a no-op from a pass that never ran.
+
+## Rotate a sideways image
+
+Scraped folders and phone exports are full of shots lying on their side. Both
+places you meet an image can turn it a quarter turn, and neither charges you for
+it. (Asked for by 1Tomber, GitHub issue #17.)
+
+**In a dataset**, open the image (click its tile) and use **↺ Rotate left** /
+**↻ Rotate right** in the bar under the picture, next to ⇄ Mirror. The file
+keeps its name, its caption, its status and its format — a PNG stays a PNG, a
+WEBP stays a WEBP. Four turns bring you back to exactly where you started:
+measured on the shipped encoder, a PNG and a WEBP come back **byte-identical**
+after going all the way round, so a mis-click costs nothing. The one exception
+is a JPEG, which the format itself forces to be re-encoded on every save: at the
+quality LDS writes (95, no chroma subsampling) that is around 46 dB PSNR — far
+below anything visible, and it barely grows with more turns — but it is not
+free, so it is worth knowing. Datasets normally hold WEBP, so this mostly
+concerns files restored from an old backup.
+
+Rotation is deliberately **not** part of ✂ Crop, even though that is where you
+might look for it first. Cropping **resamples** the image — it rescales the box
+you drew to a 1024 px long side — and resampling costs detail no matter how
+carefully the result is then saved. A quarter turn resamples nothing at all: it
+just moves existing pixels to new coordinates. Sending it through the crop lane
+would make it pay a price it does not owe.
+
+**In a bank**, your own folder is never written to — so a bank rotation does not
+touch your files at all. The turn is remembered against the image and applied to
+what the app shows you and to what it copies when you **⬆ Promote**; your
+original keeps its exact bytes, whatever you do. Select the images and use
+**↺ Rotate left** / **↻ Rotate right** in the selection bar to fix a whole
+sideways batch at once, or turn one image without leaving **▶ Review** with the
+↺ / ↻ buttons (keyboard: `[` and `]`). Rotating in Review never decides
+anything — the image stays under your cursor so you can judge it once it is the
+right way up.
+
+One caveat worth stating: the analysis passes (Subject, ✨ Score, Framing)
+still read the original file, so turning an image does **not** re-run them. Turn
+first, then run the passes if you want them to see it upright.
 
 ## Clean the watermarks a bank found
 
@@ -913,6 +1163,19 @@ at their pictures *at the same time*, which a full-screen viewer cannot do. From
 that viewer, **Pin to canvas** drops the image onto the board as a node of its
 own, joined to the checkpoint that produced it by the same connector the board
 uses for "this run continued from that checkpoint".
+**Pinning an image onto the board.** Comparing two checkpoints means looking
+at their pictures *at the same time*, which a full-screen viewer cannot do. So
+**** drops an image onto the board as a node of its own, joined to the
+checkpoint that produced it by the same connector the board uses for "this run
+continued from that checkpoint".
+
+There are two ways in, and the first one is the one to remember: **every
+thumbnail in a run or checkpoint gallery carries a in its bottom-right
+corner** — one tap, no need to open the image at all. It is hidden while you are
+in **Select** mode (that mode is for arming a delete, and a second target there
+is a mis-tap waiting to happen). The same action is also in the full-screen
+viewer, spelled out as **Pin to canvas**, for when you have already opened a
+picture and decide it belongs on the board.
 
 - **Move it** by dragging (on a phone: a long press picks it up, exactly like a
   run card). **Resize it** from the corner handle. **Close it** with **✕**.
@@ -929,8 +1192,38 @@ uses for "this run continued from that checkpoint".
   its connecting line.
 - Unticking a dataset takes its lane off the board, pinned images included; they
   come back with the lane, untouched.
-- **✦ Tidy up** does not throw pinned images away — it re-flows them beside their
-  cards, since the cards are what they were positioned against.
+- **✦ Tidy up** does not throw pinned images away — it re-flows them into the
+  same tidy band **Pin all** uses, so a rebuild of the automatic tree can no
+  longer park a picture on top of a run card.
+- The **✕**, the **** and the resize corner keep a finger-sized target **at
+  every zoom level**: they are drawn at a constant size on screen rather than at
+  the board's, so a board fitted to twenty runs is still one you can tap.
+
+**Pin all — the whole lot in one gesture.** When a generation launched from
+the board finishes, the green bar says how many images are ready and names the
+checkpoints they joined. **Pin all N to the board** puts every one of them on
+the board without opening a single gallery.
+
+- **Where they land.** In a band under the lane, **one column per checkpoint**,
+  each column under the checkpoint that produced it — so a lot spanning four runs
+  reads as four groups, and each picture still draws its own line back to its
+  pill. The band starts below everything already on the lane, which is what makes
+  the guarantee a real one: **nothing is ever placed on top of a run card, a
+  checkpoint pill or a picture you positioned yourself.**
+- **Big lots become a contact sheet.** A pair of renders lands full size; twenty
+  or thirty land as thumbnails, which is the size you actually compare that many
+  pictures at. Each one is still resizable afterwards like any other node.
+- **What is already on the board is left alone.** An image you have already
+  pinned is neither moved nor duplicated, and the button counts only what is
+  left — once everything is up, the button is simply not there any more. An
+  image you *closed* is offered again, and comes back where you closed it when
+  that spot is free.
+- **Nothing is stacked in silence.** One click places at most 40 pictures; if the
+  run made more, the bar says how many were left out and where to get them
+  (their checkpoint gallery). The count of what was actually pinned is announced
+  for screen readers too.
+- **↩ Undo** takes exactly the images that click added straight back off the
+  board, and nothing else.
 
 **Which checkpoints you can generate from, at a glance.** Every checkpoint pill
 carries its deployment state on its **left edge**: a **solid sky bar** means the

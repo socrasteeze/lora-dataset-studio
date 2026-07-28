@@ -30,11 +30,14 @@ holding an HTTP request open or freezing the UI.
 """
 from __future__ import annotations
 
+import hashlib
+import io
 import logging
 import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -47,8 +50,9 @@ from .. import config as cfg
 from ..extensions import db
 from ..models import BankImage, FaceDataset, FaceDatasetImage, ImageBank
 from ..utils.dbbusy import write_with_retry
-from . import bank_jobs, bank_queue, trash
-from .face_dataset_service import _dhash, _hamming, import_images
+from . import bank_jobs, bank_queue, bank_undo, trash
+from .face_dataset_service import (SCRAPE_IMPORT_MAX, _dhash, _download_scrape_item,
+                                   _hamming, _SCRAPE_DL_WORKERS, import_images)
 from .image_quality import ANALYSIS_MAX_SIDE, quality_metrics
 from .image_provenance import ORIGINS, provenance_metrics
 
@@ -106,6 +110,19 @@ def _score_cache_path(bank_id) -> Path:
     return _bank_dir(bank_id) / 'score_cache.npz'
 
 
+def _abs_under(base: str, relpath: str) -> str | None:
+    """The containment-checked realpath of ``relpath`` under an ALREADY resolved
+    ``base``. Split out of ``abs_image_path`` so a loop over thousands of rows can
+    resolve the bank folder ONCE instead of per row: ``os.path.realpath`` is a
+    filesystem call, and re-resolving the same unchanging bank folder for every
+    image cost 424 ms of the 6 353-row curation pool alone (measured). Same
+    strings out, one syscall in."""
+    full = os.path.realpath(os.path.join(base, relpath))
+    if os.path.normcase(full).startswith(os.path.normcase(base + os.sep)):
+        return full
+    return None
+
+
 def abs_image_path(bank: ImageBank, row: BankImage) -> str | None:
     """Absolute SOURCE path of a bank image, or None when it escapes the
     bank's folder (belt & braces — relpaths only ever come from our own walk).
@@ -113,11 +130,7 @@ def abs_image_path(bank: ImageBank, row: BankImage) -> str | None:
     ⚠ This is the user's own file. It is READ-ONLY for us, and it is NOT what
     the app should display or copy once a watermark has been cleaned — every
     reader must go through resolved_image_path() instead (see its docstring)."""
-    base = os.path.realpath(bank.source_path)
-    full = os.path.realpath(os.path.join(base, row.relpath))
-    if os.path.normcase(full).startswith(os.path.normcase(base + os.sep)):
-        return full
-    return None
+    return _abs_under(os.path.realpath(bank.source_path), row.relpath)
 
 
 def _clean_dir(bank_id) -> Path:
@@ -131,23 +144,85 @@ def clean_image_path(bank_id, image_id) -> Path:
     return _clean_dir(bank_id) / f'{image_id}.webp'
 
 
+def _rotated_dir(bank_id) -> Path:
+    """Where manually TURNED copies live — the bank's own working directory,
+    next to clean/. Never inside the user's folder."""
+    return _bank_dir(bank_id) / 'rotated'
+
+
+def rotated_image_path(bank_id, image_id, rotation, source: str) -> Path:
+    """Where the turned copy of one image lives. Keyed on the angle AND on the
+    source's extension so a rotated PNG stays a PNG; keyed on the CLEAN state too
+    (via the source name) is unnecessary because every clean change drops the
+    whole derived set (see drop_derived)."""
+    ext = os.path.splitext(source)[1].lower() or '.png'
+    return _rotated_dir(bank_id) / f'{image_id}.r{int(rotation)}{ext}'
+
+
+def _ensure_rotated(bank_id, row: BankImage, source: str) -> str:
+    """Materialise (once) the turned copy of ``source`` and return its path.
+
+    ALWAYS built from the pristine source — never from a previously rotated copy
+    — so the angle is applied exactly once no matter how many times the user
+    clicked. Fails OPEN: an encoder problem serves the un-turned image rather
+    than a 404, because a bank must stay browsable."""
+    from .face_dataset_service import (normalize_rotation,
+                                       transformed_image_bytes, rotate_transform)
+    try:
+        turn = normalize_rotation(row.rotation)
+    except ValueError:
+        return source
+    if not turn:
+        return source
+    dst = rotated_image_path(bank_id, row.id, turn, source)
+    if dst.is_file():
+        return str(dst)
+    try:
+        payload = transformed_image_bytes(source, rotate_transform(turn))
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        # Two simultaneous GETs of the same turned image (grid + lightbox) each
+        # build it. A SHARED temp name would make one of them fail on Windows
+        # (the other still holds it) and degrade to serving the un-turned source;
+        # a unique one lets both win and the last atomic replace decide.
+        tmp = dst.with_name(f'{dst.name}.{os.getpid()}-{threading.get_ident()}.tmp')
+        try:
+            tmp.write_bytes(payload)
+            os.replace(tmp, dst)
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+        return str(dst)
+    except (ValueError, OSError) as e:
+        logger.warning('bank image %s could not be rotated: %s', row.id, e)
+        return source
+
+
 def resolved_image_path(bank: ImageBank, row: BankImage) -> str | None:
     """THE path every reader must use: the watermark-cleaned version when one
-    exists, the untouched source otherwise.
+    exists, the untouched source otherwise — turned by the row's manual rotation
+    when it carries one.
 
-    A bank is a read-only view over a folder we must never write to, so cleaning
-    a watermark cannot rewrite the source — it writes a separate blob under the
-    bank's working directory. That only pays off if the READERS prefer it, so
-    there is exactly ONE resolver and all three known readers call it:
-    promotion (the blob handed to import_images), the grid thumbnail, and the
-    /bank/<id>/file route. A new reader calling abs_image_path() directly would
-    silently serve the watermarked original — test_bank_watermark_clean.py
-    asserts these three go through here."""
+    A bank is a read-only view over a folder we must never write to, so neither
+    cleaning a watermark nor turning an image can rewrite the source: both write
+    a separate blob under the bank's working directory. That only pays off if the
+    READERS prefer it, so there is exactly ONE resolver and all three known
+    readers call it: promotion (the blob handed to import_images), the grid
+    thumbnail, and the /bank/<id>/file route. A new reader calling
+    abs_image_path() directly would silently serve the watermarked original —
+    test_bank_watermark_clean.py asserts these three go through here."""
+    path = None
     if row.watermark_clean_method:
         cleaned = clean_image_path(bank.id, row.id)
         if cleaned.is_file():
-            return str(cleaned)
-    return abs_image_path(bank, row)
+            path = str(cleaned)
+    if path is None:
+        path = abs_image_path(bank, row)
+    if path is None or not getattr(row, 'rotation', None):
+        return path
+    return _ensure_rotated(bank.id, row, path)
 
 
 # --- CRUD -------------------------------------------------------------------
@@ -572,6 +647,8 @@ def delete_bank(user_id, bank_id) -> bool:
     BankImage.query.filter_by(bank_id=bank_id).delete(synchronize_session=False)
     db.session.delete(bank)
     db.session.commit()
+    bank_undo.clear(bank_id)     # its rows are gone; a stale offer would outlive them
+    reset_score_memo()           # ~45 MB of embeddings for a bank that no longer is
     shutil.rmtree(_bank_dir(bank_id), ignore_errors=True)
     if imported_source and os.path.isdir(imported_source):
         try:
@@ -646,11 +723,19 @@ def _image_dict(row: BankImage, th: dict, promoted_by: dict | None = None) -> di
     # means the badge disappears when the user deletes the image in the dataset,
     # instead of advertising a copy that is gone.
     promoted = (promoted_by or {}).get(row.id, row.promoted_dataset_id)
+    # A quarter turn transposes what the user SEES. The columns keep the source's
+    # own numbers (a re-scan rewrites them from the file, which never changed), so
+    # the swap happens here, at read time — the payload can never drift out of
+    # sync with the stored angle.
+    rotation = int(row.rotation or 0) % 360
+    width, height = ((row.height, row.width) if rotation in (90, 270)
+                     else (row.width, row.height))
     return {
         'id': row.id,
         'name': os.path.basename(row.relpath),
         'relpath': row.relpath,
-        'width': row.width, 'height': row.height, 'file_size': row.file_size,
+        'rotation': rotation,
+        'width': width, 'height': height, 'file_size': row.file_size,
         'quality_state': row.quality_state,
         'blur_score': row.blur_score, 'noise_score': row.noise_score,
         'uniformity_score': row.uniformity_score,
@@ -949,10 +1034,52 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'clusters': clusters, 'faces_scanned': faces_scanned,
         'style_clusters': style_clusters,
         'activity': bank_jobs.get(bank_id),
+        # ↩ the one-step-back offer, so the bar survives a reload (the decision
+        # it takes back is in the database, not in a tab).
+        'undo': bank_undo.peek(bank_id),
         'pipeline_report': _load_pipeline_report(bank),
         'score_device': score_device_info(bank_id),
         'thresholds': th,
     }
+
+
+def flag_preview(user_id, bank_id, overrides=None) -> dict | None:
+    """Per-flag image counts for a CANDIDATE threshold set — what the bank WOULD
+    look like at those numbers, without saving anything.
+
+    This is what turns tuning a threshold from a guess into a decision: the
+    quality scan persists RAW scores and every verdict is recomputed at read
+    time (see BankImage's docstring), so answering "how many images would a
+    sharpness floor of 140 flag?" is the same COUNT the payload already runs,
+    with a different dict. No decode, no pass, no write.
+
+    Only the read-time thresholds are meaningful here. The four grouping ones
+    (dup_distance, face/style/semantic similarity) are baked into stored group
+    ids by their pass, so a count against a candidate value would be a number
+    about the OLD grouping — the UI says "applies at the next pass" instead.
+
+    Unknown keys and junk values are ignored rather than 400: this is a live
+    preview firing on every keystroke, and a half-typed "0." must degrade to
+    "no change yet", never to an error toast."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    th = thresholds()
+    for key, val in (overrides or {}).items():
+        if key not in cfg.DEFAULTS['bank']:
+            continue
+        try:
+            th[key] = float(val)
+        except (TypeError, ValueError):
+            continue
+    th['dup_distance'] = int(th['dup_distance'])
+    th['min_side'] = int(th['min_side'])
+    base = BankImage.query.filter_by(bank_id=bank_id)
+    flags = {}
+    for flag in _QUALITY_FLAGS + _SCORE_FLAGS:
+        crit = _flag_filter(flag, th)
+        flags[flag] = base.filter(crit).count() if crit is not None else 0
+    return {'flags': flags, 'thresholds': th, 'total': base.count()}
 
 
 def _load_pipeline_report(bank: ImageBank):
@@ -1189,25 +1316,40 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
 
 # --- thumbnails -------------------------------------------------------------
 def _thumb_path(bank_id, row: BankImage) -> Path:
-    """Where this image's thumbnail lives. A watermark-cleaned image gets its
-    OWN thumbnail file, named after the cleaning method: the cached source
-    thumbnail is never overwritten (so an undo instantly shows the original
-    again) and the grid can never serve a stale pre-clean crop. Deleting a
-    cached thumbnail in place would be the fragile version of this — on Windows
-    the file may still be held open by the response that just served it."""
+    """Where this image's thumbnail lives. A watermark-cleaned or manually
+    TURNED image gets its OWN thumbnail file, named after the cleaning method and
+    the angle: the cached source thumbnail is never overwritten (so an undo — or
+    a fourth quarter turn — instantly shows the original again) and the grid can
+    never serve a stale pre-clean crop or a sideways tile. Deleting a cached
+    thumbnail in place would be the fragile version of this — on Windows the file
+    may still be held open by the response that just served it."""
     suffix = f'.{row.watermark_clean_method}' if row.watermark_clean_method else ''
+    if getattr(row, 'rotation', None):
+        suffix += f'.r{int(row.rotation)}'
     return _thumbs_dir(bank_id) / f'{row.id}{suffix}.webp'
 
 
-def drop_clean_thumbs(bank_id, image_id) -> None:
-    """Best-effort removal of the cleaned thumbnails of one image (an undo or a
-    re-scan just invalidated them). A leftover is harmless — nothing points at
-    it once the row carries no clean method — so a locked file is not an error."""
-    for method in ('crop', 'lama', 'klein'):
+def drop_derived(bank_id, image_id) -> None:
+    """Best-effort removal of every DERIVED blob of one image — the cleaned and
+    turned thumbnails plus the turned full-size copies (an undo, a re-scan or a
+    new clean just invalidated them). The pristine `<id>.webp` thumbnail of the
+    untouched source is deliberately kept. A leftover is harmless — nothing
+    points at it once the row's state moved on — so a locked file is not an
+    error."""
+    for pattern, folder in ((f'{image_id}.*.webp', _thumbs_dir(bank_id)),
+                            (f'{image_id}.r*', _rotated_dir(bank_id))):
         try:
-            (_thumbs_dir(bank_id) / f'{image_id}.{method}.webp').unlink()
+            for stale in folder.glob(pattern):
+                try:
+                    stale.unlink()
+                except OSError:
+                    pass
         except OSError:
             pass
+
+
+#: Historical alias — external callers/tests may still name the narrow version.
+drop_clean_thumbs = drop_derived
 
 
 def ensure_thumb(bank: ImageBank, row: BankImage) -> Path | None:
@@ -1485,6 +1627,27 @@ def _assign_groups(column, groups) -> None:
 
 
 # --- semantic near-duplicate groups (stage 2 — crops / re-compressed variants) --
+# One-entry memo for the parsed score cache. Reading it is 350 ms on a 14 700-row
+# bank (40 MB .npz + a stat per row), and a user tuning a curation slider clicks
+# three or four times on the SAME unchanged cache — that was 350 ms paid over and
+# over for a file nobody touched. Bounded on purpose:
+#   • ONE bank at a time (~45 MB of float32 at 14 700 × 768 — switching banks frees
+#     the previous one rather than accumulating);
+#   • keyed on the .npz's own (size, mtime_ns), so a finished ✨ Score pass — which
+#     rewrites the file — invalidates it without anyone having to remember to;
+#   • and it expires anyway after _SCORE_MEMO_TTL, because the per-row staleness
+#     stats it skips are how a since-edited IMAGE gets dropped. A short window
+#     covers the double-click; a session-long one would hide a real edit.
+_SCORE_MEMO_TTL = 60.0
+_score_memo = None            # (key, at, {path: emb}) — see reset_score_memo()
+
+
+def reset_score_memo() -> None:
+    """Drop the parsed-score-cache memo (tests; bank deletion)."""
+    global _score_memo
+    _score_memo = None
+
+
 def _load_score_embeddings(bank: ImageBank) -> dict:
     """{abs_path: emb (np.float32, L2-normed)} from the Score pass cache, for the
     scored 'ok' images whose file still matches what was scored. Empty when the pass
@@ -1493,10 +1656,20 @@ def _load_score_embeddings(bank: ImageBank) -> dict:
     signature) is dropped, so a semantic group is never built on an outdated
     embedding. Reads the .npz directly (numpy is in the Flask venv); torch/open_clip
     are NOT needed here — stage 2 costs no new GPU work, it reuses Score's output."""
+    global _score_memo
     import numpy as np
     path = _score_cache_path(bank.id)
     if not path.is_file():
         return {}
+    try:
+        st = path.stat()
+        key = (bank.id, str(path), st.st_size, st.st_mtime_ns)
+    except OSError:
+        key = None
+    if key is not None and _score_memo is not None:
+        mkey, at, cached = _score_memo
+        if mkey == key and (time.time() - at) < _SCORE_MEMO_TTL:
+            return cached
     try:
         with np.load(str(path), allow_pickle=False) as z:
             paths = [str(p) for p in z['paths']]
@@ -1523,6 +1696,8 @@ def _load_score_embeddings(bank: ImageBank) -> dict:
             except OSError:
                 continue
         out[p] = np.asarray(emb, dtype='float32')
+    if key is not None:
+        _score_memo = (key, time.time(), out)
     return out
 
 
@@ -1685,7 +1860,7 @@ def _best_of(rows):
 
 def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
                  col=BankImage.dup_group, attr='dup_group', reason='duplicate',
-                 respect_existing_keep=True):
+                 respect_existing_keep=True, snapshot=None):
     """Resolve duplicate groups: keep one member, REJECT the others (a status,
     never a file deletion, so it's reversible). strategy 'best'|'first' applies to
     one group or, when ``group`` is None, to every unresolved group at once;
@@ -1700,12 +1875,27 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
     group to ONE, and the members of a same-shot group are typically ALL 'keep',
     so respecting keep would reject nobody. The elected keeper is always safe
     (``r.id in keep``); with False every OTHER member falls to reject, keep
-    included. Returns {'resolved': groups, 'rejected': images}."""
+    included. Returns {'resolved': groups, 'rejected': images}.
+
+    ``snapshot``: pass a live :class:`bank_undo.Snapshot` to fold this resolve
+    into a WIDER undo step (the pipeline's auto-reject is a flag pass plus this
+    one); omit it and the call publishes its own one-step undo offer."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
+    own_snapshot = snapshot is None
+    # The undo snapshot is built INSIDE the retried unit of work and published only
+    # once the write actually committed: write_with_retry REPLAYS _apply after a
+    # rollback (utils.dbbusy), so a snapshot assembled outside it could describe a
+    # transaction that never landed. A caller-supplied snapshot is safe to re-note
+    # on a replay -- Snapshot.note keeps the earliest `before`.
+    published = {}
 
     def _apply():
+        snap = bank_undo.Snapshot(
+            'Resolve same-shot groups' if reason == 'semantic_dup'
+            else 'Resolve duplicate groups') if own_snapshot else snapshot
+        published['snapshot'] = snap
         keep_by_group = {}
         if keep_ids:
             rows = BankImage.query.filter(
@@ -1737,6 +1927,7 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
             for r in rows:
                 if r.id in keep or (respect_existing_keep and r.status == 'keep'):
                     continue
+                snap.note(r, 'reject', reason)
                 r.status, r.reject_reason = 'reject', reason
                 rejected += 1
                 changed = True
@@ -1746,55 +1937,119 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
 
     # Same reasoning as set_status: a resolve fired while a pass is running must
     # not be lost to the write lock (see utils.dbbusy).
-    return write_with_retry(_apply)
+    out = write_with_retry(_apply)
+    if own_snapshot:
+        published['snapshot'].commit(bank_id)
+    return out
 
 
 def resolve_semantic_dups(user_id, bank_id, strategy='best', group=None,
-                          keep_ids=None, respect_existing_keep=True):
+                          keep_ids=None, respect_existing_keep=True,
+                          snapshot=None):
     """resolve_dups for stage 2 (semantic_dup_group, reject reason
     'semantic_dup')."""
     return resolve_dups(user_id, bank_id, strategy=strategy, group=group,
                         keep_ids=keep_ids, col=BankImage.semantic_dup_group,
                         attr='semantic_dup_group', reason='semantic_dup',
-                        respect_existing_keep=respect_existing_keep)
+                        respect_existing_keep=respect_existing_keep,
+                        snapshot=snapshot)
 
 
 # --- statuses & flag application --------------------------------------------
+_STATUS_UNDO_LABEL = {'keep': 'Keep images', 'reject': 'Reject images',
+                      'pending': 'Set images back to undecided'}
+
+
 def set_status(user_id, bank_id, ids, status) -> int:
     """Manual keep/reject/pending on a selection. Returns rows changed.
 
     Wrapped in write_with_retry: this is THE click a user makes while a pass is
     running on another bank, and losing it to SQLite's single write lock is what
-    turned curating-during-a-run into a string of 500s."""
+    turned curating-during-a-run into a string of 500s.
+
+    Snapshots the prior (status, reason) of every row it actually flips, so the
+    workspace can offer ONE step back -- this is the gesture that puts hundreds of
+    decisions in flight at once (select the whole filter, then reject)."""
     if status not in ('pending', 'keep', 'reject'):
         raise ValueError('bad status')
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
     ids = [int(i) for i in (ids or [])]
+    reason = 'manual' if status == 'reject' else None
+    published = {}
 
     def _apply():
+        # Rebuilt per attempt: write_with_retry replays the whole unit of work.
+        snap = bank_undo.Snapshot(_STATUS_UNDO_LABEL[status])
+        published['snapshot'] = snap
         n = 0
         for i0 in range(0, len(ids), _SQL_IN_CHUNK):
             rows = BankImage.query.filter(
                 BankImage.bank_id == bank_id,
                 BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all()
             for r in rows:
+                snap.note(r, status, reason)
                 r.status = status
-                r.reject_reason = 'manual' if status == 'reject' else None
+                r.reject_reason = reason
                 n += 1
         return n
 
-    return write_with_retry(_apply)
+    n = write_with_retry(_apply)
+    published['snapshot'].commit(bank_id)
+    return n
 
 
-def apply_flags(user_id, bank_id, flags) -> dict:
-    """Bulk-reject the PENDING images carrying the given flags. Manual ✓/✕
-    decisions are never flipped (only status='pending' is touched) — same
-    contract as the dataset auto-triage. Returns per-flag reject counts."""
+def rotate_images(user_id, bank_id, ids, delta) -> dict:
+    """Turn a selection by ``delta`` degrees CLOCKWISE (idea by 1Tomber, #17).
+
+    The user's files are NEVER written to: the new angle is stored on the row and
+    the derived blobs (turned copy + thumbnail) are dropped so the ONE resolver
+    rebuilds them from the pristine source on the next read. That is what makes
+    the turn free of loss where it counts — a fourth quarter turn puts the row
+    back at 0 and every reader is served the original bytes again, byte for byte.
+
+    ``delta`` may be negative (-90 = turn left). Returns {'rotated': n,
+    'rotations': {image_id: angle}} so the grid can re-render without a refetch.
+    """
+    from .face_dataset_service import normalize_rotation
+    step = normalize_rotation(delta)
+    if step == 0:
+        raise ValueError('rotation must be 90, 180 or 270 degrees')
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
+    ids = [int(i) for i in (ids or [])]
+    if not ids:
+        raise ValueError('select at least one image')
+    rotations = {}
+    for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+        rows = BankImage.query.filter(
+            BankImage.bank_id == bank_id,
+            BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all()
+        for r in rows:
+            r.rotation = (int(r.rotation or 0) + step) % 360 or None
+            drop_derived(bank_id, r.id)
+            rotations[r.id] = int(r.rotation or 0)
+    db.session.commit()
+    return {'rotated': len(rotations), 'rotations': rotations}
+
+
+def apply_flags(user_id, bank_id, flags, snapshot=None) -> dict:
+    """Bulk-reject the PENDING images carrying the given flags. Manual ✓/✕
+    decisions are never flipped (only status='pending' is touched) — same
+    contract as the dataset auto-triage. Returns per-flag reject counts.
+
+    This is the mis-set-threshold accident in one click, so it snapshots what it
+    flipped. ``snapshot``: pass a live :class:`bank_undo.Snapshot` to fold the
+    pass into a wider undo step (the pipeline does); omit it and the call
+    publishes its own offer."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    own_snapshot = snapshot is None
+    if own_snapshot:
+        snapshot = bank_undo.Snapshot('Auto-reject by flag')
     th = thresholds()
 
     def _apply():
@@ -1808,11 +2063,86 @@ def apply_flags(user_id, bank_id, flags) -> dict:
             rows = (BankImage.query.filter_by(bank_id=bank_id, status='pending')
                     .filter(crit).all())
             for r in rows:
+                # Safe on a write_with_retry replay: the rollback restores every
+                # row, so re-noting sees the same `before` and Snapshot.note keeps
+                # the earliest one.
+                snapshot.note(r, 'reject', flag)
                 r.status, r.reject_reason = 'reject', flag
             out[flag] = len(rows)
         return out
 
-    return write_with_retry(_apply)
+    out = write_with_retry(_apply)
+    if own_snapshot:
+        snapshot.commit(bank_id)
+    return out
+
+
+# --- ↩ undo the last bulk decision ------------------------------------------
+_UNDO_NAME_SAMPLE = 8        # conflicting files quoted back so the user can find them
+
+
+def undo_offer(user_id, bank_id) -> dict | None:
+    """{label, count, at} for the workspace's ↩ bar, or None. Rides in the bank
+    payload the workspace already polls, which is what makes the offer survive a
+    reload — the decision it takes back lives in the database, not in a tab."""
+    if not get_bank(user_id, bank_id):
+        return None
+    return bank_undo.peek(bank_id)
+
+
+def undo_last(user_id, bank_id) -> dict:
+    """Put every row the last bulk decision changed back to what it was.
+
+    Three outcomes per row, all counted, because a restore that quietly missed
+    half of its rows would be worse than no undo at all:
+
+    * **restored** — the row is still there and still carries what the action
+      set, so it goes back to its recorded prior value (status AND reason: the
+      flag counters read the reason column);
+    * **missing** — the row left the bank since (a re-scan dropped a file that
+      disappeared from the folder);
+    * **conflict** — someone changed it since (another tab, ▶ Review, a later
+      pass). It is LEFT ALONE and named: overwriting a newer decision with an
+      older one is not "undo", it is a second accident.
+
+    Rows the action never touched are untouched here by construction — only the
+    snapshot's ids are read. Synchronous even on a big lot: the work is one
+    indexed SELECT plus in-place writes over the ids we already know, so a
+    5 000-image restore lands in well under a second — a progress bar would take
+    longer to render than the job it reports on.
+    """
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    if bank_jobs.running(bank_id):
+        raise RuntimeError('a pass is running on this bank — stop it first')
+    snap = bank_undo.take(bank_id)
+    if not snap or not snap['rows']:
+        raise ValueError('nothing to undo')
+
+    entries = snap['rows']
+    ids = list(entries)
+    seen = set()
+    restored = conflicts = 0
+    conflict_names = []
+    for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+        rows = BankImage.query.filter(
+            BankImage.bank_id == bank_id,
+            BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all()
+        for r in rows:
+            seen.add(r.id)
+            entry = entries[r.id]
+            if (r.status, r.reject_reason) != tuple(entry['after']):
+                conflicts += 1
+                if len(conflict_names) < _UNDO_NAME_SAMPLE:
+                    conflict_names.append(os.path.basename(r.relpath))
+                continue
+            r.status, r.reject_reason = entry['before']
+            restored += 1
+    db.session.commit()
+    return {'label': snap['label'], 'total': len(ids), 'restored': restored,
+            'missing': len(ids) - len(seen), 'conflicts': conflicts,
+            'conflict_names': conflict_names}
 
 
 # --- curation selectors (diversity · reference similarity) ------------------
@@ -1887,10 +2217,23 @@ def _pool_embeddings(bank, emb_by_path, filters):
     import numpy as np
     rows = (_pool_query(bank.id, thresholds(), **filters)
             .order_by(BankImage.id.asc()).all())
+    base = os.path.realpath(bank.source_path)   # once, not once per row
+    prefix = os.path.normcase(base + os.sep)
     ids, vecs = [], []
     for r in rows:
-        p = abs_image_path(bank, r)
-        emb = emb_by_path.get(p) if p else None
+        # Fast path: the keys of emb_by_path were THEMSELVES produced by
+        # _abs_under (the ✨ Score pass walks the same rows), so a lexical
+        # normpath that HITS the dict is provably the very string realpath would
+        # have returned — no filesystem call needed to know that. A miss is the
+        # only case that can be a symlink/junction, and it falls through to the
+        # real resolution, so the result set is identical either way. That matters
+        # because realpath is a syscall and this loop runs once per pool image:
+        # 756 ms of a 6 353-row pool, against 6 ms for the lexical form.
+        p = os.path.normpath(os.path.join(base, r.relpath))
+        emb = emb_by_path.get(p) if os.path.normcase(p).startswith(prefix) else None
+        if emb is None:
+            p = _abs_under(base, r.relpath)
+            emb = emb_by_path.get(p) if p else None
         if emb is not None:
             ids.append(r.id)
             vecs.append(emb)
@@ -1907,6 +2250,63 @@ _TYPICALITY_BLOCK = 512      # rows per similarity block — NEVER a full (m×m)
 _TYPICALITY_Z = 3.0          # robust deviations below the median density = full penalty
 _TYPICALITY_DECADES = 3.0    # novelty discount at full guard + full penalty: 10⁻³
 _TYPICALITY_MIN_POOL = 32    # under this a median/MAD "tail" is noise — guard off
+
+_BLAS_GEMM = ...             # unprobed sentinel; None once probed and unavailable
+
+
+def _fast_gemm_nt():
+    """scipy's single-precision GEMM (``A @ B.T``), or None when unreachable.
+
+    WHY this exists, measured rather than assumed: the numpy wheels this app runs
+    on ship WITHOUT an optimised BLAS (``threadpoolctl.threadpool_info()`` returns
+    an empty list), so ``E @ E.T`` runs single-threaded at ~5 GFLOP/s. On a real
+    6 353-image pool that is 12.6 s for ONE similarity pass — 89 % of a curation
+    click. scipy's wheels bundle OpenBLAS (24 threads here): the identical product
+    takes 0.14 s, ~90× less, for the same 62 GFLOP.
+
+    scipy is not in ``requirements.txt``, and it does not need to be: this lane
+    only runs when numpy is present, numpy only arrives with
+    ``requirements-ml.txt``, and insightface (the first line of that file) depends
+    on scipy. So every install that CAN reach this code has the fast path, and the
+    numpy fallback below is the belt-and-braces branch, not the normal one.
+
+    Probed once per process and remembered — importing scipy.linalg is ~200 ms."""
+    global _BLAS_GEMM
+    if _BLAS_GEMM is ...:
+        try:
+            from scipy.linalg.blas import sgemm
+            _BLAS_GEMM = sgemm
+        except Exception as e:  # noqa: BLE001 — no scipy / broken wheel = slow path
+            logger.info('no scipy BLAS for curation sampling (%s); '
+                        'falling back to numpy matmul', e)
+            _BLAS_GEMM = None
+    return _BLAS_GEMM
+
+
+def _sim_block(A, E):
+    """``A @ E.T`` for L2-normed float32 rows — the similarity block of the
+    typicality pass, routed through an optimised BLAS when one is reachable.
+
+    Returns a C-contiguous (len(A) × len(E)) float32 array: scipy hands back a
+    Fortran-ordered result, and the ``np.partition(..., axis=1)`` that follows
+    walks rows, so the copy pays for itself several times over.
+
+    Float caveat, stated because it is the one thing this change can affect: a
+    different BLAS sums the same products in a different order, so a similarity
+    can differ from numpy's by ~1e-6 (measured max absolute deviation over the
+    real bank). That is far below any threshold this module compares against, and
+    the selections were verified id-for-id identical on the production bank across
+    n ∈ {20, 60, 200} and typicality ∈ {0.25, 0.5, 1.0} — but it is an equality
+    of results, not of bits. ``typicality=0`` never reaches here at all, so the
+    golden "historical behaviour" path is untouched by construction."""
+    import numpy as np
+    gemm = _fast_gemm_nt()
+    if gemm is not None and A.dtype == np.float32 and E.dtype == np.float32:
+        try:
+            return np.ascontiguousarray(gemm(1.0, A, E, trans_b=True))
+        except Exception as e:  # noqa: BLE001 — never fail a click over an optimisation
+            logger.warning('scipy BLAS gemm refused the pool (%s); using numpy', e)
+    return A @ E.T
 
 
 def _isolation_penalty(E, *, k=_TYPICALITY_K, block=_TYPICALITY_BLOCK):
@@ -1937,12 +2337,15 @@ def _isolation_penalty(E, *, k=_TYPICALITY_K, block=_TYPICALITY_BLOCK):
 
     Time: this is an exact all-pairs pass, Θ(m²·d) — the same shape of work the
     semantic-dedup stage already does, and the reason the guard is computed ONLY
-    when it is on. Seconds on a big bank with a normal (BLAS-backed) numpy; a
-    numpy built without an optimised BLAS is ~50× slower and will make the click
-    wait, which is why the button reports that it is working. An approximation
-    (subsampling the reference set) was rejected on purpose: it would make a small
-    but legitimate group — eight shots of one rare outfit — look isolated and get
-    penalised, which is exactly the variety this selector exists to preserve."""
+    when it is on. It is also, by a wide margin, the most expensive thing a
+    curation click does; ``_sim_block`` explains why the product goes through
+    scipy's BLAS rather than numpy's (12.6 s → 0.14 s on a 6 353-image pool,
+    measured — the numpy this app ships on has no optimised BLAS, so the "~50×
+    slower" case that paragraph used to describe as a hazard WAS the normal one).
+    An approximation (subsampling the reference set) was rejected on purpose: it
+    would make a small but legitimate group — eight shots of one rare outfit —
+    look isolated and get penalised, which is exactly the variety this selector
+    exists to preserve."""
     import numpy as np
     m = int(E.shape[0])
     k = min(int(k), m - 1)
@@ -1953,7 +2356,7 @@ def _isolation_penalty(E, *, k=_TYPICALITY_K, block=_TYPICALITY_BLOCK):
         return np.zeros(m, dtype='float32')
     dens = np.empty(m, dtype='float32')
     for a in range(0, m, block):
-        S = E[a:a + block] @ E.T             # (b, m) block — never (m, m)
+        S = _sim_block(E[a:a + block], E)    # (b, m) block — never (m, m)
         rows = np.arange(S.shape[0])
         S[rows, rows + a] = -np.inf          # a row is not its own neighbour
         top = np.partition(S, m - k, axis=1)[:, m - k:]
@@ -1968,6 +2371,38 @@ def _isolation_penalty(E, *, k=_TYPICALITY_K, block=_TYPICALITY_BLOCK):
     return (ramp * ramp).astype('float32')
 
 
+def _farthest_point(E, factor, n):
+    """Greedy farthest-point sampling over the L2-normed rows of ``E`` (m×d),
+    returning ``n`` ROW POSITIONS in pick order. Seeded on position 0 — callers
+    pass rows in ascending id order, so the seed and every tie-break resolve to
+    the lowest id and the result is deterministic.
+
+    ``factor`` is the per-row novelty multiplier in (0, 1] (the typicality guard,
+    see ``_isolation_penalty``) or None to sample on pure max-min distance. Shared
+    by ``select_diverse`` (whole pool) and ``select_balanced`` (one call per
+    bucket, on a slice of the same E and the same pool-wide factor) so the guard
+    behaves identically in both — there is exactly one copy of this loop."""
+    import numpy as np
+    m = int(E.shape[0])
+    if n <= 0 or m == 0:
+        return []
+    if n >= m:
+        return list(range(m))
+    # min_dist[i] = cosine distance from row i to the NEAREST chosen row so far.
+    chosen = [0]                                 # seed = lowest id (E[0])
+    min_dist = 1.0 - E @ E[0]
+    min_dist[0] = -np.inf                        # never re-pick a chosen row
+    for _ in range(n - 1):
+        score = min_dist if factor is None else min_dist * factor
+        nxt = int(np.argmax(score))              # ties → lowest index = lowest id
+        if not np.isfinite(score[nxt]):          # pool exhausted (all chosen)
+            break
+        chosen.append(nxt)
+        min_dist = np.minimum(min_dist, 1.0 - E @ E[nxt])
+        min_dist[nxt] = -np.inf
+    return chosen
+
+
 def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
                    filters=None):
     """Farthest-point sampling over the Score CLIP embeddings, tempered by a
@@ -1975,8 +2410,15 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
     visual space — the antidote to a dump of 4 000 near-identical shots. Greedy
     FPS: seed with the lowest-id row (deterministic), then repeatedly add the
     point whose nearest already-chosen neighbour is FARTHEST (max-min cosine
-    distance). O(n·m·d) — one (m×d)·(d,) product per pick, ~sub-second even at
-    m=24 000 / n=2 000.
+    distance). The SAMPLING itself is O(n·m·d) — one (m×d)·(d,) product per pick,
+    110 ms at m=6 353 / n=60 (measured).
+
+    That figure used to be quoted as the cost of the WHOLE call ("~sub-second
+    even at m=24 000"), and on real data it was wrong by a factor of thirty: the
+    click took 32 s, of which the loop below was 0.1 s. The rest was the guard's
+    all-pairs pass (see ``_isolation_penalty`` / ``_sim_block``). Whatever else
+    changes here, keep this docstring measured — a comment promising a second
+    where the user waits half a minute is a debt, not documentation.
 
     ``typicality`` (0–1) exists because pure max-min distance is, mathematically,
     the criterion that prefers ISOLATED points: on a collected bank the first
@@ -2030,20 +2472,199 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
     factor = None
     if w > 0.0:
         factor = 10.0 ** (-_TYPICALITY_DECADES * w * _isolation_penalty(E))
-    # min_dist[i] = cosine distance from row i to the NEAREST chosen row so far.
-    chosen = [0]                                 # seed = lowest id (E[0])
-    min_dist = 1.0 - E @ E[0]
-    min_dist[0] = -np.inf                        # never re-pick a chosen row
-    for _ in range(n - 1):
-        score = min_dist if factor is None else min_dist * factor
-        nxt = int(np.argmax(score))              # ties → lowest index = lowest id
-        if not np.isfinite(score[nxt]):          # pool exhausted (all chosen)
-            break
-        chosen.append(nxt)
-        min_dist = np.minimum(min_dist, 1.0 - E @ E[nxt])
-        min_dist[nxt] = -np.inf
+    chosen = _farthest_point(E, factor, n)
     return {'image_ids': sorted(ids[i] for i in chosen),
             'pool': m, 'requested': n, 'typicality': w}
+
+
+# --- balanced selection (coverage of the LABELS, not of the embedding space) --
+# `select_diverse` answers "is my set VARIED?"; this one answers a different
+# question no per-image score can ask: "does my set COVER what I want to be able
+# to generate?". Asking for the 60 best/most varied of a bank that is 49% full
+# body and 3.6% face shots returns those proportions — the LoRA then renders one
+# framing well and the rest badly, with nothing having said so.
+#
+# WHICH AXIS. Measured on a real 43 000-image bank rather than assumed: `framing`
+# had 13 000 rows classified across all four buckets (body 49%, bust 37%, back
+# 11%, face 3.6%) — a discrete label with a real, actionable imbalance. Over the
+# same bank `face_cluster` covered 4.7% of the rows and shattered them into 561
+# clusters whose biggest held 34% — on a mono-subject bank a semantic/identity
+# split is sparse and arbitrary, so balancing on it would spread a selection over
+# noise. Hence: framing is the DEFAULT axis, and person is an explicit opt-in for
+# the genuinely multi-subject dump.
+_BALANCE_AXES = ('framing', 'framing+person')
+_BALANCE_DEFAULT_AXIS = 'framing'   # stored in localStorage — never rename
+
+
+def _balanced_quotas(sizes: dict, n: int) -> dict:
+    """Split ``n`` picks as evenly as possible over the buckets, capped by what
+    each one actually HAS (largest-remainder water-filling).
+
+    A bucket that cannot serve its equal share is filled to the brim and its
+    unused share is redistributed over the buckets that still have room — the
+    ARBITRATION being: asking for 60 when a perfect split only yields 42 returns
+    60, not 42, because throwing 18 usable images away buys a purity nobody asked
+    for. What is forbidden is doing it SILENTLY: every caller gets ``fair_share``
+    next to ``selected`` per bucket, so the top-up is visible as the deficit it
+    is. Deterministic: buckets are walked in sorted key order, and a leftover
+    single pick goes to the bucket with the most room left (key ascending on a
+    tie)."""
+    keys = sorted(sizes)
+    quota = {k: 0 for k in keys}
+    open_keys = [k for k in keys if sizes[k] > 0]
+    remaining = min(int(n), sum(sizes.values()))
+    while open_keys and remaining > 0:
+        base = remaining // len(open_keys)
+        if base == 0:                       # fewer picks left than buckets
+            order = sorted(open_keys, key=lambda k: (-(sizes[k] - quota[k]), k))
+            for k in order[:remaining]:
+                quota[k] += 1
+            break
+        capped = [k for k in open_keys if sizes[k] - quota[k] <= base]
+        if capped:
+            for k in capped:
+                take = sizes[k] - quota[k]
+                quota[k] += take
+                remaining -= take
+            capped_set = set(capped)
+            open_keys = [k for k in open_keys if k not in capped_set]
+        else:
+            for k in open_keys:
+                quota[k] += base
+            remaining -= base * len(open_keys)
+    return quota
+
+
+def _pool_labels(bank, filters) -> dict:
+    """{image_id: (framing, face_cluster)} for the same pool ``_pool_embeddings``
+    walks — one extra column read, no GPU."""
+    rows = _pool_query(bank.id, thresholds(), **(filters or {})).all()
+    return {r.id: (r.framing, r.face_cluster) for r in rows}
+
+
+def _balance_axis_hint(axis, m, unlabelled, unknown) -> str:
+    """The honest message for a bank that simply has not been labelled yet — the
+    DEFAULT state of a fresh bank, not an error. Names the pass that is missing
+    and the numbers, instead of returning an empty or misleading selection."""
+    what = ('the shot type of each image' if axis == 'framing'
+            else 'the shot type AND the person of each image')
+    passes = ('run the Framing pass first' if axis == 'framing'
+              else 'run the Framing and Group by person passes first')
+    tail = ''
+    if unknown and not unlabelled:
+        tail = (f' — {unknown} of {m} came back as "unknown" framing, which is a '
+                f'classification the balance cannot use')
+    else:
+        tail = f' — {unlabelled} of {m} images here have no label yet'
+    return (f'{passes}: balanced selection needs {what}{tail}. '
+            f'Pick diverse works without it.')
+
+
+def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
+                    typicality=_TYPICALITY_DEFAULT, filters=None):
+    """Select ``n`` images SPREAD OVER the labels of ``axis`` instead of taking
+    the top of one ranking: an even split across framings (and optionally across
+    people), each bucket filled with the same farthest-point + typicality
+    sampling ``select_diverse`` uses. So it is "the most varied 15 face shots,
+    the most varied 15 busts, …" rather than "the most varied 60", which on a
+    lopsided bank is 30 bodies and 2 faces.
+
+    It ACCOMPANIES ``select_diverse``, it does not replace it: variety inside a
+    space and coverage of a label are different questions, and the diverse
+    selector still works on a bank with no labels at all (which is most banks
+    until the Framing pass has run).
+
+    Composition with the typicality guard: the isolation penalty is computed ONCE
+    over the WHOLE filtered pool and then sliced per bucket — deliberately, since
+    "alone in the bank" is a property of the bank. Computing it per bucket would
+    make every member of a small bucket look isolated and penalise exactly the
+    images the balance exists to bring in.
+
+    Returns {'image_ids', 'pool', 'requested', 'selected', 'typicality', 'axis',
+    'buckets': [{key, framing, cluster, available, fair_share, selected, short}],
+    'unlabelled', 'unknown', 'shortfall'}. Raises ValueError (→400) when Score
+    has not run, or when nothing in the filter carries the axis label."""
+    import numpy as np
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    if axis not in _BALANCE_AXES:
+        axis = _BALANCE_DEFAULT_AXIS
+    emb_by_path = _load_score_embeddings(bank)
+    if not emb_by_path:
+        raise ValueError('run ✨ Score first — balanced selection reuses its '
+                         'embeddings')
+    n = max(1, min(int(n), _CURATION_MAX_N))
+    try:
+        w = 0.0 if typicality is None else float(typicality)
+    except (TypeError, ValueError):
+        w = _TYPICALITY_DEFAULT
+    w = max(0.0, min(1.0, w))
+    ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
+    m = len(ids)
+    if not m:
+        raise ValueError('nothing to select from in the current filter')
+
+    labels = _pool_labels(bank, filters or {})
+    buckets, meta = {}, {}
+    unlabelled = unknown = 0
+    for pos, iid in enumerate(ids):
+        fr, cl = labels.get(iid, (None, None))
+        if fr is None:
+            unlabelled += 1
+            continue
+        if fr not in _FRAMINGS:              # 'unknown' — a real classification,
+            unknown += 1                     # but not one you can balance on
+            continue
+        if axis == 'framing+person':
+            if cl is None:
+                unlabelled += 1
+                continue
+            key = f'{fr}#{int(cl)}'
+            meta[key] = (fr, int(cl))
+        else:
+            key = fr
+            meta[key] = (fr, None)
+        buckets.setdefault(key, []).append(pos)
+    if not buckets:
+        raise ValueError(_balance_axis_hint(axis, m, unlabelled, unknown))
+
+    sizes = {k: len(v) for k, v in buckets.items()}
+    quota = _balanced_quotas(sizes, n)
+    # What a split with no ceiling WOULD have given each bucket — the yardstick
+    # a shortfall is reported against ("back: 3 of an even 15").
+    fair = _balanced_quotas({k: n for k in sizes}, n)
+
+    factor = None
+    if w > 0.0:
+        factor = 10.0 ** (-_TYPICALITY_DECADES * w * _isolation_penalty(E))
+    chosen, report = [], []
+    for key in sorted(sizes):
+        pos = buckets[key]                   # ascending id order (pool order)
+        take = quota[key]
+        if take >= len(pos):
+            picked = list(pos)
+        elif take <= 0:
+            picked = []
+        else:
+            idx = np.asarray(pos)
+            sub = np.ascontiguousarray(E[idx])
+            subf = None if factor is None else np.ascontiguousarray(factor[idx])
+            picked = [pos[i] for i in _farthest_point(sub, subf, take)]
+        chosen.extend(picked)
+        fr, cl = meta[key]
+        report.append({'key': key, 'framing': fr, 'cluster': cl,
+                       'available': len(pos), 'fair_share': fair[key],
+                       'selected': len(picked),
+                       'short': len(pos) < fair[key]})
+    order = {k: i for i, k in enumerate(_FRAMINGS)}
+    report.sort(key=lambda b: (order.get(b['framing'], 99),
+                               b['cluster'] if b['cluster'] is not None else -1))
+    return {'image_ids': sorted(ids[i] for i in chosen),
+            'pool': m, 'requested': n, 'selected': len(chosen),
+            'typicality': w, 'axis': axis, 'buckets': report,
+            'unlabelled': unlabelled, 'unknown': unknown,
+            'shortfall': max(0, n - len(chosen))}
 
 
 def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=None):
@@ -2329,6 +2950,10 @@ def delete_rejected(user_id, bank_id) -> dict:
         ).delete(synchronize_session=False)
     out['rows_removed'] = len(remove_ids)
     db.session.commit()
+    # The pending ↩ offer points at rows this run just dropped — restoring them
+    # would find nothing. Withdraw it rather than advertise a restore we cannot
+    # perform (the files themselves went to a trash only the user can reach).
+    bank_undo.clear(bank_id)
     # Report the WORST outcome that happened: one permanently removed file makes
     # the run 'delete', whatever the rest did. The UI wording follows this.
     for mode in ('delete', 'app_trash', 'trash'):
@@ -2934,7 +3559,7 @@ def _discard_clean_blob(bank_id, row) -> None:
         clean_image_path(bank_id, row.id).unlink()
     except OSError:
         pass
-    drop_clean_thumbs(bank_id, row.id)
+    drop_derived(bank_id, row.id)
     row.watermark_clean_method = None
 
 
@@ -3017,7 +3642,7 @@ def _watermark_crop_job(bank_id):
                 if _apply_watermark_crop(str(dst), box):
                     row.watermark_state = 'cleaned'
                     row.watermark_clean_method = 'crop'
-                    drop_clean_thumbs(bank_id, row.id)
+                    drop_derived(bank_id, row.id)
                     cropped += 1
                 else:
                     _discard_clean_blob(bank_id, row)
@@ -3129,7 +3754,7 @@ def _watermark_inpaint_job(bank_id, method):
                         if ok:
                             row.watermark_state = 'cleaned'
                             row.watermark_clean_method = 'klein'
-                            drop_clean_thumbs(bank_id, row.id)
+                            drop_derived(bank_id, row.id)
                             counts['klein'] += 1
                         else:
                             _discard_clean_blob(bank_id, row)
@@ -3158,7 +3783,7 @@ def _watermark_inpaint_job(bank_id, method):
                         if ok:
                             row.watermark_state = 'cleaned'
                             row.watermark_clean_method = 'lama'
-                            drop_clean_thumbs(bank_id, row.id)
+                            drop_derived(bank_id, row.id)
                             counts['inpainted'] += 1
                         else:
                             _discard_clean_blob(bank_id, row)
@@ -3692,10 +4317,17 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, 
                            or f"scanned {c['scanned']}, {c['dup_groups']} duplicate group(s)")
         return
     if step == 'auto_reject':
-        rejected = apply_flags(user_id, bank_id, reject_flags) if reject_flags else {}
+        # ONE undo offer for the whole step, not one per sub-pass: the user fired
+        # "Launch all", so the unit they would take back is the auto-reject, not
+        # its second half. The later steps only ADD analysis columns, so undoing
+        # this one leaves them consistent.
+        snap = bank_undo.Snapshot('Launch all — auto-reject')
+        rejected = (apply_flags(user_id, bank_id, reject_flags, snapshot=snap)
+                    if reject_flags else {})
         dup_rejected = 0
         if resolve_dups:
-            dup_rejected = resolve_dups_keep_best(user_id, bank_id)
+            dup_rejected = resolve_dups_keep_best(user_id, bank_id, snapshot=snap)
+        snap.commit(bank_id)
         n = sum(rejected.values()) + dup_rejected
         entry['counts'] = {'rejected': n, 'by_flag': rejected,
                            'duplicates': dup_rejected}
@@ -3773,10 +4405,10 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, 
     entry['status'], entry['reason'] = 'skipped', 'unknown step'
 
 
-def resolve_dups_keep_best(user_id, bank_id) -> int:
+def resolve_dups_keep_best(user_id, bank_id, snapshot=None) -> int:
     """Auto-resolve every unresolved duplicate group keeping the best member,
     for the pipeline's auto-reject step. Returns the number REJECTED."""
-    out = resolve_dups(user_id, bank_id, strategy='best')
+    out = resolve_dups(user_id, bank_id, strategy='best', snapshot=snapshot)
     return out.get('rejected', 0)
 
 
@@ -4015,6 +4647,123 @@ def _import_folder_for(name: str) -> str:
         candidate = root / f'{stem}-{i}'
         i += 1
     return str(candidate)
+
+
+_SCRAPE_EXT = {'JPEG': '.jpg', 'PNG': '.png', 'WEBP': '.webp', 'BMP': '.bmp'}
+
+
+def _scrape_blob_name(raw: bytes) -> str | None:
+    """The filename a downloaded blob gets in a bank folder: its own content
+    hash. Two consequences, both wanted:
+
+    * a resume that re-downloads the SAME bytes writes the same name, so it
+      overwrites itself instead of piling up `photo (2).jpg` — idempotent without
+      anyone having to decide what a duplicate is;
+    * that is file IDENTITY, not curation. Near-duplicates (a re-encode, a crop,
+      the same shot at another size) keep separate names and reach the bank, where
+      the duplicate-group pass and the semantic pass are the ONE place that rules
+      on them. The dataset outlet's dHash gate deliberately does not run here —
+      two different definitions of "duplicate" over one pile is the failure mode
+      this whole path exists to avoid.
+
+    None when the bytes are not a raster image we store."""
+    try:
+        with Image.open(io.BytesIO(raw)) as im:
+            ext = _SCRAPE_EXT.get(im.format)
+    except (OSError, ValueError):
+        return None
+    if not ext:
+        return None
+    return f'{hashlib.sha256(raw).hexdigest()[:24]}{ext}'
+
+
+def scrape_import_to_bank(user_id, items, bank_id=None, name=None) -> dict:
+    """Scrape → BANK: the scraper's second destination.
+
+    Downloads the SELECTED scanned images ({'url','title'}) into a bank's source
+    FOLDER, then lets the ordinary folder walk inventory them. Two modes:
+    ``bank_id`` appends to an existing bank (resume — a bank points at a live
+    folder, so a second scrape simply adds to the pile it already holds), while
+    ``name`` creates a new bank under ``bank_sources_root()`` exactly like
+    "Import to bank" does.
+
+    Deliberately does NOT reuse `scrape_import_urls`: that path is a DATASET
+    intake and rightly refuses what cannot be trained on (side < 768 px, ratio
+    > 3:1) and what it judges a perceptual duplicate. A bank is the step BEFORE
+    that judgement — "too small" and "near-duplicate" are verdicts its own passes
+    produce, with thresholds the user moves. Filtering at download time would
+    delete the evidence before the triage tool ever sees it. What IS kept from
+    that path is the download itself (`_download_scrape_item`: SSRF guard,
+    content-type allow-list, image-magic check, size cap) and the per-request cap.
+
+    Returns {'bank_id', 'name', 'created', 'saved', 'already_there', 'added',
+    'skipped': {...}}. ``added`` is what the folder walk actually inventoried.
+    Raises ValueError (bad input) or BankJobBusy (a pass owns the bank)."""
+    items = [it for it in (items or []) if isinstance(it, dict) and it.get('url')]
+    if not items:
+        raise ValueError('no items')
+    if len(items) > SCRAPE_IMPORT_MAX:
+        raise ValueError(f'max {SCRAPE_IMPORT_MAX} images per import')
+
+    created = False
+    if bank_id is not None:
+        bank = get_bank(user_id, bank_id)
+        if bank is None:
+            raise ValueError('bank not found')
+        # A live pass works off a snapshot of this bank's rows and reports against
+        # a fixed total; refresh_bank also declines to walk underneath it. Adding
+        # files now would land outside both — refuse in the shape the UI knows.
+        if bank_jobs.running(bank.id):
+            # The snapshot can vanish between the two reads (a job that finishes
+            # right here); the refusal must still name something.
+            snap = bank_jobs.get(bank.id) or {}
+            raise bank_jobs.BankJobBusy(snap.get('kind') or 'background')
+        folder = bank.source_path
+        if not folder or not os.path.isdir(folder):
+            raise ValueError('this bank\'s folder is unavailable — relocate it first')
+    else:
+        name = (name or '').strip()
+        if not name:
+            raise ValueError('name is required')
+        folder = _import_folder_for(name)
+        os.makedirs(folder, exist_ok=True)
+        bank = ImageBank(user_id=user_id, name=name, source_path=folder)
+        db.session.add(bank)
+        db.session.commit()
+        created = True
+
+    with ThreadPoolExecutor(max_workers=_SCRAPE_DL_WORKERS) as pool:
+        downloaded = list(pool.map(_download_scrape_item, items))
+
+    skipped: dict[str, int] = {}
+    saved = already_there = 0
+    for reason, raw in downloaded:
+        if reason != 'ok' or not raw:
+            skipped[reason] = skipped.get(reason, 0) + 1
+            continue
+        blob_name = _scrape_blob_name(raw)
+        if blob_name is None:
+            skipped['not_image'] = skipped.get('not_image', 0) + 1
+            continue
+        dest = os.path.join(folder, blob_name)
+        if os.path.exists(dest):
+            already_there += 1
+            continue
+        try:
+            with open(dest, 'wb') as fh:
+                fh.write(raw)
+        except OSError:
+            logger.warning('bank scrape: could not write %s', blob_name, exc_info=True)
+            skipped['errors'] = skipped.get('errors', 0) + 1
+            continue
+        saved += 1
+
+    # ONE inventory path for every bank: the same walk that picks up files the
+    # user drops in the folder by hand picks these up too. No third insert path.
+    sync = refresh_bank(user_id, bank.id, force=True) or {}
+    return {'bank_id': bank.id, 'name': bank.name, 'created': created,
+            'saved': saved, 'already_there': already_there,
+            'added': sync.get('added', 0), 'skipped': skipped}
 
 
 def start_dataset_import(app, user_id, dataset_id, name):

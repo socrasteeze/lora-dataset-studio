@@ -246,6 +246,33 @@ def is_installed() -> bool:
     return bool(p) and p.is_file()
 
 
+def assert_interpreter_ready() -> None:
+    """Refuse a launch whose interpreter provably cannot `import torch`, NAMING
+    the path — the only fact that makes the failure obvious in one second.
+
+    `is_installed()` above only asks whether a file is there. A path that exists,
+    runs, and carries none of ai-toolkit's dependencies passes it, the run starts,
+    and ai-toolkit dies on `ModuleNotFoundError: No module named 'torch'` while the
+    panel suggests a missing base model or a Hugging Face token (GitHub #19,
+    strouder — an `aitoolkit.python` pointing at the Windows Store python stub
+    while a working venv sat next to run.py).
+
+    Refuses ONLY on a proven False. An unknown probe (cold-import timeout) lets
+    the launch through: blocking a real training run on an answer we do not have
+    would be a worse bug than the one this fixes. RuntimeError -> 409 (a backend
+    availability problem, not a bad request)."""
+    from .. import capabilities
+    from .training_diagnostics import interpreter_verdict
+    try:
+        report = capabilities.aitoolkit_interpreter_report()
+    except Exception:
+        return                                   # a broken probe never blocks a run
+    verdict = interpreter_verdict(report['python'], report['torch'],
+                                  alternative=report['alternative'])
+    if verdict:
+        raise RuntimeError(verdict['message'])
+
+
 def _aitoolkit_supports_krea() -> bool:
     """L'ai-toolkit installé connaît-il l'arch Krea 2 ? C'est CRITIQUE : ai-toolkit
     fait `if ModelClass.arch == config.arch` puis, sans match, retombe
@@ -1688,7 +1715,12 @@ def launch_settings_snapshot(ds, family=None) -> dict:
     # Fixed at 1 by every family's recipe today. Recorded anyway: the day it stops
     # being 1, the runs on either side of the change have to be comparable.
     snap['batch_size'] = 1
-    snap['dual_captions'] = bool(s.get('dual_captions'))
+    # Stamped EFFECTIVE, like `ema` and the memory keys: krea/anima cannot train a second
+    # caption (they cache their text embeddings — see _dual_captions_unsupported_reason),
+    # so recording the preference there would make the run comparison claim two runs
+    # differ by dual captions when the trainer saw exactly the same captions.
+    snap['dual_captions'] = (bool(s.get('dual_captions'))
+                             and fam not in DUAL_CAPTION_UNSUPPORTED_FAMILIES)
     # Face masking is a per-run FACT, not a preference: two concept runs that
     # differ only by it are not the same experiment, so it is stamped effective
     # (concept-only, hence the kind check) exactly like `ema` and the memory keys.
@@ -2838,6 +2870,45 @@ def _apply_style_overrides(ds, process: dict, family: str | None = None) -> dict
     return process
 
 
+# Families whose recipe caches the text embeddings and unloads the text encoder to fit
+# their 12B/2B DiT — and which therefore CANNOT honour dual captions (see
+# _dual_captions_unsupported_reason). Kept as data so the preflight can warn before the
+# launch without building a job config; test_dual_captions asserts it stays in sync with
+# what the recipes actually emit, so a new caching family cannot slip in unnoticed.
+DUAL_CAPTION_UNSUPPORTED_FAMILIES = ('krea', 'anima')
+
+
+def _dual_captions_unsupported_reason(process: dict) -> str | None:
+    """Why this ai-toolkit process cannot train dual captions. None = it can.
+
+    ai-toolkit caches ONE embedding per image: TextEmbeddingCachingMixin.cache_text_embeddings
+    encodes `file_item.caption` (the LONG one) and nothing else, and once the encoder is
+    unloaded SDTrainer takes the `if unload_text_encoder or is_caching_text_embeddings`
+    branch, which feeds the model `batch.prompt_embeds` and never looks at the prompt
+    strings again. The short caption has, literally, nowhere to go.
+
+    It does not merely go unused — it crashes the run. The caching pass reaches
+    load_caption() through get_text_embedding_info_dict() WITHOUT the JSON caption dict,
+    so each item is filled from its .txt sidecar (long only) and `raw_caption_short` stays
+    None; load_caption() then short-circuits on the real per-batch call ("we already
+    loaded it"), `caption_short` is never computed, and the doubled prompt list handed to
+    inject_trigger_into_prompt contains None → AttributeError at the first step, after the
+    weights download and the whole caching pass. Reported on krea as GitHub issue #22 by
+    1Tomber; anima emits the identical pair.
+
+    So the combination is refused at config time rather than patched with a placeholder
+    short caption: a placeholder would buy a green run that trains exactly like a
+    long-caption run while claiming otherwise."""
+    train = process.get('train') or {}
+    if any(d.get('cache_text_embeddings') for d in process.get('datasets', ())):
+        return ('this family pre-caches its text embeddings (one embedding per image) '
+                'to free the VRAM its text encoder would hold')
+    if train.get('unload_text_encoder'):
+        return ('this family unloads its text encoder after caching, so no second '
+                'caption can be encoded')
+    return None
+
+
 def _apply_dual_captions(ds, process: dict, dataset_folder) -> dict:
     """Wire ai-toolkit dual long+short captioning onto one process. No-op unless the
     dataset opted in. When on, the FIRST dataset block points at the JSON caption file
@@ -2846,8 +2917,14 @@ def _apply_dual_captions(ds, process: dict, dataset_folder) -> dict:
     BOTH captions. caption_ext is left as-is; it is ignored once folder_path is a JSON file.
 
     Local-only for now: the cloud pod's dataset upload skips the JSON, so the cloud path
-    (_cloudify_job_config) reverts this back to the historical folder + .txt sidecars."""
+    (_cloudify_job_config) reverts this back to the historical folder + .txt sidecars.
+
+    No-op as well on a family that caches its text embeddings — emitting the pair is what
+    crashed issue #22. The run then trains on the long caption alone (the .txt sidecars,
+    trigger included), and the preflight says so before the launch."""
     if not fds.dual_captions_enabled(ds):
+        return process
+    if _dual_captions_unsupported_reason(process):
         return process
     datasets = process.get('datasets') or []
     if not datasets:
@@ -4465,7 +4542,8 @@ _KREA_MIN_VRAM_GB = 24
 _VRAM24_FAMILIES = ('krea', 'flux')   # familles 12B qui recommandent ~24 GB à 1024
 
 
-def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> dict:
+def training_preflight(user_id, dataset_id, train_type=None, variant=None,
+                       lane=None) -> dict:
     """Pre-launch sanity report: {'blockers': [...], 'warnings': [...]}. Blockers
     stop the launch (too few images for the family); warnings ask for one explicit
     confirm in the UI. Pure reads — never mutates, never raises on probe failures
@@ -4478,7 +4556,16 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
     workspace (gf-generate/gf-images) où corriger — None quand rien à cibler.
     NB : le check 'captioned' (images gardées sans caption) est un fail dans
     `checks` (assert_trainable refusera le launch) mais volontairement PAS un
-    blocker ici — le flux modal existant (launch → erreur explicite) est conservé."""
+    blocker ici — le flux modal existant (launch → erreur explicite) est conservé.
+
+    ``lane`` ('local' default, or 'cloud') says WHERE the run will execute. Every
+    row carries a ``scope``: 'dataset' (a property of the images/captions, true
+    wherever the job runs) or 'machine' (a read of THIS box — its GPU, its
+    ai-toolkit venv). A cloud lane drops the 'machine' rows and their warning
+    lines: that hardware will not run the job, and on a machine with no local
+    training environment at all they would fire on every single cloud launch —
+    which is exactly how users learn to click through warnings without reading
+    them. Default 'local' keeps the historical payload byte-for-byte."""
     from .face_variations import caption_has_identity_leak
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
@@ -4487,13 +4574,24 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
     label = _FAMILY_LABEL.get(ttype, ttype)
     blockers, warnings = [], []
     checks = []
+    # `warnings` is a flat list of strings (the modal renders it verbatim), so the
+    # lane filter cannot recognise a machine-scope line by reading it. Record the
+    # indices as they are appended instead — the only reliable pairing.
+    machine_warning_ix = set()
 
-    def _check(cid, clabel, status, detail, target=None, bypassable=None, hint=None):
+    def _machine_warn(msg):
+        machine_warning_ix.add(len(warnings))
+        warnings.append(msg)
+
+    def _check(cid, clabel, status, detail, target=None, bypassable=None, hint=None,
+               scope='dataset'):
         # `bypassable` (fail rows only): True = a QUALITY guard-rail the explicit
         # "Continue anyway" ack can waive; False = a physical impossibility the ack
         # never covers. `hint` = the honest one-line risk shown next to the ack.
+        # `scope`: 'dataset' = a property of the images/captions (true on any lane);
+        # 'machine' = a read of THIS box, meaningless when the job runs elsewhere.
         entry = {'id': cid, 'label': clabel, 'status': status,
-                 'detail': detail, 'target': target}
+                 'detail': detail, 'target': target, 'scope': scope}
         if bypassable is not None:
             entry['bypassable'] = bool(bypassable)
         if hint:
@@ -4616,6 +4714,28 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
         else:
             _check('captioned', 'Every kept image captioned', 'ok', f'{n}/{n} captioned')
 
+    # 3ter) DUAL CAPTIONS vs famille. Krea/Anima pré-cachent les embeddings de texte et
+    # déchargent l'encodeur : la caption courte n'a aucun encodeur pour la lire, et l'émettre
+    # quand même faisait planter le run au 1er step (issue #22, 1Tomber). La combinaison est
+    # refusée à la construction de la config — on le DIT ici, avant le launch, plutôt que de
+    # laisser l'utilisateur croire qu'il entraîne sur deux libellés. scope='dataset' : c'est
+    # une propriété de la recette de famille, vraie sur n'importe quelle voie.
+    # Slider mode is excluded: its guided loss ignores captions entirely, and the
+    # 'captioned' row above already says so — a second row promising two wordings would
+    # contradict it.
+    if fds.dual_captions_enabled(ds) and not slider:
+        if ttype in DUAL_CAPTION_UNSUPPORTED_FAMILIES:
+            warnings.append(
+                f'Dual captions are ON but {label} cannot train them — it pre-caches its '
+                'text embeddings and unloads the text encoder, so only the long caption is '
+                'encoded. The run will train on the long caption alone.')
+            _check('dual_captions', 'Dual captions', 'warn',
+                   f'{label} caches its text embeddings — the short caption is ignored and '
+                   'the run trains on the long one alone', 'gf-training')
+        else:
+            _check('dual_captions', 'Dual captions', 'ok',
+                   f'{label} trains each image on both its long and its short caption')
+
     # 3) captions suspectes (trop courtes / dupliquées) — sans objet en slider mode
     caps = [(r.caption or '').strip() for r in kept if (r.caption or '').strip()]
     if caps and not slider:
@@ -4711,11 +4831,12 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
         from .. import capabilities
         vram = capabilities.gpu_vram_gb()
         if vram is not None and ttype in _VRAM24_FAMILIES and vram < _KREA_MIN_VRAM_GB:
-            warnings.append(f'{label} training needs ~{_KREA_MIN_VRAM_GB} GB of VRAM at 1024 '
-                            f'— this GPU reports {vram} GB; expect OOM or extreme slowness. '
-                            'Drop the resolution to 768 in Advanced options to fit.')
+            _machine_warn(f'{label} training needs ~{_KREA_MIN_VRAM_GB} GB of VRAM at 1024 '
+                          f'— this GPU reports {vram} GB; expect OOM or extreme slowness. '
+                          'Drop the resolution to 768 in Advanced options to fit.')
             _check('vram', 'GPU memory', 'warn',
-                   f'{label} needs ~{_KREA_MIN_VRAM_GB} GB VRAM — this GPU reports {vram} GB')
+                   f'{label} needs ~{_KREA_MIN_VRAM_GB} GB VRAM — this GPU reports {vram} GB',
+                   scope='machine')
     except Exception:
         pass
 
@@ -4731,13 +4852,13 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
         arch = torch_arch_verdict(capabilities.aitoolkit_torch_info(),
                                   venv_python=cfg.aitoolkit_path('venv_python'))
         if arch and not arch['supported']:
-            warnings.append(arch['message']
-                            + (f' Fix: {arch["command"]}' if arch['command'] else ''))
+            _machine_warn(arch['message']
+                          + (f' Fix: {arch["command"]}' if arch['command'] else ''))
             # Keep the row SHORT — it sits in a one-line list next to ten other
             # checks, on a phone too. The full explanation + fix is the warning.
             _check('torch_arch', 'PyTorch supports this GPU', 'warn',
                    f'torch {arch["torch"]} has no {arch["sm"]} kernels — the run '
-                   'dies at the first GPU computation')
+                   'dies at the first GPU computation', scope='machine')
     except Exception:
         pass   # a probe failure must never block or fake a diagnosis
 
@@ -4775,6 +4896,17 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
             _check('face_mask', 'Face masking ready', 'ok',
                    'InsightFace found — the faces will be weighted down')
 
+    # Lane filter — BEFORE the verdict, so a launch whose only complaint was this
+    # machine's GPU comes back clean instead of carrying a warning nobody can act
+    # on. Note what stays: face_mask is machine-INSTALLED but dataset-SCOPED, since
+    # the masks are generated locally at export and travel with the images —
+    # InsightFace missing here means the run trains unmasked. Divergence 4: this
+    # fork surfaces no rental lane, so the branch serves the dormant backend route
+    # only; it is kept because the lane concept is shared with Continue.
+    if (lane or 'local') == 'cloud':
+        checks = [c for c in checks if c.get('scope') != 'machine']
+        warnings = [w for i, w in enumerate(warnings) if i not in machine_warning_ix]
+
     # Verdict agrégé pour la pastille : un fail = rouge, sinon un warn = orange, sinon vert.
     statuses = {c['status'] for c in checks}
     verdict = ('blocked' if 'fail' in statuses
@@ -4797,6 +4929,9 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None) -> di
             # can_override : la case « Continue anyway » n'est offerte que quand c'est True
             # (miroir exact du garde serveur assert_trainable/allow_not_ready).
             'can_override': can_override, 'override_hint': override_hint,
+            # Echoed so the modal can say WHERE this run is headed (and, implicitly,
+            # why no GPU-memory row is listed) without re-deriving it client-side.
+            'lane': ('cloud' if (lane or 'local') == 'cloud' else 'local'),
             'kept': n, 'floor': floor, 'recommended': reco}
 
 
@@ -4857,7 +4992,8 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
     the watcher thread, and an unknown probe adds no key at all."""
     from ..utils.redact import redact_tokens, redact_user_paths
     from .training_diagnostics import (extract_error_excerpt, gated_repo_verdict,
-                                       torch_arch_verdict)
+                                       hf_transfer_verdict, interpreter_verdict,
+                                       missing_module_in_log, torch_arch_verdict)
     wide = _log_tail(log_path, _ERROR_SCAN_LINES)
     payload = {'dataset_id': dataset_id, 'rc': rc,
                'log_tail': redact_tokens(redact_user_paths(_log_tail(log_path)))[-1500:],
@@ -4869,6 +5005,34 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
         if gated:
             payload['hf_gated'] = {k: gated[k] for k in ('status', 'repo', 'url',
                                                          'title', 'message')}
+    except Exception:
+        pass
+    # A dead fast-download accelerator looks exactly like a network fault, and the
+    # app never sets that variable — so saying so is the whole remedy (GitHub #18,
+    # bobba84).
+    try:
+        transfer = hf_transfer_verdict(wide)
+        if transfer:
+            payload['hf_transfer'] = transfer
+    except Exception:
+        pass
+    # A `ModuleNotFoundError` in the log is a PROVEN interpreter problem, and the
+    # one fact the log itself never carries is WHICH Python produced it. The
+    # module is read off the log — no subprocess is spawned from the watcher
+    # thread — and the "which venv works instead" hint costs a probe only here,
+    # on a run that already failed (GitHub #19, strouder).
+    try:
+        module = missing_module_in_log(wide)
+        if module:
+            from .. import capabilities
+            report = capabilities.aitoolkit_interpreter_report()
+            verdict = interpreter_verdict(
+                report['python'] or cfg.aitoolkit_path('venv_python'),
+                False, alternative=report['alternative'], module=module)
+            if verdict:
+                payload['interpreter'] = {k: verdict[k] for k in (
+                    'python', 'module', 'windows_store', 'alternative',
+                    'title', 'message')}
     except Exception:
         pass
     try:
@@ -4954,6 +5118,10 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
     availability problem, not a bad request)."""
     if not is_installed():
         raise RuntimeError('ai-toolkit is not configured')
+    # The interpreter EXISTS; can it actually run ai-toolkit? Asked here, before a
+    # whole dataset is exported, so a torch-less Python is named now instead of
+    # surfacing minutes later as an opaque crash (GitHub #19, strouder).
+    assert_interpreter_ready()
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
@@ -5280,6 +5448,9 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
             queue_manager._get_system_state('training_pid', None))
         if not (_allow_dead_predecessor and previous_is_dead):
             raise ValueError('a training is already in progress')
+    # Same interpreter gate as a fresh launch: a resume spawns the very same
+    # ai-toolkit command, so a torch-less Python must be named here too.
+    assert_interpreter_ready()
     # Validate the safe-subset overrides BEFORE any side effect: a forbidden key
     # (rank/alpha/optimizer/…) must fail loudly with nothing archived or persisted.
     override_patch = validate_resume_overrides(overrides)
@@ -5765,6 +5936,23 @@ _PROG_LOG_MAX_BYTES = 4 * 1024 * 1024   # tail cap: 3000 tqdm updates ≈ 0.5 MB
 _PROG_CURVE_MAX_POINTS = 200
 _PROG_SAMPLES_MAX = 24
 
+# The SAME log also carries huggingface_hub's byte-counter bars while the pod
+# pulls the base weights — the phase that costs the most and reported the least:
+#   raw.safetensors:   7%|▋| 1.95G/26.3G [15:30<2:37:06, 2.58MB/s]
+# Two independent reasons to recognise them.
+#  * They are not steps. '0.00/26.3G' matched _PROG_STEP_RE as "0/26", so a run
+#    downloading its base model showed 'step 0 / 26' — a plausible-looking
+#    number that was pure noise (verified on the run-121 log, 2026-07-28).
+#  * They ARE the answer to "is it downloading or is it frozen?", which nothing
+#    surfaced: two users waited hours in front of a fixed sentence.
+# The discriminator is the rate unit: tqdm prints B/s only for byte bars
+# (it/s or s/it for step bars). '?B/s' (no estimate yet) counts too.
+_DOWNLOAD_PROG_RE = re.compile(
+    r'(?P<label>[^\r\n|]{1,80}?):\s*(?P<percent>\d{1,3})%\|[^|]*\|\s*'
+    r'(?P<done>[\d.]+\s*[kKMGTP]?)/(?P<total>[\d.]+\s*[kKMGTP]?)\s*'
+    r'\[(?P<elapsed>[\d:]+)<(?P<eta>[\d:?]+),\s*(?P<speed>[\d.?]+\s*[kKMGTP]?B/s)\s*\]')
+_DOWNLOAD_RATE_RE = re.compile(r'[\d.?]\s*[kKMGTP]?B/s')
+
 
 def _parse_training_log(text: str) -> dict:
     """Extract (step, total, loss, speed, eta, loss_curve) from raw log text.
@@ -5778,6 +5966,10 @@ def _parse_training_log(text: str) -> dict:
         # contains incidental 'X/Y' text (dataset counts, resolutions) that must not
         # be read as progress.
         if '%|' not in seg and not lm:
+            continue
+        # A byte bar is a download, not a training step: '0.00/26.3G' read as
+        # step 0 of 26 is worse than no number at all.
+        if _DOWNLOAD_RATE_RE.search(seg):
             continue
         sm = None
         for sm in _PROG_STEP_RE.finditer(seg):
@@ -5808,6 +6000,40 @@ def _parse_training_log(text: str) -> dict:
         curve = [curve[int(i * stride)] for i in range(_PROG_CURVE_MAX_POINTS - 1)] + [curve[-1]]
     out['loss_curve'] = curve
     return out
+
+
+def parse_download_progress(text: str) -> dict | None:
+    """The LAST byte-counter bar in the log, or None when there is none.
+
+    Pure function. Returns the figures exactly as tqdm printed them — strings,
+    not converted numbers: '1.95G' is what the log says, and inventing
+    1.95 × 1024³ bytes from it would be a number the log never contained (the
+    unit divisor is the producer's choice, not ours). The caller displays them
+    and compares `done` for movement; neither needs a conversion.
+
+    Degrades on purpose: this format belongs to huggingface_hub/tqdm and can
+    change or be absent (some phases print no bar at all). Anything that does
+    not match EVERY field is not guessed at — it yields None, and the caller
+    keeps whatever it was already showing."""
+    last = None
+    for seg in re.split(r'[\r\n]+', text or ''):
+        m = _DOWNLOAD_PROG_RE.search(seg)
+        if m:
+            last = m
+    if last is None:
+        return None
+    label = last.group('label').strip()
+    # tqdm re-prints the bar with a bumped elapsed even while the byte counter
+    # is frozen (measured on the run-121 log: 1.95G at 15:11, then at 15:30).
+    # 'done' is therefore the only field that means "it moved".
+    return {'label': label[-60:] or 'download',
+            'percent': min(100, int(last.group('percent'))),
+            'done': last.group('done').strip(),
+            'total': last.group('total').strip(),
+            'elapsed': last.group('elapsed'),
+            'eta': None if '?' in last.group('eta') else last.group('eta'),
+            'speed': (None if '?' in last.group('speed')
+                      else last.group('speed').strip())}
 
 
 def _samples_dir(user_id, dataset_id, base_model=_PERSISTED, family=None,
@@ -5905,6 +6131,10 @@ def training_progress(user_id, dataset_id, base_model=_PERSISTED, family=None,
     log_path = _run_log_path(ds, base_model, family, variant)
     parsed = {'step': None, 'total': None, 'loss': None, 'speed': None, 'eta': None,
               'loss_curve': []}
+    # A local run downloads its base weights too (the first run of a family
+    # pulls tens of GB from Hugging Face), and showed the same motionless
+    # 'Starting up...' the cloud card showed. Same parser, same degradation.
+    download = None
     log_exists = os.path.isfile(log_path)
     if log_exists:
         try:
@@ -5912,10 +6142,13 @@ def training_progress(user_id, dataset_id, base_model=_PERSISTED, family=None,
             with open(log_path, encoding='utf-8', errors='replace') as fh:
                 if size > _PROG_LOG_MAX_BYTES:
                     fh.seek(size - _PROG_LOG_MAX_BYTES)
-                parsed = _parse_training_log(fh.read())
+                text = fh.read()
+            parsed = _parse_training_log(text)
+            download = parse_download_progress(text)
         except OSError:
             log_exists = False
     return {'active': active, 'log_exists': log_exists, **parsed,
+            'download': download,
             'masks_skipped': bool(active and queue_manager._get_system_state('training_masks_skipped', False)),
             'samples': list_training_samples(
                 user_id, dataset_id, base_model, family, variant=variant)}

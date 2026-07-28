@@ -499,6 +499,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
     : kleinUnavailableReason({
       enabledInSettings: enabledEngines.includes('klein'),
       comfyuiReachable: !!caps.comfyui?.reachable,
+      comfyui: caps.comfyui,
       missingAssets: caps.comfyui?.klein_missing,
       unsupportedEnums: caps.comfyui?.klein_unsupported_enums,
     });
@@ -509,6 +510,7 @@ export default function VariationCatalog({ onGenerate, busy, generating = null, 
   const kreaHint = krAvailable ? null : kreaUnavailableReason({
     enabledInSettings: enabledEngines.includes('krea'),
     comfyuiReachable: !!caps.comfyui?.reachable,
+    comfyui: caps.comfyui,
     missingAssets: caps.comfyui?.krea_missing,
     missingNodes: caps.comfyui?.krea_nodes_missing,
     invalidAssets: caps.comfyui?.krea_invalid,

@@ -50,6 +50,207 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-28-scrape-straight-into-a-bank',
+    date: '2026-07-28',
+    title: 'Scrape the web straight into a bank — no throwaway dataset first',
+    blurb:
+      'The scraper had one outlet: straight into a dataset, through filters made for training — anything under 768 px, anything wider than 3:1 and anything it judged a near-duplicate was dropped before you ever saw it. Getting a scrape into the Image bank meant building a dataset you did not want, then importing it back, having already lost the images the triage passes exist to judge. The Image bank page now has its own scrape section: same scan, same picking, you just choose which bank receives them — a new one, or more into a bank you are already triaging. Nothing is filtered on the way in; the quality, duplicate and framing passes rule on the pile, and you promote the keepers into a dataset as usual.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-cloud-run-download-bytes-and-durable-freeze-clock',
+    date: '2026-07-28',
+    title: 'A run downloading its base weights now shows the bytes, not a frozen sentence',
+    blurb:
+      'While a run fetches its base weights — 26 GB for Krea — the card used to show one motionless line, "fetching transformer weights", for as long as it took, with nothing to tell a healthy download from a stalled one. It now reads the download\'s own counter: how much has landed, of how much, at what speed, with the ETA. The "no progress" warning is finally reliable too — it is measured on what the job actually does, so restarting the app no longer resets it.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-07-28-generation-works-on-linux-and-across-wsl',
+    date: '2026-07-28',
+    title: 'Generation works on Linux — and when ComfyUI runs in WSL or a container',
+    blurb:
+      'On Linux, nothing generated at all: every model kept in a subfolder (Krea, Klein, Z-Image, your trained LoRAs — which is all of them) was handed to ComfyUI with Windows-style backslashes, and ComfyUI rejected the whole workflow before the first step. Model names are now spelled the way the ComfyUI you are actually talking to spells them, read from that install itself — so it also works the other way round, when the app runs on Windows and ComfyUI lives in WSL, Docker or on another machine. Found and diagnosed by 1Tomber (GitHub #21).',
+  },
+  {
+    id: '2026-07-28-pick-diverse-and-balanced-are-fast-again',
+    date: '2026-07-28',
+    title: 'Pick diverse and ⚖ Balanced pick answer in about a second',
+    blurb:
+      'On a large bank these two buttons took over half a minute, almost all of it spent computing the same thing over and over: how crowded each image\'s neighbourhood is, plus one filesystem lookup per image that had already been done. The maths now runs on an optimised BLAS, the bank folder is resolved once instead of once per image, and a second click on an unchanged bank reuses the scores it just read. Measured on a real 9 500-image pool: 32 seconds down to roughly two. The images picked are exactly the same ones — this is speed, not a different selection.',
+  },
+  {
+    id: '2026-07-28-dual-captions-no-longer-crash-krea-and-anima',
+    date: '2026-07-28',
+    title: 'Dual captions no longer crash a Krea 2 or Anima run',
+    blurb:
+      'Turning on dual captions before a Krea 2 or Anima run made training die at the first step with a NoneType error — after the weights download and the whole caching pass. Those two families pre-cache their text embeddings and unload the text encoder to fit in VRAM, so there is no encoder left to read a second caption. The app now says so on the toggle and in the pre-launch check, and trains on the long caption alone instead of building a config that cannot run. Reported by 1Tomber (GitHub #22).',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-07-28-comfyui-slow-is-not-comfyui-stopped',
+    date: '2026-07-28',
+    title: 'A busy ComfyUI is no longer reported as a stopped one',
+    blurb:
+      'The app gave ComfyUI 8 seconds to list its nodes and model files — and that list grows with every custom-node pack and every weight you install, so the richer your ComfyUI, the more likely it ran out of time. Krea 2 generations then refused with "ComfyUI isn\'t running" at a ComfyUI that was running perfectly. The budget is now 45 seconds and adjustable (Settings ▸ Local tools ▸ ComfyUI ▸ "ComfyUI response timeout"), and a slow ComfyUI and a stopped one no longer share one message: one tells you to raise the timeout, the other to start ComfyUI. A ComfyUI that is genuinely off is still detected in seconds, so nothing waits 45 seconds for nothing. Found, measured (~15 s on his install) and fixed by j_o_e_l. (Discord).',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-28-bank-undo-last-bulk-decision',
+    date: '2026-07-28',
+    title: 'Marked 400 bank images by mistake? Take it back.',
+    blurb:
+      'A bank\'s bulk actions — ✓/✕ over a whole filter, auto-reject at a threshold, collapsing duplicate groups, Launch all — now leave an ↩ Undo bar above the grid. One press puts every image back exactly as it was, its state and its reason, without touching the images the action never moved. The bar waits for you instead of vanishing on a timer, and it survives a page reload. Limits stated on the bar itself: one step back, and only until the app restarts. Delete rejected and ⬆ Promote deliberately offer nothing, because neither can be undone honestly — and if an undo cannot restore everything, it says how many it restored and names what it left alone.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-balanced-pick',
+    date: '2026-07-28',
+    title: 'Pick a set that covers your framings, not just the top of a ranking',
+    blurb:
+      'Asking for "the 60 most varied" of a bank that is mostly full-body shots gives you mostly full-body shots — on a realistic test pool it returned 0 face shots and 0 back views out of 20, and nothing said so. ⚖ Balanced pick spreads the same sampling evenly over face / bust / body / back (optionally per person), tells you exactly what you got — "5 face, 5 bust, 5 body, 5 back" — and names any framing it could not fill instead of quietly padding with something else. It sits in the Curate row and at the bottom of Coverage advice, where the advice finally becomes a gesture.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-crops-keep-their-own-resolution',
+    date: '2026-07-28',
+    title: 'Cropping in no longer blows the crop up to 1024 px',
+    blurb:
+      'A crop used to be stretched to a 1024 px long side whatever its real size, so a 240×180 selection was stored as 1024×768. Those extra pixels carried nothing — shrinking such a file back recovers the real crop almost exactly — while costing about 6× the bytes now that crops are stored losslessly. A crop is now never enlarged beyond what you actually selected; anything LARGER than 1024 px is still normalised down to 1024, exactly as before. Two things to know: new crops are smaller images than old ones, so a dataset can end up mixing sizes — training handles that (it buckets by size), but the smallest tiles genuinely carry less detail. That is what the composition meter now says out loud: the old "⚠ Upscaled" line is now "⚠ Under training resolution", and it still flags a framing bucket you filled by cropping far into a photo instead of adding native shots. Images cropped BEFORE this keep the enlarged pixels they already have.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-broken-model-replaced-only-once-the-new-one-arrives',
+    date: '2026-07-28',
+    title: 'A corrupted model file is only deleted once its replacement has landed',
+    blurb:
+      'Setup can now spot a model file that cannot be loaded (a login page saved under the model name, a truncated download) and re-fetch it. It used to delete the broken file first and download after — so an expired token, a re-gated repo or a host that was simply down left you with nothing at all instead of something broken. Now the download is opened and checked first, and the old file is only removed once real weights are actually on disk. Nothing is ever thrown away for a download that did not happen.',
+    to: '/setup',
+  },
+  {
+    id: '2026-07-28-bank-rerun-buttons-say-what-is-happening',
+    date: '2026-07-28',
+    title: 'The bank\'s ↻ re-run buttons finally tell you what is going on',
+    blurb:
+      'A bank runs one pass at a time, so pressing ↻ Re-group duplicates while a ✨ Score was still walking the bank could only ever produce a red "a scan job is already running on this bank" — a sentence with no progress and no way out. Those buttons are now disabled while another pass owns the bank, and each says which one and how far it has got ("✨ Score pass is running — 137 / 412"), pointing at Stop. When a re-run does go through, it reports what it produced right where you pressed it — "Done — 12 duplicate groups · 34 images (was 9 · 26)" — and says "unchanged" when your new value groups exactly the same images, instead of leaving you unable to tell a no-op from a pass that never ran. Every other occupied-bank refusal in the bank (Promote, Delete rejected, Launch all, the watermark passes) is now worded the same way.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-cropping-no-longer-recompresses',
+    date: '2026-07-28',
+    title: 'Cropping no longer quietly re-compresses your image',
+    blurb:
+      'Every crop was re-encoded to lossy WebP, so cropping a PNG degraded it — and left a .png file holding WebP bytes. Crop and the watermark cleaners now keep the file\'s own format and write it back without losing pixels, like ✂ Mirror and ↺ Rotate already did: crop the same shot ten times and the tenth is identical to the first. JPEG has no lossless mode, so it is re-saved at the highest practical quality instead of being converted to something heavier. Cropped files are noticeably bigger now — that is the price of keeping the pixels. Two honest limits: a box longer than 1024 px is still rescaled down to it, and that resampling can never be lossless (only the watermark ✂ auto-crop, which never resizes, is); and images you cropped BEFORE this keep the pixels they have — nothing is re-processed retroactively.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-rotate-images-in-the-dataset-and-the-bank',
+    date: '2026-07-28',
+    title: 'Straighten a sideways photo — rotate 90° in the dataset and in the bank',
+    blurb:
+      'Idea by 1Tomber (GitHub #17). ↺ / ↻ turn an image a quarter turn: in the dataset from the image inspector, next to Mirror, and in the bank from the selection bar or straight inside ▶ Review ([ and ]). It costs the image nothing it does not have to: a dataset PNG or WEBP comes back pixel-for-pixel identical after four turns, and in the bank your own files are never rewritten at all — the turn is remembered and applied to what you see and to what gets promoted.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-offline-is-not-empty',
+    date: '2026-07-28',
+    title: 'Losing the connection no longer looks like your job stopped',
+    blurb:
+      'Leaving a running pass and coming back on a phone used to greet you with ten stacked "Connection lost" banners over the whole app — and no progress bar, because the poll behind it had failed. The banners are now one line that counts repeats, automatic polls fail silently, and a single "Offline — reconnecting…" strip takes over: your progress stays on screen, marked as the last thing we heard. Passes always kept running on the server; now the screen says so, and says it again when the connection is back.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-bank-filter-thresholds-in-place',
+    date: '2026-07-28',
+    title: 'Tune every Bank filter without leaving the bank',
+    blurb:
+      'The twelve numbers behind the filter chips — blurry, small, duplicate, NSFW — were only editable in Settings, three screens from the bank you were triaging. They are now under the chips too, in Filter thresholds: grouped by what they answer, each one saying which way catches MORE images (the duplicate distance and the semantic similarity move opposite ways), when it takes effect, and how many images the value you are typing would flag — before you save. Reset any one, or all of them, to the shipped defaults. Same setting as Settings, so it applies to every bank.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-canvas-pin-all-generated-images',
+    date: '2026-07-28',
+    title: 'One click puts every image a canvas run made onto the board',
+    blurb:
+      'A finished generation said “5 images ready” and left you to open each checkpoint’s gallery and pin the pictures one by one. The green bar now carries Pin all — the whole lot lands on the board in one go, each image in its own column under the checkpoint that made it, and nothing is ever placed on top of anything else. It says how many it put down, names anything it left out, and ↩ Undo takes them straight back off.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-28-canvas-node-buttons-reachable-on-a-phone',
+    date: '2026-07-28',
+    title: 'The ✕ on a pinned image can be tapped again',
+    blurb:
+      'Closing a picture pinned on the LoRA Canvas did not work on a phone. The buttons were drawn at the board’s zoom, so on a board read at 65 % the cross was about ten pixels wide with the right beside it — a near miss opened the full-screen view instead of closing the node. The ✕, the and the resize corner now keep a real finger-sized target at every zoom level.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-07-28-preflight-before-cloud-and-continue',
+    date: '2026-07-28',
+    title: 'The pre-training check now runs before ▶ Continue too',
+    blurb:
+      'Continuing a run from a checkpoint skipped the pre-training review entirely, so leaking captions, near-duplicate images and pictures still waiting on a ✓/✕ went into the continuation unnoticed — the same review a fresh launch has always shown. ▶ Continue now opens it, with its editable caption list and its reject-one-of-each pairs, and it stays advisory: you can read it and go ahead anyway.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-zimage-finds-its-own-encoder-and-vae',
+    date: '2026-07-28',
+    title: 'Z-Image no longer asks you to rename your files',
+    blurb:
+      'The Test Studio demanded one exact spelling for the Z-Image text encoder and VAE — “z ae.safetensors” with a space, inside a folder capitalised “Z image”. Anything else, including ComfyUI’s own documented names, read as missing. The app now finds them itself: any capitalisation, any separator (z_ae, z ae, z-ae), any sub-folder, across every extra_model_paths root. If nothing is there it still tells you exactly what to place and where. Thanks to bobba84 (GitHub #18).',
+  },
+  {
+    id: '2026-07-28-zimage-base-keeps-its-own-settings',
+    date: '2026-07-28',
+    title: 'Z-Image Base starts on Base settings, not Turbo’s',
+    blurb:
+      'Selecting a non-distilled Z-Image Base in the Test Studio opened on CFG 1 and 8 steps — correct for the distilled Turbo build and ruinous for Base, which needs real guidance and far more steps. Each base model now proposes its own starting CFG and step count, and the pickers reach the values Base needs. Anything you had already chosen yourself is left exactly as it was. Thanks to bobba84 (GitHub #18).',
+  },
+  {
+    id: '2026-07-28-training-names-the-python-it-uses',
+    date: '2026-07-28',
+    title: 'Training now tells you WHICH Python it is about to run',
+    blurb:
+      'A path that exists, runs, and has no torch used to pass every check — then every run died on "No module named \'torch\'" while the panel suggested a missing base model or a Hugging Face token, two dead ends. The app now tries `import torch` on the interpreter you configured before it launches anything, and if it fails it refuses with the path on screen, points out a Windows Store python.exe when that is what you picked, and offers the working venv sitting next to run.py. The Test button in Settings ▸ Local tools checks the same thing, and a torch failure never mentions Hugging Face again. Reported in detail by strouder (GitHub #19).',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-28-a-failed-download-is-not-always-your-network',
+    date: '2026-07-28',
+    title: 'A download that dies is no longer blamed on your connection',
+    blurb:
+      'The optional Hugging Face fast-download accelerator (HF_HUB_ENABLE_HF_TRANSFER) needs the hf_xet package, and without it transfers abort with something that reads exactly like a network fault — so people go and check their firewall. The training failure panel now recognises it and names both fixes: set the variable to 0, or install hf_xet. The app never sets that variable itself; it comes from your shell or another tool. Reported by bobba84 (GitHub #18).',
+  },
+  {
+    id: '2026-07-28-guide-explains-the-two-folders',
+    date: '2026-07-28',
+    title: 'The Guide finally explains which folder does what',
+    blurb:
+      'A full-local install is three programs, two folders, two ports and two Python environments — and nothing said so, which cost one user hours of patching ai-toolkit\'s own web UI (port 8675) while the real problem was one setting here. Getting started now has a short table: the Studio and its .venv drive training and read config.json, ai-toolkit\'s venv is the one that needs torch, and its Next.js UI is unrelated. It also documents the Python versions that actually work — 3.11 for ai-toolkit, and 3.11.9 on Windows because later 3.11 releases ship no installer. Reported by strouder (GitHub #19).',
+    to: '/guide',
+  },
+  {
+    id: '2026-07-28-pin-to-canvas-from-the-thumbnail',
+    date: '2026-07-28',
+    title: 'Put a generated image on the board without opening it first',
+    blurb:
+      'Pinning a render onto the lineage board was only offered once you had opened it full-screen, so most people never learned the board could hold images at all. Every thumbnail in a run or checkpoint gallery now carries a of its own — one tap and it lands on the board next to the checkpoint that made it. It stays out of the way while you are selecting images to delete, so nothing new can be tapped by mistake.',
+  },
+  {
+    id: '2026-07-28-klein-refusals-name-the-cause',
+    date: '2026-07-28',
+    title: 'When Klein is greyed out, the app now tells you which thing is wrong',
+    blurb:
+      'The watermark cleaner and the small-image rescue used to answer every Klein refusal the same way — "needs ComfyUI running and the Klein models" — even when ComfyUI was running and the models were right there. They now show the same precise sentence the generation page does: the exact file that is missing, the file that is present but corrupted, the widget value your ComfyUI does not offer, or the engine being switched off in Settings. The cleaner also stops treating a broken weight as usable and silently handing it to ComfyUI.',
+  },
+  {
+    id: '2026-07-28-setup-checks-every-file-it-skips',
+    date: '2026-07-28',
+    title: 'Setup checks every file it decides not to re-download',
+    blurb:
+      'A download can be skipped because some other file already covers it — an earlier build under its old name, a copy in a folder you added through extra_model_paths, or a model you placed by hand. None of those were being opened before being vouched for, so a corrupted one sent you back into the same dead end by a different door. Each of them is now validated, and a file that cannot be loaded no longer counts as installed.',
+    to: '/setup',
+  },
+  {
     id: '2026-07-28-setup-stops-certifying-broken-models',
     date: '2026-07-28',
     title: 'Setup no longer says a model is installed when it cannot be loaded',

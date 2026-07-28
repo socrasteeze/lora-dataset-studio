@@ -135,14 +135,18 @@ class FaceDatasetImage(db.Model):
     # affiché sur la tuile — sinon l'échec est muet et l'utilisateur relance à
     # l'aveugle. Nettoyé au regenerate. Colonne additive (migration create_app).
     fail_reason = db.Column(Text, nullable=True)
-    # Facteur d'agrandissement appliqué par le crop (head-crop auto à l'import OU
-    # recadrage manuel) pour atteindre le carré 1024 : size / côté_de_la_box. NULL =
+    # De combien la box recadrée (head-crop auto à l'import OU recadrage manuel) est
+    # en-dessous de la résolution d'entraînement : size / côté_de_la_box. NULL =
     # jamais croppé (import plein cadre) ou pas encore recalculé (anciennes lignes).
-    # >1 = le crop était plus petit que 1024 et a été agrandi (LANCZOS) — ce pixel-là
-    # est donc de la texture inventée, pas du détail réel, et sur-pèse la loss de
-    # cette image proportionnellement à sa part du cadre. Colonne additive (migration
-    # create_app). Alimente composition_upscaled (dataset_payload) pour repérer un
-    # dataset trop chargé en gros plans fabriqués plutôt que natifs.
+    # >1 = la box était plus petite que 1024. Deux producteurs, pixels différents,
+    # MÊME sens et même remède :
+    #   - import head-crop : la box est agrandie (LANCZOS) → texture inventée ;
+    #   - recadrage manuel : depuis la fin de l'agrandissement, la tuile garde ses
+    #     pixels et reste donc simplement sous la résolution d'entraînement.
+    # Dans les deux cas le cadrage est « rempli en recadrant », pas par une vraie
+    # prise native. Valeur et échelle INCHANGÉES (ne pas plafonner : le seuil
+    # UPSCALE_WARN_THRESHOLD et les lignes existantes en dépendent). Colonne additive
+    # (migration create_app). Alimente composition_upscaled (dataset_payload).
     upscale_ratio = db.Column(Float, nullable=True)
     # Watermark auto-correction (V1) : détection + suppression des watermarks INCRUSTÉS
     # (logo de site, URL, pseudo, texte de studio ajouté PAR-DESSUS la photo scrapée) —
@@ -321,6 +325,17 @@ class BankImage(db.Model):
     jpeg_quality = db.Column(Float, nullable=True)
     origin = db.Column(String(8), nullable=True, index=True)
     origin_evidence = db.Column(String(24), nullable=True)
+    # Manual turn, in degrees CLOCKWISE: NULL/0 = untouched | 90 | 180 | 270.
+    # (Idea by 1Tomber, GitHub #17.) A bank is a READ-ONLY view over the user's
+    # own folder, so a rotation cannot rewrite their file — it is stored here and
+    # applied by the ONE resolver every reader goes through
+    # (image_bank_service.resolved_image_path), which materialises a turned copy
+    # in the bank's own working directory. That makes the turn free of loss where
+    # it matters: the source keeps its exact bytes, and the derived copy is always
+    # rebuilt from that pristine source, so ANY angle costs exactly one re-encode
+    # and four quarter turns cost zero (the row is back at 0 and the copy is
+    # dropped). Additive column — existing banks carry NULL and behave as before.
+    rotation = db.Column(Integer, nullable=True)
     # Triage decision — same words as dataset images (pending|keep|reject).
     # reject_reason: blur|noise|uniform|small|duplicate|unreadable|manual
     #                |low_aesthetic|nsfw|watermark (the V2 score-derived flags)

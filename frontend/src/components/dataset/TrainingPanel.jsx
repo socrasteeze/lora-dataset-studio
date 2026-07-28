@@ -6,6 +6,7 @@ import { getCsrfToken } from '../../api/fetchClient';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { postJson } from '../../hooks/useDataset';
 import { animeFamilyNote } from './animeFamilyNote.js';
+import { dualCaptionsSupport } from './dualCaptions.js';
 import ConceptFaceMaskField from './ConceptFaceMaskField';
 import {
   checkpointSelectionMatchesTraining,
@@ -45,6 +46,7 @@ import { graphContinueRefusal } from './lineageContinue.js';
 import RunLineageGraph from './RunLineageGraph';
 import TrainingProgress from './TrainingProgress';
 import PreflightModal from './PreflightModal';
+import { laneOfPayload, preflightUrl } from './preflightLane.js';
 import { failureView } from './trainingFailure';
 import {
   MEMORY_KEYS, MEMORY_LABELS, memoryAdviceText, memoryIsOverridden, memoryPatchFor,
@@ -684,10 +686,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     preflightResolver.current?.(ok);
     preflightResolver.current = null;
   };
-  const preflightOk = async () => {
+  // `lane` ('local' | 'cloud') decides which rows are relevant: a cloud run is
+  // not going to care about this box's VRAM or torch build. trainType/variant
+  // default to the panel's selection, but ▶ Continue overrides them with the
+  // checkpoint's own family so the image floor is checked against the right one.
+  const preflightOk = async ({ lane, trainType: tt, variant: va } = {}) => {
     try {
       const r = await fetch(
-        `/api/dataset/${ds.currentId}/train/preflight?train_type=${encodeURIComponent(trainType)}&variant=${encodeURIComponent(variant)}`,
+        preflightUrl(ds.currentId, { trainType: tt ?? trainType, variant: va ?? variant, lane }),
         { credentials: 'include' });
       if (!r.ok) return true;
       const d = await r.json();
@@ -733,7 +739,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     // ONE dialog, two lanes: the chosen checkpoint either resumes on this machine
     // or is seeded onto a fresh cloud pod. Same payload, same guarded+confirmable
     // request helper — only the hook call differs.
-    const inCloud = payload.lane === 'cloud';
+    const lane = laneOfPayload(payload);
+    const inCloud = lane === 'cloud';
+    // Continuing trains on the LIVE dataset, which can have drifted since the run
+    // started (images added, captions edited, triage left half-done) — so it gets
+    // the same sanity gate as a fresh launch, on whichever lane it resumes. The
+    // checkpoint's own family/variant, not the panel's current selection.
+    if (!(await preflightOk({ lane, trainType: checkpointTrainType,
+                              variant: checkpointVariant }))) return;
     await runConfirmableTrainingRequest(
       (continueOpts) => (inCloud ? ds.continueTrainingInCloud : ds.continueTraining)(
         payload.extraSteps, checkpointBase, checkpointVariant, checkpointTrainType,
@@ -1202,6 +1215,35 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         return (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-200 text-[0.6875rem]">
           <div className="font-semibold">⚠ {view.title}</div>
+          {/* WHICH Python ai-toolkit was run with. A path that exists and runs but
+              has no torch passes every folder check, so the run dies on
+              "No module named 'torch'" with nothing pointing at the setting at
+              fault — hours lost, reported by strouder (GitHub #19). Named first,
+              above every other verdict: once the path is on screen the mistake is
+              obvious in one second. `break-all` because these paths are long and
+              the panel has to survive a 400 px phone. */}
+          {view.interpreter && (
+            <div className="mt-1.5 rounded border border-amber-400/40 bg-amber-500/10 p-2 text-amber-100">
+              <div className="font-semibold">{view.interpreter.title}</div>
+              <p className="m-0 mt-0.5 break-words text-amber-200/90">{view.interpreter.message}</p>
+              <div className="mt-1 break-all font-mono text-[0.625rem] text-amber-100">
+                {view.interpreter.python}
+              </div>
+              <a href="#/settings/local-tools?focus=aitoolkit-python"
+                className="mt-1 inline-block text-amber-300 underline decoration-amber-300/50">
+                Settings ▸ Local tools ▸ Python interpreter →
+              </a>
+            </div>
+          )}
+          {/* The optional Hugging Face fast-download accelerator, dead. It reads
+              like a network fault and is not one, and the app never sets that
+              variable — reported by bobba84 (GitHub #18). */}
+          {view.hfTransfer && (
+            <div className="mt-1.5 rounded border border-amber-400/40 bg-amber-500/10 p-2 text-amber-100">
+              <div className="font-semibold">{view.hfTransfer.title}</div>
+              <p className="m-0 mt-0.5 break-words text-amber-200/90">{view.hfTransfer.message}</p>
+            </div>
+          )}
           {/* The GPU-architecture verdict is a PROVEN cause read from the venv
               that trains — it goes first, above the log, with its remedy. */}
           {view.gpuArch && (
@@ -1962,6 +2004,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
                   <span className="text-content-muted text-[0.75rem]">long + short (local training only)</span>
                 </label>
+                {/* Issue #22 (1Tomber): Krea 2 / Anima cache their text embeddings, so the
+                    short caption can never be encoded. Say it here rather than let the user
+                    believe two wordings are training. Wraps at 400 px — no fixed width. */}
+                {advDualCaptions && !dualCaptionsSupport(trainType).supported && (
+                  <span className="text-amber-400 text-[0.6875rem] leading-relaxed">
+                    Ignored here: {dualCaptionsSupport(trainType).note}
+                  </span>
+                )}
                 <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> trains each image with both a full and a brief
                   caption (text-side augmentation) so the LoRA leans less on any single wording.

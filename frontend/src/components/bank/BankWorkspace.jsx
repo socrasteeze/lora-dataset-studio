@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
 import { useCapabilities } from '../../context/CapabilitiesContext'
+import { useConnectionStatus } from '../../hooks/useConnectionStatus'
 import DupGroupsPanel from './DupGroupsPanel'
 import PromoteDialog from './PromoteDialog'
 import DeleteRejectedDialog from './DeleteRejectedDialog'
@@ -12,8 +13,15 @@ import FolderSyncNote from './FolderSyncNote'
 import RelocateBankDialog from './RelocateBankDialog'
 import BankReviewLightbox from './BankReviewLightbox'
 import BankWatermarkPanel from './BankWatermarkPanel'
+// The twelve triage thresholds, edited here instead of in Settings.
+import BankThresholdsPanel from './BankThresholdsPanel.jsx'
 // Source-folder re-walk messages (pure/testable).
 import { folderSyncToast } from './bankSync.js'
+import { UNDO_HINT, undoBannerText, undoOffer, undoResultMessage } from './bankUndo.js'
+// Four progress states, not two — including the honest "I don't know" (pure/testable).
+import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } from './progressPresence.js'
+// An occupied bank refuses in OUR words, never in the server's (pure/testable).
+import { busyRefusal } from './bankPassRun.js'
 import { holdsTheGpu, scoreDeviceNote } from './bankScoreDevice.js'
 // Wording that adapts to the machine (a card-less box is never sold CUDA).
 import { openerLabel } from './scoringPython.js'
@@ -30,6 +38,12 @@ import { bankSortOptions } from '../../utils/gridSort.js'
 import {
   limitsSentence, pendingLabel, readinessHint, summarize,
 } from './bankTextSearch.js'
+// ⚖ Balanced pick — the distribution obtained, in words and numbers. Pure logic
+// on purpose: the repartition is what has to be provable (node --test, no JSX).
+import {
+  BALANCE_AXES, BALANCE_DEFAULT_AXIS, balanceNotes, balanceReadiness,
+  balanceRows, summarizeBalance,
+} from './bankBalance.js'
 
 const PAGE_SIZE = 120
 
@@ -105,15 +119,73 @@ const STEP_SHORT = {
   framing: 'Framing', caption: 'Caption',
 }
 
-function ProgressBar({ activity, onCancel }) {
-  if (!activity || activity.finished) return null
+/* No contact with the server, so no fresh job snapshot. Saying NOTHING here is
+   the bug this replaces: a pass that is running perfectly well in the bank's
+   server-side thread looked exactly like a pass that had stopped. Plain text,
+   NOT a live region — the global ConnectionBanner already announces the outage
+   once, and a second live region would double every announcement. */
+function ProgressUnknown({ stale }) {
+  return (
+    <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-content-muted">
+      {stale
+        ? 'Lost contact — the progress above is the last thing we heard. The pass keeps running on the server.'
+        : 'Lost contact — can’t read job progress right now. Anything you started keeps running on the server; this comes back when the connection does.'}
+    </p>
+  )
+}
+
+/** ↩ The net under the bank's biggest gesture.
+ *
+ * Deliberately NOT a toast: a bar that vanishes after four seconds is unusable
+ * for anyone who reads slowly, and this is the one control you reach for after
+ * realising you just marked 400 images wrong. It stays until it is used,
+ * dismissed, or replaced by a newer action — and it is fed by the bank payload,
+ * so it is still there after a reload, unlike an undo that only ever lived in
+ * this tab.
+ *
+ * `role="status"` + `aria-live="polite"` so a screen reader is told the net
+ * exists at the moment the bulk action lands, without stealing focus from the
+ * grid. Both controls are real buttons, in tab order.
+ */
+function UndoBar({ offer, busy, onUndo, onDismiss }) {
+  if (!offer) return null
+  return (
+    <div role="status" aria-live="polite"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-sm text-content">
+      <p className="m-0 min-w-0 grow basis-full sm:basis-auto">
+        <span aria-hidden>↩</span>{' '}
+        <span className="font-semibold">{undoBannerText(offer)}</span>
+        <span className="block text-xs text-content-muted sm:inline sm:before:content-['_—_']">
+          {UNDO_HINT}
+        </span>
+      </p>
+      <button type="button" onClick={onUndo} disabled={busy}
+        className="rounded border border-sky-400/60 px-2 py-1 text-xs font-semibold hover:bg-white/10 disabled:opacity-50">
+        {busy ? 'Undoing…' : '↩ Undo'}
+      </button>
+      <button type="button" onClick={onDismiss} disabled={busy}
+        title="Keep the change and hide this"
+        className="rounded border border-border px-2 py-1 text-xs text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50">
+        Dismiss
+      </button>
+    </div>
+  )
+}
+
+function ProgressBar({ activity, onCancel, offline = false }) {
+  const presence = progressPresence(activity, offline)
+  if (presence === PROGRESS_HIDDEN) return null
+  if (presence === PROGRESS_UNKNOWN) return <ProgressUnknown />
+  const stale = presence === PROGRESS_STALE
   const { kind, done, total, detail } = activity
   const pct = total > 0 ? Math.round((100 * done) / total) : null
   const pipe = kind === 'pipeline' ? activity.pipeline : null
   return (
     <div className="space-y-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
-      <div className="flex items-center gap-3">
-        <span className="text-content">
+      {/* flex-wrap: at 400 px the label, the bar and Stop cannot share one row —
+          they used to squash the label to a sliver. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className={`text-content ${stale ? 'opacity-60' : ''}`}>
           {pipe
             ? `Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${STEP_SHORT[pipe.current] || pipe.current}`
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
@@ -133,6 +205,7 @@ function ProgressBar({ activity, onCancel }) {
           Stop
         </button>
       </div>
+      {stale && <ProgressUnknown stale />}
       {pipe && Array.isArray(pipe.results) && pipe.results.length > 0 && (
         <ul className="flex flex-wrap gap-1.5 pl-6 text-xs">
           {pipe.results.map((r, i) => (
@@ -257,7 +330,7 @@ function FramingBar({ framing }) {
   )
 }
 
-function CoveragePanel({ coverage, onClose }) {
+function CoveragePanel({ coverage, onClose, onBalance = null, balanceReason = '' }) {
   if (!coverage) {
     return <p className="text-sm text-content-subtle">Reading coverage…</p>
   }
@@ -283,6 +356,20 @@ function CoveragePanel({ coverage, onClose }) {
           </li>
         ))}
       </ul>
+      {/* The advice said what leans; this is the gesture that acts on it. Still
+          only a SELECTION — the panel itself never keeps or rejects anything. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onBalance || undefined} disabled={!onBalance}
+          title={onBalance
+            ? 'Select a set spread evenly over the framings, instead of the top of one ranking'
+            : balanceReason}
+          className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-emerald-500/20">
+          ⚖ Pick a balanced set…
+        </button>
+        {!onBalance && balanceReason && (
+          <span className="text-[11px] text-content-subtle">{balanceReason}</span>
+        )}
+      </div>
       <p className="text-[11px] text-content-subtle">
         Advice only — nothing is kept or rejected. Based on what the passes already computed.
       </p>
@@ -311,7 +398,11 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
           + (img.semantic_dup_group ? ` · same shot #${img.semantic_dup_group}` : '')
           + (img.caption ? `\n${img.caption}` : '')}
         className="block w-full">
-        <img src={`/api/bank/${bankId}/thumb/${img.id}`} alt={img.name} loading="lazy"
+        {/* ?r= is a cache buster, not a parameter the server reads: the thumb
+            route answers with max-age=3600, so a turned image would keep showing
+            its old orientation for an hour and read as "the button did nothing". */}
+        <img src={`/api/bank/${bankId}/thumb/${img.id}${img.rotation ? `?r=${img.rotation}` : ''}`}
+          alt={img.rotation ? `${img.name} (rotated ${img.rotation}°)` : img.name} loading="lazy"
           className={`w-full object-cover ${size === 'S' ? 'h-24' : 'h-36'}`} />
       </button>
       {selected && (
@@ -372,6 +463,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [selected, setSelected] = useState(() => new Set())
   const [promoteOpen, setPromoteOpen] = useState(false)
   const [deleteRejectedOpen, setDeleteRejectedOpen] = useState(false)
+  // ↩ one step back over the last bulk decision. `undoDismissedAt` remembers the
+  // offer the user waved away by its timestamp, so the NEXT bulk action shows a
+  // bar again instead of inheriting the dismissal.
+  const [undoBusy, setUndoBusy] = useState(false)
+  const [undoDismissedAt, setUndoDismissedAt] = useState(0)
   const [launchOpen, setLaunchOpen] = useState(false)
   // Score's interpreter picker — reuse a CUDA Python this machine already has
   // instead of downloading another torch. Opened from the CPU warning.
@@ -380,6 +476,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [relocating, setRelocating] = useState(false)
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [showAutoReject, setShowAutoReject] = useState(false)
+  // The threshold editor folds away: the chips are the daily gesture, the
+  // numbers behind them are the occasional one.
+  const [thresholdsOpen, setThresholdsOpen] = useState(false)
   // Curation popovers ('diverse' | 'similar' | null) and their target counts.
   const [curateOpen, setCurateOpen] = useState(null)
   const [diverseN, setDiverseN] = useState(60)
@@ -391,6 +490,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // service docstring).
   const [diverseTypicality, setDiverseTypicality] = useState(0.5)
   const [diverseBusy, setDiverseBusy] = useState(false)
+  // ⚖ Balanced pick — the OTHER question ("does my set cover the framings?").
+  // Axis ids are persisted keys, never renamed (see bankBalance.js).
+  const [balanceN, setBalanceN] = useState(60)
+  const [balanceAxis, setBalanceAxis] = useState(BALANCE_DEFAULT_AXIS)
+  const [balanceBusy, setBalanceBusy] = useState(false)
+  const [balanceResult, setBalanceResult] = useState(null)
   const [similarN, setSimilarN] = useState(60)
   // Text search. `textStatus` is the BEFORE-the-click truth (available? model
   // already warm? would it download?), `textResult` the AFTER-the-click one that
@@ -422,6 +527,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [review, setReview] = useState(null)
   const [reviewLoading, setReviewLoading] = useState(false)
   const activityWasLive = useRef(false)
+  // Drives the "we lost contact" note in the progress zone: a failed poll
+  // must never render as "no job running".
+  const connection = useConnectionStatus()
 
   const loadCoverage = useCallback(async () => {
     try {
@@ -438,7 +546,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       // ?refresh=1 forces the source-folder re-walk (the bank was just opened);
       // a plain poll lets the server's cooldown decide, so the 2 s job poll
       // doesn't hammer the disk.
-      const d = await apiFetch(`/api/bank/${bankId}${opts.force ? '?refresh=1' : ''}`)
+      const d = await apiFetch(`/api/bank/${bankId}${opts.force ? '?refresh=1' : ''}`,
+        { background: !!opts.background })
       setPayload(d)
       // Images dropped in the folder show up on their own — say it, and pull
       // them into the grid, so the counters never move without a reason.
@@ -515,7 +624,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       return undefined
     }
     activityWasLive.current = true
-    const t = setInterval(refreshPayload, 2000)
+    // background: this 2 s tick is the one that stacked ten "Connection lost"
+    // banners over the whole app when the phone's connection dropped.
+    const t = setInterval(() => refreshPayload({ background: true }), 2000)
     return () => clearInterval(t)
   }, [live, refreshPayload, refreshImages, toast, payload?.activity?.error,
       payload?.activity?.cancelled, payload?.activity?.detail])
@@ -574,7 +685,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       await refreshPayload(); await refreshImages()
       return d
     } catch (e) {
-      toast.error(e?.message || 'Action failed.')
+      // ONE bank, ONE background job: every action here can be refused because
+      // another pass owns the bank. That refusal used to reach the user as the
+      // server's own sentence — "a scan job is already running on this bank" —
+      // which names no progress and no way out. The route now labels the 409
+      // with `busy_kind`, so it is rewritten HERE, once, for every button that
+      // goes through act(): the ✨ Analyze, the ↻ re-runs in the threshold
+      // panel, Delete rejected, ⬆ Promote, Launch all. Anything else keeps
+      // its own message — only a refusal that identified itself is reworded.
+      const kind = e?.body?.busy_kind
+      toast.error(e?.status === 409 && kind
+        ? busyRefusal({ kind, activity: payload?.activity })
+        : (e?.message || 'Action failed.'))
       return null
     }
   }
@@ -605,6 +727,42 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setSelected(new Set())
     // The selection is gone, so its view has nothing left to show — return to the grid.
     if (showSelected) { exitSelectionView(); setOffset(0); refreshImages(filter, 0, { on: false }) }
+  }
+
+  // ↩ Put the last bulk decision back. The reply is a ledger, not an "ok": it
+  // is reported verbatim, so a restore that only got 340 of 400 rows back says
+  // which ones it could not take and why.
+  const undoLast = async () => {
+    setUndoBusy(true)
+    try {
+      const d = await postJson(`/api/bank/${bankId}/undo`, {})
+      const msg = undoResultMessage(d)
+      toast[msg.type === 'error' ? 'error' : msg.type](msg.text)
+      setSelected(new Set())
+      if (showSelected) exitSelectionView()
+      await refreshPayload(); await refreshImages()
+    } catch (e) {
+      toast.error(e?.message || 'Undo failed — nothing was changed.')
+      await refreshPayload()
+    } finally {
+      setUndoBusy(false)
+    }
+  }
+
+  // Quarter turns on the selection (idea by 1Tomber, GitHub #17). A whole
+  // scraped folder can come out sideways, so this is a BULK action here rather
+  // than a per-tile button — the tile already carries the selection gesture, the
+  // status badges and two hit targets.
+  const rotateSelection = async (degrees) => {
+    const ids = [...selected]
+    if (!ids.length) return
+    const d = await act(() => postJson(`/api/bank/${bankId}/rotate`, { ids, degrees }),
+      null)
+    if (d?.rotated) {
+      toast.success(`${d.rotated} image(s) rotated 90° ${degrees === 90 ? 'right' : 'left'}`
+        + ' — your own files are untouched.')
+      await refreshImages()
+    }
   }
 
   const applyAutoReject = async () => {
@@ -642,6 +800,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // kept/rejected/undecided track the run live. The grid is refreshed once, on
   // close, so its tiles don't shuffle around behind the lightbox.
   const onReviewDecided = () => { refreshPayload() }
+  // A turn made in ▶ Review must already be right on the tile behind it: the
+  // grid is only refetched on close, and a tile still lying sideways would read
+  // as "it didn't take".
+  const onReviewRotated = (imageId, rotation) => setPage((prev) => ({
+    ...prev,
+    images: prev.images.map((im) => (im.id === imageId
+      ? { ...im, rotation, width: im.height, height: im.width }
+      : im)),
+  }))
   const closeReview = () => { setReview(null); refreshPayload(); refreshImages() }
 
   const selectAllCurrent = async () => {
@@ -687,6 +854,33 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       toast.error(e?.message || 'Diversity sampling failed.')
     } finally {
       setDiverseBusy(false)
+    }
+  }
+
+  // ⚖ Balanced pick — spread over the framings instead of taking the top of one
+  // ranking. Same embeddings and same typicality guard as Pick diverse, applied
+  // INSIDE each bucket. The result is only useful if the user can see its shape,
+  // so the distribution is kept on screen (numbers, aria-live) after the click.
+  const pickBalanced = async () => {
+    setCurateOpen(null)
+    setBalanceBusy(true)
+    try {
+      const d = await postJson(`/api/bank/${bankId}/select-balanced`,
+        { n: balanceN, axis: balanceAxis, typicality: diverseTypicality,
+          ...filterParams(filter) })
+      if (!d.image_ids?.length) {
+        toast.info('Nothing to balance — no labelled images match the current filter.')
+        return
+      }
+      setBalanceResult(d)
+      showCuratedSelection(d.image_ids)
+      toast.info(summarizeBalance(d))
+    } catch (e) {
+      // A missing pass is the DEFAULT state of a fresh bank, not a failure: the
+      // backend names the pass, so show that sentence rather than "failed".
+      toast.error(e?.message || 'Balanced selection failed.')
+    } finally {
+      setBalanceBusy(false)
     }
   }
 
@@ -762,6 +956,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }
 
   const counts = payload?.counts
+  // ↩ the live offer, minus the one the user already waved away.
+  const offer = undoOffer(payload)
+  const undoBar = offer && offer.at !== undoDismissedAt ? offer : null
   const flags = payload?.flags || {}
   const resBuckets = payload?.res_buckets || {}
   // Only surface tiers that actually hold scanned images (plus the active one,
@@ -789,6 +986,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const visionModel = caps.ollama?.vision_model || ''
   const visionModelLooksUncensored = /abliterat|uncensor|huihui|nsfw/i.test(visionModel)
   const scored = counts?.scored || 0
+  // Can a balanced pick even run? Answered BEFORE the click when we already
+  // know (Score missing; coverage says nothing is classified) — otherwise the
+  // backend answers it with the exact pass and the numbers.
+  const balanceReady = balanceReadiness({ scored, coverage })
   // What Score will really run on — the pass no longer holds the GPU when it
   // computes on the CPU, and the UI must say which of the two is happening.
   const scoreDevice = payload?.score_device
@@ -866,7 +1067,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         )}
       </header>
 
-      <ProgressBar activity={payload?.activity} onCancel={cancelJob} />
+      <ProgressBar activity={payload?.activity} onCancel={cancelJob} offline={!connection.online} />
+
+      <UndoBar offer={undoBar} busy={undoBusy} onUndo={undoLast}
+        onDismiss={() => setUndoDismissedAt(undoBar?.at || 0)} />
 
       {!live && payload?.pipeline_report
         && payload.pipeline_report.finished_at !== dismissedReportAt && (
@@ -1183,6 +1387,41 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
 
+        {/* The numbers BEHIND those chips. Folded by default — the chips are
+            the everyday gesture and the thresholds are the occasional one — but
+            present, because tuning them used to mean leaving the bank for
+            Settings and coming back blind. Same config keys, same save. */}
+        <div className="border-t border-border pt-2">
+          <button type="button" onClick={() => setThresholdsOpen((v) => !v)}
+            aria-expanded={thresholdsOpen} aria-controls="bank-thresholds-panel"
+            className="flex w-full items-center gap-1.5 text-left text-xs text-content-muted hover:text-content">
+            <span className="font-medium">Filter thresholds</span>
+            {/* The gloss is the first thing to go on a phone: the label already
+                says what it opens, and a wrapped subtitle costs two lines. */}
+            <span className="hidden text-content-subtle sm:inline">
+              — what the chips above count as blurry, small, duplicate…
+            </span>
+            <span aria-hidden className="ml-auto text-content-subtle">{thresholdsOpen ? '▲' : '▼'}</span>
+          </button>
+          {thresholdsOpen && (
+            <div id="bank-thresholds-panel" className="mt-2">
+              {/* The panel's ↻ re-run buttons start the SAME one-job-per-bank
+                  passes as the toolbar above, so they need the same two facts
+                  the progress bar reads: whether a job holds the bank (to refuse
+                  the click before it is made, saying which pass and where it is)
+                  and the duplicate counts (to report what the pass produced).
+                  Both are already in this payload — no extra poll, no second
+                  progress mechanism. */}
+              <BankThresholdsPanel bankId={bankId}
+                activity={payload?.activity} offline={!connection.online}
+                dupSummary={payload?.dup} semanticDupSummary={payload?.semantic_dup}
+                onSaved={() => { refreshPayload(); refreshImages() }}
+                onRunPass={(endpoint) => act(
+                  () => postJson(`/api/bank/${bankId}/${endpoint}`, {}), null)} />
+            </div>
+          )}
+        </div>
+
         {/* View controls — order and tile size, off to the right on their own line */}
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
           <GroupLabel>View</GroupLabel>
@@ -1307,6 +1546,21 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               className="rounded-md border border-rose-400/50 bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/20">✕ Reject</button>
             <button type="button" onClick={() => batchStatus([...selected], 'pending')}
               className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">↺ Undecided</button>
+            {/* Rotate the selection. Your own files are never rewritten: the
+                angle is stored on the row and applied to what the app shows and
+                to what it promotes — so four turns cost the original nothing. */}
+            <button type="button" onClick={() => rotateSelection(-90)}
+              aria-label={`Rotate the ${selected.size} selected image(s) 90 degrees left`}
+              title="Rotate 90° left (counter-clockwise). Your own files are never modified — the turn is stored and applied to what you see and to what gets promoted."
+              className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
+              <span aria-hidden="true">↺</span> Rotate left
+            </button>
+            <button type="button" onClick={() => rotateSelection(90)}
+              aria-label={`Rotate the ${selected.size} selected image(s) 90 degrees right`}
+              title="Rotate 90° right (clockwise). Your own files are never modified — the turn is stored and applied to what you see and to what gets promoted."
+              className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
+              <span aria-hidden="true">↻</span> Rotate right
+            </button>
           </>
         )}
       </div>
@@ -1369,6 +1623,62 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 <button type="button" onClick={pickDiverse} disabled={diverseBusy}
                   className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-60">
                   {diverseBusy ? 'Sampling…' : `Select ${diverseN} most diverse`}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        {/* ⚖ Balanced pick — a DIFFERENT question from Pick diverse: not "is
+            my set varied?" but "does it cover the framings I want to generate?".
+            Kept as its own button rather than a mode of the other one, because a
+            bank with no Framing pass can still use diversity. */}
+        <div className="relative">
+          <button type="button" disabled={live || balanceBusy || !balanceReady.ready}
+            onClick={() => setCurateOpen((v) => (v === 'balanced' ? null : 'balanced'))}
+            aria-expanded={curateOpen === 'balanced'}
+            title={balanceReady.ready
+              ? 'Select N images SPREAD OVER the framings (face / bust / body / back) instead of the top of one ranking — so a LoRA does not learn one shot type and fail the rest. Reuses the ✨ Score embeddings, no GPU.'
+              : balanceReady.reason}
+            className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+            ⚖ Balanced pick…{balanceBusy && ' (sampling…)'}
+          </button>
+          {curateOpen === 'balanced' && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setCurateOpen(null)} aria-hidden />
+              {/* Bottom sheet below sm (measured at 400 px, an anchored w-80 panel
+                  pushes the page sideways), normal popover from sm up. */}
+              <div className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:max-h-none sm:w-80 sm:overflow-visible">
+                <p className="text-xs text-content-muted">
+                  Splits your pick <strong>evenly across the framings</strong> — “20 face, 20 bust,
+                  20 body” — and fills each bucket with the same most-varied sampling.
+                  Nothing is kept or deleted; you get a selection to review.
+                </p>
+                <label className="flex items-center gap-2 text-sm text-content">
+                  How many
+                  <input type="number" min={1} max={2000} value={balanceN}
+                    onChange={(e) => setBalanceN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                    className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
+                </label>
+                <fieldset className="space-y-1">
+                  <legend className="text-sm text-content">Balance on</legend>
+                  {BALANCE_AXES.map((a) => (
+                    <label key={a.id} className="flex items-start gap-2 text-xs text-content-muted">
+                      <input type="radio" name="bank-balance-axis" value={a.id}
+                        checked={balanceAxis === a.id}
+                        onChange={() => setBalanceAxis(a.id)}
+                        className="mt-0.5 accent-primary" />
+                      <span><span className="text-content">{a.label}</span> — {a.hint}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <p className="text-[11px] leading-snug text-content-muted">
+                  Framing is the reliable axis on a one-subject bank: person groups there tend to be
+                  few, sparse and arbitrary. It uses the same “Skip the odd ones out” setting as
+                  Pick diverse ({diverseTypicality === 0 ? 'off' : `${Math.round(diverseTypicality * 100)}%`}).
+                </p>
+                <button type="button" onClick={pickBalanced} disabled={balanceBusy}
+                  className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-60">
+                  {balanceBusy ? 'Sampling…' : `Select ${balanceN}, balanced`}
                 </button>
               </div>
             </>
@@ -1501,8 +1811,42 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         )}
       </div>
 
+      {/* ⚖ What the balanced pick actually GAVE you. A repartition the user
+          cannot see is indistinguishable from an unbalanced one, so this is
+          numbers first — the bar is decoration over a list that reads out. */}
+      <div aria-live="polite">
+        {balanceResult && (
+          <div className="mt-2 space-y-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs text-content">
+            <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+              <span aria-hidden>⚖</span>
+              <span className="min-w-0 flex-1">{summarizeBalance(balanceResult)}</span>
+              <button type="button" onClick={() => setBalanceResult(null)}
+                className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised">
+                Dismiss
+              </button>
+            </div>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 tabular-nums">
+              {balanceRows(balanceResult).map((r) => (
+                <li key={r.key} className={r.short ? 'text-amber-200' : 'text-content-muted'}>
+                  <span className="text-content">{r.selected}</span> {r.label}
+                  <span className="text-content-subtle"> of {r.available}</span>
+                  {r.short && <span> · wanted {r.fairShare}</span>}
+                </li>
+              ))}
+            </ul>
+            {balanceNotes(balanceResult).map((note, i) => (
+              <p key={i} className={note.tone === 'warn' ? 'text-amber-300/90' : 'text-content-subtle'}>
+                {note.tone === 'warn' ? '⚠ ' : ''}{note.text}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+
       {coverageOpen && (
-        <CoveragePanel coverage={coverage} onClose={() => setCoverageOpen(false)} />
+        <CoveragePanel coverage={coverage} onClose={() => setCoverageOpen(false)}
+          onBalance={balanceReady.ready ? () => setCurateOpen('balanced') : null}
+          balanceReason={balanceReady.reason} />
       )}
       </ZoneSection>
 
@@ -1602,7 +1946,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
       {review && (
         <BankReviewLightbox bankId={bankId} ids={review.ids} startId={review.startId}
-          seedImages={page.images} onDecided={onReviewDecided} onClose={closeReview} />
+          seedImages={page.images} onDecided={onReviewDecided}
+          onRotated={onReviewRotated} onClose={closeReview} />
       )}
 
       {relocating && (
