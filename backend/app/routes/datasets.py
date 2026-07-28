@@ -225,6 +225,11 @@ def dataset_list():
         {'id': d.id, 'name': d.name, 'trigger_word': d.trigger_word, 'ref_filename': d.ref_filename,
          'kind': ((d.kind or '').lower() or 'character'),
          'train_type': (d.train_type or 'zimage'),
+         # Where the dataset's images live on disk. Displayed on the dataset (with
+         # a copy button), and read by the bank creation form so it can say
+         # "that folder belongs to a dataset" WHILE the path is being typed —
+         # the server refuses it either way (services/path_guard.py).
+         'storage_path': dataset_path(d.id),
          **(stats.get(d.id) or empty)}
         for d in dss]})
 
@@ -1270,7 +1275,8 @@ def dataset_image_regenerate(image_id):
 def dataset_import_zip(dataset_id):
     """Merge an EXISTING training dataset (ZIP of images + kohya-style same-stem
     .txt captions) into this dataset. Aspect preserved, dHash dedupe, captions
-    attached to the rows."""
+    attached to the rows. An image already here is not re-added, but its sidecar
+    caption IS applied to the row that holds it (caption-elsewhere round trip)."""
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
     f = request.files.get('file')
@@ -1285,6 +1291,11 @@ def dataset_import_zip(dataset_id):
     return jsonify({'ok': True, 'imported': len(ids), 'failed': failed,
                     'duplicates': stats.get('duplicates', 0),
                     'captions': stats.get('captions', 0),
+                    # Captions that landed on images ALREADY in the dataset (the
+                    # caption-elsewhere round trip) vs those left alone because
+                    # the row was already captioned here.
+                    'captions_applied': stats.get('captions_applied', 0),
+                    'captions_kept': stats.get('captions_kept', 0),
                     'small': stats.get('small', 0)})
 
 
@@ -1309,6 +1320,11 @@ def dataset_import_folder(dataset_id):
     return jsonify({'ok': True, 'imported': len(ids), 'failed': failed,
                     'duplicates': stats.get('duplicates', 0),
                     'captions': stats.get('captions', 0),
+                    # Captions that landed on images ALREADY in the dataset (the
+                    # caption-elsewhere round trip) vs those left alone because
+                    # the row was already captioned here.
+                    'captions_applied': stats.get('captions_applied', 0),
+                    'captions_kept': stats.get('captions_kept', 0),
                     'small': stats.get('small', 0)})
 
 

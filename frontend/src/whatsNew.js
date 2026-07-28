@@ -50,6 +50,91 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-28-bank-watermark-mask-editing',
+    date: '2026-07-28',
+    title: 'Fix a wrong watermark box without leaving the bank',
+    blurb:
+      'The watermark detector draws one box, and it guesses: it misses a second logo, or lands beside the mark. Correcting it was only possible inside a dataset, so in a bank a bad box meant rejecting the image. Open ▶ Review on a flagged image and press Edit mask: draw the zones yourself, and Inpaint repaints exactly those — including a mark on the subject. Auto-crop deliberately skips a hand-masked image, and an emptied mask cleans nothing, on purpose. Thanks to Qeeyana (Reddit) for reporting it.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-improve-says-what-it-is-about-to-ask-klein',
+    date: '2026-07-28',
+    title: 'Upscale & improve now shows the instruction it is about to send',
+    blurb:
+      'The improve pass sends Klein a fixed instruction — and the built-in one asks for photographic texture and sharp detail, which is why anime and illustrated datasets came back looking realistic. That instruction is now quoted right next to the ✨ button, with one click to rewrite it or turn it off entirely, and a drawn dataset gets an explicit warning. Thanks Qeeyana (Reddit).',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-07-28-klein-model-needs-no-symlink',
+    date: '2026-07-28',
+    title: 'Your Klein model can stay where it is — no copy, no symlink',
+    blurb:
+      'models/unet/klein/ is only where Setup downloads to; it was never required. Any klein-named sub-folder of models/unet or models/diffusion_models works, as does either folder\'s top level, plus every extra_model_paths.yaml root and a relocated models folder. The Setup screen, the README and the Guide now say so, and a test keeps that list honest. Thanks CyberTod (Reddit).',
+  },
+  {
+    id: '2026-07-28-import-resolution-is-yours-to-choose',
+    date: '2026-07-28',
+    title: 'You choose what resolution your imported photos are stored at',
+    blurb:
+      'Every image entering a dataset was resampled to 1024 px and re-encoded as WebP quality 92 — with no setting anywhere and nothing on screen saying why. Settings ▸ Captioning & quality ▸ Dataset import now lets you pick 1024 to 4096 px, or the original size, and the encoding alongside it (quality 92, quality 100, or fully lossless) — because the resolution was only half the loss. The default is unchanged at 1024/q92, so nothing already imported moves, and the import dropzone now states what it is about to store and why, with a link to change it. Original size still stops at 8192 px: WebP itself refuses past 16383. Thanks to Qeeyana (Reddit) for asking why the app was deciding this for you.',
+    to: '/settings/captioning',
+  },
+  {
+    id: '2026-07-28-caption-elsewhere-round-trip',
+    date: '2026-07-28',
+    title: 'Caption your images in another tool, and bring the captions back',
+    blurb:
+      'A Style dataset refused to export its ZIP until every kept image was captioned, with no way past it — which blocked something perfectly reasonable: getting the bare images out to caption them in your own tool. That refusal is now a confirmation that explains what an empty caption does to a Style LoRA, and cancelling still takes you to the captions. The return trip works too, and that was the real gap: re-importing those images with their new .txt files used to drop every one of them as a duplicate, captions included. Their captions now land on the images already in the dataset, a caption you wrote here is never overwritten, and the Import & export panel finally says the round trip exists. Thanks to Qeeyana (Reddit).',
+    to: '/datasets?section=export',
+  },
+  {
+    id: '2026-07-28-installs-that-do-not-work-no-longer-report-success',
+    date: '2026-07-28',
+    title: 'An install that did not work no longer says it worked',
+    blurb:
+      'Installing Person masks could report success — every requirement "already satisfied" — while the capability stayed ✗ Not installed and masked training quietly fell back to unmasked, so a whole run learned the background you meant to exclude. The missing piece (onnxruntime, which rembg needs but no longer declares) is now installed, an existing GPU build is left alone, and every scoped install re-runs the capability check afterwards and names the missing module when it fails. Launching a masked run without it now asks you first, instead of finding out from the result. Thanks to 1Tomber (GitHub #24).',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-28-cloud-boot-waits-for-a-pod-that-is-still-working',
+    date: '2026-07-28',
+    title: 'Cloud launches survive a slow host pulling its image',
+    blurb:
+      'A pod that took more than 25 minutes to boot was terminated even when it was honestly downloading its multi-gigabyte image — and its host was quietly skipped for the next three days. The boot wait now restarts its clock whenever the pod shows real progress, keeps an absolute ceiling so a dead pod still dies fast, tells you where the boot actually got to, and only exiles a slow host for a few hours.',
+  },
+  {
+    id: '2026-07-28-continue-training-keeps-your-choices-when-refused',
+    date: '2026-07-28',
+    title: 'A refused ▶ Continue training no longer wipes what you picked',
+    blurb:
+      'Continue training closed the moment you clicked it, so a refusal left you with an error and an empty form: the lane, the checkpoint to resume from, the extra steps and every adjusted setting had to be typed again, with no clue which of them was refused. The form now stays open, the reason appears inside it next to those choices, and only a launch that actually starts closes it.',
+  },
+  {
+    id: '2026-07-28-a-bank-can-no-longer-be-created-on-a-dataset-folder',
+    date: '2026-07-28',
+    title: 'A bank can no longer be pointed at a dataset’s own image folder',
+    blurb:
+      'Nothing stopped you from pasting a dataset’s storage folder into “Create bank”. The bank then listed the dataset’s live files — and its Delete rejected deleted images out of the dataset, with no warning at all. A bank and a dataset only ever pass images to each other by copy, so that folder is now refused at creation and when moving a bank, and the refusal names the dataset and sends you to Import to bank instead (which copies). The check sees through subfolders, the folder holding all datasets, a different case, other separators, and symlinks or Windows junctions. If you already have such a bank, nothing is deleted or repaired behind your back: opening it says so, and only the destructive button is refused.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-28-a-dataset-now-shows-where-its-images-are-on-disk',
+    date: '2026-07-28',
+    title: 'A dataset now shows where its images are on disk',
+    blurb:
+      'The folder holding a dataset’s images was displayed nowhere, so finding it meant digging through the app’s data directory by hand. It is now at the top of the dataset with a copy button — next to the one line worth knowing: that folder belongs to the dataset, and it must not be used as an image bank’s source.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-28-masked-training-is-saved-on-the-dataset',
+    date: '2026-07-28',
+    title: 'Masked training is saved on the dataset, not in one browser',
+    blurb:
+      'The Masked toggle used to live in the browser you set it in: open the app from your phone and it quietly reverted to the default, and no run recorded which way it was set. It is now a dataset setting — shared across your devices, stamped into every run so two runs that differ only by masking no longer look identical, and read by the readiness badge, which can finally warn you that a dataset set to masked will train unmasked because rembg is missing. Existing datasets keep today’s behaviour; a browser that had turned masking off is asked once what to do with it.',
+    to: '/datasets?section=training',
+  },
+  {
     id: '2026-07-28-notifications-are-no-longer-hidden-behind-dialogs',
     date: '2026-07-28',
     title: 'Notifications no longer disappear behind an open dialog',

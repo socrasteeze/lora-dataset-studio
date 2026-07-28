@@ -19,11 +19,21 @@ from app.config import LOCAL_USER
 
 
 def _configure_aitoolkit(tmp_path, monkeypatch, app):
-    """Fake ai-toolkit install: venv python + run.py present, dir configured."""
+    """Fake ai-toolkit install: venv python + run.py present, dir configured.
+
+    Divergence 5 (fork patch): upstream creates ONLY the Windows layout, but
+    config.aitoolkit_derived_python branches on os.name and looks for
+    venv/bin/python on POSIX — so on Linux the install reads as absent and five
+    tests here fail with 'ai-toolkit is not configured' (409). Both layouts are
+    written; the resolver picks the one for the platform it is on, so this is
+    inert on Windows and the tests assert the same thing on both.
+    """
     from app import config as cfg
     root = tmp_path / 'aitoolkit'
     (root / 'venv' / 'Scripts').mkdir(parents=True)
     (root / 'venv' / 'Scripts' / 'python.exe').write_text('fake')
+    (root / 'venv' / 'bin').mkdir(parents=True)
+    (root / 'venv' / 'bin' / 'python').write_text('fake')
     (root / 'run.py').write_text('fake')
     with app.app_context():
         cfg.save_config({'aitoolkit': {'dir': str(root)}})

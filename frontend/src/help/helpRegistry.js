@@ -211,6 +211,11 @@ const TOPICS = [
      'trained loras', 'training history', 'include loras', 'not trained yet',
      'import backup', 'backup menu', 'restore backup', 'zip'],
     '/datasets', 'using-the-app', 'back-up-everything'),
+  action('caption-elsewhere', 'Caption your images in another tool',
+    ['caption', 'captions', 'external', 'another tool', 'other tool', 'taggui',
+     'booru', 'manual', 'txt', 'sidecar', 'export zip', 'import zip', 'round trip',
+     'style export blocked', 'export without captions', 'uncaptioned'],
+    '/datasets?section=export', 'using-the-app', 'caption-your-images-in-another-tool'),
   { id: 'page-bank', kind: 'page', title: 'Image bank (triage)',
     keywords: ['bank', 'triage', 'import', 'folder', 'browse', 'choose folder', 'path',
       'telegram', 'duplicates', 'blurry', 'quality', 'cluster', 'person', 'sort',
@@ -296,6 +301,21 @@ const TOPICS = [
      'disk space', 'size', 'weight', 'how big', 'megabytes', 'copy', 'copies',
      'share files', 'bank', 'triage'],
     '/bank', 'using-the-app', 'promote-a-shortlist-into-a-new-bank'),
+  action('bank-not-on-a-dataset-folder', 'Why a bank cannot be created on a dataset’s folder',
+    ['dataset folder', 'dataset path', 'folder refused', 'cannot create bank',
+     'bank refused', 'refused', 'rejected folder', 'not allowed', 'blocked',
+     'belongs to a dataset', 'share files', 'shared files', 'same folder',
+     'delete rejected deleted my dataset', 'deleted my dataset', 'lost images',
+     'dataset images gone', 'missing images', 'bank over dataset',
+     'import to bank', 'copy', 'copies', 'transit', 'move folder', 'relocate',
+     'symlink', 'junction', 'shortcut', 'bank', 'triage', 'dataset'],
+    '/bank', 'using-the-app', 'a-bank-and-a-dataset-never-share-files'),
+  action('dataset-images-folder', 'Where a dataset’s images are on disk',
+    ['dataset folder', 'images folder', 'where are my images', 'on disk', 'path',
+     'storage', 'storage path', 'copy path', 'file manager', 'explorer',
+     'find the files', 'locate', 'open folder', 'data folder', 'datasets folder',
+     'dataset', 'images'],
+    '/datasets', 'using-the-app', 'a-bank-and-a-dataset-never-share-files'),
   action('bank-tune-thresholds', 'Tune the Bank filter thresholds without leaving the bank',
     ['threshold', 'thresholds', 'tune', 'tuning', 'calibrate', 'calibration', 'adjust',
      'filter', 'filters', 'stricter', 'harder', 'tighter', 'looser', 'sensitivity',
@@ -305,6 +325,12 @@ const TOPICS = [
      'reset to default', 'reset all', 'defaults', 'how many images',
      'preview', 'effect', 'bank', 'triage', 'settings in bank'],
     '/bank', 'using-the-app', 'tune-the-bank-filter-thresholds'),
+  action('bank-edit-watermark-mask', 'Fix a watermark mask in a bank',
+    ['watermark', 'mask', 'edit mask', 'zone', 'zones', 'region', 'regions', 'box',
+     'bbox', 'wrong box', 'missed', 'second logo', 'draw', 'redraw', 'correct',
+     'manual', 'by hand', 'inpaint', 'repaint', 'crop', 'clean', 'review',
+     'bank', 'triage'],
+    '/bank', 'using-the-app', 'fix-a-watermark-mask-in-a-bank'),
   action('bank-undo-bulk', 'Undo the last bulk decision in a bank',
     ['undo', 'undo last', 'revert', 'take back', 'go back', 'step back', 'oops',
      'mistake', 'wrong threshold', 'bad filter', 'rejected everything',
@@ -340,7 +366,15 @@ const TOPICS = [
      // a file that is present but unreadable (a cut-short or corrupted download).
      'klein model missing', 'model missing', 'corrupted', 'corrupt', 'truncated',
      'unreadable', 'on disk but', 'cannot be loaded', 'greyed out', 'not ready',
-     'download again', 'redownload', 're-download', 'broken download']),
+     'download again', 'redownload', 're-download', 'broken download',
+     // WHERE the model may live. CyberTod (Reddit) read the download destination
+     // as a requirement, copied ~10 GB into unet/klein/ and made a symlink to get
+     // the disk space back — the resolver had been scanning diffusion_models/,
+     // both roots' top level and every extra_model_paths root all along.
+     'symlink', 'symbolic link', 'junction', 'hard link', 'disk space', 'space',
+     'move the model', 'another folder', 'different folder', 'shared models',
+     'diffusion_models', 'extra_model_paths', 'stability matrix', 'portable',
+     'models_dir', 'models folder', 'duplicate', 'copy the model']),
   setupStep('setup-krea-install', 'install', 'Install the Krea 2 Edit engine',
     ['krea', 'krea 2', 'krea 2 edit', 'install krea', 'node pack', 'comfyui-krea2edit',
      'custom nodes', 'custom_nodes', 'identity lora', 'krea2_identity_edit', 'civitai',
@@ -590,8 +624,16 @@ const TOPICS = [
   // shown in this fork (Divergence 1) — only the local ones below.
   setting('identity_prompts.klein_identity', 'engines', 'identity-prompts', 'Klein identity prompt',
     ['identity', 'klein', 'restage', 'face', 'prompt', 'preserve', 'pose']),
+  // The words Qeeyana (Reddit) actually used are in here verbatim: she had the
+  // symptom ("anime looks realistic after the quality inpaint") and no path to
+  // the cause, because the shipped instruction — "add detailed texture, add
+  // sharp details, add candid shot, add soft focus effect" — is a photographic
+  // recipe applied to every dataset. Searching her own sentence must land here.
   setting('identity_prompts.klein_improve', 'engines', 'identity-prompt-klein-improve', 'Klein improve prompt & toggle',
-    ['klein', 'improve', 'upscale', 'enhance', 'prompt', 'texture', 'detail', 'toggle', 'disable']),
+    ['klein', 'improve', 'upscale', 'enhance', 'prompt', 'texture', 'detail', 'toggle', 'disable',
+     'anime', 'drawn', 'illustration', 'cartoon', 'too realistic', 'realistic', 'photoreal',
+     'textures', 'skin detail', 'skin', 'improve prompt', 'turn off improve', 'quality inpaint',
+     'inpaint', 'ruins my images', 'harms the image', 'style changed', 'no prompt']),
   // The four knobs behind the lightbox's "Adjust improve strength →". They were
   // exposed as settings but never registered, so Help search could not reach them
   // and the link had nothing to aim at.
@@ -677,6 +719,14 @@ const TOPICS = [
   setting('aitoolkit.hf_home', 'local-tools', 'aitoolkit-hf-home', 'ai-toolkit Hugging Face cache',
     ['ai-toolkit', 'aitoolkit', 'hugging face', 'hf home', 'cache', 'override', 'path']),
   // captioning
+  setting('dataset_import.max_side', 'captioning', 'dataset-import-max-side',
+    'Dataset import — stored resolution',
+    ['import', 'resolution', 'size', 'pixels', '1024', '2048', 'downscale', 'resize',
+     'normalize', 'normalized', 'shrink', 'original', 'full size', 'quality']),
+  setting('dataset_import.encoding', 'captioning', 'dataset-import-encoding',
+    'Dataset import — stored encoding',
+    ['import', 'encoding', 'webp', 'quality', 'lossless', 'compression', 'artifacts',
+     'q92', 'recompress', 'disk space']),
   setting('captioning.backend', 'captioning', 'captioning-backend', 'Captioning backend',
     ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto']),
   setting('watermark.device', 'captioning', 'watermark-device', 'Watermark processing device',
@@ -728,6 +778,24 @@ const TOPICS = [
     app: { route: '/datasets?section=training' },
     tip: { trigger: 'dual-captions-advanced',
       text: 'New: train each image on a long AND a short caption (Advanced options → Dual captions) so the LoRA leans less on any single wording.' } },
+  // Person masking (`masked`, background at 10 %) became a per-DATASET setting on
+  // 28/07 — it used to be a per-BROWSER localStorage preference the server only saw
+  // at launch. Same shape as Dual captions / Memory saving: a per-dataset training
+  // option, so it points at the settings-reference Training section, and its route
+  // is the training workspace section where the toggle lives.
+  { id: 'training.masked', kind: 'setting', title: 'Masked training (background at 10%)',
+    keywords: ['masked', 'mask', 'person mask', 'masked training', 'background',
+      'bg 10%', 'rembg', 'subject', 'isolate', 'loss weight', 'identity', 'room',
+      'advanced', 'training', 'not installed', 'missing', 'ml extras',
+      // It moved: people searching for where their old browser toggle went must
+      // land here, and so must the readiness row that now names it.
+      'per browser', 'localstorage', 'preference', 'phone', 'other machine',
+      'trains unmasked', 'readiness', 'preparation'],
+    guide: { chapter: 'settings-reference', anchor: 'training' },
+    // Deliberately NO one-time tip: the What's-new entry announces the move, and
+    // the panel already shows a targeted notice to the only browsers it affects
+    // (the ones that had turned masking off). A third surface would be nagging.
+    app: { route: '/datasets?section=training' } },
   // Concept face masking (issue #15) is a per-DATASET Advanced training option,
   // so like Dual captions it points at the dataset guide rather than
   // settings-reference. Its two tuning knobs live in Settings > Training and are

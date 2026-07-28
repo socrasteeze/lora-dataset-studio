@@ -10,6 +10,7 @@ import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast } from '../components/bank/bankSync'
 import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
 import { overlapNotice } from '../components/bank/bankOverlap'
+import { datasetFolderNotice } from '../utils/pathRelation'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
 import RelocateBankDialog from '../components/bank/RelocateBankDialog'
 import BankScrapePanel from '../components/bank/BankScrapePanel'
@@ -176,6 +177,10 @@ export default function BankPage() {
   // The bank whose Launch-all dialog is open (queue or run-now from the list).
   const [dialogBankId, setDialogBankId] = useState(null)
   const [relocating, setRelocating] = useState(null)   // the bank being repointed
+  // Dataset storage folders, so a folder that belongs to a dataset can be named
+  // as such WHILE it is typed. The server refuses it either way — this only
+  // spares the round-trip and the "why not?" (see utils/pathRelation.js).
+  const [datasets, setDatasets] = useState([])
 
   const refresh = useCallback(async () => {
     try {
@@ -228,6 +233,17 @@ export default function BankPage() {
     }, 400)
     return () => { alive = false; clearTimeout(t) }
   }, [splitMode, folder])
+  // Best effort: a failed list just means no live hint, never a broken form.
+  useEffect(() => {
+    if (currentId != null) return undefined
+    let alive = true
+    apiFetch('/api/dataset/list')
+      .then((d) => { if (alive) setDatasets(d.datasets || []) })
+      .catch(() => { if (alive) setDatasets([]) })
+    return () => { alive = false }
+  }, [currentId])
+
+  const folderNotice = datasetFolderNotice(folder, datasets)
 
   const open = (id) => {
     try { localStorage.setItem(CURRENT_KEY, String(id)) } catch { /* ignore */ }
@@ -240,7 +256,9 @@ export default function BankPage() {
 
   const create = async (e) => {
     e.preventDefault()
-    if (creating) return
+    // A bank over a dataset's folder would share the dataset's LIVE files; the
+    // server refuses it, and so does the form (the notice says what to do).
+    if (creating || folderNotice) return
     setCreating(true)
     try {
       if (splitMode) {
@@ -364,7 +382,8 @@ export default function BankPage() {
               value={folder} onChange={setFolder} required
               placeholder="C:\path\to\unsorted-images (subfolders included)" />
           </div>
-          <button type="submit" disabled={creating}
+          <button type="submit" disabled={creating || !!folderNotice}
+            title={folderNotice ? 'That folder belongs to a dataset' : undefined}
             className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
             {creating ? 'Inventorying…' : (splitMode ? '➕ Create banks' : '➕ Create bank')}
           </button>
@@ -410,6 +429,12 @@ export default function BankPage() {
               </>
             )}
           </div>
+        )}
+        {folderNotice && (
+          <p role="alert"
+            className="basis-full rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100">
+            {folderNotice.text}
+          </p>
         )}
       </form>
 
