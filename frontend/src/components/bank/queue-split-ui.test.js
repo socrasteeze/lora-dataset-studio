@@ -10,7 +10,10 @@ test('the launch dialog exposes an onQueue action alongside Run now', () => {
   assert.match(dialog, /function LaunchAllDialog\(\{[^}]*onQueue[^}]*\}/);
   // Both actions send the SAME config shape (built once).
   assert.match(dialog, /const config = \(\) =>/);
-  assert.match(dialog, /const launch = \(\) => onLaunch\(config\(\)\)/);
+  // launch is async since the refusal-keeps-input wave (it posts with the dialog
+  // open and only closes on success); queue is still the plain call. Both must
+  // keep sending config() rather than re-building the body separately.
+  assert.match(dialog, /attemptModalSubmit\(\(\) => onLaunch\(config\(\)\)/);
   assert.match(dialog, /const queue = \(\) => onQueue\(config\(\)\)/);
   // The button only renders when an onQueue handler is provided.
   assert.match(dialog, /\{onQueue &&[\s\S]*?Add to queue/);

@@ -121,6 +121,22 @@ It is a **rendering** knob, not an anatomy fix: extra limbs, tails or wrong body
 
 Separate from **Upscale & improve ▸ Steps** (`klein.improve_steps`), which drives the manual improve pass only.
 
+### Klein model (per dataset)
+
+Not in Settings — it lives on the **dataset**, in the *Klein tuning* block of the generation panel and next to the ✨ **Upscale & improve** action itself. One setting, deliberately: generation and improve drive the same loader in the same workflow, so two near-identical model dropdowns would only be a lasting source of confusion. If you ever need to improve with a heavier model than the one you generate with, say so — splitting one stored value into two is additive; merging two back into one would have to throw one of your answers away.
+
+**Default is Auto**, and Auto is exactly what every dataset did before this setting existed: Studio resolves the model itself (the canonical download first, then the first loadable Klein file it finds). Choosing nothing changes nothing.
+
+**The list is detected, never typed.** It comes from the same scan ComfyUI itself would do — `models/unet`, `models/diffusion_models`, every root declared in `extra_model_paths.yaml`, and a relocated models folder (`comfyui.models_dir`) — in a `klein`-named subfolder **or** loose at the root. The one real constraint is that the model must be *nameable* as Klein: either the file name or its folder name has to contain `klein`. See *Where the Klein model can live* in the README.
+
+**What it applies to:** the single ✨ improve, the ✨ re-run, the whole improve batch, and Klein generation (variations and regenerations) for that dataset.
+
+**When there is only one model**, the picker does not appear — there is no choice to make — but the line naming the model still does. Not knowing which model produced an image was the actual complaint; a dropdown with one option was never the answer.
+
+**If the model you chose is later moved or deleted**, the run **refuses by name** and tells you which file is gone. It does not quietly fall back to another model: that swap produces a result that looks perfectly fine and is not the one you asked for.
+
+**Coming from an older version:** the generation picker used to save to your **browser** (`editPage_flux2KleinModel_v1`), which improve never read — that is why improve had no model option anywhere. That browser value is still honoured for generation and is now offered, once, to be saved onto the dataset. Nothing is adopted behind your back: until you accept, improve keeps resolving Auto exactly as before.
+
 ### Identity & Klein prompts (advanced)
 
 *Feature request by @bbsorry (雨田壹).* Every generated variation is prefixed by a hidden **identity lock** — a block of text that tells the engine to keep the subject's exact identity and take the pose and setting from the description, not the reference photo. These used to be baked in and invisible; now you can read and edit them. They are stored under `identity_prompts.*`.
@@ -377,6 +393,24 @@ Defaults for new local training runs.
 - **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download); it is **local-only** for now (needs an up-to-date ai-toolkit + diffusers — cloud training arrives once the GPU pod image is verified).
 
 This fork's Settings → Training keeps only **Defaults** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
+### Training base & variant are per FAMILY
+
+The **Base** and **variant** chosen in *Advanced training options* belong to the
+model family they were chosen under, not to the dataset as a whole. Switching
+**LoRA type** hands you that family's own base — the official one the first time
+you pick it — and switching back restores what you had. Nothing is discarded:
+each family's choice is remembered on the dataset.
+
+This matters because the choices are not interchangeable. A Z-Image base is a
+ComfyUI merge **name** that gets converted to the diffusers layout first; Krea 2,
+FLUX.1 and FLUX.2 Klein take an **absolute path** to a `.safetensors` of their own
+architecture. Before this, one dataset held one base for every family, so a base
+picked for Z-Image stayed attached to a Krea 2 run — where it was silently ignored
+in favour of the official base, while the panel's summary line and the cloud
+dialog both went on advertising it.
+
+A base that provably belongs to another family (found on datasets created before
+this change) is reported as such in the panel and is not used.
 
 ### Concept face masking
 
@@ -419,7 +453,14 @@ separate 3.10–3.12 interpreter.
 
 ### Advanced options (per run)
 
-These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. Two are worth calling out because of a caveat:
+These live under **Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. Two are worth calling out because of a caveat.
+
+**One rule applies to all of them: they are stored per DATASET, not per family.** Switching **LORA TYPE** keeps every advanced setting you had — which is what you want for rank, optimizer or resolution, and what you do **not** want for the two settings below, whose right value is different on every family. Those two are handled explicitly:
+
+- **Memory saving carries over, and is now said out loud.** `quantize` / `quantize_te` / `low_vram` are a statement about *your card*, and your card doesn't change when the family does — so the values follow you. What changes is whether the card still suffices: switching them off on Anima or SDXL (2B, where **off** is the calibrated default) and then moving to Krea 2, FLUX.1, FLUX.2 Klein or Z-Image used to build an unquantised 12B run in complete silence. Both the panel and the **pre-launch check** now name which saver is off, what that family needs without it (see the estimates below) and what your card reports. It stays a **warning, never a blocker** — a big card legitimately runs unquantised — The warning is also *provenance-blind*: unticking a box directly on Krea 2 with a 24 GB card gets the same sentence as inheriting it from Anima, because it is the same danger.
+- **Timestep weighting is remembered per family instead.** `sigmoid` is Z-Image's and FLUX.1's canonical flow-matching schedule, `linear` is Krea 2's, `weighted` is FLUX.2 Klein's and Anima's — the value has no meaning outside a family, and carrying it over changed the LoRA that came out with nothing at all to observe afterwards. Each family now keeps its own choice: switching hands the incoming family its own value (or **Auto**, its canonical default, if you never set one there), and coming back finds yours exactly where you left it. Nothing is destroyed and nothing is asked. **Existing datasets are untouched** — a dataset that never changes family keeps every setting it has, byte for byte.
+- **Resolution stays global on purpose.** 768 and 1024 mean the same thing on every family, so remembering it per family would mean silently raising your 768 back to 768+1024 on a switch — a new silent change to fix an old one. The one combination that costs you (1024 on a 12B with a small card) is a pre-launch row instead, and that row no longer tells you to "drop the resolution to 768" when you are already at 768.
+
 
 - **Memory saving** — three switches (`quantize`, `quantize_te`, `low_vram`) that used to be hard-coded. **The defaults have not changed:** Z-Image, Krea 2, FLUX.1 and FLUX.2 Klein quantise the base model and the text encoder to `qfloat8` and stream blocks between CPU and GPU, which is what makes a 12B model train on a 24 GB card; Anima and SDXL are small enough to run without any of it. Turning them **off** trades VRAM for precision and speed — worth it only if your card is bigger than the target. As a rough order of magnitude with the savers off: **Z-Image ≈ 18 GB**, **FLUX.2 Klein 4B ≈ 14 GB**, **FLUX.2 Klein 9B ≈ 24 GB**, **Krea 2 / FLUX.1 ≈ 30 GB** (estimates: bf16 weights plus headroom, not a measurement on your exact card). The panel detects your GPU and says which side of that line you are on; if it can't (no NVIDIA card, `nvidia-smi` missing), it falls back to a generic note and blocks nothing. ⚠ **The failure mode is slowness, not a crash.** On Windows there is no clean out-of-memory error: the driver silently pages to system RAM and the run creeps along for hours. If a run that used to take 40 minutes is still going after three, put the switches back. The setting also works the other way — a small card can turn quantisation **on** for Anima or SDXL. It's recorded in each run's snapshot and in the Share config, so two runs can be compared honestly.
 

@@ -6,6 +6,7 @@ import { getCsrfToken } from '../../api/fetchClient';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { postJson } from '../../hooks/useDataset';
 import { animeFamilyNote } from './animeFamilyNote.js';
+import { customBasePushView } from './customBasePush.js';
 import { dualCaptionsSupport } from './dualCaptions.js';
 import { maskedCarryOverAction, clearLegacyMasked } from './maskedMigration.js';
 import ConceptFaceMaskField from './ConceptFaceMaskField';
@@ -52,7 +53,7 @@ import { laneOfPayload, preflightUrl } from './preflightLane.js';
 import { failureView } from './trainingFailure';
 import {
   MEMORY_KEYS, MEMORY_LABELS, memoryAdviceText, memoryIsOverridden, memoryPatchFor,
-  memoryStateLabel,
+  memoryRiskLine, memoryStateLabel,
 } from './memorySavingAdvice';
 import { stopOutcomeMessage } from '../../utils/runSilence';
 import SettingsLink from '../common/SettingsLink';
@@ -390,11 +391,25 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       // Wait for both before re-enabling Apply so an old-family preset/settings
       // cannot race the new selection.
       const info = await ds.trainBaseInfo?.();
+      // Re-seed base/variant from the SERVER, which now remembers them per
+      // family. The optimistic reset above only cleared this browser's state:
+      // it looked fixed until the next reload re-read the shared column and
+      // handed the other family's base straight back — the "change it and come
+      // back" dance. The server is the truth; adopt what it says. `nextBase`
+      // stays the fallback so SDXL — the one family that REQUIRES a checkpoint
+      // — still lands on a usable one the first time it is picked.
+      let seededBase = nextBase;
+      let seededVariant = nextVariant;
       if (info) {
         setBaseInfo(info);
         setAdv(info.train_settings || null);
+        seededBase = info.base || nextBase;
+        seededVariant = normalizeCheckpointVariant(t, info.variant || nextVariant);
+        setBase(seededBase);
+        setCustomBase(looksAbsolute(seededBase));
+        setVariant(seededVariant);
       }
-      const checkpointData = await ds.listCheckpoints?.(nextBase, t, nextVariant);
+      const checkpointData = await ds.listCheckpoints?.(seededBase, t, seededVariant);
       setStepsInfo(checkpointData?.recommended_steps_info || null);
     } catch {
       // Persistence succeeded: keep the new family truthful and let the normal
@@ -453,6 +468,9 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const advMemTouched = memoryIsOverridden(adv?.memory_saving);
   const advMemStateLabel = memoryStateLabel(advMemEff);
   const advMemAdviceText = memoryAdviceText(adv?.memory_advice);
+  // Non-null only when a saver THIS family's recipe relies on is switched off.
+  // The server decides (one rule, shared with the preflight); the panel renders.
+  const advMemRiskLine = memoryRiskLine(adv?.memory_risk, adv?.family_label);
   const LR_SCHED_LABELS = { constant: 'Constant (default)', constant_with_warmup: 'Warmup → constant', linear: 'Linear decay', cosine: 'Cosine decay', cosine_with_restarts: 'Cosine + restarts' };
   // The resolution the next run will actually train at. Slider mode defaults to
   // 768 only (the slider loss makes several prediction passes per step — much
@@ -1480,6 +1498,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </span>
       </div>
 
+      {/* A custom base picked on ANOTHER family was still attached to this
+          dataset (one shared column). The run ignores it — say so, once, rather
+          than let the summary above advertise weights nobody will load. */}
+      {baseInfo?.base_family_mismatch && (
+        <p className="m-0 mt-1 text-amber-300 text-[0.6875rem]">
+          ⚠ {baseInfo.base_family_mismatch}
+        </p>
+      )}
+
       {/* --- Slider LoRA (Beta) : entraîne un LoRA BIPOLAIRE (±strength) depuis une
            paire de prompts via le trainer `concept_slider` d'ai-toolkit. Les images
            du dataset ne servent que de substrat de débruitage (captions ignorées).
@@ -2123,6 +2150,16 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     </label>
                   ))}
                 </div>
+                {/* A saver this family's recipe relies on is off — most often
+                    because it was switched off on a 2B family (Anima/SDXL, where
+                    off IS the default) and the family then changed. Wraps at
+                    400 px: no fixed width, no truncation. */}
+                {advMemRiskLine && (
+                  <span className={`text-[0.6875rem] leading-relaxed ${
+                    adv?.memory_risk?.verdict === 'can_disable' ? 'text-content-muted' : 'text-amber-300'}`}>
+                    {adv?.memory_risk?.verdict === 'can_disable' ? '' : '⚠ '}{advMemRiskLine}
+                  </span>
+                )}
                 <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> the recipes are tuned so a 12B model fits in
                   24 GB — quantisation costs precision and low-VRAM streaming costs a lot of speed. If your card is
