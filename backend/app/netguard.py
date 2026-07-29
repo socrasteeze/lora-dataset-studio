@@ -30,6 +30,22 @@ from flask import jsonify, request, session
 
 SESSION_FLAG = 'lds_token_ok'
 
+# The ONLY endpoints a compute peer's bearer token opens. Matched on the
+# endpoint name, never on a path prefix: the `/api/cluster/` blueprint also
+# carries hub-admin routes (mint a join token, revoke another peer, enqueue an
+# infer script the peer then executes), so a prefix test would have made one
+# peer credential equal to full cluster admin. `/api/cluster/peer/connect` is
+# likewise a BROWSER route that happens to live under the `/peer/` prefix —
+# which is why even a narrower prefix would have been wrong.
+PEER_ENDPOINTS = frozenset({
+    'cluster.peer_heartbeat',
+    'cluster.peer_pull',
+    'cluster.peer_job_heartbeat',
+    'cluster.peer_job_complete',
+    'cluster.peer_download_artifact',
+    'cluster.peer_upload_artifact',
+})
+
 
 def _is_loopback(addr: str | None) -> bool:
     if not addr:
@@ -62,12 +78,12 @@ def install_network_guard(app):
         from . import config as cfg
         # First-contact join uses a one-time join token (validated in-handler),
         # not the browser access token and not a peer bearer yet.
-        if request.path == '/api/cluster/join' and request.method == 'POST':
+        if request.endpoint == 'cluster.join':
             return None
         # Peer workers present a ClusterDevice bearer — accept that even when the
         # browser access-token gate is on (machine-to-machine over Tailscale).
         presented = _presented_token()
-        if presented and request.path.startswith('/api/cluster/'):
+        if presented and request.endpoint in PEER_ENDPOINTS:
             try:
                 from .services import cluster as cluster_svc
                 if cluster_svc.authenticate_peer(presented) is not None:

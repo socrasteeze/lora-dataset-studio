@@ -496,7 +496,14 @@ Rent another machine’s GPU while keeping datasets on one Primary. Both install
 - **Primary URL / join token** (peer only) — paste the Primary’s Tailscale URL and a one-time join token from the Primary’s Devices card. After join, the peer pulls jobs outbound (sleep-friendly) and uploads results back; datasets never move.
 - **Generate join token** (primary only) — mint a short-lived token, copy it once to the peer. Revoke a peer anytime; its pending jobs fail cleanly.
 
-**Limits that stay visible:** the peer must be awake and online; the models/node packs for a job must exist on **that** machine’s ComfyUI/Ollama/ai-toolkit; flipping which box is Primary does **not** migrate `data/` automatically — move the data folder or keep Primary fixed and only rent the other GPU. Shared SMB dataset mounts are not used.
+**Limits that stay visible:**
+
+- **Only generation actually goes to a peer.** The **Run on** picker appears on Generate. Training, captioning, scoring and every other GPU job run on the Primary regardless of what the picker says — the peer-side execution for them exists but nothing in the UI drives it, and a peer-run training leaves loose checkpoint files under `data/cluster_artifacts/` instead of a run on the Training page.
+- **A peer runs what its Primary sends.** That is the whole point of renting a GPU, but it means the Primary can start processes on the peer. The peer will only run scripts that ship with its own install and only with its own configured Python — it will not run a file the Primary names — but the trust still points one way: **join only a Primary you control.**
+- The peer must be **awake and online** (heartbeat ~90 s); an offline peer is greyed out in the picker.
+- The models/node packs for a job must exist on **that** machine’s ComfyUI/Ollama/ai-toolkit. The Primary skips its own preflight for a remote job, so a missing model surfaces as a failed job rather than an up-front 409.
+- Flipping which box is Primary does **not** migrate `data/` automatically — move the data folder or keep Primary fixed and only rent the other GPU. Shared SMB dataset mounts are not used.
+- A join token is single-use and expires after 48 h. A peer's token is a **compute** credential only: it cannot mint further tokens, revoke other peers, or reach anything outside its own job endpoints.
 
 ## Maintenance
 

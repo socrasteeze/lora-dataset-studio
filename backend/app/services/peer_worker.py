@@ -352,16 +352,19 @@ class PeerWorker:
         if not script_name:
             self._complete(job_id, error='missing infer script')
             return
-        # Resolve to backend/infer/<script> if a bare name was sent.
-        script_path = Path(script_name)
+        # ALWAYS resolve inside this install's backend/infer/ — the basename and
+        # nothing else. The Primary is a remote machine; honouring an absolute
+        # path (or a bare `python` to run it with) would have let whoever holds
+        # the Primary run any file on this box as the user who started the app.
+        # That is a bigger grant than "rent my GPU", and it is not what the
+        # Devices card asks the user to agree to.
+        from ..config import REPO_ROOT
+        script_path = REPO_ROOT / 'backend' / 'infer' / os.path.basename(str(script_name))
         if not script_path.is_file():
-            from ..config import REPO_ROOT
-            candidate = REPO_ROOT / 'backend' / 'infer' / os.path.basename(script_name)
-            if candidate.is_file():
-                script_path = candidate
-            else:
-                self._complete(job_id, error=f'infer script not found: {script_name}')
-                return
+            self._complete(job_id,
+                           error=f'infer script not available on this peer: '
+                                 f'{os.path.basename(str(script_name))}')
+            return
 
         artifact_names = list(job.get('artifacts') or payload.get('artifacts') or [])
         work = Path(tempfile.mkdtemp(prefix='lds-peer-infer-'))
@@ -390,8 +393,10 @@ class PeerWorker:
                     if base in path_map:
                         stdin_payload[key] = path_map[base]
 
-            python = (payload.get('python')
-                      or (cfg.get('bank_scoring.python') or '').strip()
+            # Interpreter comes from THIS machine's config only — a peer-supplied
+            # `python` would reintroduce the arbitrary-execution grant the script
+            # confinement above just closed.
+            python = ((cfg.get('bank_scoring.python') or '').strip()
                       or (cfg.get('aitoolkit.python') or '').strip()
                       or sys.executable)
             timeout = int(payload.get('timeout') or 3600)

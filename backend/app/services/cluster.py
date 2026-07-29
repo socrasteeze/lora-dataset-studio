@@ -166,12 +166,18 @@ def list_join_tokens() -> list[dict]:
             .limit(50)
             .all())
     out = []
+    now = datetime.utcnow()
     with _join_token_lock:
         for r in rows:
             d = r.to_dict()
-            # Plaintext only while unredeemed and still in this process cache.
-            if not r.redeemed_at and r.id in _join_token_plaintext:
-                d['token'] = _join_token_plaintext[r.id]
+            expired = bool(r.expires_at and r.expires_at < now)
+            if r.redeemed_at or expired:
+                # A token that can no longer be redeemed must stop being shown:
+                # otherwise the panel kept offering the plaintext of every
+                # expired token until the process restarted.
+                _join_token_plaintext.pop(r.id, None)
+            elif r.id in _join_token_plaintext:
+                d['token'] = _join_token_plaintext[r.id]   # still in this process
             out.append(d)
     return out
 
@@ -196,6 +202,17 @@ def redeem_join_token(token: str, name: str | None = None,
     auth_token = secrets.token_urlsafe(32)
     device_id = str(uuid.uuid4())
     display = (name or '').strip() or f'Peer-{device_id[:8]}'
+    # Claim the token with a CONDITIONAL update, the same shape pull_next_job
+    # uses: the read-then-write above is a race, and losing it would mint two
+    # devices from one single-use token.
+    claimed = (ClusterJoinToken.query
+               .filter_by(id=row.id)
+               .filter(ClusterJoinToken.redeemed_at.is_(None))
+               .update({'redeemed_at': datetime.utcnow(),
+                        'redeemed_device_id': device_id}))
+    if not claimed:
+        db.session.rollback()
+        raise ValueError('join token already used')
     device = ClusterDevice(
         id=device_id,
         name=display,
@@ -204,8 +221,6 @@ def redeem_join_token(token: str, name: str | None = None,
         last_heartbeat=datetime.utcnow(),
         busy=0,
     )
-    row.redeemed_at = datetime.utcnow()
-    row.redeemed_device_id = device_id
     db.session.add(device)
     db.session.commit()
     with _join_token_lock:

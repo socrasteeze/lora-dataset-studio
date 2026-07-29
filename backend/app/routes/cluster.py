@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 
 from .. import config as cfg
 from ..extensions import csrf
@@ -246,11 +246,12 @@ def peer_download_artifact(job_id, name):
         path = cluster_svc.artifact_path(job_id, name)
     except FileNotFoundError:
         return jsonify({'error': 'artifact not found'}), 404
-    return Response(
-        path.read_bytes(),
-        mimetype='application/octet-stream',
-        headers={'Content-Disposition': f'attachment; filename="{path.name}"'},
-    )
+    # send_file streams. The artifacts crossing this route are dataset zips and
+    # training checkpoints — reading one into memory to answer a GET would take
+    # the Primary down on the first real training job.
+    return send_file(path, mimetype='application/octet-stream',
+                     as_attachment=True, download_name=path.name,
+                     conditional=True)
 
 
 @bp.put('/peer/artifacts/<job_id>/<path:name>')
@@ -264,9 +265,26 @@ def peer_upload_artifact(job_id, name):
     if job is None:
         return jsonify({'error': 'job not found'}), 404
     safe = name.replace('\\', '/').split('/')[-1]
+    # A basename of '', '.' or '..' resolves to a DIRECTORY, and opening one for
+    # writing is a detail-free 500 rather than an answer.
+    if safe in ('', '.', '..'):
+        return jsonify({'error': 'invalid artifact name'}), 400
     dest = cluster_svc.job_artifact_dir(job_id) / safe
-    dest.write_bytes(request.get_data() or b'')
-    return jsonify({'ok': True, 'name': safe})
+    # Copy in chunks: the body here is a dataset zip or a LoRA checkpoint, and
+    # reading one into memory is how a peer's first real training job takes the
+    # Primary down. The 64 MiB request ceiling that would otherwise 413 this is
+    # raised for this endpoint in create_app's _set_dataset_archive_request_limit
+    # — it has to happen in a before_request, not here, because the limit fires
+    # before the view runs.
+    written = 0
+    with open(dest, 'wb') as fh:
+        while True:
+            chunk = request.stream.read(1024 * 1024)
+            if not chunk:
+                break
+            fh.write(chunk)
+            written += len(chunk)
+    return jsonify({'ok': True, 'name': safe, 'bytes': written})
 
 
 @bp.get('/jobs/<job_id>')

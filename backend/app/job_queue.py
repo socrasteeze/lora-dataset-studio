@@ -437,16 +437,24 @@ class JobQueueManager:
 
         ``worker_id``: ``None``/``local`` = this machine's ComfyUI. Any other id is a
         registered cluster peer — the local queue worker skips the row and a
-        ClusterJob is created for peer pull.
+        ClusterJob is created for peer pull. A remote job needs its row COMMITTED
+        before the peer can claim it, which is incompatible with ``commit=False``
+        — and "just commit anyway" is not a fix, because ``db.session.commit()``
+        flushes everything else the caller had pending in that session, not only
+        this row. The two are refused together instead.
         """
         if job_type != 'image':
-            raise ValueError(f'unsupported job_type: {job_type}')
+            raise ValueError(f'unsupported job_type: {job_type!r}')
         if not workflow_data:
             raise ValueError('workflow_data is required')
         job_id = job_id or str(uuid.uuid4())
         from .services import cluster as cluster_svc
         device_id = cluster_svc.normalize_device_id(worker_id)
         remote = device_id != cluster_svc.LOCAL_DEVICE_ID
+        if remote and not commit:
+            raise ValueError('a remote (peer) job cannot be enqueued with '
+                             'commit=False — its row must be committed before '
+                             'the peer can claim it')
         job = ImageGenerationQueue(
             job_id=job_id,
             user_id=str(user_id),
@@ -459,9 +467,8 @@ class JobQueueManager:
         )
         db.session.add(job)
         if remote:
-            # Remote jobs must be visible before the peer can complete them —
-            # force a commit even when the caller asked for commit=False (Studio
-            # fan-out). Local commit=False behaviour is unchanged.
+            # Guaranteed commit=True here (refused above otherwise): the row must
+            # be visible to the peer's next pull.
             db.session.commit()
             try:
                 self._publish_remote_comfy_job(job_id, workflow_data, metadata, device_id)

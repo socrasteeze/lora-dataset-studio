@@ -598,6 +598,10 @@ class ImageGenerationQueue(JobQueueMixin, db.Model):
                 metadata = json.loads(self.job_metadata)
             except json.JSONDecodeError:
                 metadata = {}
+        # staged_input_paths holds absolute paths on THIS machine, for the
+        # cluster queue's own use. /status is the payload a user is most likely
+        # to paste into a bug report, so it never leaves the server.
+        metadata.pop('staged_input_paths', None)
 
         return {
             'job_id': self.job_id,

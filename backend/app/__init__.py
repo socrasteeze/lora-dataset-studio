@@ -84,6 +84,17 @@ _DATASET_ARCHIVE_UPLOAD_ENDPOINTS = frozenset({
     # as the whole library — it needs the same raised request ceiling.
     'backup.full_restore',
 })
+# A compute peer returning its output: a dataset zip on the way out, a LoRA
+# checkpoint on the way back. Both routinely clear the 64 MiB browser ceiling,
+# and this body is streamed to disk a chunk at a time rather than buffered, so
+# the ceiling buys nothing here. Authenticated by ClusterDevice bearer, so it is
+# not reachable by a browser that wandered in.
+_PEER_ARTIFACT_UPLOAD_ENDPOINTS = frozenset({'cluster.peer_upload_artifact'})
+# NOT None: Flask reads `None` as "fall back to MAX_CONTENT_LENGTH", so setting
+# the request attribute to None would silently keep the 64 MiB ceiling. A finite
+# ceiling is also the honest answer — a peer is authenticated, not trusted with
+# the Primary's disk.
+_DEFAULT_PEER_ARTIFACT_MAX_UPLOAD_BYTES = 16 * 1024 * 1024 * 1024
 
 
 def _positive_env_int(name, default):
@@ -355,6 +366,10 @@ def create_app(config_object=None):
         DATASET_ARCHIVE_MULTIPART_OVERHEAD_BYTES=(
             _DEFAULT_DATASET_ARCHIVE_MULTIPART_OVERHEAD_BYTES),
         DATASET_ARCHIVE_SPOOL_MEMORY_BYTES=8 * 1024 * 1024,
+        # A compute peer handing back a checkpoint or pulling a dataset zip.
+        PEER_ARTIFACT_MAX_UPLOAD_BYTES=_positive_env_int(
+            'LDS_PEER_ARTIFACT_MAX_UPLOAD_BYTES',
+            _DEFAULT_PEER_ARTIFACT_MAX_UPLOAD_BYTES),
     )
     app.config.update(config_object or {})
 
@@ -390,6 +405,9 @@ def create_app(config_object=None):
             overhead = max(0, int(
                 app.config['DATASET_ARCHIVE_MULTIPART_OVERHEAD_BYTES']))
             request.max_content_length = archive_max + overhead
+        elif request.endpoint in _PEER_ARTIFACT_UPLOAD_ENDPOINTS:
+            request.max_content_length = int(
+                app.config['PEER_ARTIFACT_MAX_UPLOAD_BYTES'])
 
     db.init_app(app)
     csrf.init_app(app)
