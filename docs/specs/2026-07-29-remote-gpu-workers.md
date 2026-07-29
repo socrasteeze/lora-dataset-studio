@@ -86,6 +86,12 @@ described — a picker that silently does nothing is worse than one that isn't o
 - A remote job cannot ride a `commit=False` fan-out — its row has to be committed
   before a peer can claim it, and committing the caller's session would flush
   whatever else it had pending. `add_job` refuses the combination.
+- Artifacts under `data/cluster_artifacts/<job_id>/` are swept at **boot** once
+  older than 48 h, sparing pending/claimed/running jobs — not deleted on
+  completion, because for a moment the artifact is the only copy of the output
+  (`_materialize_comfy_output`'s fallback) and the `vision`/`infer` result JSON is
+  read back out of it later by `read_job_result_json`. Bounded disk beats a
+  deletion that can destroy a user's image.
 
 ## Non-goals (this wave)
 

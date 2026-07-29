@@ -504,6 +504,7 @@ Rent another machine’s GPU while keeping datasets on one Primary. Both install
 - The models/node packs for a job must exist on **that** machine’s ComfyUI/Ollama/ai-toolkit. The Primary skips its own preflight for a remote job, so a missing model surfaces as a failed job rather than an up-front 409.
 - Flipping which box is Primary does **not** migrate `data/` automatically — move the data folder or keep Primary fixed and only rent the other GPU. Shared SMB dataset mounts are not used.
 - A join token is single-use and expires after 48 h. A peer's token is a **compute** credential only: it cannot mint further tokens, revoke other peers, or reach anything outside its own job endpoints.
+- Remote jobs move files as copies, not over a shared mount, so each one briefly costs disk on **both** machines under `data/cluster_artifacts/`. Folders older than 48 h are swept at startup (jobs still in flight are spared whatever their age) — so restart the app occasionally if you have been renting a GPU hard, or clear that folder yourself.
 
 ## Maintenance
 

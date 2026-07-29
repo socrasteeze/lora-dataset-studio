@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 
 def test_cluster_status_standalone(client):
@@ -270,3 +271,66 @@ def test_a_remote_job_cannot_ride_a_commit_false_fanout(app):
         # The local contract is untouched.
         jid = queue_manager.add_job(workflow_data={'1': {}}, commit=False)
         assert _json.loads('{}') == {} and jid
+
+
+# ── Renting a GPU must not cost a permanent second copy of every image ────
+
+def test_stale_artifact_folders_are_swept_but_live_and_fresh_ones_are_not(app,
+                                                                         monkeypatch):
+    """Nothing deleted cluster artifacts, so every remote job left the source
+    image AND the returned output on disk forever — full size, on top of the copy
+    already in the dataset."""
+    import time
+    from app import config as cfg
+    from app.services import cluster as cluster_svc
+
+    with app.app_context():
+        cfg.save_config({'cluster': {'role': 'primary'}})
+        minted = cluster_svc.mint_join_token()
+        peer = cluster_svc.redeem_join_token(minted['token'], name='peer')
+
+        # One finished job (sweepable), one still running (must be spared).
+        for jid, status in (('old-done', 'completed'), ('old-running', 'running')):
+            job = cluster_svc.create_cluster_job(
+                device_id=peer['device_id'], kind='comfy', payload={}, job_id=jid)
+            job.status = status
+        from app.extensions import db
+        db.session.commit()
+
+        old_done = cluster_svc.job_artifact_dir('old-done')
+        old_running = cluster_svc.job_artifact_dir('old-running')
+        fresh = cluster_svc.job_artifact_dir('fresh-orphan')
+        for d in (old_done, old_running, fresh):
+            (d / 'source.png').write_bytes(b'PNG')
+
+        # Age the two "old" folders past the fence.
+        stale = time.time() - (cluster_svc.ARTIFACT_MAX_AGE_SECONDS + 3600)
+        for d in (old_done, old_running):
+            os.utime(d, (stale, stale))
+
+        assert cluster_svc.prune_job_artifacts() == 1
+        assert not old_done.exists(), 'a finished, aged job keeps nothing'
+        assert old_running.exists(), 'a running job is spared whatever its age'
+        assert fresh.exists(), 'the age fence protects anything recent'
+
+
+def test_the_primary_does_not_put_its_own_paths_on_the_wire(app):
+    """The peer routes by basename; absolute hub paths would only leak layout."""
+    from app import config as cfg
+    from app.services import cluster as cluster_svc
+
+    with app.app_context():
+        cfg.save_config({'cluster': {'role': 'primary'}})
+        minted = cluster_svc.mint_join_token()
+        peer = cluster_svc.redeem_join_token(minted['token'], name='peer')
+        cluster_svc.create_cluster_job(
+            device_id=peer['device_id'], kind='comfy', job_id='wire-1',
+            payload={'artifacts': ['a.png'],
+                     'metadata': {'staged_inputs': ['a.png'],
+                                  'staged_input_paths': {'a.png': '/somewhere/a.png'}}})
+        device = cluster_svc.authenticate_peer(peer['auth_token'])
+        job = cluster_svc.pull_next_job(device)
+
+    md = job['payload']['metadata']
+    assert 'staged_input_paths' not in md
+    assert md['staged_inputs'] == ['a.png'], 'the basenames the peer needs stay'
