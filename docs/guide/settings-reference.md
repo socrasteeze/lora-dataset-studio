@@ -129,7 +129,9 @@ Not in Settings — it lives on the **dataset**, in the *Klein tuning* block of 
 
 **The list is detected, never typed.** It comes from the same scan ComfyUI itself would do — `models/unet`, `models/diffusion_models`, every root declared in `extra_model_paths.yaml`, and a relocated models folder (`comfyui.models_dir`) — in a `klein`-named subfolder **or** loose at the root. The one real constraint is that the model must be *nameable* as Klein: either the file name or its folder name has to contain `klein`. See *Where the Klein model can live* in the README.
 
-**What it applies to:** the single ✨ improve, the ✨ re-run, the whole improve batch, and Klein generation (variations and regenerations) for that dataset.
+**What it applies to:** every piece of Klein work that dataset starts — the single ✨ improve, the 🔄✨ re-run, the whole improve batch, Klein generation (variations and regenerations), the **reference edit** on the Klein engine, the **rescue of scraped images under 768 px**, and the **🧽 watermark clean** on the Klein engine (bulk and per-image).
+
+**The one exception is a bank**, which has no dataset and therefore nothing to inherit: its 🧽 Klein inpaint resolves the model automatically, and the panel says which one. Naming the model and choosing it are separate questions — a bank can be told, it just has nowhere to store an answer.
 
 **When there is only one model**, the picker does not appear — there is no choice to make — but the line naming the model still does. Not knowing which model produced an image was the actual complaint; a dropdown with one option was never the answer.
 
@@ -227,9 +229,13 @@ Where you point the app at the local programs that unlock the full pipeline: **C
 
 **Overrides and `extra_model_paths.yaml`.** These two mechanisms stack rather than compete. `comfyui.models_dir`/`comfyui.loras_dir` set the app's *default* model roots; `extra_model_paths.yaml` is read **in addition**, from `<comfyui.base_dir>/extra_model_paths.yaml` — the same place ComfyUI itself looks. The yaml is therefore always located from the install directory, never from a models override, so the two can't end up pointing at different trees. For models and LoRAs the yaml usually already does the job; the override is for the case where the models folder itself moved.
 
+**Where a deployed LoRA lands.** Reading a LoRA can span every root; installing one has to pick exactly one folder, and the app picks it in this order: the **`comfyui.loras_dir` override** if you filled it (you said where your files go — the yaml cannot take that back), otherwise **the first LoRA root in ComfyUI's own priority order**, otherwise `<install>/models/loras`. In yaml terms that first root is a declared `loras:` folder **only when its profile carries `is_default: true`** — that flag is exactly how ComfyUI is told *look here first*, and a plain extra root stays a secondary location for ComfyUI, so it stays secondary here too. The **open LoRA folder** button opens that same folder, by construction. Reported by Geekswordsman (GitHub #25), whose deploys were landing in `<install>/models/loras` while his yaml declared another folder. LoRAs deployed **before** this changed are still listed, still loadable and still deletable where they are — nothing on disk is moved.
+
 **Continuing without ComfyUI.** Leaving the install directory empty in the Setup wizard is a deliberate choice: it shows what turns off (local Klein generation including the NSFW lane, Klein watermark cleaning, the Test Studio, training on your own ComfyUI base models, and the on-disk LoRA preset picker) versus what stays on (scraping, curation, captioning, the API image engines, ai-toolkit/cloud training, Hugging Face publishing), then remembers the skip (`comfyui.setup_skipped`) so it stops nagging. Entering a directory at any point cancels the skip automatically and turns those features back on — the flag never hides a real problem with a ComfyUI you *have* configured.
 
 **Models outside `models/`?** If your ComfyUI uses an `extra_model_paths.yaml` (portable builds and Stability Matrix installs commonly do), the app reads it the same way ComfyUI does, so bases that live elsewhere are found. This isn't a setting — it follows automatically from your install directory. Without such a file, nothing changes.
+
+This now includes the **training** bases, which were the last exception: an SDXL checkpoint and a Z-Image merge declared in the yaml are listed in the base picker, accepted at launch, and handed to ai-toolkit as a real path. When the same file name exists in two roots, the one a running ComfyUI would load wins (`is_default` first), so you train on the same weights you generate with. Capitalisation of folders and file names doesn't have to match what the picker stored. And when a base genuinely cannot be found, the app says so **naming the file**, instead of passing a bare name down to ai-toolkit and letting it fail on a path you never typed.
 
 ### Ollama
 
@@ -627,7 +633,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `comfyui.input_dir` | Explicit override for ComfyUI's input folder. Set it when ComfyUI runs with `--input-directory`. Editable in Settings → Local tools. |
 | `comfyui.models_dir` | Explicit override for ComfyUI's models folder (used to scan available checkpoints/UNETs). `extra_model_paths.yaml` is still read on top of it. Editable in Settings → Local tools. |
 | `comfyui.object_info_timeout_s` | Seconds ComfyUI may take to enumerate its nodes and model files (default `45`, clamped to 5-300). Raise it on an install with many custom nodes; a ComfyUI that is simply stopped is still detected in ~3 s regardless. Editable in Settings → Local tools. |
-| `comfyui.loras_dir` | Explicit override for ComfyUI's LoRA folder. Editable in Settings → Local tools. |
+| `comfyui.loras_dir` | Explicit override for ComfyUI's LoRA folder — where trained LoRAs are installed. Wins over `extra_model_paths.yaml`; left empty, the deploy folder follows the yaml's `is_default` LoRA root, else `<install>/models/loras`. Editable in Settings → Local tools. |
 | `ollama.url` | Base URL of your Ollama instance (default `http://127.0.0.1:11434`). |
 | `ollama.vision_model` | Ollama vision model used for auto-classify and auto head-crop (default `huihui_ai/qwen3-vl-abliterated:8b-instruct`, the uncensored **abliterated** build — use the Instruct, not Thinking, variant). |
 | `ollama.vision_concurrency` | How many images a bank vision pass (watermark / framing / captions) sends to Ollama at once (default `4`, clamped to 1-16). Higher overlaps more waiting; `1` restores the old one-at-a-time behaviour. |
