@@ -35,6 +35,14 @@ whether each one is set) and your folder paths (only whether each one is
 configured). One caveat: the log tail can mention file names from your machine
 — skim the paste before posting if that matters to you.
 
+**If the copy does not happen:** browsers only give a page the clipboard on
+HTTPS or on `localhost`, so opening the app from another machine — its LAN or
+Tailscale address over plain http — means the copy is blocked no matter what
+the app does. The report is still built: the button says so and drops the whole
+thing into a box below it, already selected, so Ctrl/Cmd+C still gets you the
+paste. Only a message that starts with *"Could not build the report"* means the
+report itself failed.
+
 ## Feature requests
 
 Describe the **job you were doing when you missed the feature** — the problem

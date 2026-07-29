@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-copy-diagnostic-report-over-plain-http',
+    date: '2026-07-29',
+    title: 'The bug-report button works when you open the app from another machine',
+    blurb:
+      '"Copy diagnostic report" answered "Could not build the report" on any address that is not localhost — a LAN or Tailscale address, which is how most people reach the app from a laptop or phone. The report had actually been built every time; browsers just refuse the clipboard on a plain-http page and the app blamed the wrong step. It now says the report is ready, explains that the browser blocked the copy, and shows the text in a box that is already selected so you can copy it by hand.',
+    to: '/settings/maintenance',
+  },
+  {
     id: '2026-07-29-buttons-that-were-blank-have-their-icons-back',
     date: '2026-07-29',
     title: 'Buttons that showed as blank squares have their icons back',
