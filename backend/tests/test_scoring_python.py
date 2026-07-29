@@ -1,4 +1,4 @@
-"""Score on a GPU Python you already own.
+"""✨ Score on a GPU Python you already own.
 
 The trap this feature exists to avoid: an interpreter can have a perfect CUDA
 torch and STILL be unable to run the pass, because bank_score_infer.py also

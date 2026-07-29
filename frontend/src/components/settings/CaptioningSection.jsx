@@ -172,7 +172,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
 
       <Card
         title="Image bank triage"
-        help="Thresholds for the Bank quality flags. Raw scores are stored per image, so changing a threshold re-sorts an already-scanned bank instantly — no rescan."
+        help="Thresholds for the 🗃️ Bank quality flags. Raw scores are stored per image, so changing a threshold re-sorts an already-scanned bank instantly — no rescan."
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div>
@@ -183,7 +183,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               value={config.bank?.sharpness_min ?? bankDefault('sharpness_min')}
               onChange={(e) => setField('bank', 'sharpness_min', parseFloat(e.target.value) || 0)}
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Laplacian variance under this = blurry.</p>
+            <p className="mt-0.5 text-xs text-content-muted">Laplacian variance under this = 🌫 blurry.</p>
             <ResetToDefault label="Sharpness minimum" section="bank" field="sharpness_min"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -195,7 +195,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               value={config.bank?.noise_max ?? bankDefault('noise_max')}
               onChange={(e) => setField('bank', 'noise_max', parseFloat(e.target.value) || 0)}
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Residual grain over this = noisy.</p>
+            <p className="mt-0.5 text-xs text-content-muted">Residual grain over this = 📺 noisy.</p>
             <ResetToDefault label="Noise maximum" section="bank" field="noise_max"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -219,7 +219,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               value={config.bank?.min_side ?? bankDefault('min_side')}
               onChange={(e) => setField('bank', 'min_side', parseInt(e.target.value, 10) || 0)}
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Smaller side under this = small (trainers only downscale).</p>
+            <p className="mt-0.5 text-xs text-content-muted">Smaller side under this = 📐 small (trainers only downscale).</p>
             <ResetToDefault label="Minimum side" section="bank" field="min_side"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -232,7 +232,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               onChange={(e) => setField('bank', 'detail_min', parseFloat(e.target.value) || 0)}
               className={INPUT_CLASS} />
             <p className="mt-0.5 text-xs text-content-muted">
-              Share of the stored size that still carries real picture, under which an image is flagged soft detail — the usual cause is an enlargement. 0.72 picks the softest few percent. A soft or out-of-focus photo reads the same way, so treat it as a score, not proof.
+              Share of the stored size that still carries real picture, under which an image is flagged 🫧 soft detail — the usual cause is an enlargement. 0.72 picks the softest few percent. A soft or out-of-focus photo reads the same way, so treat it as a score, not proof.
             </p>
             <ResetToDefault label="Real-detail minimum" section="bank" field="detail_min"
               config={config} configDefaults={configDefaults} setField={setField} />
@@ -245,7 +245,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               value={config.bank?.bars_max ?? bankDefault('bars_max')}
               onChange={(e) => setField('bank', 'bars_max', parseFloat(e.target.value) || 0)}
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Share of the frame that may be flat black letterbox before an image is flagged black bars (video screenshots, padded stills).</p>
+            <p className="mt-0.5 text-xs text-content-muted">Share of the frame that may be flat black letterbox before an image is flagged 🎞 black bars (video screenshots, padded stills).</p>
             <ResetToDefault label="Black-bar maximum" section="bank" field="bars_max"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -269,7 +269,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               value={config.bank?.face_threshold ?? bankDefault('face_threshold')}
               onChange={(e) => setField('bank', 'face_threshold', parseFloat(e.target.value) || 0)}
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Cosine similarity for the person clustering. Applies at the next face pass.</p>
+            <p className="mt-0.5 text-xs text-content-muted">Cosine similarity for the 👥 person clustering. Applies at the next face pass.</p>
             <ResetToDefault label="Same-person similarity" section="bank" field="face_threshold"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
@@ -305,7 +305,7 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               value={config.bank?.style_threshold ?? bankDefault('style_threshold')}
               onChange={(e) => setField('bank', 'style_threshold', parseFloat(e.target.value) || 0)}
               className={INPUT_CLASS} />
-            <p className="mt-0.5 text-xs text-content-muted">Cosine similarity for the style clustering. Applies at the next scoring pass.</p>
+            <p className="mt-0.5 text-xs text-content-muted">Cosine similarity for the 🎨 style clustering. Applies at the next scoring pass.</p>
             <ResetToDefault label="Same-style similarity" section="bank" field="style_threshold"
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>

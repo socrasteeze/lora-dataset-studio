@@ -1,4 +1,4 @@
-/* One place that knows whether the browser can still reach this server.
+/* 📡 One place that knows whether the browser can still reach this server.
  *
  * THE BUG THIS EXISTS FOR
  * -----------------------

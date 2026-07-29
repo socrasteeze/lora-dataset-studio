@@ -79,7 +79,7 @@ export function cropLevelState(levels, { live = false } = {}) {
           // A hand-drawn mask can hold several zones and zones on the subject —
           // a border crop expresses neither, so this level skips those images.
           // Saying "not in a border" there would be a lie.
-          ? 'The flagged images all carry a hand-edited mask — Inpaint repaints '
+          ? 'The flagged images all carry a hand-edited mask — 🧽 Inpaint repaints '
             + 'the zones you drew.'
           : 'Nothing to crop: the remaining marks are not in a border, or cropping '
             + 'would shrink the image too much. Use level 3.')
@@ -164,7 +164,7 @@ export function progressSummary(levels) {
 export function maskNote(levels) {
   const c = levelCounts(levels);
   if (!c.handMasked) return null;
-  const drawn = `${c.handMasked} flagged image(s) carry a mask you edited — Inpaint `
+  const drawn = `${c.handMasked} flagged image(s) carry a mask you edited — 🧽 Inpaint `
     + 'repaints those zones, ✂ Auto-crop skips them.';
   if (!c.emptyMasks) return drawn;
   return `${drawn} ${c.emptyMasks} of them has an EMPTY mask and will be cleaned by `

@@ -95,16 +95,16 @@ test('an unknown job kind degrades to a neutral phrase, never to an internal id'
 
 test('busyLine carries the running detail when the pass has no total', () => {
   const line = busyLine({ activity: { kind: 'scan', done: 12, total: 0, detail: 'grouping duplicates' } });
-  assert.match(line, /Quality scan/);
+  assert.match(line, /🔎 Quality scan/);
   assert.match(line, /12/);
   assert.match(line, /grouping duplicates/);
 });
 
 test('a detail that only repeats the pass name is dropped, not stuttered', () => {
   // Measured on a live bank: start_scan sets detail='quality scan', which gave
-  // "Quality scan is running on this bank — 1996 / 5425 · quality scan".
+  // "🔎 Quality scan is running on this bank — 1996 / 5425 · quality scan".
   const line = busyLine({ activity: { kind: 'scan', done: 1996, total: 5425, detail: 'quality scan' } });
-  assert.equal(line, 'Quality scan is running on this bank — 1996 / 5425');
+  assert.equal(line, '🔎 Quality scan is running on this bank — 1996 / 5425');
 });
 
 test('a finished job contributes no stale detail to the line', () => {

@@ -424,7 +424,7 @@ export default function SetupPage() {
               {step.dirValid ? (
                 <div className="space-y-2 rounded-md border border-border bg-white/5 p-2.5">
                   <p className="text-content text-xs font-medium">
-                    One-click downloads — straight into the validated ComfyUI folders:
+                    ⬇ One-click downloads — straight into the validated ComfyUI folders:
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -434,25 +434,25 @@ export default function SetupPage() {
                           Direct public download — no token needed. The FLUX Non-Commercial License governs use.
                         </span>
                       </p>
-                      {installBtn('klein_model', 'Download Klein model')}
+                      {installBtn('klein_model', '⬇ Download Klein model')}
                     </div>
                     <div>
                       <p className="mb-1 text-[0.6875rem] text-content-muted">
                         Consistency LoRA (331 MB) → <span className="font-mono">models/loras/klein/</span>
                       </p>
-                      {installBtn('klein_lora', 'Download consistency LoRA')}
+                      {installBtn('klein_lora', '⬇ Download consistency LoRA')}
                     </div>
                     <div>
                       <p className="mb-1 text-[0.6875rem] text-content-muted">
                         Text encoder (~8.7 GB) → <span className="font-mono">models/text_encoders/</span>
                       </p>
-                      {installBtn('klein_text_encoder', 'Download text encoder')}
+                      {installBtn('klein_text_encoder', '⬇ Download text encoder')}
                     </div>
                     <div>
                       <p className="mb-1 text-[0.6875rem] text-content-muted">
                         VAE (336 MB) → <span className="font-mono">models/vae/</span>
                       </p>
-                      {installBtn('klein_vae', 'Download VAE')}
+                      {installBtn('klein_vae', '⬇ Download VAE')}
                     </div>
                   </div>
                 </div>
@@ -653,14 +653,14 @@ export default function SetupPage() {
       // that one without redoing the whole monolithic step. The all-at-once install
       // stays available below for a first-time setup.
       const ML_CAPS = [
-        { action: 'face_scoring', cap: 'face_scoring', icon: '', title: 'Face-similarity scoring',
+        { action: 'face_scoring', cap: 'face_scoring', icon: '🎭', title: 'Face-similarity scoring',
           body: 'Powers the "Analyze faces" pass: scores how closely each generated image resembles your reference photo, so you keep the ones that truly look like the person. It only ranks — it never deletes anything.' },
-        { action: 'masks', cap: 'masks', icon: '', title: 'Person masks',
+        { action: 'masks', cap: 'masks', icon: '🧍', title: 'Person masks',
           body: 'Isolates the subject from the background for masked training: the surroundings are weighted down so the LoRA binds the identity to the person, not the room. A training without masks is still valid.' },
-        { action: 'watermark_inpaint', cap: 'watermark_inpaint', icon: '', title: 'Watermark inpainting',
-          body: 'Repaints small off-center watermarks (LaMa) during Clean instead of only cropping border marks. It can use CUDA or CPU from Settings. Without it, off-center marks are skipped.' },
-        { action: 'bank_scoring', cap: 'bank_scoring', icon: '', title: 'Bank scoring (aesthetic · NSFW · style)',
-          body: "Powers the Bank's Score pass: rates images for aesthetics (1–10), flags NSFW and groups them by visual style with one CLIP pass — and makes 'keep best' prefer the nicest-looking duplicate. Installs into its own Python (CLIP + a small NSFW model). Without it, the Score button is disabled with this hint." },
+        { action: 'watermark_inpaint', cap: 'watermark_inpaint', icon: '🧽', title: 'Watermark inpainting',
+          body: 'Repaints small off-center watermarks (LaMa) during 🧽 Clean instead of only cropping border marks. It can use CUDA or CPU from Settings. Without it, off-center marks are skipped.' },
+        { action: 'bank_scoring', cap: 'bank_scoring', icon: '✨', title: 'Bank scoring (aesthetic · NSFW · style)',
+          body: "Powers the 🗃️ Bank's ✨ Score pass: rates images for aesthetics (1–10), flags NSFW and groups them by visual style with one CLIP pass — and makes 'keep best' prefer the nicest-looking duplicate. Installs into its own Python (CLIP + a small NSFW model). Without it, the Score button is disabled with this hint." },
       ]
       return (
         <div className="space-y-3">
@@ -986,7 +986,7 @@ export default function SetupPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="text-center">
-          <div className="text-3xl" aria-hidden="true"></div>
+          <div className="text-3xl" aria-hidden="true">🧬</div>
           <h1 className="mt-2 text-2xl font-bold text-content">Welcome to LoRA Dataset Studio</h1>
           <p className="mt-2 text-sm text-content-muted">
             Let's set up your machine. I'll scan what's already installed and help you install the rest —
@@ -1074,7 +1074,7 @@ export default function SetupPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="text-center">
-          <div className="text-3xl" aria-hidden="true"></div>
+          <div className="text-3xl" aria-hidden="true">🎉</div>
           <h1 className="mt-2 text-2xl font-bold text-content">You're all set</h1>
           <p className="mt-1 text-sm text-content-muted">{readyCount} of {summary.length} capabilities ready.</p>
         </div>
@@ -1131,7 +1131,7 @@ export default function SetupPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         <div className="text-center">
-          <div className="text-3xl" aria-hidden="true"></div>
+          <div className="text-3xl" aria-hidden="true">⬇</div>
           <h1 className="mt-2 text-2xl font-bold text-content">Install components</h1>
           <p className="mt-2 text-sm text-content-muted">
             Now that your services are configured, install what the app can set up for you —
@@ -1195,7 +1195,7 @@ export default function SetupPage() {
 
       {reason && (
         <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-          {reason}
+          🔒 {reason}
         </p>
       )}
       <div className="flex items-center justify-between">

@@ -3,7 +3,7 @@ import { CLUSTER_UNITS, chromeScale } from '../../utils/canvasNodeChrome';
 import { imageFactsLine } from '../../utils/generatedImageFacts';
 import { useImageDownload } from '../../hooks/useImageDownload';
 
-/* One generated image, pinned ON the board.
+/* 🖼 One generated image, pinned ON the board.
 
    The board compares checkpoints and the thing being compared is the picture —
    so a picture that can only be seen one at a time, in a modal, cannot be
@@ -36,7 +36,7 @@ import { useImageDownload } from '../../hooks/useImageDownload';
    ⬇ …and the cluster now has THREE controls, which is why it wraps. The cap
    that keeps it off the picture is spent on the cluster's WIDTH, so a third
    button drawn beside the others would have shrunk all of them by a third and
-   walked the same bug back in. It goes on a second line instead, last, so 
+   walked the same bug back in. It goes on a second line instead, last, so 🔍
    and ✕ never move. What it downloads keeps its lineage in its NAME — dataset,
    run, step, seed — because this board is the only place that knows all four
    and a file called out_00042_.png in Downloads knows none of them.
@@ -51,7 +51,7 @@ export default function CanvasImageNode({ node, datasetId, laneName, onGeometry,
   const img = node.image || {};
   const stepLabel = img.step == null ? 'step unknown' : `step ${img.step}`;
   const facts = imageFactsLine(img);
-  /* A MEMBER of a group draws the same picture with the same actions, in a
+  /* 🖼🖼 A MEMBER of a group draws the same picture with the same actions, in a
      box the strip decides (utils/canvasImageGroups.layoutImageNodes) instead of
      its own. Three things go away and nothing is added:
 

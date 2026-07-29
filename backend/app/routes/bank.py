@@ -1,4 +1,4 @@
-"""Image bank API — triage a big unsorted folder before it becomes datasets.
+"""🗃️ Image bank API — triage a big unsorted folder before it becomes datasets.
 
 All heavy passes (quality scan, face clustering, promotion) return 202 and run
 in ONE background thread per bank; the UI polls GET /bank/<id> whose payload
@@ -67,7 +67,7 @@ def bank_create():
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     # Nested folders mean two banks over the same files: harmless while triaging
-    # (statuses are per bank), but Delete rejected in one amputates the other.
+    # (statuses are per bank), but 🗑 Delete rejected in one amputates the other.
     # Say it now, once, rather than at the destructive click only.
     return jsonify({'ok': True, 'id': bank.id, 'added': added,
                     'overlaps': banks.overlapping_banks(LOCAL_USER, bank.id)})
@@ -124,7 +124,7 @@ def bank_from_dataset():
 
 @bp.post('/bank/scrape-import')
 def bank_scrape_import():
-    """Scrape → BANK — the scraper's second destination, next to the dataset one.
+    """🕸 Scrape → BANK — the scraper's second destination, next to the dataset one.
 
     Body: {items:[{url,title}], bank_id?} to APPEND to an existing bank (resume),
     or {items, name} to create one. Synchronous like the dataset outlet (the same
@@ -181,7 +181,7 @@ def bank_rename(bank_id):
 @bp.post('/bank/<int:bank_id>/flag-preview')
 def bank_flag_preview(bank_id):
     """How many images each flag WOULD hold at the thresholds in the body —
-    the live effect readout under the Bank's threshold controls.
+    the live effect readout under the Bank's 🎚 threshold controls.
 
     Read-only and cheap: verdicts are recomputed from persisted raw scores, so
     this is one COUNT per flag, the same queries the workspace payload already
@@ -317,7 +317,7 @@ def bank_score(bank_id):
 
 @bp.post('/bank/<int:bank_id>/semantic-dedup')
 def bank_semantic_dedup(bank_id):
-    """Stage-2 semantic near-duplicate pass (crops/variants) over the Score
+    """Stage-2 semantic near-duplicate pass (crops/variants) over the ✨ Score
     embeddings — CPU, no GPU. {threshold: 0.95} overrides the config for an ad-hoc
     re-tri without a re-scan. 202/409; 400 with a "run Score first" hint when no
     embeddings exist yet."""
@@ -663,7 +663,7 @@ def bank_undo_last(bank_id):
     400 and name what it left alone. 400 = there is nothing to undo (no offer,
     or it expired); 409 = a pass is running on this bank.
 
-    Only the status-flipping bulk actions are ever offered here. Delete
+    Only the status-flipping bulk actions are ever offered here. 🗑 Delete
     rejected and ⬆ Promote are not undoable cleanly, so they publish no offer —
     see ``services.bank_undo``."""
     try:
@@ -733,7 +733,7 @@ def _curation_filters(data):
 @bp.post('/bank/<int:bank_id>/select-diverse')
 def bank_select_diverse(bank_id):
     """Farthest-point selection of the N most VARIED images in the current filter,
-    reusing the Score embeddings (no GPU). Returns the chosen ids for the UI to
+    reusing the ✨ Score embeddings (no GPU). Returns the chosen ids for the UI to
     check — never mutates. 400 with a "run Score first" hint when unscored.
 
     {typicality} (0–1) tempers the sampling so isolated aberrations stop winning
@@ -790,7 +790,7 @@ def bank_select_balanced(bank_id):
 def bank_select_similar(bank_id):
     """Rank the current filter by CLIP similarity to a reference bank image
     ({ref_id}); returns the top-N ids (or everything ≥ {min_score}) for the UI to
-    check. Reuses the Score embeddings (no GPU). 400 when unscored / bad ref."""
+    check. Reuses the ✨ Score embeddings (no GPU). 400 when unscored / bad ref."""
     data = request.get_json(silent=True) or {}
     try:
         ref_id = int(data.get('ref_id'))
@@ -864,7 +864,7 @@ def bank_text_search_release():
 
 @bp.get('/bank/<int:bank_id>/delete-rejected/preview')
 def bank_delete_rejected_preview(bank_id):
-    """What Delete rejected would really do, for the confirmation dialog: how
+    """What 🗑 Delete rejected would really do, for the confirmation dialog: how
     many files, where they would go, and which OTHER banks share them (nested
     source folders make one bank's cleanup another bank's amputation)."""
     out = banks.rejected_delete_preview(LOCAL_USER, bank_id)

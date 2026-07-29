@@ -1,5 +1,5 @@
 /*
- * Pure helpers for the "Back up everything" flow — progress phrasing, the
+ * Pure helpers for the "💾 Back up everything" flow — progress phrasing, the
  * finished-backup summary and the honest restore report. Kept free of React so
  * node --test can exercise the wording (fullBackup.test.js) without a DOM.
  */

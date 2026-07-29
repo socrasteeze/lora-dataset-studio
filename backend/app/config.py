@@ -87,7 +87,7 @@ DEFAULTS = {
                 'enabled': ['klein', 'krea'],
                 'known': []},
     'captioning': {'backend': 'auto'},                         # auto|joycaption|ollama|none
-    # What happens to a photo the moment it enters a dataset. Until now this
+    # 📥 What happens to a photo the moment it enters a dataset. Until now this
     # was two hardcoded numbers with no sentence anywhere saying they existed
     # (reported by Qeeyana on Reddit: "images added to dataset are automatically
     # normalized to 1024. Why? Let me choose not to.").
@@ -194,7 +194,7 @@ DEFAULTS = {
     # models_root overrides the HF/torch cache for those weights. Empty python
     # = fall back to the app interpreter (probe fails until install).
     'bank_scoring': {'python': '', 'models_root': ''},
-    # Image bank triage thresholds. Raw scores are persisted per image;
+    # 🗃️ Image bank triage thresholds. Raw scores are persisted per image;
     # these thresholds only drive the FLAGS computed at read time — so tuning
     # them re-sorts an already-scanned bank instantly, no rescan needed.
     # sharpness_min: Laplacian variance below this = flagged blurry (the classic
@@ -232,10 +232,10 @@ DEFAULTS = {
              #   reference bank (screenshots of videos, padded stills).
              'bars_max': 0.04},
     'masks': {'python': ''},
-    # Bank Score pass interpreter (CLIP aesthetic/NSFW stack). Auto-provisioned
+    # Bank ✨ Score pass interpreter (CLIP aesthetic/NSFW stack). Auto-provisioned
     # by the bank_scoring installer into its own venv — declared here so a
     # full-config Save round-trips it instead of failing "unknown config section".
-    # text_search_idle_minutes: how long the text-search encoder stays warm
+    # text_search_idle_minutes: how long the 🔤 text-search encoder stays warm
     #   after its last query. Loading CLIP costs ~8 s; encoding a phrase costs
     #   ~20 ms — so the worker is kept alive to make a refine-and-retry session
     #   instant, and reaped afterwards because it holds ~2.4 GB of RAM. 0 means
@@ -759,7 +759,7 @@ def bank_sources_root() -> Path:
     return root
 
 def banks_root() -> Path:
-    """Working data of the image banks (thumbnails + face-embedding cache),
+    """Working data of the 🗃️ image banks (thumbnails + face-embedding cache),
     one subfolder per bank — never the source images, which stay in the user's
     folder untouched."""
     root = _data_dir() / 'banks'

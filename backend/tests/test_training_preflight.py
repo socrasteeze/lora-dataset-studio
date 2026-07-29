@@ -217,16 +217,16 @@ def test_preflight_checks_and_verdict_mirror_findings(app, monkeypatch):
     from app import capabilities
     with app.app_context():
         monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: None)
-        # blocked : sous le plancher famille
+        # 🔴 blocked : sous le plancher famille
         r = lt.training_preflight(LOCAL_USER, _mk(app, n_keep=8).id)
         assert r['verdict'] == 'blocked'
         img = next(c for c in r['checks'] if c['id'] == 'images')
         assert img['status'] == 'fail' and img['target'] == 'gf-generate'
-        # warnings : au-dessus du plancher, sous la reco (aucun fail)
+        # 🟡 warnings : au-dessus du plancher, sous la reco (aucun fail)
         r2 = lt.training_preflight(LOCAL_USER, _mk(app, n_keep=15, framing='body').id)
         assert r2['verdict'] == 'warnings'
         assert not any(c['status'] == 'fail' for c in r2['checks'])
-        # ready : dataset propre (reco atteinte, body, captions variées)
+        # 🟢 ready : dataset propre (reco atteinte, body, captions variées)
         ds3 = _mk(app, n_keep=20, framing='body',
                   caption='full body shot of the subject walking through a sunny park wearing jeans')
         r3 = lt.training_preflight(LOCAL_USER, ds3.id)

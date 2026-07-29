@@ -1,4 +1,4 @@
-"""Bank vision passes run their Ollama calls concurrently.
+"""🗃️ Bank vision passes run their Ollama calls concurrently.
 
 The watermark, framing and caption passes call Ollama once per image over banks
 of tens of thousands of files, and most of each call is round-trip waiting

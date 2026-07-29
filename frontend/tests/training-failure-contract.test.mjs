@@ -43,11 +43,11 @@ test('both notes name a button rendered in the failure block itself', () => {
   // the contract actually guarantees is that the notes name the button rendered
   // beside them — asserted on the label itself, which both sides share.
   for (const note of [NO_ERROR_NOTE, FULL_LOG_NOTE]) {
-    assert.match(note, /Open run folder/)
+    assert.match(note, /📂 Open run folder/)
   }
   // node:test runs cases after the module has evaluated, so `block` (read at the
   // bottom of this file) is available here.
-  assert.ok(block.includes('Open run folder'),
+  assert.ok(block.includes('📂 Open run folder'),
     'the button the notes point at must live in the failure block')
 })
 

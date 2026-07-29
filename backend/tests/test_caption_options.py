@@ -1,4 +1,4 @@
-"""Per-dataset caption method options (Captions Options popover).
+"""Per-dataset caption method options (Captions ⚙️ Options popover).
 
 Covers the whole seam:
   - additive caption_options migration on a LEGACY table (no column yet);

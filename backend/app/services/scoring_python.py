@@ -1,4 +1,4 @@
-"""Find a Python already on this machine that can run Score on the GPU.
+"""Find a Python already on this machine that can run ✨ Score on the GPU.
 
 The scoring extra deliberately installs CPU-only torch (Setup builds it a small
 private venv rather than pushing a ~2.5 GB CUDA download on people who have no
@@ -335,7 +335,7 @@ def candidates() -> list:
         "The app's inpainting environment")
     add(sys.executable, 'app', "The app's own Python")
     add((cfg.get('bank_scoring.python') or '').strip(), 'configured',
-        'Currently used for Score')
+        'Currently used for ✨ Score')
     return out
 
 
@@ -426,7 +426,7 @@ class SelectionError(ValueError):
 
 
 def select(path: str) -> dict:
-    """Point Score at `path` (or back at the app default when blank).
+    """Point ✨ Score at `path` (or back at the app default when blank).
 
     Verifies FIRST and refuses anything it could not prove — an interpreter that
     is missing open_clip would fail an hour into a pass. On success the
@@ -445,7 +445,7 @@ def select(path: str) -> dict:
                 'That path did not answer as a Python interpreter — '
                 'nothing was changed.', verdict)
         raise SelectionError(
-            f"That Python cannot run Score: {verdict['detail']}. "
+            f"That Python cannot run ✨ Score: {verdict['detail']}. "
             'Nothing was changed — install the missing packages there first.',
             verdict)
     cfg.save_config({'bank_scoring': {'python': target}})

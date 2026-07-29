@@ -181,7 +181,7 @@ export default function DatasetLightbox({
     await onMirror(img.id);
   };
 
-  // Quarter turns (idea by 1Tomber, GitHub #17). `mirrorBusy` is the shared
+  // 🔄 Quarter turns (idea by 1Tomber, GitHub #17). `mirrorBusy` is the shared
   // "a pixel edit is running on this image" flag — both actions rewrite the same
   // file, so neither may start while the other is in flight.
   const rotate = (degrees) => async (event) => {
@@ -321,7 +321,7 @@ export default function DatasetLightbox({
             className="min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-indigo-400/50 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             {improveReady
               ? '✓ Review improvement first'
-              : improvementActive ? 'Improving…' : 'Upscale & improve'}
+              : improvementActive ? '✨ Improving…' : '✨ Upscale & improve'}
           </button>
         )}
         {/* Its strength, step count and instruction are all editable, and nothing

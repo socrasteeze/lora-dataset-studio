@@ -77,7 +77,7 @@ export function toImageNodeMap(rows) {
       imageId: Number(id),
       ...clampImageBox(r),
       visible: r.visible !== false,
-      /* Group membership, when this picture is part of a side-by-side strip
+      /* 🖼🖼 Group membership, when this picture is part of a side-by-side strip
          (utils/canvasImageGroups). Two ADDITIVE, nullable fields: a lane loaded
          from a database that predates them reads null everywhere and draws the
          board it always drew. Nothing here is renamed — the geometry keys and

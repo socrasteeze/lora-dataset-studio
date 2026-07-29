@@ -635,9 +635,9 @@ _HAS_EXPRESSION = re.compile(
 # --- Krea 2 Identity Edit wrapper --------------------------------------------
 # MEASURED on a live install (2026-07-25), single reference photo, NO character
 # LoRA:
-#   identity holds by itself — forehead/neck tattoos, five piercings, hoop
+#   ✅ identity holds by itself — forehead/neck tattoos, five piercings, hoop
 #      earrings, body morphology, all carried from the one reference;
-#   the requested FRAMING is honoured (a real full-length shot when asked),
+#   ✅ the requested FRAMING is honoured (a real full-length shot when asked),
 #      which the API-engine wrapper never managed on this model — that wrapper
 #      leads with preservation ("change nothing"), and Krea answered with a
 #      close-up whatever the shot asked for. So Krea reuses the KLEIN wrapper's

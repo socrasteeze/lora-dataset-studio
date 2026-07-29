@@ -24,7 +24,7 @@ const ENGINE_OPTIONS = [
    @waltm — Discord feature request): named combinations of user-pointed LoRA
    files (any files, any purpose — texture, anatomy, style…). Inside a preset
    the rows chain after the consistency LoRA in LIST ORDER (file + strength,
-   reorderable, capped at 8). Per run the workspace's Klein tuning panel
+   reorderable, capped at 8). Per run the workspace's 🖥️ Klein tuning panel
    just PICKS a preset ("None" by default) — the choice carries the intent,
    there is no automatic gating. The app never ships or hardcodes a LoRA name. */
 const MAX_GENERATION_LORAS = 8        // mirrors backend klein_edit_helper caps
@@ -137,7 +137,7 @@ function KleinLorasCard({ config, setField }) {
     <Card
       id="klein-generation-lora-presets"
       title="Klein generation LoRA presets (optional)"
-      help={`Named combinations of your own LoRA files, chained after the consistency LoRA on the local Klein engine — inside a preset the order is the chain order (max ${MAX_GENERATION_LORAS} LoRAs each, ${MAX_GENERATION_LORA_PRESETS} presets). Pick each row from the LoRAs found under ComfyUI's models/loras (Klein-compatible ones are listed first; you can still type a path for a file not on disk yet) — any LoRA, any purpose. Per run, pick a preset in the workspace's Klein tuning panel ("None" by default). Presets and LoRA autocomplete by @waltm (Discord).`}
+      help={`Named combinations of your own LoRA files, chained after the consistency LoRA on the local Klein engine — inside a preset the order is the chain order (max ${MAX_GENERATION_LORAS} LoRAs each, ${MAX_GENERATION_LORA_PRESETS} presets). Pick each row from the LoRAs found under ComfyUI's models/loras (Klein-compatible ones are listed first; you can still type a path for a file not on disk yet) — any LoRA, any purpose. Per run, pick a preset in the workspace's 🖥️ Klein tuning panel ("None" by default). Presets and LoRA autocomplete by @waltm (Discord).`}
     >
       {presets.length === 0 && (
         <p className="text-sm text-content-muted">No presets yet — create your first combination below.</p>

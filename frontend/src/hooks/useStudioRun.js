@@ -3,7 +3,7 @@
  *
  * Pilots ONE run identified by `runId`. Polls
  * GET /api/studio/run/<runId>/status (3 s while cells are pending — same rhythm
- * as useLoraTestStudio) and exposes the mutations: rate a cell /, cancel the
+ * as useLoraTestStudio) and exposes the mutations: rate a cell 👍/👎, cancel the
  * run, resume it. When `runId` is null → no poll (blank studio waiting for a run).
  *
  * Contract of the status payload (delivered by the backend):

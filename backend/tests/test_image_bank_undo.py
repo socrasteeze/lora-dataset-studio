@@ -144,7 +144,7 @@ def test_duplicate_resolution_is_undoable(client, tmp_path):
 
 
 def test_launch_all_auto_reject_offers_one_undo_for_the_whole_step(client, tmp_path):
-    """Launch all's auto-reject is a flag pass PLUS a duplicate resolution.
+    """🚀 Launch all's auto-reject is a flag pass PLUS a duplicate resolution.
     The unit the user would take back is the step, so it must publish ONE offer
     covering both — not two, of which only the second is reachable."""
     def maker(i):
@@ -206,7 +206,7 @@ def test_partial_undo_reports_what_it_could_not_restore(client, tmp_path, app):
 def test_delete_rejected_offers_no_undo_and_invalidates_the_previous_one(client,
                                                                         tmp_path,
                                                                         monkeypatch):
-    """Delete rejected drops rows and sends files to the trash: it cannot be
+    """🗑 Delete rejected drops rows and sends files to the trash: it cannot be
     undone, and it makes the PREVIOUS reject-snapshot un-restorable too — so the
     offer must disappear instead of promising a restore that would find nothing."""
     import sys

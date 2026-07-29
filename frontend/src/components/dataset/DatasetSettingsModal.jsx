@@ -91,7 +91,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
       onClick={onClose}>
       <div className="w-full max-w-md rounded-xl border border-border bg-surface-overlay p-4 flex flex-col gap-3 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-content font-semibold flex items-center gap-1.5">Dataset settings</h2>
+        <h2 className="text-content font-semibold flex items-center gap-1.5">⚙️ Dataset settings</h2>
 
         <label className="flex flex-col gap-1">
           <span className="text-content-muted text-xs">Name</span>
@@ -156,7 +156,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             aria-expanded={suffixOpen}
             className="flex items-center gap-1.5 text-left text-content-muted hover:text-content text-xs font-medium">
             <span className={`transition-transform ${suffixOpen ? 'rotate-90' : ''}`}>▸</span>
-            Prompt suffixes
+            ✨ Prompt suffixes
             <span className="text-content-subtle font-normal">— optional creative direction</span>
           </button>
           {suffixOpen && (
@@ -209,7 +209,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             {switchSummary.recaption && (
               <div className="rounded border border-amber-400/30 bg-amber-500/10 px-2 py-1.5 text-amber-100">
                 Existing captions were written for <b>{KIND_LABELS[switchSummary.from]}</b>. They
-                are <b>not</b> rewritten automatically — use <b>Re-caption</b> in the Captions
+                are <b>not</b> rewritten automatically — use <b>🔄 Re-caption</b> in the Captions
                 section to apply the new strategy.
               </div>
             )}

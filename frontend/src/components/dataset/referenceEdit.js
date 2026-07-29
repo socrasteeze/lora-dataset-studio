@@ -2,7 +2,7 @@
    the small guards the modal relies on. PURE JS (no JSX) so node --test can
    import and exercise it directly — same split as engineSelection.js.
 
-   The Edit modal sends the reference + a prompt to an engine and gets an edited
+   The ✦ Edit modal sends the reference + a prompt to an engine and gets an edited
    candidate back. Upstream this was an API-only gesture, because the edit was a
    BLOCKING provider call and the local engines have no blocking call to make.
    That is no longer true: a local edit is queued on the same ComfyUI job queue as

@@ -180,7 +180,7 @@ export default function ContinueDialog({
               <span className="text-content text-[0.75rem] w-28 shrink-0">Run it</span>
               <div role="radiogroup" aria-label="Where to run the continuation"
                 className="flex items-center gap-1 rounded-lg border border-border bg-surface p-0.5">
-                {[['local', 'Local'], ['cloud', 'Cloud']].map(([id, label]) => {
+                {[['local', '💻 Local'], ['cloud', '☁ Cloud']].map(([id, label]) => {
                   const st = laneState(id);
                   const off = st.available === false;
                   return (
@@ -221,7 +221,7 @@ export default function ContinueDialog({
           </div>
           <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
             <b className="text-content-muted font-medium">Why:</b> a later epoch can be over-cooked — resume from the
-            one that held up best (the <b>best</b> tag, when scored).
+            one that held up best (the 🏆 <b>best</b> tag, when scored).
           </span>
         </div>
 

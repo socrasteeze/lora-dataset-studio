@@ -35,19 +35,19 @@ import { progressPresence, PROGRESS_RUNNING, PROGRESS_STALE } from './progressPr
    can see on screen. Unknown kinds fall back to a neutral phrase rather than
    leaking an internal identifier. */
 export const JOB_LABELS = {
-  scan: 'Quality scan',
-  faces: 'Face pass',
+  scan: '🔎 Quality scan',
+  faces: '👥 Face pass',
   score: '✨ Score pass',
   semantic_dedup: '✂ Crops & variants',
-  watermark: 'Watermark scan',
-  watermark_crop: 'Watermark crop',
-  watermark_inpaint: 'Watermark repaint',
-  framing: 'Framing pass',
-  caption: 'Captioning',
+  watermark: '🚩 Watermark scan',
+  watermark_crop: '🚩 Watermark crop',
+  watermark_inpaint: '🚩 Watermark repaint',
+  framing: '📐 Framing pass',
+  caption: '🏷️ Captioning',
   promote: '⬆ Promotion',
   bank_promote: '⬆ Copy into a new bank',
-  import: 'Import',
-  pipeline: 'Launch all',
+  import: '📥 Import',
+  pipeline: '🚀 Launch all',
 };
 
 export function jobLabel(kind) {
@@ -100,7 +100,7 @@ export function busyLine({ kind, activity } = {}) {
 }
 
 /* Several passes set a `detail` that is simply their own name ("quality scan"),
-   which reads as a stutter once the line already opens with "Quality scan
+   which reads as a stutter once the line already opens with "🔎 Quality scan
    is running". Only a detail that ADDS something is worth the width — and width
    is exactly what a 400 px phone does not have. */
 function usefulDetail(label, detail) {

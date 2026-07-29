@@ -34,7 +34,7 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
       className={`flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 cursor-pointer text-center
         ${over ? 'border-primary bg-primary/10' : 'border-border bg-surface'} ${busy ? 'opacity-50 pointer-events-none' : ''}`}
     >
-      <span className="text-xl"></span>
+      <span className="text-xl">📥</span>
       <span className="text-content text-xs font-medium">Import real photos</span>
       <span className="text-content-subtle text-[0.625rem]">
         drag and drop or click — kept, and {importPolicyLine(caps.dataset_import)}

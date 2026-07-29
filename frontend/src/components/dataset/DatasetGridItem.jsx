@@ -37,7 +37,7 @@ const GREY_LABEL = { no_face: 'no face detected', low_det: 'low detection',
 function faceBadge(img, thresholds) {
   if (img.face_state == null) return null;
   if (img.face_state !== 'scorable' || img.face_score == null) {
-    return { border: 'border-2 border-dashed border-gray-500', icon: '', cls: 'text-gray-300',
+    return { border: 'border-2 border-dashed border-gray-500', icon: '👁', cls: 'text-gray-300',
       label: GREY_LABEL[img.face_state] || 'not scored' };
   }
   const green = thresholds?.green ?? DEFAULT_FACE_VALID;
@@ -48,7 +48,7 @@ function faceBadge(img, thresholds) {
   return { border: 'border-4 border-red-500', icon: '⚠', cls: 'text-red-300', label: `${s.toFixed(2)} low` };
 }
 
-// Watermark V1 badge from watermark_state (detected / ⊘ dismissed / cleaned /
+// Watermark V1 badge from watermark_state (🚩 detected / ⊘ dismissed / ✨ cleaned /
 // ⚠ failed), or null when never scanned ('none' is also silent — nothing to show).
 // `dismissed` shows a DISCREET grey ⊘ (not nothing): it confirms the user's "not a
 // watermark" ruling took effect and explains why a re-scan won't re-flag it — silence
@@ -61,11 +61,11 @@ const WATERMARK_ROUTE_HINT = {
   review: 'Watermark on the subject — Clean flags it for manual review (auto crop/inpaint would damage the photo); reject or crop manually',
 };
 const WATERMARK_BADGE = {
-  detected: { icon: '', cls: 'text-amber-300', text: 'watermark',
+  detected: { icon: '🚩', cls: 'text-amber-300', text: 'watermark',
     label: 'Overlaid watermark detected — Clean will crop the border, inpaint a small mark, or flag it for manual review (V2 handles on-subject watermarks)' },
   dismissed: { icon: '⊘', cls: 'text-content-subtle', text: 'not a watermark',
-    label: 'You marked this “not a watermark” — future Find passes skip it' },
-  cleaned: { icon: '', cls: 'text-emerald-300', text: 'watermark', label: 'Watermark removed (original kept as a .orig backup)' },
+    label: 'You marked this “not a watermark” — future 🧽 Find passes skip it' },
+  cleaned: { icon: '✨', cls: 'text-emerald-300', text: 'watermark', label: 'Watermark removed (original kept as a .orig backup)' },
   failed: { icon: '⚠', cls: 'text-red-300', text: 'watermark', label: 'Watermark removal failed' },
 };
 
@@ -160,7 +160,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
                     {img.fail_reason}
                   </span>
                 )}
-                <span className="text-content-subtle text-[0.5625rem]">to retry</span>
+                <span className="text-content-subtle text-[0.5625rem]">🔄 to retry</span>
               </>
             ) : (
               <span className="text-content-subtle text-xs">…</span>
@@ -195,7 +195,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
         {fb && (
           <span className={`${FACE_BADGE_CLASS} px-1.5 py-0.5 rounded bg-black/70 ${fb.cls}`}
             title={`Resemblance to the reference face — ${fb.label}`}>
-            {fb.icon} {fb.label}
+            {fb.icon} 🎭 {fb.label}
           </span>
         )}
         <div className="dataset-grid-item__actions absolute top-1 right-1 flex max-w-[calc(100%_-_0.5rem)] flex-wrap justify-end gap-1">
@@ -204,7 +204,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
               onClick={(e) => { e.stopPropagation(); onRegenerate?.(img.id); }}
               title="Regenerate this variation (new seed)"
               aria-label="Regenerate this variation (new seed)"
-              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px]"></button>
+              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px]">🔄</button>
           )}
           {canRegenerate && (
             <button type="button"
@@ -244,7 +244,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
             <button type="button"
               onClick={(e) => { e.stopPropagation(); if (window.confirm('Permanently delete this image?')) onDelete(img.id); }}
               title="Delete permanently" aria-label="Delete permanently"
-              className="px-1.5 py-0.5 rounded bg-red-700/80 text-white text-[10px]"></button>
+              className="px-1.5 py-0.5 rounded bg-red-700/80 text-white text-[10px]">🗑</button>
           )}
         </div>
         {editingPrompt && (
@@ -297,7 +297,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
                 title="Delete this image's caption (then “Caption” regenerates it via JoyCaption)"
                 aria-label="Delete this image's caption"
                 className="rounded border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300 hover:bg-red-500/25">
-                Caption
+                🗑 Caption
               </button>
             )}
           </div>

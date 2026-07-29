@@ -55,7 +55,7 @@ export function faceAnalysisLabel(scope) {
   return `🎭 Analyze faces (${total})`;
 }
 
-/** Can Auto-triage act on the stored face scores?
+/** Can 🎯 Auto-triage act on the stored face scores?
  *
  * Scores written BEFORE a dataset was marked anime are kept (nothing is deleted —
  * flip the subject type back and they are all still there), but auto-triage is the

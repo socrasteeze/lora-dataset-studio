@@ -73,7 +73,7 @@ export async function postJson(url, body, isForm) {
 }
 
 /**
- * Compose the Clean summary toast from the server's counts — PURE (no React,
+ * Compose the 🧽 Clean summary toast from the server's counts — PURE (no React,
  * no toast) so the honest-message logic is testable on its own.
  * Response shape: {cropped, inpainted, inpainted_klein, needs_review, failed, skipped, error}.
  *
@@ -102,7 +102,7 @@ export function summarizeClean(d) {
   const parts = [];
   if (cropped) parts.push(`${cropped} cropped`);
   if (inpainted) parts.push(`${inpainted} inpainted`);
-  if (skipped) parts.push(`${skipped} waiting for inpainting (install it)`);
+  if (skipped) parts.push(`${skipped} waiting for inpainting (⬇ install it)`);
   if (needsReview) parts.push(`${needsReview} need manual review`);
   if (failed) parts.push(`${failed} failed`);
   return { severity: skipped ? 'warning' : 'success', message: parts.join(' · ') };
@@ -140,7 +140,7 @@ export function useDataset() {
   // has rendered the disabled button.
   const [mirroringIds, setMirroringIds] = useState(() => new Set());
   const mirroringRef = useRef(new Set());
-  // Per-image re-caption in flight (Identity-leak panel's targeted ): keep the busy
+  // Per-image re-caption in flight (Identity-leak panel's targeted 🔄): keep the busy
   // state scoped to the offending row so the rest of the panel stays usable, with a
   // synchronous ref guard against a double-click enqueuing the same image twice.
   const [recaptioningIds, setRecaptioningIds] = useState(() => new Set());
@@ -484,7 +484,7 @@ export function useDataset() {
     return d;
   }, [refresh, toast]);
 
-  // Re-run the Upscale & improve pass on a tile that IS an improvement. The
+  // Re-run the ✨ Upscale & improve pass on a tile that IS an improvement. The
   // generic regenerate is closed to those rows (it would restart from the dataset
   // reference and make an unrelated variation); this replaces the result in place,
   // from the same parent image, with the improve settings as they are NOW — which
@@ -500,7 +500,7 @@ export function useDataset() {
     return d;
   }, [refresh, toast]);
 
-  // Bulk Klein upscale & improve: ONE call that starts a SERVER job. The batch
+  // Bulk ✨ Klein upscale & improve: ONE call that starts a SERVER job. The batch
   // used to be a browser loop, so a selection bigger than the backend's fan-out cap
   // was mostly refused, ⏹ Stop could not reach it, and closing the tab killed it.
   // Progress now rides on `activity` (kind 'improve') and survives a reload.
@@ -650,7 +650,7 @@ export function useDataset() {
   }), [wrap, currentId, refresh, toast]);
 
   // Watermark scan (Qwen3-VL, GPU window). Marks kept images with an overlaid
-  // watermark → badges + a "Clean (N)" button. Deletes nothing.
+  // watermark → 🚩 badges + a "Clean (N)" button. Deletes nothing.
   const findWatermarks = useCallback(() => wrap(async () => {
     setWatermarking(true);
     try {
@@ -679,7 +679,7 @@ export function useDataset() {
       // A LaMa inpaint that was attempted and failed surfaces WHY (never silent).
       if (d.error) {
         toast.error(d.error.kind === 'unavailable'
-          ? 'Watermark inpainting is not installed — use Install inpainting next to the watermark tools.'
+          ? 'Watermark inpainting is not installed — use ⬇ Install inpainting next to the watermark tools.'
           : `Watermark inpainting failed: ${d.error.detail}`);
       }
       // ONE honest summary toast (no more "Nothing to clean" alongside "N skipped").
@@ -738,7 +738,7 @@ export function useDataset() {
   }, [currentId, refresh]);
 
   // Mark flagged image(s) as NOT a watermark (false positive) — badge clears and
-  // future Find passes skip them.
+  // future 🧽 Find passes skip them.
   const dismissWatermarks = useCallback(async (ids) => {
     const list = (ids || []).filter((v) => v != null);
     if (!list.length) return { ok: true, dismissed: 0 };
@@ -767,7 +767,7 @@ export function useDataset() {
      just typed only if it can tell a refusal from a success. `silent` is for
      that caller and that caller only: it renders the refusal next to the
      textarea, so a toast would say the same thing twice. The inline grid edit
-     and Caption own no surface of their own and keep the toast. */
+     and 🗑 Caption own no surface of their own and keep the toast. */
   const setCaption = useCallback(async (imageId, captionText, shortText, { silent = false } = {}) => {
     // shortText undefined → only the long caption is sent (inline grid edit); the expanded
     // editor passes a string (possibly '') to also set the short variant.
@@ -810,7 +810,7 @@ export function useDataset() {
     }
   }, [refresh, toast]);
 
-  // Quarter turns (idea by 1Tomber, GitHub #17). Same busy set as the mirror
+  // 🔄 Quarter turns (idea by 1Tomber, GitHub #17). Same busy set as the mirror
   // on purpose: both rewrite the SAME file, so one running edit must grey out
   // the other rather than letting two of them race on one image.
   const rotateImage = useCallback(async (imageId, degrees) => {
@@ -872,7 +872,7 @@ export function useDataset() {
     setRefNonce((n) => n + 1);
   }, [currentId, refresh, toast]);
 
-  // Edit the reference. STARTS a server-side background job and returns at once
+  // ✦ Edit the reference. STARTS a server-side background job and returns at once
   // (202) — the render is slow, so it must NOT ride the client's fetch (a
   // backgrounded mobile tab would kill it and lose the result). The candidate is
   // rediscovered through the payload's `reference_edit`; refresh() here starts the
@@ -940,7 +940,7 @@ export function useDataset() {
   }, [currentId, toast]);
 
   // Open the dataset folder (images + .txt sidecars) in the OS file explorer —
-  // same server-resolved open-folder route as the training panel's buttons.
+  // same server-resolved open-folder route as the training panel's 📂 buttons.
   const openDatasetFolder = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/train/open-folder`, { target: 'dataset' });
     if (!d.ok) toast.error(d.error || 'Unexpected error');
@@ -974,7 +974,7 @@ export function useDataset() {
   // Re-roll one generated variation with a fresh seed (F2). Works on finished
   // AND failed tiles — it is the recovery path for failures. `prompt` (optional)
   // is the user-edited core prompt from the tile's ✏ bubble; omitted → the
-  // server reuses the row's / label's prompt (plain and reject→regenerate).
+  // server reuses the row's / label's prompt (plain 🔄 and reject→regenerate).
   // The generator CURRENTLY selected in the workspace (persisted by
   // VariationCatalog) is sent along so the regenerate follows the user's
   // selection instead of being pinned to the engine that made the tile.

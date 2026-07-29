@@ -230,7 +230,7 @@ def test_an_unavailable_engine_is_explained_and_leaves_no_phantom_job(
     assert resp.status_code == 409
     assert resp.get_json()['error']                    # actionable, not empty
     assert client.get(f'/api/dataset/{did}').get_json()['reference_edit'] is None
-    assert dataset_activity.get(did) is None           # no badge left lit
+    assert dataset_activity.get(did) is None           # no ✦ badge left lit
 
 
 def test_an_empty_prompt_is_refused_before_anything_is_queued(client, monkeypatch):

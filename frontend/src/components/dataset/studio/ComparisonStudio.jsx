@@ -6,7 +6,7 @@
  * Flux : règle un run (StudioRunSetup) sur la `selection` reçue → POST
  * /api/studio/run → useStudioRun(run_id) pilote l'affichage (poll + vote +
  * cancel/resume). Grille colonnes = LoRA × lignes = strength (LoraComparisonGrid),
- * panneau « Classement LoRA » (data.lora_ranking). Vote rapide (file + swipe)
+ * panneau « 🏆 Classement LoRA » (data.lora_ranking). Vote rapide (file + swipe)
  * et lightbox réutilisent useQuickVote / QuickVoteModal / ResultLightbox.
  *
  * Le LoraPicker reste dans StudioShell (partagé avec la branche 1-LoRA) ; ici on
@@ -222,7 +222,7 @@ export default function ComparisonStudio({ selection, baseModels = [], runType =
 
         {!runId ? (
           <p className="text-content-subtle text-sm rounded-lg border border-border bg-surface px-3 py-6 text-center">
-            Set up the run on the left then “Launch the test” to compare the {selection.length} LoRAs side by side.
+            Set up the run on the left then “🚀 Launch the test” to compare the {selection.length} LoRAs side by side.
           </p>
         ) : (
           <div className="flex flex-col gap-2">
@@ -254,16 +254,16 @@ export default function ComparisonStudio({ selection, baseModels = [], runType =
       {/* Barre de commande fixe : Run toujours visible + raccourcis de sections. */}
       <StudioActionBar
         shortcuts={[
-          { id: 'st-loras', emoji: '', label: 'LoRAs' },
-          { id: 'st-setup', emoji: '', label: 'Prompt & seed' },
-          { id: 'st-format', emoji: '', label: 'Format' },
+          { id: 'st-loras', emoji: '🧬', label: 'LoRAs' },
+          { id: 'st-setup', emoji: '📝', label: 'Prompt & seed' },
+          { id: 'st-format', emoji: '📐', label: 'Format' },
           ...(runType === 'krea' ? [
-            { id: 'st-sampling', emoji: '', label: 'Sampling' },
-            { id: 'st-engine', emoji: '', label: 'Engine' },
+            { id: 'st-sampling', emoji: '🎛️', label: 'Sampling' },
+            { id: 'st-engine', emoji: '⚙️', label: 'Engine' },
           ] : []),
-          ...(runType === 'sdxl' ? [{ id: 'st-detail', emoji: '', label: 'Detail' }] : []),
-          ...(runType === 'zimage' ? [{ id: 'st-negative', emoji: '', label: 'Negative' }] : []),
-          { id: 'st-results', emoji: '', label: 'Results' },
+          ...(runType === 'sdxl' ? [{ id: 'st-detail', emoji: '✨', label: 'Detail' }] : []),
+          ...(runType === 'zimage' ? [{ id: 'st-negative', emoji: '🚫', label: 'Negative' }] : []),
+          { id: 'st-results', emoji: '🖼️', label: 'Results' },
         ]}
         canRun={!!selection.length && !!strengths.length && !launching && !data?.gpu_busy}
         running={launching}

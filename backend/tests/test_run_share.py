@@ -1,4 +1,4 @@
-"""'Share configuration' per-run download (Runs hub): a paste-safe .txt of
+"""'Share configuration' per-run download (🏋️ Runs hub): a paste-safe .txt of
 everything a launch sent to ai-toolkit, for both local and cloud runs, with
 graceful degradation on pre-snapshot rows and strict redaction (no home paths,
 no secrets)."""

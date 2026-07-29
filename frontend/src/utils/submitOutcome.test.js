@@ -69,7 +69,7 @@ test('the prompt bubble keeps a hand-rewritten prompt when the GPU is busy', asy
   assert.equal(out.error, 'A generation is already running')
 })
 
-test('Launch all keeps its checkboxes when the bank refuses', async () => {
+test('🚀 Launch all keeps its checkboxes when the bank refuses', async () => {
   // BankWorkspace.startPipeline answers {ok:false,error} carrying act()'s
   // reworded 409 — the same sentence the toast used to carry, now shown next to
   // the checkboxes it is about.

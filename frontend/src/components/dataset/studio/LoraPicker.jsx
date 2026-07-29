@@ -148,7 +148,7 @@ export default function LoraPicker({ preselectDataset, onSelectionChange }) {
         <span className="text-content-muted text-[0.6875rem] uppercase">LoRA to test</span>
         {count >= 2 && (
           <span className="px-2 py-0.5 rounded-full text-[0.625rem] font-semibold bg-amber-400/15 border border-amber-400/40 text-amber-200">
-            Comparison ({count})
+            ⚖ Comparison ({count})
           </span>
         )}
         <span className="ml-auto text-content-subtle text-[0.6875rem]">{count} checked</span>

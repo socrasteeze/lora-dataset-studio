@@ -1,4 +1,4 @@
-// Bouton « Lancer le test ». Désactivé tant que !canLaunch (calculé par RunSetupPanel).
+// Bouton « 🚀 Lancer le test ». Désactivé tant que !canLaunch (calculé par RunSetupPanel).
 // Extrait behavior-preserving de LoraTestStudio.jsx (bouton de lancement).
 //
 // `label`/`title` : le ◉ LoRA Canvas fait dire au bouton CE QU'IL VA FAIRE quand

@@ -256,7 +256,7 @@ def loras_list():
 
 @bp.get('/scoring-python')
 def scoring_python_list():
-    """Pythons on this machine that could run the Score pass, each with a
+    """Pythons on this machine that could run the ✨ Score pass, each with a
     per-dependency verdict — the picker behind "use a GPU Python you already
     have". ``?force=1`` re-probes (after the user pip-installed something);
     ``?path=`` adds a hand-typed interpreter to the list. Read-only: nothing is
@@ -296,7 +296,7 @@ def scoring_python_list():
 
 @bp.post('/scoring-python')
 def scoring_python_select():
-    """Point Score at an interpreter (``{python: "<path>"}``), or back at the
+    """Point ✨ Score at an interpreter (``{python: "<path>"}``), or back at the
     app's own (``{python: ""}``). Refuses — 400, with the verdict attached — any
     interpreter that could not be proven able to run the pass, so a bad pick can
     never turn an hour of scoring into an import error."""

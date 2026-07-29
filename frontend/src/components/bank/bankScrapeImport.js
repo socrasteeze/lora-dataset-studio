@@ -1,5 +1,5 @@
 /**
- * Scrape → BANK — the client half of the scraper's second destination.
+ * 🕸 Scrape → BANK — the client half of the scraper's second destination.
  *
  * The server bounds one request (same cap as the dataset outlet), so a big
  * "Select all" is sent in sequential batches. The one thing that MUST NOT be

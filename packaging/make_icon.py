@@ -1,7 +1,7 @@
 """Generate packaging/icon.ico for the launcher exe + window.
 
 A rounded indigo->violet tile with a little DNA double-helix (dots on two offset sine
-strands) — matches the app's theme. Committed alongside the .ico it produces so the
+strands) — matches the app's 🧬 theme. Committed alongside the .ico it produces so the
 build is reproducible; re-run `python packaging/make_icon.py` to regenerate.
 """
 import math

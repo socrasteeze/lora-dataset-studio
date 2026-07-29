@@ -1,5 +1,5 @@
 /**
- * Re-run of the Upscale & improve pass, for a tile that IS an improvement.
+ * 🔄 Re-run of the ✨ Upscale & improve pass, for a tile that IS an improvement.
  *
  * The generic regenerate button is deliberately hidden on these tiles: that route
  * restarts from the dataset's reference photo and the catalog prompt, so it would

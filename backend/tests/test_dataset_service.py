@@ -775,7 +775,7 @@ def test_regeneration_clears_all_watermark_metadata(app, monkeypatch):
 
 def test_regenerate_without_prompt_keeps_existing(app, monkeypatch):
     """Empty/omitted prompt = current behaviour: variation_prompt is unchanged
-    and the stored prompt is what feeds the engine (plain / reject path)."""
+    and the stored prompt is what feeds the engine (plain 🔄 / reject path)."""
     from app.services import face_dataset_service as svc
     from app.services import klein_edit_helper
     from app.models import FaceDatasetImage
@@ -932,7 +932,7 @@ def test_link_completed_dataset_image_without_comfyui_configured(app, monkeypatc
         assert refreshed.status == 'failed'
 
 
-# --- 'generate' activity indicator (blocks Generate for the whole batch) ----
+# --- 'generate' activity indicator (blocks ⚡ Generate for the whole batch) ----
 
 def test_klein_generate_activity_from_enqueue_to_last_completion(app, monkeypatch):
     """Klein: enqueue advertises 'generate' with the batch total (pending-count

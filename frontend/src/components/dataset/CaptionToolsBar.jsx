@@ -7,8 +7,8 @@ import SettingsLink from '../common/SettingsLink';
    prose counts useful whole words by caption. Guidance changes for character,
    concept and style sets. Clicking an entry pre-fills the matching edit mode;
    leaving "replace" empty removes it from every caption.
-   Also hosts Write .txt files (kohya-style sidecar captions written next to
-   the images on disk, same text as the export ZIP) + open that folder. */
+   Also hosts 💾 Write .txt files (kohya-style sidecar captions written next to
+   the images on disk, same text as the export ZIP) + 📂 open that folder. */
 export default function CaptionToolsBar({ images, kind = 'character', mode = 'booru',
                                           excludes = [], includes = [], onExclude, onInclude,
                                           onReplace, onWriteFiles, onOpenFolder, busy,
@@ -55,7 +55,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
       <button type="button" data-workspace-focus
         onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex items-center gap-2 w-full text-left text-content text-sm font-semibold">
-        <span aria-hidden></span> Caption tools
+        <span aria-hidden>📝</span> Caption tools
         <span className="text-content-subtle text-[0.6875rem] font-normal">
           find/replace · {categoryCopy.frequencyTitle.toLowerCase()} ({captioned.length} captioned)
         </span>
@@ -186,14 +186,14 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                 <button type="button" onClick={onWriteFiles} disabled={busy}
                   title="Writes <image>.txt next to each kept image in the dataset folder — same format as the ZIP export, for external tools"
                   className="px-3 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface">
-                  Write .txt files
+                  💾 Write .txt files
                 </button>
                 {onOpenFolder && (
                   <button type="button" onClick={onOpenFolder}
                     title="Open the dataset folder in the file explorer"
                     aria-label="Open the dataset folder"
                     className="px-2 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs hover:bg-surface">
-
+                    📂
                   </button>
                 )}
                 <span className="text-content-subtle text-[0.6875rem]">

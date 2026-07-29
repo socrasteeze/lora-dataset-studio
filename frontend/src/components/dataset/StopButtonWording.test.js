@@ -69,11 +69,11 @@ test('the captioning Stop keeps the same convention: stop verb + what is kept', 
   assert.notEqual(start, -1, 'the captioning Stop button block was not found');
   const block = workspace.slice(start, workspace.indexOf('</button>', start));
   assert.match(block, /ds\.cancelCaption/);
-  // Divergence 3 (emoji-free UI): upstream prefixes this button with the
-  // emoji-presentation ⏹; this fork strips those. The plain geometric ■ the
-  // Caption Lab uses below is kept — it is a monochrome glyph, not an emoji.
-  // What this test actually guards is the WORDING, asserted just below.
-  assert.match(block, />\s*\{act\?\.cancelling \? 'Stopping…' : 'Stop'\}/);
+  // Divergence 3 is RETIRED (2026-07-29): the fork keeps upstream's glyphs, so
+  // this button reads '⏹ Stop' again. Stripping it was what left several other
+  // controls as blank rectangles. What this test guards is the WORDING — the
+  // stop verb plus what is kept — which the glyph prefix does not change.
+  assert.match(block, />\s*\{act\?\.cancelling \? 'Stopping…' : '⏹ Stop'\}/);
   assert.doesNotMatch(block, /re-enable ComfyUI/);
   const title = block.match(/title="([^"]+)"/);
   assert.ok(title, 'the captioning Stop button has no title');

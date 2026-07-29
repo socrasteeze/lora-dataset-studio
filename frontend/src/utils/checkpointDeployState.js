@@ -1,4 +1,4 @@
-/* Is this checkpoint DEPLOYED — i.e. can I generate from it right now?
+/* 🔌 Is this checkpoint DEPLOYED — i.e. can I generate from it right now?
 
    The pills under a run card (250, 500, … 3500) already knew the answer and
    never said it: `testable` rides on every pill and only surfaced as the words
@@ -56,7 +56,7 @@ export function deployBadge(state) {
       // Says what to do about it, and names the button that does it — the board
       // already deploys the picks that need it, and a second mechanism would be
       // a second thing to keep true.
-      text: 'on disk but not deployed to ComfyUI — tick it and Generate will '
+      text: 'on disk but not deployed to ComfyUI — tick it and 🎨 Generate will '
         + 'deploy it first',
     };
   }

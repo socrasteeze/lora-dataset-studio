@@ -38,7 +38,7 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
               {s.unavailable ? (
                 <Link to="/settings" title={s.hint} className={cls}>
                   {body}
-                  <span aria-hidden className="shrink-0 pl-0.5"></span>
+                  <span aria-hidden className="shrink-0 pl-0.5">⚙</span>
                   <span className="sr-only"> — {s.hint}</span>
                 </Link>
               ) : (

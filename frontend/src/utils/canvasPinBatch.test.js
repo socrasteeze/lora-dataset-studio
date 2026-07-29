@@ -6,7 +6,7 @@ import {
 } from './canvasPinBatch.js';
 import { CARD_W } from './lineageGraph.js';
 
-/* Pin all — the one assertion that decides whether this feature is worth
+/* 📌 Pin all — the one assertion that decides whether this feature is worth
    having: NOTHING may end up on top of anything else.
 
    Everything here works in BOARD units, never in screen pixels. The user's own
@@ -231,8 +231,8 @@ test('a big lot lands as a contact sheet, a small one at full size', () => {
 // ---- the button's own words -----------------------------------------------
 
 test('the button says how many it will put down', () => {
-  assert.equal(pinBatchLabel(5), 'Pin all 5 to the board');
-  assert.equal(pinBatchLabel(1), 'Pin this image to the board');
+  assert.equal(pinBatchLabel(5), '📌 Pin all 5 to the board');
+  assert.equal(pinBatchLabel(1), '📌 Pin this image to the board');
   assert.equal(pinBatchLabel(0), '');
 });
 
@@ -252,7 +252,7 @@ test('the count is what is NOT on the board yet, lane by lane', () => {
   const { pending, already } = pinBatchPendingAcrossLanes(candidates, lanes);
   assert.deepEqual(pending.map((p) => p.id), [502, 601], 'a CLOSED one still counts');
   assert.equal(already, 1);
-  assert.equal(pinBatchLabel(pending.length), 'Pin all 2 to the board');
+  assert.equal(pinBatchLabel(pending.length), '📌 Pin all 2 to the board');
 });
 
 test('a lot entirely on the board already offers nothing', () => {

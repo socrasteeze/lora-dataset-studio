@@ -1,4 +1,4 @@
-/* Score, CPU or GPU — the DECIDABLE part, kept free of JSX so `node --test`
+/* ✨ Score, CPU or GPU — the DECIDABLE part, kept free of JSX so `node --test`
  * can run it.
  *
  * The scoring extra deliberately installs CPU-only torch: Setup builds it a
@@ -29,12 +29,12 @@ export function scoreDeviceNote(info, installed = true) {
   if (!info.gpu_present) {
     return {
       tone: 'info',
-      text: `Score runs on the CPU on this machine — no NVIDIA GPU detected.${cost}`,
+      text: `✨ Score runs on the CPU on this machine — no NVIDIA GPU detected.${cost}`,
     }
   }
   return {
     tone: 'warn',
-    text: `Score runs on the CPU — about 20× slower than your GPU.${cost} `
+    text: `✨ Score runs on the CPU — about 20× slower than your GPU.${cost} `
       + `The scoring environment ships CPU-only PyTorch so a first install stays small. `
       + `If another Python on this machine already has a working CUDA PyTorch — the one `
       + `that trains your LoRAs, the one ComfyUI runs on — Score can borrow it and this `

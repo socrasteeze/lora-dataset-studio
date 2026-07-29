@@ -696,7 +696,7 @@ def dual_captions_enabled(ds) -> bool:
 
 
 # --- Per-dataset caption method options --------------------------------------
-# The Captions Options popover writes these to the caption_options JSON column.
+# The Captions ⚙️ Options popover writes these to the caption_options JSON column.
 # All three are OVERRIDES of the global captioning defaults: an empty value means
 # "follow the global default" (captioning.backend / ollama.vision_model), so a
 # dataset that never touched the popover behaves byte-for-byte as before.
@@ -2038,7 +2038,7 @@ def delete_dataset(user_id, dataset_id):
     # parent below. A dataset must never fail to delete over a display
     # preference: that exact bug already answered HTTP 500 once in this project.
     canvas_rows = CanvasNodePosition.query.filter_by(dataset_id=dataset_id).all()
-    # Pinned-image nodes: same story, same trap. They reference
+    # 🖼 Pinned-image nodes: same story, same trap. They reference
     # lora_test_image rows that are being deleted in this very transaction.
     canvas_imgs = CanvasImageNode.query.filter_by(dataset_id=dataset_id).all()
     dataset_path = _dataset_path(dataset_id)
@@ -2899,7 +2899,7 @@ def link_completed_reference_edit(job_id, filename, failed=False, reason=None):
         if failed:
             reference_edit_jobs.set_failed(
                 dataset_id, entry['token'],
-                f"{entry['engine']}: {reason or 'the render failed — see Server log in Settings'}")
+                f"{entry['engine']}: {reason or 'the render failed — see 🪵 Server log in Settings'}")
             return
         data = _read_comfy_output(filename)
         if not data:
@@ -3077,7 +3077,7 @@ def _watermark_route_payload(img):
     """The routes Clean WOULD take for a 'detected' image, as a dict spread into the
     image payload:
       - 'watermark_route'        : the DEFAULT route ('crop' | 'lama' | 'review'), used
-                                   by the tooltip and the batch/lightbox planned line;
+                                   by the 🚩 tooltip and the batch/lightbox planned line;
       - 'watermark_route_nocrop' : the SAME routing with auto-crop disabled ('lama' |
                                    'review') -- only ever differs when the default is
                                    'crop'. It lets the review lightbox offer a per-image
@@ -3215,7 +3215,7 @@ def dataset_payload(user_id, dataset_id):
         # Where this dataset's images actually live. It was displayed NOWHERE,
         # which is how people ended up hunting for it in the file manager and
         # pasting it into "create a bank" — a bank over a dataset's live files,
-        # whose Delete rejected then deleted images out of the dataset. Showing
+        # whose 🗑 Delete rejected then deleted images out of the dataset. Showing
         # the path (with the sentence that it belongs to the dataset) removes the
         # reason to go looking; `services.path_guard` refuses the paste anyway.
         'storage_path': _dataset_path(ds.id),
@@ -3265,7 +3265,7 @@ def dataset_payload(user_id, dataset_id):
                     # manual treatment (the aggregate badge alone forced a grid hunt).
                     'leak': _img_leaks(i),
                     'face_score': i.face_score, 'face_state': i.face_state,
-                    # Watermark V1: state drives the tile badge (detected / ⊘ dismissed
+                    # Watermark V1: state drives the tile badge (🚩 detected / ⊘ dismissed
                     # / cleaned / ⚠ failed) and the "Clean (N)" count; bbox lets the UI
                     # draw the detected box (review lightbox); watermark_route(_nocrop)
                     # name the planned action ('crop'|'lama'|'review') with auto-crop on
@@ -4627,7 +4627,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
     d'identite isolee).
 
     `image_ids` (optionnel) restreint la passe a ce sous-ensemble d'images gardees —
-    utilise par le bouton Re-caption cible du panneau Identity-leak (une seule image
+    utilise par le bouton 🔄 Re-caption cible du panneau Identity-leak (une seule image
     ou « toutes les fuyantes ») ; None -> tout le dataset (comportement batch). Meme
     moteur, meme mode, meme contexte kind et memes regles de nettoyage que le lot complet.
 
@@ -4640,7 +4640,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return 0
-    # Per-dataset method overrides (Captions Options): the chosen engine, an extra
+    # Per-dataset method overrides (Captions ⚙️ Options): the chosen engine, an extra
     # instruction appended to the prompt, and the Ollama vision model to run. Each falls
     # back to the global default when the dataset never set it.
     opts = caption_options(ds)
@@ -4987,7 +4987,7 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
 
 
 # --- Caption Lab: per-candidate preview (no persistence) ---------------------
-# The Caption Lab lets the user try a caption CONFIG (engine × Ollama model ×
+# The 🧪 Caption Lab lets the user try a caption CONFIG (engine × Ollama model ×
 # vocabulary register) on ONE image and read the result WITHOUT writing anything to
 # the row. It rides on caption_paths() — the dataset-free by-path brick — so it runs
 # purely DESCRIPTIVE captioning (no kind omission, no dual short): the point is to
@@ -5509,7 +5509,7 @@ def detect_watermarks(user_id, dataset_id, *, include_dismissed=False):
 
 def dismiss_watermarks(user_id, dataset_id, image_ids):
     """Mark 'detected' images as 'dismissed' -- the user ruled, in the review lightbox,
-    that the flag is a FALSE positive. Dismissed images drop the badge, leave the
+    that the flag is a FALSE positive. Dismissed images drop the 🚩 badge, leave the
     Clean batch, and are skipped by future detect passes (see detect_watermarks) so
     they're never re-flagged. Only 'detected' rows of THIS dataset transition (ids that
     don't belong / aren't detected are silently ignored, like batch_image_action).
@@ -6015,7 +6015,7 @@ def _improve_enqueue_profile(ds=None) -> dict:
 
     `ds` is the dataset the improved image belongs to. Reading its model HERE is
     what makes the choice reach all three improve lanes at once: the single pass,
-    the re-run, and the batch (which drains through improve_existing_image).
+    the 🔄 re-run, and the batch (which drains through improve_existing_image).
     None / a dataset that never chose yields klein_model=None — the exact value
     every improve sent before this setting existed.
 
@@ -6288,7 +6288,7 @@ def _reimprove_image_locked(user_id, image_id):
 
 
 # --- Bulk Klein upscale & improve: a SERVER job --------------------------------
-# The Improve button used to loop in the BROWSER, one request per image. On a
+# The ✨ Improve button used to loop in the BROWSER, one request per image. On a
 # 250-image selection that produced two bugs with a single root cause — the batch
 # only existed in the tab:
 #   * everything past MAX_FANOUT was REFUSED. That cap is a CONCURRENCY limit
@@ -6368,7 +6368,7 @@ def bulk_improve_eligible_ids(user_id, dataset_id, image_ids):
 
 
 def start_bulk_improve(app, user_id, dataset_id, image_ids):
-    """Start the server-side Klein upscale & improve batch over ``image_ids``.
+    """Start the server-side ✨ Klein upscale & improve batch over ``image_ids``.
 
     Returns ``{'queued', 'skipped'}`` — how many images the job will process and
     how many of the selection were not eligible. Raises ValueError (-> 400) on an
@@ -6756,7 +6756,7 @@ def link_completed_dataset_image(job_id, filename, failed=False, reason=None):
                 and img.status in ('keep', 'reject')):
             img.status = 'failed'
             img.fail_reason = (img.fail_reason or reason
-                               or 'Klein generation failed (see Server log in Settings for the ComfyUI error)')
+                               or 'Klein generation failed (see 🪵 Server log in Settings for the ComfyUI error)')
     else:
         output_dir = _comfy_output_dir()
         src = os.path.join(output_dir, filename) if output_dir else None

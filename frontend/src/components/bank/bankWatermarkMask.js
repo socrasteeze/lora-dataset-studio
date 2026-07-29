@@ -1,4 +1,4 @@
-/** Bank watermark MASK — the state around the hand-drawn correction zones
+/** 🚩 Bank watermark MASK — the state around the hand-drawn correction zones
  * (pure and JSX-free, so `node --test` covers it directly).
  *
  * Reported by Qeeyana (Reddit): the mask could only be edited from a dataset.
@@ -36,7 +36,7 @@ export function initialMask(img) {
 }
 
 /** The sentence under the editor. It names the LEVEL that will act, because the
- * mask alone tells the user nothing: hand zones are repainted by Inpaint and
+ * mask alone tells the user nothing: hand zones are repainted by 🧽 Inpaint and
  * deliberately skipped by ✂ Auto-crop (a crop cannot express several zones, nor
  * a zone on the subject). */
 export function maskStatus({ regions, manual } = {}) {
@@ -48,7 +48,7 @@ export function maskStatus({ regions, manual } = {}) {
   }
   if (manual) {
     return { tone: 'ok',
-      text: `${count} hand-drawn zone${count === 1 ? '' : 's'} — Inpaint repaints `
+      text: `${count} hand-drawn zone${count === 1 ? '' : 's'} — 🧽 Inpaint repaints `
         + 'exactly these; ✂ Auto-crop skips this image.' }
   }
   if (count) {

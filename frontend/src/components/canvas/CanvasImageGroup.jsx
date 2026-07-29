@@ -1,7 +1,7 @@
 import { groupBarHeight } from '../../utils/canvasNodeChrome';
 import CanvasImageNode from './CanvasImageNode';
 
-/* Several pinned images fused into ONE node: a continuous strip, side by
+/* 🖼🖼 Several pinned images fused into ONE node: a continuous strip, side by
    side, with nothing drawn between them.
 
    Drop one pinned picture onto another and they merge; drop a third, a tenth,

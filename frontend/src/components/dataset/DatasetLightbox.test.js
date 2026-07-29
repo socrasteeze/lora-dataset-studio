@@ -12,8 +12,8 @@ const settings = readFileSync(new URL('../settings/ScrapingSection.jsx', import.
 const attribution = readFileSync(new URL('./PexelsAttribution.jsx', import.meta.url), 'utf8');
 
 test('lightbox exposes an accessible responsive image improvement action', () => {
-  assert.match(lightbox, /Upscale & improve/);
-  assert.match(lightbox, /Improving…/);
+  assert.match(lightbox, /✨ Upscale & improve/);
+  assert.match(lightbox, /✨ Improving…/);
   assert.match(lightbox, /Review improvement first/);
   assert.match(lightbox, /aria-busy=\{improvementActive\}/);
   assert.match(lightbox, /w-full sm:w-auto/);
@@ -85,7 +85,7 @@ test('the bulk improvement is ONE call that starts a server job, not a per-image
   assert.doesNotMatch(grid, /runSequentialKleinImprove/);
   // Progress is read from the server activity, so it survives a reload.
   assert.match(grid, /kleinImproveBatchLabel\(activity\)/);
-  // Stop generation stays reachable (and enabled) for a running batch. The
+  // ⏹ Stop generation stays reachable (and enabled) for a running batch. The
   // enabled-ness itself is decided by isStopGenerationBlocked (unit-tested in
   // scraperState.test.js) — this earlier inline expression only exempted
   // 'improve', which left the button dead for every plain generation batch.
@@ -109,7 +109,7 @@ test('settings separates scraper rescue instructions from manual lightbox improv
 test('manual improvement candidates cannot use the unrelated generic regenerate path', () => {
   const gridItem = readFileSync(new URL('./DatasetGridItem.jsx', import.meta.url), 'utf8');
   // The guard moved into improveRerun.js (testable in node --test, which cannot
-  // parse JSX) when the tile gained its own re-run of the improve pass. Same
+  // parse JSX) when the tile gained its own 🔄✨ re-run of the improve pass. Same
   // meaning, asserted at both ends: the tile delegates, and the decision refuses.
   assert.match(gridItem, /const isImageImproveCandidate = isImageImproveRow\(img\)/);
   assert.match(gridItem, /const canRegenerate = canRegenerateGeneric\(img, \{ isRescueDerived \}\)/);

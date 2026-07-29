@@ -1,9 +1,9 @@
-/* Banks that share files — the DECIDABLE part, kept free of JSX so
+/* 🗃 Banks that share files — the DECIDABLE part, kept free of JSX so
  * `node --test` can run it.
  *
  * Nothing stops two banks pointing at nested folders, and while you are only
  * triaging that is harmless: statuses live on the bank, not on the file. It
- * stops being harmless at Delete rejected, the one action that removes the
+ * stops being harmless at 🗑 Delete rejected, the one action that removes the
  * FILES — the other bank simply finds them gone. These helpers turn the backend
  * facts into the sentences that have to be said BEFORE that click.
  */
@@ -20,7 +20,7 @@ export function overlapNotice(overlaps) {
   if (!list.length) return null
   const names = list.map((o) => `“${o.name}”`).join(', ')
   return `Heads up: this folder overlaps ${names}. Both banks list the same files, `
-    + 'so Delete rejected in one removes them from the other too.'
+    + 'so 🗑 Delete rejected in one removes them from the other too.'
 }
 
 /** A bank whose source folder IS a dataset's storage folder — the one overlap
@@ -46,7 +46,7 @@ export function datasetConflictBlock(conflict) {
     title: '⛔ This bank sits on a dataset’s image folder',
     text: conflict.message
       || 'Deleting these files would delete images out of a dataset. A bank and a '
-      + 'dataset must never share files — open the dataset and use Import to bank, '
+      + 'dataset must never share files — open the dataset and use 🗃 Import to bank, '
       + 'which copies them into a bank of their own.',
   }
 }

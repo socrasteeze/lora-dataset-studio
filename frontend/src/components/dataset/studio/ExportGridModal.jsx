@@ -97,7 +97,7 @@ export default function ExportGridModal({ open, onClose, datasetId, family, run,
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface-overlay p-4 flex flex-col gap-3 shadow-xl">
         <div className="flex items-center justify-between">
           <h2 className="text-content text-sm font-semibold flex items-center gap-1.5">
-            <span aria-hidden></span> Export grid
+            <span aria-hidden>🖼</span> Export grid
           </h2>
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close"
             className="w-8 h-8 rounded-lg border border-border bg-app text-content-muted hover:text-content disabled:opacity-40">×</button>
@@ -173,7 +173,7 @@ export default function ExportGridModal({ open, onClose, datasetId, family, run,
           </button>
           <button type="button" onClick={doExport} disabled={busy}
             className="px-4 py-1.5 rounded-lg bg-gradient-primary text-white text-[0.75rem] font-semibold disabled:opacity-60">
-            {busy ? 'Composing…' : 'Export'}
+            {busy ? 'Composing…' : '⬇ Export'}
           </button>
         </div>
       </div>

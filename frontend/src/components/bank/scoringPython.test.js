@@ -53,7 +53,7 @@ test('the best suggestion is a GPU-ready interpreter that is not already in use'
   assert.equal(bestUpgrade(rows).label, 'ai-toolkit');
   assert.equal(sortInterpreters(rows)[0].label, 'ai-toolkit');
   assert.equal(sortInterpreters(rows).at(-1).label, 'App Python');
-  assert.equal(detectionSummary(rows), '1 of 3 can run Score on your GPU.');
+  assert.equal(detectionSummary(rows), '1 of 3 can run ✨ Score on your GPU.');
 });
 
 test('the one already selected is never offered again', () => {

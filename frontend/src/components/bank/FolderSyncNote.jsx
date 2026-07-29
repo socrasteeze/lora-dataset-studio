@@ -1,6 +1,6 @@
 import { folderSyncNote } from './bankSync'
 
-/** The state of a bank's SOURCE FOLDER as of the last automatic walk.
+/** 🗃️ The state of a bank's SOURCE FOLDER as of the last automatic walk.
  *
  * Shown on the bank card and in the workspace header. It only appears when
  * something is off — files listed in the bank that are no longer on disk, or a
@@ -24,7 +24,7 @@ export default function FolderSyncNote({ sync, onRelocate }) {
       {note.canRelocate && onRelocate && (
         <button type="button" onClick={onRelocate}
           className="mt-1 rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
-          Move folder…
+          📦 Move folder…
         </button>
       )}
     </div>

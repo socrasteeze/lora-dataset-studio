@@ -12,9 +12,9 @@ const KINDS = {
     groupsPath: 'dup-groups',
     resolvePath: 'dups/resolve',
     header: (n) => `${n} unresolved group${n > 1 ? 's' : ''}`,
-    lead: 'Losers are rejected, never deleted — undo any of it from the Rejected filter.',
+    lead: 'Losers are rejected, never deleted — undo any of it from the ✕ Rejected filter.',
     cardHint: 'exact or resized copy — click the one to KEEP',
-    empty: 'No unresolved duplicate group — either the bank is clean, or every group has been resolved. (Groups appear after a quality scan.)',
+    empty: 'No unresolved duplicate group — either the bank is clean, or every group has been resolved. (Groups appear after a 🔎 quality scan.)',
     pagesLabel: 'Duplicate group pages',
   },
   semantic: {
@@ -23,7 +23,7 @@ const KINDS = {
     header: (n) => `${n} "same shot" group${n > 1 ? 's' : ''}`,
     lead: 'Same shot, different crop/compression — the dHash never linked these. Losers are rejected (reversible), never deleted.',
     cardHint: 'same shot, different crop — click the one to KEEP',
-    empty: 'No unresolved semantic near-duplicate group. (Groups appear after Score, then Find crops & variants.)',
+    empty: 'No unresolved semantic near-duplicate group. (Groups appear after ✨ Score, then ✂ Find crops & variants.)',
     pagesLabel: 'Semantic duplicate group pages',
   },
 }

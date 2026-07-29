@@ -5,7 +5,7 @@ import {
   canStartPromote, promoteButtonLabel, promoteSummary, weightNotice,
 } from './bankPromote.js'
 
-/** Promote: copy the selection somewhere it can be worked on. TWO
+/** ⬆ Promote: copy the selection somewhere it can be worked on. TWO
  * destinations.
  *
  * • A DATASET — the original door. Goes through the normal import path (webp
@@ -107,13 +107,13 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
     <div role="dialog" aria-modal="true" aria-label="Promote the selection"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4">
       <div className="w-full max-w-md max-h-full overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
-        <h2 className="text-base font-bold text-content">Promote the selection</h2>
+        <h2 className="text-base font-bold text-content">⬆ Promote the selection</h2>
 
         <div>
           <p className="text-sm font-medium text-content">Send it to…</p>
           <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-            {tab('dataset', 'An existing dataset')}
-            {tab('bank', 'A new image bank')}
+            {tab('dataset', '📁 An existing dataset')}
+            {tab('bank', '🗃 A new image bank')}
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
 
         {weight && (
           <p className="rounded-md border border-border bg-surface-raised px-3 py-2 text-xs text-content-muted">
-            {weight}
+            💾 {weight}
           </p>
         )}
 

@@ -113,7 +113,7 @@ def test_import_suffixes_deployed_name_with_version(app, ds_with_images, tmp_pat
         # both deployed files are listed (the _v suffix passes the boundary)
         names = [c['filename'] for c in lt.list_imported_checkpoints(LOCAL_USER, ds_id)]
         assert any(n.endswith('_v1.safetensors') for n in names)
-        # the deployed file carries its source-run identity for the #N chip
+        # the deployed file carries its source-run identity for the 💻 #N chip
         imported = lt.list_imported_checkpoints(LOCAL_USER, ds_id)
         tagged = [e for e in imported if e['filename'].endswith('_v1.safetensors')]
         assert tagged and tagged[0]['run_id'] == rec.id
@@ -123,7 +123,7 @@ def test_import_suffixes_deployed_name_with_version(app, ds_with_images, tmp_pat
 def test_record_for_mtime_prefers_oldest_for_preregistry_files(app, ds_with_images):
     """A checkpoint file OLDER than every record predates the registry: its
     owner is the oldest record (legacy baseline), never the newest (live
-    sighting: local checkpoints wore a chip because a cloud launch was the
+    sighting: local checkpoints wore a ☁ chip because a cloud launch was the
     latest record)."""
     import time
     from app.services import checkpoint_registry as reg
@@ -197,7 +197,7 @@ def test_cloud_checkpoints_lists_synced_saves_and_checks_files(app, ds_with_imag
 
 
 def test_checkpoint_download_targets_run_id(app, client, monkeypatch, ds_with_images, tmp_path):
-    """Two finished runs of a family: the older row's must serve ITS file,
+    """Two finished runs of a family: the older row's ⬇ must serve ITS file,
     not the newest run's (family resolution alone did)."""
     import json as _json
     from app.extensions import db

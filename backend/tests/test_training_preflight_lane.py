@@ -120,7 +120,7 @@ def test_cloud_lane_never_shows_vram_or_torch_arch(app, tmp_path):
 
 
 def test_cloud_verdict_ignores_a_machine_only_complaint(app, tmp_path):
-    """A dataset whose ONLY problem is this machine's GPU is for a cloud run."""
+    """A dataset whose ONLY problem is this machine's GPU is 🟢 for a cloud run."""
     from app.services import lora_training as lt
     with app.app_context():
         ds = _dataset(tmp_path)

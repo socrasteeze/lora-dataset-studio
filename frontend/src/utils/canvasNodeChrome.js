@@ -10,7 +10,7 @@
    was the TARGET: the header button is ~16 board units, the board is routinely
    read at 24-65 %, and 16 × 0.65 ≈ 10 screen pixels — a quarter of the ~40 px a
    finger actually lands on. The button was not broken, it was unhittable, and
-   the sitting right beside it meant a near miss opened the full-screen view
+   the 🔍 sitting right beside it meant a near miss opened the full-screen view
    instead of closing the node. That reads exactly like "the cross does nothing".
 
    So a control is sized in SCREEN space: it is counter-scaled by the board's own
@@ -77,7 +77,7 @@ export function chromeScreenSize(boardScale, nodeW) {
   return CHROME_BASE * chromeScale(s, nodeW) * s;
 }
 
-// The GRIP of a group of pinned images: the title bar you drag to move the
+// 🖼🖼 The GRIP of a group of pinned images: the title bar you drag to move the
 // whole strip. Same problem as the buttons above and the same answer, with one
 // difference — a bar spans the strip's whole width, so it cannot be `scale()`d
 // (that would stretch it sideways too). Only its HEIGHT is counter-scaled.

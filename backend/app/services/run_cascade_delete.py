@@ -1,4 +1,4 @@
-"""Delete a run AND everything it produced — the explicit, opt-in cascade.
+"""🗑 Delete a run AND everything it produced — the explicit, opt-in cascade.
 
 WHY THIS IS A SEPARATE MODE, NOT THE NEW DEFAULT
 ------------------------------------------------

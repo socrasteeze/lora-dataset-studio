@@ -1,5 +1,5 @@
 /**
- * Backup — the library-level menu: ONE header disclosure that holds both
+ * 💾 Backup — the library-level menu: ONE header disclosure that holds both
  * ways in and out of an archive. "Back up everything" archives EVERY dataset
  * plus the app config (secrets excluded) into a single master file, produced by
  * a background job with visible progress, then a download + "open folder";
@@ -78,11 +78,11 @@ function BackupOverlay({ job, onDownload, onOpenFolder, onDismiss }) {
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <button type="button" onClick={onOpenFolder}
               className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface-raised">
-              Open folder
+              📂 Open folder
             </button>
             <button type="button" onClick={() => onDownload(job.result?.name)}
               className="rounded-lg bg-gradient-primary px-3.5 py-1.5 text-sm font-semibold text-white">
-              Download
+              ⬇ Download
             </button>
             <button type="button" onClick={onDismiss}
               className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content-muted hover:bg-surface-raised">
@@ -170,7 +170,7 @@ export default function FullBackupControls({ backup, onRestore }) {
                 onClick={() => { closeMenu(); backup.start(includeLoras); }}
                 title="Archive every dataset, its training history + your settings (API keys excluded) into one file"
                 className={MENU_ITEM}>
-                <span className="whitespace-nowrap">Back up everything</span>
+                <span className="whitespace-nowrap">💾 Back up everything</span>
                 <span className="ml-auto shrink-0 text-content-subtle text-[0.625rem]">
                   {running ? 'running…' : 'datasets · settings'}
                 </span>
@@ -190,7 +190,7 @@ export default function FullBackupControls({ backup, onRestore }) {
               onClick={() => { closeMenu(); restoreRef.current?.click(); }}
               title="Import a portable dataset backup — a new dataset will be created"
               className={MENU_ITEM}>
-              <span className="whitespace-nowrap">Import backup</span>
+              <span className="whitespace-nowrap">📦 Import backup</span>
               <span className="ml-auto shrink-0 text-content-subtle text-[0.625rem]">.zip archive</span>
             </button>
           )}

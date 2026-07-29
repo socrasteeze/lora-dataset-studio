@@ -114,7 +114,7 @@ export default function CanvasPage() {
      A closed node keeps its row and its geometry (`visible: false`), which is
      what makes re-opening it land on the same spot at the same size.
 
-     `group_id`/`group_pos` travel the same way — which side-by-side strip
+     🖼🖼 `group_id`/`group_pos` travel the same way — which side-by-side strip
      this picture belongs to, and where in it. They are ADDITIVE and nullable:
      an install whose database predates them reads null and draws the board it
      always drew. A row that does not MENTION them keeps whatever it had, so a
@@ -167,7 +167,7 @@ export default function CanvasPage() {
        it. The re-flow needs the laid-out lane, so it is done here against the
        automatic tree the board is about to fall back to.
 
-       It re-flows through the SAME function Pin all uses
+       It re-flows through the SAME function 📌 Pin all uses
        (utils/canvasPinBatch), on purpose: two placers would be two chances to
        disagree, and the one thing the user is promised on this board is that
        nothing lands on top of anything. Before this, the re-flow only avoided
@@ -179,7 +179,7 @@ export default function CanvasPage() {
         if (!map) continue;
         const tree = trees[id]?.tree;
         const graph = tree ? buildLineageGraph(tree) : null;
-        /* A picture that is part of a side-by-side GROUP is left exactly
+        /* 🖼🖼 A picture that is part of a side-by-side GROUP is left exactly
            where it is. Same argument as the closed pins just below: a strip is
            a deliberate arrangement the user built by hand, and re-flowing its
            members one by one would not tidy it — it would take it apart.

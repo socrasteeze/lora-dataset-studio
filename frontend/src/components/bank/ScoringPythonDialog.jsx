@@ -5,7 +5,7 @@ import {
   missingLabels, sortInterpreters, statusBadge,
 } from './scoringPython.js'
 
-/** Use a GPU Python you already have — the picker behind the "Score runs on
+/** ⚡ Use a GPU Python you already have — the picker behind the "✨ Score runs on
  * the CPU" warning.
  *
  * This app never installs into an environment it did not build. ai-toolkit's venv
@@ -171,7 +171,7 @@ export default function ScoringPythonDialog({ onClose, onChanged }) {
                   <div className="flex flex-wrap gap-2">
                     <button type="button" disabled={!canSelect(r) || !!busy}
                       onClick={() => choose(r.path)}
-                      title={canSelect(r) ? 'Point Score at this interpreter'
+                      title={canSelect(r) ? 'Point ✨ Score at this interpreter'
                         : r.selected ? 'Already in use' : 'This one cannot run the pass yet'}
                       className="rounded-md border border-border px-2.5 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40 disabled:hover:bg-transparent">
                       {busy === r.path ? 'Checking…' : 'Use this one'}

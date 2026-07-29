@@ -50,7 +50,7 @@ test('the checkpoint gallery cannot delete on an accidental tap', () => {
   assert.match(gallery, /data-testid="gallery-confirm-delete"[\s\S]{0,120}onClick=\{runDelete\}/);
 });
 
-/* An action nobody finds is an action that does not exist.
+/* 📌 An action nobody finds is an action that does not exist.
    Pin-to-canvas shipped INSIDE the viewer: you had to open an image to discover
    the board could hold it. The toolbar hint mentioned it, last in a seven-clause
    line that `lg:hidden` removes entirely below a laptop. So the tile carries it
@@ -74,7 +74,7 @@ test('the run gallery offers Pin on the thumbnail itself, never while arming a d
   assert.match(gallery, /data-testid="gallery-pin-image"/);
 });
 
-/* One reachable place for the whole gesture. Select used to sit in the header,
+/* 👍 One reachable place for the whole gesture. Select used to sit in the header,
    two thumb-lengths from the Select all / Delete it leads to; on a phone that is
    the most expensive reach in the panel. It now opens the SAME pinned bar, which
    is why the reach-distance argument below is inverted: what must stay far apart

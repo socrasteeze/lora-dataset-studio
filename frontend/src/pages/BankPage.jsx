@@ -147,7 +147,7 @@ function QueuePanel({ queue, nameOf, onCancel, onClear }) {
   )
 }
 
-/** Image bank — triage a big unsorted folder BEFORE it becomes datasets.
+/** 🗃️ Image bank — triage a big unsorted folder BEFORE it becomes datasets.
  * List view (create/open/delete banks, the Launch-all queue) + per-bank
  * workspace. The bank references the folder in place: nothing is copied until
  * promotion, and the source files are never modified. */
@@ -357,7 +357,7 @@ export default function BankPage() {
     <div className="space-y-6">
       <header className="flex items-center gap-2">
         {/* Beta chip retired here — it now marks the LoRA Canvas instead. */}
-        <h1 className="text-xl font-bold text-content">Image bank</h1>
+        <h1 className="text-xl font-bold text-content">🗃️ Image bank</h1>
         <HelpBadge topic="page-bank" />
       </header>
       <p className="text-sm text-content-muted max-w-3xl">
@@ -433,7 +433,7 @@ export default function BankPage() {
         {folderNotice && (
           <p role="alert"
             className="basis-full rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100">
-            {folderNotice.text}
+            ⛔ {folderNotice.text}
           </p>
         )}
       </form>
@@ -476,7 +476,7 @@ export default function BankPage() {
                 <BankTitle bank={b} onOpen={() => open(b.id)}
                   onRename={(newName) => rename(b, newName)} />
                 {b.activity && !b.activity.finished && (
-                  <span className="text-xs text-amber-300">{b.activity.kind}…</span>
+                  <span className="text-xs text-amber-300">⏳ {b.activity.kind}…</span>
                 )}
                 {qs && (
                   <span className="rounded bg-indigo-500/15 px-1.5 py-px text-[10px] font-semibold text-indigo-300">
@@ -486,7 +486,7 @@ export default function BankPage() {
                 <button type="button" onClick={() => setRelocating(b)}
                   aria-label={`Move the folder of bank ${b.name}`}
                   title="Moved this folder to another disk? Point the bank at its new location."
-                  className="ml-auto px-1.5 text-content-subtle hover:text-content"></button>
+                  className="ml-auto px-1.5 text-content-subtle hover:text-content">📦</button>
                 <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
                   className="px-1.5 text-content-subtle hover:text-rose-300">✕</button>
               </div>

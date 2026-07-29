@@ -195,7 +195,7 @@ class FaceDatasetImage(db.Model):
     # (logo de site, URL, pseudo, texte de studio ajouté PAR-DESSUS la photo scrapée) —
     # sinon le LoRA les apprend. watermark_state : NULL (jamais scanné) | 'none' (propre)
     # | 'detected' (trouvé, pas encore traité / à revoir manuellement) | 'dismissed'
-    # (l'utilisateur a jugé en review que c'est un FAUX positif → plus de , et les
+    # (l'utilisateur a jugé en review que c'est un FAUX positif → plus de 🚩, et les
     # prochains scans le sautent) | 'cleaned' (crop ou inpaint LaMa appliqué) | 'failed'.
     # watermark_bbox : JSON [x1,y1,x2,y2] normalisé
     # [0,1] du watermark (NULL si aucun). Les bbox VLM sont GROSSIÈRES → déjà élargies
@@ -284,7 +284,7 @@ class BankImage(db.Model):
     # same 64-bit dHash family (Hamming <= dup_distance).
     dup_group = db.Column(Integer, nullable=True, index=True)
     # Semantic near-duplicate group id (stage 2 — "same shot, different crop"):
-    # cosine of the CLIP embeddings the Score pass cached >= semantic_dup_threshold.
+    # cosine of the CLIP embeddings the ✨ Score pass cached >= semantic_dup_threshold.
     # Catches crops / re-compressed variants a dHash misses. Assigned by the
     # semantic-dedup pass over the scored images; NULL = no semantic near-dup /
     # the pass hasn't run. Distinct column from dup_group so the two stages
@@ -347,7 +347,7 @@ class BankImage(db.Model):
     # (Qwen3-VL, CLASSIFY_PROMPT). face = head close-up | bust = upper body |
     # body = full body | back = seen from behind | 'unknown' = a parseable answer
     # that wasn't one of the four | NULL = not classified yet (retryable). Powers
-    # the Framing filter chips AND the coverage advice. Additive column —
+    # the 📐 Framing filter chips AND the coverage advice. Additive column —
     # created by db.create_all(), no migration (see _SCHEMA_ADDITIONS).
     framing = db.Column(String(8), nullable=True, index=True)
     # Provenance pass — computed by the SAME pure-PIL quality scan (no numpy, no
@@ -755,7 +755,7 @@ class CheckpointPreview(db.Model):
 
 
 class TrainingPreset(db.Model):
-    """Named, shareable snapshot of the advanced training settings.
+    """Named, shareable snapshot of the ⚙️ advanced training settings.
 
     `settings` stores the RAW explicit keys (the same blob shape as
     face_dataset.train_settings) — validation happens at APPLY time through
@@ -858,7 +858,7 @@ class CanvasImageNode(db.Model):
     w = db.Column(Float, nullable=False, default=260.0)
     h = db.Column(Float, nullable=False, default=260.0)
     visible = db.Column(db.Boolean, nullable=False, default=True)
-    # Which side-by-side GROUP this picture is fused into, and where in it.
+    # 🖼🖼 Which side-by-side GROUP this picture is fused into, and where in it.
     # Dropping one pinned image onto another turns them into one node whose
     # pictures sit edge to edge; there is no limit on how many join, and
     # dragging one off the strip makes it a node of its own again.

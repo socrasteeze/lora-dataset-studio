@@ -127,7 +127,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant, 
         {masksWarn}
         {cloud && prog?.phase ? (
           <p className="m-0 text-sky-300 text-[0.625rem]">
-            {prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}
+            ☁ {prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}
           </p>
         ) : (
           <p className="m-0 text-content-subtle text-[0.625rem]">

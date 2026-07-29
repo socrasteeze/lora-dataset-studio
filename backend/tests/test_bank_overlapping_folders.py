@@ -1,8 +1,8 @@
-"""Image bank — two banks over the same files.
+"""🗃️ Image bank — two banks over the same files.
 
 A bank does not own its folder, so nothing stops one bank pointing at a folder
 that sits inside another bank's. Triaging is unaffected (statuses are per bank),
-but Delete rejected removes the FILES — and those files belong to the other
+but 🗑 Delete rejected removes the FILES — and those files belong to the other
 bank too, which simply finds them missing. The confirmation has to be able to
 say that before the click, and the creation flow says it once up front.
 """

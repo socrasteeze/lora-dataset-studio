@@ -1,4 +1,4 @@
-"""LoRA Canvas — images pinned onto the board (canvas_image_node).
+"""🖼 LoRA Canvas — images pinned onto the board (canvas_image_node).
 
 The feature's promise is narrow and testable: close a pinned image, re-open it,
 and it comes back at the SAME place and the SAME size. That is the assertion
@@ -200,7 +200,7 @@ def test_deleting_a_dataset_that_has_pinned_images_does_not_500(client, app):
         assert CanvasImageNode.query.filter_by(dataset_id=ds_id).count() == 0
 
 
-# ---- fused into one node, side by side --------------------------------
+# ---- 🖼🖼 fused into one node, side by side --------------------------------
 
 def test_a_group_survives_a_reload_with_its_order_intact(client, app):
     """Drop one pinned image onto another and they become ONE node. What the

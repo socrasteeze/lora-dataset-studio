@@ -132,7 +132,7 @@ def test_a_promoted_custom_card_keeps_its_id():
     ids are what saved presets store (datasetCustomPresetsV1.selectedIds), so the
     backend must accept the card's own `custom_…` id verbatim, not normalise it."""
     kept = fv.sanitize_custom_shots({'human': [
-        {'id': 'custom_1700000000000', 'label': 'on a vintage motorbike',
+        {'id': 'custom_1700000000000', 'label': '✨ on a vintage motorbike',
          'prompt': 'full body shot, sitting on a vintage motorbike in a garage',
          'framing': 'body'},
     ]})['human']

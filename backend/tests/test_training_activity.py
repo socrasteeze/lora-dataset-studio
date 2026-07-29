@@ -1,4 +1,4 @@
-"""The live "something is training" signal behind the nav indicator.
+"""🏋️ The live "something is training" signal behind the nav indicator.
 
 Every page polls this, so the contract is as much about what it must NOT do as
 about what it returns: no capability probe, no disk, no network — one persisted

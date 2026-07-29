@@ -7,7 +7,7 @@ import {
   relocationReady, relocationSummary,
 } from './bankRelocate'
 
-/** Move a bank's folder — repoint a bank at the folder's NEW location after
+/** 📦 Move a bank's folder — repoint a bank at the folder's NEW location after
  * the user moved it (another disk, a rename, a drive letter that changed).
  *
  * Every score, caption, duplicate group and keep/reject decision lives in the
@@ -84,7 +84,7 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
     <div role="dialog" aria-modal="true" aria-label="Move this bank's folder"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
-        <h2 className="text-base font-bold text-content">Move this bank&apos;s folder</h2>
+        <h2 className="text-base font-bold text-content">📦 Move this bank&apos;s folder</h2>
         <p className="text-sm text-content-muted">
           Moved <span className="font-semibold text-content">{bankName}</span> to
           another disk or renamed its folder? Point it at the new location — every
@@ -128,7 +128,7 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
           </button>
           <button type="button" onClick={check} disabled={busy || !folder.trim()}
             className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-40">
-            {busy && !ready ? 'Checking…' : 'Check this folder'}
+            {busy && !ready ? 'Checking…' : '🔍 Check this folder'}
           </button>
           <button type="button" onClick={apply} disabled={busy || !ready}
             className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-40">

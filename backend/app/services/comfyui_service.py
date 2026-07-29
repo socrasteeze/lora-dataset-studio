@@ -1,9 +1,9 @@
 """
 SAFE ComfyUI Service
 ===================
-Flask-safe (no process scanning)
-PID-based restart only
-Windows compatible
+✅ Flask-safe (no process scanning)
+✅ PID-based restart only
+✅ Windows compatible
 
 Lifted from the parent project's app/services/comfyui_service.py for LoRA
 Dataset Studio: SRC's module-level COMFYUI_API_ADDRESS constant becomes a live
@@ -92,7 +92,7 @@ class ComfyUIService:
         logger.warning("⚠ Demande de redémarrage ignorée (gestion externe).")
         pass
 
-    # API publique unifiée utilisée par queue_manager
+    # ✅ API publique unifiée utilisée par queue_manager
     def stop_comfyui_process(self):
         """Arrêt désactivé."""
         logger.warning("⚠ stop_comfyui_process ignoré.")

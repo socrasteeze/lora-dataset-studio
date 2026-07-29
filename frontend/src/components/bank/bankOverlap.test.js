@@ -113,7 +113,7 @@ test('the delete dialog blocks on a dataset conflict rather than warning about i
   assert.match(src, /datasetConflictBlock\(preview\?\.dataset_conflict\)/);
 });
 
-test('the workspace disables Delete rejected on a bank that sits on a dataset', () => {
+test('the workspace disables 🗑 Delete rejected on a bank that sits on a dataset', () => {
   // The banner promises "Delete rejected is disabled here". A button that still
   // opened the dialog, only to be refused inside it, would make that a lie.
   const src = fs.readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');

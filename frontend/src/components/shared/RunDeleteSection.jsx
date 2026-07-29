@@ -14,7 +14,7 @@ import { useToast } from '../common/Toast';
    fires from a board where cards get dragged all day, so:
      • the button sits at the BOTTOM of the scrolled body, under a rule and its
        own "Danger zone" label — the far end of the panel from the pinned action
-       bar, where Select / Delete-images live. The two destructive verbs are
+       bar, where Select / 🗑 Delete-images live. The two destructive verbs are
        never one thumb-slide apart, and this one is never reached by accident;
      • it is outlined, not filled: destructive register, but the quietest button
        on the panel — the loud one is the action you take every day;

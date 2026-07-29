@@ -239,7 +239,7 @@ test('the dataset graph renders INLINE inside the manager (no body-portal modal)
 });
 
 test('a pill can be deployed straight from EITHER surface, deployed pills say so', () => {
-  // Deploy → loras/<family> uses the CSRF-safe postJson and the list's exact
+  // 📦 Deploy → loras/<family> uses the CSRF-safe postJson and the list's exact
   // payload (via lineageImportPayload); an already-deployed pill shows ✓ Deployed.
   // One implementation, in the hook — the canvas is not a second one.
   assert.match(actionsHook, /lineageImportPayload/);
@@ -295,9 +295,9 @@ test('a preview opens LARGE in a lightbox — shared, so the canvas is not a dea
   assert.match(canvas, /onZoomPreview=\{zoomPreview\}/);
 });
 
-test('a persisted Big-previews mode enlarges the generated tiles', () => {
+test('a persisted 🔍 Big-previews mode enlarges the generated tiles', () => {
   // Toggle + persistence in the graph, geometry threaded to the layout.
-  assert.match(graph, /Big previews/);
+  assert.match(graph, /🔍 Big previews/);
   assert.match(graph, /localStorage\.getItem\('lds\.graphBigPreviews'\)/);
   assert.match(graph, /setItem\('lds\.graphBigPreviews'/);
   assert.match(graph, /buildLineageGraph\(shownTree, \{ bigPreviews \}\)/);
@@ -346,7 +346,7 @@ test('undeploy is EXPLICIT and symmetric with deploy — and never confusable wi
   // file while the click posts another (the invariant of this popover).
   assert.match(helpers, /export function checkpointUndeployAction[^]*?checkpointDeleteTarget\(node, pill\)/);
   assert.match(helpers, /target\.kind !== 'deployed'\) return null;/);
-  // The retreat row is reserved for the one destructive action: the save.
+  // The 🗑 retreat row is reserved for the one destructive action: the save.
   assert.match(popoverRules, /del: target && target\.kind === 'save' \? target : null/);
   // Undeploy is presented as REVERSIBLE — the save survives and can be re-deployed.
   assert.match(helpers, /Reversible: the training save is kept/);

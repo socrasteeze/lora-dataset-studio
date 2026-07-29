@@ -321,24 +321,24 @@ test('every refusal names the entry AND what is wrong with it — that is the wh
   assert.match(bad.message, /face, bust, body, back/);   // and what to do instead
 });
 
-// --- Keep: promote a hand-written card into the durable catalog -------------
-// The cards live in localStorage and die with the browser cache. Exporting +
+// --- Keep: promote a hand-written ✨ card into the durable catalog -------------
+// The ✨ cards live in localStorage and die with the browser cache. Exporting +
 // re-importing them cannot rescue them (they collide with themselves), so the
 // only real fix is a direct promotion — and it has to MOVE the card, not copy it.
 
-const custom = (over = {}) => ({ id: 'custom_1700000000000', label: 'on a vintage motorbike',
+const custom = (over = {}) => ({ id: 'custom_1700000000000', label: '✨ on a vintage motorbike',
   prompt: 'full body shot, sitting on a vintage motorbike in a garage, warm light',
   framing: 'body', ...over });
 
 test('promoting moves the card: gone from the custom list, present in the imported one', () => {
   const shotToKeep = custom();
-  const other = custom({ id: 'custom_2', label: 'another' });
+  const other = custom({ id: 'custom_2', label: '✨ another' });
   const res = promoteCustomShot({ shot: shotToKeep, customShots: [shotToKeep, other], importedShots: [] });
   assert.equal(res.ok, true);
   // MOVED, not copied — two copies would mean two shots with the same label,
   // which is the very collision the importer refuses.
   assert.deepEqual(res.customShots.map((s) => s.id), ['custom_2']);
-  assert.deepEqual(res.importedShots.map((s) => s.label), ['on a vintage motorbike']);
+  assert.deepEqual(res.importedShots.map((s) => s.label), ['✨ on a vintage motorbike']);
   assert.equal(res.importedShots[0].imported, true);
 });
 

@@ -10,7 +10,7 @@ import {
 } from './bankScrapeImport'
 
 /**
- * Scrape into a bank — the scraper's second destination.
+ * 🕸 Scrape into a bank — the scraper's second destination.
  *
  * The scraper used to have exactly one outlet: straight into a dataset, through
  * filters that exist for TRAINING (short side ≥ 768 px, ratio ≤ 3:1, perceptual

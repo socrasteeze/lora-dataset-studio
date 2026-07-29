@@ -137,7 +137,7 @@ def _reset_inmemory_registries():
     failed once in a full suite and never alone. The suite must never depend on a
     lease left behind by an earlier test, nor talk to a live Ollama by accident.
 
-    The text-search query cache is a third one, and it bites the same way in
+    The 🔤 text-search query cache is a third one, and it bites the same way in
     reverse: it is keyed by PHRASE only (a CLIP vector depends on the checkpoint,
     not on the bank), so a query encoded by one test would be served from memory
     to the next — whose LDS_DATA_DIR is a different empty tmp dir. A test proving

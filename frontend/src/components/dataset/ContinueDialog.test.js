@@ -81,8 +81,8 @@ test('the dialog can offer the LANE (local vs cloud), opt-in and reasoned', () =
   assert.match(dialog, /resolveInitialLane\(where, lanes\)/);
   // both lanes rendered as radios, a closed one disabled WITH its reason shown
   assert.match(dialog, /aria-label="Where to run the continuation"/);
-  assert.match(dialog, /Local/);
-  assert.match(dialog, /Cloud/);
+  assert.match(dialog, /💻 Local/);
+  assert.match(dialog, /☁ Cloud/);
   assert.match(dialog, /disabled=\{off\}/);
   assert.match(dialog, /laneState\(lane\)\.reason/);
   // the chosen lane rides the payload, and a blocked lane can't be submitted

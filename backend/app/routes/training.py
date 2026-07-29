@@ -1018,8 +1018,8 @@ def train_presets_list():
 @bp.post('/train/presets')
 def train_presets_save():
     """Create or overwrite (by name). Two sources: `dataset_id` snapshots that
-    dataset's current explicit settings (the Save-current path); `settings`
-    stores an explicit dict (the import path)."""
+    dataset's current explicit settings (the 💾 Save-current path); `settings`
+    stores an explicit dict (the ⬆ import path)."""
     import json
     from ..extensions import db
     from ..models import TrainingPreset
@@ -1371,7 +1371,7 @@ def dataset_train_import(dataset_id):
             return jsonify({'error': 'unknown cloud run'}), 404
         kw['src_dir'] = crun.staging_dir
         kw['version'] = ct._run_param(crun, 'version')
-        # Tag the deployed name with THIS cloud run's id (#N) so importing the
+        # Tag the deployed name with THIS cloud run's id (☁ #N) so importing the
         # same step from two different runs never overwrites one with the other.
         kw['run_id'] = crun.id
         kw['run_source'] = 'cloud'
@@ -1633,7 +1633,7 @@ def dataset_train_run_share(run_key):
 
 @bp.get('/dataset/train/runs/<int:record_id>/lineage')
 def dataset_train_run_lineage(record_id):
-    """Genealogy tree of the lineage a run belongs to: nodes (every launch
+    """🌳 Genealogy tree of the lineage a run belongs to: nodes (every launch
     linked by continuations, local + cloud) and parent→child edges. Addressed
     by TrainingRunRecord id — the universal run node key (cloud rows expose it
     as record_id too). Open like the other Runs-hub reads: unknown id → 404."""
@@ -1770,7 +1770,7 @@ def dataset_train_checkpoint_note(record_id, step):
 
 @bp.post('/dataset/<int:dataset_id>/lineage/previews')
 def dataset_lineage_generate_previews(dataset_id):
-    """Lab inline generation: render a same-prompt/same-seed preview for each
+    """🎨 Lab inline generation: render a same-prompt/same-seed preview for each
     selected checkpoint by reusing the Test-Studio engine pinned to those
     checkpoints at strength 1.0. Body: {prompt, seed, family,
     checkpoints:[{record_id, step}]}.
@@ -1918,7 +1918,7 @@ def dataset_train_checkpoint_file(dataset_id):
 
 @bp.get('/train/activity')
 def train_activity():
-    """Live "something is training" signal for the nav indicator, local and
+    """🏋️ Live "something is training" signal for the nav indicator, local and
     cloud. Ungated and free by design (one flag + one COUNT): every page polls
     it, so it must never probe, touch the disk or reach the network. An
     unconfigured cloud simply reports zero."""
@@ -1980,7 +1980,7 @@ def train_canvas_generate():
 
 @bp.get('/train/checkpoint/<int:record_id>/<int:step>/images')
 def train_checkpoint_images(record_id, step):
-    """Everything this checkpoint ever generated, newest first — the gallery
+    """🖼 Everything this checkpoint ever generated, newest first — the gallery
     the ◉ Canvas opens under a node. Reads the link written at generation time,
     so it holds images made from any surface (Test Studio, canvas, comparison
     grid). Open like the other Runs-hub reads; a checkpoint with no image simply
@@ -2195,7 +2195,7 @@ def dataset_canvas_images_clear(dataset_id):
 
 @bp.get('/dataset/<int:dataset_id>/train/lineage')
 def dataset_train_dataset_lineage(dataset_id):
-    """Genealogy forest of ALL this dataset's runs (every launch + its
+    """🌳 Genealogy forest of ALL this dataset's runs (every launch + its
     checkpoints), for the ◉ Graph the Checkpoints & LoRAs manager opens.
     Optionally scoped to the family/variant the panel shows (train_type/variant).
     Unlike the per-run lineage there is no single current run. Empty → 200 with

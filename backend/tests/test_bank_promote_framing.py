@@ -1,5 +1,5 @@
-"""Bug report from axelf_ (Discord): images uploaded to a Bank, analysed, then
-promoted into a dataset showed "Composition (0)" in Add images — the count only
+"""Bug report from axelf_ (Discord): images uploaded to a 🗃️ Bank, analysed, then
+promoted into a dataset showed "Composition (0)" in 📸 Add images — the count only
 came alive while a generation was running (the in-flight rows DO carry a framing)
 and fell back to 0 the moment it was stopped (those rows are deleted).
 
@@ -77,7 +77,7 @@ def _bank_to_dataset(client, app, tmp_path, monkeypatch, files, verdicts):
 
 def test_promoted_images_land_counted_in_the_composition(client, tmp_path, app, monkeypatch):
     """axelf_'s exact path: bank → analyse (framing) → promote. The dataset payload
-    the Add images bar reads must show the real counts, with nothing generating."""
+    the 📸 Add images bar reads must show the real counts, with nothing generating."""
     _bank, ds_id = _bank_to_dataset(
         client, app, tmp_path, monkeypatch,
         {'a.png': _blocks(128, seed=0), 'b.png': _blocks(60, seed=1),

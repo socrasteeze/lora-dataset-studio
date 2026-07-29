@@ -1,5 +1,5 @@
 // =====================================================================//
-//  Discord announcement generator — the same What's new, condensed
+//  Discord announcement generator — the same 🎁 What's new, condensed
 // =====================================================================//
 //  WHY THIS FILE EXISTS
 //  --------------------
@@ -63,12 +63,12 @@ export function renderAnnouncement({ tag, entries, previousTag, limit = DISCORD_
       + `${previousTag || 'the previous release'}. An announcement that lists nothing `
       + 'is how a wave gets skipped — fix the changelog, do not post an empty message.');
   }
-  const head = `## ${tag} is out — ${entries.length} change${entries.length > 1 ? 's' : ''}\n`;
+  const head = `## 🎁 ${tag} is out — ${entries.length} change${entries.length > 1 ? 's' : ''}\n`;
   const credits = extractCredits(entries);
   const tail = [
     '',
     credits.length
-      ? `Thanks to **${credits.join('**, **')}** — these came from your reports. `
+      ? `Thanks to **${credits.join('**, **')}** — these came from your reports. 🙏`
       : '',
     `Update from **Settings ▸ Maintenance ▸ Update & restart**, or grab the ZIP: <${REPO_URL}/releases/tag/${tag}>`,
   ].filter(Boolean).join('\n');

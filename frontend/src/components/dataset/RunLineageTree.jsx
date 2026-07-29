@@ -4,7 +4,7 @@ import { famLabel, StatusDot, SavesChip } from './lineageChrome';
 import { runNumber, cloudNumber, runIdentityLabel } from '../../utils/runIdentity';
 import RunLineageGraph from './RunLineageGraph';
 
-/* A run's lineage — the runs linked by continuations (run → continue →
+/* 🌳 A run's lineage — the runs linked by continuations (run → continue →
    re-continue, and forks). Two views of the same genealogy, toggled in the
    header and remembered per browser:
      ☰ List  — a compact indented tree (file-tree rails), dense and scannable.

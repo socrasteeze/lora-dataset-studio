@@ -88,7 +88,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
       onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss() }}>
       <div className="flex w-full max-w-lg flex-col rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl"
         style={{ maxHeight: '80vh' }}>
-        <h2 className="text-base font-bold text-content">Choose a folder</h2>
+        <h2 className="text-base font-bold text-content">📁 Choose a folder</h2>
         <p className="mt-1 text-xs text-content-muted">
           Folders on the machine running the app. Nothing is opened or modified —
           you're only picking a location.
@@ -98,7 +98,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
           <button type="button" onClick={() => load(atRoot ? null : (data?.parent ?? null))}
             disabled={loading || atRoot}
             className="rounded-md border border-border px-2 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
-            Up
+            ⬆ Up
           </button>
           <span className="min-w-0 grow truncate font-mono text-xs text-content-subtle"
             title={data?.path || 'This computer'}>
@@ -117,7 +117,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
             <li key={e.path}>
               <button type="button" onClick={() => load(e.path)}
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-content hover:bg-surface">
-                <span aria-hidden="true"></span>
+                <span aria-hidden="true">📁</span>
                 <span className="min-w-0 truncate">{e.name}</span>
               </button>
             </li>
@@ -191,7 +191,7 @@ export default function FolderPickerField({
           className="w-full min-w-0 grow rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content font-mono" />
         <button type="button" onClick={browse} disabled={busy}
           className="shrink-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-50">
-          {busy ? 'Opening…' : 'Browse…'}
+          {busy ? 'Opening…' : '📂 Browse…'}
         </button>
       </div>
       {hint && <p className="mt-1 text-xs text-content-muted">{hint}</p>}
