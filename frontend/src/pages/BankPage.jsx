@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch, del, postJson } from '../api/fetchClient'
 import { useToast } from '../components/common/Toast'
 import { useCapabilities } from '../context/CapabilitiesContext'
@@ -12,6 +12,8 @@ import { bankListSyncToast, forgetMissingConfirm } from '../components/bank/bank
 import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
 import { overlapNotice } from '../components/bank/bankOverlap'
 import { allExcludedWarning, normalizeExcluded, splitPlan } from '../components/bank/bankSplit'
+import { queueAllCandidates, queueAllConfirm, queueAllResult } from '../components/bank/bankQueueAll'
+import { pipelineBadge, pipelineReportVerdict, queueOutcomeLine } from '../components/bank/pipelineVerdict'
 import { datasetFolderNotice } from '../utils/pathRelation'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
 import RelocateBankDialog from '../components/bank/RelocateBankDialog'
@@ -116,6 +118,20 @@ function BankPreviewStrip({ bank, onOpen }) {
  * up behind it. Drains one bank at a time (never a busy-GPU 503), so a user can
  * queue several banks and walk away. Each row can be cancelled; Clear all empties
  * it (and stops the running pipeline). Names are resolved from the loaded banks. */
+/** "⚠ 2 passes skipped in the last 🚀 Launch all" — or nothing at all. A clean
+ *  run is deliberately silent: a green tick on every card is noise, and it makes
+ *  the one card that needs attention harder to find, not easier. */
+function PipelineVerdictNote({ report }) {
+  const badge = pipelineBadge(pipelineReportVerdict(report))
+  if (!badge) return null
+  return (
+    <p title={badge.title}
+      className={`text-xs ${badge.tone === 'error' ? 'text-rose-300' : 'text-amber-300'}`}>
+      {badge.label} in the last 🚀 Launch all — open the bank for the report.
+    </p>
+  )
+}
+
 function QueuePanel({ queue, nameOf, onCancel, onClear }) {
   if (!queue?.items?.length) return null
   return (
@@ -182,7 +198,9 @@ export default function BankPage() {
   const [excluded, setExcluded] = useState(() => new Set())
   const [preview, setPreview] = useState(null)
   // The bank whose Launch-all dialog is open (queue or run-now from the list).
-  const [dialogBankId, setDialogBankId] = useState(null)
+  // What the Launch-all dialog is about: one bank, or every bank that still has
+  // undecided images. `null` = closed.
+  const [dialogScope, setDialogScope] = useState(null)
   const [relocating, setRelocating] = useState(null)   // the bank being repointed
   // Dataset storage folders, so a folder that belongs to a dataset can be named
   // as such WHILE it is typed. The server refuses it either way — this only
@@ -208,6 +226,30 @@ export default function BankPage() {
   }, [])
 
   useEffect(() => { if (currentId == null) refresh() }, [currentId, refresh])
+
+  // When the queue EMPTIES, say what became of the banks that drained — once,
+  // not on a poll. "12 finished" alone is the sentence that let a night where
+  // every GPU pass was skipped for "GPU busy" pass for a good one. This is the
+  // only place the bank list is refreshed off a timer-adjacent event, and it is
+  // a single refresh per drain, not a poll: GET /api/banks re-walks every source
+  // folder, which must stay a navigation-time action.
+  const drained = useRef([])
+  useEffect(() => {
+    const ids = (queue?.items || []).map((i) => i.bank_id)
+    if (ids.length) { drained.current = ids; return }
+    const just = drained.current
+    if (!just.length) return
+    drained.current = []
+    ;(async () => {
+      const fresh = await apiFetch('/api/banks').catch(() => null)
+      const rows = fresh?.banks || []
+      const line = queueOutcomeLine(
+        just.map((id) => pipelineReportVerdict(
+          rows.find((b) => b.id === id)?.pipeline_report)))
+      if (rows.length) setBanks(rows)
+      if (line) toast[/problems/.test(line) ? 'warning' : 'success'](line)
+    })()
+  }, [queue, toast])
 
   // Poll the QUEUE (a cheap in-memory snapshot) while on the list page. The bank
   // cards are deliberately NOT polled: GET /api/banks force-re-walks every source
@@ -263,6 +305,10 @@ export default function BankPage() {
     try { localStorage.removeItem(CURRENT_KEY) } catch { /* ignore */ }
     setCurrentId(null)
   }
+
+  // How many banks "Queue all" would take. Same rule the server uses
+  // (banks_needing_triage), so the button's number matches what it queues.
+  const queueAllCount = queueAllCandidates(banks, queue).length
 
   // Computed once: the row list, the "Will create N" count and the all-excluded
   // warning are three views of the same decision.
@@ -335,9 +381,39 @@ export default function BankPage() {
     }
   }
 
+  /** Every bank with undecided images, QUEUED — one entry each, never one run
+   *  each. The queue drains one bank at a time behind an idle GPU, which is the
+   *  whole reason this is safe as a single button; the confirm says so before
+   *  anything is posted. Both dialog actions land here in the 'all' scope: with
+   *  twelve banks there is no honest "run now".  */
+  const queueAll = async (config) => {
+    const candidates = queueAllCandidates(banks, queue)
+    const confirm = queueAllConfirm(candidates, config.steps)
+    if (!confirm) {
+      setDialogScope(null)
+      toast.info('Nothing to queue — every bank is fully triaged.')
+      return
+    }
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(confirm)) return
+    setDialogScope(null)
+    try {
+      // The toast is built from the SERVER's counts: the client's idea of what
+      // is eligible can differ (a bank triaged in another tab), and a
+      // disagreement must be reported rather than papered over.
+      const note = queueAllResult(await postJson('/api/bank-queue/all', config))
+      toast[note.type](note.text)
+    } catch (e) {
+      toast.error(e?.message || 'Could not queue the banks.')
+    } finally {
+      refreshQueue()
+    }
+  }
+
   const runNow = async (config) => {
-    const id = dialogBankId
-    setDialogBankId(null)
+    if (dialogScope?.kind === 'all') return queueAll(config)
+    const id = dialogScope?.bankId
+    setDialogScope(null)
     try {
       await postJson(`/api/bank/${id}/pipeline`, config)
       toast.success('Launch all started — Stop it any time from the bank.')
@@ -347,8 +423,9 @@ export default function BankPage() {
     }
   }
   const enqueue = async (config) => {
-    const id = dialogBankId
-    setDialogBankId(null)
+    if (dialogScope?.kind === 'all') return queueAll(config)
+    const id = dialogScope?.bankId
+    setDialogScope(null)
     try {
       const d = await postJson(`/api/bank/${id}/queue`, config)
       toast.success(`Added to the queue (position ${d.position}).`)
@@ -489,6 +566,22 @@ export default function BankPage() {
         )}
       </form>
 
+      {/* One button for "triage everything I have". It QUEUES — one entry per
+          bank, drained one at a time behind an idle GPU — and the confirm says
+          so, because "run all" on twelve banks is the thing to be afraid of. */}
+      {queueAllCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
+            title="Line every bank that still has undecided images up to run, one after another"
+            className="rounded-md border border-indigo-400/50 bg-indigo-500/10 px-3 py-1.5 text-sm font-semibold text-indigo-200 hover:bg-indigo-500/20">
+            ⏳ Queue all {queueAllCount} bank(s)…
+          </button>
+          <span className="text-xs text-content-subtle">
+            One at a time, in order — nothing runs in parallel.
+          </span>
+        </div>
+      )}
+
       {/* A queue that drains into nothing is the loudest symptom of a leftover
           "GPU busy" flag — every bank is skipped and the night is wasted. The
           notice is silent unless the server says the flag has nothing behind it. */}
@@ -552,6 +645,12 @@ export default function BankPage() {
               <p className="text-xs text-content-muted">
                 {b.total} image(s) · {b.scanned} scanned · <span className="text-emerald-300">{b.keep} kept</span> · <span className="text-rose-300">{b.reject} rejected</span>
               </p>
+              {/* The last Launch-all's verdict, ON THE CARD. A run where every
+                  GPU pass was skipped for "GPU busy" used to look identical to a
+                  clean one from here — and queueing banks overnight is exactly
+                  when nobody is watching. A clean run gets no badge: a tick on
+                  every card makes the one amber card harder to spot. */}
+              <PipelineVerdictNote report={b.pipeline_report} />
               <FolderSyncNote sync={b.folder_sync}
                 onRelocate={() => setRelocating(b)}
                 onForget={(missing) => forgetMissing(b, missing)} />
@@ -561,7 +660,7 @@ export default function BankPage() {
                   Open →
                 </button>
                 {!qs && (
-                  <button type="button" onClick={() => setDialogBankId(b.id)} disabled={b.total === 0}
+                  <button type="button" onClick={() => setDialogScope({ kind: 'bank', bankId: b.id })} disabled={b.total === 0}
                     title="Run Launch all now, or add this bank to the queue"
                     className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
                     Launch all…
@@ -575,9 +674,9 @@ export default function BankPage() {
         </div>
       )}
 
-      {dialogBankId != null && (
+      {dialogScope && (
         <LaunchAllDialog caps={caps} visionReady={visionReady}
-          onClose={() => setDialogBankId(null)}
+          onClose={() => setDialogScope(null)}
           onLaunch={runNow} onQueue={enqueue} />
       )}
 

@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-queue-every-bank-and-see-what-really-ran',
+    date: '2026-07-29',
+    title: 'Queue every bank in one click — and find out in the morning what really ran',
+    blurb:
+      'Lining up several banks meant opening each one and adding it to the queue by hand. "Queue all N bank(s)" on the Banks page does the lot: every bank that still has undecided images, one entry each, run strictly one at a time behind an idle GPU — it queues, it never starts anything in parallel, and the confirmation says so with the count before anything happens. The other half matters just as much: a queued run that could not take the GPU skipped its passes and finished anyway, which looked exactly like a clean run from the bank list. Each card now shows the verdict of its last Launch all — "2 passes skipped", "1 step failed", with the reason on hover — and a clean run shows nothing, so the one card that needs you stands out. A pass that declined itself for a good reason (de-dup waiting on Score) is not flagged; a pass the machine refused is.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-exclude-subfolders-from-a-bank-import',
     date: '2026-07-29',
     title: 'Leave folders out when you import a folder of folders',

@@ -515,6 +515,32 @@ def bank_queue_remove(bank_id):
     return jsonify({'ok': True})
 
 
+@bp.post('/bank-queue/all')
+def bank_queue_all():
+    """Queue EVERY bank that still has undecided images, one entry each.
+
+    Always 202, even when nothing was eligible: nothing was refused — there was
+    simply nothing to do, and a 4xx there would read as an error. The body
+    carries what really happened per bank ({queued, skipped}) so the toast is
+    built from the SERVER's counts; a client/server disagreement is then
+    reported rather than hidden behind a number the client guessed.
+
+    Still one bank at a time — this queues twelve entries, it does not start
+    twelve runs. The worker's gate is untouched."""
+    data = request.get_json(silent=True) or {}
+    try:
+        bank_ids = banks.banks_needing_triage(LOCAL_USER)
+        out = bank_queue.enqueue_many(
+            _app(), LOCAL_USER, bank_ids,
+            steps=data.get('steps'), reject_flags=data.get('reject_flags'),
+            resolve_dups=bool(data.get('resolve_dups')))
+    except ValueError as e:
+        # The step list is sanitized before anything is enqueued, so this cannot
+        # leave a half-queued queue behind.
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'eligible': len(bank_ids), **out}), 202
+
+
 @bp.post('/bank-queue/clear')
 def bank_queue_clear():
     """Empty the whole queue (and cancel the running pipeline)."""

@@ -83,3 +83,41 @@ test('the all-excluded case is warned about BEFORE the click, not surfaced as a 
   assert.match(page, /const splitWarning = allExcludedWarning\(splitPlanNow/);
   assert.match(page, /\{splitWarning && \(/);
 });
+
+// --- Queue ALL banks ---------------------------------------------------------
+test('queue-all posts the queue route, never one pipeline per bank', () => {
+  // The whole ask: they must QUEUE, not run at the same time. One request, one
+  // entry per bank, drained one at a time by the untouched worker gate.
+  assert.match(page, /postJson\('\/api\/bank-queue\/all', config\)/);
+  assert.match(page, /⏳ Queue all \{queueAllCount\} bank\(s\)…/);
+  assert.match(page, /One at a time, in order — nothing runs in parallel/);
+});
+
+test('queue-all confirms first, and the toast comes from the SERVER counts', () => {
+  assert.match(page, /window\.confirm\(confirm\)/);
+  assert.match(page, /queueAllResult\(await postJson\('\/api\/bank-queue\/all'/);
+});
+
+test("the 'all' scope has no run-now — with twelve banks there is no honest one", () => {
+  // Both dialog actions land on queueAll in that scope. LaunchAllDialog itself
+  // is untouched (ModalRefusalKeepsInput.contract.test.js depends on it), and
+  // the handler names runNow/enqueue are kept for the assertions above.
+  assert.match(page, /const runNow = async \(config\) => \{\s*\n\s*if \(dialogScope\?\.kind === 'all'\) return queueAll\(config\)/);
+  assert.match(page, /const enqueue = async \(config\) => \{\s*\n\s*if \(dialogScope\?\.kind === 'all'\) return queueAll\(config\)/);
+  assert.match(page, /setDialogScope\(\{ kind: 'bank', bankId: b\.id \}\)/);
+});
+
+test('a run whose passes were skipped is visible from the LIST', () => {
+  // It was only ever shown inside the workspace, so an overnight queue that
+  // skipped every GPU pass looked exactly like a clean night from here.
+  assert.match(page, /<PipelineVerdictNote report=\{b\.pipeline_report\} \/>/);
+  assert.match(page, /pipelineBadge\(pipelineReportVerdict\(report\)\)/);
+  assert.match(page, /if \(!badge\) return null/);   // a clean run stays silent
+});
+
+test('the drained queue reports its outcome ONCE, never on a poll', () => {
+  // GET /api/banks force-re-walks every source folder; one refresh per drain is
+  // fine, a poll is not (see the setInterval assertion above).
+  assert.match(page, /queueOutcomeLine\(/);
+  assert.doesNotMatch(page, /setInterval\(refresh,/);
+});
