@@ -451,10 +451,16 @@ class JobQueueManager:
         from .services import cluster as cluster_svc
         device_id = cluster_svc.normalize_device_id(worker_id)
         remote = device_id != cluster_svc.LOCAL_DEVICE_ID
+        backend = remote and cluster_svc.is_backend_id(device_id)
         if remote and not commit:
-            raise ValueError('a remote (peer) job cannot be enqueued with '
-                             'commit=False — its row must be committed before '
-                             'the peer can claim it')
+            raise ValueError('a remote (peer/backend) job cannot be enqueued '
+                             'with commit=False — its row must be committed '
+                             'before the remote worker can claim it')
+        if backend and cluster_svc.backend_by_id(device_id) is None:
+            # Fail at enqueue, where the user gets a 4xx with the device name —
+            # not minutes later as a row no worker will ever claim.
+            raise ValueError('unknown backend device — it may have been removed '
+                             'in Settings → Devices')
         job = ImageGenerationQueue(
             job_id=job_id,
             user_id=str(user_id),
@@ -466,7 +472,13 @@ class JobQueueManager:
             worker_id=device_id if remote else None,
         )
         db.session.add(job)
-        if remote:
+        if backend:
+            # An API backend needs no ClusterJob and no artifact copies: the
+            # committed queue row IS the job, and the BackendWorker thread for
+            # this backend claims it by worker_id. Inputs travel later, straight
+            # from staged_input_paths to the backend's /upload/image.
+            db.session.commit()
+        elif remote:
             # Guaranteed commit=True here (refused above otherwise): the row must
             # be visible to the peer's next pull.
             db.session.commit()

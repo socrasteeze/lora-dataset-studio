@@ -23,12 +23,23 @@ export default function DevicesSection({ config, setField, handleSave, configDef
   const [peerToken, setPeerToken] = useState('')
   const [peerName, setPeerName] = useState(config.cluster?.device_name || '')
   const [busy, setBusy] = useState(false)
+  // Remote ComfyUI API backends — the lighter model, no second install.
+  const [backends, setBackends] = useState(null)
+  const [backendName, setBackendName] = useState('')
+  const [backendUrl, setBackendUrl] = useState('')
+  const [backendTest, setBackendTest] = useState(null)
 
   const refresh = useCallback(async () => {
     try {
       setStatus(await apiFetch('/api/cluster/status'))
     } catch (e) {
       /* section still usable offline from config */
+    }
+    try {
+      const d = await apiFetch('/api/cluster/backends')
+      setBackends(d.backends || [])
+    } catch (e) {
+      setBackends([])
     }
   }, [])
 
@@ -96,6 +107,45 @@ export default function DevicesSection({ config, setField, handleSave, configDef
     }
   }
 
+  const testBackendUrl = async () => {
+    setBackendTest('testing')
+    try {
+      const d = await postJson('/api/cluster/backends/test', { url: backendUrl.trim() })
+      setBackendTest(d.online ? 'online' : 'offline')
+    } catch (e) {
+      setBackendTest('offline')
+    }
+  }
+
+  const addApiBackend = async () => {
+    setBusy(true)
+    try {
+      const d = await postJson('/api/cluster/backends',
+        { name: backendName.trim(), url: backendUrl.trim() })
+      if (d.error) { toast.error(d.error); return }
+      toast.success(d.online
+        ? 'Backend added — it appears in the Run on picker'
+        : 'Backend added, but it is not answering — check the URL and --listen')
+      setBackendName(''); setBackendUrl(''); setBackendTest(null)
+      await refresh()
+    } catch (e) {
+      toast.error(e.message || 'Could not add backend')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeApiBackend = async (id) => {
+    if (!window.confirm('Remove this backend? Its pending jobs will fail.')) return
+    try {
+      await postJson(`/api/cluster/backends/${id}/remove`, {})
+      toast.success('Backend removed')
+      await refresh()
+    } catch (e) {
+      toast.error(e.message || 'Remove failed')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card title="Role"
@@ -132,6 +182,69 @@ export default function DevicesSection({ config, setField, handleSave, configDef
           </p>
         )}
       </Card>
+
+      {role !== 'peer' && (
+        <Card id="remote-comfyui-backends" title="Remote ComfyUI backends"
+          help="The lighter way to rent a GPU: the other box runs ONLY ComfyUI (started with --listen), no second app install. This machine sends inputs and fetches results over ComfyUI's own API. Works in any role, Primary account not needed.">
+          {backends === null ? (
+            <p className="text-sm text-content-muted">Loading…</p>
+          ) : backends.length === 0 ? (
+            <p className="text-sm text-content-muted">
+              No backends yet. Start ComfyUI on the other machine with
+              <code className="mx-1 rounded bg-surface-raised px-1">--listen</code>
+              and add its URL below.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {backends.map((b) => (
+                <li key={b.id} className="flex items-center gap-3 text-sm">
+                  <span className={b.online ? 'text-emerald-400' : 'text-content-subtle'}>
+                    {b.online ? '●' : '○'}
+                  </span>
+                  <span className="font-medium text-content">{b.name}</span>
+                  <span className="font-mono text-xs text-content-muted">{b.url}</span>
+                  {!b.online && <span className="text-xs text-amber-300">offline</span>}
+                  <button type="button" onClick={() => removeApiBackend(b.id)}
+                    className="ml-auto text-xs text-rose-400 hover:underline">
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <div>
+              <label htmlFor="backend-name" className="block text-xs text-content-muted">Name</label>
+              <input id="backend-name" value={backendName}
+                onChange={(e) => setBackendName(e.target.value)}
+                className={`${INPUT_CLASS} max-w-[11rem]`} placeholder="Laptop 4090" />
+            </div>
+            <div>
+              <label htmlFor="backend-url" className="block text-xs text-content-muted">ComfyUI URL</label>
+              <input id="backend-url" value={backendUrl}
+                onChange={(e) => { setBackendUrl(e.target.value); setBackendTest(null) }}
+                className={`${INPUT_CLASS} max-w-[16rem]`} placeholder="http://laptop:8188" />
+            </div>
+            <button type="button" disabled={busy || !backendUrl.trim()} onClick={testBackendUrl}
+              className="rounded-md border border-border-strong px-3 py-2 text-sm text-content disabled:opacity-50">
+              Test
+            </button>
+            <button type="button" disabled={busy || !backendUrl.trim()} onClick={addApiBackend}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+              Add backend
+            </button>
+            {backendTest === 'testing' && <span className="text-xs text-content-muted">testing…</span>}
+            {backendTest === 'online' && <span className="text-xs text-emerald-400">✓ reachable</span>}
+            {backendTest === 'offline' && <span className="text-xs text-rose-400">✕ not answering</span>}
+          </div>
+          <p className="mt-3 text-[0.8125rem] text-content-muted">
+            The models and node packs for a job must already exist on that machine, and
+            generation is the only work that travels. ⚠️ ComfyUI’s API has <strong>no
+            authentication</strong> — only add machines on a network you trust
+            (Tailscale, home LAN). For token-gated access use a compute peer instead.
+          </p>
+        </Card>
+      )}
 
       {role === 'primary' && (
         <Card title="Compute peers"

@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-remote-comfyui-backends',
+    date: '2026-07-29',
+    title: 'Rent a GPU with nothing but ComfyUI on the other machine',
+    blurb:
+      'The second, lighter way to use another box’s GPU: start ComfyUI there with --listen, paste its URL under Settings → Devices → Remote ComfyUI backends, and it appears in the Run on picker — no second app install, no join token. Backends render in parallel with this machine, and they keep rendering while a training holds the local GPU. The limits stay the same as peers — the models for a job must exist on that machine, generation is the only work that travels — plus one of their own: ComfyUI’s API has no authentication, so only add machines on a network you trust.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-29-remote-gpu-workers',
     date: '2026-07-29',
     title: 'Rent another machine’s GPU without moving your datasets',

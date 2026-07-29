@@ -93,6 +93,24 @@ described — a picker that silently does nothing is worse than one that isn't o
   read back out of it later by `read_job_result_json`. Bounded disk beats a
   deletion that can destroy a user's image.
 
+## The second model: remote ComfyUI API backends (added same day)
+
+The SwarmUI shape, for when the far box is yours and a bare ComfyUI is enough:
+`cluster.backends` config entries (`api:<hex>` ids) appear in the same Run-on
+picker in **any role**. `services/backend_worker.py` runs one thread per
+backend — upload inputs over `/upload/image`, queue over `/prompt` (via
+upstream's dormant `worker_url` params, now live — FORK_NOTES divergence 6),
+poll `/history`, download over `/view` into the LOCAL output folder under a
+`backend_<jobid>_` name so the remote SaveImage counter can never overwrite a
+local render. No ClusterJob, no artifacts, no sweep surface. Backend jobs are
+NOT gated on `training_in_progress` — that gate protects the local GPU, which
+a backend does not use.
+
+The trade against a peer, stated where users choose (Devices card, README,
+settings-reference): a backend has **no auth** (raw ComfyUI API — trusted
+networks only, never port-forwarded), a peer is token-gated and revocable and
+can someday run the non-comfy kinds.
+
 ## Non-goals (this wave)
 
 - Browser WebGPU compute  
