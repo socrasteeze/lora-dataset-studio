@@ -1231,11 +1231,51 @@ def list_banks(user_id, dataset_id=None) -> list:
             'preview_ids': _preview_ids(bank.id),
             'activity': bank_jobs.get(bank.id),
             'queue_state': bank_queue.state_for(bank.id),
+            # The last Launch-all's outcome, on the CARD. It was only ever shown
+            # inside the workspace, so a run where every GPU pass was skipped for
+            # "GPU busy" looked exactly like a clean one from the list — and
+            # queueing twelve banks overnight is precisely when nobody is
+            # watching. Steps only; the full report stays in the workspace.
+            'pipeline_report': _report_steps(bank),
         }
         if promotable is not None:
             row['promotable'] = promotable.get(bank.id, 0)
         out.append(row)
     return out
+
+
+def _report_steps(bank) -> dict | None:
+    """The step outcomes of the last pipeline, for the bank list — {steps,
+    cancelled} and nothing else. The full report (counts, timings, flags) stays
+    a workspace payload: the list needs a verdict, not a transcript."""
+    report = _load_pipeline_report(bank)
+    steps = (report or {}).get('steps')
+    if not steps:
+        return None
+    return {
+        'cancelled': bool(report.get('cancelled')),
+        'steps': [{'step': e.get('step'), 'status': e.get('status'),
+                   'reason': e.get('reason')} for e in steps],
+    }
+
+
+def banks_needing_triage(user_id) -> list:
+    """Bank ids that still have UNDECIDED images, ascending.
+
+    "Undecided" is the same rule the list card shows: total minus keep minus
+    reject. A fully triaged bank has nothing for a pipeline to decide, so
+    queue-all skips it rather than paying for a pass whose every step would find
+    nothing to do. One grouped query — the naive form is one COUNT per bank.
+    """
+    rows = (db.session.query(
+        BankImage.bank_id,
+        func.count(BankImage.id),
+        func.sum(case((BankImage.status.in_(('keep', 'reject')), 1), else_=0)))
+        .join(ImageBank, ImageBank.id == BankImage.bank_id)
+        .filter(ImageBank.user_id == user_id)
+        .group_by(BankImage.bank_id).all())
+    return sorted(bank_id for bank_id, total, decided in rows
+                  if (total or 0) - (decided or 0) > 0)
 
 
 def _promotable_counts(user_id, dataset_id) -> dict | None:

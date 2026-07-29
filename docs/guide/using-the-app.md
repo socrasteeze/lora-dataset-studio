@@ -481,6 +481,26 @@ turn for the GPU rather than failing when another bank — or a training run —
 using it. A panel on the Banks page shows what's running and what's lined up, and
 lets you cancel a bank or clear the whole queue. Queue three exports before bed
 and they'll be triaged by morning.
+
+**⏳ Queue all N bank(s)…** does the whole library in one gesture. It picks every
+bank that still has undecided images — a fully triaged one has nothing for a
+pipeline to decide, so it is skipped — asks which passes to run, and adds one
+queue entry per bank. It **queues**; it does not launch anything in parallel.
+The confirmation says so with the count, and every bank is still cancellable
+from the queue panel. A bank already in the queue is skipped by name rather than
+counted twice.
+
+**And you will be told if the night was wasted.** A queued run that could not
+take the GPU skips its passes and finishes anyway — which used to look exactly
+like a clean run from the bank list. Each card now carries the verdict of its
+last 🚀 Launch all when there is one worth carrying: *"2 passes skipped"* or
+*"1 step failed"*, with the reason on hover. A clean run shows **nothing** — a
+tick on every card only makes the one card that needs attention harder to find.
+The distinction is deliberate: a pass that declined itself for a stated
+prerequisite (semantic de-dup wanting ✨ Score first) is the pipeline working as
+designed and is not flagged; a pass the machine refused ("GPU busy", never
+reached) is. When the queue empties, one line says how many finished and how
+many had problems.
 ## Pick a balanced set
 
 Advice is only half the gesture, so **📊 Coverage advice** ends with **⚖️ Pick a

@@ -78,6 +78,42 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
     return position
 
 
+def enqueue_many(app, user_id, bank_ids, steps=None, reject_flags=None,
+                 resolve_dups=False) -> dict:
+    """Queue several banks in one call — the "queue all" primitive.
+
+    Returns {'queued': [{bank_id, position}], 'skipped': [{bank_id, reason}]}.
+
+    The step list and reject flags are sanitized ONCE up front and raise BEFORE
+    anything is enqueued: a half-queued 400 is the worst outcome available here,
+    because the user cannot tell which banks made it in. Everything after that
+    point is per-bank and never aborts the batch — a bank already in the queue is
+    skipped by name, not treated as a failure of the whole request.
+
+    No queue-engine change: this loops the same enqueue(), and _process_next
+    still starts one bank at a time once the previous is done and the GPU is
+    free. Queueing twelve banks is twelve entries, not twelve concurrent runs.
+    """
+    from . import image_bank_service as banks
+    steps = banks._sanitize_pipeline_steps(steps)
+    if not steps:
+        raise ValueError('no pipeline steps selected')
+    flags = [f for f in (reject_flags or []) if f in banks.PIPELINE_REJECT_FLAGS]
+
+    queued, skipped = [], []
+    for bank_id in bank_ids:
+        try:
+            position = enqueue(app, user_id, bank_id, steps=steps,
+                               reject_flags=flags, resolve_dups=resolve_dups)
+            queued.append({'bank_id': bank_id, 'position': position})
+        except BankAlreadyQueued:
+            skipped.append({'bank_id': bank_id, 'reason': 'already queued'})
+        except ValueError as e:
+            # Cannot be the step list (sanitized above), so it is bank-specific.
+            skipped.append({'bank_id': bank_id, 'reason': str(e)})
+    return {'queued': queued, 'skipped': skipped}
+
+
 def _ensure_worker(app):
     """Start the single global worker thread if it isn't already running."""
     global _worker
