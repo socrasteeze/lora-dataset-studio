@@ -297,7 +297,17 @@ touching the folder itself:
    top-level subfolder becomes its own bank — so you can curate, queue and
    promote each one separately. A preview shows exactly which banks will be made
    and how many images each holds; loose images sitting directly in the parent
-   get their own bank too, so nothing is dropped. The folder also stays LIVE:
+   get their own bank too, so nothing is dropped. **Untick any subfolder in that
+   preview to leave it out of this import** — a rendered-output folder, a backup,
+   the 40 000-file archive you do not want triaged. Excluded folders stay on the
+   list struck through (so you can see what you skipped rather than wonder what
+   the walk missed), and they are not read at all rather than read and then
+   discarded. The exclusion applies to *that import*: each bank created is rooted
+   at its own subfolder, so nothing you excluded can reappear later. If you tick
+   off **every** subfolder the app says so before you press the button — it will
+   make the loose-files bank if there is one, and refuse outright if there is
+   not, rather than quietly importing the whole parent folder instead. The folder
+   also stays LIVE:
    keep dropping images into it and they are picked up automatically the next
    time you open the bank list or the bank itself ("42 new image(s) found in the
    folder"), as undecided images ready for the next scan — your existing

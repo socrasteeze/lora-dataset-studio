@@ -11,6 +11,7 @@ import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast, forgetMissingConfirm } from '../components/bank/bankSync'
 import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
 import { overlapNotice } from '../components/bank/bankOverlap'
+import { allExcludedWarning, normalizeExcluded, splitPlan } from '../components/bank/bankSplit'
 import { datasetFolderNotice } from '../utils/pathRelation'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
 import RelocateBankDialog from '../components/bank/RelocateBankDialog'
@@ -174,6 +175,11 @@ export default function BankPage() {
   // dropped). A live preview shows what will be created before committing.
   const [splitMode, setSplitMode] = useState(false)
   const [includeLoose, setIncludeLoose] = useState(true)
+  // Top-level subfolders ticked OFF for this import. Client state only: the
+  // preview effect is debounced on `folder`, so sending exclusions with it
+  // would mean a re-POST per checkbox and a race between what is ticked and
+  // what is drawn. They ride the create call instead.
+  const [excluded, setExcluded] = useState(() => new Set())
   const [preview, setPreview] = useState(null)
   // The bank whose Launch-all dialog is open (queue or run-now from the list).
   const [dialogBankId, setDialogBankId] = useState(null)
@@ -234,6 +240,9 @@ export default function BankPage() {
     }, 400)
     return () => { alive = false; clearTimeout(t) }
   }, [splitMode, folder])
+  // A new folder has new subfolders — names ticked off the previous one would
+  // silently exclude whatever happens to share a name.
+  useEffect(() => { setExcluded(new Set()) }, [folder])
   // Best effort: a failed list just means no live hint, never a broken form.
   useEffect(() => {
     if (currentId != null) return undefined
@@ -255,6 +264,15 @@ export default function BankPage() {
     setCurrentId(null)
   }
 
+  // Computed once: the row list, the "Will create N" count and the all-excluded
+  // warning are three views of the same decision.
+  const splitPlanNow = splitMode && preview
+    ? splitPlan({ preview, excluded, includeLoose })
+    : null
+  const splitWarning = allExcludedWarning(splitPlanNow, {
+    loose: preview?.loose_root_count || 0, includeLoose,
+  })
+
   const create = async (e) => {
     e.preventDefault()
     // A bank over a dataset's folder would share the dataset's LIVE files; the
@@ -263,7 +281,8 @@ export default function BankPage() {
     setCreating(true)
     try {
       if (splitMode) {
-        const d = await postJson('/api/bank/split', { folder, include_loose: includeLoose })
+        const d = await postJson('/api/bank/split',
+          { folder, include_loose: includeLoose, exclude: normalizeExcluded(excluded) })
         toast.success(`${d.banks.length} bank(s) created from subfolders.`)
         setName(''); setFolder(''); setPreview(null)
         refresh()
@@ -428,19 +447,36 @@ export default function BankPage() {
             ) : (
               <>
                 <p className="font-semibold text-content">
-                  Will create {preview.subfolders.length + (includeLoose && preview.loose_root_count ? 1 : 0)} bank(s):
+                  Will create {splitPlanNow.bankCount} bank(s):
                 </p>
+                {/* Untick a folder to leave it out of THIS import. It stays on
+                    the list, struck through: a row that silently vanished would
+                    be indistinguishable from one the walk never found. */}
                 <ul className="mt-1 space-y-0.5 text-content-muted">
-                  {preview.subfolders.map((s) => (
-                    <li key={s.name}>• {s.name} — {s.image_count} image(s)</li>
-                  ))}
-                  {preview.loose_root_count > 0 && (
-                    <li className={includeLoose ? '' : 'line-through opacity-60'}>
-                      • (loose files) — {preview.loose_root_count} image(s)
-                      {!includeLoose && ' — skipped'}
+                  {splitPlanNow.rows.map((r) => (
+                    <li key={r.name} className={r.excluded ? 'line-through opacity-60' : ''}>
+                      {r.kind === 'loose' ? (
+                        <>• {r.name} — {r.imageCount} image(s){r.excluded && ' — skipped'}</>
+                      ) : (
+                        <label className="flex items-center gap-1.5">
+                          <input type="checkbox" checked={!r.excluded}
+                            onChange={(e) => setExcluded((prev) => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.delete(r.name)
+                              else next.add(r.name)
+                              return next
+                            })} />
+                          {r.name} — {r.imageCount} image(s){r.excluded && ' — skipped'}
+                        </label>
+                      )}
                     </li>
-                  )}
+                  ))}
                 </ul>
+                {splitWarning && (
+                  <p className="mt-2 rounded border border-amber-400/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200">
+                    ⚠ {splitWarning}
+                  </p>
+                )}
               </>
             )}
           </div>

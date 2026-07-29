@@ -317,18 +317,26 @@ def rename_bank(user_id, bank_id, name) -> ImageBank | None:
     return write_with_retry(_apply)
 
 
-def _split_walk(folder):
+def _split_walk(folder, exclude=None):
     """Validate + realpath ``folder`` and bucket every image under it by its
     top-level subfolder. Returns ``(folder, buckets, loose)`` where ``buckets``
     maps subfolder name -> list of rels RELATIVE TO THAT SUBFOLDER (nested dirs
     preserved, so they stay the child bank's own subfolder facet) and ``loose``
-    is the list of root-level filenames. ValueError on a missing folder."""
+    is the list of root-level filenames. ValueError on a missing folder.
+
+    ``exclude`` names top-level subfolders to skip. They are pruned AT DEPTH 0
+    INSIDE the walk rather than filtered out afterwards, so a 40 000-file
+    excluded folder is never walked at all — the point of excluding it. Matching
+    is normcase, because the user picked the name off a listing we produced."""
     folder = (folder or '').strip().strip('"\'')
     if not folder or not os.path.isdir(folder):
         raise ValueError(f'folder not found or not readable: {folder or "(empty)"}')
     folder = os.path.realpath(folder)
+    skip = {os.path.normcase(str(n)) for n in (exclude or []) if str(n).strip()}
     buckets, loose = {}, []
-    for root, _dirs, files in os.walk(folder):
+    for root, dirs, files in os.walk(folder):
+        if skip and root == folder:
+            dirs[:] = [d for d in dirs if os.path.normcase(d) not in skip]
         for f in files:
             if not f.lower().endswith(IMG_EXTS):
                 continue
@@ -354,7 +362,7 @@ def split_folder_preview(folder) -> dict:
 
 
 def split_folder_into_banks(user_id, folder, name_prefix=None,
-                            include_loose=True):
+                            include_loose=True, exclude=None):
     """Create ONE bank per top-level subfolder of ``folder`` (each rooted at that
     subfolder, referencing files in place — no copy). Loose images sitting
     directly in the parent get their own parent-named bank when ``include_loose``
@@ -362,11 +370,26 @@ def split_folder_into_banks(user_id, folder, name_prefix=None,
     10 loose images -> 3 banks. Falls back to a single create_bank when there is
     no image-bearing subfolder. Returns [{id, name, added}], newest last.
 
+    ``exclude`` names top-level subfolders to leave out of THIS import. It is not
+    persisted: the bank's own live re-walk is unaffected, because each bank that
+    IS created is rooted at its own subfolder and never sees the excluded ones.
+
     Per-bank BANK_MAX_FILES still applies (each subfolder is its own bank)."""
-    folder, buckets, loose = _split_walk(folder)
+    folder, buckets, loose = _split_walk(folder, exclude=exclude)
     parent_name = os.path.basename(folder.rstrip('/\\')) or 'bank'
     prefix = name_prefix if name_prefix is not None else f'{parent_name} / '
     if not buckets:
+        # THE SHARPEST EDGE. The no-subfolder fallback calls create_bank on the
+        # PARENT, which recurses the whole tree — so with exclusions it would
+        # re-import exactly what was just excluded, under one bank, silently.
+        # With exclusions in play the fallback is therefore the loose bank or
+        # nothing at all.
+        if exclude:
+            if include_loose and loose:
+                bank, added = _register_bank(user_id, parent_name, folder, loose,
+                                             root_only=True)
+                return [{'id': bank.id, 'name': bank.name, 'added': added}]
+            raise ValueError('every subfolder was excluded — nothing left to create')
         bank, added = create_bank(user_id, parent_name, folder)
         return [{'id': bank.id, 'name': bank.name, 'added': added}]
     created = []

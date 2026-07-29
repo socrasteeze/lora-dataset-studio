@@ -51,15 +51,35 @@ test('run-now from the list posts the pipeline, add-to-queue posts the queue', (
 // --- Banks page: one-bank-per-subfolder split -------------------------------
 test('split mode previews and creates one bank per subfolder', () => {
   assert.match(page, /postJson\('\/api\/bank\/split\/preview', \{ folder \}\)/);  // live preview
-  assert.match(page, /postJson\('\/api\/bank\/split', \{ folder, include_loose: includeLoose \}\)/);
+  // The preview body stays EXCLUSION-FREE on purpose (asserted above): that
+  // effect is debounced on `folder`, so exclusions there would mean a re-POST
+  // per checkbox and a race between what is ticked and what is drawn. They ride
+  // the create call only.
+  assert.match(page, /postJson\('\/api\/bank\/split',\s*\n?\s*\{ folder, include_loose: includeLoose, exclude: normalizeExcluded\(excluded\) \}\)/);
   // The toggle and the loose-files option exist and default to including loose.
   assert.match(page, /One bank per subfolder/);
   assert.match(page, /useState\(true\)/);            // includeLoose defaults on
   assert.match(page, /Also make a bank from loose root images/);
 });
 
-test('the split preview lists subfolders and flags skipped loose files', () => {
-  assert.match(page, /preview\.subfolders\.map/);
-  assert.match(page, /preview\.loose_root_count/);
-  assert.match(page, /includeLoose \? '' : 'line-through/);
+test('the split preview lists every folder, striking out the excluded ones', () => {
+  // Excluded rows STAY on the list struck through — a row that silently
+  // vanished is indistinguishable from one the walk never found.
+  assert.match(page, /splitPlanNow\.rows\.map/);
+  assert.match(page, /r\.excluded \? 'line-through opacity-60' : ''/);
+  assert.match(page, /Will create \{splitPlanNow\.bankCount\} bank\(s\)/);
+});
+
+test('exclusions reset when the folder changes', () => {
+  // Names ticked off the previous folder would silently exclude whatever
+  // happens to share a name under the new one.
+  assert.match(page, /useEffect\(\(\) => \{ setExcluded\(new Set\(\)\) \}, \[folder\]\)/);
+});
+
+test('the all-excluded case is warned about BEFORE the click, not surfaced as a 400', () => {
+  // The server's no-subfolder fallback imports the PARENT, which would recurse
+  // into everything just excluded — it refuses instead, and the UI says which
+  // of the two outcomes applies first.
+  assert.match(page, /const splitWarning = allExcludedWarning\(splitPlanNow/);
+  assert.match(page, /\{splitWarning && \(/);
 });
