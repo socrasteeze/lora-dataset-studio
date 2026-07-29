@@ -58,6 +58,14 @@ export const WHATS_NEW = [
     to: '/settings/devices',
   },
   {
+    id: '2026-07-29-remote-gpu-workers-fix',
+    date: '2026-07-29',
+    title: 'Remote GPU now works on the machines actually worth renting',
+    blurb:
+      'If Settings ▸ Devices greeted you with "Server error. Please try again later.", or pasting a join token hung and then failed, that is fixed. The app was misreading its own capability report on any machine with face scoring, background masks, bank scoring or watermark inpainting installed — so the Devices tab, the Run on picker, the join and the peer\'s heartbeat loop all broke on exactly the boxes with a GPU worth borrowing, and worked fine on the bare ones. The Run on picker also shows each device\'s VRAM now, which it never managed to before.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-29-remote-gpu-workers',
     date: '2026-07-29',
     title: 'Rent another machine’s GPU without moving your datasets',
