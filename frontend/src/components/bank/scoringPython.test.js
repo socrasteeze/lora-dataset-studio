@@ -8,6 +8,7 @@ import {
   detectionSummary,
   dialogCopy,
   enteredNote,
+  gpuWindowCost,
   missingLabels,
   openerLabel,
   selectionNote,
@@ -186,4 +187,31 @@ test('the panel names the interpreter in use, and stays quiet on the default', (
   assert.match(selectionNote({ interpreters: [chosen] }), /4090/);
   assert.equal(selectionNote({ interpreters: [row()] }), null);
   assert.equal(selectionNote(null), null);
+});
+
+/* ── What borrowing a CUDA interpreter really costs ────────────────────────── */
+
+test('a CUDA row says the pass will take the GPU exclusively, before it is picked', () => {
+  // The dialog sold this purely as speed. It also flips ✨ Score into the
+  // GPU-exclusive window app-wide: someone who only reads "faster" meets the
+  // consequence as a queue that refused all night, with nothing connecting the
+  // two.
+  const cost = gpuWindowCost(row({ source: 'aitoolkit' }));
+  assert.match(cost.text, /ComfyUI is unloaded/);
+  assert.match(cost.text, /training run cannot start/);
+  assert.match(cost.text, /CPU default holds nothing/);
+  assert.equal(cost.comfyui, null);
+});
+
+test('a CPU-only row costs nothing and says nothing', () => {
+  assert.equal(gpuWindowCost(row({ status: 'cpu_only', cuda: false })), null);
+  assert.equal(gpuWindowCost(null), null);
+});
+
+test("ComfyUI's own interpreter carries the extra trap", () => {
+  // Score frees ComfyUI's VRAM; it does not close ComfyUI. CUDA start-up in the
+  // borrowed interpreter can block against a process still holding the card.
+  const cost = gpuWindowCost(row({ source: 'comfyui' }));
+  assert.match(cost.comfyui, /does not\s+close ComfyUI/);
+  assert.match(cost.comfyui, /15 minutes/);   // the watchdog, so a stall is bounded
 });

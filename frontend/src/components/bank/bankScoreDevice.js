@@ -48,3 +48,33 @@ export function scoreDeviceNote(info, installed = true) {
 export function holdsTheGpu(info) {
   return Boolean(info && info.gpu)
 }
+
+/** What a GPU pass costs the rest of the app, shown standing — null when Score
+ *  runs on the CPU (it then holds nothing) or the extra isn't installed.
+ *
+ *  scoreDeviceNote says nothing about a GPU pass, and for the stock extra that
+ *  was right: it ships CPU-only torch, so "GPU" meant the user had deliberately
+ *  installed CUDA into the scoring environment and knew. Borrowing an
+ *  interpreter (⚡ Use a GPU Python I already have) reaches the same state in two
+ *  clicks, sold purely on speed — and it silently changes an app-wide rule:
+ *  every Score pass now unloads ComfyUI, blocks a training start, and makes
+ *  every other GPU pass and every queued bank answer "GPU busy" while it runs.
+ *  That is not a tuning knob, and it must not be discovered by a queue that
+ *  refuses overnight. */
+export function scoreGpuHoldNote(info, installed = true) {
+  if (!installed || !holdsTheGpu(info)) return null
+  const where = info.borrowed
+    ? 'in the Python you pointed it at'
+    : 'in the scoring environment'
+  return {
+    tone: 'info',
+    text: `✨ Score runs on the GPU ${where} — fast, but it takes the card `
+      + `exclusively: ComfyUI is unloaded before the pass and a training run cannot `
+      + `start until it finishes. Other GPU passes and queued banks wait, saying `
+      + `"GPU busy". `
+      + (info.borrowed
+        ? '"Back to the app default" in the interpreter picker returns Score to the CPU, '
+          + 'where it holds nothing.'
+        : 'A CPU-only scoring environment holds nothing.'),
+  }
+}

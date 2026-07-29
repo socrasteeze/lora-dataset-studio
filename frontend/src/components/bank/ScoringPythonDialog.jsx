@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import {
   canSelect, detectionFailure, detectionSummary, dialogCopy, enteredNote,
-  missingLabels, sortInterpreters, statusBadge,
+  gpuWindowCost, missingLabels, sortInterpreters, statusBadge,
 } from './scoringPython.js'
 
 /** ⚡ Use a GPU Python you already have — the picker behind the "✨ Score runs on
@@ -135,6 +135,9 @@ export default function ScoringPythonDialog({ onClose, onChanged }) {
           <ul className="space-y-2">
             {rows.map((r) => {
               const missing = missingLabels(r)
+              // Said BEFORE the pick, next to the button that makes it true —
+              // not discovered later as a queue that refused all night.
+              const cost = gpuWindowCost(r)
               return (
                 <li key={r.path}
                   className={`rounded-lg border p-3 space-y-2 ${r.selected
@@ -166,6 +169,14 @@ export default function ScoringPythonDialog({ onClose, onChanged }) {
                       <code className="block overflow-x-auto whitespace-pre rounded bg-surface-raised px-2 py-1 font-mono text-[0.6875rem] text-content-muted">
                         {r.install_command}
                       </code>
+                    </div>
+                  )}
+                  {cost && (
+                    <div className="rounded border border-border bg-surface-raised p-2 space-y-1">
+                      <p className="text-[0.6875rem] text-content-muted">⚡ {cost.text}</p>
+                      {cost.comfyui && (
+                        <p className="text-[0.6875rem] text-amber-300/90">{cost.comfyui}</p>
+                      )}
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">

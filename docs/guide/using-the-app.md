@@ -1148,6 +1148,25 @@ instead of suggesting a CUDA install you could not use. Borrowing an interpreter
 is still offered, for one honest reason: if another Python here already has the
 packages, you can skip installing them a second time. It will not be faster.
 
+**What borrowing a GPU interpreter changes besides speed.** This is the one part
+that is not a free win, and it is worth reading before you pick. A Score pass
+that runs **on the GPU takes the card exclusively** for its whole duration:
+ComfyUI's VRAM is freed before the pass starts, a training run cannot begin until
+it finishes, and every other GPU pass — including banks waiting in the queue —
+answers *"GPU busy"* meanwhile. On the CPU-only default, Score holds nothing and
+happily runs alongside your generation. So a fast pass costs you the card while
+it runs; a slow one costs you time but nothing else. The dialog states this on
+every CUDA row, and once a GPU interpreter is in use the bank panel keeps saying
+it.
+
+**If you borrow ComfyUI's own Python**, one extra thing to know: Score frees
+ComfyUI's VRAM, but it does not close ComfyUI, and CUDA start-up in the borrowed
+interpreter can stall against a process still holding the card. If a first pass
+sits at zero and never moves, close ComfyUI and start it again. You are not stuck
+either way — a pass that produces no output at all for **15 minutes** is stopped
+for you, the GPU is released, and the bank says what happened instead of leaving
+everything refusing "GPU busy".
+
 **Back to the app default** puts everything back exactly as it was. The choice is
 reversible at any time, and the note under the passes always says which
 interpreter is in use. If you never open this dialog, nothing changes: an install

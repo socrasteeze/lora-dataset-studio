@@ -3046,6 +3046,30 @@ def delete_rejected(user_id, bank_id) -> dict:
 _INFER_CANCEL_GRACE = 15.0   # seconds a cleanly-cancelled child gets before a kill
 _CACHED_RE = re.compile(r'(\d+) image\(s\), (\d+) cached')
 
+# A child that says NOTHING for this long is wedged, not slow. Nothing here used
+# to bound it: the parent sat in a blocking `proc.stdout.read()` forever, and
+# when the pass had taken the GPU-exclusive window that window stayed open just
+# as long — the window's own TTL cannot save it, because the heartbeat re-arms
+# the TTL for as long as the window is open (gpu_window.py). So every other GPU
+# pass, every queued bank and any training start answered "GPU busy" until the
+# app was restarted. It is reached in practice by pointing bank_scoring.python at
+# a CUDA interpreter (ComfyUI's, typically) whose CUDA init blocks.
+#
+# 15 minutes is deliberately generous: a cold `import torch` + CLIP load off a
+# slow disk, with an antivirus reading every DLL, is minutes of real silence
+# before the first `[score] 0/N`. This bounds a hang; it does not police a slow
+# machine.
+_INFER_STALL_TIMEOUT = 900.0
+_INFER_STALL_POLL = 5.0
+
+
+class InferStalled(RuntimeError):
+    """An infer child produced no output for _INFER_STALL_TIMEOUT and was killed.
+
+    Raised from inside the ``with window`` block on purpose, so unwinding
+    releases the GPU-exclusive window on the way out — the whole point.
+    """
+
 
 def _safe_kill(proc):
     try:
@@ -3080,14 +3104,20 @@ def _stopped_detail(noun, data, cache_path, total):
 
 
 def _drive_infer_subprocess(job, python, script, payload, cache_path,
-                            progress_re, window):
+                            progress_re, window, stall_label='pass',
+                            stall_timeout=_INFER_STALL_TIMEOUT):
     """Run an infer subprocess, streaming its stderr progress into ``job`` and
     honouring Stop cooperatively. Returns (data, stderr_tail, returncode) where
     ``data`` is the child's last JSON line (``cancelled: true`` when it stopped
     cleanly). On the first "N cached" line it sets a "resuming" hint, so relaunching
-    over a partly-cached bank doesn't look like a full recompute."""
+    over a partly-cached bank doesn't look like a full recompute.
+
+    A child that emits nothing at all for ``stall_timeout`` seconds is stopped
+    and :class:`InferStalled` is raised — see the constant for why a hang here
+    used to cost a permanent "GPU busy"."""
     import json
     import threading
+    import time
     cancel_file = str(cache_path) + '.cancel'
     try:
         os.remove(cancel_file)   # never inherit a stale sentinel from a past run
@@ -3117,9 +3147,15 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
 
         bank_jobs.set_cancel_hook(job, _cancel)
         stderr_tail = deque(maxlen=5)
+        # Liveness is "the child said ANYTHING", not "the child made progress":
+        # a pass that logs per-image warnings while getting nowhere is a
+        # different bug, and killing it here would be guessing.
+        alive = {'at': time.monotonic(), 'stalled': False}
+        watchdog_stop = threading.Event()
 
         def _drain_stderr():
             for line in proc.stderr:
+                alive['at'] = time.monotonic()
                 line = line.strip()
                 if line:
                     stderr_tail.append(line)
@@ -3136,8 +3172,21 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
                                 job,
                                 detail=f'resuming — {cached} of {total} already cached')
 
+        def _watch_for_stall():
+            while not watchdog_stop.wait(min(_INFER_STALL_POLL, stall_timeout)):
+                if time.monotonic() - alive['at'] < stall_timeout:
+                    continue
+                alive['stalled'] = True
+                logger.warning('%s: no output for %.0f s — stopping the helper so '
+                               'the GPU window is released', stall_label, stall_timeout)
+                _cancel()   # ask cleanly first; _cancel arms its own hard-kill timer
+                return
+
         t = threading.Thread(target=_drain_stderr, daemon=True)
         t.start()
+        watchdog = threading.Thread(target=_watch_for_stall, daemon=True,
+                                    name='infer-stall-watchdog')
+        watchdog.start()
         try:
             proc.stdin.write(payload)
             proc.stdin.close()
@@ -3145,13 +3194,26 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
             pass  # process died early — surfaced through the exit path below
         stdout = proc.stdout.read()
         proc.wait()
+        watchdog_stop.set()
         t.join(timeout=5)
+        watchdog.join(timeout=5)
         if killer['timer']:
             killer['timer'].cancel()
+    # Past this line the `with window` block has closed, so the GPU-exclusive
+    # window is already released — which is the whole point of bounding the
+    # child. Raising (rather than returning) also keeps a stall out of the
+    # "Stopped by the user" branch below: nobody stopped it.
     try:
         os.remove(cancel_file)
     except OSError:
         pass
+    if alive['stalled']:
+        raise InferStalled(
+            f'the {stall_label} helper produced no output for '
+            f'{int(stall_timeout // 60)} minutes and was stopped — the GPU is '
+            'free again. If you pointed ✨ Score at another Python, that '
+            'interpreter may be stalling on CUDA start-up: close ComfyUI and '
+            'retry, or use "Back to the app default".')
     line = next((ln for ln in reversed(stdout.splitlines())
                  if ln.strip().startswith('{')), '')
     try:
@@ -3236,7 +3298,8 @@ def _faces_job(bank_id):
         python = cfg.get('face_scoring.python') or sys.executable
         window = gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu else nullcontext()
         data, stderr_tail, returncode = _drive_infer_subprocess(
-            job, python, _EMBED_SCRIPT, payload, cache_path, _PROGRESS_RE, window)
+            job, python, _EMBED_SCRIPT, payload, cache_path, _PROGRESS_RE, window,
+            stall_label='face')
         # Stopped by the user — say exactly what's kept, never a mute ✗ (the cached
         # embeddings are safe; relaunching skips them and only finishes the rest).
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):
@@ -3319,7 +3382,12 @@ def score_device_info(bank_id=None) -> dict:
     what nobody told them about."""
     from ..capabilities import gpu_vram_gb
     device, use_gpu = _resolve_score_device()
+    # Is Score running in an interpreter the user pointed it at, rather than the
+    # one the app built? It changes what a GPU pass COSTS — a borrowed CUDA
+    # interpreter makes Score take the GPU-exclusive window, unloading ComfyUI
+    # and blocking a training start — and the panel has to be able to say so.
     out = {'device': device, 'gpu': use_gpu, 'gpu_present': False,
+           'borrowed': bool((cfg.get('bank_scoring.python') or '').strip()),
            'eta_minutes': None}
     if use_gpu:
         return out
@@ -3404,7 +3472,7 @@ def _score_job(bank_id):
                   else nullcontext())
         data, stderr_tail, returncode = _drive_infer_subprocess(
             job, python, _SCORE_SCRIPT, payload, cache_path, _SCORE_PROGRESS_RE,
-            window)
+            window, stall_label='scoring')
         # Stopped by the user — say exactly what's kept, never a mute ✗ (the cached
         # scores/embeddings are safe; relaunching skips them and finishes the rest).
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):

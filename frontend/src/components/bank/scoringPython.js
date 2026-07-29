@@ -45,6 +45,34 @@ export function canSelect(row) {
   return Boolean(row && row.usable && !row.selected)
 }
 
+/** What picking THIS row changes beyond speed — null for a CPU-only one.
+ *
+ *  The dialog sells borrowing purely as a speed-up (336 ms → ~15 ms an image),
+ *  and that is true. What it left out is that a CUDA interpreter makes ✨ Score
+ *  take the GPU-exclusive window: ComfyUI is unloaded before the pass, a
+ *  training run cannot start during it, and every other GPU pass and queued bank
+ *  answers "GPU busy" until it ends. On the CPU-only default Score holds nothing,
+ *  so this is a change in app-wide behaviour, not a tuning knob — and someone
+ *  who meets it as a queue that refused overnight has no way to connect the two.
+ *
+ *  `comfyui` carries the sharper trap: ComfyUI's own interpreter is the one most
+ *  people will pick, and Score unloading ComfyUI does not make ComfyUI exit —
+ *  CUDA start-up in the borrowed interpreter can block against a process still
+ *  holding VRAM. */
+export function gpuWindowCost(row) {
+  if (!row?.cuda) return null
+  return {
+    text: 'On the GPU, ✨ Score takes the card exclusively: ComfyUI is unloaded '
+      + 'before the pass and a training run cannot start until it finishes. Other '
+      + 'GPU passes and queued banks wait. The CPU default holds nothing.',
+    comfyui: row.source === 'comfyui'
+      ? 'This is ComfyUI\'s own Python. Score frees ComfyUI\'s VRAM, but it does not '
+        + 'close ComfyUI — if the first pass sits at 0 with no progress, close ComfyUI '
+        + 'and try again. A pass that says nothing for 15 minutes is stopped for you.'
+      : null,
+  }
+}
+
 /** The names of what's missing, for a sentence like "missing OpenCLIP, timm". */
 export function missingLabels(row) {
   return (row?.deps || []).filter((d) => !d.present).map((d) => d.label)

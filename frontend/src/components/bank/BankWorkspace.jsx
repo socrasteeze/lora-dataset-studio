@@ -22,7 +22,7 @@ import { UNDO_HINT, undoBannerText, undoOffer, undoResultMessage } from './bankU
 import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } from './progressPresence.js'
 // An occupied bank refuses in OUR words, never in the server's (pure/testable).
 import { busyRefusal } from './bankPassRun.js'
-import { holdsTheGpu, scoreDeviceNote } from './bankScoreDevice.js'
+import { holdsTheGpu, scoreDeviceNote, scoreGpuHoldNote } from './bankScoreDevice.js'
 // Wording that adapts to the machine (a card-less box is never sold CUDA).
 import { openerLabel } from './scoringPython.js'
 // Reuse the dataset's register list so the Bank lane never drifts from it.
@@ -1009,6 +1009,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // computes on the CPU, and the UI must say which of the two is happening.
   const scoreDevice = payload?.score_device
   const scoreNote = scoreDeviceNote(scoreDevice, Boolean(caps.bank_scoring))
+  // …and the other half: a GPU pass is fast, but it TAKES the card for its whole
+  // duration. Borrowing an interpreter reaches that state in two clicks sold on
+  // speed alone, so the consequence has to stand on the panel, not only in a
+  // button tooltip nobody hovers.
+  const scoreHoldNote = scoreGpuHoldNote(scoreDevice, Boolean(caps.bank_scoring))
   // Does this machine have an NVIDIA card AT ALL? Reported by the same
   // score_device probe, and only meaningful while the pass would run on the
   // CPU (a GPU pass answers gpu:true and stops looking). Undefined until the
@@ -1189,6 +1194,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             ? 'text-amber-400/90' : 'text-content-subtle'}`}>
             {scoreNote.text}
           </p>
+        )}
+        {scoreHoldNote && (
+          <p className="text-xs text-content-subtle">{scoreHoldNote.text}</p>
         )}
         {!capsLoading && !caps.bank_scoring && (
           <p className="text-xs text-content-muted">
