@@ -281,8 +281,8 @@ export function placeImageBatch({ graph, existing, images, remembered, max } = {
 export function pinBatchLabel(count) {
   const n = Number(count) || 0;
   if (n <= 0) return '';
-  if (n === 1) return 'Pin this image to the board';
-  return `Pin all ${n} to the board`;
+  if (n === 1) return '📌 Pin this image to the board';
+  return `📌 Pin all ${n} to the board`;
 }
 
 /**

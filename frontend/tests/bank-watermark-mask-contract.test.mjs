@@ -1,4 +1,4 @@
-/* Bank watermark mask — wiring contract (node --test cannot parse JSX, so the
+/* 🚩 Bank watermark mask — wiring contract (node --test cannot parse JSX, so the
  * properties that would silently un-ship the feature are asserted as text).
  *
  * Reported by Qeeyana (Reddit). The risk this file guards is NOT "the dialog
@@ -45,7 +45,7 @@ test('every edit is persisted to the bank route, and a failure says so', () => {
 
 test('the review lightbox offers the editor on flagged images only', () => {
   assert.match(lightbox, /canEditMask\(img\) && \(/)
-  assert.match(lightbox, /Edit mask/)
+  assert.match(lightbox, /🚩 Edit mask/)
   assert.match(lightbox, /k === 'm' && canEditMask\(img\)/)
   assert.match(lightbox, /M watermark mask/)       // printed, not folklore
 })

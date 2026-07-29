@@ -1,4 +1,4 @@
-/* The gallery panel's TARGET — the decidable half of "one panel, two scopes".
+/* 🖼 The gallery panel's TARGET — the decidable half of "one panel, two scopes".
  *
  * The board opens the same panel on a checkpoint pill (one step) and on a run
  * card (every step of that run). Writing a second panel for the second scope

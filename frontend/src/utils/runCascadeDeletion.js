@@ -1,4 +1,4 @@
-/* "Delete this run and everything it produced" — the words and the numbers.
+/* 🗑 "Delete this run and everything it produced" — the words and the numbers.
  *
  * The gesture lives on the LoRA Canvas, a board where cards get dragged around
  * all day. So the confirmation cannot be a generic "Are you sure?": it has to

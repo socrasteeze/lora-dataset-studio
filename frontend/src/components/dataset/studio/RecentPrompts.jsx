@@ -1,10 +1,10 @@
 // Vignettes des prompts récents (clic pour recharger) — rétro-compat string vs objet.
 // Extrait behavior-preserving de LoraTestStudio.jsx (bloc « Prompts récents »),
-// + bouton par preset (supprime le prompt et ses cellules/images de test).
+// + bouton 🗑 par preset (supprime le prompt et ses cellules/images de test).
 export default function RecentPrompts({ items, datasetId, selectedPrompt, onPick, onDelete }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-content-subtle text-[0.5625rem] uppercase">Recent prompts (click to reload · to delete) — thumbnail = image </span>
+      <span className="text-content-subtle text-[0.5625rem] uppercase">Recent prompts (click to reload · 🗑 to delete) — thumbnail = image 👍</span>
       <div className="flex gap-1.5 flex-wrap">
         {items.map((item) => {
           // rétro-compat : avant restart Flask, l'API renvoie des strings ;
@@ -12,7 +12,7 @@ export default function RecentPrompts({ items, datasetId, selectedPrompt, onPick
           const pr = typeof item === 'string' ? { prompt: item } : item;
           const sel = selectedPrompt === pr.prompt;
           // Conteneur = la « carte » (porte la bordure) ; deux boutons frères à
-          // l'intérieur (PAS imbriqués) : recharger (principal) + supprimer ().
+          // l'intérieur (PAS imbriqués) : recharger (principal) + supprimer (🗑).
           return (
             <div key={pr.prompt}
               className={`flex items-stretch rounded-lg border text-[0.625rem] max-w-[260px] overflow-hidden ${

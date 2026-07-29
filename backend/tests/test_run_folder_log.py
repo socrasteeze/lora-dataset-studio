@@ -2,11 +2,11 @@
 
 Reported by wannadecryptor (Discord #help): training died after ~3 s and there
 was NO log anywhere in the run folder. The panel explicitly tells you to open
-`training.log` via "Run folder".
+`training.log` via "📂 Run folder".
 
 Ground truth in `lora_training`:
   - the launch writes the log to   <output>/<run_name>/training.log
-  - "Run folder" opened          <output>/<run_name>/lora_<trigger>/
+  - "📂 Run folder" opened          <output>/<run_name>/lora_<trigger>/
 
 `lora_<trigger>` is ai-toolkit's save_root — created by ai-toolkit itself when
 it reaches the first save. A run that dies at boot never creates it, so the
@@ -85,7 +85,7 @@ def dying_run(app, tmp_path, monkeypatch):
 
 def test_run_folder_button_opens_the_folder_holding_the_log(dying_run, app, monkeypatch):
     """wannadecryptor's scenario: a run dead in seconds, zero checkpoint, and the
-    UI checkpoint selector carrying nothing. The folder "Run folder" opens
+    UI checkpoint selector carrying nothing. The folder "📂 Run folder" opens
     must CONTAIN training.log."""
     from app.services import lora_training as lt
     from app.config import LOCAL_USER

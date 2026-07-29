@@ -1,4 +1,4 @@
-"""Image bank — "already promoted into this dataset" is MEASURED, not remembered.
+"""🗃️ Image bank — "already promoted into this dataset" is MEASURED, not remembered.
 
 A bank used to mark an image promoted with a one-way flag. Delete that image in
 the dataset and the flag stayed: the bank then advertised nothing promotable

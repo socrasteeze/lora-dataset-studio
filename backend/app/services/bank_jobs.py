@@ -1,4 +1,4 @@
-"""In-memory background-job runner for the image bank.
+"""In-memory background-job runner for the 🗃️ image bank.
 
 Unlike dataset batches (dataset_activity), a bank pass runs over THOUSANDS of
 files — holding the HTTP request open for its whole duration is not an option.

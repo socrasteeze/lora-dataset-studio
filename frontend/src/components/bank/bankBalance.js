@@ -12,7 +12,7 @@
 
 // Axis ids are persisted (localStorage) — NEVER rename one without an alias.
 export const BALANCE_AXES = [
-  { id: 'framing', label: 'Framing', hint: 'Face / bust / body / back — the Framing pass' },
+  { id: 'framing', label: 'Framing', hint: 'Face / bust / body / back — the 📐 Framing pass' },
   { id: 'framing+person', label: 'Framing × person',
     hint: 'Also splits per person — for a bank that really holds several subjects' },
 ]
@@ -76,7 +76,7 @@ export function balanceNotes(result) {
   if (result.unlabelled > 0) {
     out.push({
       tone: 'info',
-      text: `${result.unlabelled} image${result.unlabelled === 1 ? '' : 's'} in this filter have no label yet and were left out — run the Framing pass to bring them in.`,
+      text: `${result.unlabelled} image${result.unlabelled === 1 ? '' : 's'} in this filter have no label yet and were left out — run the 📐 Framing pass to bring them in.`,
     })
   }
   if (result.unknown > 0) {
@@ -98,7 +98,7 @@ export function balanceReadiness({ scored = 0, coverage = null } = {}) {
     return { ready: false, reason: 'Run ✨ Score first — balanced selection reuses its embeddings.' }
   }
   if (coverage && coverage.framing_available === false) {
-    return { ready: false, reason: 'Run the Framing pass first — a balanced pick needs the shot type of each image.' }
+    return { ready: false, reason: 'Run the 📐 Framing pass first — a balanced pick needs the shot type of each image.' }
   }
   return { ready: true, reason: '' }
 }

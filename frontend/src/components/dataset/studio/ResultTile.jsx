@@ -1,6 +1,6 @@
 // react-frontend/src/components/dataset/studio/ResultTile.jsx
 /**
- * Une vignette (image + /) pour UNE génération (un seed). En batch, plusieurs
+ * Une vignette (image + 👍/👎) pour UNE génération (un seed). En batch, plusieurs
  * tuiles sont affichées côte à côte dans la même cellule (bande). Extrait 1:1 du
  * `renderTile` de l'ancien LoraTestStudio (behavior-preserving).
  *
@@ -24,7 +24,7 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
           user knows WHY instead of relaunching blind (P0-b). */}
       {cell.status === 'failed' && (
         <div
-          title={cell.error || 'Generation failed — see the Server log in Settings for details.'}
+          title={cell.error || 'Generation failed — see the 🪵 Server log in Settings for details.'}
           className="w-20 h-28 overflow-hidden rounded-md border border-red-500/50 bg-red-500/10 flex flex-col items-center justify-center gap-0.5 text-red-300 text-[0.625rem] cursor-help px-1 text-center">
           <span aria-hidden className="text-sm">⚠</span>
           <span>failed</span>
@@ -52,10 +52,10 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
             : cell.face_score >= 0.45
               ? 'border-amber-400/50 bg-amber-400/10 text-amber-300'
               : 'border-red-400/50 bg-red-400/10 text-red-300'}`}>
-          {cell.face_score.toFixed(2)}
+          🎯 {cell.face_score.toFixed(2)}
         </span>
       )}
-      {/* Badge de l'axe batch : distingue la cellule AVEC le LoRA testé de sa
+      {/* Badge de l'axe ⚖ batch : distingue la cellule AVEC le LoRA testé de sa
           jumelle sans (même config, même seed). */}
       {cell.batch_lora && (
         <span className="max-w-[5rem] truncate px-1 py-px rounded border border-amber-400/50 bg-amber-400/15 text-amber-300 text-[0.5625rem] font-semibold"

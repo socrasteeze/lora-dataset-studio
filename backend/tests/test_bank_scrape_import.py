@@ -1,4 +1,4 @@
-"""Scrape → BANK: the scraper's second destination.
+"""🕸 Scrape → BANK: the scraper's second destination.
 
 Until now the scraper had exactly ONE outlet, `scrape_import_urls` (straight into
 a dataset), and that path applies training-grade filters BEFORE anything is
@@ -82,7 +82,7 @@ def test_scrape_creates_a_bank_and_inventories_it(app):
 
 def test_small_and_extreme_images_reach_the_bank_instead_of_being_dropped(app):
     """The dataset outlet drops these two before storing them. The bank must NOT:
-    'too small' and 'panorama' are triage verdicts the user adjusts with the 
+    'too small' and 'panorama' are triage verdicts the user adjusts with the 🎚
     thresholds, and an image the bank never received cannot be reviewed."""
     with app.app_context():
         tiny = _img_bytes(320, 240, grad='ltr')

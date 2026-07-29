@@ -1,4 +1,4 @@
-"""Retrofit pass for images promoted from a Bank BEFORE the promotion carried
+"""Retrofit pass for images promoted from a 🗃️ Bank BEFORE the promotion carried
 their framing (bug reported by axelf_ on Discord): they landed with framing NULL
 and stayed invisible in the Composition tally. Fixing the promotion path only
 helps the next promotion — this pass repairs the datasets already on disk.

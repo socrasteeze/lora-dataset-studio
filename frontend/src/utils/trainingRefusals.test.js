@@ -165,7 +165,7 @@ test('every mutating handler of the Runs hub says something when it is refused',
     assert.ok(body, `handler not found: ${handler}`);
     assert.match(body, /\} catch \(e\) \{[\s\S]*?toast\.error\(/);
   }
-  // the global purge posts inside a try whose catch toasts
+  // the global 🧹 purge posts inside a try whose catch toasts
   assert.match(page, /cloud\/purge', \{\}\);[\s\S]{0,600}?\} catch \(e\) \{\s*\n\s*toast\.error\(/);
 });
 

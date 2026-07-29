@@ -21,7 +21,7 @@ captioning rules and a few guards change with the dataset kind.
    style; you can change it later).
 2. **Upload the reference photo.** The app head-crops it automatically; use the
    crop editor (or *Reset to auto*) if the framing is off. Up to 3 extra angles
-   can be added for multi-view consistency. **Edit** retouches the reference
+   can be added for multi-view consistency. **✦ Edit** retouches the reference
    itself from a prompt ("plain studio-grey background", "add glasses") and shows
    you a Before/After to Keep or Discard. It runs on **Klein** or **Krea 2 Edit**,
    on your own ComfyUI: free, private, and safe to repeat until it looks right.
@@ -45,7 +45,7 @@ captioning rules and a few guards change with the dataset kind.
 7. **Caption** — one click captions the kept set (prose or booru tags,
    matched to the target model). The **identity-leak check** flags any caption
    that describes hair/face/skin — fix every flagged one. A find/replace +
-   tag-frequency panel sweeps the whole set at once; its **Write .txt
+   tag-frequency panel sweeps the whole set at once; its **💾 Write .txt
    files** button drops a kohya-style `<image>.txt` next to each kept image
    in the dataset folder (same format as the export ZIP) for external tools.
 8. **Fix individual shots** — every generated tile has a ✏ button: edit the
@@ -54,7 +54,7 @@ captioning rules and a few guards change with the dataset kind.
    captions, leaks, duplicates). It no longer *blocks*: leaking captions and
    near-duplicates are editable right inside the confirm, and missing captions
    just ask you to **Start anyway** (captions stay strongly recommended). Steps
-   are computed automatically; Advanced options exposes every knob (each with
+   are computed automatically; ⚙️ Advanced options exposes every knob (each with
    its own why/how) and a **Presets** row — apply a shipped ★ recipe (*Krea
    character*, *Concept*, *Style*) or save/import/export your own as a JSON.
    Training runs on your local GPU via ai-toolkit. Watch this run — and every
@@ -75,9 +75,9 @@ the captioner needs to know exactly *what to omit*. What changes vs character:
   **scraper** (paste a gallery URL or run a Reddit keyword search, tick the
   frames you want, they land straight in the dataset — deduplicated and
   quality-filtered). Already have a kohya-style dataset on disk (images +
-  same-name `.txt` captions)? **⋯ More → Import from folder…** merges it in
+  same-name `.txt` captions)? **⋯ More → 📂 Import from folder…** merges it in
   from a pasted folder path — captions attach, duplicates are skipped (a ZIP
-  works too, via **Import dataset**). On gallery sites (PornPics), a category/tag/search scan
+  works too, via **📦 Import dataset**). On gallery sites (PornPics), a category/tag/search scan
   shows **the same previews the listing page does** — one per gallery, the shot
   that actually matches your keyword. Tick **Scan full albums** to pull every
   photo of each matched gallery instead, or paste a single `/galleries/…` URL
@@ -123,7 +123,7 @@ You are not locked into the captioners shipped here. The round trip is:
 2. **Caption them wherever you like.** Any tool that writes a `<image>.txt`
    sidecar next to each image works — that is the convention this app reads,
    whatever the file names are and whatever folder depth you use.
-3. **Import dataset (ZIP)** (or **Import from folder…**) with the same
+3. **📦 Import dataset (ZIP)** (or **📂 Import from folder…**) with the same
    images and their new `.txt` files. Images already in the dataset are **not
    duplicated**: their caption lands on the row that already holds them, and the
    toast says how many were applied.
@@ -251,7 +251,7 @@ card (remove it and add it again) and press **Keep** once more.
 
 ## Back up everything
 
-The **Back up everything** button on the Datasets library packs your whole
+The **💾 Back up everything** button on the Datasets library packs your whole
 setup into a single file so you can move to a new machine — or recover from one
 — without losing anything.
 
@@ -270,8 +270,8 @@ setup into a single file so you can move to a new machine — or recover from on
   around; re-enter them once on the new install.
 - **How it runs**: in the background. A library can be gigabytes, so you get a
   live "X / N datasets" progress bar and can keep working. When it's done, use
-  **Download** to save the archive, or **Open folder** to find it on disk.
-- **Restoring**: hand the master archive to the same **Import backup** button.
+  **⬇ Download** to save the archive, or **📂 Open folder** to find it on disk.
+- **Restoring**: hand the master archive to the same **📦 Import backup** button.
   It restores your settings (without overwriting keys you've already entered),
   rebuilds each dataset **and its training history** — so it lands back under
   **Trained** instead of "Not trained yet", with its runs in the Runs hub.
@@ -286,7 +286,7 @@ setup into a single file so you can move to a new machine — or recover from on
 
 You exported 9 000 unsorted images from Telegram (or a scraper dumped a
 mountain of files) and a dataset only needs the best 30–150 of them. The
-**Bank** tab is the triage funnel that gets you there — without ever
+**🗃️ Bank** tab is the triage funnel that gets you there — without ever
 touching the folder itself:
 
 1. **Create a bank** — give it a name and paste the folder path. The app
@@ -304,8 +304,8 @@ touching the folder itself:
    keep/reject decisions, scores and captions are never touched. Files you
    removed from the folder are reported at the top of the bank, never deleted
    from it, so an unplugged drive can't wipe your triage.
-1bis. **Scrape the web into a bank** — you don't need a folder you prepared
-   by hand. Unfold **Scrape the web into a bank** on the bank list, choose a
+1bis. **🕸 Scrape the web into a bank** — you don't need a folder you prepared
+   by hand. Unfold **🕸 Scrape the web into a bank** on the bank list, choose a
    destination (a **new bank**, or **add to an existing one**), then scan a
    gallery URL and pick images exactly as you would for a dataset. They are
    downloaded into that bank's own folder and inventoried on the spot.
@@ -326,7 +326,7 @@ touching the folder itself:
      not a duplicate verdict (the bank's own passes own that word).
 
    The rest of the funnel is unchanged: scan, cull, promote into a dataset.
-2. **Scan quality** — a background pass (CPU only, a few minutes even on
+2. **🔎 Scan quality** — a background pass (CPU only, a few minutes even on
    thousands of images) scores every file: sharpness, noise, flat/empty
    frames, resolution — and groups **near-duplicates**. The flags follow the
    thresholds in *Settings → Captioning & quality*; because the raw scores are
@@ -334,19 +334,19 @@ touching the folder itself:
    pass also answers two questions the file itself lies about — see
    *Is this image really what it says it is?* below.
 3. **Cull** — use the filter chips (Blurry, Noisy, ⬜ Flat, Small,
-   Soft detail, Black bars, ≈ Duplicates) to review the worst
-   offenders first. **Auto-reject
+   🧇 Soft detail, 🎞 Black bars, ≈ Duplicates) to review the worst
+   offenders first. **🧹 Auto-reject
    flagged…** clears whole categories in one click (your manual ✓/✕ are never
    flipped). In the Duplicates view, resolve every group at once with **keep
    best** (highest resolution, then sharpest) or **keep first**, or pick the
    keeper by eye.
-4. **Group by person** — the face pass (needs the Quality tools from Setup)
+4. **👥 Group by person** — the face pass (needs the Quality tools from Setup)
    detects the dominant face of every remaining image and clusters the bank by
    person, *no reference photo needed*. Click a person card to see only them,
    select all, keep or reject. Embeddings are cached, so re-running after a
    cull is much faster.
-5. **Caption & search** — caption the bank with the same engines your
-   datasets use (JoyCaption / Ollama vision, your *Settings*). Hit **Caption
+5. **🏷️ Caption & 🔍 search** — caption the bank with the same engines your
+   datasets use (JoyCaption / Ollama vision, your *Settings*). Hit **🏷️ Caption
    all** to describe every not-yet-captioned image, or select some first to
    caption just those. It runs in the background, frees the GPU like the other
    passes, and is Stop-able mid-run. The captions are plain descriptions (no
@@ -354,7 +354,7 @@ touching the folder itself:
    search box — `red dress`, `sunset`, a file name — and the grid filters to
    matching images, combinable with every other filter. It's the fast way to
    find shots in a 9 000-image dump.
-6. **Promote** — the kept images are **copied** into the dataset you choose
+6. **⬆ Promote** — the kept images are **copied** into the dataset you choose
    through the normal import path: normalized to webp, near-duplicates already
    in the dataset skipped. Any bank caption **rides along**, so a captioned
    selection starts already captioned in the dataset. From there they get
@@ -362,7 +362,7 @@ touching the folder itself:
    a reference, training.
 
 Work the funnel in that order: quality first (cheap, catches the trash), then
-subject, then selection. A promoted image keeps its badge in the bank so you
+subject, then selection. A promoted image keeps its ⬆ badge in the bank so you
 always know what's been used where.
 
 **Keeping the list readable.** A bank is named once, at creation — and *One bank
@@ -473,18 +473,18 @@ lets you cancel a bank or clear the whole queue. Queue three exports before bed
 and they'll be triaged by morning.
 ## Pick a balanced set
 
-Advice is only half the gesture, so **Coverage advice** ends with **Pick a
+Advice is only half the gesture, so **📊 Coverage advice** ends with **⚖️ Pick a
 balanced set…** (the same button sits in the **Curate** row). It answers a
 question no per-image score can ask: *does my set cover what I want to be able to
 generate?*
 
-Ask **Pick diverse** for 20 images out of a bank that is 47% full body, 35%
+Ask **🎨 Pick diverse** for 20 images out of a bank that is 47% full body, 35%
 bust, 12% face and 6% back views, and you get roughly those proportions — on a
 synthetic reproduction of exactly that shape it returned **0 face shots and 0
 back views**. The LoRA then renders one shot type well and the rest badly, and
-nothing ever said so. **Balanced pick** returns **5 face, 5 bust, 5 body, 5
+nothing ever said so. **⚖️ Balanced pick** returns **5 face, 5 bust, 5 body, 5
 back** out of the same pool, each bucket filled with the *same* most-varied
-sampling — and the same **Skip the odd ones out** guard — that Pick diverse
+sampling — and the same **Skip the odd ones out** guard — that 🎨 Pick diverse
 uses.
 
 - **Balance on** — **Framing** by default. It is the axis that carries real
@@ -501,9 +501,9 @@ uses.
   framing: 15 face, 15 bust, 15 body, 15 back"* — as text, per bucket, next to
   what each bucket had available. There is no chart you have to read.
 - **An unlabelled bank is the normal state**, not an error. Nothing has a framing
-  until the Framing pass has run, so the button says which pass is missing and
+  until the 📐 Framing pass has run, so the button says which pass is missing and
   how many images it would bring in, rather than returning an empty or misleading
-  selection. Pick diverse keeps working without it.
+  selection. 🎨 Pick diverse keeps working without it.
 
 Like the other selectors it honours the current filter and search, and it only
 **selects** — nothing is kept, rejected or deleted.
@@ -511,13 +511,13 @@ Like the other selectors it honours the current filter and search, and it only
 ## Is this image really what it says it is?
 
 Two things a file will happily lie about, both measured by the ordinary
-**Scan quality** pass — plain CPU work, no extra install, no GPU.
+**🔎 Scan quality** pass — plain CPU work, no extra install, no GPU.
 
 **Its size.** An image enlarged from 512 px to 2048 px still *reports* 2048, so
 it walks into a dataset as a high-resolution shot and the LoRA learns
 interpolated mush. The scan measures how far real detail actually goes and says
 it in pixels on the image's details line: *"2048 px stored · ~512 px of real
-detail"*. The worst offenders sit behind the **Soft detail** filter chip,
+detail"*. The worst offenders sit behind the **🧇 Soft detail** filter chip,
 and *Settings → Captioning & quality → Real-detail minimum* moves the bar.
 
 Treat it exactly like the sharpness score: **a shortlist, not a verdict.** A
@@ -531,14 +531,14 @@ enlargements are under-stated, so the pixel figure ranks images rather than
 recovering the original file's size.
 
 **Where it came from.** The scan reads the file's own metadata and sorts the
-bank with the **Origin** chips:
+bank with the **🔎 Origin** chips:
 
-- **AI** — the file still carries generation metadata: a ComfyUI workflow
+- **🤖 AI** — the file still carries generation metadata: a ComfyUI workflow
   in the PNG, A1111-style `parameters`, or the C2PA/XMP "generated" marker the
   commercial generators write. Certain when present.
-- **Camera** — the file still carries camera EXIF (make, model, exposure).
+- **📷 Camera** — the file still carries camera EXIF (make, model, exposure).
   Strong evidence it was actually photographed.
-- **Unknown** — nothing left to read. **This is the normal answer**, not a
+- **❔ Unknown** — nothing left to read. **This is the normal answer**, not a
   failure: scrapers, chat apps and social networks strip metadata on sight (on a
   36 000-image Telegram export, *every single file* landed here). It is not
   evidence the image is a real photo, and it is not evidence it is AI — it is
@@ -550,19 +550,19 @@ dimensions are a standard generator size (1024×1024, 832×1216, 896×1152…) a
 there is no camera EXIF. It says it is a hint; plenty of crops and downloads
 land on round numbers too.
 
-Two smaller facts come free with the same pass: **Black bars** flags flat
+Two smaller facts come free with the same pass: **🎞 Black bars** flags flat
 letterbox/pillarbox padding (video screenshots, stills padded into a square,
 which survive a training crop), and the **JPEG quality** of the last save is
 shown as-is — a low figure means the file has been through a re-encoding
 pipeline, but it is far too common to be worth a filter.
 
-A bank you already scanned picks all of this up on its next **Scan** — the
+A bank you already scanned picks all of this up on its next **🔎 Scan** — the
 pass re-visits the images that predate these measurements on its own. You do not
 need a full rescan.
 
 ## Find bank images by describing them
 
-Under **Curate**, **Find by text…** ranks images by how close they are to a
+Under **Curate**, **🔤 Find by text…** ranks images by how close they are to a
 phrase you type — `brunette outdoors, wide shot`, `red dress against a white
 wall`, `close-up, harsh flash`. It reuses the embeddings **✨ Score** already
 computed, so there is no extra model, no download and no GPU work; searching
@@ -688,10 +688,10 @@ on a tile still selects it for the bulk ✓/✕/⬆ bar, so both ways of working
 
 **⬆ Promote…** has two destinations, and picking the right one saves you a mess.
 
-- **An existing dataset** — the end of the funnel. The images are normalized
+- **📁 An existing dataset** — the end of the funnel. The images are normalized
   to webp, deduplicated against what the dataset already holds, and become
   training material.
-- **A new image bank** — for when you are not there yet. A 9 000-image dump,
+- **🗃 A new image bank** — for when you are not there yet. A 9 000-image dump,
   200 candidates isolated out of it, and you want to keep working on those 200
   apart: give the new bank a name and the selection lands in it, **un-triaged**,
   with every bank tool available again (scan, dedup, framing, captions, review).
@@ -718,7 +718,7 @@ You are told what happened and nothing has changed.
 
 A bank lets you mark hundreds of images with one click: select the whole filter
 and press ✕, apply an auto-reject at a threshold, collapse every duplicate group,
-or run Launch all. That is the point of a bank — and it is also the click you
+or run 🚀 Launch all. That is the point of a bank — and it is also the click you
 most want back when the threshold was wrong or the filter was not the one you
 thought.
 
@@ -749,7 +749,7 @@ stays until you use it, dismiss it, or run another bulk action.
 **What is deliberately NOT offered.** Two bank actions have no undo, because a
 half-working one would be worse than none:
 
-- **Delete rejected** sends your source files to the recycle bin and drops
+- **🗑 Delete rejected** sends your source files to the recycle bin and drops
   their rows with everything the passes had computed about them. Files in the
   recycle bin are yours to restore, from your file manager — the app cannot do
   it for you, and it will not pretend otherwise. This action also withdraws any
@@ -759,7 +759,7 @@ half-working one would be worse than none:
   already captioned, cropped or trained on. Delete them there if you want them
   gone.
 
-The rotate button needs no undo entry: turn the other way and the image is
+The 🔄 rotate button needs no undo entry: turn the other way and the image is
 byte-for-byte the original again.
 ## Sort a grid to review faster
 
@@ -824,10 +824,10 @@ image you opened.
 
 ## Tune the Bank filter thresholds
 
-The filter chips (Blurry, Small, ≈ Duplicates…) are verdicts, and every
+The filter chips (🌫 Blurry, 📐 Small, ≈ Duplicates…) are verdicts, and every
 verdict comes from a number. Those numbers used to live only in
 *Settings ▸ Captioning & quality*, three screens away from the bank you were
-triaging. They are now also under the chips themselves: open **Filter
+triaging. They are now also under the chips themselves: open **🎚 Filter
 thresholds** above the grid.
 
 It is the **same setting in both places** — one value, seen twice — so anything
@@ -993,7 +993,7 @@ them cleanable.
 
 The detector draws **one** box, and it is a guess: it can miss a second logo,
 swallow half the face, or land beside the mark. Open **▶ Review**, walk to a
-flagged image and press **Edit mask** (shortcut `M`) — the same zone editor
+flagged image and press **🚩 Edit mask** (shortcut `M`) — the same zone editor
 the datasets use, on the bank image, right there.
 
 - **+ Add zone**, then drag on the photo to draw a rectangle over the mark. Up
@@ -1005,7 +1005,7 @@ the datasets use, on the bank image, right there.
 
 What the two cleaning steps then do with your mask:
 
-- **Inpaint repaints exactly the zones you drew** — all of them, including a
+- **🧽 Inpaint repaints exactly the zones you drew** — all of them, including a
   zone sitting on the subject, which is precisely what a hand mask is for.
 - **✂ Auto-crop skips a hand-masked image.** A crop can only cut one border
   band; it cannot express several zones or a mark on the subject, so cropping
@@ -1028,27 +1028,27 @@ and both directions **copy**. That is not an implementation detail — it is the
 rule the whole flow rests on:
 
 - **Bank → dataset** (**⬆ Promote…**) writes new files into the dataset.
-- **Dataset → bank** (**Import to bank**, on the dataset) copies the dataset's
+- **Dataset → bank** (**🗃 Import to bank**, on the dataset) copies the dataset's
   kept images into a folder of the bank's own.
 
 Neither ever *points* at the other's files. The reason is that the two containers
 have opposite contracts. A dataset **owns** its images; a bank merely **points**
-at a live folder it does not own — which is exactly why **Delete rejected** is
+at a live folder it does not own — which is exactly why 🗑 **Delete rejected** is
 allowed to remove files from it. Put a bank on a dataset's folder and that button
 stops deleting your rejects and starts deleting the dataset's training images.
 
 So the app refuses it. If you paste a dataset's image folder into **➕ Create
-bank** — or into **Move folder…** for an existing bank — you get a refusal
-that names the dataset and points you at **Import to bank** instead. The check
+bank** — or into **📦 Move folder…** for an existing bank — you get a refusal
+that names the dataset and points you at **🗃 Import to bank** instead. The check
 looks through the disguises: a subfolder of the dataset, the folder *containing*
 all datasets, a different letter case, forward slashes instead of backslashes,
 and symlinks or Windows junctions that resolve to the same place.
 
 **If you already have such a bank** (it was possible before this check existed),
 nothing is repaired or deleted behind your back. Opening it shows a red banner
-naming the dataset, and Delete rejected is refused on that bank — everything
+naming the dataset, and 🗑 Delete rejected is refused on that bank — everything
 else keeps working, so you can finish triaging. When you are ready, either
-**Move folder…** to point the bank at a folder of its own, or remove the bank
+**📦 Move folder…** to point the bank at a folder of its own, or remove the bank
 (removing a bank never touches files).
 
 The dataset's own folder is shown at the top of the dataset, with a **⧉ Copy**
@@ -1287,23 +1287,23 @@ everything else off the screen, and both the **seed** and the **prompt** copy in
 one click. A run that predates a given setting simply shows no row for it: an
 absent line is honest, a dash is not.
 
-**Pinning an image onto the board.** Comparing two checkpoints means looking
+**📌 Pinning an image onto the board.** Comparing two checkpoints means looking
 at their pictures *at the same time*, which a full-screen viewer cannot do. From
 that viewer, **Pin to canvas** drops the image onto the board as a node of its
 own, joined to the checkpoint that produced it by the same connector the board
 uses for "this run continued from that checkpoint".
-**Pinning an image onto the board.** Comparing two checkpoints means looking
+**📌 Pinning an image onto the board.** Comparing two checkpoints means looking
 at their pictures *at the same time*, which a full-screen viewer cannot do. So
-**** drops an image onto the board as a node of its own, joined to the
+**📌** drops an image onto the board as a node of its own, joined to the
 checkpoint that produced it by the same connector the board uses for "this run
 continued from that checkpoint".
 
 There are two ways in, and the first one is the one to remember: **every
-thumbnail in a run or checkpoint gallery carries a in its bottom-right
+thumbnail in a run or checkpoint gallery carries a 📌 in its bottom-right
 corner** — one tap, no need to open the image at all. It is hidden while you are
 in **Select** mode (that mode is for arming a delete, and a second target there
 is a mis-tap waiting to happen). The same action is also in the full-screen
-viewer, spelled out as **Pin to canvas**, for when you have already opened a
+viewer, spelled out as **📌 Pin to canvas**, for when you have already opened a
 picture and decide it belongs on the board.
 
 - **Move it** by dragging (on a phone: a long press picks it up, exactly like a
@@ -1322,13 +1322,13 @@ picture and decide it belongs on the board.
 - Unticking a dataset takes its lane off the board, pinned images included; they
   come back with the lane, untouched.
 - **✦ Tidy up** does not throw pinned images away — it re-flows them into the
-  same tidy band **Pin all** uses, so a rebuild of the automatic tree can no
+  same tidy band **📌 Pin all** uses, so a rebuild of the automatic tree can no
   longer park a picture on top of a run card.
 - The **✕**, the **** and the resize corner keep a finger-sized target **at
   every zoom level**: they are drawn at a constant size on screen rather than at
   the board's, so a board fitted to twenty runs is still one you can tap.
 
-**Fuse pinned images side by side.** Comparing two renders across a gap and
+**🖼🖼 Fuse pinned images side by side.** Comparing two renders across a gap and
 two frames is comparing two frames. **Drop one pinned image onto another and
 they become a single node**, pictures edge to edge with nothing drawn between
 them. There is **no limit**: drop a third, a tenth, they all join the strip.
@@ -1371,9 +1371,9 @@ them. There is **no limit**: drop a third, a tenth, they all join the strip.
   purpose, and taking it apart is not tidying. The way out is the group's ✕, or
   dragging its pictures back off it.
 
-**Pin all — the whole lot in one gesture.** When a generation launched from
+**📌 Pin all — the whole lot in one gesture.** When a generation launched from
 the board finishes, the green bar says how many images are ready and names the
-checkpoints they joined. **Pin all N to the board** puts every one of them on
+checkpoints they joined. **📌 Pin all N to the board** puts every one of them on
 the board without opening a single gallery.
 
 - **Where they land.** In a band under the lane, **one column per checkpoint**,
@@ -1402,7 +1402,7 @@ carries its deployment state on its **left edge**: a **solid sky bar** means the
 checkpoint is deployed to ComfyUI and can be generated from right now; a **dashed
 grey bar** means the file is on your disk but not deployed yet. Not deployed does
 *not* mean missing — the save is there, it simply has no copy in ComfyUI, and
-ticking it before **Generate** makes the launch deploy it for you. The shape
+ticking it before **🎨 Generate** makes the launch deploy it for you. The shape
 (solid versus dashed) carries as much of the message as the colour does, a legend
 sits above the board, and hovering a pill spells it out in words.
 

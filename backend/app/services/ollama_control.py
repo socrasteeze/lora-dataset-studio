@@ -157,7 +157,7 @@ def ensure_captioning_ready() -> dict:
 
 
 # --- Installed-model listing + parametrized pull -----------------------------
-# The Captions Options popover lets a user pick which pulled Ollama model captions
+# The Captions ⚙️ Options popover lets a user pick which pulled Ollama model captions
 # a dataset, and pull a new one they name. A pull takes an ARBITRARY model name, so it
 # lives here (an Ollama action) rather than in setup_installer, whose fixed catalog
 # deliberately takes no client-supplied arguments. The name is validated to Ollama's

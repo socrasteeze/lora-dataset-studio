@@ -10,7 +10,7 @@ import { DEPLOY_BAR_CLASS } from '../../utils/checkpointDeployState';
 import { runNumber } from '../../utils/runIdentity';
 import { HelpBadge } from '../../help/HelpMode';
 
-/* Generating from the board.
+/* 🎨 Generating from the board.
 
    This panel is deliberately thin. It mounts the Test Studio's own hooks and
    renders the Test Studio's own settings panel — same prompt field, same seed

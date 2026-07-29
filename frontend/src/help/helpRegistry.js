@@ -166,7 +166,7 @@ const TOPICS = [
     guide: { chapter: 'using-the-app', anchor: 'concept-datasets-an-object-or-action-not-a-person' },
     app: { route: '/datasets?section=scrape&panel=scan' },
     tip: { trigger: 'add-images-visit',
-      text: 'Scraping now lives in its own Scrape section of the sidebar.' } },
+      text: 'Scraping now lives in its own 🕸 Scrape section of the sidebar.' } },
   { id: 'workspace-curation', kind: 'section', title: 'Curation',
     keywords: ['curation', 'quality', 'face', 'watermark', 'clean', 'cleanup', 'rescue'],
     guide: { chapter: 'using-the-app', anchor: 'the-character-walkthrough-reference-photo-trained-lora' },
@@ -430,7 +430,7 @@ const TOPICS = [
      'no longer on this machine', 'not linked on this machine',
      'continue from here does nothing', 'extra steps vs total steps'],
     '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
-  action('canvas-pin-all', 'Pin all of a run’s images at once',
+  action('canvas-pin-all', '📌 Pin all of a run’s images at once',
     ['pin all', 'pin all images', 'pin everything', 'pin the whole run',
      'put all the images on the board', 'deploy all images to the canvas',
      'one click pin', 'bulk pin', 'pin all 5', 'images ready button',
@@ -438,7 +438,7 @@ const TOPICS = [
      'why are my images under the tree', 'where did the pinned images go',
      'pin all button missing', 'pin all does nothing', 'already pinned'],
     '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
-  action('canvas-pinned-images', 'Pin an image onto the board',
+  action('canvas-pinned-images', '📌 Pin an image onto the board',
     ['pin an image', 'pin to canvas', 'image on the canvas', 'put an image on the board',
      'compare two images side by side', 'move an image', 'resize an image',
      'close a pinned image', 'reopen a pinned image', 'my image came back',
@@ -462,10 +462,10 @@ const TOPICS = [
      'why only 500', 'zip is smaller than the gallery', 'missing from the zip',
      'image no longer on disk', 'download does nothing'],
     '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
-  // A gesture nobody can guess: it earns a topic of its own, not a clause
+  // 🖼🖼 A gesture nobody can guess: it earns a topic of its own, not a clause
   // buried in the one above. Half these keywords are how someone who has
   // ALREADY done it by accident would describe what happened.
-  action('canvas-image-groups', 'Fuse pinned images side by side',
+  action('canvas-image-groups', '🖼🖼 Fuse pinned images side by side',
     ['group images', 'merge images', 'fuse images', 'combine pinned images',
      'side by side', 'contact sheet on the canvas', 'compare images edge to edge',
      'no border between images', 'strip of images', 'image group',
@@ -884,7 +884,7 @@ const TOPICS = [
      'path changed', 'source folder', 'unavailable', 'missing images', 'keep analysis',
      'keep decisions', 'lost my scores', 'rescan'],
     '/bank', 'using-the-app', 'move-a-bank-folder-to-another-disk'),
-  action('action-scoring-python', 'Make Score use a GPU Python you already have',
+  action('action-scoring-python', 'Make ✨ Score use a GPU Python you already have',
     ['score', 'scoring', 'gpu', 'cuda', 'cpu', 'slow', 'hours', 'torch', 'pytorch',
      'open_clip', 'openclip', 'transformers', 'timm', 'interpreter', 'python',
      'ai-toolkit', 'comfyui', 'venv', 'environment', 'faster', 'speed up',

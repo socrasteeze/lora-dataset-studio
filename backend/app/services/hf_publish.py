@@ -212,7 +212,7 @@ def build_readme(ds, count, license, nfaa) -> str:
         '',
         'Each image ships with a matching `.txt` caption (the trigger word is '
         'prepended), and a `metadata.jsonl` maps every image to its caption, so '
-        'the dataset loads straight into the Datasets library:',
+        'the dataset loads straight into the 🤗 Datasets library:',
         '',
         '```python',
         'from datasets import load_dataset',

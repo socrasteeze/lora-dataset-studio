@@ -1,4 +1,4 @@
-/* Bank triage thresholds — the DESCRIPTION of the twelve knobs, and the pure
+/* 🎚 Bank triage thresholds — the DESCRIPTION of the twelve knobs, and the pure
    logic the Bank's threshold panel runs on.
 
    WHY THIS FILE EXISTS
@@ -54,15 +54,15 @@ export const BANK_SECTION = 'bank';
    answers to narrower questions and stay folded, which is also what keeps the
    panel readable at 400 px. */
 export const THRESHOLD_GROUPS = [
-  { id: 'quality', emoji: '', label: 'Image quality', defaultOpen: true,
+  { id: 'quality', emoji: '🌫', label: 'Image quality', defaultOpen: true,
     blurb: 'Is the picture technically good enough to train on?' },
   { id: 'duplicates', emoji: '≈', label: 'Duplicates', defaultOpen: true,
     blurb: 'Have I already got this shot?' },
-  { id: 'resolution', emoji: '', label: 'Size & framing', defaultOpen: false,
+  { id: 'resolution', emoji: '📐', label: 'Size & framing', defaultOpen: false,
     blurb: 'Is there enough real picture in the file?' },
-  { id: 'content', emoji: '', label: 'Content', defaultOpen: false,
+  { id: 'content', emoji: '👥', label: 'Content', defaultOpen: false,
     blurb: 'Is it the right person, and is it worth keeping?' },
-  { id: 'style', emoji: '', label: 'Style', defaultOpen: false,
+  { id: 'style', emoji: '🎨', label: 'Style', defaultOpen: false,
     blurb: 'How close must two images look to count as the same style?' },
 ];
 
@@ -73,8 +73,8 @@ export const THRESHOLD_GROUPS = [
    they cannot show a live preview and must say so instead of faking one. */
 export const APPLIES = {
   instant: 'Applies immediately — the bank re-sorts, no rescan.',
-  scan: 'Applies at the next quality scan.',
-  faces: 'Applies at the next face pass.',
+  scan: 'Applies at the next 🔍 quality scan.',
+  faces: 'Applies at the next 👥 face pass.',
   score: 'Applies at the next ✨ score pass.',
   dedup: 'Applies at the next ✂ semantic dedup (instant — cached embeddings).',
 };
@@ -115,14 +115,14 @@ export const BANK_THRESHOLDS = [
     label: 'Sharpness minimum', unit: 'Laplacian variance',
     step: 10, min: 0, integer: false,
     catchesMoreWhen: 'raised', applies: 'instant',
-    hint: 'Laplacian variance under this is flagged blurry. ~100 is the classic rule of thumb.',
+    hint: 'Laplacian variance under this is flagged 🌫 blurry. ~100 is the classic rule of thumb.',
   },
   {
     field: 'noise_max', group: 'quality', flag: 'noise',
     label: 'Noise maximum', unit: 'residual grain',
     step: 1, min: 0, integer: false,
     catchesMoreWhen: 'lowered', applies: 'instant',
-    hint: 'Residual grain over this is flagged noisy.',
+    hint: 'Residual grain over this is flagged 📺 noisy.',
   },
   {
     field: 'uniformity_min', group: 'quality', flag: 'uniform',
@@ -136,21 +136,21 @@ export const BANK_THRESHOLDS = [
     label: 'Minimum side', unit: 'px',
     step: 64, min: 0, integer: true,
     catchesMoreWhen: 'raised', applies: 'instant',
-    hint: 'Smaller side under this is flagged small. Trainers only ever downscale, so an image below your training size is lost detail.',
+    hint: 'Smaller side under this is flagged 📐 small. Trainers only ever downscale, so an image below your training size is lost detail.',
   },
   {
     field: 'detail_min', group: 'resolution', flag: 'soft_detail',
     label: 'Real-detail minimum', unit: '0–1 of the stored size',
     step: 0.02, min: 0, max: 1, integer: false,
     catchesMoreWhen: 'raised', applies: 'instant',
-    hint: 'Share of the stored size that still carries real picture; under this is flagged soft detail. The usual cause is an enlargement — but a soft or out-of-focus photo reads the same, so treat it as a score, not proof.',
+    hint: 'Share of the stored size that still carries real picture; under this is flagged 🫧 soft detail. The usual cause is an enlargement — but a soft or out-of-focus photo reads the same, so treat it as a score, not proof.',
   },
   {
     field: 'bars_max', group: 'resolution', flag: 'bars',
     label: 'Black-bar maximum', unit: '0–1 of the frame',
     step: 0.01, min: 0, max: 1, integer: false,
     catchesMoreWhen: 'lowered', applies: 'instant',
-    hint: 'Share of the frame allowed to be flat black letterbox before black bars — video screenshots, padded stills.',
+    hint: 'Share of the frame allowed to be flat black letterbox before 🎞 black bars — video screenshots, padded stills.',
   },
   {
     field: 'dup_distance', group: 'duplicates', flag: null,
@@ -172,7 +172,7 @@ export const BANK_THRESHOLDS = [
     label: 'Same-person similarity', unit: 'cosine similarity',
     step: 0.01, min: 0, max: 1, integer: false,
     catchesMoreWhen: 'lowered', applies: 'faces',
-    hint: 'How alike two faces must be to land in the same person cluster. Lower merges more people together; higher splits one person into several clusters.',
+    hint: 'How alike two faces must be to land in the same 👥 person cluster. Lower merges more people together; higher splits one person into several clusters.',
   },
   {
     field: 'aesthetic_min', group: 'content', flag: 'low_aesthetic',
@@ -193,7 +193,7 @@ export const BANK_THRESHOLDS = [
     label: 'Same-style similarity', unit: 'cosine similarity',
     step: 0.01, min: 0, max: 1, integer: false,
     catchesMoreWhen: 'lowered', applies: 'score',
-    hint: 'How alike two images must look to share a style cluster. Deliberately looser than the semantic-duplicate bar — a crop is far closer than merely "same style".',
+    hint: 'How alike two images must look to share a 🎨 style cluster. Deliberately looser than the semantic-duplicate bar — a crop is far closer than merely "same style".',
   },
 ];
 

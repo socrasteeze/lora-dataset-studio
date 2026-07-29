@@ -43,7 +43,7 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
   const shownTree = useMemo(
     () => deletedIds.reduce((t, id) => removeRunFromTree(t, id), tree),
     [tree, deletedIds]);
-  // Big-preview mode: enlarge the generated thumbnails into ComfyUI-style tiles
+  // 🔍 Big-preview mode: enlarge the generated thumbnails into ComfyUI-style tiles
   // so epochs compare at a glance without opening each. Persisted; default compact.
   const [bigPreviews, setBigPreviews] = useState(() => {
     try { return localStorage.getItem('lds.graphBigPreviews') === '1'; } catch { return false; }
@@ -295,7 +295,7 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
   return (
     <>
     <div className="mb-1.5 flex items-center justify-end gap-2 text-[0.625rem] text-content-subtle">
-      {/* Big-preview mode: enlarge the generated tiles to compare epochs at a
+      {/* 🔍 Big-preview mode: enlarge the generated tiles to compare epochs at a
           glance (ComfyUI-style), no clicking each. Persisted; default compact. */}
       <button type="button" onClick={toggleBigPreviews}
         aria-pressed={bigPreviews}
@@ -304,7 +304,7 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
           + (bigPreviews
             ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 '
             : 'border-border bg-app/60 text-content-muted hover:text-content ')}>
-        Big previews
+        🔍 Big previews
       </button>
       {selectedForDiff.length === 0 ? (
         <span><span className="font-semibold">⇧ Shift-click</span> two runs to compare · tick the <span aria-hidden>☑</span> corner box on an <span className="font-semibold">imported</span> checkpoint to preview it (import one with first)</span>
@@ -318,14 +318,14 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
         </>
       )}
     </div>
-    {/* Generation bar — appears once a checkpoint is checked. ONE shared prompt
+    {/* 🎨 Generation bar — appears once a checkpoint is checked. ONE shared prompt
         + seed renders a strength-1.0 preview per selected checkpoint (reusing the
         Test-Studio engine), so a LoRA's epoch-by-epoch evolution reads at a glance.
         Disabled with an honest reason when the picks aren't deployable. */}
     {selectedCk.size > 0 && (
       <div className="lds-lgen mb-2 rounded-xl border border-indigo-400/40 bg-indigo-500/5 p-2.5">
         <div className="mb-1.5 flex items-center gap-2 text-[0.6875rem]">
-          <span className="font-semibold text-content">Generate previews</span>
+          <span className="font-semibold text-content">🎨 Generate previews</span>
           <span className="text-content-muted">{sel.testableCount} checkpoint{sel.testableCount !== 1 ? 's' : ''}, one shared prompt + seed, strength 1.0</span>
           <button type="button" onClick={() => setSelectedCk(new Set())}
             className="ml-auto text-content-subtle underline decoration-dotted hover:text-content">Clear</button>
@@ -442,11 +442,11 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
       <LineageDetailPanel node={openNode} onClose={() => setOpenNode(null)}
         onNodeChanged={handleNodeChanged} onNodeDeleted={handleNodeDeleted} />
     )}
-    {/* Preview lightbox — a checkpoint's generated image LARGE, so epochs read
+    {/* 🔍 Preview lightbox — a checkpoint's generated image LARGE, so epochs read
         in ComfyUI spirit (the pill thumbnails are only 14px). Shared with the
         canvas, where the same thumbnail used to be clickable and do nothing. */}
     <PreviewLightbox target={bigPreview} onClose={() => setBigPreview(null)} />
-    {/* Everything one checkpoint ever produced — the same panel the canvas
+    {/* 🖼 Everything one checkpoint ever produced — the same panel the canvas
         opens, so the results of a generation are reachable from either surface. */}
     <CheckpointGalleryPanel target={gallery} onClose={() => setGallery(null)}
       onDeleted={() => { Promise.resolve(refetchTree?.()).catch(() => {}); }} />

@@ -1,4 +1,4 @@
-"""Image bank — TEXT search ("brunette outdoors, wide shot" → ranked images).
+"""🗃️ Image bank — TEXT search ("brunette outdoors, wide shot" → ranked images).
 
 Same engine as the two curation selectors: the CLIP embeddings the ✨ Score pass
 already cached. The ONE new ingredient is a query VECTOR, produced by running

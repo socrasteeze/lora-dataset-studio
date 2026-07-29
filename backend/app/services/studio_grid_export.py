@@ -90,7 +90,7 @@ def _variant_header(z_model_label, aspect, cfg, steps, steps2) -> str:
 
 
 def _pick_representative(cells: list) -> "LoraTestImage | None":
-    """One image per (checkpoint × strength) cell: prefer a liked () tile, else
+    """One image per (checkpoint × strength) cell: prefer a liked (👍) tile, else
     the most recent completed one — deterministic, matches « show the winner »."""
     done = [c for c in cells if c.status == 'done' and c.filename]
     if not done:

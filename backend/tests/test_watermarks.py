@@ -941,7 +941,7 @@ def test_dataset_payload_prefers_stored_watermark_regions(app):
 
 
 def test_payload_exposes_watermark_route_for_detected_only(app):
-    """The review lightbox and the tooltip read the exact planned action from the
+    """The review lightbox and the 🚩 tooltip read the exact planned action from the
     payload (no _route_watermark duplicated in JS). Only 'detected' rows carry it."""
     from app.services import face_dataset_service as svc
     from app.config import LOCAL_USER

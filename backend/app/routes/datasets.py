@@ -226,7 +226,7 @@ def dataset_list():
          'kind': ((d.kind or '').lower() or 'character'),
          'train_type': (d.train_type or 'zimage'),
          # Where the dataset's images live on disk. Displayed on the dataset (with
-         # a copy button), and read by the bank creation form so it can say
+         # a copy button), and read by the 🗃 bank creation form so it can say
          # "that folder belongs to a dataset" WHILE the path is being typed —
          # the server refuses it either way (services/path_guard.py).
          'storage_path': dataset_path(d.id),
@@ -914,7 +914,7 @@ def dataset_caption_cancel(dataset_id):
 @bp.get('/dataset/<int:dataset_id>/caption/options')
 def dataset_caption_options_get(dataset_id):
     """Per-dataset caption method overrides {backend, ollama_model, instructions} for the
-    Options popover. Empty values mean "follow the global default"."""
+    ⚙️ Options popover. Empty values mean "follow the global default"."""
     ds = svc.get_dataset(LOCAL_USER, dataset_id)
     if not ds:
         return jsonify({'error': 'not found'}), 404
@@ -937,7 +937,7 @@ def dataset_caption_options_set(dataset_id):
 
 @bp.post('/dataset/<int:dataset_id>/image/<int:image_id>/caption/preview')
 def dataset_image_caption_preview(dataset_id, image_id):
-    """Caption Lab: run ONE candidate config on ONE image and return the caption
+    """🧪 Caption Lab: run ONE candidate config on ONE image and return the caption
     WITHOUT writing it. Ephemeral A/B probe — the modal fires this once per candidate,
     sequentially, and compares them side by side.
 
@@ -1027,7 +1027,7 @@ def dataset_watermarks_clean(dataset_id):
     through the serialized ComfyUI queue (no vision window — that would deadlock the
     worker). Returns counts + the inpaint error. Optional {image_ids:[...]} scopes the
     pass to a subset (the review lightbox cleans one image at a time); omitted → every
-    detected image (the bulk Clean button). Optional {allow_crop:bool} overrides the
+    detected image (the bulk 🧽 Clean button). Optional {allow_crop:bool} overrides the
     persisted crop preference: omitted → Settings' watermark.allow_crop; True/False →
     force crop / force inpaint (the lightbox's per-image crop-vs-inpaint choice)."""
     if not svc.get_dataset(LOCAL_USER, dataset_id):
@@ -1074,7 +1074,7 @@ def dataset_watermarks_clean(dataset_id):
 @bp.post('/dataset/<int:dataset_id>/watermarks/dismiss')
 def dataset_watermarks_dismiss(dataset_id):
     """Mark flagged images as NOT a watermark (a false positive ruled out in the review
-    lightbox). Body: {image_ids:[...]}. Dismissed images drop the badge and are
+    lightbox). Body: {image_ids:[...]}. Dismissed images drop the 🚩 badge and are
     skipped by future detect passes. CPU only, no GPU window."""
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
@@ -1246,7 +1246,7 @@ def dataset_image_reimprove(image_id):
 
 @bp.post('/dataset/<int:dataset_id>/improve/batch')
 def dataset_improve_batch(dataset_id):
-    """Start the SERVER-side Klein upscale & improve batch over a selection.
+    """Start the SERVER-side ✨ Klein upscale & improve batch over a selection.
 
     Returns immediately with {queued, skipped}; progress rides on the dataset's
     `activity` (kind 'improve'), so it survives a reload, and ⏹ Stop generation

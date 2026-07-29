@@ -1,4 +1,4 @@
-/* Wording for the "something is training" indicator in the nav.
+/* 🏋️ Wording for the "something is training" indicator in the nav.
    Pure on purpose: node --test cannot parse JSX, so the phrasing — the part
    that is easy to get subtly wrong — lives here and is covered without a
    browser. The component only decides whether to paint a dot. */

@@ -1,5 +1,5 @@
 /**
- * What's new — in-app changelog surface.
+ * 🎁 What's new — in-app changelog surface.
  *
  * Two exports, wired together by a tiny DOM event bus so several triggers
  * (desktop nav + mobile bar) can share ONE modal and keep their badges in sync:
@@ -68,7 +68,7 @@ export function WhatsNewButton() {
         has ? 'text-content hover:text-content' : 'text-content-muted hover:text-content'
       } hover:bg-surface-raised`}
     >
-      <span aria-hidden></span>
+      <span aria-hidden>🎁</span>
       {has && (
         <span
           aria-hidden
@@ -140,7 +140,7 @@ export function WhatsNewModal() {
       >
         <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <h2 id="whats-new-title" className="flex items-center gap-2 text-base font-semibold text-content">
-            <span aria-hidden></span> What&apos;s new
+            <span aria-hidden>🎁</span> What&apos;s new
           </h2>
           <button
             type="button"

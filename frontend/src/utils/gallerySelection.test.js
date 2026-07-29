@@ -83,7 +83,7 @@ test('the summary reports what the backend did, not what was asked', () => {
   assert.match(galleryDeleteSummary(null), /Nothing was deleted/);
 });
 
-/* The pinned action bar. `Select` used to sit in the HEADER while everything
+/* 📌 The pinned action bar. `Select` used to sit in the HEADER while everything
  * it leads to sat in a footer bar that only existed once the mode was on — so
  * entering the mode was a reach to the top of a panel whose every other control
  * was under the thumb. The bar is now PERMANENT (as soon as there is something
@@ -126,13 +126,13 @@ test('the delete half only exists in Select mode, and is inert until a pick', ()
   }).deleteDisabled, true);
 });
 
-/* Pin to canvas, from the grid.
+/* 📌 Pin to canvas, from the grid.
  *
  * The action shipped inside the VIEWER only: you had to open an image to learn
  * it could leave the modal, and the person who asked for the feature never
  * found it. It now sits on the tile — but a tile is also the target of a batch
  * delete, and that collision is what is worth pinning. */
-test('a tile offers only outside Select mode, and only with a board to pin onto', () => {
+test('a tile offers 📌 only outside Select mode, and only with a board to pin onto', () => {
   assert.equal(galleryTilePin({ canPin: true }), true);
 
   // Select mode arms a DELETE. Its safety story is "outside it a tap zooms,

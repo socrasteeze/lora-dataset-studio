@@ -135,7 +135,7 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
       </p>
       <p className="text-xs text-content-subtle">{progressSummary(levels)}</p>
       {note && <p className="text-xs text-amber-300/90">⚠️ {note}</p>}
-      {masks && <p className="text-xs text-content-subtle">{masks}</p>}
+      {masks && <p className="text-xs text-content-subtle">🚩 {masks}</p>}
 
       <div className="flex flex-wrap gap-2">
         <LevelCard index={1} title="Find them" state={find}

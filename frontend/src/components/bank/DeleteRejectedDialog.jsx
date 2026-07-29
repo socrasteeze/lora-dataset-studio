@@ -6,7 +6,7 @@ import {
   sharedFileCount, sharedFilesWarning,
 } from './bankOverlap'
 
-/** Delete rejected from disk — the ONE bank action that writes to the source
+/** 🗑 Delete rejected from disk — the ONE bank action that writes to the source
  * folder. Unlike the reversible reject STATUS, this removes the actual files.
  *
  * The dialog asks the server what the run would really do BEFORE arming: where
@@ -64,7 +64,7 @@ export default function DeleteRejectedDialog({ bankId, count, sourcePath, onClos
     <div role="dialog" aria-modal="true" aria-label="Delete rejected from disk"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
       <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-rose-500/60 bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
-        <h2 className="text-base font-bold text-rose-300">Delete rejected from disk</h2>
+        <h2 className="text-base font-bold text-rose-300">🗑 Delete rejected from disk</h2>
         <div className="rounded-md border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-200 space-y-2">
           <p className="font-semibold">
             This removes {count} rejected file{count === 1 ? '' : 's'} from your disk.

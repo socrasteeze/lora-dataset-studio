@@ -22,7 +22,7 @@
 
    The storage rule of this repo forbids renaming or re-typing a persisted key:
    `datasetGenerator` is read by the regenerate path (useDataset.js) and by the
-   identity-prompt modal, which both want ONE engine. So the string key is
+   ✎ identity-prompt modal, which both want ONE engine. So the string key is
    KEPT, unchanged, as a mirror of the PRIMARY engine, and the list lives in a
    new key next to it. A profile that only ever knew the old key reads back as a
    one-engine selection — i.e. exactly the pre-Krea behaviour. A profile still

@@ -280,7 +280,7 @@ test('a flat edge never has a zero-height bounding box', () => {
   assert.ok(Math.abs(y2 - y1) <= 1);                   // …and imperceptibly so
 });
 
-// --- big-preview mode (adaptive geometry) --------------------------------
+// --- 🔍 big-preview mode (adaptive geometry) --------------------------------
 
 test('graphMetrics: compact is the default, big enlarges the tiles', () => {
   const compact = graphMetrics(false);

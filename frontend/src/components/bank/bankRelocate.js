@@ -1,4 +1,4 @@
-/** Moving a bank's folder — pure helpers (no JSX, so `node --test` runs them).
+/** 🗃️ Moving a bank's folder — pure helpers (no JSX, so `node --test` runs them).
  *
  * A bank points at a folder by path, but every image row is stored RELATIVE to
  * it and every analysis (scores, duplicate groups, face verdicts, captions,

@@ -1,7 +1,7 @@
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
 
 /**
- * The app's single, quiet voice for "I can't reach the server right now".
+ * 📡 The app's single, quiet voice for "I can't reach the server right now".
  *
  * Replaces the stack of "Connection lost" toasts a failing poll used to emit.
  * It is deliberately ONE node that mounts when the outage opens and unmounts

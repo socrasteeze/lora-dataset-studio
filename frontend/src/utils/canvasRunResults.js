@@ -113,7 +113,7 @@ export function describeCanvasRun(run) {
 
 /**
  * The images a finished run actually produced, as {id, datasetId} — the lot
- * Pin all offers to drop onto the board.
+ * 📌 Pin all offers to drop onto the board.
  *
  * Same definition of "ready" as readyImageCount: a cell with a file on disk.
  * A cancelled or failed cell is not an image and must not be counted into a

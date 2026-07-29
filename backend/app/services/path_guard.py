@@ -4,7 +4,7 @@ Images move between a bank and a dataset by COPY, in both directions
 (``start_dataset_import`` one way, ``_promote_job`` the other), so each side
 owns its files and curating one can never mutate the other. That is an
 invariant, not a feature: the moment a bank's source folder IS a dataset's
-storage folder, Delete rejected stops deleting the bank's rejects and starts
+storage folder, 🗑 Delete rejected stops deleting the bank's rejects and starts
 deleting the dataset's images.
 
 Nothing enforced it. ``overlapping_banks`` only ever compared banks against
@@ -32,7 +32,7 @@ from .. import config as cfg
 # name the alternative turns a trap into a wall — and the alternative already
 # exists and already does the right thing (it copies).
 ALTERNATIVE = ('To re-triage a dataset\'s images in a bank, open the dataset and use '
-               'Import to bank — it COPIES them into a bank of their own, so '
+               '🗃 Import to bank — it COPIES them into a bank of their own, so '
                'curating the bank can never touch the dataset.')
 
 
@@ -120,5 +120,5 @@ def _message(rel, dataset_id) -> str:
         what = ('That folder contains the datasets folder, so a bank there would '
                 'list every dataset\'s images.')
     return (f'{what} A bank and a dataset must never share files on disk: a bank '
-            'points at a LIVE folder, so Delete rejected in the bank would delete '
+            'points at a LIVE folder, so 🗑 Delete rejected in the bank would delete '
             f'images out of the dataset. {ALTERNATIVE}')

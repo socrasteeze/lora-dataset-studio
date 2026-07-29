@@ -1,4 +1,4 @@
-"""Image bank — "Delete rejected from disk".
+"""🗃️ Image bank — 🗑 "Delete rejected from disk".
 
 This is the ONLY bank action that writes to the source folder, so the tests are
 paranoid: rejected files must actually leave the disk, NON-rejected files must

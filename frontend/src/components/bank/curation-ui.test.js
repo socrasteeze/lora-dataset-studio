@@ -22,7 +22,7 @@ test('each curation button feeds its OWN returned ids into the selection view', 
   assert.match(ws, /\/api\/bank\/\$\{bankId\}\/select-similar/);
   assert.match(ws, /const ref = \[\.\.\.selected\]\[0\]/);
   assert.match(ws, /ref_id: ref/);
-  // … and Find by text is the third of the same family: its own endpoint, its
+  // … and 🔤 Find by text is the third of the same family: its own endpoint, its
   // own ranked ids, the same view. (Its wording/limits contract lives in
   // bankTextSearch.test.js; here we only pin that it joins the family.)
   assert.match(ws, /\/api\/bank\/\$\{bankId\}\/search-text/);
@@ -42,7 +42,7 @@ test('each curation button feeds its OWN returned ids into the selection view', 
 // the user turn it back OFF (the historical behaviour is still one drag away), and
 // (c) SAY what it does — a selector whose meaning changed silently would be worse
 // than the bias it fixes.
-test('Pick diverse exposes the typicality guard and sends it', () => {
+test('🎨 Pick diverse exposes the typicality guard and sends it', () => {
   assert.match(ws, /const \[diverseTypicality, setDiverseTypicality\] = useState\(0\.5\)/);
   assert.match(ws, /typicality: diverseTypicality/);
   // a real, bounded control (0 → 1) the user can drag back to the old behaviour

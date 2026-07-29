@@ -47,7 +47,7 @@ Run through this before calling a wave done:
 2. **Source-only commits.** Never commit `frontend/dist/**` alongside sources;
    the dist rebuild is a separate consolidated `build(frontend):` commit at the
    end of the wave.
-3. **What's new** (`frontend/src/whatsNew.js`): prepend one benefit-first
+3. **🎁 What's new** (`frontend/src/whatsNew.js`): prepend one benefit-first
    entry per user-visible feature or fix. Between releases this panel is the
    ONLY way users learn something shipped. Plumbing/refactors don't need one.
 4. **Help registry** (`frontend/src/help/helpRegistry.js`): any new setting,

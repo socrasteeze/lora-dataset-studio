@@ -1,4 +1,4 @@
-"""Deleting a run AND everything it produced — the explicit cascade.
+"""🗑 Deleting a run AND everything it produced — the explicit cascade.
 
 Removing a run used to mean ONE thing: tidying a ghost out of the graph. A run
 whose checkpoints were still on disk was refused (409, "delete those first") and

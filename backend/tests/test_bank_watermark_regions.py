@@ -1,4 +1,4 @@
-"""Bank watermark MASK editing — the hand-drawn correction zones.
+"""🚩 Bank watermark MASK editing — the hand-drawn correction zones.
 
 Reported by Qeeyana (Reddit): watermark masking could only be edited from a
 dataset, never from a bank. The Bank had detection, dismissal, crop, inpaint and
@@ -122,7 +122,7 @@ def _capture_lama(monkeypatch, *, available=True, ok=True):
 # --- 1. persisted, and RE-READ by the cleaning pass --------------------------
 def test_edited_mask_is_persisted_and_used_by_the_repaint_pass(
         client, tmp_path, app, monkeypatch):
-    """The whole point: Repaint must act on the zones the user drew, not on
+    """The whole point: 🧽 Repaint must act on the zones the user drew, not on
     the detector's box. Captured at the engine boundary."""
     bank_id, src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
     image_id = _flag(app, bank_id, OFFCENTER_MARK)

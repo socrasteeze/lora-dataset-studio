@@ -95,7 +95,7 @@ export default function BankReviewLightbox({
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  // Which image's watermark mask is open, if any. Review is where a flagged
+  // 🚩 Which image's watermark mask is open, if any. Review is where a flagged
   // image is actually LOOKED at, so it is where a wrong detection box gets
   // fixed — until now that was only possible inside a dataset (Qeeyana, Reddit).
   const [maskId, setMaskId] = useState(null)
@@ -147,7 +147,7 @@ export default function BankReviewLightbox({
     }
   }, [bankId, busy, onDecided, session])
 
-  // Quarter turn of the image under the cursor (idea by 1Tomber, GitHub #17).
+  // 🔄 Quarter turn of the image under the cursor (idea by 1Tomber, GitHub #17).
   // It does NOT advance — a sideways photo is fixed and then judged, which is the
   // whole point of noticing it here. The user's own file is never rewritten: the
   // angle is stored and the app rebuilds its view from the pristine source.
@@ -302,9 +302,9 @@ export default function BankReviewLightbox({
             </button>
             {canEditMask(img) && (
               <button type="button" onClick={() => setMaskId(id)} disabled={busy}
-                title="Fix the watermark zones on this image (M) — decides nothing. Inpaint then repaints exactly what you draw."
+                title="Fix the watermark zones on this image (M) — decides nothing. 🧽 Inpaint then repaints exactly what you draw."
                 className="rounded-lg border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50 hover:bg-amber-500/30">
-                Edit mask{shortcut('M')}
+                🚩 Edit mask{shortcut('M')}
               </button>
             )}
             <button type="button" onClick={() => sendDecision('keep')} disabled={busy}

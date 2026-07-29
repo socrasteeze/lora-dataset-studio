@@ -1,4 +1,4 @@
-/* Toast queue arithmetic — merging, capping and expiry.
+/* 🔔 Toast queue arithmetic — merging, capping and expiry.
  *
  * WHY THIS IS A SEPARATE .js FILE
  * -------------------------------

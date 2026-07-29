@@ -2,7 +2,7 @@
 
 Nothing used to stop `POST /api/bank/create` from being handed a dataset's own
 storage folder: the resulting bank listed the dataset's LIVE files, and its
-Delete rejected then deleted images out of the dataset. `overlapping_banks`
+🗑 Delete rejected then deleted images out of the dataset. `overlapping_banks`
 never saw it, because it only ever compared banks against banks.
 
 These tests pin the door shut on every spelling of the same folder — the folder

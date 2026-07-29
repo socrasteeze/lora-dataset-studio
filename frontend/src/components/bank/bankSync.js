@@ -1,4 +1,4 @@
-/** Bank folder sync — pure helpers (no JSX, so `node --test` can run them).
+/** 🗃️ Bank folder sync — pure helpers (no JSX, so `node --test` can run them).
  *
  * A bank points at a LIVE folder: the backend re-walks it on the bank list and
  * on the workspace payload, and reports the outcome as `folder_sync`

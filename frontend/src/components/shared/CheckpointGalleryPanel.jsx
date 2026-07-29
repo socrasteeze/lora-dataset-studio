@@ -17,7 +17,7 @@ import { configRows } from '../dataset/lineageDetail.js';
 import RunDeleteSection from './RunDeleteSection';
 import GeneratedImageLightbox from './GeneratedImageLightbox';
 
-/* Everything one checkpoint — or one whole RUN — ever produced.
+/* 🖼 Everything one checkpoint — or one whole RUN — ever produced.
 
    Images used to be attached to a checkpoint by PARSING the LoRA's filename on
    every render, and a checkpoint could hold exactly one preview — regenerating
@@ -46,7 +46,7 @@ import GeneratedImageLightbox from './GeneratedImageLightbox';
    names a RUN but no step are no longer part of that number: they are a real
    "Step unknown" group, because the run genuinely is known.
 
-   And it deletes. A checkpoint accumulates dozens of renders and most are
+   🗑 And it deletes. A checkpoint accumulates dozens of renders and most are
    misses; a gallery that can only show them makes the user leave the board to
    clean up. The delete is REAL (the row is the Test Studio's own cell — see
    galleryDeleteConfirmation for the sentences that say so before the click) and
@@ -214,7 +214,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
 
   const tile = (img, altLabel) => {
     const isPicked = selected.has(img.id);
-    // straight from the grid. It used to exist ONLY inside the viewer, so the
+    // 📌 straight from the grid. It used to exist ONLY inside the viewer, so the
     // board's headline feature was behind "open an image and hope" — the person
     // who asked for it never found it. The rule (never in Select mode, never
     // without a board to pin onto) lives in gallerySelection so it is testable.
@@ -256,7 +256,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
             className="pointer-events-none absolute right-0.5 top-0.5 text-[0.625rem] text-rose-300">✗</span>
         )}
         {showPin && (
-          // BOTTOM-right, because top-right is where the /verdict sits and a
+          // BOTTOM-right, because top-right is where the 👍/👎 verdict sits and a
           // thumb aiming for one must not find the other.
           //
           // The size is INVERTED from the usual responsive instinct, because the
@@ -268,7 +268,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
           <button type="button" data-testid="gallery-tile-pin"
             onClick={() => onPin(img)}
             aria-label="Pin this image to the canvas"
-            title="Pin to canvas — put this image on the board, beside the checkpoint that made it"
+            title="📌 Pin to canvas — put this image on the board, beside the checkpoint that made it"
             className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full
                        border border-indigo-300/70 bg-black/60 text-[0.8125rem] text-indigo-100
                        hover:bg-indigo-500/50 focus-visible:bg-indigo-500/50
@@ -331,7 +331,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                 {d.count === 0
                   ? 'Nothing generated from this checkpoint yet — tick it and run from the board.'
                   : picking
-                    ? `Tap the misses, then Delete. ${d.count} image${d.count > 1 ? 's' : ''} here.`
+                    ? `Tap the misses, then 🗑 Delete. ${d.count} image${d.count > 1 ? 's' : ''} here.`
                     : `${d.count} image${d.count > 1 ? 's' : ''}, newest first.`}
               </p>
               <div className={GRID}>
@@ -344,7 +344,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
             <>
               <p className="m-0 mb-2 text-content-muted text-[0.6875rem]">
                 {picking
-                  ? `Tap the misses, then Delete. ${images.length} shown in the open steps.`
+                  ? `Tap the misses, then 🗑 Delete. ${images.length} shown in the open steps.`
                   : runGallerySummary(d)}
               </p>
 
@@ -394,7 +394,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                 );
               })}
 
-              {/* The notes, where the images they describe are. They stay
+              {/* 📝 The notes, where the images they describe are. They stay
                   READ-ONLY here: editing lives in the details drawer, which
                   already owns saving, and two editors over one field is one too
                   many. A run with no note simply has no section. */}
@@ -474,7 +474,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
           )}
         </div>
 
-        {/* The action bar, pinned so it stays reachable with a thumb however far
+        {/* 📌 The action bar, pinned so it stays reachable with a thumb however far
             the grid has been scrolled — and PERMANENT: `Select` used to sit up in
             the header, so entering the mode meant reaching the top of a panel
             whose every other control was already down here. It also means the
@@ -533,7 +533,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                   disabled={bar.deleteDisabled}
                   onClick={() => setConfirming(true)}
                   className="ml-auto rounded-md border border-rose-500/50 px-3 py-1.5 text-[0.75rem] text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
-                  Delete{selected.size ? ` (${selected.size})` : ''}
+                  🗑 Delete{selected.size ? ` (${selected.size})` : ''}
                 </button>
               </>
             )}
@@ -572,7 +572,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
         </div>
       )}
 
-      {/* The image, large, with its facts laid out instead of run together in
+      {/* 🔍 The image, large, with its facts laid out instead of run together in
           one paragraph across the whole screen — see GeneratedImageLightbox.
           `onPin` is the canvas's: it drops this render onto the board as a node
           of its own, which is where two checkpoints actually get compared. */}

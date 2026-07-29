@@ -1,4 +1,4 @@
-"""Image bank — inventory, quality scan, duplicate groups, triage statuses,
+"""🗃️ Image bank — inventory, quality scan, duplicate groups, triage statuses,
 promotion. The bank references the source folder IN PLACE and must never write
 to it; background jobs run inline under TESTING (see bank_jobs.start)."""
 import io

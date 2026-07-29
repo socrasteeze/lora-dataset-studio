@@ -2855,7 +2855,7 @@ def _sync_latest_checkpoint(run, remote):
     2026-07-13). Never raises, never flips the run's status. EVERY synced save
     is KEPT (user ask: harvest ALL trained epochs) — the pod prunes its own
     saves to max_step_saves, so grabbing each one as it appears is the only
-    way to collect the full epoch history; disk is reclaimed via the /
+    way to collect the full epoch history; disk is reclaimed via the 🗑/🧹
     tools and the trash.
 
     Some pods cannot serve big files WHILE training (observed live: streams
@@ -3054,7 +3054,7 @@ def _mirror_one(run, run_dir, base, src_name):
             # A LOCAL run of the same dataset+family already produced this
             # exact name (the unsuffixed FINAL collides whenever both worlds
             # completed a run) — never clobber local work. The cloud result
-            # stays available in staging, ComfyUI and the hub's button.
+            # stays available in staging, ComfyUI and the hub's ⬇ button.
             logger.warning('local run dir already has %s — cloud mirror skipped '
                            '(local checkpoint left untouched)', dest_name)
             return
@@ -3314,8 +3314,8 @@ def all_runs(limit: int = 20) -> dict:
                # rows that open into a ≥2-node tree.
                'parent_record_id': rec.parent_record_id,
                'resumed_from': rec.resumed_from,
-               # Stable local-run identity for the #N chip + Checkpoints
-               # deep-link. Cloud rows show #<cloud run id> (run_id, below).
+               # Stable local-run identity for the 💻 #N chip + Checkpoints
+               # deep-link. Cloud rows show ☁ #<cloud run id> (run_id, below).
                'record_id': rec.id,
                # local rows live only in the registry -> addressed by record id;
                # a cloud row overrides this with 'cloud-<id>' via _run_payload.
@@ -3360,7 +3360,7 @@ def all_runs(limit: int = 20) -> dict:
         row = {'source': 'cloud', 'settings': None, **_run_payload(crun)}
         _annotate_preview(row, crun, None)
         recent.append(row)
-    # Lineage flag: a row opens the tree when it has a parent OR is itself a
+    # Lineage flag: a row opens the 🌳 tree when it has a parent OR is itself a
     # parent (a continuation branched off it). `records_with_children` is one
     # query over the shown record ids, so a parent still flags even when its
     # child sits outside this window.
@@ -3382,7 +3382,7 @@ def all_runs(limit: int = 20) -> dict:
             if r['source'] == 'local' and r['dataset_id'] == cur_ds:
                 # its freshly-registered history row is dropped to avoid the
                 # double — carry its share_key (Share config) AND record_id
-                # (#N chip) onto the live card.
+                # (💻 #N chip) onto the live card.
                 dropped = recent.pop(i)
                 local_active['share_key'] = dropped.get('share_key')
                 local_active['record_id'] = dropped.get('record_id')
@@ -3504,7 +3504,7 @@ def checkpoint_notes_for(record_id):
 
 
 def training_activity() -> dict:
-    """Is anything training RIGHT NOW — locally or on a rented pod.
+    """🏋️ Is anything training RIGHT NOW — locally or on a rented pod.
 
     Deliberately the cheapest question the app can ask: one persisted flag plus
     one indexed COUNT. No capability probe, no disk, no network — the nav bar
@@ -3557,7 +3557,7 @@ def _step_of_testable(filename) -> int | None:
 def _deployed_run_tag(rec):
     """(source, run_id) as it appears in the DEPLOYED names of THIS record's
     saves. Mirrors import_checkpoint's own rule: a cloud launch is tagged with
-    its pod-run id (`_rc<id>`, the #N chip), everything else with its
+    its pod-run id (`_rc<id>`, the ☁ #N chip), everything else with its
     TrainingRunRecord id (`_rl<id>`). (None, None) when a cloud record lost its
     pod-run id — no tag to match, so nothing is claimed."""
     if rec.source == 'cloud':
@@ -4695,7 +4695,7 @@ def clear_canvas_positions(user_id, dataset_id) -> dict:
     return {'cleared': int(removed or 0)}
 
 
-# Bounds for a pinned image node, in the board's WORLD units (a run card is
+# 🖼 Bounds for a pinned image node, in the board's WORLD units (a run card is
 # CARD_W = 264 wide, for scale). The floor keeps a node grabbable at any zoom;
 # the ceiling is the one that matters — a node resized to 8 000 px would blow
 # up its lane's extent, and ✦ Fit would then collapse the whole board to a scale
@@ -4722,7 +4722,7 @@ def _clamp_image_box(x, y, w, h):
 
 
 def _clean_group(node) -> tuple:
-    """One row's group membership, sanitised: (group_id, group_pos).
+    """🖼🖼 One row's group membership, sanitised: (group_id, group_pos).
 
     The id is an opaque client key (``g<image id>``, with a suffix when that one
     is taken); it is length-capped and stripped, never parsed. An empty or
@@ -4741,7 +4741,7 @@ def _clean_group(node) -> tuple:
 
 
 def canvas_image_nodes(user_id, dataset_ids=None) -> dict:
-    """Every image pinned on the board, grouped by dataset id — geometry AND
+    """🖼 Every image pinned on the board, grouped by dataset id — geometry AND
     the image row itself, so a lane can draw its pinned pictures without a
     second round-trip per node.
 
@@ -4780,7 +4780,7 @@ def canvas_image_nodes(user_id, dataset_ids=None) -> dict:
             'x': float(r.x), 'y': float(r.y),
             'w': float(r.w), 'h': float(r.h),
             'visible': bool(r.visible),
-            # The side-by-side strip this picture belongs to, if any. Null
+            # 🖼🖼 The side-by-side strip this picture belongs to, if any. Null
             # on every row of a board that has never grouped anything — and on
             # every row of a database that predates the columns.
             'group_id': r.group_id or None,
@@ -4816,7 +4816,7 @@ def save_canvas_image_nodes(user_id, dataset_id, nodes) -> dict:
         box = _clamp_image_box(n.get('x'), n.get('y'), n.get('w'), n.get('h'))
         if box is None:
             continue
-        # Group membership travels with the row. A row that does not MENTION
+        # 🖼🖼 Group membership travels with the row. A row that does not MENTION
         # the fields keeps whatever it had — a plain drag or resize sent by an
         # older client (or by any code path that only knows about geometry) must
         # never quietly dissolve a group.
@@ -5045,7 +5045,7 @@ def delete_cloud_checkpoint(dataset_id, run_id, filename) -> str:
 
 def staging_spare_reason(run) -> str | None:
     """Why this run's staging must NOT be trashed, or None when it is fair game.
-    The single source of truth for both buttons and for the per-run button's
+    The single source of truth for both 🧹 buttons and for the per-run button's
     disabled state — duplicating it is how the two drift apart."""
     if run.status in ACTIVE_STATES:
         return 'this run is still active — its staging is being written to'
@@ -5080,7 +5080,7 @@ _STAGING_SIZE_TTL = 60.0
 
 def staging_sizes(run_ids=None) -> dict:
     """{run_id: bytes on disk} for the runs whose staging dir still exists —
-    what the per-run needs to name the weight it is about to move. Runs with
+    what the per-run 🧹 needs to name the weight it is about to move. Runs with
     no staging (never launched, already purged, hand-deleted) are simply absent,
     which the UI reads as "nothing to clean here". Best-effort: a directory that
     cannot be walked is skipped rather than failing the whole request."""

@@ -1,4 +1,4 @@
-"""Moving a bank's folder — repoint the bank, keep every analysis.
+"""🗃️ Moving a bank's folder — repoint the bank, keep every analysis.
 
 A bank row stores `source_path`; every BankImage stores a relpath UNDER it, and
 every analysis (quality scores, dhash, face state, captions, keep/reject

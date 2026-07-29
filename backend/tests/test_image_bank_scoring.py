@@ -1,4 +1,4 @@
-"""Image bank V2 — aesthetic/NSFW/style scoring, overlaid-watermark scan and
+"""🗃️ Image bank V2 — aesthetic/NSFW/style scoring, overlaid-watermark scan and
 subfolder scoping. The heavy ML runs in a dedicated subprocess/venv; here we
 exercise the parts that don't need torch or Ollama: the read-time score flags
 (persisted scores → verdicts against the live thresholds), the facets, the

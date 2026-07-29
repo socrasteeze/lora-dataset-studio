@@ -80,9 +80,9 @@ the caption does NOT explain** to the trigger word.
 
 **The golden rule: never describe what the person IS — describe everything else.**
 
-- `myTrigger, a woman with long blonde hair and blue eyes, smiling` —
+- ❌ `myTrigger, a woman with long blonde hair and blue eyes, smiling` —
   the LoRA learns almost nothing: the caption already "explains" the appearance.
-- `myTrigger, sitting at a café table, warm afternoon light, denim jacket,
+- ✅ `myTrigger, sitting at a café table, warm afternoon light, denim jacket,
   looking at the camera` — hair, face and skin are unexplained → they bind
   to `myTrigger`.
 
@@ -106,7 +106,7 @@ very thing you're training. Masking **faces** is the opposite polarity and is
 available on purpose: see §8.
 
 **Stopping a run.** Started a big caption pass and realized it's captioning badly,
-or an option was mis-set? A **Stop** button sits in the captioning progress
+or an option was mis-set? A **⏹ Stop** button sits in the captioning progress
 banner. It finishes the image being written (an inference is never cut off
 mid-way), then stops cleanly: every caption written so far is kept, the rest is
 left untouched, and you get a *"stopped — X captioned"* summary. Nothing is killed
@@ -117,7 +117,7 @@ and nothing already done is lost — just fix the option and run again on what's
 ## 4. Settings cheat-sheet
 
 The defaults below are the app's defaults (post-research). Change them from
-Advanced options on the training panel — each knob has its own why/how there.
+⚙️ Advanced options on the training panel — each knob has its own why/how there.
 That panel also has a **Presets** row: apply a shipped ★ recipe (*Krea
 character*, *Concept*, *Style*), or save your tuned settings as a named preset to
 reuse across datasets and share (import/export as JSON).
@@ -264,7 +264,7 @@ Continue works for both **local and cloud** runs from the Runs hub.
 
 ## 7. Dual captions (long + short)
 
-An optional, **off-by-default** training technique, toggled under **Advanced
+An optional, **off-by-default** training technique, toggled under **⚙️ Advanced
 options → Dual captions** on the training panel. When on, the run uses
 ai-toolkit's native `short_and_long_captions`: **every image trains with both its
 full caption and a short one.** It's a *text-side augmentation* — showing the

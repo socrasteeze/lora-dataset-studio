@@ -1319,7 +1319,7 @@ def _run_bank_scoring(action) -> int:
     into the app's OWN bank-scoring venv — never the Flask venv, and never an
     environment the app did not build. Auto-provisions the managed venv when nothing
     is configured; a bank_scoring.python pointing anywhere else is a BORROWED
-    interpreter (that is what the picker writes) and is refused with the command
+    interpreter (that is what the ⚡ picker writes) and is refused with the command
     to run by hand. Verifies the import at the end so a pip-success-but-import-fail
     never reports a ready capability over a silent ✗ (same honesty gate as the
     watermark install)."""

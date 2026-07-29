@@ -197,7 +197,7 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
     <div style={{ position: 'absolute', left: offX, top: offY, width: pill.w, height: pill.h }}
       className="lds-ckpill-wrap">
       {big ? (
-        // Big-preview tile: the generated image at a size where it can actually
+        // 🔍 Big-preview tile: the generated image at a size where it can actually
         // be JUDGED (ComfyUI-style — click it to view full-screen), with a step
         // label strip underneath that opens the pill's actions. This is where an
         // image belongs on the board; the compact pill only counts them.

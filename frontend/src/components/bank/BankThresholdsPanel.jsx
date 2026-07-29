@@ -1,4 +1,4 @@
-/* Filter thresholds — the twelve knobs that decide every Bank flag, edited
+/* 🎚 Filter thresholds — the twelve knobs that decide every Bank flag, edited
    WHERE THE TRIAGE HAPPENS instead of three screens away.
 
    WHY IT EXISTS. Tightening duplicate detection used to mean leaving the bank

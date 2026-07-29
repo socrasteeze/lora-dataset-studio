@@ -141,7 +141,7 @@ test('the prompt bubble keeps a rewritten prompt when the server refuses', () =>
     'the bubble must portal out of the tile, or its refusal is unreadable at 400 px');
 });
 
-test('Launch all keeps its checkboxes when the bank is busy', () => {
+test('🚀 Launch all keeps its checkboxes when the bank is busy', () => {
   const body = slice(code(bank), 'const startPipeline = async (config)', 'const batchStatus');
   assertPostsBeforeClosing(body, 'setLaunchOpen(false)', 'BankWorkspace');
   // act() rewrites the 409 "another pass owns this bank" refusal for every bank

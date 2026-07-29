@@ -1,4 +1,4 @@
-"""Server-side folder picker — native dialog (mocked) + read-only listing.
+"""🖥️ Server-side folder picker — native dialog (mocked) + read-only listing.
 
 The native dialog spawns PowerShell on a real desktop, which we never want in a
 test run, so open_native_folder_dialog is monkeypatched at the route boundary.

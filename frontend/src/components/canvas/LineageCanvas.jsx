@@ -323,7 +323,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
   const imagesRef = useRef(imagesByLane);
   useEffect(() => { imagesRef.current = imagesByLane; }, [imagesByLane]);
 
-  /* What each lane actually DRAWS: lone pictures, and groups of pictures
+  /* 🖼🖼 What each lane actually DRAWS: lone pictures, and groups of pictures
      fused into one side-by-side strip (utils/canvasImageGroups). Derived, never
      stored — the rows keep one geometry per picture, exactly as before, plus
      two nullable group fields.
@@ -568,7 +568,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
        in utils/canvasNodeChrome so it is testable and cannot be lost in a
        rewrite of this handler. */
     if (isNodeControlTarget(e.target)) return;
-    /* A GROUP's own grips, hit-tested before its pictures: the title bar
+    /* 🖼🖼 A GROUP's own grips, hit-tested before its pictures: the title bar
        moves the whole strip, the corner resizes it. Both act on the ANCHOR,
        whose box IS the strip's — see beginImage(asGroup). On every pointer
        type, no long press: the bar is the only grip a group has, and a finger
@@ -847,7 +847,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
   // The open actions popover: { lane, node, pill, anchor } | null. `pill` is null
   // when a run CARD was clicked — the same popover, with only its run-level rows.
   const [openCk, setOpenCk] = useState(null);
-  // The open gallery: {recordId, step} for a checkpoint pill, or
+  // 🖼 The open gallery: {recordId, step} for a checkpoint pill, or
   // {kind:'run', recordId, node} for a whole run card. Declared here because the
   // card-click handler below opens it.
   const [gallery, setGallery] = useState(null);
@@ -1160,7 +1160,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
     onSaveImageNodes?.(dsId, [{ image_id: img.id, ...geo, visible: true, image: img }]);
   }, [imageNodes, onSaveImageNodes]);
 
-  /* Pin ALL of a finished run's images, in one click.
+  /* 📌 Pin ALL of a finished run's images, in one click.
      A lot spanning four checkpoints used to mean opening four galleries and
      pinning five pictures one by one — the board's own generation, and the
      board was the last place it landed.
@@ -1254,7 +1254,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
   /* Closing KEEPS the geometry -- that is the whole promise. Only `visible`
      flips.
 
-     Closing a picture that is inside a GROUP also takes it out of it: a
+     🖼🖼 Closing a picture that is inside a GROUP also takes it out of it: a
      closed picture is not in the strip, and leaving its membership behind would
      make the strip re-form around a picture nobody can see. It leaves through
      exactly the same function a drag-out uses, so the ones staying behind close
@@ -1350,7 +1350,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
           <span aria-hidden>✦</span> Tidy up
         </button>
         <HelpBadge topic="canvas-arrange" />
-        {/* The board's own launch button. It carries the pick count so the
+        {/* 🎨 The board's own launch button. It carries the pick count so the
             settings panel can be closed without losing sight of what is queued
             up — at 400 px the panel covers the board, and closing it is normal. */}
         <button type="button" onClick={() => setPanelOpen((v) => !v)}
@@ -1387,7 +1387,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
         </span>
         {/* The ONLY place the board's gestures are discoverable. A gesture that
             is not listed here does not exist as far as anyone is concerned, so
-            every new one earns its clause — including drop-to-fuse, which
+            every new one earns its clause — including 🖼🖼 drop-to-fuse, which
             nobody would ever guess. */}
         <span className="ml-auto hidden text-content-subtle text-[0.625rem] lg:inline">
           Drag a run to move it · drag the background to pan · wheel to zoom · click a run for all its images, notes and settings · click a checkpoint for its actions · tick a checkpoint’s <span aria-hidden>✓</span> to generate from it · <span className="font-semibold">⇧ Shift-click</span> two runs to compare - pin an image from its gallery to put it ON the board · <span className="font-semibold">drop one pinned image onto another</span> to fuse them side by side, drag one off the group to take it back out
@@ -1541,7 +1541,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
           onNodeChanged={handleNodeChanged} onNodeDeleted={handleNodeDeleted} />
       )}
 
-      {/* The run settings — the Test Studio's own panel, on the Test Studio's
+      {/* 🎨 The run settings — the Test Studio's own panel, on the Test Studio's
           own hooks. Only the checkpoints differ: they are the ticked pills. */}
       {panelOpen && (
         <CanvasGenerationPanel
@@ -1553,7 +1553,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, onPinLan
           onClose={() => setPanelOpen(false)} />
       )}
 
-      {/* Everything one checkpoint — or one whole run — ever produced. Deleting
+      {/* 🖼 Everything one checkpoint — or one whole run — ever produced. Deleting
           from it re-reads the affected lanes: the pills carry a results COUNT and
           a thumbnail, and without this the board keeps advertising images that no
           longer exist. `onDetails` hands the run over to the drawer that owns

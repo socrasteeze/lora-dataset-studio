@@ -1,4 +1,4 @@
-/* React view onto the shared connection state (utils/connectionStatus.js).
+/* 📡 React view onto the shared connection state (utils/connectionStatus.js).
    Kept as a plain .js hook so the store stays testable under `node --test`,
    which cannot parse JSX. */
 import { useEffect, useState } from 'react'

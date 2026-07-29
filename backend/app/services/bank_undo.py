@@ -13,14 +13,14 @@ Only the STATUS DIMENSION: ``(status, reject_reason)`` per row, the two columns
 those actions write. That is exactly the set of bulk actions that are reversible
 *cleanly*, and the honesty rule is that we offer undo for nothing else:
 
-* Delete rejected sends source files to the OS trash (which we cannot pull
+* 🗑 Delete rejected sends source files to the OS trash (which we cannot pull
   back programmatically) and drops the rows with all their analysis — an
   "Undo" there would restore, at best, half of half. It CLEARS this registry
   instead, because the rows a pending snapshot points at are the ones it just
   deleted.
 * ⬆ Promote copies through the dataset import path; un-promoting would mean
   deleting images in someone else's dataset.
-* Rotate lives on another column and already has a natural inverse (turn the
+* 🔄 Rotate lives on another column and already has a natural inverse (turn the
   other way), which the toast says.
 
 DEPTH IS ONE, ON PURPOSE
@@ -125,7 +125,7 @@ def take(bank_id):
 
 def clear(bank_id):
     """Drop the offer — used by the actions that make it un-restorable
-    (Delete rejected drops the very rows it points at) and by bank deletion."""
+    (🗑 Delete rejected drops the very rows it points at) and by bank deletion."""
     with _lock:
         _snapshots.pop(int(bank_id), None)
 

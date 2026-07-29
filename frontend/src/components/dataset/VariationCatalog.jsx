@@ -209,11 +209,11 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
     setSelected((s) => { const n = new Set(s); n.delete(id); return n; });
   };
 
-  // Imported shots (idea by ashish.sinha — Discord): a JSON catalog the user
+  // 📥 Imported shots (idea by ashish.sinha — Discord): a JSON catalog the user
   // had an LLM write, rather than typing 40 shots by hand. These live SERVER-side
   // (config `custom_shots`, per subject type), so they survive a browser wipe,
   // show up on a phone as well as the desktop and ride along in the full backup —
-  // the cards above stay in localStorage, unchanged.
+  // the ✨ cards above stay in localStorage, unchanged.
   const [importedShots, setImportedShots] = useState([]);
   // Every label the by-label resolvers already answer for (all catalogs + legacy
   // aliases). An imported label that shadows one of these resolves to the WRONG
@@ -288,7 +288,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
   /** ⇪ Keep — promote a hand-written card into the durable catalog. Those cards
    *  live in localStorage and die with the browser cache; exporting and
    *  re-importing them can't rescue them (they collide with themselves), so this
-   *  is the only path — one click, and the card visibly moves to the group.
+   *  is the only path — one click, and the card visibly moves to the 📥 group.
    *  Saved first, removed from localStorage only once the server confirms it
    *  landed: a failure must never make the card disappear. */
   const keepCustomShot = async (shot) => {
@@ -336,7 +336,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
     [customShots, importedShots]);
 
   /** One user-shot card — selectable like a catalog card, plus the ✕ that only
-   *  user shots have. Shared by the Custom and Imported groups so they can
+   *  user shots have. Shared by the ✨ Custom and 📥 Imported groups so they can
    *  never drift apart. */
   const renderUserShot = (c, onRemove, removeTitle, onKeep = null) => {
     const on = selected.has(c.id);
@@ -649,7 +649,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
       return;
     }
     // A saved preset carries a COPY of the user shots it selected. Restore the
-    // missing ones as cards, minus those the subject already has imported —
+    // missing ones as ✨ cards, minus those the subject already has imported —
     // otherwise an imported shot would be duplicated into localStorage.
     const restored = applyShotPreset(preset, userShots);
     const importedIds = new Set(importedShots.map((s) => s.id));
@@ -669,7 +669,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
     setCustomPresets((items) => deleteShotPreset(items, preset.id));
   };
 
-  // Prompt suffixes (Idea by waltm — Discord): the dataset's creative-
+  // ✨ Prompt suffixes (Idea by waltm — Discord): the dataset's creative-
   // direction text (one global + one per framing), surfaced here so it can be
   // tuned PER BATCH without opening the Settings modal. These are the SAME
   // dataset fields the modal edits (one shared truth) — pre-filled from the
@@ -756,7 +756,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
       <div className="flex items-center gap-2">
-        <span aria-hidden="true"></span>
+        <span aria-hidden="true">🎬</span>
         <h2 className="text-content font-semibold text-sm">Generate variations</h2>
         <span className="text-content-subtle text-[0.6875rem]">
           pick the shots to synthesize from the reference photo
@@ -924,7 +924,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
         <details className="rounded-lg border border-border bg-app/30 open:pb-2"
           onToggle={(e) => { if (e.currentTarget.open) requestHelpTip('klein-tuning-open'); }}>
           <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
-            Klein tuning
+            🖥️ Klein tuning
             <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
               model file · consistency LoRA {loraStrength <= 0 ? 'off' : loraStrength.toFixed(2)}
               {activeLoraPreset && activeLoraPreset.loras.length > 0
@@ -1015,7 +1015,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
       {isKrea && krAvailable && (
         <details className="rounded-lg border border-border bg-app/30 open:pb-2">
           <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
-            Krea 2 Edit tuning
+            🧬 Krea 2 Edit tuning
             <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
               reference grounding {groundingDescription(kreaGrounding)}
             </span>
@@ -1091,7 +1091,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
                   className="flex w-full min-w-0 flex-col gap-1.5 p-2 pr-12 text-left">
                   <span className="flex w-full min-w-0 items-baseline gap-1">
                     <span className={`truncate text-[0.6875rem] font-semibold ${active ? 'text-white' : 'text-content'}`}>
-                      {preset.name}
+                      ✨ {preset.name}
                     </span>
                     <span className="ml-auto shrink-0 text-[0.625rem] text-content-subtle">{st?.total || 0}</span>
                   </span>
@@ -1210,7 +1210,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
         {customShots.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span aria-hidden="true"></span>
+              <span aria-hidden="true">✨</span>
               <span className="text-[0.6875rem] uppercase font-semibold text-content-muted">Custom</span>
               <span className="text-content-subtle text-[0.625rem]">
                 your own shots, stored in this browser — Keep saves one for good, ✕ removes it
@@ -1311,7 +1311,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           <details> keeps its fields mounted, so drafts survive fold/unfold. */}
       <details className="rounded-lg border border-border bg-app/30 open:pb-2">
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
-          Custom shot
+          ✨ Custom shot
           <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
             write your own prompt — it becomes a reusable card in the Custom group above{nsfwMode && localOnlyRun ? ' — 🔞 register active' : ''}
           </span>
@@ -1340,13 +1340,13 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
         </div>
       </details>
 
-      {/* Shot catalog JSON — idea by ashish.sinha (Discord): export the catalog,
+      {/* 📥 Shot catalog JSON — idea by ashish.sinha (Discord): export the catalog,
           have an LLM write 40 more shots in the same shape, import the result.
           Export FIRST on purpose: nobody (and no LLM) can produce the right JSON
           without an example of it. Collapsed by default. */}
       <details className="rounded-lg border border-border bg-app/30 open:pb-2">
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
-          Shot catalog (JSON)
+          📥 Shot catalog (JSON)
           <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
             import your own shots — export first to get the format
           </span>
@@ -1421,15 +1421,15 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
         </div>
       </details>
 
-      {/* Prompt suffixes — the dataset's creative-direction text, editable
+      {/* ✨ Prompt suffixes — the dataset's creative-direction text, editable
           right here so it can be adjusted per batch (Idea by waltm — Discord).
           Applies to EVERY engine at generation time and shares the dataset
-          fields with the Settings modal; persisted just before the batch is
+          fields with the ⚙️ Settings modal; persisted just before the batch is
           enqueued. Collapsed unless a suffix is already set. */}
       <details className="rounded-lg border border-border bg-app/30 open:pb-2"
         open={suffixOpen} onToggle={(e) => setSuffixOpen(e.currentTarget.open)}>
         <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold flex items-center gap-1.5">
-          Prompt suffixes
+          ✨ Prompt suffixes
           <span className="font-normal text-content-subtle text-[0.625rem]">
             creative direction added to every generated shot{suffixDirty ? ' · applied when you generate' : ''}
           </span>
@@ -1457,7 +1457,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           <p className="text-content-subtle text-[0.625rem]">
             Free text appended to every <b>generated</b> variation — the identity lock is
             untouched. A framing suffix applies to that shot type first, then the global one.
-            Saved to the dataset when you generate, and shared with Dataset settings.
+            Saved to the dataset when you generate, and shared with ⚙️ Dataset settings.
           </p>
         </div>
       </details>
@@ -1498,7 +1498,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
             ? (generating
                 ? `Generating…${generating.total ? ` ${generating.done}/${generating.total}` : ''}`
                 : '…')
-            : `Generate (${totalImages(selected.size, engines, engineMode, multiplier)})`}
+            : `⚡ Generate (${totalImages(selected.size, engines, engineMode, multiplier)})`}
         </button>
       </div>
     </div>

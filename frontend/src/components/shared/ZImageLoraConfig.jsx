@@ -183,7 +183,7 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
                   aria-label={`Test ${l.displayName} as a batch axis (with/without)`}
                   className="accent-amber-400 w-3.5 h-3.5" />
                 <span className={c.batch ? 'text-amber-300 font-semibold' : ''}>
-                  Batch axis (compare with / without)
+                  ⚖ Batch axis (compare with / without)
                 </span>
               </label>
             )}

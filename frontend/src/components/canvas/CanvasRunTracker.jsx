@@ -23,7 +23,7 @@ export default function CanvasRunTracker({ run, targets, onStop, onResume, onOpe
   onPinAll, onUndoPinAll }) {
   const s = describeCanvasRun(run);
   if (s.phase === 'idle') return null;
-  // The one-click way onto the board. It says HOW MANY it will put down, and
+  // 📌 The one-click way onto the board. It says HOW MANY it will put down, and
   // it is simply not rendered once there is nothing left to put down — a lit
   // button that does nothing is a worse answer than no button.
   const pinLabel = pinBatchLabel(pinCount);
@@ -85,7 +85,7 @@ export default function CanvasRunTracker({ run, targets, onStop, onResume, onOpe
               </button>
             ))}
           </span>
-          {/* …or put the whole lot on the board at once. Beside Dismiss
+          {/* 📌 …or put the whole lot on the board at once. Beside Dismiss
               because they are the two ends of the same sentence: take them, or
               let them go. Placement is utils/canvasPinBatch — one column per
               source checkpoint, in a band under the lane, guaranteed to overlap
@@ -95,7 +95,7 @@ export default function CanvasRunTracker({ run, targets, onStop, onResume, onOpe
               data-testid="canvas-pin-all"
               title="Put every image this run produced on the board, each under the checkpoint that made it"
               className="shrink-0 rounded-md border border-emerald-400/60 bg-emerald-500/20 px-2 py-0.5 font-semibold text-emerald-50 hover:bg-emerald-500/35 disabled:opacity-50">
-              {pinBusy ? 'Pinning…' : pinLabel}
+              {pinBusy ? '📌 Pinning…' : pinLabel}
             </button>
           )}
           {onUndoPinAll && (

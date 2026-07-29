@@ -1,4 +1,4 @@
-// Text search — the wording that keeps a SIMILARITY RANKING from reading as a
+// 🔤 Text search — the wording that keeps a SIMILARITY RANKING from reading as a
 // filter, kept out of the JSX so `node --test` can exercise it.
 //
 // The honesty problem this file exists for: a text search returns the N closest

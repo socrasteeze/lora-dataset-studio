@@ -15,7 +15,7 @@ import StudioPreflightBanner from './StudioPreflightBanner';
 // Extraction behavior-preserving de LoraTestStudio.jsx :
 //   - bandeaux gpu_busy / pending (→ studio.cancel) / resumable (→ studio.resume)
 //   - le bloc {!d.pending && (...)} : checkpoints, strengths, prompt+récents,
-//     modèle/formats/cfg/steps, seed///×N + compteur, bouton Lancer.
+//     modèle/formats/cfg/steps, seed/🎲/🔒/×N + compteur, bouton 🚀 Lancer.
 // `d` = payload useLoraTestStudio ; `studio` = hook ; `form` = useStudioForm.
 // `datasetId` (optionnel) : requis seulement par RecentPrompts pour les vignettes
 //   (le payload `d` ne porte pas l'id du dataset → StudioShell le transmet). Voir
@@ -49,7 +49,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
 
   const canLaunch = form.total > 0 && !d.pending && !d.gpu_busy && !studio.launching
     && !launchBlocked;
-  // Axe batch (Always-on LoRA cochés batch) : chaque config tourne SANS puis
+  // Axe ⚖ batch (Always-on LoRA cochés batch) : chaque config tourne SANS puis
   // AVEC chaque LoRA coché → le compteur d'images/temps doit en tenir compte
   // (le backend multiplie déjà les cellules par 1 + nb cochés).
   const batchMult = 1 + ((genSettings.batch_loras || []).length);
@@ -205,21 +205,21 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
       {actionBar && (
       <StudioActionBar
         shortcuts={[
-          { id: 'st-loras', emoji: '', label: 'LoRAs' },
-          { id: 'st-setup', emoji: '', label: 'Prompt & seed' },
-          { id: 'st-format', emoji: '', label: 'Format' },
+          { id: 'st-loras', emoji: '🧬', label: 'LoRAs' },
+          { id: 'st-setup', emoji: '📝', label: 'Prompt & seed' },
+          { id: 'st-format', emoji: '📐', label: 'Format' },
           ...(d.family === 'krea' ? [
-            { id: 'st-sampling', emoji: '', label: 'Sampling' },
-            { id: 'st-engine', emoji: '', label: 'Engine' },
+            { id: 'st-sampling', emoji: '🎛️', label: 'Sampling' },
+            { id: 'st-engine', emoji: '⚙️', label: 'Engine' },
           ] : []),
-          ...(d.family === 'sdxl' ? [{ id: 'st-detail', emoji: '', label: 'Detail' }] : []),
-          ...(d.family === 'zimage' ? [{ id: 'st-negative', emoji: '', label: 'Negative' }] : []),
-          { id: 'st-results', emoji: '', label: 'Results' },
+          ...(d.family === 'sdxl' ? [{ id: 'st-detail', emoji: '✨', label: 'Detail' }] : []),
+          ...(d.family === 'zimage' ? [{ id: 'st-negative', emoji: '🚫', label: 'Negative' }] : []),
+          { id: 'st-results', emoji: '🖼️', label: 'Results' },
         ]}
         canRun={canLaunch}
         running={studio.launching}
         onRun={onLaunch}
-        runLabel={launchLabel ? `${launchLabel}` : undefined}
+        runLabel={launchLabel ? `🚀 ${launchLabel}` : undefined}
       />
       )}
     </>

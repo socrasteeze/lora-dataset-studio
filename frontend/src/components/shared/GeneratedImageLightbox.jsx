@@ -5,7 +5,7 @@ import {
   imageHeadlineFacts, imagePromptBlocks, imageSettingFacts, promptFold,
 } from '../../utils/generatedImageFacts';
 
-/* ONE generated image, large, with what it was made from.
+/* 🔍 ONE generated image, large, with what it was made from.
 
    It replaces two things: the zoom that lived inline in CheckpointGalleryPanel,
    and PreviewLightbox (which now renders this with the little it knows). The
@@ -100,7 +100,7 @@ function PromptBlock({ block }) {
 /**
  * `img` is a gallery image row (see services.cloud_training._gallery_image).
  * `alt` names it. `actions` is an optional node rendered in the metadata
- * column's footer — the canvas puts its Pin button there.
+ * column's footer — the canvas puts its 📌 Pin button there.
  */
 export default function GeneratedImageLightbox({ img, alt, actions = null, onClose }) {
   const dialogRef = useRef(null);

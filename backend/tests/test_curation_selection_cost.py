@@ -1,7 +1,7 @@
-"""Curation selectors — what a click COSTS, and the promise that it still
+"""🗃️ Curation selectors — what a click COSTS, and the promise that it still
 returns the same images.
 
-A Pick diverse on a real 9 500-image pool took 32 seconds while the docstring
+A 🎨 Pick diverse on a real 9 500-image pool took 32 seconds while the docstring
 promised "~sub-second". Profiled on that bank, the split was:
 
     typicality guard (all-pairs E @ E.T)   12.6 s   89 %

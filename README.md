@@ -4,7 +4,7 @@
 
 **Your whole LoRA pipeline in one self-hosted browser tab — build Character, Concept and Style datasets (generate from a reference, scrape, or triage a giant unsorted folder in the Image Bank), curate, caption, clean watermarks, then train locally or in the cloud across six model families and rank the checkpoints in a built-in Test Studio.**
 
-**Train locally** on your own NVIDIA GPU — or **train in the cloud** on a rented pod (~$1–2 per run, no GPU required): same one-click flow, every epoch synced back to your machine. You can even bring your own custom base weights to either lane.
+🖥️ **Train locally** on your own NVIDIA GPU — or ☁️ **train in the cloud** on a rented pod (~$1–2 per run, no GPU required): same one-click flow, every epoch synced back to your machine. You can even bring your own custom base weights to either lane.
 
 📑 **Not sure which settings to use?** Thirteen researched presets ship built-in — a Character and a Concept recipe for each of the six families, plus a Style recipe — sourced from Ostris' ai-toolkit defaults, vendor guidance and documented community consensus. One click applies the whole recipe.
 
@@ -358,7 +358,7 @@ Directions, not dates. These are discussed openly on the project's Discord, and 
   - [Contributing](#contributing)
   - [License](#license)
 
->  **New here?** The **Guide** tab inside the app is a 5-chapter manual: getting started, day-to-day usage, dataset quality (also readable as [docs/DATASET_GUIDE.md](docs/DATASET_GUIDE.md)), troubleshooting, and how to report problems — with a one-click diagnostic report. The chapters live in [docs/guide/](docs/guide/) if you prefer reading on GitHub.
+> 📖 **New here?** The **Guide** tab inside the app is a 5-chapter manual: getting started, day-to-day usage, dataset quality (also readable as [docs/DATASET_GUIDE.md](docs/DATASET_GUIDE.md)), troubleshooting, and how to report problems — with a one-click diagnostic report. The chapters live in [docs/guide/](docs/guide/) if you prefer reading on GitHub.
 
 ---
 
@@ -385,9 +385,9 @@ An empty dataset needs material. There are four ways in, and they mix freely ins
 **The four sources:**
 
 - **Generate** — from one or more reference photos, through the local **Klein/ComfyUI** engine (this fork is local-only for generation). Each request wraps the selected references in identity-preservation instructions so the face is preserved; generated results still need human review. (Character sets add up to 3 extra reference angles for multi-view consistency.)
-- **Import** — drag in your own photos. Concept/Style keep the full frame; Character can optionally auto-crop around the head (or use a centered/manual crop when local vision is unavailable).
-- **Scrape** — collect real images from supported web sources (below).
-- **Image bank** — when you're not starting from a handful of shots but from a **giant unsorted dump**, triage it first, then promote the keepers.
+- **📥 Import** — drag in your own photos. Concept/Style keep the full frame; Character can optionally auto-crop around the head (or use a centered/manual crop when local vision is unavailable).
+- **🌐 Scrape** — collect real images from supported web sources (below).
+- **🗃️ Image bank** — when you're not starting from a handful of shots but from a **giant unsorted dump**, triage it first, then promote the keepers.
 
 ### The Image bank — triage a giant folder in place
 
@@ -503,15 +503,15 @@ Real images pulled off the web carry **overlaid watermarks** — a site logo, a 
 </p>
 <p align="center"><em>Review each flagged mark with its detected box drawn on the shot, pick the engine, and see the cleaned result before moving on.</em></p>
 
-- **Find watermarks** runs a local vision pass (Qwen3-VL) over the kept images and flags each overlaid mark with a badge and a stored bounding box. It *deletes nothing* — it targets logos/URLs/usernames added on top of the photo, not scene text like signs or clothing prints.
-- **Clean (N)** routes each flagged image by cost and risk, with an **engine picker** — **LaMa (fast)** or **Klein (quality)**:
+- **🧽 Find watermarks** runs a local vision pass (Qwen3-VL) over the kept images and flags each overlaid mark with a 🚩 badge and a stored bounding box. It *deletes nothing* — it targets logos/URLs/usernames added on top of the photo, not scene text like signs or clothing prints.
+- **🧽 Clean (N)** routes each flagged image by cost and risk, with an **engine picker** — **LaMa (fast)** or **Klein (quality)**:
   - a mark in an outer **border band** is **cropped off** (pure pixel crop — it invents nothing, and never cuts a side below 768 px);
   - a small **off-centre** mark is **inpainted** — with LaMa (local, limited to the masked region, CPU or CUDA), or with the **Klein engine**: LaMa pre-fills the mark, then a FLUX.2 Klein refine pass regenerates real texture over the soft patch, composited back **in pixel space** so every pixel outside the mark keeps its original bytes;
   - with LaMa, anything large or sitting on the subject is left for **manual review** rather than risking a bad auto-edit — with the **Klein engine those on-subject marks become cleanable too**.
   Every edited image keeps its watermarked original as a sibling `.orig` backup, and Clean reports one honest summary (cropped / inpainted / need review / failed).
 - **Review flagged (N)** opens a lightbox that steps through the flagged images one at a time: you see the **detected box drawn** on the shot and the tool's planned action, pick the engine, then Clean it (and see the **cleaned result** before moving on), **dismiss** it as a false positive (the flag clears and future Find passes never re-flag it), or reject it outright.
 
-Inpainting is an **ML extra**: without it, Clean still crops border marks and simply *skips* the off-centre ones — a one-click **Install inpainting** button sits right next to the tools. The Klein engine additionally needs ComfyUI with the FLUX.2 Klein models (the same preflight/auto-download as Klein generation), and since LaMa is its pre-fill stage, no inpainting extras means Klein cleaning reports itself unavailable instead of degrading silently.
+Inpainting is an **ML extra**: without it, Clean still crops border marks and simply *skips* the off-centre ones — a one-click **⬇ Install inpainting** button sits right next to the tools. The Klein engine additionally needs ComfyUI with the FLUX.2 Klein models (the same preflight/auto-download as Klein generation), and since LaMa is its pre-fill stage, no inpainting extras means Klein cleaning reports itself unavailable instead of degrading silently.
 
 ---
 
@@ -520,7 +520,7 @@ Inpainting is an **ML extra**: without it, Clean still crops border marks and si
 Click **Train** and [ai-toolkit](https://github.com/ostris/ai-toolkit) runs underneath. The recommended path needs no config file; **Advanced** exposes the levers for deliberate experiments.
 
 <p align="center">
-  <img src="docs/screenshots/training/training-presets.png" alt="The training panel with the preset picker open, showing the Built-in (researched) group of Character / Style / Concept recipes scoped to the selected family, each with a one-line rationale, above the Advanced options section" width="820">
+  <img src="docs/screenshots/training/training-presets.png" alt="The training panel with the preset picker open, showing the Built-in (researched) group of Character / Style / Concept recipes scoped to the selected family, each with a one-line rationale, above the ⚙ Advanced options section" width="820">
 </p>
 <p align="center"><em>Thirteen researched presets — a Character and a Concept recipe per family, plus a Style recipe — with a sourced one-line why; the picker only shows a recipe when kind, family and variant match.</em></p>
 
@@ -532,13 +532,13 @@ Click **Train** and [ai-toolkit](https://github.com/ostris/ai-toolkit) runs unde
 - **Advanced controls** — rank/alpha, resolution, LoRA or LoKr, network dropout, timestep weighting, optimizer, learning-rate scheduler/warmup, gradient accumulation, EMA, save/sample cadence and preview prompts. A **training queue** with scheduling lines runs up instead of colliding on the GPU, with a protected **⏹ Stop training**. A **Saves kept** cap lets ai-toolkit trim older intermediate checkpoints during the run (default 4), and everything the app deletes goes to an app-wide **Trash** you empty on your own terms.
 - **Character-only masked training** from auto-generated rembg masks; Concept and Style force masking off so the subject or full-frame aesthetic isn't erased.
 - **Continue +N steps** to extend a run. Local checkpoints have a one-click import into ComfyUI; downloaded cloud results are imported automatically when a ComfyUI LoRA folder is configured.
-- **Slider LoRA mode (Beta)** — turn any dataset into a **concept slider**: give a positive and a negative prompt and ai-toolkit's `concept_slider` trainer learns a single bipolar LoRA whose ±strength dials the trait at inference (the images are only a denoising substrate, so caption guards the slider never reads are skipped). A fixed 1000-step policy, low default rank, bipolar preview samples and an isolated `_slider` run tag keep it from clobbering a normal setup. All five families are offered behind honest experimental notes — **Krea 2 is the reference** — and it runs **locally or in the cloud** (slider settings are snapshotted at launch so a mid-run edit can't retarget a rented run; the first paid slider run is still unproven — extra-Beta). Test both poles with Test Studio's **negative strengths**.
+- **🎚 Slider LoRA mode (Beta)** — turn any dataset into a **concept slider**: give a positive and a negative prompt and ai-toolkit's `concept_slider` trainer learns a single bipolar LoRA whose ±strength dials the trait at inference (the images are only a denoising substrate, so caption guards the slider never reads are skipped). A fixed 1000-step policy, low default rank, bipolar preview samples and an isolated `_slider` run tag keep it from clobbering a normal setup. All five families are offered behind honest experimental notes — **Krea 2 is the reference** — and it runs **locally or in the cloud** (slider settings are snapshotted at launch so a mid-run edit can't retarget a rented run; the first paid slider run is still unproven — extra-Beta). Test both poles with Test Studio's **negative strengths**.
 - **When a run dies, it says why** — the failure panel quotes the line that actually explains the crash (the traceback, else the last real error) instead of whatever warning happened to be printed last, and known traps are named with their fix — chief among them the **RTX 50-series PyTorch trap**, where a `sm_120` card meets a torch build that doesn't know it. A run that dies in the first seconds still gets an **Open run folder** button pointing at its `training.log`, so the log is never stranded in a folder the app didn't create.
 - **🎚 Slider LoRA mode (Beta)** — turn any dataset into a **concept slider**: give a positive and a negative prompt and ai-toolkit's `concept_slider` trainer learns a single bipolar LoRA whose ±strength dials the trait at inference (the images are only a denoising substrate, so caption guards the slider never reads are skipped). A fixed 1000-step policy, low default rank, bipolar preview samples and an isolated `_slider` run tag keep it from clobbering a normal setup. All five families are offered behind honest experimental notes — **Krea 2 is the reference** — and it runs **locally or in the cloud** (slider settings are snapshotted at launch so a mid-run edit can't retarget a rented run; the first paid slider run is still unproven — extra-Beta). Test both poles with Test Studio's **negative strengths**.
 
 ### No GPU? Train in the cloud
 
-No local GPU? Add a **vast.ai API key** (Settings → Training, or the setup wizard) and use **Train in cloud** in the Training panel. The app rents a verified-datacenter GPU, uploads your dataset, trains with the **exact same ai-toolkit configuration** as a local run, downloads the resulting `.safetensors`, and terminates the pod automatically.
+No local GPU? Add a **vast.ai API key** (Settings → Training, or the setup wizard) and use **☁️ Train in cloud** in the Training panel. The app rents a verified-datacenter GPU, uploads your dataset, trains with the **exact same ai-toolkit configuration** as a local run, downloads the resulting `.safetensors`, and terminates the pod automatically.
 
 - **Cost** — you pay vast.ai directly and offer prices vary over time. A price cap (`cloud.max_price_per_hour`, default $0.80/h), a monthly budget ceiling, and a hard runtime cap (`cloud.max_runtime_minutes`, default 8 h) are enforced before launch.
 - **Supported families** — **Z-Image, Krea 2 and FLUX.2 Klein**, on an official Hugging Face base *or* **your own custom base** pushed one-time to a private repo on your HF account (private enforced, cached by combo hash so the same base never uploads twice; the pod pulls it with your token). The launch verifies the repo, files and sizes before renting anything. **Klein 9B — 32-48 GB VRAM — is the cloud-first lane** of its family; SDXL and FLUX.1 require local training.
@@ -547,13 +547,13 @@ No local GPU? Add a **vast.ai API key** (Settings → Training, or the setup wiz
 
 ### The Runs hub
 
-**Runs** (top nav) collects **cloud and local** training side by side: live step/loss/ETA/samples, the exact recipe and dataset version, **Stop**, cloud **Retry/Continue**, downloads, and **Share config** — a paste-safe parameter/outcome summary with local paths and keys stripped.
+**🏋️ Runs** (top nav) collects **cloud and local** training side by side: live step/loss/ETA/samples, the exact recipe and dataset version, **Stop**, cloud **Retry/Continue**, downloads, and **⎘ Share config** — a paste-safe parameter/outcome summary with local paths and keys stripped.
 
 <details>
 <summary>📸 See the Runs hub — cloud and local runs side by side</summary>
 
 <p align="center">
-  <img src="docs/screenshots/training/runs-hub.png" alt="The Runs hub listing local and cloud training runs side by side, each row showing live step/loss/ETA, sample thumbnails, and Stop / Retry / Continue / Download / Share-config controls" width="820">
+  <img src="docs/screenshots/training/runs-hub.png" alt="The 🏋️ Runs hub listing local 💻 and cloud ☁ training runs side by side, each row showing live step/loss/ETA, sample thumbnails, and Stop / Retry / Continue / Download / Share-config controls" width="820">
 </p>
 <p align="center"><em>Every run, local and cloud, in one place — live progress, the exact settings it used, and one-click Stop / Retry / Continue / Download / Share.</em></p>
 
@@ -563,10 +563,10 @@ No local GPU? Add a **vast.ai API key** (Settings → Training, or the setup wiz
 
 ## 7. Read the family tree
 
-Every time you continue or fork a run, a **lineage** is born. The Runs page draws it as a **family tree** — List or Graph (now the default) — and turns it into a full experiment lab.
+Every time you continue or fork a run, a **lineage** is born. The Runs page draws it as a **family tree** — ☰ List or ◉ Graph (now the default) — and turns it into a full experiment lab.
 
 <p align="center">
-  <img src="docs/screenshots/07-lineage-graph.png" alt="Graph view of a run's lineage: a root Z-Image · turbo run with six saved checkpoints and four continuations laid out left to right, edges anchored on the exact checkpoint each run resumed from, the current run glowing indigo, and two set-aside branches dashed in amber" width="820">
+  <img src="docs/screenshots/07-lineage-graph.png" alt="◉ Graph view of a run's lineage: a root Z-Image · turbo run with six saved checkpoints and four continuations laid out left to right, edges anchored on the exact checkpoint each run resumed from, the current run glowing indigo, and two set-aside branches dashed in amber" width="820">
 </p>
 <p align="center"><em>Graph — a run's whole lineage as a family tree. The trunk lights the path root → current run, each continuation's edge starts on the checkpoint it resumed from, and set-aside branches stay dashed. Cloud and local runs sit side by side, each tagged on-disk or gone.</em></p>
 
@@ -671,14 +671,14 @@ Nothing here locks your data in — every stage has an exit.
 | Stage of the job | ai-toolkit alone | LoRA Dataset Studio |
 |---|---|---|
 | Build the dataset from one photo | none — you arrive with your images | Klein fan-out, 53-shot variation catalog, 12/6/6/1 composition target |
-| Build the dataset from the web | none | Reddit search and supported gallery/search URLs into any dataset (dedup + quality filters) |
-| Triage a giant unsorted dump | none | Image bank — quality scan, dup groups, by-person clustering, aesthetic/NSFW scores, then promote keepers |
-| Curate | your file explorer | keep/reject, crop/mirror, auto-triage, multi-select, Klein candidates, composition meter and **InsightFace scoring** |
-| Captions | write them yourself | JoyCaption/Ollama, prose vs booru by family, Concept leak checks and content-only Style rules |
-| Masked training | consumes `mask_path` if you supply masks | generates rembg masks and writes the config for Character; safely disables them for Concept/Style |
-| Training | **it is the engine** — direct config/YAML control | orchestrates adaptive/scoped recipes, preflight guards, advanced controls, queue/scheduling and continue +N |
-| Pick the best checkpoint | its sample images + your eye | Z-Image/SDXL/Krea Studio grids, same-family multi-LoRA comparison, Wilson voting and optional face ranking |
-| Move or publish the dataset | manual file handling | training ZIP, portable backup/restore, merge from ZIP/folder, optional Hugging Face publishing |
+| Build the dataset from the web | ❌ none | ✅ Reddit search and supported gallery/search URLs into any dataset (dedup + quality filters) |
+| Triage a giant unsorted dump | ❌ none | ✅ Image bank — quality scan, dup groups, by-person clustering, aesthetic/NSFW scores, then promote keepers |
+| Curate | ❌ your file explorer | ✅ keep/reject, crop/mirror, auto-triage, multi-select, Klein candidates, composition meter and **InsightFace scoring** |
+| Captions | ❌ write them yourself | ✅ JoyCaption/Ollama, prose vs booru by family, Concept leak checks and content-only Style rules |
+| Masked training | ⚙️ consumes `mask_path` if you supply masks | ✅ generates rembg masks and writes the config for Character; safely disables them for Concept/Style |
+| Training | ✅ **it is the engine** — direct config/YAML control | ⚙️ orchestrates adaptive/scoped recipes, preflight guards, advanced controls, queue/scheduling and continue +N |
+| Pick the best checkpoint | ❌ its sample images + your eye | ✅ Z-Image/SDXL/Krea Studio grids, same-family multi-LoRA comparison, Wilson voting and optional face ranking |
+| Move or publish the dataset | ⚙️ manual file handling | ✅ training ZIP, portable backup/restore, merge from ZIP/folder, optional Hugging Face publishing |
 
 **Honest verdict:** the studio is strongest when you want one guided path from raw images to a reviewed Character, Concept or Style LoRA. It now exposes common expert controls such as rank, optimizer, scheduler and timestep weighting, but a raw ai-toolkit config still offers the widest surface for unsupported architectures or experimental keys. The two coexist cleanly: ai-toolkit remains the engine, and the studio's standard ZIP/sidecars let you move between them at any time.
 
@@ -875,8 +875,8 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 | **Auto-captioning & framing** (Ollama vision, 8B model) | ~8 GB VRAM | ~7 GB | Runs alongside generation, not concurrently |
 | **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality, and downloads publicly (no HF token) |
 | **LoRA training — Z-Image / SDXL** (ai-toolkit) | 16 GB+ recommended | 10 GB+ free enforced per run | Quantized (qfloat8) + low-VRAM mode |
-| **LoRA training — Krea 2** (ai-toolkit) | **24 GB VRAM** at 1024px (enforced warning) | ~24 GB base download (Raw) + 10 GB+ free | 12B model. Under 24 GB, set **Resolution → 768 only** in Advanced options — the main VRAM lever |
-| **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** (cloud lane) | base download + 10 GB+ free | Both bases gated on Hugging Face (HF token required). Train the 9B via cloud |
+| **LoRA training — Krea 2** (ai-toolkit) | **24 GB VRAM** at 1024px (enforced warning) | ~24 GB base download (Raw) + 10 GB+ free | 12B model. Under 24 GB, set **Resolution → 768 only** in ⚙️ Advanced options — the main VRAM lever |
+| **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** (cloud lane) | base download + 10 GB+ free | Both bases gated on Hugging Face (HF token required). Train the 9B via ☁️ cloud |
 | **Face scoring / person masks / watermark inpaint** (ML extras) | none (CPU) | ~3 GB (+ a CPU torch for LaMa inpaint) | Python **3.10–3.12 required** (no wheels beyond); installable per capability from Setup |
 
 - **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux/macOS work for curation-only + manual venv.

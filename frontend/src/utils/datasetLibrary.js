@@ -12,8 +12,8 @@
 // d.trained_families (real runs), NEVER the mutable d.train_type scalar: that
 // one is just the training panel's current pick and gets rewritten on a mere
 // dropdown change. First value = the section's collapse key.
-export const TRAINED = ['trained', 'Trained', ''];
-export const NOT_TRAINED = ['not-trained', 'Not trained yet', ''];
+export const TRAINED = ['trained', 'Trained', '🎓'];
+export const NOT_TRAINED = ['not-trained', 'Not trained yet', '🚫'];
 
 // Tile size: 'S' compact list rows (maximum density), 'M' the historical
 // photo grid, 'L' large previews. Same 3-step segmented idiom as the

@@ -4,7 +4,7 @@
  * A dataset and a bank must never share bytes on disk: images only ever TRANSIT
  * between them, by copy. The server is what enforces that (it can call
  * realpath, so it also sees through symlinks and NTFS junctions). This module
- * exists so the bank creation form can say it WHILE the folder is being
+ * exists so the 🗃 bank creation form can say it WHILE the folder is being
  * typed, instead of letting the user press the button and take a 400.
  *
  * It is deliberately LEXICAL — a browser has no filesystem. So it is a hint,
@@ -72,7 +72,7 @@ export function pathRelation(a, b, opts) {
  *  /api/dataset/list). Returns {datasetId, name, relation, text} or null.
  *
  *  The text names the alternative on purpose. A refusal that only says no turns
- *  a trap into a wall — and "Import to bank" already does the right thing:
+ *  a trap into a wall — and "🗃 Import to bank" already does the right thing:
  *  it copies. */
 export function datasetFolderNotice(folder, datasets) {
   if (!String(folder ?? '').trim()) return null
@@ -89,8 +89,8 @@ export function datasetFolderNotice(folder, datasets) {
       name: d.name || '',
       relation: rel,
       text: `${what} A bank and a dataset must never share files: a bank points at a `
-        + 'LIVE folder, so Delete rejected here would delete the dataset’s images. '
-        + 'Open the dataset and use Import to bank instead — it copies them into a '
+        + 'LIVE folder, so 🗑 Delete rejected here would delete the dataset’s images. '
+        + 'Open the dataset and use 🗃 Import to bank instead — it copies them into a '
         + 'bank of their own.',
     }
   }

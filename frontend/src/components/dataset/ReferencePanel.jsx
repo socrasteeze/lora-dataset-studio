@@ -44,7 +44,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
             {refFilename && onEditRef && (
               <button type="button" onClick={onEditRef} disabled={busy}
                 title={`Edit the reference with a prompt (${editEngineNames()}) — compare before/after, then Keep or Discard`}
-                className="px-2.5 py-1 rounded-lg bg-surface-raised text-content text-xs disabled:opacity-40">Edit</button>
+                className="px-2.5 py-1 rounded-lg bg-surface-raised text-content text-xs disabled:opacity-40">✦ Edit</button>
             )}
             <label className="flex items-center gap-1 text-[0.625rem] text-content-muted cursor-pointer"
               title={visionBusy ? 'Auto head-crop is unavailable during local generation; the reference imports with a centered crop.' : 'ON: a vision pass finds the head and crops around it (slower, pauses ComfyUI). OFF (default): instant centered square — adjust with ✂ Crop, usually faster.'}>

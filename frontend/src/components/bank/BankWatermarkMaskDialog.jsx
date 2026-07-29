@@ -1,5 +1,5 @@
 /**
- * Watermark mask editor for a BANK image (idea/report: Qeeyana, Reddit).
+ * 🚩 Watermark mask editor for a BANK image (idea/report: Qeeyana, Reddit).
  *
  * The detector's box is a guess: it misses a second logo, swallows half the face,
  * or lands next to the mark. In a dataset that was fixable — in a bank it was not,
@@ -9,7 +9,7 @@
  * WatermarkRegionEditor, the geometry is utils/watermarkRegions, and the mask is
  * validated server-side by the dataset's own validator: the two lanes cannot
  * drift apart because there is only one of each. What is bank-specific is the
- * lane the mask feeds — hand zones are repainted by Inpaint and skipped by
+ * lane the mask feeds — hand zones are repainted by 🧽 Inpaint and skipped by
  * ✂ Auto-crop — and that is spelled out on screen instead of being folklore.
  *
  * Every edit saves immediately (one PUT per commit, serialized). The source file
@@ -108,7 +108,7 @@ export default function BankWatermarkMaskDialog({ bankId, image, onSaved, onClos
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Edit the watermark mask"
       className="fixed inset-0 z-[9998] flex flex-col bg-black">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2">
-        <span className="text-sm font-semibold text-white">Watermark mask</span>
+        <span className="text-sm font-semibold text-white">🚩 Watermark mask</span>
         <span className="max-w-[14rem] truncate text-xs text-white/60" title={image?.name}>
           {image?.name}
         </span>

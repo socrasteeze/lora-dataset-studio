@@ -3,8 +3,8 @@ import { readinessSignature, overrideAck } from '../../utils/readinessOverride';
 import { HelpBadge } from '../../help/HelpMode';
 
 /* Pastille de préparation à l'entraînement — miroir du preflight serveur
-   (GET /train/preflight, champs checks+verdict) : ready / warnings /
-   blocked, avec la liste des contrôles dépliable. Chaque ligne en défaut
+   (GET /train/preflight, champs checks+verdict) : 🟢 ready / 🟡 warnings /
+   🔴 blocked, avec la liste des contrôles dépliable. Chaque ligne en défaut
    qui cible une section du workspace porte un bouton « Fix → » (onJump).
    Re-fetch débouncé quand les compteurs pertinents changent (curation,
    captions, fuites) — pas à chaque poll (le preflight relit les images sur
@@ -12,9 +12,9 @@ import { HelpBadge } from '../../help/HelpMode';
    backend gate (ai-toolkit absent → 409). */
 
 const VERDICT = {
-  ready: { icon: '', label: 'Ready to train', cls: 'border-emerald-400/40 bg-emerald-500/10' },
-  warnings: { icon: '', label: 'Almost ready', cls: 'border-amber-400/40 bg-amber-500/10' },
-  blocked: { icon: '', label: 'Not ready', cls: 'border-red-400/40 bg-red-500/10' },
+  ready: { icon: '🟢', label: 'Ready to train', cls: 'border-emerald-400/40 bg-emerald-500/10' },
+  warnings: { icon: '🟡', label: 'Almost ready', cls: 'border-amber-400/40 bg-amber-500/10' },
+  blocked: { icon: '🔴', label: 'Not ready', cls: 'border-red-400/40 bg-red-500/10' },
 };
 const ROW_ICON = { ok: '✓', warn: '⚠', fail: '✕' };
 const ROW_CLS = { ok: 'text-emerald-400', warn: 'text-amber-300', fail: 'text-red-300' };

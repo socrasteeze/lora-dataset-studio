@@ -82,7 +82,7 @@ export function TipHost() {
     <div role="status"
       className="fixed bottom-4 right-4 z-50 max-w-xs rounded-xl border border-indigo-400/40 bg-surface-overlay/95 p-3 shadow-lg backdrop-blur">
       <div className="flex items-start gap-2">
-        <span aria-hidden className="text-base leading-none"></span>
+        <span aria-hidden className="text-base leading-none">💡</span>
         <div className="min-w-0 flex-1">
           <p className="m-0 text-xs leading-relaxed text-content">{tip.text}</p>
           <button type="button"

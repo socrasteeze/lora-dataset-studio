@@ -1,7 +1,7 @@
 /* "Use a GPU Python you already have" — the decidable half, JSX-free so
  * `node --test` can import it.
  *
- * Score ships CPU-only PyTorch on purpose, and on a machine with a card that
+ * ✨ Score ships CPU-only PyTorch on purpose, and on a machine with a card that
  * costs hours. The fix is NOT to download a 2.5 GB CUDA wheel from inside the
  * app (wrong wheel index = a broken environment, and it is a big download for
  * people who may not need it). It is to reuse an interpreter this machine has
@@ -75,19 +75,19 @@ export function detectionSummary(rows, nvidiaPresent = true) {
       ? ` ${usable.length} interpreter${usable.length === 1 ? '' : 's'} here already `
         + `${usable.length === 1 ? 'has' : 'have'} the packages, if you would rather not install them again.`
       : ''
-    return `No NVIDIA card detected on this machine — Score runs on the CPU either way.${offer}`
+    return `No NVIDIA card detected on this machine — ✨ Score runs on the CPU either way.${offer}`
   }
   if (!list.length) return 'No Python interpreters found to check yet.'
   const ready = list.filter((r) => r.status === 'gpu_ready')
   if (ready.length) {
-    return `${ready.length} of ${list.length} can run Score on your GPU.`
+    return `${ready.length} of ${list.length} can run ✨ Score on your GPU.`
   }
   const close = list.filter((r) => r.status === 'incomplete' && r.cuda)
   if (close.length) {
     const names = close.map((r) => `${r.label} (${missingLabels(r).join(', ')})`)
     return `None is ready yet. Reaches the GPU but needs packages: ${names.join('; ')}.`
   }
-  return 'None of these can reach the GPU — Score stays on the CPU. '
+  return 'None of these can reach the GPU — ✨ Score stays on the CPU. '
     + 'If you have another Python with a CUDA PyTorch, enter its path below.'
 }
 
@@ -114,7 +114,7 @@ export function detectionFailure(result) {
 export function dialogCopy(nvidiaPresent = true) {
   if (!nvidiaPresent) {
     return {
-      title: 'Run Score in a Python you already have',
+      title: '⚡ Run ✨ Score in a Python you already have',
       intro: 'Score needs PyTorch, OpenCLIP and a couple of others. If another '
         + 'Python on this machine already carries them, it can run the pass — no '
         + 'second install. Nothing is ever installed into those environments: '
@@ -122,7 +122,7 @@ export function dialogCopy(nvidiaPresent = true) {
     }
   }
   return {
-    title: 'Run Score on a GPU Python you already have',
+    title: '⚡ Run ✨ Score on a GPU Python you already have',
     intro: 'If this machine already has a working CUDA PyTorch — the one that '
       + 'trains your LoRAs, or the one ComfyUI runs on — Score can borrow it '
       + 'instead of downloading another. Nothing is ever installed into those '
@@ -134,8 +134,8 @@ export function dialogCopy(nvidiaPresent = true) {
  *  must not be offered "a GPU Python" — it would be a promise we cannot keep. */
 export function openerLabel(nvidiaPresent = true) {
   return nvidiaPresent
-    ? 'Use a GPU Python I already have'
-    : 'Use a Python I already have'
+    ? '⚡ Use a GPU Python I already have'
+    : '⚡ Use a Python I already have'
 }
 
 /** What to tell someone who just typed a path and pressed Check it. Silence is
@@ -168,5 +168,5 @@ export function selectionNote(result) {
   const rows = result?.interpreters || []
   const current = rows.find((r) => r.selected)
   if (!current) return null
-  return `Score runs in ${current.label} — ${current.detail}`
+  return `✨ Score runs in ${current.label} — ${current.detail}`
 }

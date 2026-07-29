@@ -112,7 +112,7 @@ test('something with no closest() at all does not throw', () => {
   assert.equal(nodePointerIntent(null, 'touch'), 'press');
 });
 
-// ---- the grip of a GROUP of pinned images ----------------------------
+// ---- 🖼🖼 the grip of a GROUP of pinned images ----------------------------
 
 const GROUP_BAR = el('[data-canvas-group-bar]', '[data-canvas-group]');
 const GROUP_CLOSE = el('[data-canvas-group-bar] button', '[data-canvas-group-bar]',

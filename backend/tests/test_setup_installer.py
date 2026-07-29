@@ -588,7 +588,7 @@ def test_execute_klein_success_clears_model_caches(monkeypatch):
 # Installs JUST simple-lama-inpainting (the version floor read from
 # requirements-ml.txt) into the SAME interpreter the LaMa wrapper resolves, so a
 # user who already has the ML extras doesn't redo the whole step. Shown next to
-# the Curate tools; a success drops the probe import-cache (no restart).
+# the Curate 🧽 tools; a success drops the probe import-cache (no restart).
 
 
 def test_install_actions_include_watermark_inpaint(app):
@@ -1513,7 +1513,7 @@ def test_run_ml_capability_pins_pillow_when_targeting_flask_venv(app, monkeypatc
 
 
 # --- bank scoring: a BORROWED interpreter is never installed into --------------
-# bank_scoring.python is what the "use a GPU Python you already have" picker
+# bank_scoring.python is what the ⚡ "use a GPU Python you already have" picker
 # writes, and that dialog promises twice that borrowed environments "are checked,
 # never changed". The Install / ↻ Reinstall button used to take that same value
 # as its install TARGET — i.e. pip into the user's ai-toolkit or ComfyUI venv.

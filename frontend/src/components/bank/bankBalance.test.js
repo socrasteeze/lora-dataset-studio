@@ -78,7 +78,7 @@ test('unlabelled images are counted out loud with the pass that fixes it', () =>
   const notes = balanceNotes({ ...EVEN, unlabelled: 30398 });
   const text = notes.map((n) => n.text).join(' | ');
   assert.match(text, /30398 images in this filter have no label yet/);
-  assert.match(text, /Framing pass/);
+  assert.match(text, /📐 Framing pass/);
 });
 
 test('“unknown” framing is distinguished from “not classified”', () => {
@@ -92,7 +92,7 @@ test('readiness refuses before Score and before Framing, with the reason', () =>
   assert.match(balanceReadiness({ scored: 0 }).reason, /✨ Score/);
   const noFraming = balanceReadiness({ scored: 10, coverage: { framing_available: false } });
   assert.equal(noFraming.ready, false);
-  assert.match(noFraming.reason, /Framing/);
+  assert.match(noFraming.reason, /📐 Framing/);
   assert.equal(balanceReadiness({ scored: 10, coverage: { framing_available: true } }).ready, true);
 });
 

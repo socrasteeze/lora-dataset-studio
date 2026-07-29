@@ -1,4 +1,4 @@
-"""Bank threshold preview: how many images a CANDIDATE threshold WOULD flag.
+"""🎚 Bank threshold preview: how many images a CANDIDATE threshold WOULD flag.
 
 This is what makes the Bank's threshold panel a decision instead of a guess —
 the user sees "1 240 → 3 019 images flagged" before saving anything. It works

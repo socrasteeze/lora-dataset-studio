@@ -1,4 +1,4 @@
-/* One panel, two scopes — the decisions a screenshot cannot show.
+/* 🖼 One panel, two scopes — the decisions a screenshot cannot show.
  *
  * The run gallery is the checkpoint gallery with its scope widened, so what has
  * to be pinned is everything that would let the two drift or lie:

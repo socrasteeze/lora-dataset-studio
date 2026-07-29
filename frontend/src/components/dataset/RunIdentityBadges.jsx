@@ -2,7 +2,7 @@
    never confused again:
 
    • RunIdChip — a rounded-full PILL carrying a training run's stable id
-     (#49 for a cloud run, #12 for a local one). This is the identity the
+     (☁ #49 for a cloud run, 💻 #12 for a local one). This is the identity the
      Runs page and the Checkpoints panel share so "this final" ties back to
      "the run that produced it".
    • DatasetVersionChip — a rounded-RECTANGLE tag for the dataset version the
@@ -46,7 +46,7 @@ export function BaseModelChip({ label, className = '' }) {
           ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
           : 'border-border bg-surface-raised text-content-subtle')
         + (className ? ` ${className}` : '')}>
-      <span aria-hidden></span>
+      <span aria-hidden>🧩</span>
       <span className="truncate">{label.text}</span>
     </span>
   );

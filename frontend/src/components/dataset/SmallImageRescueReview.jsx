@@ -84,7 +84,7 @@ export default function SmallImageRescueReview({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 id="small-image-rescue-title" className="m-0 text-sm font-semibold text-content">
-            Small-image rescue review
+            ✨ Small-image rescue review
           </h3>
           <p className="m-0 mt-0.5 max-w-3xl text-[0.6875rem] leading-relaxed text-content-subtle">
             Klein is generative: compare identity, textures and small details. Both versions stay out

@@ -1,4 +1,4 @@
-/* Wiring contract for the Score interpreter picker.
+/* Wiring contract for the ✨ Score interpreter picker.
  *
  * The logic is unit-tested in scoringPython.test.js; what a rewrite of the
  * workspace silently loses is the WIRING — the entry point, the refresh after a

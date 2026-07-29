@@ -118,7 +118,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
       <div className="w-full max-w-3xl mx-auto my-auto flex flex-col gap-3
                       bg-surface-overlay border border-border rounded-2xl shadow-2xl p-4 sm:p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-content text-base font-semibold">Edit reference</h2>
+          <h2 className="text-content text-base font-semibold">✦ Edit reference</h2>
           <button type="button" onClick={onClose} disabled={busy}
             aria-label="Close" className="px-2 py-1 rounded-lg bg-surface text-content text-sm disabled:opacity-40">✕</button>
         </div>

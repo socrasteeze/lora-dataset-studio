@@ -38,7 +38,7 @@ export function allGalleryImageIds(images) {
   return new Set((images || []).map((i) => i?.id).filter((id) => id != null));
 }
 
-/** What the pinned bottom bar carries, for a given panel state.
+/** 📌 What the pinned bottom bar carries, for a given panel state.
  *
  *  `Select` used to live in the header while `Select all` and `Delete` lived in
  *  a footer bar that only existed once the mode was ON. Entering the mode was
@@ -74,7 +74,7 @@ export function galleryActionBar({
   };
 }
 
-/** Does THIS thumbnail carry a "pin to canvas" affordance?
+/** 📌 Does THIS thumbnail carry a "pin to canvas" affordance?
  *
  *  WHY THIS IS A DECISION AND NOT AN INLINE `&&`
  *  ---------------------------------------------

@@ -1,4 +1,4 @@
-/* What a generated image was actually MADE with — the reading order.
+/* 🔍 What a generated image was actually MADE with — the reading order.
 
    The lightbox used to print one paragraph across the full width of the screen:
 

@@ -1,4 +1,4 @@
-// Classify framing — UI gate (PURE JS, JSX-free so node --test can import it).
+// 📐 Classify framing — UI gate (PURE JS, JSX-free so node --test can import it).
 //
 // Imported images keep framing = NULL unless head-crop was on at import time, and
 // the Composition bar only counts images whose framing is KNOWN. A drag-and-drop
@@ -40,7 +40,7 @@ export function classifyBlockedReason(ollama, loading = false) {
   return null;
 }
 
-/** Everything the Classify framing affordance needs.
+/** Everything the 📐 Classify framing affordance needs.
  *
  * `activity` is the dataset payload's persistent server-side batch indicator, so a
  * pass keeps showing its progress across a page reload. */
@@ -63,8 +63,8 @@ export function classifyFramingState({
     blockedReason,
     disabled: running || busy || capsLoading || !!blockedReason,
     label: running
-      ? `Classifying framing… ${done}/${total || count}`
-      : `Classify framing (${count})`,
+      ? `📐 Classifying framing… ${done}/${total || count}`
+      : `📐 Classify framing (${count})`,
     title: blockedReason
       || (running
         ? 'A framing pass is already running on this dataset'

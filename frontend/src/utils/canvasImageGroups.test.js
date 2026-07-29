@@ -5,7 +5,7 @@ import {
   mergeTargetAt, nextGroupId, shouldExtract,
 } from './canvasImageGroups.js';
 
-/* Grouped pinned images — the arithmetic.
+/* 🖼🖼 Grouped pinned images — the arithmetic.
 
    "Drop one image onto another and they become ONE node, side by side, with no
    border between them, no limit on how many; drag one out and it is its own

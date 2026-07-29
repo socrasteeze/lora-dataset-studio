@@ -134,7 +134,7 @@ function HelpModeToggle({ onToggle }) {
 
 function NavBar() {
   const { caps } = useCapabilities()
-  // Live indicator on Runs: a training can hold the GPU for hours (local) or
+  // 🏋️ Live indicator on Runs: a training can hold the GPU for hours (local) or
   // bill by the minute (cloud), and from any other page nothing said so.
   const activity = useTrainingActivity()
   const activityTitle = activityLabel(activity)
@@ -349,12 +349,12 @@ function UpdateBanner() {
     <div className="mx-auto max-w-5xl px-4 pt-3">
       <div role="status"
         className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm">
-        <span aria-hidden></span>
+        <span aria-hidden>⬆</span>
         {applying ? (
           <span className="text-content">
             {phase === 'restarting'
               ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back…'
-              : 'Pulling the latest version…'}
+              : '⬇ Pulling the latest version…'}
           </span>
         ) : (
           <>

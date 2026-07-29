@@ -204,7 +204,7 @@ export function applyShotImport(existing, accepted) {
 }
 
 /**
- * Promote a hand-written card (localStorage, dies with the browser cache) into
+ * Promote a hand-written ✨ card (localStorage, dies with the browser cache) into
  * the durable catalog. Returns BOTH lists so the move can't degrade into a copy:
  * two shots with the same label is exactly the collision the importer refuses.
  *

@@ -23,7 +23,7 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
         <button type="button" onClick={() => setDescribeOpen(true)}
           title="Describe an image into a test prompt (vision model)"
           className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-[0.625rem] hover:text-content">
-          Describe
+          🔎 Describe
         </button>
       </div>
       <textarea

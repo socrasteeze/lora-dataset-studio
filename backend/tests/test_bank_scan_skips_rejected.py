@@ -1,4 +1,4 @@
-"""Image bank — the quality scan leaves rejected images alone.
+"""🗃️ Image bank — the quality scan leaves rejected images alone.
 
 Every other pass (faces, score, framing, watermark, captions) already filtered
 `status != 'reject'`; the quality scan did not. On a real 30 000-image bank with

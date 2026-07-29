@@ -9,9 +9,9 @@ import { useEffect, useRef, useState } from 'react';
 export function useQuickVote(rate) {
   const [voteQueue, setVoteQueue] = useState(null);
   const [voteIdx, setVoteIdx] = useState(0);
-  // Titre de mode optionnel (ex. « Reconfirmer les ») : distingue visuellement
+  // Titre de mode optionnel (ex. « Reconfirmer les 👍 ») : distingue visuellement
   // une 2e passe sur les votés d'une 1re passe sur les non-votés (sinon le modal
-  // est identique et on risque de par erreur en croyant voter des nouvelles).
+  // est identique et on risque de 👎 par erreur en croyant voter des nouvelles).
   const [voteTitle, setVoteTitle] = useState(null);
   const touchRef = useRef(null);
 

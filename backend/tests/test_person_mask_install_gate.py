@@ -98,7 +98,7 @@ def test_rembg_present_is_a_green_row_not_a_warning(app, tmp_path, monkeypatch):
 
 
 def test_unmasked_launch_says_nothing(app, tmp_path, monkeypatch):
-    """Someone who unticked Masked is not waiting for a mask — warning there is
+    """Someone who unticked 🎭 Masked is not waiting for a mask — warning there is
     the noise that teaches people to click through preflights."""
     from app.services import lora_training as lt
     _no_rembg(monkeypatch)

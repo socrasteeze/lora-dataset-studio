@@ -35,7 +35,7 @@ export const PAD = 22;     // breathing room around the whole tree
 // tree — the saves are satellites of the run, never their own generations.
 export const PILL_W = 60;
 export const PILL_H = 20;
-// Big-preview mode: the pill becomes a ComfyUI-style preview tile so several
+// 🔍 Big-preview mode: the pill becomes a ComfyUI-style preview tile so several
 // checkpoints' generated images can be compared at a glance without opening each.
 // Square-ish, ~2 tiles per card row — the layout below adapts to these.
 export const PILL_W_BIG = 128;

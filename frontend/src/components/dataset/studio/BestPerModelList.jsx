@@ -31,7 +31,7 @@ export default function BestPerModelList({ items, breakdown, datasetId, onMemori
             <span className="text-content-subtle">
               str {fmt(m.strength)}{m.cfg != null ? ` · cfg ${m.cfg}` : ''}{m.steps != null ? ` · ${m.steps}${m.steps2 != null ? '/' + m.steps2 : ''}st` : ''}{m.aspect ? ` · ${m.aspect}` : ''}
             </span>
-            <span className="text-content-subtle tabular-nums">{m.likes}/{m.voted}</span>
+            <span className="text-content-subtle tabular-nums">👍{m.likes}/{m.voted}</span>
             <button type="button" onClick={() => onMemorize(m)}
               title="Save this setting as the dataset's best"
               className="ml-auto px-2 py-0.5 rounded bg-amber-400/15 border border-amber-400/40 text-amber-200">★</button>
@@ -42,7 +42,7 @@ export default function BestPerModelList({ items, breakdown, datasetId, onMemori
                 <span key={`${m.checkpoint}|${b.z_model || 'off'}`}
                   title={`${b.voted} voted out of ${b.images} generated`}>
                   {b.z_model_label || 'Official'} {b.voted}/{b.images}
-                  {b.like_rate != null ? ` · ${Math.round(b.like_rate * 100)}%` : ''}
+                  {b.like_rate != null ? ` · ${Math.round(b.like_rate * 100)}%👍` : ''}
                 </span>
               ))}
             </div>

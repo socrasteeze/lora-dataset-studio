@@ -340,7 +340,7 @@ export default function StudioGenerationSettings({ family = 'zimage', storagePre
                 loras={permCandidates}
                 onChange={setPermStack}
                 storageKey={k('perm')}
-                label="Always-on LoRAs (every cell · batch = tested as an axis)"
+                label="Always-on LoRAs (every cell · ⚖ batch = tested as an axis)"
                 emptyHint="No always-on LoRA for this pipeline."
                 krea
                 batchToggle

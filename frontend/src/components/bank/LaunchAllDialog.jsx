@@ -203,7 +203,7 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
 
         {/* The refusal, right above the button that produced it — the passes you
             ticked are still ticked. shrink-0 keeps it from being squashed to a
-            clipped sliver, max-h-24 keeps a long sentence from pushing Launch
+            clipped sliver, max-h-24 keeps a long sentence from pushing 🚀 Launch
             off a 400-px screen. */}
         {error && (
           <div role="alert"
@@ -231,7 +231,7 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
           )}
           <button type="button" onClick={launch} disabled={busy || nRun === 0}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? 'Starting…' : `Launch${nRun ? ` ${nRun} pass${nRun > 1 ? 'es' : ''}` : ''}`}
+            {busy ? 'Starting…' : `🚀 Launch${nRun ? ` ${nRun} pass${nRun > 1 ? 'es' : ''}` : ''}`}
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-"""Image bank — Score only holds the GPU when it actually uses it.
+"""🗃️ Image bank — ✨ Score only holds the GPU when it actually uses it.
 
 The scoring extra installs CPU-only torch on purpose, and the child picks its
 own device (`cuda if torch.cuda.is_available()`). The parent used to take the

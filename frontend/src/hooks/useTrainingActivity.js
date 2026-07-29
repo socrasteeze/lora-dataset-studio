@@ -1,4 +1,4 @@
-/* Polls "is anything training right now" for the nav indicator.
+/* 🏋️ Polls "is anything training right now" for the nav indicator.
    Separate from useCapabilities on purpose: capabilities are probed and cached
    server-side for 30 s, which is the wrong freshness for a live indicator, and
    probing every 15 s would be wasteful. GET /api/train/activity is one flag

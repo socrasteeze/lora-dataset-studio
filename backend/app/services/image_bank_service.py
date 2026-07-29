@@ -1,4 +1,4 @@
-"""Image bank service — triage a big unsorted folder into dataset-ready
+"""🗃️ Image bank service — triage a big unsorted folder into dataset-ready
 selections.
 
 The founding use case: "I exported 9 000 images from Telegram — now what?".
@@ -246,7 +246,7 @@ def create_bank(user_id, name, folder):
     # A bank and a dataset only ever TRANSIT images (by copy) — they never share
     # them. This folder is the one place that door was open: a dataset's storage
     # folder pasted here made a bank over the dataset's LIVE files, and this
-    # bank's Delete rejected then deleted images out of the dataset.
+    # bank's 🗑 Delete rejected then deleted images out of the dataset.
     conflict = path_guard.dataset_folder_conflict(folder)
     if conflict:
         raise ValueError(conflict['message'])
@@ -856,7 +856,7 @@ _FRAMING_TARGET = {'face': 12, 'bust': 6, 'body': 6, 'back': 1}
 
 
 def _framing_counts(bank_id, extra_crit=None) -> dict:
-    """Per-bucket image counts for the Framing chips in ONE GROUP BY. Rows with
+    """Per-bucket image counts for the 📐 Framing chips in ONE GROUP BY. Rows with
     a NULL framing (not classified) are excluded, so every key is present with a
     real count. ``extra_crit`` narrows the pool (e.g. status='keep' for coverage)."""
     q = (db.session.query(BankImage.framing, func.count(BankImage.id))
@@ -1068,7 +1068,7 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'score_device': score_device_info(bank_id),
         # Non-null only on a bank created before the create-time guard, whose
         # folder IS a dataset's storage. The workspace turns it into a standing
-        # banner and disables Delete rejected, which the server refuses anyway.
+        # banner and disables 🗑 Delete rejected, which the server refuses anyway.
         'dataset_conflict': bank_dataset_conflict(user_id, bank_id),
         'thresholds': th,
     }
@@ -1680,7 +1680,7 @@ def reset_score_memo() -> None:
 
 
 def _load_score_embeddings(bank: ImageBank) -> dict:
-    """{abs_path: emb (np.float32, L2-normed)} from the Score pass cache, for the
+    """{abs_path: emb (np.float32, L2-normed)} from the ✨ Score pass cache, for the
     scored 'ok' images whose file still matches what was scored. Empty when the pass
     never ran (no cache) — the caller then surfaces the "run Score first" hint. A
     STALE entry (a same-path edit since scoring, detected via the cached size+mtime
@@ -1733,7 +1733,7 @@ def _load_score_embeddings(bank: ImageBank) -> dict:
 
 
 def rebuild_semantic_dup_groups(bank_id, threshold=None) -> int | None:
-    """Stage-2 near-duplicate grouping over the CLIP embeddings the Score pass
+    """Stage-2 near-duplicate grouping over the CLIP embeddings the ✨ Score pass
     cached — catches crops and re-compressed variants of the SAME shot that the
     dHash (stage 1) misses. Returns the group count (groups of ≥2), or None when NO
     embeddings are available (Score hasn't run) so the caller shows the "run Score
@@ -1821,7 +1821,7 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None) -> int | None:
 
 
 def start_semantic_dedup(app, user_id, bank_id, threshold=None):
-    """Launch the stage-2 semantic near-duplicate pass (CPU, reuses the Score
+    """Launch the stage-2 semantic near-duplicate pass (CPU, reuses the ✨ Score
     embeddings — no GPU). ValueError (→400) when Score hasn't produced any usable
     embedding yet, so the UI shows the clear "run Score first" hint rather than a
     job that quietly does nothing."""
@@ -1829,7 +1829,7 @@ def start_semantic_dedup(app, user_id, bank_id, threshold=None):
     if not bank:
         raise ValueError('bank not found')
     if not _load_score_embeddings(bank):
-        raise ValueError('run Score first — semantic near-duplicates reuse its '
+        raise ValueError('run ✨ Score first — semantic near-duplicates reuse its '
                          'embeddings')
     return bank_jobs.start(app, bank_id, 'semantic_dedup',
                            _semantic_dedup_job(bank_id, threshold), total=0)
@@ -1840,7 +1840,7 @@ def _semantic_dedup_job(bank_id, threshold):
         bank_jobs.progress(job, done=0, total=0, detail='finding crops & variants')
         n = rebuild_semantic_dup_groups(bank_id, threshold)
         if n is None:
-            bank_jobs.progress(job, detail='no embeddings — run Score first')
+            bank_jobs.progress(job, detail='no embeddings — run ✨ Score first')
             return
         bank_jobs.progress(job, detail=f'done — {n} semantic near-duplicate group(s)')
     return run
@@ -2177,7 +2177,7 @@ def undo_last(user_id, bank_id) -> dict:
 
 
 # --- curation selectors (diversity · reference similarity) ------------------
-# Both reuse the CLIP embeddings the Score pass already cached — no GPU, no
+# Both reuse the CLIP embeddings the ✨ Score pass already cached — no GPU, no
 # re-scan (same contract as the semantic-dedup stage). They only ever build a
 # SELECTION (a set of image ids the UI checks); the user reviews it before any
 # Keep / Reject / Promote — nothing is mutated or deleted here.
@@ -2436,7 +2436,7 @@ def _farthest_point(E, factor, n):
 
 def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
                    filters=None):
-    """Farthest-point sampling over the Score CLIP embeddings, tempered by a
+    """Farthest-point sampling over the ✨ Score CLIP embeddings, tempered by a
     TYPICALITY guard: the ``n`` images of the (filtered) pool that best COVER the
     visual space — the antidote to a dump of 4 000 near-identical shots. Greedy
     FPS: seed with the lowest-id row (deterministic), then repeatedly add the
@@ -2475,7 +2475,7 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
     selection into look-alikes from the middle of the cloud.
 
     Returns {'image_ids': [...] (sorted), 'pool': m, 'requested': n,
-    'typicality': w}. Raises ValueError (→400, "run Score first") when no
+    'typicality': w}. Raises ValueError (→400, "run ✨ Score first") when no
     embedding exists yet, so the UI shows the clear hint instead of an empty,
     unexplained selection."""
     import numpy as np
@@ -2484,7 +2484,7 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
         raise ValueError('bank not found')
     emb_by_path = _load_score_embeddings(bank)
     if not emb_by_path:
-        raise ValueError('run Score first — diversity sampling reuses its '
+        raise ValueError('run ✨ Score first — diversity sampling reuses its '
                          'embeddings')
     n = max(1, min(int(n), _CURATION_MAX_N))
     try:
@@ -2579,8 +2579,8 @@ def _balance_axis_hint(axis, m, unlabelled, unknown) -> str:
     and the numbers, instead of returning an empty or misleading selection."""
     what = ('the shot type of each image' if axis == 'framing'
             else 'the shot type AND the person of each image')
-    passes = ('run the Framing pass first' if axis == 'framing'
-              else 'run the Framing and Group by person passes first')
+    passes = ('run the 📐 Framing pass first' if axis == 'framing'
+              else 'run the 📐 Framing and 👥 Group by person passes first')
     tail = ''
     if unknown and not unlabelled:
         tail = (f' — {unknown} of {m} came back as "unknown" framing, which is a '
@@ -2588,7 +2588,7 @@ def _balance_axis_hint(axis, m, unlabelled, unknown) -> str:
     else:
         tail = f' — {unlabelled} of {m} images here have no label yet'
     return (f'{passes}: balanced selection needs {what}{tail}. '
-            f'Pick diverse works without it.')
+            f'🎨 Pick diverse works without it.')
 
 
 def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
@@ -2603,7 +2603,7 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
     It ACCOMPANIES ``select_diverse``, it does not replace it: variety inside a
     space and coverage of a label are different questions, and the diverse
     selector still works on a bank with no labels at all (which is most banks
-    until the Framing pass has run).
+    until the 📐 Framing pass has run).
 
     Composition with the typicality guard: the isolation penalty is computed ONCE
     over the WHOLE filtered pool and then sliced per bucket — deliberately, since
@@ -2700,7 +2700,7 @@ def select_balanced(user_id, bank_id, n=60, *, axis=_BALANCE_DEFAULT_AXIS,
 
 def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=None):
     """Rank the (filtered) pool by CLIP cosine similarity to a REFERENCE bank image
-    (its own cached Score embedding) — "keep what looks like THIS", to pull one
+    (its own cached ✨ Score embedding) — "keep what looks like THIS", to pull one
     person / look out of a mixed dump. Returns the top-``n`` most similar ids, OR
     everything with cosine ≥ ``min_score`` when that is given; the reference itself
     (cosine 1.0) is always included. Reuses the cached embeddings — no GPU.
@@ -2714,7 +2714,7 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
         raise ValueError('bank not found')
     emb_by_path = _load_score_embeddings(bank)
     if not emb_by_path:
-        raise ValueError('run Score first — reference similarity reuses its '
+        raise ValueError('run ✨ Score first — reference similarity reuses its '
                          'embeddings')
     ref = db.session.get(BankImage, int(ref_id))
     if ref is None or ref.bank_id != bank_id:
@@ -2722,7 +2722,7 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
     ref_path = abs_image_path(bank, ref)
     ref_emb = emb_by_path.get(ref_path) if ref_path else None
     if ref_emb is None:
-        raise ValueError('the reference image has no Score embedding — score '
+        raise ValueError('the reference image has no ✨ Score embedding — score '
                          'it first (it may have been rejected before Score ran)')
     ids, E = _pool_embeddings(bank, emb_by_path, filters or {})
     if not ids:
@@ -2892,7 +2892,7 @@ def bank_dataset_conflict(user_id, bank_id) -> dict | None:
 
     The guard alone protects nobody who already has such a bank: it was created
     before the guard existed, it is in their database right now, and the click
-    that hurts is Delete rejected. So the conflict is DETECTED at open time
+    that hurts is 🗑 Delete rejected. So the conflict is DETECTED at open time
     (it rides in the workspace payload, which is also the 2 s poll — one
     realpath, no walk) and the destructive action refuses. Deliberately nothing
     else: the bank stays fully readable and fully triageable, and NOTHING is
@@ -2905,7 +2905,7 @@ def bank_dataset_conflict(user_id, bank_id) -> dict | None:
 
 
 def rejected_delete_preview(user_id, bank_id) -> dict | None:
-    """What a Delete rejected would actually destroy — the honest warning the
+    """What a 🗑 Delete rejected would actually destroy — the honest warning the
     confirmation needs. Counts the rejected files of this bank that ANOTHER bank
     also lists, per bank, by matching absolute paths against that bank's own
     inventory. None when the bank is gone.
@@ -3309,7 +3309,7 @@ SCORE_CPU_MS_PER_IMAGE = 336
 
 
 def score_device_info(bank_id=None) -> dict:
-    """What Score will run on, and — when that is the CPU — how long the bank
+    """What ✨ Score will run on, and — when that is the CPU — how long the bank
     would take and whether this machine even has a card to switch to.
 
     The pass is not slow by accident: the scoring extra installs CPU-only torch
@@ -3607,7 +3607,7 @@ def _watermark_job(bank_id, rescan):
 #   level 1 — ✂ auto-crop: CPU/PIL, invents no pixel. Only touches marks the
 #             dataset router calls croppable (inside a border band, and the crop
 #             still leaves a usable image). Everything else is left flagged.
-#   level 2 — inpaint: LaMa (fast, non-generative) or Klein (ComfyUI, handles
+#   level 2 — 🧽 inpaint: LaMa (fast, non-generative) or Klein (ComfyUI, handles
 #             on-subject marks) over what is STILL flagged. allow_crop=False, so
 #             a border mark that level 1 skipped (or that the user never cropped)
 #             is repainted rather than cropped — level 2 is the "repaint what's
@@ -3730,7 +3730,7 @@ def start_watermark_crop(app, user_id, bank_id):
     if not total:
         if _clean_pool_query(bank_id).count():
             raise ValueError('the flagged images all carry a hand-edited mask — '
-                             'use Inpaint, which repaints the zones you drew')
+                             'use 🧽 Inpaint, which repaints the zones you drew')
         raise ValueError('no flagged image to clean — run the watermark scan first')
     return bank_jobs.start(app, bank_id, 'watermark_crop',
                            _watermark_crop_job(bank_id), total=total)
@@ -4112,7 +4112,7 @@ def watermark_levels(user_id, bank_id) -> dict | None:
 def start_framing(app, user_id, bank_id, rescan=False):
     """Classify every non-rejected image by SHOT TYPE (face / bust / body / back),
     reusing the SAME Qwen3-VL classifier the datasets use (CLASSIFY_PROMPT). Feeds
-    the Framing filter chips and the coverage advice. Needs the vision model
+    the 📐 Framing filter chips and the coverage advice. Needs the vision model
     pulled; serialized against training/vision like the watermark pass (503 when
     the GPU is held). ``rescan`` re-classifies rows that already have a framing."""
     from ..capabilities import probe_ollama_model
@@ -4227,7 +4227,7 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None)
     dataset caption uses, appended as an instruction. Explicit only spells sexual
     content out when the backend runs an abliterated Ollama model; the choice rides
     per-call (the UI passes it), so a call WITHOUT it is byte-identical to before
-    (no instruction appended). Richer captions also mean richer search text."""
+    (no instruction appended). Richer captions also mean richer 🔍 search text."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -4574,7 +4574,7 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, 
         # mute ✗) when Score produced no embeddings.
         n = rebuild_semantic_dup_groups(bank_id)
         if n is None:
-            entry['status'], entry['reason'] = 'skipped', 'run Score first — no embeddings'
+            entry['status'], entry['reason'] = 'skipped', 'run ✨ Score first — no embeddings'
             return
         entry['counts'] = {'semantic_groups': n}
         entry['detail'] = f'{n} semantic near-duplicate group(s) to review'
@@ -4654,7 +4654,7 @@ def subfolders_payload(user_id, bank_id) -> dict | None:
 # is thin for a good LoRA — purely from data the passes already computed (framing,
 # person clusters, style clusters, resolution). It NEVER selects or rejects; it
 # only phrases honest, non-alarmist sentences. Everything here is pure DB math,
-# zero GPU — the framing part just needs the Framing pass to have run.
+# zero GPU — the framing part just needs the 📐 Framing pass to have run.
 def _pct(n, total) -> int:
     return int(round(100 * n / total)) if total else 0
 
@@ -4729,11 +4729,11 @@ def _coverage_advice(stats: dict) -> list:
                     'text': f'Only {total} {noun} — most LoRA families train more '
                             f'reliably with 20+ images.'})
 
-    # Framing balance (needs the Framing pass).
+    # Framing balance (needs the 📐 Framing pass).
     fr, known = stats['framing'], stats['framing_known']
     if not stats['framing_available']:
         out.append({'tone': 'info',
-                    'text': 'Run the Framing pass to see how your face / bust / '
+                    'text': 'Run the 📐 Framing pass to see how your face / bust / '
                             'body / back shots balance.'})
     elif known > 0:
         dom = max(_FRAMINGS, key=lambda k: fr[k])
@@ -4896,7 +4896,7 @@ def _scrape_blob_name(raw: bytes) -> str | None:
 
 
 def scrape_import_to_bank(user_id, items, bank_id=None, name=None) -> dict:
-    """Scrape → BANK: the scraper's second destination.
+    """🕸 Scrape → BANK: the scraper's second destination.
 
     Downloads the SELECTED scanned images ({'url','title'}) into a bank's source
     FOLDER, then lets the ordinary folder walk inventory them. Two modes:

@@ -199,7 +199,7 @@ test('tab order follows the eye: one DOM order, no CSS reordering', () => {
     '⇆ Mirror horizontally',
     'Rotate left',
     'Rotate right',
-    'Upscale & improve',
+    '✨ Upscale & improve',
     '<KleinImproveNote',
   ].map(at);
   for (let i = 1; i < order.length; i += 1) {
@@ -214,7 +214,7 @@ test('tab order follows the eye: one DOM order, no CSS reordering', () => {
 
 test('the rail keeps words — these actions rotate, recrop and spend GPU time', () => {
   for (const label of ['✂ Crop', '⇆ Mirror horizontally', 'Rotate left',
-    'Rotate right', 'Upscale & improve']) {
+    'Rotate right', '✨ Upscale & improve']) {
     assert.ok(lightbox.includes(label), `${label} must stay spelled out`);
   }
   // No placement branch may swap a label for a bare glyph.

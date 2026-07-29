@@ -17,7 +17,7 @@ import GeneratedImageLightbox from '../shared/GeneratedImageLightbox';
    ⚠ A pill's preview carries no seed and no settings: it is a URL and a step,
    held by the lineage node, not a gallery row. The facts column therefore shows
    the step and says the rest is unknown rather than inventing it. The full
-   record is one click away — the pill's badge opens the gallery, whose rows
+   record is one click away — the pill's 🖼 badge opens the gallery, whose rows
    are the real thing.
 
    `target` is { url, step } | null. */

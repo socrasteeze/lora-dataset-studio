@@ -1,6 +1,6 @@
 """The image half and the text half of CLIP must load the SAME model.
 
-Text search ranks a query vector (from ``clip_text_infer.py``) against the
+🔤 Text search ranks a query vector (from ``clip_text_infer.py``) against the
 image vectors ``bank_score_infer.py`` cached. Cosine similarity between vectors
 produced by two DIFFERENT CLIP configurations is meaningless — and, crucially,
 it does not look meaningless: the dot product returns numbers in the usual range

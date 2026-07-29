@@ -96,7 +96,7 @@ export default function PublishHfModal({ datasetId, onClose }) {
       <div className="w-full max-w-lg rounded-xl border border-border bg-surface-overlay p-4 flex flex-col gap-3 max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}>
         <h2 className="text-content font-semibold flex items-center gap-1.5">
-          Publish to Hugging Face
+          🤗 Publish to Hugging Face
         </h2>
 
         {phase === 'done' ? (
@@ -121,7 +121,7 @@ export default function PublishHfModal({ datasetId, onClose }) {
             <div className="flex flex-col gap-1">
               <span className="text-content-muted text-xs">Visibility</span>
               <div className="flex gap-2">
-                {[['private', 'Private'], ['public', 'Public']].map(([v, lbl]) => (
+                {[['private', '🔒 Private'], ['public', '🌐 Public']].map(([v, lbl]) => (
                   <label key={v}
                     className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-sm ${
                       visibility === v ? 'border-indigo-500 bg-indigo-500/10 text-content' : 'border-border text-content-muted'}`}>

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { HelpBadge } from '../../help/HelpMode';
 import { classifyFramingState } from './classifyFramingGate';
 
-/** Classify framing — sits right under the Composition bar, where the lack is
+/** 📐 Classify framing — sits right under the Composition bar, where the lack is
  * seen: images imported without head-crop have no shot type, so they count for
  * nothing above. Renders nothing when there is nothing to classify. */
 export default function ClassifyFramingButton({

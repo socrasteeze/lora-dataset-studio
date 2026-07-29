@@ -1,6 +1,6 @@
 // react-frontend/src/components/dataset/studio/ResultLightbox.jsx
 /**
- * Aperçu plein écran d'UN résultat + notation /(toggle) + NAVIGATION dans le
+ * Aperçu plein écran d'UN résultat + notation 👍/👎 (toggle) + NAVIGATION dans le
  * set courant (feuilleter d'une image à l'autre sans fermer). Extrait 1:1 du bloc
  * `{lbImg && (...)}` de l'ancien LoraTestStudio (behavior-preserving) pour le rating,
  * avec les correctifs a11y déjà actés : focus-trap (useFocusTrap), fermeture sur Échap,
