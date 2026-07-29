@@ -1089,6 +1089,30 @@ are away no longer degrades them either: a file that is *absent* is not a file
 that is *broken*, so the pass stops and tells you the folder appears to have
 moved instead of marking thousands of images unusable.
 
+## Images you deleted from the folder yourself
+
+The bank's folder walk is deliberately **additive**: it registers files that
+appeared and it *never* removes a row. That rule is what makes an unplugged
+drive survivable — otherwise one walk with the disk missing would erase a triage
+built over hours.
+
+The cost is that a file you really did delete by hand is counted as *missing*
+forever, and the count never comes down. The bank's warning line now carries the
+way out: **Accept — remove N from this bank**, next to **📦 Move folder…**. It
+is on the bank's card in the list and in the workspace header, wherever the
+warning appears.
+
+- It removes **rows only**. Nothing on disk is touched — those files are already
+  gone.
+- What you lose with each row is that image's keep/reject decision and its
+  scores. The confirmation says so before you commit.
+- It is **never automatic**, and it never runs on the app's initiative. That is
+  the same principle as everywhere else in the bank: the app reports, you decide.
+- It is **not offered while the folder is unreachable**, and refused by the
+  server if asked anyway. With the drive unplugged every row looks missing, so
+  accepting would delete the whole bank. If the folder simply *moved*, use
+  **📦 Move folder…** instead — that keeps everything.
+
 
 ## Make Score use a GPU Python you already have
 

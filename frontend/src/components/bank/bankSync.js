@@ -63,9 +63,27 @@ export function folderSyncNote(sync) {
       tone: 'warn',
       text: `${missing} image(s) listed here are no longer in the folder — their rows `
         + 'are kept (nothing is deleted for you) but they will fail to load. If you '
-        + 'moved the folder, point the bank at its new location.',
+        + 'moved the folder, point the bank at its new location. If you deleted them '
+        + 'on purpose, accept it and the count clears.',
       canRelocate: true,
+      // Only offered when the folder IS reachable. With the drive unplugged
+      // every row looks missing, and "accept" there would delete the whole
+      // triage — the exact disaster the keep-everything rule prevents. The
+      // server refuses it too; this stops the button from being shown at all.
+      canForget: true,
+      missing,
     }
   }
   return null
+}
+
+/** The confirmation for "accept the missing images". Names both halves of the
+ *  trade: what is lost (the decisions and scores that lived on those rows) and
+ *  what is NOT touched (anything on disk — the files are already gone). */
+export function forgetMissingConfirm(missing) {
+  const n = Number(missing) || 0
+  return `Remove ${n} missing image(s) from this bank?\n\n`
+    + 'Their keep/reject decisions and scores are lost with the rows. '
+    + 'Nothing on disk is touched — those files are already gone. '
+    + 'If the folder was only moved, use Move folder… instead: that keeps everything.'
 }

@@ -506,6 +506,65 @@ def _remember_sync(bank_id, at, result) -> dict:
     return dict(result)
 
 
+def forget_missing(user_id, bank_id) -> dict:
+    """Drop the rows of images whose file is genuinely gone from the folder.
+
+    refresh_bank is strictly additive on purpose — an unplugged drive must never
+    wipe a triage — so a file deleted by hand is counted forever and the bank
+    keeps reporting a "missing" count that nothing can bring down. This is the
+    ACCEPT half of that decision, and it stays explicit: nothing here ever runs
+    on the app's own initiative.
+
+    ROWS ONLY. The files are already gone; nothing on disk is touched. What is
+    lost with each row is its decision and its scores — the confirmation says so.
+
+    Refuses while a job owns the bank (same guard as delete_rejected: that job
+    works off a snapshot of these rows). Returns {'removed', 'checked'}.
+    """
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    if bank_jobs.running(bank_id):
+        raise RuntimeError('a job is running on this bank — stop it first')
+    folder = bank.source_path
+    if not folder or not os.path.isdir(folder):
+        # The whole folder is unreachable. EVERY row would look missing, and
+        # removing them all is precisely the disaster the additive rule exists to
+        # prevent — a reconnected drive would come back to an empty bank.
+        raise RuntimeError(
+            'the source folder is not reachable right now — reconnect it first, '
+            'or nothing here can tell a deleted file from an unplugged drive')
+
+    rows = BankImage.query.filter_by(bank_id=bank_id).all()
+    gone = []
+    for row in rows:
+        path = abs_image_path(bank, row)
+        # A relpath that escapes the folder resolves to None: keep it. It is a
+        # row we should never have made, not a file the user deleted.
+        if path is not None and not os.path.exists(path):
+            gone.append(row.id)
+
+    def _apply():
+        for i0 in range(0, len(gone), _SQL_IN_CHUNK):
+            BankImage.query.filter(
+                BankImage.id.in_(gone[i0:i0 + _SQL_IN_CHUNK])
+            ).delete(synchronize_session=False)
+        db.session.commit()
+        return len(gone)
+
+    removed = write_with_retry(_apply) if gone else 0
+    for image_id in gone:
+        drop_derived(bank_id, image_id)
+    if removed:
+        # Same reason delete_rejected withdraws it: the pending ↩ offer points at
+        # rows that no longer exist, so restoring would find nothing.
+        bank_undo.clear(bank_id)
+        # Force the next walk — the cached sync result still carries the old
+        # missing count, and leaving it would show the flag we just cleared.
+        _folder_sync.pop(bank_id, None)
+    return {'removed': removed, 'checked': len(rows)}
+
+
 def refresh_banks(user_id, force=False) -> dict:
     """refresh_bank() over every bank of the user — {bank_id: result}. Used by
     the bank list, which is loaded when the user NAVIGATES to the page (never

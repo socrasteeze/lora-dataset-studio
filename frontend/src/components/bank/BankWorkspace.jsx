@@ -17,7 +17,7 @@ import BankWatermarkPanel from './BankWatermarkPanel'
 // 🎚 The twelve triage thresholds, edited here instead of in Settings.
 import BankThresholdsPanel from './BankThresholdsPanel.jsx'
 // Source-folder re-walk messages (pure/testable).
-import { folderSyncToast } from './bankSync.js'
+import { folderSyncToast, forgetMissingConfirm } from './bankSync.js'
 import { UNDO_HINT, undoBannerText, undoOffer, undoResultMessage } from './bankUndo.js'
 // Four progress states, not two — including the honest "I don't know" (pure/testable).
 import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } from './progressPresence.js'
@@ -562,6 +562,23 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     }
   }, [bankId, onGone, toast])
 
+  /** Accept that hand-deleted images are gone, so the "N missing" flag clears.
+   *  Rows only — the files are already gone. Never automatic: the folder walk
+   *  stays additive so an unplugged drive cannot wipe a triage, which makes
+   *  accepting the loss the user's explicit call. */
+  const forgetMissing = useCallback(async (missing) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(forgetMissingConfirm(missing))) return
+    try {
+      const out = await postJson(`/api/bank/${bankId}/forget-missing`, {})
+      toast.success(`${out.removed} missing image(s) removed from this bank — no file was touched.`)
+      await refreshPayload({ force: true })
+      refreshImagesRef.current?.()
+    } catch (e) {
+      toast.error(e.message || 'Those rows could not be removed.')
+    }
+  }, [bankId, refreshPayload, toast])
+
   const filterParams = useCallback((f) => {
     const params = {}
     if (f.status) params.status = f.status
@@ -1090,7 +1107,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           </div>
         )}
         <FolderSyncNote sync={payload?.folder_sync}
-          onRelocate={() => setRelocating(true)} />
+          onRelocate={() => setRelocating(true)}
+          onForget={forgetMissing} />
         {counts && (
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm">
             <Stat label="images" value={counts.total} />
