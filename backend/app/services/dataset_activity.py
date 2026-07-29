@@ -286,6 +286,14 @@ def _dsid_of(token):
         return None
 
 
+def active_dataset_ids() -> list:
+    """Every dataset with a live activity right now. The global stop needs the
+    real list — a client's idea of what is running is exactly what a stuck state
+    has made wrong."""
+    with _lock:
+        return [dsid for dsid, bucket in list(_active.items()) if bucket]
+
+
 def reset():
     """Test helper: clear the whole registry between cases."""
     with _lock:

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
+import GpuBusyNotice from '../common/GpuBusyNotice'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
 import DupGroupsPanel from './DupGroupsPanel'
@@ -1118,6 +1119,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {/* ① Analyze — run the analysis passes (or 🚀 Launch all) on the dump.
           Grouping + accent only; every pass keeps its own endpoint/behaviour. */}
       <ZoneSection zone={analyzeZone} accented={activeStep === 'analyze'}>
+      {/* Silent in every normal state; it appears exactly where the "GPU busy"
+          refusal does, and only when the server says nothing backs that flag up.
+          Recovering from a leftover flag used to mean restarting the app. */}
+      <GpuBusyNotice className="mb-2" onCleared={() => refreshPayload()} />
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
           title="Run the whole triage in one go — scan, auto-reject, score, watermarks, group by person and (optionally) caption. Start it and walk away."

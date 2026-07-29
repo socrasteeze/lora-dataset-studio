@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-stop-everything-and-unstick-a-false-gpu-busy',
+    date: '2026-07-29',
+    title: 'A "GPU busy" that is not true no longer needs an app restart',
+    blurb:
+      'Everything that touches the GPU is gated on two flags the app keeps. When a process died without letting go — ComfyUI gone, an external Python that never returned — the flags stayed set and every pass, every queued bank and every training start refused with "GPU busy" forever; restarting the app was the only way out. Now, where that refusal appears (the bank, the banks page, Settings ▸ Maintenance) a warning shows up only when the server has checked and found nothing behind the flag, with one button that clears it and stops nothing. And when work really is wedged, ⏹ Stop everything in Settings ▸ Maintenance cancels queued and running bank passes, dataset batches and in-flight generations, unloads ComfyUI, stops training and unsticks the GPU. It reports each one separately and does not round up: an unreachable ComfyUI says "not confirmed", and a training process it cannot confirm dead is a failure whose flag it refuses to clear.',
+    to: '/settings/maintenance',
+  },
+  {
     id: '2026-07-29-score-on-a-borrowed-gpu-python-says-what-it-costs',
     date: '2026-07-29',
     title: 'Pointing Score at a GPU Python now says what that does to the rest of the app',

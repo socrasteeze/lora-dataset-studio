@@ -6,6 +6,7 @@ import { HelpBadge } from '../help/HelpMode'
 import BankWorkspace from '../components/bank/BankWorkspace'
 import LaunchAllDialog from '../components/bank/LaunchAllDialog'
 import FolderPickerField from '../components/common/FolderPicker'
+import GpuBusyNotice from '../components/common/GpuBusyNotice'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast } from '../components/bank/bankSync'
 import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
@@ -438,6 +439,10 @@ export default function BankPage() {
         )}
       </form>
 
+      {/* A queue that drains into nothing is the loudest symptom of a leftover
+          "GPU busy" flag — every bank is skipped and the night is wasted. The
+          notice is silent unless the server says the flag has nothing behind it. */}
+      <GpuBusyNotice onCleared={refreshQueue} />
       <QueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued} onClear={clearQueue} />
       {/* Second way in: the scraper's own destination. A bank no longer needs a
           folder you prepared by hand — you can fill one straight from the web. */}

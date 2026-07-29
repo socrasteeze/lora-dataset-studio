@@ -160,6 +160,16 @@ def running(bank_id) -> bool:
     return bool(snap and not snap['finished'])
 
 
+def live_bank_ids() -> list:
+    """Every bank with an unfinished job right now. Used by the global stop,
+    which must cancel what is actually running rather than what a client thinks
+    is running — and by the stuck-flag recovery, which must REFUSE to clear a
+    'GPU busy' flag that a live pass legitimately owns."""
+    with _lock:
+        return [bank_id for bank_id, job in list(_jobs.items())
+                if not job['finished']]
+
+
 def reset():
     """Test helper: forget every job."""
     with _lock:

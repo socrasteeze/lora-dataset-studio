@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import DiagnosticReport from '../common/DiagnosticReport'
+import GlobalStopPanel from './GlobalStopPanel'
 import { Card, TextField } from './primitives'
 import ResetToDefault from './ResetToDefault'
 import { installMode, zipUpdateHeadline, progressLabel, progressPercent } from './updateStatus'
@@ -379,6 +380,7 @@ export default function MaintenanceSection({ config, setField, configDefaults })
             config={config} configDefaults={configDefaults} setField={setField} />
         </TextField>
       </Card>
+      <GlobalStopPanel />
       <DiagnosticReport />
       <LogViewer />
     </div>
