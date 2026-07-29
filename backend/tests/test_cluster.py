@@ -21,6 +21,59 @@ def test_devices_list_includes_local(client):
     assert any(d['id'] == 'local' and d.get('local') for d in devices)
 
 
+# The shape capabilities.probe() returns on a machine where every ML extra IS
+# installed. Not a convenience fixture — it is the whole point of the two tests
+# below. `local_capabilities` used to read `(caps['face_scoring'] or {})
+# .get('available')`, and an all-FALSE probe runs that line cleanly (`False or
+# {}` is a dict) while a machine with the extra installed raises AttributeError
+# on `True.get`. So the bug was invisible to every test and every CI box, and
+# fired only on a peer actually worth renting. Only the True case catches it.
+# Mirrors the real keys in capabilities.probe() — four of them are FLAT BOOLS.
+def _probe_all_installed():
+    return {
+        'comfyui': {'reachable': True, 'models': {}},
+        'ollama': {'reachable': True},
+        'aitoolkit': {'valid': True},
+        'captioners': {'joycaption': True, 'ollama': True},
+        'face_scoring': True,
+        'masks': True,
+        'bank_scoring': True,
+        'watermark_inpaint': True,
+        'training_visible': True,
+        'python': {'version': '3.12.0', 'ml_supported': True},
+    }
+
+
+def test_local_capabilities_on_a_fully_installed_machine(app, monkeypatch):
+    from app import capabilities
+    from app.services import cluster as cluster_svc
+
+    monkeypatch.setattr(capabilities, 'probe', _probe_all_installed)
+    monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: 24.0)
+    with app.app_context():
+        caps = cluster_svc.local_capabilities()
+
+    for key in ('comfyui', 'ollama', 'aitoolkit', 'joycaption', 'face_scoring',
+                'masks', 'bank_scoring', 'watermark_inpaint', 'training'):
+        assert caps[key] is True, f'{key} must be advertised on a full install'
+    # VRAM used to read caps['python']['vram_gb'] / caps['comfyui']['vram_gb'],
+    # keys probe() has never had — so the Run-on picker showed no card, ever.
+    assert caps['vram_gb'] == 24.0
+    assert caps['node_id'] and caps['device_name']
+    assert 'comfy' in caps['kinds']
+
+
+def test_cluster_status_survives_a_fully_installed_machine(client, monkeypatch):
+    """The Devices tab 500'd on exactly this: a real GPU box with the extras."""
+    from app import capabilities
+
+    monkeypatch.setattr(capabilities, 'probe', _probe_all_installed)
+    monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: 24.0)
+    r = client.get('/api/cluster/status')
+    assert r.status_code == 200
+    assert r.get_json()['local_capabilities']['face_scoring'] is True
+
+
 def test_join_token_requires_primary(client, app):
     from app import config as cfg
     with app.app_context():

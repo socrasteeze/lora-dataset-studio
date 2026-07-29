@@ -31,7 +31,14 @@ export default function DevicesSection({ config, setField, handleSave, configDef
 
   const refresh = useCallback(async () => {
     try {
-      setStatus(await apiFetch('/api/cluster/status'))
+      /* background: the catch below already decided this failure is not news,
+         but apiFetch toasts "Server error. Please try again later." on any 5xx
+         BEFORE the caller ever sees it — so opening this tab against a sick
+         /status shouted at the user over a section that renders fine from
+         config. The flag routes it to the offline indicator instead. The
+         buttons below (mint / join / revoke / rename) keep their own toasts:
+         a failure the user ASKED for still speaks. */
+      setStatus(await apiFetch('/api/cluster/status', { background: true }))
     } catch (e) {
       /* section still usable offline from config */
     }

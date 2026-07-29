@@ -130,8 +130,11 @@ def peer_connect_local():
     if not primary_url or not token:
         return jsonify({'error': 'primary_url and token required'}), 400
     import requests
+    # Local probe, not a network call — keep it out of the block whose only
+    # sentence is "could not reach Primary". It raising here is what turned a
+    # failed join into a bare 500 and a "Server error. Please try again later."
+    caps = cluster_svc.local_capabilities()
     try:
-        caps = cluster_svc.local_capabilities()
         r = requests.post(
             f'{primary_url}/api/cluster/join',
             json={
@@ -146,6 +149,11 @@ def peer_connect_local():
             return jsonify({'error': body.get('error') or f'Primary returned {r.status_code}'}), 400
     except requests.RequestException as e:
         return jsonify({'error': f'could not reach Primary: {e}'}), 400
+    except Exception as e:
+        # Anything else (a malformed Primary reply, a redirect to an HTML login)
+        # still has to name itself — a 500 here reads as "the app is broken".
+        logger.exception('cluster: join failed')
+        return jsonify({'error': f'join failed: {e}'}), 400
 
     cfg.save_config({
         'cluster': {

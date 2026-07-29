@@ -174,31 +174,56 @@ def prune_job_artifacts(max_age_seconds: int = ARTIFACT_MAX_AGE_SECONDS,
 
 
 def local_capabilities() -> dict:
-    """Capability blob a peer heartbeats (or Primary advertises for itself)."""
+    """Capability blob a peer heartbeats (or Primary advertises for itself).
+
+    Mind the two SHAPES probe() publishes. `comfyui`/`ollama`/`aitoolkit`/
+    `captioners` are nested dicts; `face_scoring`/`masks`/`bank_scoring`/
+    `watermark_inpaint`/`training_visible` are FLAT BOOLS. Reading a flat one as
+    a mapping — `(caps.get('face_scoring') or {}).get('available')` — looks
+    correct on any machine WITHOUT the extra (`False or {}` is a dict) and
+    raises `AttributeError: 'bool' object has no attribute 'get'` on one with
+    it. That shipped: it took out the Devices tab, the Run-on picker, the join
+    and the peer heartbeat loop, on exactly the machines worth renting, while
+    every test stayed green. routes/settings.py reads these same keys flat.
+    """
+    from .. import capabilities
     try:
-        from .. import capabilities
         caps = capabilities.probe()
     except Exception:
         logger.exception('cluster: capabilities probe failed')
         caps = {}
-    # Keep the wire payload small — peers/hub only need routing gates.
-    return {
-        'comfyui': bool((caps.get('comfyui') or {}).get('reachable')),
-        'ollama': bool((caps.get('ollama') or {}).get('reachable')),
-        'aitoolkit': bool((caps.get('aitoolkit') or {}).get('valid')),
-        'joycaption': bool((caps.get('captioners') or {}).get('joycaption')),
-        'face_scoring': bool((caps.get('face_scoring') or {}).get('available')),
-        'masks': bool((caps.get('masks') or {}).get('available')),
-        'bank_scoring': bool((caps.get('bank_scoring') or {}).get('cuda')
-                             or (caps.get('bank_scoring') or {}).get('available')),
-        'watermark_inpaint': bool((caps.get('watermark_inpaint') or {}).get('available')),
-        'training': bool(caps.get('training_visible')),
-        'vram_gb': (caps.get('python') or {}).get('vram_gb')
-                   or (caps.get('comfyui') or {}).get('vram_gb'),
+    # Identity first, so the degraded return below cannot re-run whatever just
+    # failed. A device that answers with no gates is still addressable; one that
+    # answers with nothing is a 500.
+    base = {
         'device_name': device_display_name(),
         'node_id': ensure_node_id(),
         'kinds': sorted(_VALID_KINDS),
     }
+    # Keep the wire payload small — peers/hub only need routing gates.
+    try:
+        return {
+            **base,
+            'comfyui': bool((caps.get('comfyui') or {}).get('reachable')),
+            'ollama': bool((caps.get('ollama') or {}).get('reachable')),
+            'aitoolkit': bool((caps.get('aitoolkit') or {}).get('valid')),
+            'joycaption': bool((caps.get('captioners') or {}).get('joycaption')),
+            'face_scoring': bool(caps.get('face_scoring')),
+            'masks': bool(caps.get('masks')),
+            'bank_scoring': bool(caps.get('bank_scoring')),
+            'watermark_inpaint': bool(caps.get('watermark_inpaint')),
+            'training': bool(caps.get('training_visible')),
+            # probe() carries no VRAM figure at all (it must stay network-free,
+            # and the ComfyUI numbers live in comfyui_runtime_info). Reading a
+            # `vram_gb` key off it therefore always yielded None and the picker
+            # never showed a card. nvidia-smi, cached 10 min, None = unknown.
+            'vram_gb': capabilities.gpu_vram_gb(),
+        }
+    except Exception:
+        # A probe-shape drift must cost a routing gate, not the Devices tab,
+        # the picker and the peer's whole pull loop.
+        logger.exception('cluster: could not build the capability blob')
+        return base
 
 
 def mint_join_token(label: str | None = None) -> dict:
@@ -736,5 +761,5 @@ def status_summary() -> dict:
         'peer_configured': bool(cfg.get('cluster.peer_token') and cfg.get('cluster.primary_url')),
         'peers': peers,
         'pending_remote_jobs': pending,
-        'local_capabilities': local_capabilities() if r != 'peer' else local_capabilities(),
+        'local_capabilities': local_capabilities(),
     }
