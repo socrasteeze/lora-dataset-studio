@@ -26,6 +26,7 @@
  * closes, initial focus. */
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_ENGINE } from './engineSelection.js';
+import KleinModelSetting from '../shared/KleinModelSetting';
 import {
   EDIT_ENGINES, editBlockedReason, batchLiveNote, editPhase,
   editEngineOptions, editCostNote, editKeepNote, editRefNote,
@@ -227,6 +228,12 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
               </p>
             )}
             <p className="text-[0.6875rem] text-content-muted">{editCostNote(engine)}</p>
+            {/* The reference is what the whole dataset is anchored on, and this
+                lane runs on the dataset's Klein model like every other one — so
+                say which, and let it be changed from here. Klein only: the other
+                local engine (Krea) resolves a global base model, and the API
+                engines have no local model at all. */}
+            {engine === 'klein' && <KleinModelSetting datasetId={datasetId} />}
 
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={onClose} disabled={busy}

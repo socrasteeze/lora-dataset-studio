@@ -50,6 +50,30 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-deploy-follows-extra-model-paths',
+    date: '2026-07-29',
+    title: 'Deployed LoRAs land where your extra_model_paths.yaml says',
+    blurb:
+      'If your ComfyUI keeps its LoRAs outside the install folder, deploying one — and the "open LoRA folder" button — used the default folder anyway. Both now follow your extra_model_paths.yaml, the LoRA override still wins when you set one, and Settings shows the exact folder that will receive the file. LoRAs you deployed before stay listed and deletable where they are. Thanks to Geekswordsman (GitHub #25).',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-07-29-training-bases-follow-extra-model-paths',
+    date: '2026-07-29',
+    title: 'Train on a base that lives outside ComfyUI\'s models folder',
+    blurb:
+      'If your ComfyUI keeps its weights elsewhere through extra_model_paths.yaml (portable builds, Stability Matrix, a shared A1111 tree), your SDXL checkpoints and Z-Image merges now show up in the training base picker, launch, and convert — the last two places that still only looked in models/. When the same file name exists in two roots, the app picks the one ComfyUI itself would load, so you train on the weights you generate with. And a base that really is missing is now named here, instead of failing later inside ai-toolkit with a path you never typed.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-07-29-every-klein-screen-names-its-model',
+    date: '2026-07-29',
+    title: 'Every screen that runs Klein now says which model it runs',
+    blurb:
+      'Three more places started Klein work on a model nothing named: the reference edit, the rescue of scraped images under 768 px, and the 🧽 watermark clean. They follow your dataset\'s Klein model now, like improve and generation already did, and each screen states which model will run — including when there is only one and nothing to pick. A model you chose that has since been moved or deleted is refused by name instead of being swapped for a neighbour. A bank has no dataset to follow, so its Klein inpaint keeps resolving the model itself — and now tells you which. Datasets that never chose a model are untouched.',
+    to: '/datasets',
+  },
+  {
     id: '2026-07-29-banks-that-share-a-name-become-one-card',
     date: '2026-07-29',
     title: 'Two folders, one collection: banks that share a name become one card',
