@@ -3,6 +3,13 @@
     "host": "127.0.0.1",
     "port": 5050
   },
+  "cluster": {
+    "role": "standalone",
+    "device_name": "",
+    "primary_url": "",
+    "peer_token": "",
+    "node_id": ""
+  },
   "paths": {
     "dataset_images_root": ""
   },

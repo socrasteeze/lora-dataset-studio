@@ -5835,7 +5835,7 @@ def _sync_generate_activity(dataset_id):
 
 
 def generate_variations(user_id, dataset_id, variations, multiplier, klein_model=None,
-                        lora_strength=None, generation_lora_preset=None):
+                        lora_strength=None, generation_lora_preset=None, device_id=None):
     """For each (variation x multiplier), enqueue a Klein edit of the reference
     and create a pending FaceDatasetImage. Returns the created image ids.
 
@@ -5869,9 +5869,12 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
     # not a dataset full of failed tiles, each doomed by a ComfyUI validation
     # error on a file that isn't there.
     from .klein_edit_helper import klein_missing_assets, KLEIN_REQUIRED, KleinModelsMissing
-    _missing = klein_missing_assets()
-    if any(a in _missing for a in KLEIN_REQUIRED):
-        raise KleinModelsMissing(_missing)
+    from . import cluster as cluster_svc
+    if (cluster_svc.normalize_device_id(device_id)
+            == cluster_svc.LOCAL_DEVICE_ID):
+        _missing = klein_missing_assets()
+        if any(a in _missing for a in KLEIN_REQUIRED):
+            raise KleinModelsMissing(_missing)
     mult = max(1, int(multiplier))
     total = len(variations) * mult
     if total > MAX_FANOUT:
@@ -5924,7 +5927,8 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                         lora_strength=lora_strength, extra_ref_paths=extra_paths,
                         generation_loras=run_loras, sampler_steps=_generation_steps(),
                         extra_metadata={'is_dataset': True, 'dataset_id': dataset_id,
-                                        'variation_label': v.get('label')})
+                                        'variation_label': v.get('label')},
+                        device_id=device_id)
                 except Exception:
                     img.status = 'failed'
                     db.session.commit()
@@ -5937,7 +5941,8 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
     return ids
 
 
-def generate_variations_krea(user_id, dataset_id, variations, multiplier):
+def generate_variations_krea(user_id, dataset_id, variations, multiplier,
+                             device_id=None):
     """Krea 2 Identity Edit fan-out — the second LOCAL engine, same contract as
     `generate_variations` (Klein): one pending row committed BEFORE its job is
     enqueued, the whole batch preflighted up front, the created ids returned.
@@ -5959,7 +5964,10 @@ def generate_variations_krea(user_id, dataset_id, variations, multiplier):
         raise ValueError('reference image required')
     # Assets AND custom nodes, before any row exists: a missing piece then
     # surfaces as one actionable 409 instead of a grid of silently-failing tiles.
-    keh.preflight()
+    from . import cluster as cluster_svc
+    if (cluster_svc.normalize_device_id(device_id)
+            == cluster_svc.LOCAL_DEVICE_ID):
+        keh.preflight()
     mult = max(1, int(multiplier))
     total = len(variations) * mult
     if total > MAX_FANOUT:
@@ -5996,7 +6004,8 @@ def generate_variations_krea(user_id, dataset_id, variations, multiplier):
                             subject_type=subject_type_of(ds),
                             label=v.get('label') or ''),
                         extra_metadata={'is_dataset': True, 'dataset_id': dataset_id,
-                                        'variation_label': v.get('label')})
+                                        'variation_label': v.get('label')},
+                        device_id=device_id)
                 except Exception:
                     img.status = 'failed'
                     db.session.commit()

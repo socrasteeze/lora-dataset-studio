@@ -644,7 +644,7 @@ def _comfy_input_dir() -> str:
 
 
 def enqueue_krea_edit(user_id, source_filename, edit_prompt, source_path=None,
-                      extra_metadata=None, krea_model=None):
+                      extra_metadata=None, krea_model=None, device_id=None):
     """Copy the reference into ComfyUI's input folder, build the Krea 2 Edit
     graph against what is ACTUALLY installed, and enqueue it. Returns the app
     job_id.
@@ -666,7 +666,12 @@ def enqueue_krea_edit(user_id, source_filename, edit_prompt, source_path=None,
     if not os.path.exists(source_path):
         raise ValueError(f'source image not found: {source_filename}')
 
-    preflight()
+    # Assets AND custom nodes, before any row exists — skip when targeting a peer.
+    from . import cluster as cluster_svc
+    remote = (cluster_svc.normalize_device_id(device_id)
+              != cluster_svc.LOCAL_DEVICE_ID)
+    if not remote:
+        preflight()
     unet = resolve_krea_unet(krea_model)
     clip = resolve_krea_text_encoder()
     vae = resolve_krea_vae()
@@ -674,10 +679,13 @@ def enqueue_krea_edit(user_id, source_filename, edit_prompt, source_path=None,
 
     # Same filesystem hand-off (and the same guard) as the Klein lane: the URL
     # being up says nothing about ComfyUI's input folder being reachable from here.
-    comfy_input_dir = comfy_fs.ensure_input_usable(_comfy_input_dir())
+    # Remote peers: skip local Comfy input — artifacts are published from paths.
     uid = uuid.uuid4().hex[:8]
-    comfy_input = f'krea_source_{uid}_{source_filename}'
-    comfy_fs.stage_input_copy(source_path, comfy_input, comfy_input_dir)
+    comfy_input = f'krea_source_{uid}_{os.path.basename(source_filename)}'
+    staged_input_paths = {comfy_input: os.path.abspath(source_path)}
+    if not remote:
+        comfy_input_dir = comfy_fs.ensure_input_usable(_comfy_input_dir())
+        comfy_fs.stage_input_copy(source_path, comfy_input, comfy_input_dir)
 
     width, height = fit_output_size(*_source_size(source_path))
     workflow = build_workflow(
@@ -697,9 +705,10 @@ def enqueue_krea_edit(user_id, source_filename, edit_prompt, source_path=None,
     if extra_metadata:
         meta.update(extra_metadata)
     meta['staged_inputs'] = [comfy_input]   # dropped again when the job ends
+    meta['staged_input_paths'] = staged_input_paths
     queue_manager.add_job(job_type='image', user_id=str(user_id),
                           workflow_data=workflow, prompt=edit_prompt,
-                          job_id=job_id, metadata=meta)
+                          job_id=job_id, metadata=meta, worker_id=device_id)
     return job_id
 
 

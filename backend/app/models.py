@@ -890,3 +890,131 @@ class CanvasImageNode(db.Model):
     dataset = db.relationship('FaceDataset')
     __table_args__ = (db.UniqueConstraint('dataset_id', 'image_id',
                                           name='uq_canvas_image_node'),)
+
+
+class ClusterDevice(db.Model):
+    """A compute peer registered with this Primary (hub).
+
+    `local` is never a row — the Primary itself is always offered as device_id
+    ``local``. Peers authenticate with ``auth_token`` (stored hashed).
+    """
+    __tablename__ = 'cluster_device'
+    id = db.Column(String(36), primary_key=True)
+    name = db.Column(String(120), nullable=False)
+    auth_token_hash = db.Column(String(128), nullable=False)
+    capabilities = db.Column(Text, nullable=True)  # JSON blob from peer heartbeat
+    last_heartbeat = db.Column(DateTime, nullable=True)
+    busy = db.Column(Integer, default=0, nullable=False)  # 0/1
+    created_at = db.Column(DateTime, default=datetime.utcnow, nullable=False)
+    revoked_at = db.Column(DateTime, nullable=True)
+
+    def to_dict(self, *, online_ttl_seconds=90):
+        caps = {}
+        if self.capabilities:
+            try:
+                caps = json.loads(self.capabilities)
+            except (TypeError, ValueError):
+                caps = {}
+        online = False
+        if self.last_heartbeat and not self.revoked_at:
+            online = (datetime.utcnow() - self.last_heartbeat) < timedelta(
+                seconds=online_ttl_seconds)
+        return {
+            'id': self.id,
+            'name': self.name,
+            'online': online,
+            'busy': bool(self.busy),
+            'capabilities': caps,
+            'last_heartbeat': (self.last_heartbeat.isoformat()
+                               if self.last_heartbeat else None),
+            'revoked': self.revoked_at is not None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class ClusterJoinToken(db.Model):
+    """One-time (or short-lived) token a peer redeems to join this Primary."""
+    __tablename__ = 'cluster_join_token'
+    id = db.Column(Integer, primary_key=True)
+    token_hash = db.Column(String(128), nullable=False, unique=True)
+    label = db.Column(String(120), nullable=True)
+    created_at = db.Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = db.Column(DateTime, nullable=True)
+    redeemed_at = db.Column(DateTime, nullable=True)
+    redeemed_device_id = db.Column(String(36), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'label': self.label,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'redeemed': self.redeemed_at is not None,
+            'redeemed_device_id': self.redeemed_device_id,
+        }
+
+
+class ClusterJob(db.Model):
+    """Durable remote-capable job for peer pull (comfy / infer / vision / training).
+
+    Comfy jobs also keep an ``ImageGenerationQueue`` row (``image_job_id``) so
+    existing completion dispatch stays intact; the peer never talks to that
+    table directly.
+    """
+    __tablename__ = 'cluster_job'
+    id = db.Column(Integer, primary_key=True)
+    job_id = db.Column(String(36), unique=True, nullable=False)
+    device_id = db.Column(String(36), nullable=False, index=True)  # peer uuid (not local)
+    kind = db.Column(String(32), nullable=False)  # comfy|infer|vision|training
+    status = db.Column(String(20), nullable=False, default='pending')
+    payload = db.Column(Text, nullable=True)   # JSON
+    result = db.Column(Text, nullable=True)    # JSON
+    progress = db.Column(Text, nullable=True)  # JSON
+    error_message = db.Column(Text, nullable=True)
+    image_job_id = db.Column(String(36), nullable=True, index=True)
+    created_at = db.Column(DateTime, default=datetime.utcnow, nullable=False)
+    claimed_at = db.Column(DateTime, nullable=True)
+    completed_at = db.Column(DateTime, nullable=True)
+    last_heartbeat = db.Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        db.Index('idx_cluster_job_device_status', 'device_id', 'status'),
+    )
+
+    def payload_dict(self):
+        if not self.payload:
+            return {}
+        try:
+            return json.loads(self.payload)
+        except (TypeError, ValueError):
+            return {}
+
+    def result_dict(self):
+        if not self.result:
+            return {}
+        try:
+            return json.loads(self.result)
+        except (TypeError, ValueError):
+            return {}
+
+    def to_dict(self):
+        progress = {}
+        if self.progress:
+            try:
+                progress = json.loads(self.progress)
+            except (TypeError, ValueError):
+                progress = {}
+        return {
+            'job_id': self.job_id,
+            'device_id': self.device_id,
+            'kind': self.kind,
+            'status': self.status,
+            'payload': self.payload_dict(),
+            'result': self.result_dict(),
+            'progress': progress,
+            'error_message': self.error_message,
+            'image_job_id': self.image_job_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'claimed_at': self.claimed_at.isoformat() if self.claimed_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+        }

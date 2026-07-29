@@ -387,10 +387,11 @@ export function useDataset() {
   // `extraLoras`: optional generation-LoRA preset for this run (Idea by
   // @waltm) — an already-gated `{ generation_lora_preset? }` fragment from
   // generationLoraPresetPayload(); an absent key means "no preset".
-  const generate = useCallback((variations, multiplier, kleinModel, loraStrength, generator, extraLoras) => wrap(async () => {
+  const generate = useCallback((variations, multiplier, kleinModel, loraStrength, generator, extraLoras, deviceId) => wrap(async () => {
     const d = await postJson(`/api/dataset/${currentId}/generate`,
       { variations, multiplier, klein_model: kleinModel, lora_strength: loraStrength,
-        generator: generator || 'klein', ...(extraLoras || {}) });
+        generator: generator || 'klein', device_id: deviceId || 'local',
+        ...(extraLoras || {}) });
     if (!d.ok) { toast.error(d.error || 'Unexpected error'); return; }
     toast.success(`${d.created} variation(s) queued`);
     await refresh();

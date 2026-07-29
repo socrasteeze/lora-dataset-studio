@@ -546,3 +546,16 @@ def _start_workers(app):
     # enforces the runtime cap, the stop deadline and the freeze detection must
     # not share a fate with the recovery it supervises.
     cloud_training.start_supervisor(app)
+
+    # Cluster: persist a node_id; start the peer pull-loop when role=peer.
+    try:
+        from .services import cluster as cluster_svc
+        from .services.peer_worker import peer_worker
+        with app.app_context():
+            cluster_svc.ensure_node_id()
+        peer_worker.init_app(app)
+        if cluster_svc.role() == 'peer':
+            peer_worker.start()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('cluster boot failed')

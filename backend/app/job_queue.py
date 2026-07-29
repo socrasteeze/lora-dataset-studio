@@ -12,15 +12,25 @@ imports the services that create jobs (avoids import cycles).
 from __future__ import annotations
 import json
 import logging
+import os
 import threading
 import time
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from .extensions import db
 from .models import ImageGenerationQueue, SystemState
 
 logger = logging.getLogger(__name__)
+
+
+def cfg_comfy_input():
+    try:
+        from . import config as cfg
+        return cfg.comfyui_dir('input')
+    except Exception:
+        return None
 
 POLL_INTERVAL_SECONDS = 2
 POLL_TIMEOUT_SECONDS = 15 * 60
@@ -355,6 +365,9 @@ class JobQueueManager:
 
         job = (ImageGenerationQueue.query
                .filter_by(status='pending')
+               .filter((ImageGenerationQueue.worker_id.is_(None))
+                       | (ImageGenerationQueue.worker_id == '')
+                       | (ImageGenerationQueue.worker_id == 'local'))
                .order_by(ImageGenerationQueue.priority.desc(), ImageGenerationQueue.created_at.asc())
                .first())
         if job is None:
@@ -415,16 +428,25 @@ class JobQueueManager:
 
     # -- public API (verbatim surface; lifted services call these) --------
     def add_job(self, job_type='image', user_id='local', workflow_data=None, prompt='',
-               job_id=None, metadata=None, priority=10, *, commit=True) -> str:
+               job_id=None, metadata=None, priority=10, *, commit=True,
+               worker_id=None) -> str:
         """``commit=False`` leaves the queue row PENDING in the caller's session so a
         fan-out (a Studio grid) can insert its own row and the job in ONE transaction
         — one write lock per cell instead of three. The caller MUST then commit (or
-        roll back) itself; the worker only ever sees committed rows either way."""
+        roll back) itself; the worker only ever sees committed rows either way.
+
+        ``worker_id``: ``None``/``local`` = this machine's ComfyUI. Any other id is a
+        registered cluster peer — the local queue worker skips the row and a
+        ClusterJob is created for peer pull.
+        """
         if job_type != 'image':
-            raise ValueError(f'unsupported job_type: {job_type!r}')
+            raise ValueError(f'unsupported job_type: {job_type}')
         if not workflow_data:
             raise ValueError('workflow_data is required')
         job_id = job_id or str(uuid.uuid4())
+        from .services import cluster as cluster_svc
+        device_id = cluster_svc.normalize_device_id(worker_id)
+        remote = device_id != cluster_svc.LOCAL_DEVICE_ID
         job = ImageGenerationQueue(
             job_id=job_id,
             user_id=str(user_id),
@@ -433,11 +455,56 @@ class JobQueueManager:
             prompt=prompt,
             priority=priority,
             job_metadata=json.dumps(metadata) if metadata else None,
+            worker_id=device_id if remote else None,
         )
         db.session.add(job)
-        if commit:
+        if remote:
+            # Remote jobs must be visible before the peer can complete them —
+            # force a commit even when the caller asked for commit=False (Studio
+            # fan-out). Local commit=False behaviour is unchanged.
+            db.session.commit()
+            try:
+                self._publish_remote_comfy_job(job_id, workflow_data, metadata, device_id)
+            except Exception:
+                logger.exception('job_queue: failed to publish remote comfy job %s', job_id)
+                job = ImageGenerationQueue.query.filter_by(job_id=job_id).first()
+                if job is not None:
+                    job.update_status('failed',
+                                      error_message='failed to publish job to peer')
+                    db.session.commit()
+                    _dispatch_completion(job, None, True)
+        elif commit:
             db.session.commit()
         return job_id
+
+    def _publish_remote_comfy_job(self, job_id, workflow_data, metadata, device_id):
+        from .services import cluster as cluster_svc
+        md = metadata or {}
+        staged = list(md.get('staged_inputs') or ())
+        artifact_names = []
+        # Prefer paths recorded by the enqueue helper; fall back to Comfy input dir.
+        input_dir = cfg_comfy_input()
+        for name in staged:
+            src = None
+            staged_paths = md.get('staged_input_paths') or {}
+            if name in staged_paths and staged_paths[name]:
+                src = staged_paths[name]
+            elif input_dir:
+                candidate = Path(input_dir) / name
+                if candidate.is_file():
+                    src = str(candidate)
+            if src:
+                artifact_names.append(cluster_svc.stage_file_artifact(job_id, src, name))
+            else:
+                # Still list the basename — peer may already have it (unlikely).
+                artifact_names.append(os.path.basename(name))
+        cluster_svc.enqueue_remote_comfy(
+            device_id=device_id,
+            image_job_id=job_id,
+            workflow=workflow_data,
+            artifact_names=artifact_names,
+            metadata=md,
+        )
 
     def cancel_job(self, job_id, user_id=None, job_type='image', *, commit=True,
                    on_interrupt_result=None) -> bool:

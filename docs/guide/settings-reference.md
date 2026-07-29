@@ -487,6 +487,17 @@ How the app binds and who can reach it. **These are the settings that need a res
 
 **Trap:** if you launched via `start.bat` with `LDS_PORT` set, that variable can override the port in your config. The in-app **Save & restart** pins host and port for the relaunch, precisely so the restart lands on the port you chose rather than the one the script forced.
 
+## Devices
+
+Rent another machine’s GPU while keeping datasets on one Primary. Both installs keep their own ComfyUI / Ollama / ai-toolkit. Tailscale (or any private network) is the supported path.
+
+- **Role** → `cluster.role`. **`standalone`** (default) = today’s single-machine app. **`primary`** = this install owns `data/` and accepts compute peers. **`peer`** = this install only runs GPU jobs for a Primary (open the Primary’s URL in the browser to edit datasets).
+- **Device name** → `cluster.device_name`. Label shown in the **Run on** picker (e.g. “Desktop 5090”, “G18 laptop”). Empty → hostname.
+- **Primary URL / join token** (peer only) — paste the Primary’s Tailscale URL and a one-time join token from the Primary’s Devices card. After join, the peer pulls jobs outbound (sleep-friendly) and uploads results back; datasets never move.
+- **Generate join token** (primary only) — mint a short-lived token, copy it once to the peer. Revoke a peer anytime; its pending jobs fail cleanly.
+
+**Limits that stay visible:** the peer must be awake and online; the models/node packs for a job must exist on **that** machine’s ComfyUI/Ollama/ai-toolkit; flipping which box is Primary does **not** migrate `data/` automatically — move the data folder or keep Primary fixed and only rent the other GPU. Shared SMB dataset mounts are not used.
+
 ## Maintenance
 
 Housekeeping and diagnostics. Only one true setting lives here; the rest are actions.
