@@ -306,6 +306,119 @@ def authenticate_peer(presented: str | None) -> ClusterDevice | None:
     return device
 
 
+# ── Remote ComfyUI backends (the SwarmUI shape) ───────────────────────────
+#
+# The second way to rent a GPU, next to the peer model above. A backend is a
+# BARE ComfyUI on another box (`--listen`), no second app install: this machine
+# uploads inputs over `/upload/image`, queues over `/prompt`, polls `/history`,
+# downloads over `/view`. Orthogonal to role — a standalone can have backends.
+# The trade against a peer stays visible where users choose: a peer is
+# authenticated and revocable and can someday run vision/training; a backend is
+# zero-setup but raw ComfyUI has NO auth, so it is trusted-network-only.
+
+BACKEND_ID_PREFIX = 'api:'
+
+# probe cache: url -> (expires_monotonic, online: bool). ComfyUI's /system_stats
+# answers in milliseconds when up; an unreachable laptop costs the full timeout,
+# and the picker must not pay that on every mount.
+_backend_probe_cache: dict[str, tuple[float, bool]] = {}
+_BACKEND_PROBE_TTL_SECONDS = 30
+_BACKEND_PROBE_TIMEOUT_SECONDS = 2
+
+
+def is_backend_id(device_id: str | None) -> bool:
+    return bool(device_id) and str(device_id).startswith(BACKEND_ID_PREFIX)
+
+
+def list_backends() -> list[dict]:
+    """Configured backends, shape-validated — config.json is user-editable."""
+    raw = cfg.get('cluster.backends') or []
+    out = []
+    for entry in raw if isinstance(raw, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        url = str(entry.get('url') or '').strip().rstrip('/')
+        bid = str(entry.get('id') or '').strip()
+        if not url or not is_backend_id(bid):
+            continue
+        out.append({'id': bid,
+                    'name': str(entry.get('name') or '').strip() or url,
+                    'url': url})
+    return out
+
+
+def backend_by_id(device_id: str | None) -> dict | None:
+    for b in list_backends():
+        if b['id'] == device_id:
+            return b
+    return None
+
+
+def add_backend(name: str, url: str) -> dict:
+    url = (url or '').strip().rstrip('/')
+    if not url.lower().startswith(('http://', 'https://')):
+        raise ValueError('backend url must start with http:// or https://')
+    if any(b['url'] == url for b in list_backends()):
+        raise ValueError('a backend with this URL already exists')
+    entry = {'id': f'{BACKEND_ID_PREFIX}{uuid.uuid4().hex[:12]}',
+             'name': (name or '').strip()[:120] or url,
+             'url': url}
+    cfg.save_config({'cluster': {'backends': list_backends() + [entry]}})
+    return entry
+
+
+def remove_backend(device_id: str) -> None:
+    kept = [b for b in list_backends() if b['id'] != device_id]
+    if len(kept) == len(list_backends()):
+        raise ValueError('backend not found')
+    cfg.save_config({'cluster': {'backends': kept}})
+    # Same courtesy revoke_device extends to peers: rows aimed at a device that
+    # no longer exists would sit pending forever, invisible except as a stuck
+    # counter. Fail them now with a reason the tile can show.
+    from ..job_queue import _dispatch_completion
+    from ..models import ImageGenerationQueue
+    for job in (ImageGenerationQueue.query
+                .filter_by(worker_id=device_id)
+                .filter(ImageGenerationQueue.status.in_(
+                    ('pending', 'processing', 'sent_to_comfy')))
+                .all()):
+        job.update_status('failed', error_message='backend removed in Settings')
+        db.session.commit()
+        _dispatch_completion(job, None, True)
+
+
+def rename_backend(device_id: str, name: str) -> dict:
+    name = (name or '').strip()
+    if not name:
+        raise ValueError('name required')
+    backends = list_backends()
+    for b in backends:
+        if b['id'] == device_id:
+            b['name'] = name[:120]
+            cfg.save_config({'cluster': {'backends': backends}})
+            return b
+    raise ValueError('backend not found')
+
+
+def probe_backend(url: str, *, fresh: bool = False) -> bool:
+    """True when the backend's ComfyUI answers /system_stats. TTL-cached."""
+    import time
+    import requests
+    now = time.monotonic()
+    if not fresh:
+        hit = _backend_probe_cache.get(url)
+        if hit and hit[0] > now:
+            return hit[1]
+    try:
+        r = requests.get(f'{url}/system_stats',
+                         timeout=_BACKEND_PROBE_TIMEOUT_SECONDS)
+        online = r.status_code == 200
+    except requests.RequestException:
+        online = False
+    _backend_probe_cache[url] = (now + _BACKEND_PROBE_TTL_SECONDS, online)
+    return online
+
+
 def list_devices(*, include_local: bool = True) -> list[dict]:
     """Devices available for the Run-on picker (Primary or standalone)."""
     devices = []
@@ -327,6 +440,20 @@ def list_devices(*, include_local: bool = True) -> list[dict]:
             d = row.to_dict(online_ttl_seconds=ONLINE_TTL_SECONDS)
             d['local'] = False
             devices.append(d)
+    # API backends list in EVERY role — that is the standalone/SwarmUI case.
+    # 'comfyui': True is definitional (a backend IS a ComfyUI), and busy is
+    # unknowable over the bare API, so it is never claimed.
+    for b in list_backends():
+        devices.append({
+            'id': b['id'],
+            'name': b['name'],
+            'url': b['url'],
+            'online': probe_backend(b['url']),
+            'busy': False,
+            'capabilities': {'comfyui': True, 'kind': 'api_backend'},
+            'local': False,
+            'backend': True,
+        })
     return devices
 
 

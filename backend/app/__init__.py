@@ -569,10 +569,15 @@ def _start_workers(app):
     # one does — it is the single moment nothing is in flight.
     try:
         from .services import cluster as cluster_svc
+        from .services.backend_worker import backend_workers
         from .services.peer_worker import peer_worker
         with app.app_context():
             cluster_svc.ensure_node_id()
             cluster_svc.prune_job_artifacts()
+        # API backends (bare remote ComfyUI): one worker thread per backend,
+        # in every role — a standalone with a backend is the whole point.
+        backend_workers.init_app(app)
+        backend_workers.sync()
         peer_worker.init_app(app)
         if cluster_svc.role() == 'peer':
             peer_worker.start()

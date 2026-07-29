@@ -491,14 +491,26 @@ How the app binds and who can reach it. **These are the settings that need a res
 
 Rent another machine’s GPU while keeping datasets on one Primary. Both installs keep their own ComfyUI / Ollama / ai-toolkit. Tailscale (or any private network) is the supported path.
 
+There are **two ways** to use another machine's GPU, and they can coexist in the same picker:
+
+| | Compute peer | Remote ComfyUI backend |
+|---|---|---|
+| On the other box | Full app install + its ComfyUI | **Only ComfyUI**, started with `--listen` |
+| Auth | Join token, revocable bearer | **None — ComfyUI's API has no auth**; trusted networks only |
+| Can someday run | vision / infer / training kinds | Generation only, by design |
+| Setup | Join flow below | Paste a URL |
+
 - **Role** → `cluster.role`. **`standalone`** (default) = today’s single-machine app. **`primary`** = this install owns `data/` and accepts compute peers. **`peer`** = this install only runs GPU jobs for a Primary (open the Primary’s URL in the browser to edit datasets).
+- **Remote ComfyUI backends** → `cluster.backends`. Add the other machine's ComfyUI URL (e.g. `http://laptop:8188`) and it appears in the **Run on** picker — in **any** role, no Primary needed. Inputs travel over ComfyUI's `/upload/image`, results come back over `/view` and land in this machine's output folder, so downstream (dataset linking, galleries) cannot tell the render was remote. Backends render **in parallel** with this machine, and — unlike local jobs — they keep rendering while a training holds the local GPU. **Test** probes the URL before you save it.
 - **Device name** → `cluster.device_name`. Label shown in the **Run on** picker (e.g. “Desktop 5090”, “G18 laptop”). Empty → hostname.
 - **Primary URL / join token** (peer only) — paste the Primary’s Tailscale URL and a one-time join token from the Primary’s Devices card. After join, the peer pulls jobs outbound (sleep-friendly) and uploads results back; datasets never move.
 - **Generate join token** (primary only) — mint a short-lived token, copy it once to the peer. Revoke a peer anytime; its pending jobs fail cleanly.
 
 **Limits that stay visible:**
 
-- **Only generation actually goes to a peer.** The **Run on** picker appears on Generate. Training, captioning, scoring and every other GPU job run on the Primary regardless of what the picker says — the peer-side execution for them exists but nothing in the UI drives it, and a peer-run training leaves loose checkpoint files under `data/cluster_artifacts/` instead of a run on the Training page.
+- **A backend is only as safe as the network between you.** Raw ComfyUI has no authentication: anyone who can reach that URL can render on — and read outputs from — that machine. Tailscale or a home LAN is the intended setting; never a port forwarded to the internet. When you need a credential you can revoke, use a peer.
+- **Only generation actually goes to a peer or a backend.** The **Run on** picker appears on Generate. Training, captioning, scoring and every other GPU job run on the Primary regardless of what the picker says — the peer-side execution for them exists but nothing in the UI drives it, and a peer-run training leaves loose checkpoint files under `data/cluster_artifacts/` instead of a run on the Training page.
+- **A backend render needs a local output folder.** The hub saves the downloaded result into its own ComfyUI output folder (Settings → Local tools) so every completion handler finds it where it always has. No folder configured → the job fails and says exactly this.
 - **A peer runs what its Primary sends.** That is the whole point of renting a GPU, but it means the Primary can start processes on the peer. The peer will only run scripts that ship with its own install and only with its own configured Python — it will not run a file the Primary names — but the trust still points one way: **join only a Primary you control.**
 - The peer must be **awake and online** (heartbeat ~90 s); an offline peer is greyed out in the picker.
 - The models/node packs for a job must exist on **that** machine’s ComfyUI/Ollama/ai-toolkit. The Primary skips its own preflight for a remote job, so a missing model surfaces as a failed job rather than an up-front 409.

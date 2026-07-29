@@ -168,6 +168,64 @@ def peer_connect_local():
     })
 
 
+# ── Remote ComfyUI API backends (browser routes, any role) ───────────────
+
+@bp.get('/backends')
+def list_api_backends():
+    out = []
+    for b in cluster_svc.list_backends():
+        out.append({**b, 'online': cluster_svc.probe_backend(b['url'])})
+    return jsonify({'backends': out})
+
+
+@bp.post('/backends')
+def add_api_backend():
+    data = request.get_json(silent=True) or {}
+    try:
+        entry = cluster_svc.add_backend(data.get('name') or '',
+                                        data.get('url') or '')
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    # New backend → new worker thread, without waiting for a restart.
+    try:
+        from ..services.backend_worker import backend_workers
+        backend_workers.sync()
+    except Exception:
+        logger.exception('cluster: backend worker sync failed after add')
+    return jsonify({**entry, 'online': cluster_svc.probe_backend(entry['url'],
+                                                                 fresh=True)})
+
+
+@bp.post('/backends/<device_id>/rename')
+def rename_api_backend(device_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(cluster_svc.rename_backend(device_id,
+                                                  data.get('name') or ''))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@bp.post('/backends/<device_id>/remove')
+def remove_api_backend(device_id):
+    try:
+        cluster_svc.remove_backend(device_id)
+        return jsonify({'ok': True})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@bp.post('/backends/test')
+def test_api_backend():
+    """Probe a URL before saving it — fresh, never from the 30 s cache."""
+    data = request.get_json(silent=True) or {}
+    url = (data.get('url') or '').strip().rstrip('/')
+    if not url.lower().startswith(('http://', 'https://')):
+        return jsonify({'error': 'url must start with http:// or https://'}), 400
+    return jsonify({'ok': True,
+                    'online': cluster_svc.probe_backend(url, fresh=True)})
+
+
 # ── Peer machine endpoints (bearer = device auth_token) ──────────────────
 
 @bp.post('/peer/heartbeat')

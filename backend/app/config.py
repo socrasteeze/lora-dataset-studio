@@ -52,6 +52,12 @@ DEFAULTS = {
         'primary_url': '',             # peer only — e.g. http://desktop:5050
         'peer_token': '',              # peer only — bearer after join
         'node_id': '',                 # stable uuid for this install
+        # Remote ComfyUI backends (the SwarmUI shape): the far box runs ONLY
+        # ComfyUI with --listen, no second app install, and this machine talks
+        # to it over ComfyUI's own HTTP API. Orthogonal to role — a standalone
+        # can have backends; that is the whole point of the lighter model.
+        # Each: {'id': 'api:<hex>', 'name': 'Laptop 4090', 'url': 'http://…:8188'}.
+        'backends': [],
     },
     'paths': {'dataset_images_root': ''},                      # '' -> DATA_DIR/datasets
     'comfyui': {'api_url': 'http://127.0.0.1:8188', 'base_dir': '',

@@ -486,6 +486,30 @@ The section previously held the worked example of how these are meant to end:
   `python -m pytest backend/tests -q` — verified harmless, both here and on
   upstream's own green run.
 
+## Divergence 6: upstream's dormant `worker_url` plumbing is now LIVE here
+
+Upstream's `utils/comfyui.py` has carried `worker_url=` parameters on
+`queue_prompt_to_comfyui` / `get_comfyui_history` / `cancel_comfyui_prompt` /
+`free_comfyui_vram`, plus `download_image_from_worker` and the
+`ImageGenerationQueue.worker_id` column, since before this fork — **with zero
+callers on either side**: abandoned scaffolding from an upstream remote-worker
+feature that never shipped.
+
+On 2026-07-29 this fork activated it: `services/backend_worker.py` drives
+remote ComfyUI **API backends** through those exact parameters, and
+`services/cluster.py` + `job_queue.add_job` route `worker_id` values of the
+form `api:<hex>` to per-backend worker threads (peer UUIDs and `local` keep
+their existing meaning).
+
+**Merge caution:** if upstream ever revives its own version of this feature,
+its calls will collide with ours in `job_queue.py` and `utils/comfyui.py` with
+few or no conflict markers (the signatures already match — that is the trap).
+On such a sync, diff upstream's new *callers* of `worker_url`/`worker_id`
+against `backend_worker.py` before resolving anything, and keep the fork's
+`api:` id namespace and the "backends work in ANY role" behaviour. Meanwhile
+do NOT strip the "unused" `worker_url` params during any cleanup pass —
+they are upstream surface AND fork load-bearing now.
+
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
 Lessons from actually doing these merges, aimed at an agent seeing this repo

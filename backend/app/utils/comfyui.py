@@ -656,6 +656,43 @@ def cancel_comfyui_prompt(prompt_id, client_id=None, worker_url=None) -> bool:
     return False
 
 
+def upload_input_image_to_worker(name, src_path, worker_url, timeout=120):
+    """Upload a local file into a remote ComfyUI's input folder over its API.
+
+    This is the one leg the filesystem hand-off (utils/comfy_fs) cannot make:
+    staging by copy assumes the input folder is reachable from this process,
+    which is exactly what a remote API backend breaks. `POST /upload/image`
+    is how every over-the-network ComfyUI front-end delivers inputs;
+    overwrite=true because our staged names are already uuid-prefixed, so a
+    retry of the same job must replace its own earlier copy, never a
+    stranger's file.
+
+    Returns the basename ComfyUI stored (LoadImage wants exactly that), or
+    raises RuntimeError with an actionable message — the caller turns it into
+    the job's failure reason, so it must say which backend and which file.
+    """
+    base = os.path.basename(str(name))
+    try:
+        with open(src_path, 'rb') as fh:
+            response = requests.post(
+                urljoin(worker_url, '/upload/image'),
+                files={'image': (base, fh, 'application/octet-stream')},
+                data={'overwrite': 'true', 'type': 'input'},
+                timeout=timeout,
+            )
+        response.raise_for_status()
+    except OSError as e:
+        raise RuntimeError(f'input {base} unreadable on the hub: {e}') from e
+    except requests.RequestException as e:
+        raise RuntimeError(
+            f'could not upload {base} to backend {worker_url}: {e}') from e
+    try:
+        stored = (response.json() or {}).get('name') or base
+    except ValueError:
+        stored = base
+    return stored
+
+
 def download_image_from_worker(filename, worker_url, output_dir):
     """Télécharge une image générée depuis un worker distant via l'API ComfyUI.
 
