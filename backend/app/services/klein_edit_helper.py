@@ -1078,7 +1078,13 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     if extra_metadata:
         meta.update(extra_metadata)
     meta["staged_inputs"] = staged_inputs
-    meta["staged_input_paths"] = staged_input_paths
+    # Absolute local paths, ONLY for a peer job — the queue needs them to stage
+    # the artifacts it uploads. job_metadata is echoed verbatim by to_dict() and
+    # to_status_dict(), i.e. on every /status poll, and a machine path pasted
+    # into a bug report is exactly what the privacy rule exists to prevent. A
+    # local job never needs them, so a local job never carries them.
+    if remote:
+        meta["staged_input_paths"] = staged_input_paths
     queue_manager.add_job(job_type="image", user_id=str(user_id), workflow_data=workflow,
                           prompt=edit_prompt, job_id=job_id, metadata=meta,
                           worker_id=device_id)

@@ -7,7 +7,3 @@ def register_blueprints(app, csrf):
         except ImportError:
             continue  # blueprint not built yet (earlier phases)
         app.register_blueprint(mod.bp)
-        # Peer machine-to-machine routes use bearer auth, not browser CSRF.
-        if name == 'cluster' and hasattr(mod, 'bp'):
-            # Individual @csrf.exempt on peer views; nothing else to do here.
-            pass

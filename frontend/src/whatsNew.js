@@ -54,7 +54,7 @@ export const WHATS_NEW = [
     date: '2026-07-29',
     title: 'Rent another machine’s GPU without moving your datasets',
     blurb:
-      'Run LoRA Dataset Studio on two boxes over Tailscale: make one the Primary (where datasets live) and join the other as a compute peer. Generate variations — and other GPU work — with a Run on picker that targets this machine or the peer; results always land back on the Primary. The peer must be awake, and the models for a job must exist on the machine that runs it.',
+      'Run LoRA Dataset Studio on two boxes over Tailscale: make one the Primary (where datasets live) and join the other as a compute peer. A Run on picker on Generate targets this machine or the peer, and the image always lands back on the Primary. Generation is the only job that travels for now — training, captioning and scoring still run on the Primary. The peer must be awake, the models for a job must exist on the machine that runs it, and a peer runs work its Primary sends, so join only a Primary you control.',
     to: '/settings/devices',
   },
   {

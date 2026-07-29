@@ -705,7 +705,10 @@ def enqueue_krea_edit(user_id, source_filename, edit_prompt, source_path=None,
     if extra_metadata:
         meta.update(extra_metadata)
     meta['staged_inputs'] = [comfy_input]   # dropped again when the job ends
-    meta['staged_input_paths'] = staged_input_paths
+    # Peer jobs only — see the same guard in klein_edit_helper: job_metadata is
+    # echoed on every /status poll, and absolute paths must not ride along.
+    if remote:
+        meta['staged_input_paths'] = staged_input_paths
     queue_manager.add_job(job_type='image', user_id=str(user_id),
                           workflow_data=workflow, prompt=edit_prompt,
                           job_id=job_id, metadata=meta, worker_id=device_id)

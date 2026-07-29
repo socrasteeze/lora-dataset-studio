@@ -7046,7 +7046,8 @@ def run_peer_training(*, dataset_dir, work_dir, progress_cb=None, **train_kwargs
     ``train_kwargs`` may include:
       - ``config_text``: full ai-toolkit YAML config (``{{DATASET_DIR}}`` /
         ``{{OUTPUT_DIR}}`` placeholders rewritten to peer-local folders)
-      - ``config_name``: filename under work_dir (default peer_job.yaml)
+      - ``config_name``: filename under work_dir (default peer_job.json — the
+        Primary sends JSON, same as a local run writes)
       - ``extra_args``: list of CLI args after the config path
       - ``timeout``: seconds (default 24h)
 

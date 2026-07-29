@@ -210,6 +210,15 @@ export default function DevicesSection({ config, setField, handleSave, configDef
                 onChange={(e) => setPeerName(e.target.value)}
                 className={INPUT_CLASS} placeholder="G18 5080" />
             </div>
+            {/* The trust here points one way and the user is the only one who can
+                judge it, so it is stated at the moment of the decision — not in a
+                doc they will read afterwards. */}
+            <p className="text-[0.8125rem] text-amber-300/90">
+              ⚠️ Joining lets that Primary start GPU work on this machine. This box only ever
+              runs its own installed scripts with its own Python — never a file the Primary
+              names — but <strong>join a Primary you control</strong>. Revoke from the Primary’s
+              Devices card at any time.
+            </p>
             <button type="button" disabled={busy || !peerUrl.trim() || !peerToken.trim()}
               onClick={connectPeer}
               className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
