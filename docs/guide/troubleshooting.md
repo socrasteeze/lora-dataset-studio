@@ -335,6 +335,39 @@ If a Stop button is greyed out, another batch on the same dataset (for
 example a caption pass) is holding the activity slot; it re-enables the
 moment that batch ends.
 
+## Is it stuck? — the Activity panel
+
+Every long job in LDS has a progress bar, and every bar lives on the page that
+owns it: a bank pass on that bank, a caption batch on that dataset, training on
+Runs. So "is anything actually moving?" used to cost a tour of the app — and a
+percentage cannot answer it anyway, because **a bar frozen at 34% and a bar that
+will move again in two seconds are drawn identically**.
+
+**📋 in the top bar** opens one panel that answers it, from any page:
+
+- **Running now** — every live job across banks and datasets, with the **age of
+  its last update**. That age is the whole point: a pass that reported two
+  seconds ago is fine at 3%, and a pass that reported twelve minutes ago is
+  stuck whatever its bar says. Past a minute of silence the row is flagged; past
+  five it says *probably stuck*. Those thresholds are deliberately generous — a
+  cold model load or a big folder walk can legitimately say nothing for a while,
+  and a warning that cries wolf is one you stop reading.
+- **The log** — a timestamped feed of passes starting, finishing, stopping and
+  failing, plus the GPU being taken and released. It appends as it arrives and
+  never redraws, so scrolling up to read something does not yank you back down.
+
+The GPU lines are worth knowing about: taking the exclusive window unloads
+ComfyUI and blocks training, and until now it did all of that with no visible
+trace anywhere. If the panel says the GPU was taken and never released, that is
+the *"GPU busy" when nothing is running* case below.
+
+Two things this panel is **not**. It is not the server log — Settings ▸
+Maintenance still tails that, and it is a developer artefact (Flask lines,
+tracebacks, request noise); this one is the app's own account of its work, in
+the words the UI uses. And it is **not kept across a restart**, because it
+describes work that does not survive one either; a log full of jobs that are no
+longer running would be a lie.
+
 ## "GPU busy" when nothing is running
 
 Every GPU pass, every queued bank and every training start is gated on two
