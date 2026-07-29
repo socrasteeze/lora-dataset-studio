@@ -71,9 +71,7 @@ function Group({ group, open, onToggle, customised, children }) {
     <section className="rounded-lg border border-border bg-surface">
       <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId}
         className="flex w-full items-center gap-2 px-3 py-2 text-left">
-        {/* Divergence 3: most group markers are stripped pictographs, so the
-            span is rendered only when a glyph survives (never an empty badge). */}
-        {group.emoji && <span aria-hidden className="text-sm">{group.emoji}</span>}
+        <span aria-hidden className="text-sm">{group.emoji}</span>
         <span className="text-sm font-medium text-content">{group.label}</span>
         {customised > 0 && (
           <span className="rounded-full border border-indigo-400/50 bg-indigo-500/10 px-1.5 text-[10px] font-semibold text-indigo-200">
