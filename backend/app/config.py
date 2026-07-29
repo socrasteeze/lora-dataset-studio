@@ -41,6 +41,18 @@ DEFAULTS = {
     # remote devices (access_token is then generated + persisted here so it
     # survives restarts and is copyable from Settings). Loopback never needs it.
     'server': {'host': '127.0.0.1', 'port': 5050, 'require_token': False, 'access_token': ''},
+    # Cluster / remote GPU workers. standalone = today's single-machine behaviour.
+    # primary = this install owns datasets and accepts compute peers.
+    # peer = this install dials a Primary and only runs GPU jobs for it.
+    # node_id is a stable per-install UUID (written on first save/boot); peer_token
+    # is the bearer the peer presents to the Primary after join.
+    'cluster': {
+        'role': 'standalone',          # standalone | primary | peer
+        'device_name': '',             # display name in the device picker
+        'primary_url': '',             # peer only — e.g. http://desktop:5050
+        'peer_token': '',              # peer only — bearer after join
+        'node_id': '',                 # stable uuid for this install
+    },
     'paths': {'dataset_images_root': ''},                      # '' -> DATA_DIR/datasets
     'comfyui': {'api_url': 'http://127.0.0.1:8188', 'base_dir': '',
                 'output_dir': '', 'input_dir': '', 'models_dir': '', 'loras_dir': '',

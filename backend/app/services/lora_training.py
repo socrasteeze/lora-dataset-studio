@@ -7038,3 +7038,156 @@ def start_training_scheduler(app, interval_seconds=60):
 
     threading.Thread(target=_tick, daemon=True, name='train-scheduler').start()
     logger.info('Training scheduler démarré (tick %ss)', interval_seconds)
+
+
+def run_peer_training(*, dataset_dir, work_dir, progress_cb=None, **train_kwargs):
+    """Execute a training job on this peer for a Primary that staged a dataset.
+
+    ``train_kwargs`` may include:
+      - ``config_text``: full ai-toolkit YAML config (``{{DATASET_DIR}}`` /
+        ``{{OUTPUT_DIR}}`` placeholders rewritten to peer-local folders)
+      - ``config_name``: filename under work_dir (default peer_job.yaml)
+      - ``extra_args``: list of CLI args after the config path
+      - ``timeout``: seconds (default 24h)
+
+    Returns ``{checkpoints: [paths], detail: str}``.
+    """
+    import time
+    from pathlib import Path
+
+    dataset_dir = Path(dataset_dir)
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = work_dir / 'output'
+    out_dir.mkdir(exist_ok=True)
+
+    config_text = train_kwargs.get('config_text') or train_kwargs.get('config')
+    if not config_text:
+        raise RuntimeError(
+            'peer training requires train.config_text (ai-toolkit job config) '
+            'from the Primary')
+
+    text = str(config_text)
+    text = text.replace('{{DATASET_DIR}}', str(dataset_dir).replace('\\', '/'))
+    text = text.replace('{{OUTPUT_DIR}}', str(out_dir).replace('\\', '/'))
+    cfg_name = train_kwargs.get('config_name') or 'peer_job.json'
+    cfg_path = work_dir / cfg_name
+    cfg_path.write_text(text, encoding='utf-8')
+
+    python = cfg.aitoolkit_path('venv_python')
+    toolkit_dir = cfg.aitoolkit_path('dir')
+    if not python or not toolkit_dir:
+        raise RuntimeError('ai-toolkit is not configured on this peer')
+
+    run_py = Path(toolkit_dir) / 'run.py'
+    if not run_py.is_file():
+        raise RuntimeError(f'ai-toolkit run.py not found under {toolkit_dir}')
+    cmd = [str(python), str(run_py), str(cfg_path)]
+    cmd.extend(list(train_kwargs.get('extra_args') or []))
+
+    if progress_cb:
+        try:
+            progress_cb({'phase': 'starting', 'cmd': ' '.join(cmd[:3])})
+        except Exception:
+            pass
+
+    timeout = int(train_kwargs.get('timeout') or 24 * 3600)
+    env = os.environ.copy()
+    hf = cfg.aitoolkit_path('hf_home')
+    if hf:
+        env['HF_HOME'] = str(hf)
+
+    proc = subprocess.Popen(
+        cmd, cwd=str(toolkit_dir), env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding='utf-8', errors='replace',
+        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    deadline = time.monotonic() + timeout
+    lines = []
+    while True:
+        if proc.poll() is not None:
+            break
+        if time.monotonic() >= deadline:
+            proc.kill()
+            raise TimeoutError('peer training timed out')
+        line = proc.stdout.readline() if proc.stdout else ''
+        if line:
+            lines.append(line.rstrip())
+            if progress_cb and (len(lines) % 20 == 0):
+                try:
+                    progress_cb({'phase': 'training', 'line': line.strip()[-200:]})
+                except Exception:
+                    pass
+        else:
+            time.sleep(0.5)
+    rc = proc.wait()
+    if rc != 0:
+        tail = '\n'.join(lines[-30:])
+        raise RuntimeError(f'ai-toolkit exited {rc}: {tail[-800:]}')
+
+    checkpoints = sorted(
+        {str(p) for p in out_dir.rglob('*.safetensors') if p.is_file()},
+        key=lambda s: Path(s).stat().st_mtime)
+    for pat in ('*.pt', '*.ckpt'):
+        checkpoints.extend(str(p) for p in out_dir.rglob(pat) if p.is_file())
+    return {
+        'checkpoints': checkpoints,
+        'detail': f'completed with {len(checkpoints)} checkpoint file(s)',
+        'log_tail': lines[-50:],
+    }
+
+
+def prepare_peer_training_bundle(user_id, dataset_id, *, steps=None,
+                                 base_model=None, variant=None, train_type=None,
+                                 masked=None):
+    """Export a dataset + job config for a remote peer. Returns (zip_path, config_text).
+
+    The config uses ``{{DATASET_DIR}}`` / ``{{OUTPUT_DIR}}`` placeholders so the
+    peer can rewrite them to its local work folders.
+    """
+    import tempfile
+    import zipfile
+    from pathlib import Path
+
+    ds = fds.get_dataset(user_id, dataset_id)
+    if not ds:
+        raise ValueError('dataset not found')
+    from ..extensions import db as _db
+    dirty = False
+    if train_type is not None:
+        ds.train_type = train_type
+        dirty = True
+    if base_model is not None:
+        ds.train_base_model = base_model or None
+        dirty = True
+    if variant is not None:
+        ds.train_variant = variant
+        dirty = True
+    if dirty:
+        _db.session.commit()
+
+    work = Path(tempfile.mkdtemp(prefix='lds-peer-bundle-'))
+    export_dir = work / 'dataset'
+    export_dir.mkdir()
+    folder = export_dataset_to_aitoolkit(
+        user_id, dataset_id,
+        masked=True if masked is None else bool(masked),
+        dest_dir=str(export_dir))
+    n_steps = int(steps) if steps else recommended_steps(dataset_id)
+    job_cfg = build_job_config(ds, folder, steps=n_steps,
+                               training_folder='{{OUTPUT_DIR}}')
+    # JSON is always available; ai-toolkit accepts JSON job configs in this app.
+    text = json.dumps(job_cfg, indent=2)
+    abs_folder = str(Path(folder).resolve()).replace('\\', '/')
+    text = text.replace(abs_folder, '{{DATASET_DIR}}')
+    text = text.replace(str(Path(folder).resolve()), '{{DATASET_DIR}}')
+    text = text.replace(folder.replace('\\', '/'), '{{DATASET_DIR}}')
+    text = text.replace(folder, '{{DATASET_DIR}}')
+
+    zip_path = work / 'dataset.zip'
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, _dirs, files in os.walk(folder):
+            for name in files:
+                full = Path(root) / name
+                zf.write(full, full.relative_to(folder).as_posix())
+    return str(zip_path), text

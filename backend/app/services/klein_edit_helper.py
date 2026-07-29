@@ -834,7 +834,7 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
                        extra_metadata=None, lora_strength=None, source_path=None,
                        extra_ref_paths=None, sampler_steps=None,
                        base_lora_strength=None, generation_loras=None,
-                       output_megapixels=None):
+                       output_megapixels=None, device_id=None):
     """Copy the source into ComfyUI input, configure the single Klein edit
     workflow, and enqueue it. Returns the app job_id. Raises ValueError on a
     missing source / unloadable workflow / missing required node, RuntimeError
@@ -881,22 +881,30 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     unet_ref = unet_for_job(klein_model)
     vae_ref = resolve_klein_vae()
     te_ref = resolve_klein_text_encoder()
-    missing = klein_missing_assets()
-    if any(a in missing for a in KLEIN_REQUIRED):
-        raise KleinModelsMissing(missing)
+    from . import cluster as cluster_svc
+    remote = (cluster_svc.normalize_device_id(device_id)
+              != cluster_svc.LOCAL_DEVICE_ID)
+    if not remote:
+        missing = klein_missing_assets()
+        if any(a in missing for a in KLEIN_REQUIRED):
+            raise KleinModelsMissing(missing)
 
     # The source image reaches ComfyUI over the FILESYSTEM, not the API — see
     # utils/comfy_fs.py. Staged through the guard so a folder that isn't shared
     # with ComfyUI's container/host says so (409) instead of raising a bare OSError
     # the routes can only turn into a detail-free 500 (reported by nofaceman).
-    comfy_input_dir = comfy_fs.ensure_input_usable(_comfy_input_dir())
+    # Remote peers: skip local Comfy input — artifacts are published from
+    # staged_input_paths by the job queue.
     uid = uuid.uuid4().hex[:8]
-    comfy_input = f"edit_source_{uid}_{source_filename}"
-    comfy_fs.stage_input_copy(source_path, comfy_input, comfy_input_dir)
-    # Every name staged for THIS job, so its completion can delete them again.
-    # Without this list each improved image left a full-resolution duplicate in
-    # ComfyUI's input folder forever (measured: 3 896 orphans on one install).
+    comfy_input = f"edit_source_{uid}_{os.path.basename(source_filename)}"
+    staged_input_paths = {comfy_input: os.path.abspath(source_path)}
     staged_inputs = [comfy_input]
+    if not remote:
+        comfy_input_dir = comfy_fs.ensure_input_usable(_comfy_input_dir())
+        comfy_fs.stage_input_copy(source_path, comfy_input, comfy_input_dir)
+        # Every name staged for THIS job, so its completion can delete them again.
+        # Without this list each improved image left a full-resolution duplicate in
+        # ComfyUI's input folder forever (measured: 3 896 orphans on one install).
 
     workflow["52"]["inputs"]["image"] = comfy_input
     # Prompt into the CLIPTextEncode widget directly (node 6). The old RES4LYF
@@ -937,8 +945,10 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
             logger.warning(f"klein multi-ref: extra ref missing on disk: {ref_path}")
             continue
         ref_input = f"edit_ref{i}_{uid}_{os.path.basename(ref_path)}"
-        comfy_fs.stage_input_copy(ref_path, ref_input, comfy_input_dir)
+        if not remote:
+            comfy_fs.stage_input_copy(ref_path, ref_input, comfy_input_dir)
         staged_inputs.append(ref_input)
+        staged_input_paths[ref_input] = os.path.abspath(ref_path)
         load_id, scale_id = f"ds_ref{i}_load", f"ds_ref{i}_scale"
         enc_id, lat_id = f"ds_ref{i}_encode", f"ds_ref{i}_latent"
         workflow[load_id] = {"class_type": "LoadImage", "inputs": {"image": ref_input},
@@ -1068,6 +1078,8 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     if extra_metadata:
         meta.update(extra_metadata)
     meta["staged_inputs"] = staged_inputs
+    meta["staged_input_paths"] = staged_input_paths
     queue_manager.add_job(job_type="image", user_id=str(user_id), workflow_data=workflow,
-                          prompt=edit_prompt, job_id=job_id, metadata=meta)
+                          prompt=edit_prompt, job_id=job_id, metadata=meta,
+                          worker_id=device_id)
     return job_id

@@ -52,6 +52,25 @@ def dataset_train(dataset_id):
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'error': 'not found'}), 404
     d = request.get_json(silent=True) or {}
+    # Remote peer training: zip the export folder and enqueue a ClusterJob.
+    from ..services import cluster as cluster_svc
+    device_id = cluster_svc.normalize_device_id(d.get('device_id'))
+    if device_id != cluster_svc.LOCAL_DEVICE_ID:
+        try:
+            from ..services import cluster_remote
+            archive, config_text = lt.prepare_peer_training_bundle(
+                LOCAL_USER, dataset_id, steps=d.get('steps'),
+                base_model=d.get('base_model'), variant=d.get('variant', 'turbo'),
+                train_type=d.get('train_type'), masked=d.get('masked'))
+            job_id = cluster_remote.enqueue_training_on_device(
+                device_id,
+                dataset_archive_path=archive,
+                train_params={'config_text': config_text},
+            )
+            return jsonify({'ok': True, 'mode': 'peer', 'job_id': job_id,
+                            'device_id': device_id})
+        except Exception as e:
+            return _map_error(e)
     try:
         # steps optionnel : None → adaptatif. base_model='' → officiel ; sinon merge
         # (doit être converti d'abord). variant règle l'adapter de de-distillation.

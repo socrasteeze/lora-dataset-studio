@@ -707,7 +707,12 @@ def dataset_generate(dataset_id):
     # a mixed run would already be in flight — the user would be told the batch
     # failed while paying for half of it. Both gaps answer the same actionable
     # 409 (with the downloads started), so they are checked together, up front.
-    if any(g == 'klein' for g, _ in batches):
+    # Skip local Comfy/model preflight when the job will run on a peer — the
+    # peer's own ComfyUI validates the graph.
+    from ..services import cluster as cluster_svc
+    remote_device = (cluster_svc.normalize_device_id(data.get('device_id'))
+                     != cluster_svc.LOCAL_DEVICE_ID)
+    if not remote_device and any(g == 'klein' for g, _ in batches):
         from ..services import klein_edit_helper as keh
         missing_nodes = keh.klein_missing_nodes()
         missing_assets = keh.klein_missing_assets()
@@ -716,7 +721,7 @@ def dataset_generate(dataset_id):
     # Same rule for the second LOCAL engine: weights AND the custom-node pack are
     # checked once, up front, so a two-engine run can't dispatch Klein's share and
     # only then discover Krea can't render its own.
-    if any(g == 'krea' for g, _ in batches):
+    if not remote_device and any(g == 'krea' for g, _ in batches):
         from ..services import krea_edit_helper as keh2
         try:
             keh2.preflight()
@@ -735,7 +740,8 @@ def dataset_generate(dataset_id):
                 # free, NSFW-capable. Its one dial (grounding_px) is a setting,
                 # not a per-run argument — see krea_edit_helper.grounding_px.
                 ids = svc.generate_variations_krea(LOCAL_USER, dataset_id,
-                                                   variations, multiplier)
+                                                   variations, multiplier,
+                                                   device_id=data.get('device_id'))
             else:
                 ids = svc.generate_variations(LOCAL_USER, dataset_id,
                                               variations, multiplier,
@@ -744,7 +750,8 @@ def dataset_generate(dataset_id):
                                               # Optional generation-LoRA preset
                                               # (Idea by @waltm): a NAME resolved
                                               # from config — absent/'' = none.
-                                              generation_lora_preset=data.get('generation_lora_preset'))
+                                              generation_lora_preset=data.get('generation_lora_preset'),
+                                              device_id=data.get('device_id'))
                 _autostart_optional_klein()  # bg-fetch the consistency LoRA if it's absent
             created += len(ids)
             per_engine[generator] = per_engine.get(generator, 0) + len(ids)

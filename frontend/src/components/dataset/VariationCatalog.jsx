@@ -1,6 +1,7 @@
 /** Variation catalog: presets + per-entry toggles + multiplier + Klein picker. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import KleinModelSetting from '../shared/KleinModelSetting';
+import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker';
 import { useToast } from '../common/Toast';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { apiFetch, putJson } from '../../api/fetchClient';
@@ -165,6 +166,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
   const frLabel = (fr) => framingLabel(subject, fr);
   const [selected, setSelected] = useState(new Set());
   const [multiplier, setMultiplier] = useState(1);
+  const [deviceId, setDeviceId] = useState(loadSavedDeviceId);
   const [klein, setKlein] = useState(null);
   // 🔞 NSFW mode — local Klein ONLY (the backend refuses NSFW on API engines).
   // Unlocks the uncensored body catalog + a free-prompt custom variation.
@@ -750,7 +752,8 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
     // Optional generation-LoRA preset (Klein only): only the NAME rides — the
     // backend resolves the chain from its own config (fail-closed).
     onGenerate(toGen, multiplier, klein, loraStrength, 'klein',
-      generationLoraPresetPayload({ isKlein: true, presetName: loraPresetName, presets: loraPresets }));
+      generationLoraPresetPayload({ isKlein: true, presetName: loraPresetName, presets: loraPresets }),
+      deviceId);
   };
 
   return (
@@ -1478,6 +1481,8 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
             {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
+        <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy"
+          className="text-[0.6875rem]" />
         {!hasRef && (
           <span className="text-amber-300 text-[0.6875rem]">Set a reference photo first</span>
         )}

@@ -60,6 +60,20 @@ def install_network_guard(app):
         # only engages when the user turned it on in Settings. Read lazily so the
         # toggle takes effect on the next request without a restart.
         from . import config as cfg
+        # First-contact join uses a one-time join token (validated in-handler),
+        # not the browser access token and not a peer bearer yet.
+        if request.path == '/api/cluster/join' and request.method == 'POST':
+            return None
+        # Peer workers present a ClusterDevice bearer — accept that even when the
+        # browser access-token gate is on (machine-to-machine over Tailscale).
+        presented = _presented_token()
+        if presented and request.path.startswith('/api/cluster/'):
+            try:
+                from .services import cluster as cluster_svc
+                if cluster_svc.authenticate_peer(presented) is not None:
+                    return None
+            except Exception:
+                pass
         if not cfg.get('server.require_token'):
             return None
         # config.server.access_token is read here too (not only the boot-time env)
@@ -75,7 +89,6 @@ def install_network_guard(app):
                                      'set LDS_ACCESS_TOKEN (see README) or bind 127.0.0.1'}), 403
         if session.get(SESSION_FLAG):
             return None
-        presented = _presented_token()
         if presented and secrets.compare_digest(str(presented), str(token)):
             session[SESSION_FLAG] = True   # signed cookie → the SPA's fetches follow
             return None

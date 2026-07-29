@@ -18,6 +18,7 @@ import LocalToolsSection from '../components/settings/LocalToolsSection'
 import CaptioningSection from '../components/settings/CaptioningSection'
 import TrainingSection from '../components/settings/TrainingSection'
 import ServerSection from '../components/settings/ServerSection'
+import DevicesSection from '../components/settings/DevicesSection'
 import MaintenanceSection from '../components/settings/MaintenanceSection'
 
 const SECTION_COMPONENTS = {
@@ -28,6 +29,7 @@ const SECTION_COMPONENTS = {
   captioning: CaptioningSection,
   training: TrainingSection,
   server: ServerSection,
+  devices: DevicesSection,
   maintenance: MaintenanceSection,
 }
 
