@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-buttons-that-were-blank-have-their-icons-back',
+    date: '2026-07-29',
+    title: 'Buttons that showed as blank squares have their icons back',
+    blurb:
+      'Several controls were rendering as empty boxes or thin rectangles you could not read: the download buttons on the Datasets screen, the delete and close buttons on images, the preset delete, "open the dataset folder" and the seed re-roll. This build had been removing the icons from the interface, and where an icon WAS the whole button there was nothing left to show — the button still worked, it just looked broken. Every icon is back, everywhere, and it stays that way.',
+    to: '/datasets',
+  },
+  {
     id: '2026-07-28-memory-savers-and-timestep-per-family',
     date: '2026-07-28',
     title: 'Switching model family no longer changes your run behind your back',

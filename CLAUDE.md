@@ -88,6 +88,11 @@ Never re-add Gemini/OpenAI/Nano Banana generation engines. After any merge
 that touches `frontend/`, run `cd frontend && npm run build` and the
 local-only contract test before calling the sync done.
 
+**Do NOT strip emoji.** The old emoji-free divergence was retired on
+2026-07-29: this app uses emoji AS controls, so stripping them left real
+buttons rendering as empty boxes. Take upstream's glyphs exactly as they
+come — see Divergence 3 in `FORK_NOTES.md` for what it cost.
+
 ## Releases
 
 Releases are cut on validated waves/milestones only — never per commit.
