@@ -197,19 +197,38 @@ def test_display_and_copy_readers_are_pinned_to_the_resolver():
     import app.routes.bank as bank_routes
     from app.services import image_bank_service as banks
 
-    def calls(module, func_name, inner=None):
+    def calls(module, func_name, inner=None, follow=False):
+        """The names called by one function. `follow` also inlines the calls of
+        any MODULE-LEVEL function it calls, ONE level deep.
+
+        Promotion needs `follow`: the row loop moved out of the job closure into
+        _promote_rows (now shared with the promote-into-a-new-bank job), so the
+        resolver call sits one frame down and pinning the closure alone reported
+        a broken JOIN that was not broken. One level only, and opt-in: two levels
+        reach a helper whose abs_image_path use is legitimate, which would quietly
+        turn every `abs_image_path not in ...` below into a rubber stamp."""
         tree = ast.parse(open(module.__file__, encoding='utf-8').read())
+        mod_funcs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+
+        def named(node):
+            return {n.func.id for n in ast.walk(node)
+                    if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)} | \
+                   {n.func.attr for n in ast.walk(node)
+                    if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+
         node = next(n for n in ast.walk(tree)
                     if isinstance(n, ast.FunctionDef) and n.name == func_name)
         if inner:      # the job closure inside a start_* factory
             node = next(n for n in ast.walk(node)
                         if isinstance(n, ast.FunctionDef) and n.name == inner)
-        return {n.func.id for n in ast.walk(node)
-                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)} | \
-               {n.func.attr for n in ast.walk(node)
-                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+        out = named(node)
+        if follow:
+            for name in list(out):
+                if name in mod_funcs:
+                    out = out | named(mod_funcs[name])
+        return out
 
-    promote = calls(banks, '_promote_job', inner='run')
+    promote = calls(banks, '_promote_job', inner='run', follow=True)
     assert 'resolved_image_path' in promote
     assert 'abs_image_path' not in promote
 
