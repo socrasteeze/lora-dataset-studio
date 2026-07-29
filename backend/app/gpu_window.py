@@ -16,6 +16,18 @@ class GpuBusyError(RuntimeError):
 _HEARTBEAT_FLOOR_SECONDS = 10
 
 
+def _log(message, level='info', detail=None):
+    """Mirror GPU-window transitions into the activity log. The window is the
+    single most confusing thing this app does — it unloads ComfyUI, blocks
+    training and makes everything else answer "GPU busy" — and until now it did
+    all of that with no visible trace anywhere."""
+    try:
+        from .services import activity_log
+        activity_log.record('gpu', message, level=level, detail=detail)
+    except Exception:      # noqa: BLE001 — never break the pass being described
+        pass
+
+
 def recover_stale_vision_window():
     """Clear a persisted vision lock during server startup.
 
@@ -39,6 +51,8 @@ def gpu_exclusive_vision_window(flag_ttl=300):
         raise GpuBusyError('training is running')
     token = uuid.uuid4().hex
     queue_manager._set_system_state('vision_in_progress', token, ttl_seconds=flag_ttl)
+    _log('GPU taken exclusively', 'warn',
+         detail='ComfyUI unloaded; training cannot start until this releases')
     # The TTL exists so a crashed process can't hold the GPU hostage — but a
     # LEGITIMATE batch can outlive it (a big caption run on a slow vision model
     # beats 30 min easily), and once the flag lapses the job queue's GPU gate
@@ -53,15 +67,39 @@ def gpu_exclusive_vision_window(flag_ttl=300):
     except RuntimeError:
         _app = None   # no app context (bare test harness) -> no heartbeat, old behavior
 
+    # The beat's check-and-rearm and the close's check-and-clear are the SAME
+    # critical section, and they have to be mutually exclusive — not merely
+    # ordered by a join with a timeout.
+    #
+    # This used to be `heartbeat.join(timeout=5)` alone, with a comment saying
+    # beats are two fast local DB ops so the join is effectively instant. That
+    # holds until SQLite's single write lock is contended, which this app hits
+    # often enough to carry write_with_retry and a `db_busy` error shape. When
+    # the join times out, the sequence is: beat passes its stop-check and reads
+    # the flag as still ours -> close clears the flag -> beat completes its
+    # write and re-arms it with a fresh TTL, then exits because stop is set.
+    # The result is a flag nothing is holding and nothing will refresh, so
+    # everything refuses "GPU busy" for the full 30-minute TTL. Owner-reported
+    # after cancelling a pass: "I had even canceled it and now it's showing
+    # this."
+    guard = threading.Lock()
+    closed = {'yes': False}
+
     def _rearm_until_closed():
         interval = max(_HEARTBEAT_FLOOR_SECONDS, flag_ttl / 3)
         while not heartbeat_stop.wait(interval):
             try:
-                with _app.app_context():
-                    if queue_manager._get_system_state('vision_in_progress') != token:
-                        return   # lapsed AND re-acquired by another caller — never stomp it
-                    queue_manager._set_system_state('vision_in_progress', token,
-                                                    ttl_seconds=flag_ttl)
+                with guard:
+                    # Re-checked INSIDE the lock: the window may have closed
+                    # while this beat was waiting on it, and a write after that
+                    # is the phantom lock.
+                    if closed['yes']:
+                        return
+                    with _app.app_context():
+                        if queue_manager._get_system_state('vision_in_progress') != token:
+                            return   # lapsed AND re-acquired by another caller — never stomp it
+                        queue_manager._set_system_state('vision_in_progress', token,
+                                                        ttl_seconds=flag_ttl)
             except Exception:
                 logger.debug('vision-window TTL heartbeat failed; next beat retries',
                              exc_info=True)
@@ -80,11 +118,22 @@ def gpu_exclusive_vision_window(flag_ttl=300):
         yield
     finally:
         heartbeat_stop.set()
+        # Taking `guard` is what actually closes the race: a beat mid-write holds
+        # it, so we wait for that write and then clear on top of it; a beat that
+        # has not started sees closed=True under the same lock and never writes.
+        # The join stays as a tidy-up (the thread is done within one wait), but
+        # nothing correctness-critical rests on it any more.
+        with guard:
+            closed['yes'] = True
+            # only clear the flag if we still own it (it may have expired and been re-acquired)
+            if queue_manager._get_system_state('vision_in_progress') == token:
+                queue_manager._set_system_state('vision_in_progress', None)
+                _log('GPU released', 'ok')
+            else:
+                # Someone else owns the flag now — ours lapsed and was
+                # re-acquired. Worth a line: it is the shape a "GPU busy" that
+                # outlives its owner takes.
+                _log('GPU window closed, but the flag belongs to another pass',
+                     'warn')
         if heartbeat is not None:
-            # A beat already past its stop-check could otherwise re-arm the flag
-            # AFTER we clear it below, stranding a phantom lock. Beats are two
-            # fast local DB ops, so this join is effectively instant.
             heartbeat.join(timeout=5)
-        # only clear the flag if we still own it (it may have expired and been re-acquired)
-        if queue_manager._get_system_state('vision_in_progress') == token:
-            queue_manager._set_system_state('vision_in_progress', None)

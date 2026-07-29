@@ -24,6 +24,17 @@ _FINISHED_TTL = 5 * 60    # finished snapshot lifetime
 _STALE_TTL = 60 * 60      # running job with no progress for this long = dead
 
 
+def _log(bank_id, message, level='info', detail=None):
+    """Mirror a job transition into the activity log. Imported lazily and
+    swallowed whole: the log is never allowed to break the work it describes."""
+    try:
+        from . import activity_log
+        activity_log.record('bank', message, level=level, bank_id=bank_id,
+                            detail=detail)
+    except Exception:      # noqa: BLE001
+        pass
+
+
 class BankJobBusy(Exception):
     """Another job is already running on this bank."""
     def __init__(self, kind):
@@ -45,6 +56,8 @@ def start(app, bank_id, kind, fn, total=0):
                'started_at': now, '_touched': now, '_cancel_hook': None,
                'pipeline': None}
         _jobs[bank_id] = job
+    _log(bank_id, f'{kind} started', 'info',
+         detail=f'{total} image(s)' if total else None)
 
     def _run():
         try:
@@ -53,10 +66,18 @@ def start(app, bank_id, kind, fn, total=0):
         except Exception as e:  # noqa: BLE001 — a background crash must surface in the UI
             with _lock:
                 job['error'] = f'{type(e).__name__}: {e}'
+            _log(bank_id, f'{kind} failed', 'error', detail=job['error'])
         finally:
             with _lock:
                 job['finished'] = True
                 job['_touched'] = time.time()
+                cancelled_, detail_, done_ = (job['cancelled'], job['detail'],
+                                              job['done'])
+            if cancelled_:
+                _log(bank_id, f'{kind} stopped', 'warn', detail=detail_)
+            elif not job['error']:
+                _log(bank_id, f'{kind} finished', 'ok',
+                     detail=detail_ or (f'{done_} done' if done_ else None))
 
     # Under TESTING the job runs INLINE: the test suite uses a per-connection
     # sqlite:///:memory: DB, so a real worker thread would open a fresh, EMPTY
@@ -125,6 +146,7 @@ def cancel(bank_id) -> bool:
         job = _jobs.get(bank_id)
         if not job or job['finished']:
             return False
+        _log(bank_id, f"stop requested for {job['kind']}", 'warn')
         job['cancelled'] = True
         job['_touched'] = time.time()
         hook = job['_cancel_hook']

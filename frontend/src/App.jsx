@@ -7,6 +7,7 @@ import { CapabilitiesProvider, useCapabilities } from './context/CapabilitiesCon
 import { setToastRef } from './api/fetchClient'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import { WhatsNewButton, WhatsNewModal } from './components/common/WhatsNew'
+import ActivityPanel from './components/common/ActivityPanel'
 import ConnectionBanner from './components/common/ConnectionBanner'
 import DatasetPage from './pages/DatasetPage'
 import BankPage from './pages/BankPage'
@@ -50,6 +51,27 @@ const menuItemClass = ({ isActive }) =>
  * git-aware check — server-side TTL cache keeps the network cost to one fetch
  * per 6 h across all page loads. An available update lights a dot on the button
  * and surfaces the UpdateBanner without any click. */
+/** 📋 in the header: opens the app-wide activity panel.
+ *
+ *  Deliberately always available and always silent. It carries no badge and no
+ *  count — a header that lights up whenever anything is running would be lit
+ *  most of the time, and the panel exists to answer a question the user chooses
+ *  to ask ("is it stuck?"), not to interrupt them with an answer they didn't. */
+function ActivityButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}
+        title="What the app is doing right now — running passes, the queue, and a live log"
+        aria-label="Activity"
+        className="rounded-md p-2 text-content-muted hover:text-content hover:bg-surface-raised">
+        <span aria-hidden className="block text-lg leading-none">📋</span>
+      </button>
+      {open && <ActivityPanel onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+
 function CheckUpdatesButton() {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
@@ -263,11 +285,13 @@ function NavBar() {
                 </>
               )}
             </HeaderMenu>
+            <ActivityButton />
             <WhatsNewButton />
             <CheckUpdatesButton />
           </div>
         </nav>
         <div className="ml-auto flex items-center gap-1 md:hidden">
+          <ActivityButton />
           <WhatsNewButton />
           <CheckUpdatesButton />
           <button type="button" onClick={() => setOpen((v) => !v)}

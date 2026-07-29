@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-30-activity-panel-is-it-stuck',
+    date: '2026-07-30',
+    title: 'One place that tells you whether anything is actually moving',
+    blurb:
+      '📋 in the top bar opens a live view of everything the app is doing, from any page — every running bank pass and dataset batch, what is waiting in the queue, and a timestamped log of passes starting, finishing, stopping and failing. The part that matters is next to each running job: how long since it last reported anything. A progress bar frozen at 34% and one that will move again in two seconds look identical, so the bar could never answer "is it stuck" — the age can, and past five minutes of silence the panel says so outright. The GPU now leaves a trace too: taking the card exclusively unloads ComfyUI and blocks training, and it used to do all of that invisibly.',
+    to: '/settings/maintenance',
+  },
+  {
+    id: '2026-07-30-a-cancelled-pass-no-longer-strands-the-gpu',
+    date: '2026-07-30',
+    title: 'Cancelling a pass no longer leaves the GPU marked busy for half an hour',
+    blurb:
+      'Stopping a bank pass could leave the app convinced a vision/GPU pass was still running — so every launch afterwards was refused with "a vision/GPU pass is already running", for about thirty minutes, with nothing actually running. The cause was a race at the moment the pass let go of the card: a background heartbeat that keeps the GPU reserved during a long pass could land one last write just after the release, re-reserving it for nobody. Releasing and refreshing are now the same locked step, so the reservation cannot come back from the dead. Reported by a user who had cancelled the pass and watched it happen.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-deploy-follows-extra-model-paths',
     date: '2026-07-29',
     title: 'Deployed LoRAs land where your extra_model_paths.yaml says',

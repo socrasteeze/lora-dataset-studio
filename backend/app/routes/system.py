@@ -25,7 +25,7 @@ import logging
 from flask import Blueprint, current_app, jsonify, request
 
 from ..config import LOCAL_USER
-from ..services import folder_picker, global_stop
+from ..services import activity_log, folder_picker, global_stop
 
 logger = logging.getLogger(__name__)
 
@@ -85,3 +85,22 @@ def stop_everything():
     rather than being folded into a failure that hides the ones that worked."""
     return jsonify({'ok': True, **global_stop.stop_everything(
         current_app._get_current_object(), LOCAL_USER)})
+
+
+@bp.get('/activity')
+def activity():
+    """What the app is doing, everywhere, in one poll.
+
+    `?since=<event id>` returns only newer events, so the panel can append
+    instead of redrawing — a full redraw every two seconds loses the user's
+    scroll position mid-read, which is the one thing a log must not do.
+
+    `running[].stale_seconds` is the answer to "is it stuck": a bar frozen at
+    34% and a bar that will move again in two seconds are drawn identically, and
+    only the age of the last update tells them apart."""
+    since = request.args.get('since')
+    limit = request.args.get('limit', 200)
+    return jsonify({
+        **activity_log.snapshot(LOCAL_USER),
+        'events': activity_log.events(since=since, limit=limit),
+    })
