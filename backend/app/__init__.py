@@ -231,6 +231,7 @@ _SCHEMA_ADDITIONS = (
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).
     ('image_bank', 'root_only', 'BOOLEAN'),
+    ('image_bank', 'keep_separate', 'BOOLEAN'),
     # Cloud stop that cannot lie: the moment the user asked for a stop, kept in
     # the database so the supervisor can terminate a pod whose monitor thread
     # never honoured it. Additive — existing runs simply carry NULL.

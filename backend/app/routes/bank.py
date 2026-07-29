@@ -11,6 +11,7 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 
 from ..config import LOCAL_USER
 from ..models import BankImage
+from ..services import bank_groups
 from ..services import bank_jobs
 from ..services import bank_queue
 from ..services import image_bank_service as banks
@@ -539,6 +540,62 @@ def bank_queue_all():
         # leave a half-queued queue behind.
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'eligible': len(bank_ids), **out}), 202
+
+
+@bp.post('/bank/<int:bank_id>/keep-separate')
+def bank_keep_separate(bank_id):
+    """Opt one bank out of (or back into) name grouping.
+
+    A property of the BANK, not of the group: it survives a rename away and
+    back, because auto-clearing it on rename would silently re-group a bank the
+    user had explicitly separated."""
+    data = request.get_json(silent=True) or {}
+    try:
+        value = bank_groups.set_keep_separate(LOCAL_USER, bank_id,
+                                              data.get('keep_separate'))
+    except ValueError:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, 'keep_separate': value})
+
+
+@bp.post('/bank-group/<int:bank_id>/queue')
+def bank_group_queue(bank_id):
+    """Queue every bank in ``bank_id``'s group — one entry PER BANK.
+
+    The member list comes from the SERVER (bank_groups.member_ids), never from
+    the request: a stale card — a rename in another tab, a bank deleted a second
+    ago — would otherwise queue banks that no longer share a name. A group card
+    is a display device; the queue still runs one bank at a time."""
+    data = request.get_json(silent=True) or {}
+    members = bank_groups.member_ids(LOCAL_USER, bank_id)
+    if not members:
+        return jsonify({'error': 'not found'}), 404
+    try:
+        out = bank_queue.enqueue_many(
+            _app(), LOCAL_USER, members,
+            steps=data.get('steps'), reject_flags=data.get('reject_flags'),
+            resolve_dups=bool(data.get('resolve_dups')))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'members': members, **out}), 202
+
+
+@bp.post('/bank-group/<int:bank_id>/promote')
+def bank_group_promote(bank_id):
+    """Promote every KEPT image of a name group into one dataset.
+
+    No `image_ids`: a group card has no grid selection — this is "everything
+    kept in this group that is not already there". Members are walked one after
+    another into the same dataset, and cross-bank duplicates are collapsed by
+    the import's own dedupe. 409 when ANY member has a live job: a half-done
+    group promotion is not something the user can reason about."""
+    data = request.get_json(silent=True) or {}
+    try:
+        dataset_id = int(data.get('dataset_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'dataset_id is required'}), 400
+    return _start(banks.start_group_promote, _app(), LOCAL_USER, bank_id,
+                  dataset_id)
 
 
 @bp.post('/bank-queue/clear')

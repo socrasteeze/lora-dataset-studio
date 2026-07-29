@@ -252,6 +252,15 @@ class ImageBank(db.Model):
     # Additive column — existing banks read NULL = False (recursive, as before).
     root_only = db.Column(db.Boolean, nullable=True, default=False)
 
+    # Opt OUT of name grouping. Banks that share an exact name are shown as one
+    # card (see services/bank_groups.py) — which is right for a folder split
+    # across two disks, and wrong for two banks a user deliberately named the
+    # same. This is a property of the BANK, not of the group: it survives a
+    # rename away and back, because auto-clearing it on rename would silently
+    # re-group a bank the user had explicitly separated.
+    # Additive column — existing banks read NULL = False (they group normally).
+    keep_separate = db.Column(db.Boolean, nullable=True, default=False)
+
     def __repr__(self):
         return f'<ImageBank {self.id} {self.name}>'
 

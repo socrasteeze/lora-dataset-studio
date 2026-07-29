@@ -14,6 +14,9 @@ import { overlapNotice } from '../components/bank/bankOverlap'
 import { allExcludedWarning, normalizeExcluded, splitPlan } from '../components/bank/bankSplit'
 import { queueAllCandidates, queueAllConfirm, queueAllResult } from '../components/bank/bankQueueAll'
 import { pipelineBadge, pipelineReportVerdict, queueOutcomeLine } from '../components/bank/pipelineVerdict'
+import { groupRows } from '../components/bank/bankGroups'
+import BankGroupCard from '../components/bank/BankGroupCard'
+import BankGroupPromoteDialog from '../components/bank/BankGroupPromoteDialog'
 import { datasetFolderNotice } from '../utils/pathRelation'
 import FolderSyncNote from '../components/bank/FolderSyncNote'
 import RelocateBankDialog from '../components/bank/RelocateBankDialog'
@@ -201,6 +204,8 @@ export default function BankPage() {
   // What the Launch-all dialog is about: one bank, or every bank that still has
   // undecided images. `null` = closed.
   const [dialogScope, setDialogScope] = useState(null)
+  // The group row whose ⬆ Promote dialog is open, or null.
+  const [promotingGroup, setPromotingGroup] = useState(null)
   const [relocating, setRelocating] = useState(null)   // the bank being repointed
   // Dataset storage folders, so a folder that belongs to a dataset can be named
   // as such WHILE it is typed. The server refuses it either way — this only
@@ -381,6 +386,45 @@ export default function BankPage() {
     }
   }
 
+  /** Rename from inside a group card, which has no in-place title editor.
+   *  Renaming AWAY from the group's name leaves the group — that is the whole
+   *  mechanism, and it needs no refetch because grouping is derived. */
+  const renamePrompt = async (bank) => {
+    // eslint-disable-next-line no-alert
+    const next = window.prompt(`Rename “${bank.name}”`, bank.name)
+    if (next == null || !next.trim() || next.trim() === bank.name) return
+    try { await rename(bank, next.trim()) } catch { /* rename() already told them */ }
+  }
+
+  /** Opt one bank out of (or back into) name grouping. Patched in place for the
+   *  same reason renames are: GET /api/banks force-re-walks every source folder,
+   *  so it is not something to fire for one checkbox. */
+  const keepSeparate = async (bank, value) => {
+    try {
+      const d = await postJson(`/api/bank/${bank.id}/keep-separate`, { keep_separate: value })
+      setBanks((rows) => (rows || []).map(
+        (b) => (b.id === bank.id ? { ...b, keep_separate: d.keep_separate } : b)))
+    } catch (e) {
+      toast.error(e?.message || 'Could not change that.')
+    }
+  }
+
+  /** Queue every bank in one group — one entry each, same engine, still one
+   *  bank at a time. The member list is the SERVER's (bank_groups.member_ids);
+   *  a stale card must not be able to queue banks that no longer share a name. */
+  const queueGroup = async (config) => {
+    const lead = dialogScope?.bankId
+    setDialogScope(null)
+    try {
+      const d = await postJson(`/api/bank-group/${lead}/queue`, config)
+      toast.success(`${(d.queued || []).length} bank(s) queued — they run one at a time.`)
+    } catch (e) {
+      toast.error(e?.message || 'Could not queue the group.')
+    } finally {
+      refreshQueue()
+    }
+  }
+
   /** Every bank with undecided images, QUEUED — one entry each, never one run
    *  each. The queue drains one bank at a time behind an idle GPU, which is the
    *  whole reason this is safe as a single button; the confirm says so before
@@ -412,6 +456,7 @@ export default function BankPage() {
 
   const runNow = async (config) => {
     if (dialogScope?.kind === 'all') return queueAll(config)
+    if (dialogScope?.kind === 'group') return queueGroup(config)
     const id = dialogScope?.bankId
     setDialogScope(null)
     try {
@@ -424,6 +469,7 @@ export default function BankPage() {
   }
   const enqueue = async (config) => {
     if (dialogScope?.kind === 'all') return queueAll(config)
+    if (dialogScope?.kind === 'group') return queueGroup(config)
     const id = dialogScope?.bankId
     setDialogScope(null)
     try {
@@ -615,10 +661,27 @@ export default function BankPage() {
             a card stretched it past the viewport and scrolled the whole page
             sideways on a phone — with `truncate` never getting a chance to fire. */}
         <ul className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-          {sortBanks(banks, sort).map((b) => {
+          {/* Banks that share an EXACT name become one card. Nothing is merged:
+              every image still belongs to exactly one bank, so no path resolver
+              and no invariant changes — the card is a display device with
+              combined counts, one queue action and one promote. A member can opt
+              out ("Keep separate"), which is a property of the BANK and survives
+              a rename away and back. */}
+          {groupRows(sortBanks(banks, sort)).map((row) => {
+            if (row.kind === 'group') {
+              return (
+                <BankGroupCard key={row.key} row={row} queueStateOf={queueStateOf}
+                  onOpen={open}
+                  onQueue={() => setDialogScope({ kind: 'group', bankId: row.leadId })}
+                  onPromote={() => setPromotingGroup(row)}
+                  onKeepSeparate={keepSeparate}
+                  onRename={renamePrompt} onRelocate={setRelocating} onRemove={remove} />
+              )
+            }
+            const b = row.bank
             const qs = queueStateOf(b)
             return (
-            <li key={b.id}
+            <li key={row.key}
               className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-4">
               <div className="flex min-w-0 items-center gap-2">
                 <BankTitle bank={b} onOpen={() => open(b.id)}
@@ -678,6 +741,11 @@ export default function BankPage() {
         <LaunchAllDialog caps={caps} visionReady={visionReady}
           onClose={() => setDialogScope(null)}
           onLaunch={runNow} onQueue={enqueue} />
+      )}
+
+      {promotingGroup && (
+        <BankGroupPromoteDialog row={promotingGroup}
+          onClose={() => setPromotingGroup(null)} onStarted={refresh} />
       )}
 
       {relocating && (
