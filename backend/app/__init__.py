@@ -564,12 +564,15 @@ def _start_workers(app):
     # not share a fate with the recovery it supervises.
     cloud_training.start_supervisor(app)
 
-    # Cluster: persist a node_id; start the peer pull-loop when role=peer.
+    # Cluster: persist a node_id; sweep stale artifacts; start the peer pull-loop
+    # when role=peer. The sweep runs at boot for the same reason the staged-input
+    # one does — it is the single moment nothing is in flight.
     try:
         from .services import cluster as cluster_svc
         from .services.peer_worker import peer_worker
         with app.app_context():
             cluster_svc.ensure_node_id()
+            cluster_svc.prune_job_artifacts()
         peer_worker.init_app(app)
         if cluster_svc.role() == 'peer':
             peer_worker.start()

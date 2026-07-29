@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 ONLINE_TTL_SECONDS = 90
 JOIN_TOKEN_TTL_HOURS = 48
 ARTIFACT_SUBDIR = 'cluster_artifacts'
+# Same fence as comfy_fs.STAGED_INPUT_MAX_AGE_SECONDS, for the same reason: long
+# enough that a queue running longer than anyone planned cannot lose its inputs.
+ARTIFACT_MAX_AGE_SECONDS = 48 * 3600
 LOCAL_DEVICE_ID = 'local'
 
 _VALID_ROLES = frozenset({'standalone', 'primary', 'peer'})
@@ -109,6 +112,65 @@ def artifact_path(job_id: str, name: str) -> Path:
     if not path.is_file():
         raise FileNotFoundError(safe)
     return path
+
+
+def prune_job_artifacts(max_age_seconds: int = ARTIFACT_MAX_AGE_SECONDS,
+                        now: float | None = None) -> int:
+    """Boot sweep for artifact folders no live job can still need.
+
+    Every remote job leaves full-size files here: the Primary copies the source
+    image (and each extra reference) in on the way out, and the peer uploads its
+    output — a rendered image, a vision result, a LoRA checkpoint — back into the
+    same folder. Nothing deleted any of it, so the cost of renting a GPU was a
+    permanent second copy of every image involved, forever. That is the same leak
+    already measured at 0.67 GB over three months for staged ComfyUI inputs (see
+    job_queue._prune_staged_inputs), and this folder is worse: the files are
+    bigger and it holds both ends of the trip.
+
+    Deliberately a BOOT sweep and not an inline delete on completion. For a
+    `comfy` job the output artifact is briefly the only copy that exists — if
+    `_materialize_comfy_output` could not reach ComfyUI's output dir it falls back
+    to the artifact — and for `vision`/`infer` the result JSON is read back out of
+    here by `cluster_remote.read_job_result_json` at a moment nothing controls.
+    An age fence costs a bounded amount of disk and cannot destroy the only copy
+    of a user's image; deleting on completion could.
+
+    Fenced three ways: this folder belongs to the app (not to ComfyUI), only
+    whole per-job directories are considered, nothing younger than
+    `max_age_seconds` is touched, and any job still pending/claimed/running is
+    spared outright. Returns the number of folders removed.
+    """
+    import time
+    now = time.time() if now is None else now
+    cutoff = now - max_age_seconds
+    live = set()
+    try:
+        live = {j.job_id for j in (ClusterJob.query
+                                   .filter(ClusterJob.status.in_(
+                                       ('pending', 'claimed', 'running')))
+                                   .all())}
+    except Exception:
+        # No table yet (first boot) — the sweep is still safe, just unfenced by
+        # liveness, and the age fence alone already covers anything in flight.
+        logger.debug('cluster: could not read live jobs for the artifact sweep')
+    removed = 0
+    root = cfg.data_dir() / ARTIFACT_SUBDIR
+    if not root.is_dir():
+        return 0
+    for entry in root.iterdir():
+        if not entry.is_dir() or entry.name in live:
+            continue
+        try:
+            if entry.stat().st_mtime >= cutoff:
+                continue
+            shutil.rmtree(entry, ignore_errors=True)
+            removed += 1
+        except OSError as exc:
+            logger.warning('cluster: could not prune artifacts for %s (%s)',
+                           entry.name, exc)
+    if removed:
+        logger.info('cluster: pruned %d stale artifact folder(s)', removed)
+    return removed
 
 
 def local_capabilities() -> dict:
@@ -377,7 +439,14 @@ def pull_next_job(device: ClusterDevice) -> dict | None:
     db.session.commit()
 
     payload = job.payload_dict()
-    # Attach absolute-ish artifact download names for the peer.
+    # The peer routes everything by artifact BASENAME (see peer_worker), so the
+    # Primary's absolute paths are of no use to it — and sending them would put
+    # this machine's filesystem layout on the wire and into the peer's own logs.
+    md = payload.get('metadata')
+    if isinstance(md, dict) and 'staged_input_paths' in md:
+        md = dict(md)
+        md.pop('staged_input_paths', None)
+        payload = {**payload, 'metadata': md}
     artifacts = payload.get('artifacts') or []
     return {
         'job_id': job.job_id,
