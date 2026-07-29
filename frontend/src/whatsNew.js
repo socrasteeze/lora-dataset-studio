@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-exclude-subfolders-from-a-bank-import',
+    date: '2026-07-29',
+    title: 'Leave folders out when you import a folder of folders',
+    blurb:
+      'Importing a folder of folders made a bank from every subfolder, including the ones you did not want — the rendered-output folder, the backup, the 40 000-file archive. In the preview you can now untick any of them. Excluded folders stay on the list struck through, so you can see what you skipped instead of wondering what the walk missed, and they are never read at all rather than read and then thrown away. If you untick every folder the app tells you what will happen before you press the button, and refuses rather than quietly importing the whole parent instead.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-accept-images-deleted-from-a-bank-folder',
     date: '2026-07-29',
     title: 'A bank stops counting images you deleted from the folder yourself',

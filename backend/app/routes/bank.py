@@ -89,15 +89,24 @@ def bank_split_preview():
 def bank_split():
     """Create one bank per top-level subfolder of ``folder`` (files referenced in
     place). ``include_loose`` (default true) also makes a bank from the loose
-    root-level images so nothing is dropped. Returns the created banks. 400 on a
-    bad folder / a subfolder over the size cap."""
+    root-level images so nothing is dropped. ``exclude`` names top-level
+    subfolders to leave out of this import only (never persisted). Returns the
+    created banks. 400 on a bad folder / a subfolder over the size cap / every
+    subfolder excluded."""
     data = request.get_json(silent=True) or {}
     include_loose = data.get('include_loose')
+    # Coerced defensively: a client sending a string, a null or a nested list
+    # must not reach os.walk's pruning as something that silently matches
+    # nothing (an exclusion that quietly does not apply is the worst outcome —
+    # the folder gets imported anyway).
+    raw = data.get('exclude')
+    exclude = [str(x) for x in raw if str(x).strip()] if isinstance(raw, list) else []
     try:
         created = banks.split_folder_into_banks(
             LOCAL_USER, data.get('folder'),
             name_prefix=data.get('name_prefix'),
-            include_loose=True if include_loose is None else bool(include_loose))
+            include_loose=True if include_loose is None else bool(include_loose),
+            exclude=exclude)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'banks': created})
