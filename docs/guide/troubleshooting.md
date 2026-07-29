@@ -335,6 +335,46 @@ If a Stop button is greyed out, another batch on the same dataset (for
 example a caption pass) is holding the activity slot; it re-enables the
 moment that batch ends.
 
+## "GPU busy" when nothing is running
+
+Every GPU pass, every queued bank and every training start is gated on two
+flags the app keeps: *training in progress* and *a vision/GPU pass in
+progress*. They are set when work takes the card and cleared when it lets go.
+If a process dies without letting go — ComfyUI gone, a borrowed Python that
+never returned, a helper wedged on CUDA start-up — the flag stays set and
+**everything afterwards refuses with a "GPU busy" that is not true**. The flag
+has a timer, but it does not save you: an alive-but-stuck process keeps
+refreshing it, so this used to mean restarting the app.
+
+Two ways out, and the first is almost always the right one:
+
+- **Clear the leftover flag.** Where the refusal appears — the bank workspace,
+  the banks page, and Settings ▸ Maintenance — a warning shows up *only when
+  the server has checked and found nothing behind the flag*, with a **Clear
+  it — nothing is using the GPU** button. It stops nothing; it just corrects
+  the app's belief. If something really is running you will not see it, and
+  pressing it anyway is refused rather than allowed to break your own job.
+- **⏹ Stop everything** (Settings ▸ Maintenance) when work *is* wedged. It
+  cancels queued and running bank passes, dataset batches and in-flight
+  generations, asks ComfyUI to unload, stops training, then clears the flags.
+  It confirms first — it is destructive to in-flight work by design. Passes
+  that cache their progress (✨ Score, 👥 Group by person) resume where they
+  stopped; anything mid-flight is lost.
+
+**It reports per target, and it does not round up.** An unreachable ComfyUI is
+reported as *not confirmed*, not as stopped. A training process that cannot be
+confirmed dead is a **failure**, and its flag is deliberately *not* cleared —
+saying the GPU is free while a trainer still holds it is how two runs end up on
+one card. So a result listing one failure alongside four successes is the report
+working, not the button half-failing.
+
+**The most common cause of this on a working install** is pointing ✨ Score at a
+CUDA interpreter (see *Using the app → Make Score use a GPU Python you already
+have*). That makes Score take the GPU exclusively, which is correct — but a
+borrowed interpreter that stalls on CUDA start-up used to hold the flag
+indefinitely. A helper that produces no output for 15 minutes is now stopped
+automatically and the GPU released.
+
 ## Port 5000 conflict on macOS
 
 macOS reserves port 5000 for AirPlay Receiver. Change the port in
