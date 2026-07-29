@@ -51,11 +51,14 @@ def test_a_cpu_scoring_pass_never_takes_the_gpu_window(app, tmp_path):
         bank_id = _bank(tmp_path)
         with patch('app.capabilities.bank_scoring_gpu_available', lambda: False):
             seen = _capture_window(app, bank_id)
+            # Inside the patch, like the CUDA twin below — outside it,
+            # _resolve_score_device() probes the machine actually running the
+            # suite, and the assert fails on any box with a real GPU.
+            assert banks._resolve_score_device() == ('cpu', False)
         assert isinstance(seen['window'], type(nullcontext())), \
             'a CPU pass must not unload ComfyUI or block a training start'
         # …and it says so, so an hour-long bar is not read as a hang.
         assert any('CPU' in (d or '') for d in seen['details'])
-        assert banks._resolve_score_device() == ('cpu', False)
 
 
 def test_a_cuda_scoring_pass_still_takes_the_gpu_window(app, tmp_path):

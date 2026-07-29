@@ -371,6 +371,13 @@ def test_stop_waits_until_launch_publishes_the_new_pid(
     else:
         monkeypatch.setattr(
             lt.os, 'kill', lambda pid, sig: killed.append([str(pid), str(sig)]))
+    # The pid is synthetic (7878) but _pid_alive asks the REAL OS via
+    # psutil.pid_exists — on a box where some actual process holds 7878, the
+    # mocked taskkill "succeeds" while the probe keeps answering alive, and
+    # stop_training waits the full verify timeout then raises. This test is
+    # about the lock ordering, not kill verification (that has its own test
+    # below), so the probe is pinned the way the release/TTL tests pin it.
+    monkeypatch.setattr(lt, '_pid_alive', lambda _pid: False)
     monkeypatch.setattr(lt, '_watch_training', lambda *_a, **_kw: None)
 
     def launch():
