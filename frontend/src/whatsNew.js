@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-accept-images-deleted-from-a-bank-folder',
+    date: '2026-07-29',
+    title: 'A bank stops counting images you deleted from the folder yourself',
+    blurb:
+      'Deleting images straight out of a bank\'s folder left the bank warning about them forever — the count never came down, because the folder walk deliberately never removes a row (that rule is what stops an unplugged drive from wiping a triage built over hours). The warning now carries the way out: "Accept — remove N from this bank", on the bank card and in the workspace. It removes rows only, nothing on disk is touched, and it tells you first that those images\' keep/reject decisions and scores go with them. It is not offered while the folder is unreachable — with the drive unplugged every image looks missing, and accepting there would empty the bank. If the folder only moved, Move folder… still keeps everything.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-stop-everything-and-unstick-a-false-gpu-busy',
     date: '2026-07-29',
     title: 'A "GPU busy" that is not true no longer needs an app restart',

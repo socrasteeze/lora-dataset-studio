@@ -11,8 +11,14 @@ import { folderSyncNote } from './bankSync'
  * Both cases also share the same usual cause — the folder moved — so when the
  * caller passes ``onRelocate`` the note carries the FIX and not only the
  * diagnosis: the user is already reading this line, which is where the button
- * belongs. */
-export default function FolderSyncNote({ sync, onRelocate }) {
+ * belongs.
+ *
+ * ``onForget`` is the OTHER fix, for the other cause: the files really were
+ * deleted, on purpose, and the count would otherwise be reported forever. It is
+ * offered only alongside a reachable folder (folderSyncNote decides), because
+ * with the drive unplugged every row looks missing and accepting would wipe the
+ * triage. */
+export default function FolderSyncNote({ sync, onRelocate, onForget }) {
   const note = folderSyncNote(sync)
   if (!note) return null
   const tone = note.tone === 'error'
@@ -21,12 +27,21 @@ export default function FolderSyncNote({ sync, onRelocate }) {
   return (
     <div className={`rounded-md border px-2 py-1 text-xs ${tone}`}>
       <p>{note.tone === 'error' ? '⚠ ' : 'ℹ '}{note.text}</p>
-      {note.canRelocate && onRelocate && (
-        <button type="button" onClick={onRelocate}
-          className="mt-1 rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
-          📦 Move folder…
-        </button>
-      )}
+      <div className="flex flex-wrap gap-1">
+        {note.canRelocate && onRelocate && (
+          <button type="button" onClick={onRelocate}
+            className="mt-1 rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
+            📦 Move folder…
+          </button>
+        )}
+        {note.canForget && onForget && (
+          <button type="button" onClick={() => onForget(note.missing)}
+            title="Drop the rows of images that are no longer in the folder. Nothing on disk is touched."
+            className="mt-1 rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
+            Accept — remove {note.missing} from this bank
+          </button>
+        )}
+      </div>
     </div>
   )
 }

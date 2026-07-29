@@ -897,6 +897,29 @@ def bank_delete_rejected(bank_id):
     return jsonify({'ok': True, **out})
 
 
+@bp.post('/bank/<int:bank_id>/forget-missing')
+def bank_forget_missing(bank_id):
+    """Accept that images deleted from the folder by hand are gone: drop their
+    ROWS so the "N missing" flag can finally clear.
+
+    Nothing on disk is touched — the files are already gone. What is lost with
+    each row is its triage decision and its scores, which is why this is never
+    automatic: the folder walk stays strictly additive (an unplugged drive must
+    not wipe a triage), and accepting the loss is the user's call."""
+    try:
+        out = banks.forget_missing(LOCAL_USER, bank_id)
+    except ValueError:
+        return jsonify({'error': 'not found'}), 404
+    except RuntimeError as e:
+        # Two shapes ride this: a bank a pass owns (409, same envelope as every
+        # other occupied-bank refusal), and an unreachable folder — where every
+        # row would LOOK missing, so refusing is the whole safety of the feature.
+        snap = bank_jobs.get(bank_id)
+        return jsonify({'error': str(e),
+                        'busy_kind': (snap or {}).get('kind')}), 409
+    return jsonify({'ok': True, **out})
+
+
 def _row_or_404(bank_id, image_id):
     bank = banks.get_bank(LOCAL_USER, bank_id)
     if not bank:

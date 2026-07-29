@@ -8,7 +8,7 @@ import LaunchAllDialog from '../components/bank/LaunchAllDialog'
 import FolderPickerField from '../components/common/FolderPicker'
 import GpuBusyNotice from '../components/common/GpuBusyNotice'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
-import { bankListSyncToast } from '../components/bank/bankSync'
+import { bankListSyncToast, forgetMissingConfirm } from '../components/bank/bankSync'
 import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
 import { overlapNotice } from '../components/bank/bankOverlap'
 import { datasetFolderNotice } from '../utils/pathRelation'
@@ -348,6 +348,20 @@ export default function BankPage() {
     refreshQueue()
   }
 
+  /** Accept the missing images of ONE bank from the list, without opening it.
+   *  Rows only — the files are already gone; the confirm says both halves. */
+  const forgetMissing = async (bank, missing) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(forgetMissingConfirm(missing))) return
+    try {
+      const out = await postJson(`/api/bank/${bank.id}/forget-missing`, {})
+      toast.success(`${out.removed} missing image(s) removed from “${bank.name}” — no file was touched.`)
+      await refresh()
+    } catch (e) {
+      toast.error(e?.message || 'Those rows could not be removed.')
+    }
+  }
+
   if (currentId != null) {
     return <BankWorkspace bankId={currentId} onBack={close} onGone={close} />
   }
@@ -503,7 +517,8 @@ export default function BankPage() {
                 {b.total} image(s) · {b.scanned} scanned · <span className="text-emerald-300">{b.keep} kept</span> · <span className="text-rose-300">{b.reject} rejected</span>
               </p>
               <FolderSyncNote sync={b.folder_sync}
-                onRelocate={() => setRelocating(b)} />
+                onRelocate={() => setRelocating(b)}
+                onForget={(missing) => forgetMissing(b, missing)} />
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => open(b.id)}
                   className="rounded-md border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-content hover:bg-surface">
