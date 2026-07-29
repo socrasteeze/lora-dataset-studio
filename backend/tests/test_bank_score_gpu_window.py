@@ -30,7 +30,8 @@ def _capture_window(app, bank_id):
     from app.services import image_bank_service as banks
     seen = {}
 
-    def fake_drive(job, python, script, payload, cache_path, progress_re, window):
+    def fake_drive(job, python, script, payload, cache_path, progress_re, window,
+                   **_kw):
         seen['window'] = window
         return {'ok': True, 'results': {}}, [], 0
 

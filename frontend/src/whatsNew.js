@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-score-on-a-borrowed-gpu-python-says-what-it-costs',
+    date: '2026-07-29',
+    title: 'Pointing Score at a GPU Python now says what that does to the rest of the app',
+    blurb:
+      'Borrowing an interpreter that already has CUDA — ComfyUI\'s, ai-toolkit\'s — was sold purely as a speed-up, and it is. What nobody was told is that a Score pass on the GPU takes the card exclusively: ComfyUI is unloaded, training cannot start, and other passes and queued banks answer "GPU busy" until it finishes. People met that as a Score that seemed stuck and a GPU that stayed busy afterwards. The picker now says it on every CUDA option before you choose, the bank keeps saying it while it is in force, and — the real fix — a scoring or face helper that produces no output at all for 15 minutes is stopped, so a wedged interpreter releases the GPU instead of holding it until you restart the app. Borrowing ComfyUI\'s own Python gets the extra warning it deserves: Score frees ComfyUI\'s VRAM but does not close ComfyUI, and CUDA start-up can stall against it.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-copy-diagnostic-report-over-plain-http',
     date: '2026-07-29',
     title: 'The bug-report button works when you open the app from another machine',

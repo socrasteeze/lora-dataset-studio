@@ -77,3 +77,17 @@ test('the CPU warning offers the reuse route before the 2.5 GB download', () => 
   assert.ok(warn.indexOf('already has a working CUDA PyTorch') < warn.indexOf('CUDA_TORCH_DOWNLOAD'),
     'borrowing an existing interpreter is named first — the download is the fallback');
 });
+
+test('the GPU cost is shown on the row, next to the button that commits to it', () => {
+  // Not in a tooltip and not after the fact: this is where the choice is made.
+  assert.match(dialog, /const cost = gpuWindowCost\(r\)/);
+  assert.match(dialog, /\{cost && \(/);
+  assert.match(dialog, /\{cost\.comfyui && \(/);
+});
+
+test('the workspace states the GPU hold while it is in force, not only before', () => {
+  // A user who picked the interpreter last week and hit "GPU busy" today needs
+  // the sentence on the panel, not in a dialog they will not reopen.
+  assert.match(ws, /const scoreHoldNote = scoreGpuHoldNote\(scoreDevice, Boolean\(caps\.bank_scoring\)\)/);
+  assert.match(ws, /\{scoreHoldNote && \(/);
+});
