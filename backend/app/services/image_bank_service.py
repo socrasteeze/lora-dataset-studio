@@ -1231,6 +1231,10 @@ def list_banks(user_id, dataset_id=None) -> list:
             'preview_ids': _preview_ids(bank.id),
             'activity': bank_jobs.get(bank.id),
             'queue_state': bank_queue.state_for(bank.id),
+            # Opted out of name grouping. Exactly one field — the grouping RULE
+            # itself is re-derived on the client (see bank_groups.py for why it
+            # is deliberately implemented twice).
+            'keep_separate': bool(bank.keep_separate),
             # The last Launch-all's outcome, on the CARD. It was only ever shown
             # inside the workspace, so a run where every GPU pass was skipped for
             # "GPU busy" looked exactly like a clean one from the list — and
@@ -5480,75 +5484,159 @@ def start_promote(app, user_id, bank_id, ids, dataset_id):
                            total=len(ids))
 
 
+def _promote_rows(job, bank, ids, user_id, dataset_id, stats):
+    """Promote ``ids`` OF ONE BANK into ``dataset_id``. Returns
+    (imported, failed) and bumps the job as it goes.
+
+    Extracted from _promote_job so a GROUP promotion can walk its members
+    sequentially into the same dataset through the same code. Reimplementing
+    this loop is how the two would drift on the parts that are easy to get
+    wrong: the RESOLVED path (a watermark-cleaned image must arrive cleaned),
+    the caption and framing carried alongside the blob, and the
+    promoted_dataset_id bookkeeping."""
+    rows = []
+    for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+        rows.extend(BankImage.query.filter(
+            BankImage.bank_id == bank.id,
+            BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all())
+    rows.sort(key=lambda r: r.id)
+    imported = failed = 0
+    for c0 in range(0, len(rows), _PROMOTE_CHUNK):
+        if bank_jobs.cancelled(job):
+            break
+        chunk = rows[c0:c0 + _PROMOTE_CHUNK]
+        blobs, chunk_rows, caps, frms = [], [], [], []
+        for r in chunk:
+            # RESOLVED path: a watermark-cleaned image must reach the dataset
+            # cleaned, otherwise the two cleaning levels were run for nothing.
+            p = resolved_image_path(bank, r)
+            try:
+                with open(p, 'rb') as fh:
+                    blobs.append(fh.read())
+                chunk_rows.append(r)
+                # Carry the bank caption onto the dataset image (parallel to blobs),
+                # so a captioned selection lands already captioned.
+                caps.append(r.caption)
+                # Carry the framing the bank's classify pass already wrote, so
+                # the dataset's Composition counter is right the moment the
+                # promotion lands (it only tallies rows that HAVE a framing).
+                frms.append(r.framing)
+            except (OSError, TypeError):
+                failed += 1
+        if blobs:
+            new_ids, bad = import_images(
+                user_id, dataset_id, blobs, dedupe=True, stats=stats,
+                captions=caps, bank_image_ids=[r.id for r in chunk_rows],
+                framings=frms)
+            imported += len(new_ids)
+            failed += bad
+            # The dataset row now carries the link back (import_images writes
+            # it, and hands it to the matched row when a dedupe skips the
+            # blob), so 'already promoted here' is a fact we can re-check.
+            # Clear the legacy one-way flag as we go: it would otherwise keep
+            # excluding this image from the target long after the user
+            # deleted it there.
+            #
+            # The exception is an image whose row in the dataset is already
+            # credited to ANOTHER bank (both banks hold the same photo). There
+            # is one column for one owner, so this bank gets no verifiable
+            # trace and keeps the old flag — the alternative is offering the
+            # image on every promotion, forever.
+            unlinked = set(stats.get('bank_unlinked') or ())
+            stats.pop('bank_unlinked', None)
+            for r in chunk_rows:
+                r.promoted_dataset_id = dataset_id if r.id in unlinked else None
+            db.session.commit()
+        bank_jobs.bump(job, len(chunk))
+    return imported, failed
+
+
+def _promote_detail(imported, failed, stats, prefix='done — '):
+    """The end-of-run line, shared by the single-bank and group promotions so
+    the two never report the same run in two different vocabularies."""
+    dups = stats.get('duplicates', 0)
+    small = stats.get('small', 0)
+    detail = f'{prefix}{imported} imported'
+    if dups:
+        detail += f', {dups} already in the dataset'
+    if failed:
+        detail += f', {failed} failed'
+    if small:
+        detail += f', {small} under the recommended size'
+    return detail
+
+
 def _promote_job(user_id, bank_id, ids, dataset_id):
     def run(job):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        rows = []
-        for i0 in range(0, len(ids), _SQL_IN_CHUNK):
-            rows.extend(BankImage.query.filter(
-                BankImage.bank_id == bank_id,
-                BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all())
-        rows.sort(key=lambda r: r.id)
-        bank_jobs.progress(job, done=0, total=len(rows), detail='promoting')
+        bank_jobs.progress(job, done=0, total=len(ids), detail='promoting')
+        stats: dict = {}
+        imported, failed = _promote_rows(job, bank, ids, user_id, dataset_id,
+                                         stats)
+        bank_jobs.progress(job, detail=_promote_detail(imported, failed, stats))
+    return run
+
+
+def start_group_promote(app, user_id, bank_id, dataset_id):
+    """Promote every KEPT image of a NAME GROUP into one dataset.
+
+    The member list comes from bank_groups (the database), never from a client.
+    Every member is checked for a live job UP FRONT and BankJobBusy is raised
+    before anything is created — a half-done group promotion is not something
+    the user can reason about, and there is no "resume the rest" affordance.
+
+    Members are walked SEQUENTIALLY into one dataset. import_images(...,
+    dedupe=True) already collapses cross-bank duplicates, so two members holding
+    the same photo cost one dataset image, not two.
+
+    No image_ids: a group card has no grid selection. It is "everything kept in
+    this group that is not already there", which is what _promotable_query
+    answers per member.
+    """
+    from . import bank_groups
+    ds = FaceDataset.query.filter_by(id=dataset_id, user_id=user_id).first()
+    if not ds:
+        raise ValueError('dataset not found')
+    members = bank_groups.member_ids(user_id, bank_id)
+    if not members:
+        raise ValueError('bank not found')
+    for member in members:
+        snap = bank_jobs.get(member)
+        if snap and not snap['finished']:
+            raise bank_jobs.BankJobBusy(snap['kind'])
+    plan = {}
+    for member in members:
+        plan[member] = [r.id for r in _promotable_query(member, dataset_id)
+                        .order_by(BankImage.id.asc()).all()]
+    if not any(plan.values()):
+        raise ValueError('nothing to promote — keep some images first')
+    total = sum(len(v) for v in plan.values())
+    # Registered against the LEAD bank: bank_jobs is one live job per bank, and
+    # the group card polls the lead. The up-front busy check above is what stops
+    # another member's pass from being launched underneath it.
+    return bank_jobs.start(app, members[0], 'promote',
+                           _group_promote_job(user_id, plan, dataset_id),
+                           total=total)
+
+
+def _group_promote_job(user_id, plan, dataset_id):
+    def run(job):
         stats: dict = {}
         imported = failed = 0
-        for c0 in range(0, len(rows), _PROMOTE_CHUNK):
+        bank_jobs.progress(job, done=0, detail='promoting the group')
+        for i, (bank_id, ids) in enumerate(plan.items(), 1):
             if bank_jobs.cancelled(job):
                 break
-            chunk = rows[c0:c0 + _PROMOTE_CHUNK]
-            blobs, chunk_rows, caps, frms = [], [], [], []
-            for r in chunk:
-                # RESOLVED path: a watermark-cleaned image must reach the dataset
-                # cleaned, otherwise the two cleaning levels were run for nothing.
-                p = resolved_image_path(bank, r)
-                try:
-                    with open(p, 'rb') as fh:
-                        blobs.append(fh.read())
-                    chunk_rows.append(r)
-                    # Carry the bank caption onto the dataset image (parallel to blobs),
-                    # so a captioned selection lands already captioned.
-                    caps.append(r.caption)
-                    # Carry the framing the bank's classify pass already wrote, so
-                    # the dataset's Composition counter is right the moment the
-                    # promotion lands (it only tallies rows that HAVE a framing).
-                    frms.append(r.framing)
-                except (OSError, TypeError):
-                    failed += 1
-            if blobs:
-                new_ids, bad = import_images(
-                    user_id, dataset_id, blobs, dedupe=True, stats=stats,
-                    captions=caps, bank_image_ids=[r.id for r in chunk_rows],
-                    framings=frms)
-                imported += len(new_ids)
-                failed += bad
-                # The dataset row now carries the link back (import_images writes
-                # it, and hands it to the matched row when a dedupe skips the
-                # blob), so 'already promoted here' is a fact we can re-check.
-                # Clear the legacy one-way flag as we go: it would otherwise keep
-                # excluding this image from the target long after the user
-                # deleted it there.
-                #
-                # The exception is an image whose row in the dataset is already
-                # credited to ANOTHER bank (both banks hold the same photo). There
-                # is one column for one owner, so this bank gets no verifiable
-                # trace and keeps the old flag — the alternative is offering the
-                # image on every promotion, forever.
-                unlinked = set(stats.get('bank_unlinked') or ())
-                stats.pop('bank_unlinked', None)
-                for r in chunk_rows:
-                    r.promoted_dataset_id = dataset_id if r.id in unlinked else None
-                db.session.commit()
-            bank_jobs.bump(job, len(chunk))
-        dups = stats.get('duplicates', 0)
-        small = stats.get('small', 0)
-        detail = f'done — {imported} imported'
-        if dups:
-            detail += f', {dups} already in the dataset'
-        if failed:
-            detail += f', {failed} failed'
-        if small:
-            detail += f', {small} under the recommended size'
-        bank_jobs.progress(job, detail=detail)
+            bank = db.session.get(ImageBank, bank_id)
+            if bank is None or not ids:
+                continue
+            bank_jobs.progress(
+                job, detail=f'promoting bank {i}/{len(plan)} — {bank.name}')
+            got, bad = _promote_rows(job, bank, ids, user_id, dataset_id, stats)
+            imported += got
+            failed += bad
+        bank_jobs.progress(job, detail=_promote_detail(
+            imported, failed, stats, prefix=f'done — {len(plan)} bank(s), '))
     return run

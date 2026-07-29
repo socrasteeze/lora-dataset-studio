@@ -1086,6 +1086,52 @@ button, so you never have to go hunting for it in a file manager — which is ho
 this trap was found in the first place.
 
 
+## Two banks, one card (banks that share a name)
+
+Sometimes one collection lives in two folders — an export split across disks, a
+scrape that grew a second destination, a phone dump and a laptop dump of the same
+shoot. You want them curated as one thing while the files stay exactly where they
+are.
+
+**Give the two banks the same name and they become one card.** Nothing is merged
+and nothing is copied: every image still belongs to exactly one bank, on its own
+disk, in its own folder. The card is a view — combined counts, one **⏳ Queue the
+group…**, one **⬆ Promote the group…** — with all the members one click away
+under **▸ N banks**, each keeping its own rename, 📦 move, ✕ delete and preview.
+
+The rule is deliberately small enough to keep in your head:
+
+- names must match **exactly**, ignoring only surrounding spaces. **Case
+  matters**: "Telegram" and "telegram" stay apart. Merging them silently would be
+  a surprise you cannot undo by looking at the screen; not merging them is fixed
+  by an obvious rename.
+- it takes **two**. A single bank with a name is just a bank.
+- **Keep separate**, on any member, takes that bank out of the grouping. It is a
+  property of the *bank*: rename it away and back and it is still separate,
+  because clearing it for you would silently re-group something you deliberately
+  split.
+
+**Renaming is the whole mechanism.** Rename a bank into the group's name and it
+joins; rename it away and it leaves. Delete a member and the group shrinks — at
+one member it stops being a group and the last bank is a bank again. The
+confirmation for a delete says what it always said: only triage data goes, the
+source folder is untouched, and the *other* banks are not affected.
+
+**Promoting the group** sends every kept image across its members into one
+dataset, one bank after another. There is no image picker — a group card has no
+grid, so it is "everything kept here that is not already in the dataset". Two
+members holding the same photo cost **one** dataset image; the import collapses
+duplicates. It is refused outright if any member has a pass running, before
+anything is created.
+
+**Queueing the group** adds one entry **per bank**, exactly like queueing them by
+hand. They still run one at a time.
+
+One honest limit: if two members point at **overlapping folders on disk**, the
+card's combined counts add the same images more than once. The card says so.
+Promotion is still correct — the duplicates are collapsed on the way in — but the
+number above it is a sum of what each bank believes it holds.
+
 ## Move a bank folder to another disk
 
 A bank points at a folder *in place*, but nothing it computes lives in that

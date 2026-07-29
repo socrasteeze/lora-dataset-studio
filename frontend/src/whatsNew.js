@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-banks-that-share-a-name-become-one-card',
+    date: '2026-07-29',
+    title: 'Two folders, one collection: banks that share a name become one card',
+    blurb:
+      'When one collection lives in two folders — an export split across disks, a phone dump and a laptop dump of the same shoot — you had to curate and promote them twice. Give the two banks the same name and they now show as one card: combined counts, one Queue the group, one Promote the group that sends every kept image into a single dataset (images held by both are imported once). Nothing is merged and nothing is copied — every image stays in its own folder on its own disk, and each bank keeps its own rename, move, delete and preview one click away under "N banks". The names must match exactly and case matters, so "Telegram" and "telegram" stay apart rather than being silently combined; and any bank can opt out with "Keep separate", which sticks even if you rename it away and back.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-queue-every-bank-and-see-what-really-ran',
     date: '2026-07-29',
     title: 'Queue every bank in one click — and find out in the morning what really ran',
