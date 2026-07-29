@@ -2190,7 +2190,7 @@ _BACKUP_IMG_FIELDS = ('filename', 'source', 'framing', 'variation_label', 'statu
                       'caption', 'caption_short', 'variation_prompt', 'face_score', 'face_state',
                       'upscale_ratio', 'watermark_state', 'watermark_bbox',
                       'watermark_regions', 'parent_image_id', 'derivation_kind',
-                      'fail_reason', 'fail_kind', 'source_metadata')
+                      'fail_reason', 'source_metadata')
 
 
 def _backup_basename(value):
@@ -3254,10 +3254,6 @@ def dataset_payload(user_id, dataset_id):
                     'status': i.status, 'caption': i.caption,
                     'caption_short': i.caption_short,
                     'fail_reason': i.fail_reason,
-                    # 'refused' | 'empty' | 'error' | None — de quelle NATURE est
-                    # l'échec, pour que l'UI puisse compter les refus fournisseur
-                    # sans relire la phrase (cf. models.FaceDatasetImage).
-                    'fail_kind': i.fail_kind,
                     'parent_image_id': i.parent_image_id,
                     'derivation_kind': i.derivation_kind,
                     'source_metadata': normalize_source_metadata(i.source_metadata),
@@ -6263,7 +6259,7 @@ def _reimprove_image_locked(user_id, image_id):
     # refusal must leave the current result on screen, not a broken tile.
     from ..job_queue import queue_manager
     old_state = {field: getattr(img, field) for field in (
-        'filename', 'caption', 'status', 'fail_reason', 'fail_kind', 'job_id',
+        'filename', 'caption', 'status', 'fail_reason', 'job_id',
         'variation_label', 'variation_prompt', 'framing',
         'watermark_state', 'watermark_bbox', 'watermark_regions')}
     old_path = _img_path(img) if img.filename else None
@@ -6287,7 +6283,6 @@ def _reimprove_image_locked(user_id, image_id):
         img.status = 'pending'
         img.job_id = job_id
         img.fail_reason = None
-        img.fail_kind = None
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -6563,7 +6558,7 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     from ..job_queue import queue_manager
     old_state = {
         field: getattr(img, field) for field in (
-            'filename', 'caption', 'status', 'fail_reason', 'fail_kind', 'job_id',
+            'filename', 'caption', 'status', 'fail_reason', 'job_id',
             'klein_model', 'variation_prompt', 'watermark_state',
             'watermark_bbox', 'watermark_regions')
     }
@@ -6642,7 +6637,6 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
         img.status = 'pending'
         img.job_id = new_job_id
         img.fail_reason = None
-        img.fail_kind = None
         db.session.commit()
     except Exception:
         db.session.rollback()

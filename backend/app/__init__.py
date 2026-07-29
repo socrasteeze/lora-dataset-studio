@@ -156,10 +156,9 @@ _SCHEMA_ADDITIONS = (
     ('face_dataset', 'klein_model', 'VARCHAR(255)'),
     ('face_dataset_image', 'caption_short', 'TEXT'),
     ('face_dataset_image', 'fail_reason', 'TEXT'),
-    # Nature de l'échec ('refused' | 'empty' | 'error') pour compter les refus
-    # fournisseur séparément des pannes. Les lignes existantes restent NULL :
-    # elles gardent leur phrase, et les compteurs ne les rangent nulle part.
-    ('face_dataset_image', 'fail_kind', 'VARCHAR(16)'),
+    # Pas de 'fail_kind' ici : moteurs locaux uniquement, rien ne l'écrit jamais
+    # (Divergence 1). Les bases qui ont déjà reçu la colonne la gardent — une
+    # addition passée ne se retire pas, et une colonne NULL orpheline est inerte.
     ('face_dataset_image', 'parent_image_id', 'INTEGER'),
     ('face_dataset_image', 'derivation_kind', 'VARCHAR(32)'),
     ('face_dataset_image', 'upscale_ratio', 'REAL'),
