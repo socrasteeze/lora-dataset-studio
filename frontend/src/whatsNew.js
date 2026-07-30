@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-30-caption-counts-up',
+    date: '2026-07-30',
+    title: 'Captioning was never stuck — now it proves it',
+    blurb:
+      'A bank caption run sat at 0 / 307 for its whole length and looked frozen, so people stopped it. It was working the entire time: JoyCaption captions in one batch, and nothing reported a number until the batch ended. The counter now moves image by image, and each caption is saved as it lands instead of all at the end — so a crash mid-run keeps what it captioned. Four quieter faults went with it: a bank whose source folder moved now FAILS saying so instead of reporting success over zero images, a run where the engine answered nothing for every image is a failure rather than “done — 0 captioned”, the launch-all queue says which pass it is waiting for instead of waiting in silence, and the caption step now checks the engine is really there instead of only reading a setting. The bank lane also logs start, finish and failure at last — it logged nothing at all before, which is why none of this showed up.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-30-find-a-bank',
+    date: '2026-07-30',
+    title: 'Find a bank by name or folder',
+    blurb:
+      'Past a couple of dozen banks the list stopped being scannable. There is now a search box next to the sort control that matches the bank name and its folder path — useful when a dozen banks share a name but live in different places. The count reads “showing 4 of 37” while you filter, so a filtered list never reads as a shrunken library, and it clears on reload rather than greeting you with banks apparently missing.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-30-promote-into-a-brand-new-dataset',
     date: '2026-07-30',
     title: 'Send a bank selection straight into a dataset that does not exist yet',

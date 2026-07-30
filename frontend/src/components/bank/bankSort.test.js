@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks, untriagedCount,
+  BANK_SORTS, DEFAULT_BANK_SORT, bankMatches, normalizeBankSort, sortBanks, untriagedCount,
 } from './bankSort.js';
 
 const bank = (id, name, created_at, extra = {}) => ({
@@ -69,3 +69,37 @@ test('every advertised sort id has a working comparator', () => {
     assert.ok(s.label, s.id);
   }
 });
+
+// ── search ────────────────────────────────────────────────────────────────
+// A library past a couple of dozen banks needs finding, not just ordering.
+
+test('bankMatches: empty query matches everything', () => {
+  assert.equal(bankMatches({ name: 'Anything' }, ''), true)
+  assert.equal(bankMatches({ name: 'Anything' }, '   '), true)
+  assert.equal(bankMatches({ name: 'Anything' }), true)
+})
+
+test('bankMatches: name and folder, case-insensitively', () => {
+  const b = { name: 'Studio Shoot', source_path: String.raw`D:\photos\2026\paris` }
+  assert.equal(bankMatches(b, 'studio'), true)
+  assert.equal(bankMatches(b, 'SHOOT'), true)
+  // The folder is searchable too: banks are often named alike and live apart.
+  assert.equal(bankMatches(b, 'paris'), true)
+  assert.equal(bankMatches(b, '2026'), true)
+  assert.equal(bankMatches(b, 'berlin'), false)
+})
+
+test('bankMatches: the query is trimmed, not tokenised', () => {
+  const b = { name: 'Studio Shoot' }
+  assert.equal(bankMatches(b, '  studio  '), true)
+  // Substring, not fuzzy: a filter that matches what you did NOT type is worse
+  // than one that misses.
+  assert.equal(bankMatches(b, 'studio shoot'), true)
+  assert.equal(bankMatches(b, 'shoot studio'), false)
+})
+
+test('bankMatches: a junk or half-loaded row never throws', () => {
+  assert.equal(bankMatches(null, 'x'), false)
+  assert.equal(bankMatches({}, 'x'), false)
+  assert.equal(bankMatches({ name: null, source_path: null }, 'x'), false)
+})

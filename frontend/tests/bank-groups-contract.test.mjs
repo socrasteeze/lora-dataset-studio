@@ -34,7 +34,11 @@ test('the two implementations of the rule agree on the four decisions', () => {
 })
 
 test('the list renders group rows instead of a flat bank list', () => {
-  assert.match(page, /groupRows\(sortBanks\(banks, sort\)\)/)
+  // Grouping must stay the LAST step: sort → filter (the search box) → group.
+  // Group first and a filtered-down pair would keep rendering as a group whose
+  // member list no longer matches what is on screen.
+  assert.match(page, /const visibleBanks = sortBanks\(banks \|\| \[\], sort\)\.filter\(/)
+  assert.match(page, /groupRows\(visibleBanks\)/)
   assert.match(page, /row\.kind === 'group'/)
   assert.match(page, /<BankGroupCard/)
 })
