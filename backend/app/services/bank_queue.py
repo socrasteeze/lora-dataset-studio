@@ -37,6 +37,16 @@ _worker: threading.Thread | None = None
 _POLL_SECONDS = 2.0
 
 
+def _log(bank_id, message, level='info', detail=None):
+    """Mirror a queue transition into the activity log. Lazy + swallowed."""
+    try:
+        from . import activity_log
+        activity_log.record('queue', message, level=level,
+                            bank_id=bank_id, detail=detail)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 class BankAlreadyQueued(Exception):
     """This bank already has a pending/running entry in the queue."""
     def __init__(self, bank_id):
@@ -72,6 +82,7 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
                  'enqueued_at': time.time(), 'state': 'pending'}
         _queue.append(entry)
         position = len(_queue)
+    _log(bank_id, 'bank queued', 'info', detail=f'position {position}')
     # Under TESTING every bank_jobs job runs INLINE, so drain the whole queue
     # synchronously here (no worker thread) — same inline-vs-thread split as
     # bank_jobs, and it keeps the test suite deterministic.
@@ -204,6 +215,8 @@ def _process_next(app) -> bool:
         if _find(bank_id) is not entry:
             return True                          # cancelled at the last moment
         entry['state'] = 'running'
+    _log(bank_id, 'pipeline starting', 'info',
+         detail=', '.join(entry['steps']) if entry.get('steps') else None)
 
     try:
         banks.start_pipeline(app, entry['user_id'], bank_id, entry['steps'],
@@ -217,14 +230,16 @@ def _process_next(app) -> bool:
                 entry['state'] = 'pending'
         time.sleep(_POLL_SECONDS)
         return True
-    except (ValueError, RuntimeError):
+    except (ValueError, RuntimeError) as e:
         # Bank gone / prerequisite failed at launch: drop it and move on.
+        _log(bank_id, 'queue entry dropped', 'error', detail=str(e))
         _remove(bank_id)
         return True
 
     # Wait for the pipeline to finish before starting the next bank.
     while bank_jobs.running(bank_id):
         time.sleep(_POLL_SECONDS)
+    _log(bank_id, 'pipeline done, dequeued', 'ok')
     _remove(bank_id)
     return True
 
@@ -250,6 +265,9 @@ def cancel(bank_id) -> bool:
         _queue.remove(entry)
     if was_running:
         bank_jobs.cancel(bank_id)
+        _log(bank_id, 'removed from queue (was running)', 'warn')
+    else:
+        _log(bank_id, 'removed from queue', 'warn')
     return True
 
 
@@ -263,6 +281,8 @@ def clear() -> int:
         _queue.clear()
     for bid in running_ids:
         bank_jobs.cancel(bid)
+    if n:
+        _log(None, 'queue cleared', 'warn', detail=f'{n} entr{"y" if n == 1 else "ies"}')
     return n
 
 

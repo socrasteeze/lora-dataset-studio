@@ -335,6 +335,43 @@ If a Stop button is greyed out, another batch on the same dataset (for
 example a caption pass) is holding the activity slot; it re-enables the
 moment that batch ends.
 
+## Stopping LoRA Dataset Studio
+
+Closing the browser tab **never** stops the server — there is no
+`beforeunload`, no keepalive, and no shutdown endpoint. The tab is just a
+client. To stop the server on Windows:
+
+1. **Ctrl+C** in the `start.bat` console — works on a fresh launch, and now
+   also **after Settings ▸ Restart / Update & restart**. Those used to spawn
+   the relaunched server in a *new* console window, leaving the original
+   `start.bat` window holding a dead process; Ctrl+C there did nothing useful.
+   `start.bat` is now a supervisor: a restart exits with code 3 and the same
+   window relaunches the server, so Ctrl+C keeps working.
+2. **`stop.bat`** (shipped next to `start.bat`) — the reliable stop when you
+   are not at that console, or when an older restart left the server orphaned
+   in another window. It:
+   - resolves the port (`LDS_PORT` → `config.json` → `5050`);
+   - asks the app to cancel its work (`POST /api/system/stop-everything`);
+   - kills the listener's **process tree** (so infer children go with it);
+   - sweeps leftovers whose executable path lives under this install
+     (`.venv\`, `.python\`, `data\envs\*`) plus a recorded `training_pid` —
+     never a blanket `taskkill /IM python.exe`, which would take out ComfyUI
+     and anything else named `python.exe` on the machine;
+   - **stops Ollama** (`ollama.exe` / `ollama app.exe`). State plainly: this
+     stops **any** Ollama on the machine, including one you started by hand
+     or share with another tool — the script cannot tell whose it is;
+   - **leaves ComfyUI alone** (LDS never launches it) and reports if port
+     8188 still answers;
+   - confirms `/api/health` has gone silent, or says what is still alive.
+
+Already down → `stop.bat` says so and exits cleanly.
+
+The start.bat console also narrates the same events as the Activity panel
+(see below) — pass start/finish, captions, queue, training — so you can watch
+a long overnight run without opening the browser. Level is
+`console.level` in `config.json` (default `events`; `off` / `heartbeat` /
+`all` available); `LDS_CONSOLE` overrides it for a one-off launch.
+
 ## Is it stuck? — the Activity panel
 
 Every long job in LDS has a progress bar, and every bar lives on the page that
@@ -353,8 +390,10 @@ will move again in two seconds are drawn identically**.
   cold model load or a big folder walk can legitimately say nothing for a while,
   and a warning that cries wolf is one you stop reading.
 - **The log** — a timestamped feed of passes starting, finishing, stopping and
-  failing, plus the GPU being taken and released. It appends as it arrives and
-  never redraws, so scrolling up to read something does not yank you back down.
+  failing, plus the GPU being taken and released, caption batches, the bank
+  queue and training. It appends as it arrives and never redraws, so scrolling
+  up to read something does not yank you back down. The same events also print
+  in the `start.bat` terminal (see [Stopping LoRA Dataset Studio](#stopping-lora-dataset-studio)).
 
 The GPU lines are worth knowing about: taking the exclusive window unloads
 ComfyUI and blocks training, and until now it did all of that with no visible

@@ -776,6 +776,13 @@ Double-click **`Create Desktop Shortcut.bat`** (shipped alongside `start.bat`)
 — it adds a `LoRA Dataset Studio` shortcut that opens `start.bat` and carries
 the app's own icon.
 
+To **stop** the server (closing the browser tab never does): Ctrl+C in the
+`start.bat` window, or double-click **`stop.bat`**. `stop.bat` cancels
+in-flight work, kills this install's process tree, and stops Ollama (any
+Ollama on the machine — it cannot tell whose); it leaves ComfyUI alone. After
+Settings ▸ Restart, Ctrl+C still works — the relaunch stays in the same
+console.
+
 You can use the same flow from a git checkout instead of the release ZIP:
 
 ```bash

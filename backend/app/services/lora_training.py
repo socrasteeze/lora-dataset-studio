@@ -40,6 +40,17 @@ from .person_mask import generate_person_masks
 
 logger = logging.getLogger(__name__)
 
+
+def _activity(dataset_id, message, level='info', detail=None):
+    """Mirror a training transition into the activity log. Lazy + swallowed."""
+    try:
+        from . import activity_log
+        activity_log.record('training', message, level=level,
+                            dataset_id=dataset_id, detail=detail)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # Résolution + VRAM Krea 2 (modèle 12B). MESURÉ 2026-06-26 : à 1024 SANS unload TE la VRAM
 # sature (24,0/24,5 Go) → ~180 s/it (ETA ~7 j, inexploitable) ; à 768 → 3,5 s/it (~50× plus
 # rapide → goulot = ACTIVATIONS, pas le streaming des poids). Stratégie qualité : on GARDE 1024
@@ -5439,8 +5450,11 @@ def _watch_training(app, proc, log_path, dataset_id) -> None:
                              payload['excerpt']['text'] or payload['log_tail'])
                 # Surface l'erreur à l'UI (sinon un crash = juste « terminé » silencieux).
                 queue_manager._set_system_state('training_error', payload, ttl_seconds=3600)
+                _activity(dataset_id, 'training failed', 'error',
+                          detail=f'rc={rc}')
             else:
                 logger.info("Entraînement ai-toolkit dataset %s terminé (rc=%s).", dataset_id, rc)
+                _activity(dataset_id, 'training finished', 'ok')
             process_training_queue()  # libère le GPU / enchaîne la file immédiatement
     except Exception as e:
         logger.warning("watcher training : post-traitement échoué : %s", e)
@@ -5732,6 +5746,8 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             queue_manager._set_system_state(
                 'training_pid', proc.pid, ttl_seconds=_TRAIN_STATE_TTL)
+            _activity(dataset_id, 'training started', 'info',
+                      detail=f'{steps} steps, pid {proc.pid}')
         except (FileNotFoundError, OSError) as e:
             if logf is not None:
                 try:
@@ -5739,6 +5755,8 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
                 except OSError:
                     pass
             _clear_training_identity(ttl_seconds=None)
+            _activity(dataset_id, 'training failed to start', 'error',
+                      detail=str(e))
             raise ValueError(f"could not start training: {e}")
     # Watcher event-driven : libère ComfyUI / enchaîne la file dès la fin du
     # process (le poll de /train/status reste le filet de secours).
@@ -6006,8 +6024,11 @@ def stop_training(expected_dataset_id=None, expected_run_token=None) -> bool:
         # Stop = arrêt voulu : on VIDE la file D'ABORD (sinon le prochain poll
         # relancerait l'entraînement suivant), PUIS on lève le flag EN DERNIER
         # (c'est lui qui signale à ComfyUI de reprendre le GPU).
+        stopped_id = current_id
         _save_queue([])
         _clear_training_identity(ttl_seconds=None)
+        _activity(stopped_id, 'training stopped', 'warn',
+                  detail=f'pid {pid}' if pid else None)
         return True
 
 
@@ -6797,6 +6818,8 @@ def enqueue_training(user_id, dataset_id, extra_steps=None,
         q.append(item)
         _save_queue(q)
         position = len(q)
+    _activity(dataset_id, 'training queued', 'info',
+              detail=f'position {position}')
     return {'queued': True, 'position': position, 'not_before': not_before}
 
 

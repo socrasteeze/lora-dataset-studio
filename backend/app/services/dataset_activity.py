@@ -73,6 +73,16 @@ _cancel: dict = {}
 _counter = itertools.count(1)
 
 
+def _log(dataset_id, message, level='info', detail=None):
+    """Mirror a batch transition into the activity log. Lazy + swallowed."""
+    try:
+        from . import activity_log
+        activity_log.record('dataset', message, level=level,
+                            dataset_id=dataset_id, detail=detail)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def begin(dataset_id, kind, total=0, detail=None, engine=None):
     """Register a new in-progress batch on ``dataset_id`` and return an opaque token
     to pass to ``progress``/``bump``/``end``. ``total`` is the number of items the
@@ -93,6 +103,15 @@ def begin(dataset_id, kind, total=0, detail=None, engine=None):
             _active[dataset_id][token]['detail'] = str(detail)
         if engine:
             _active[dataset_id][token]['engine'] = str(engine).lower()
+    bits = []
+    if total:
+        bits.append(f'{total} image(s)')
+    if engine:
+        bits.append(str(engine).lower())
+    if detail:
+        bits.append(str(detail))
+    _log(dataset_id, f'{kind} started', 'info',
+         detail='; '.join(bits) if bits else None)
     return token
 
 
@@ -129,13 +148,22 @@ def end(token):
     """Remove a batch's entry. Idempotent (safe on an unknown/None token) so a
     ``finally``-block ``end`` never raises even if the entry was already purged."""
     dsid = _dsid_of(token)
+    kind = done = total = detail = None
     with _lock:
         bucket = _active.get(dsid)
         if not bucket:
             return
-        bucket.pop(token, None)
+        entry = bucket.pop(token, None)
+        if entry:
+            kind = entry.get('kind')
+            done = entry.get('done')
+            total = entry.get('total')
+            detail = entry.get('detail')
         if not bucket:
             _active.pop(dsid, None)
+    if kind:
+        bits = detail or (f'{done}/{total}' if total else (f'{done} done' if done else None))
+        _log(dsid, f'{kind} finished', 'ok', detail=bits)
 
 
 def sync_pending(dataset_id, kind, pending, engine=None):
@@ -241,7 +269,9 @@ def request_cancel(dataset_id, kinds=CANCELLABLE_KINDS):
         if not live:
             return False
         _cancel.setdefault(dataset_id, set()).update(live)
-        return True
+    for kind in sorted(live):
+        _log(dataset_id, f'stop requested for {kind}', 'warn')
+    return True
 
 
 def cancel_requested(dataset_id, kinds=CANCELLABLE_KINDS):

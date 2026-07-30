@@ -67,12 +67,13 @@ def record(source, message, level='info', bank_id=None, dataset_id=None,
     the only place the app narrates itself. Deliberately the name and never the
     device uuid: this log is what a user pastes into a bug report.
     """
+    event = None
     try:
         if level not in LEVELS:
             level = 'info'
         with _lock:
             _seq[0] += 1
-            _events.append({
+            event = {
                 'id': _seq[0],
                 'at': time.time(),
                 'source': str(source),
@@ -82,9 +83,17 @@ def record(source, message, level='info', bank_id=None, dataset_id=None,
                 'dataset_id': dataset_id,
                 'detail': str(detail) if detail is not None else None,
                 'device': str(device) if device else None,
-            })
+            }
+            _events.append(event)
     except Exception:      # noqa: BLE001 — logging must never break the work
-        pass
+        return
+    # Console is a second consumer of the same event — never load-bearing.
+    if event is not None:
+        try:
+            from . import activity_console
+            activity_console.on_record(event)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def events(since=None, limit=200) -> list:

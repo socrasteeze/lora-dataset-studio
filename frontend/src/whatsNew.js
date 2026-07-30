@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-30-stop-bat-and-terminal-activity',
+    date: '2026-07-30',
+    title: 'Stop the server for real — and watch its work in the terminal',
+    blurb:
+      'Closing the browser tab never stopped the server, and after Settings ▸ Restart, Ctrl+C in the start.bat window stopped working too (the live server had moved to another console). Restart now stays in the same window, so Ctrl+C keeps working. Double-click stop.bat to cancel in-flight work, kill this install\'s process tree, and stop Ollama — it leaves ComfyUI alone. The terminal also narrates the same events as 📋 Activity (passes, captions, queue, training), configurable via console.level in config.json.',
+    to: '/settings/maintenance',
+  },
+  {
     id: '2026-07-30-caption-counts-up',
     date: '2026-07-30',
     title: 'Captioning was never stuck — now it proves it',
