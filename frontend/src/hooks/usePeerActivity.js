@@ -18,6 +18,11 @@ import { EMPTY_PEER_ACTIVITY, normalizePeerActivity } from '../utils/peerActivit
 
 const POLL_MS = 15000
 const HIDDEN_POLL_MS = 60000
+// A 404 means this build's frontend is talking to an OLDER backend process —
+// files updated, server not restarted. That does not fix itself while the page
+// stays open, so stop asking: otherwise it logs one 404 every 15 s on the
+// Primary until the user restarts. Observed in a real diagnostic.
+const MAX_404 = 3
 
 export function usePeerActivity() {
   const [activity, setActivity] = useState(EMPTY_PEER_ACTIVITY)
@@ -25,23 +30,31 @@ export function usePeerActivity() {
   useEffect(() => {
     let alive = true
     let timer = null
+    let notFound = 0
 
     const tick = async () => {
       try {
         const data = await apiFetch('/api/cluster/activity', { background: true })
         if (alive) setActivity(normalizePeerActivity(data))
-      } catch {
+        notFound = 0
+      } catch (e) {
         // Keep the last-known state on a transient error: blinking the chip off
         // mid-pass reads as "it stopped".
+        if (e?.status === 404 && ++notFound >= MAX_404) {
+          clearInterval(timer)
+          timer = null
+        }
       }
     }
 
     const schedule = () => {
       clearInterval(timer)
+      if (notFound >= MAX_404) return          // gave up: the route is not there
       timer = setInterval(tick, document.hidden ? HIDDEN_POLL_MS : POLL_MS)
     }
 
     const onVisibility = () => {
+      if (notFound >= MAX_404) return
       if (!document.hidden) tick()   // don't make the user wait a full period
       schedule()
     }

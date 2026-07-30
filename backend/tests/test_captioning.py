@@ -648,20 +648,26 @@ class _FakeStdout:
 
 
 class _FakePopen:
-    """Minimal Popen stand-in: hands the drain threads pre-buffered stdout/stderr and a
-    wait() that can raise TimeoutExpired exactly once (a killed process reaps cleanly)."""
+    """Minimal Popen stand-in: hands the drain threads pre-buffered stdout/stderr
+    and a wait() that models a child which never exits.
+
+    ``wait_raises`` raises on every BOUNDED wait (``timeout`` given) and returns
+    normally on the unbounded one — exactly what a real Popen does for a hung
+    child that is then killed and reaped. It used to raise only ONCE, which
+    silently encoded "the caller waits exactly one time"; the caller now waits in
+    short slices so it can deliver per-image callbacks while the child works, and
+    a fake that gave up after one slice made a timing-out child look like a
+    finishing one."""
     def __init__(self, stderr_lines, stdout_text, returncode=0, wait_raises=None):
         self.stdin = _FakeStdin()
         self.stdout = _FakeStdout(stdout_text)
         self.stderr = iter(stderr_lines)
         self.returncode = returncode
         self._wait_raises = wait_raises
-        self._waited = False
         self.killed = False
 
     def wait(self, timeout=None):
-        if self._wait_raises is not None and not self._waited:
-            self._waited = True
+        if self._wait_raises is not None and timeout is not None:
             raise self._wait_raises
         return self.returncode
 

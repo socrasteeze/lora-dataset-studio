@@ -4903,8 +4903,20 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
         try:
             from .joycaption import availability, caption_images_joycaption, is_available
             if is_available():
+                # Land each caption AS IT ARRIVES rather than after the batch:
+                # `_emit` is what advances the whole-set counter and persists,
+                # so without this a 300-image batch reported 0 for ~22 minutes
+                # and lost everything if the process died. JoyCaption's own
+                # progress arg is deliberately NOT used — it counts the subset
+                # it was handed, while `_emit` counts the whole set.
+                def _jc_landed(path, cap):
+                    cap = (cap or '').strip().strip('"').strip()
+                    if cap and path not in out:
+                        _emit(path, _cap_caption(cap))
+
                 jc = caption_images_joycaption(remaining, prompt=cap_prompt,
-                                               should_cancel=should_cancel)
+                                               should_cancel=should_cancel,
+                                               on_caption=_jc_landed)
             elif backend == 'joycaption':
                 raise RuntimeError(
                     'JoyCaption backend is not available — '
@@ -4918,6 +4930,8 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
             logger.warning('caption_paths: JoyCaption unavailable (%s)', e)
         still = []
         for p in remaining:
+            if p in out:
+                continue           # already landed live by _jc_landed
             cap = (jc.get(p) or '').strip().strip('"').strip()
             if cap:
                 _emit(p, _cap_caption(cap))
