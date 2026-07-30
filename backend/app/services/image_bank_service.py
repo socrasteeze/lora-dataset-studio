@@ -3231,12 +3231,21 @@ def _stopped_detail(noun, data, cache_path, total):
 
 def _drive_infer_subprocess(job, python, script, payload, cache_path,
                             progress_re, window, stall_label='pass',
-                            stall_timeout=_INFER_STALL_TIMEOUT):
+                            stall_timeout=_INFER_STALL_TIMEOUT,
+                            busy_detail=None):
     """Run an infer subprocess, streaming its stderr progress into ``job`` and
     honouring Stop cooperatively. Returns (data, stderr_tail, returncode) where
     ``data`` is the child's last JSON line (``cancelled: true`` when it stopped
     cleanly). On the first "N cached" line it sets a "resuming" hint, so relaunching
     over a partly-cached bank doesn't look like a full recompute.
+
+    ``busy_detail``: the pass's own progress sentence (e.g. "scoring pass
+    (CUDA)"). Given it, the driver says "… — loading the model" for the window
+    between the child's first output and its first counted image, and restores
+    the plain sentence once counting starts. That window is the model load, and
+    with nothing said it is drawn exactly like a hang — 0/N with a growing
+    stale age. Omitted (None) → the detail is left entirely alone, so a caller
+    that has not opted in behaves as before.
 
     A child that emits nothing at all for ``stall_timeout`` seconds is stopped
     and :class:`InferStalled` is raised — see the constant for why a hang here
@@ -3278,6 +3287,10 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
         # different bug, and killing it here would be guessing.
         alive = {'at': time.monotonic(), 'stalled': False}
         watchdog_stop = threading.Event()
+        # Has the child counted an image yet? Until it has, its silence is the
+        # model load — see busy_detail.
+        counted = {'yes': False}
+        loading_said = {'yes': False}
 
         def _drain_stderr():
             for line in proc.stderr:
@@ -3287,7 +3300,20 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
                     stderr_tail.append(line)
                 m = progress_re.search(line)
                 if m:
-                    bank_jobs.progress(job, done=int(m.group(1)), total=int(m.group(2)))
+                    first = not counted['yes']
+                    counted['yes'] = True
+                    # Restore the pass's own sentence on the first counted
+                    # image: "loading the model" must not survive to 300/500.
+                    bank_jobs.progress(
+                        job, done=int(m.group(1)), total=int(m.group(2)),
+                        detail=busy_detail if (first and busy_detail) else None)
+                elif busy_detail and not counted['yes'] and not loading_said['yes']:
+                    # The child has spoken but has not counted anything: name
+                    # the wait. Set BEFORE the cached hint below so that hint,
+                    # which is more specific, wins when it fires.
+                    loading_said['yes'] = True
+                    bank_jobs.progress(
+                        job, detail=f'{busy_detail} — loading the model')
                 if not hint['shown']:
                     mc = _CACHED_RE.search(line)
                     if mc:
@@ -3453,7 +3479,7 @@ def _faces_job(bank_id, device_id=None):
             window = gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu else nullcontext()
             data, stderr_tail, returncode = _drive_infer_subprocess(
                 job, python, _EMBED_SCRIPT, payload, cache_path, _PROGRESS_RE, window,
-                stall_label='face')
+                stall_label='face', busy_detail='face pass')
         # Stopped by the user — say exactly what's kept, never a mute ✗ (the cached
         # embeddings are safe; relaunching skips them and only finishes the rest).
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):
@@ -3685,7 +3711,8 @@ def _score_job(bank_id, device_id=None):
                       else nullcontext())
             data, stderr_tail, returncode = _drive_infer_subprocess(
                 job, python, _SCORE_SCRIPT, payload, cache_path, _SCORE_PROGRESS_RE,
-                window, stall_label='scoring')
+                window, stall_label='scoring',
+                busy_detail=f'scoring pass ({device.upper()})')
         # Stopped by the user — say exactly what's kept, never a mute ✗ (the cached
         # scores/embeddings are safe; relaunching skips them and finishes the rest).
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):
@@ -4586,7 +4613,15 @@ def _caption_job(bank_id, ids, force, vocabulary=None):
             if p and os.path.isfile(p):
                 by_path[p] = r.id
         paths = list(by_path)
-        bank_jobs.progress(job, done=0, total=len(paths), detail='captioning')
+        # Say what the silence IS. Nothing reports until the first caption
+        # lands, and loading the model can take a minute or more (JoyCaption
+        # loads as one batch; a cold Ollama pulls the vision model into VRAM) —
+        # so the panel showed `0 / 61 · captioning` with a growing stale age,
+        # which is drawn identically to a hang. Reported as "looks like it's
+        # stuck now" on a pass that then finished all 61 normally.
+        bank_jobs.progress(job, done=0, total=len(paths),
+                           detail='captioning — loading the caption model '
+                                  '(the first image can take a minute)')
         if not paths:
             return
         captioned = 0
@@ -4610,7 +4645,12 @@ def _caption_job(bank_id, ids, force, vocabulary=None):
                 extra_instructions=extra,
                 should_cancel=lambda: bank_jobs.cancelled(job),
                 on_caption=_on_caption,
-                progress=lambda d, t: bank_jobs.progress(job, done=d, total=t))
+                # The first non-zero count means the model is up: drop the
+                # loading note then, and only then. `detail=None` leaves it
+                # alone (see bank_jobs.progress), so the note survives every
+                # 0-count report instead of being cleared by the first one.
+                progress=lambda d, t: bank_jobs.progress(
+                    job, done=d, total=t, detail='captioning' if d else None))
         if bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail=f'cancelled — {captioned} captioned so far')
             return
