@@ -3,7 +3,7 @@ setlocal
 REM ============================================================================
 REM  Stop LoRA Dataset Studio: cancel in-flight work, kill the server process
 REM  tree (and leftovers from this install), and stop Ollama. Leaves ComfyUI
-REM  alone — LDS never launches it. Double-click or run from a terminal.
+REM  alone -- LDS never launches it. Double-click or run from a terminal.
 REM ============================================================================
 
 cd /d "%~dp0"

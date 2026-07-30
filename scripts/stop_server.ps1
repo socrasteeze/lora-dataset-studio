@@ -1,13 +1,13 @@
 #requires -Version 5.1
 <#
-  stop_server.ps1 — stop this install of LoRA Dataset Studio cleanly.
+  stop_server.ps1 -- stop this install of LoRA Dataset Studio cleanly.
 
   Order: ask the app to cancel its work, kill the listener's process tree,
   sweep leftovers whose ExecutablePath lives under this repo, stop Ollama
-  (any ollama on the machine — we cannot tell whose), leave ComfyUI alone,
+  (any ollama on the machine -- we cannot tell whose), leave ComfyUI alone,
   then confirm /api/health is silent.
 
-  Never taskkill /IM python.exe — every helper here is named python.exe and a
+  Never taskkill /IM python.exe -- every helper here is named python.exe and a
   blanket kill would take out ComfyUI, ai-toolkit, and unrelated Python.
 #>
 [CmdletBinding()]
@@ -69,6 +69,11 @@ function Stop-PidTree([int]$ProcessId) {
 }
 
 function Get-TrainingPidFromDb {
+  # Mirrors queue_manager._get_system_state (backend/app/job_queue.py): the row is
+  # {'v': value, 'exp': epoch-seconds-or-null}, and an expired row means the value
+  # is gone, not that it's still valid -- an old, uncleared training_pid outliving
+  # its TTL is exactly the stale-PID case Test-IsLdsPythonPid below exists to catch
+  # a second time, but there's no reason to trust an expired row even that far.
   $dataDir = if ($env:LDS_DATA_DIR) { $env:LDS_DATA_DIR } else { Join-Path $Root 'data' }
   $db = Join-Path $dataDir 'studio.db'
   if (-not (Test-Path -LiteralPath $db)) { return $null }
@@ -80,7 +85,7 @@ function Get-TrainingPidFromDb {
   $py = $pyCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
   if (-not $py) { return $null }
   $code = @"
-import json, sqlite3, sys
+import json, sqlite3, sys, time
 try:
     con = sqlite3.connect(r'$($db.Replace('\','\\'))')
     row = con.execute("SELECT value FROM system_state WHERE key='training_pid'").fetchone()
@@ -88,6 +93,9 @@ try:
     if not row or not row[0]:
         sys.exit(0)
     payload = json.loads(row[0])
+    exp = payload.get('exp')
+    if exp is not None and time.time() >= exp:
+        sys.exit(0)
     v = payload.get('v')
     if v is not None:
         print(int(v))
@@ -99,6 +107,22 @@ except Exception:
     if ($out -and "$out" -match '^\d+$') { return [int]$out }
   } catch { }
   return $null
+}
+
+function Test-IsLdsPythonPid([int]$ProcessId) {
+  # A recorded PID is not proof of anything alive: Windows recycles PIDs, and a
+  # row this script itself failed to clear on a prior run (or a crash) can point
+  # at a completely unrelated process by the time stop.bat runs again. Never
+  # taskkill /T a PID without confirming it is STILL a python.exe/pythonw.exe --
+  # the same rule Stop-RepoPythonLeftovers already applies by path, applied here
+  # by identity since a bare PID carries no path of its own to check.
+  if ($ProcessId -le 0) { return $false }
+  try {
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
+    return [bool]($proc -and $proc.Name -match '^(python|pythonw)\.exe$')
+  } catch {
+    return $false
+  }
 }
 
 function Stop-RepoPythonLeftovers {
@@ -128,7 +152,7 @@ function Stop-Ollama {
     $procs = Get-Process -Name $n -ErrorAction SilentlyContinue
     foreach ($p in $procs) {
       $found = $true
-      Write-Info "Stopping $($p.ProcessName) PID $($p.Id) (any Ollama on this machine — cannot tell whose)"
+      Write-Info "Stopping $($p.ProcessName) PID $($p.Id) (any Ollama on this machine -- cannot tell whose)"
       try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { }
       & taskkill /F /T /PID $p.Id 2>$null | Out-Null
     }
@@ -211,8 +235,12 @@ if ($listenerPid) {
 
 $trainPid = Get-TrainingPidFromDb
 if ($trainPid) {
-  Write-Info "Killing recorded training_pid $trainPid"
-  Stop-PidTree $trainPid
+  if (Test-IsLdsPythonPid $trainPid) {
+    Write-Info "Killing recorded training_pid $trainPid"
+    Stop-PidTree $trainPid
+  } else {
+    Write-Info "Recorded training_pid $trainPid is stale (not a running python.exe) -- leaving it alone"
+  }
 }
 
 $swept = Stop-RepoPythonLeftovers
@@ -225,7 +253,7 @@ if ($swept -gt 0) {
 Stop-Ollama
 
 if (Test-PortOpen 8188) {
-  Write-Info "ComfyUI still answers on port 8188 (left alone — LDS never launches it)"
+  Write-Info "ComfyUI still answers on port 8188 (left alone -- LDS never launches it)"
 } else {
   Write-Info "Nothing answering on ComfyUI port 8188"
 }
@@ -237,7 +265,7 @@ for ($i = 0; $i -lt 10; $i++) {
 
 $stillListening = Get-ListenerPid $port
 if (-not $alive -and -not $stillListening) {
-  Write-Ok "Server is stopped — /api/health no longer answers on port $port"
+  Write-Ok "Server is stopped -- /api/health no longer answers on port $port"
   exit 0
 }
 

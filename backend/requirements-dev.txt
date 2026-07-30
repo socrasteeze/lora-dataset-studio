@@ -3,7 +3,7 @@
 # WHY THIS FILE EXISTS
 # --------------------
 # The test dependencies used to be one line (`pytest>=8.0`) inside
-# requirements.txt — the file every END USER installs via start.bat. Two problems,
+# requirements.txt -- the file every END USER installs via start.bat. Two problems,
 # and the second one cost a release:
 #
 #   1. Every install shipped a test runner it never runs.
@@ -17,18 +17,18 @@
 #
 # So: this file is the ONE answer to "what do I need to run the tests", it is what
 # CI installs (ci.yml and release.yml, asserted by test_dev_requirements_contract),
-# and it pins rather than floats — a suite that passes on a different pytest than
+# and it pins rather than floats -- a suite that passes on a different pytest than
 # CI's is not evidence about CI.
 #
 #   python -m pip install -r backend/requirements-dev.txt
 #   python -m pytest backend/tests -q
 #
 # NOTE on plugins: the suite runs with `-p no:flask` (backend/pytest.ini). Having
-# pytest-flask installed anyway is harmless — it is disabled, deliberately, so a
+# pytest-flask installed anyway is harmless -- it is disabled, deliberately, so a
 # machine that carries it behaves exactly like one that does not. Do NOT add it
 # here to "match" a dev machine; matching is what pytest.ini already guarantees.
 
-# The app itself — the tests import it.
+# The app itself -- the tests import it.
 -r requirements.txt
 
 # Pinned, not floated: CI and a contributor must run the SAME collector.
@@ -36,7 +36,7 @@ pytest==8.3.5
 
 # Test-only ML extras. These are never in requirements.txt on purpose: the app
 # installs them into dedicated environments on demand (see requirements-ml.txt).
-# A handful of suites — test_watermarks.py above all — exercise real numpy/OpenCV
+# A handful of suites -- test_watermarks.py above all -- exercise real numpy/OpenCV
 # pixel maths and the Telea fallback that runs when LaMa is absent, so these two
 # (and ONLY these two: never torch, never LaMa) make those tests run for real
 # while keeping "LaMa absent" true.

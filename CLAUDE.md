@@ -76,6 +76,13 @@ Run through this before calling a wave done:
    commit message (and in-app where the feature surfaces, when appropriate).
 7. **Never rename catalog labels, config keys or What's-new ids** without an
    alias path — several of them are stored in user databases and localStorage.
+8. **Windows scripts (`.ps1`/`.bat`/`.cmd`) and `requirements*.txt` stay
+   ASCII-only.** A BOM-less `.ps1` is read by PowerShell 5.1 in the system's
+   ANSI codepage, not UTF-8 — an em-dash decodes into a curly quote there,
+   which silently closes a PowerShell string and breaks the whole parse
+   (shipped once: `stop.bat` could not run at all).
+   `backend/tests/test_windows_scripts_are_ascii.py` enforces this; fix the
+   character, don't add a BOM (invisible, strippable, and unusable on `.bat`).
 
 ## Fork sync (upstream)
 
