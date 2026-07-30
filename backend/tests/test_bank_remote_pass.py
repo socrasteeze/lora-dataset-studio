@@ -192,3 +192,178 @@ def test_the_peer_redirects_the_cache_into_its_out_folder(app, monkeypatch,
     assert 'score_cache.npz' in captured['cache']
     assert r'D:\hub' not in captured['cache'], 'hub path rewritten to peer-local'
     assert os.path.dirname(captured['cache']).endswith('out')
+
+
+# ── Bug fix: each script needs the interpreter its LOCAL run uses ─────────
+# A single "bank_scoring.python for everything" chain ran a fully-configured
+# 👥 Faces pass in the wrong venv on the peer (missing cv2/onnx/insightface),
+# because face_embed_infer.py locally runs under face_scoring.python, not
+# bank_scoring.python — see image_bank_service.py:3450.
+
+def _infer_job(script, **payload):
+    return {'job_id': 'j-env', 'kind': 'infer',
+            'payload': {'script': script, 'stdin': payload}}
+
+
+def test_the_peer_picks_face_scoring_python_for_the_faces_script(app, monkeypatch):
+    from app import config as cfg
+    from app.services.peer_worker import peer_worker
+    with app.app_context():
+        cfg.save_config({'face_scoring': {'python': 'C:/envs/face/python.exe'},
+                         'bank_scoring': {'python': 'C:/envs/score/python.exe'}})
+    used = {}
+    monkeypatch.setattr('app.services.infer_stream.run_infer_script',
+                        lambda python, *a, **k: used.update(python=python)
+                        or ('{}', [], 0, False))
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_upload_artifact',
+                        lambda job_id, path, name=None: 'x')
+    monkeypatch.setattr(peer_worker, '_complete', lambda job_id, **kw: None)
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
+    assert used['python'] == 'C:/envs/face/python.exe'
+
+
+def test_the_peer_picks_bank_scoring_python_for_the_score_script(app, monkeypatch):
+    from app import config as cfg
+    from app.services.peer_worker import peer_worker
+    with app.app_context():
+        cfg.save_config({'face_scoring': {'python': 'C:/envs/face/python.exe'},
+                         'bank_scoring': {'python': 'C:/envs/score/python.exe'}})
+    used = {}
+    monkeypatch.setattr('app.services.infer_stream.run_infer_script',
+                        lambda python, *a, **k: used.update(python=python)
+                        or ('{}', [], 0, False))
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_upload_artifact',
+                        lambda job_id, path, name=None: 'x')
+    monkeypatch.setattr(peer_worker, '_complete', lambda job_id, **kw: None)
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job('bank_score_infer.py', images=[]))
+    assert used['python'] == 'C:/envs/score/python.exe'
+
+
+def test_a_mapped_but_unconfigured_env_falls_back_to_this_interpreter(app,
+                                                                      monkeypatch):
+    import sys
+    from app import config as cfg
+    from app.services.peer_worker import peer_worker
+    with app.app_context():
+        cfg.save_config({'face_scoring': {'python': ''}})
+    used = {}
+    monkeypatch.setattr('app.services.infer_stream.run_infer_script',
+                        lambda python, *a, **k: used.update(python=python)
+                        or ('{}', [], 0, False))
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_upload_artifact',
+                        lambda job_id, path, name=None: 'x')
+    monkeypatch.setattr(peer_worker, '_complete', lambda job_id, **kw: None)
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
+    assert used['python'] == sys.executable
+
+
+def test_a_missing_module_names_the_env_and_the_fix(app, monkeypatch):
+    from app.services import infer_stream
+    from app.services.peer_worker import peer_worker
+    monkeypatch.setattr(
+        infer_stream, 'run_infer_script',
+        lambda *a, **k: ('', ["ModuleNotFoundError: No module named 'cv2'"], 1, False))
+    done = {}
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_complete',
+                        lambda job_id, **kw: done.update(kw))
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
+    assert 'face-scoring' in done['error']
+    assert 'Setup' in done['error'] and 'Quality tools' in done['error']
+    assert "cv2" in done['error']                 # the real error stays, for diagnosis
+
+
+def test_an_unmapped_script_keeps_the_old_chain_untouched(app, monkeypatch):
+    import sys
+    from app import config as cfg
+    from app.services.peer_worker import peer_worker
+    with app.app_context():
+        cfg.save_config({'bank_scoring': {'python': ''}, 'aitoolkit': {'python': ''}})
+    used = {}
+    monkeypatch.setattr('app.services.infer_stream.run_infer_script',
+                        lambda python, *a, **k: used.update(python=python)
+                        or ('{}', [], 0, False))
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_upload_artifact',
+                        lambda job_id, path, name=None: 'x')
+    monkeypatch.setattr(peer_worker, '_complete', lambda job_id, **kw: None)
+    peer_worker.init_app(app)
+    # A REAL infer script (the confinement fixed earlier today refuses anything
+    # that isn't one) that just happens not to be in the per-script env map.
+    peer_worker._run_infer(_infer_job('clip_text_infer.py', images=[]))
+    assert used['python'] == sys.executable
+
+
+# ── Hub pre-flight: refuse before staging a single image ──────────────────
+
+def test_hub_refuses_up_front_when_the_peer_already_reported_the_stack_missing(
+        app, tmp_path, monkeypatch):
+    import re
+    from app import config as cfg
+    from app.services import bank_remote, cluster as cluster_svc
+
+    with app.app_context():
+        cfg.save_config({'cluster': {'role': 'primary'}})
+        minted = cluster_svc.mint_join_token()
+        redeemed = cluster_svc.redeem_join_token(
+            minted['token'], name='peer',
+            capabilities_blob={'face_scoring': False, 'bank_scoring': True})
+        staged = {'called': False}
+        monkeypatch.setattr(
+            'app.services.cluster_remote.enqueue_infer_on_device',
+            lambda *a, **k: staged.update(called=True) or 'never')
+        with pytest.raises(RuntimeError, match='face-scoring'):
+            bank_remote.run_remote_pass(
+                object(), redeemed['device_id'], script='face_embed_infer.py',
+                by_path={str(tmp_path / 'a.jpg'): 1}, extra_payload={},
+                cache_path=tmp_path / 'c.npz', progress_re=re.compile(r'(\d)'),
+                detail_label='face pass', required_cap='face_scoring')
+        assert staged['called'] is False, 'nothing staged before the refusal'
+
+
+def test_hub_proceeds_when_the_peer_has_not_reported_yet(app, tmp_path,
+                                                         monkeypatch):
+    """An absent/empty capability blob (a peer that just joined) must not be
+    treated as 'missing' — only an EXPLICIT False blocks."""
+    import re
+    from app import config as cfg
+    from app.services import bank_remote, cluster as cluster_svc, bank_jobs
+
+    with app.app_context():
+        cfg.save_config({'cluster': {'role': 'primary'}})
+        minted = cluster_svc.mint_join_token()
+        redeemed = cluster_svc.redeem_join_token(minted['token'], name='peer')
+        monkeypatch.setattr(bank_jobs, 'cancelled', lambda job: False)
+        monkeypatch.setattr(bank_jobs, 'progress', lambda job, **kw: None)
+        monkeypatch.setattr(
+            'app.services.cluster_remote.enqueue_infer_on_device',
+            lambda *a, **k: 'job-x')
+
+        class _Row:
+            status = 'failed'
+            progress = None
+            error_message = 'stub — reached the poll, which is the point'
+
+        class _FakeClusterJob:
+            query = type('Q', (), {'filter_by': staticmethod(
+                lambda **kw: type('F', (), {'first': staticmethod(lambda: _Row())})())})()
+        monkeypatch.setattr('app.models.ClusterJob', _FakeClusterJob)
+
+        with pytest.raises(RuntimeError, match='stub'):
+            bank_remote.run_remote_pass(
+                object(), redeemed['device_id'], script='face_embed_infer.py',
+                by_path={str(tmp_path / 'a.jpg'): 1}, extra_payload={},
+                cache_path=tmp_path / 'c.npz', progress_re=re.compile(r'(\d)'),
+                detail_label='face pass', required_cap='face_scoring')
