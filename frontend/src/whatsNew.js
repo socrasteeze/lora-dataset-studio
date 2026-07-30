@@ -50,6 +50,21 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-30-comfyui-recovery-barrier-remote-safe',
+    date: '2026-07-30',
+    title: 'A stuck ComfyUI now says so, instead of quietly swallowing new work',
+    blurb:
+      'When ComfyUI stops answering mid-job, Generate, Upscale & improve and Test Studio now refuse straight away with a message that names what to recover, rather than stacking up work that was never going to run. If you have a second machine or a rented GPU set up under Devices, this only ever applies to the machine that is actually stuck — a paused ComfyUI here no longer blocks a batch you sent somewhere else.',
+    to: '/settings/devices',
+  },
+  {
+    id: '2026-07-30-dataset-caption-model-everywhere',
+    date: '2026-07-30',
+    title: 'A dataset’s own captioning model is now used for the whole pass',
+    blurb:
+      'Picking a vision model for one dataset used to apply to the main captioning step only — the follow-up passes that strip your concept out of its own captions quietly fell back to the global model, so the result depended on a setting you had already overridden. The dataset’s choice is now honoured all the way through, and a model installed only for that dataset counts as ready.',
+  },
+  {
     id: '2026-07-30-retry-reference-edit-show-engine',
     date: '2026-07-30',
     title: 'Retry a reference edit exactly as it ran',
@@ -70,7 +85,7 @@ export const WHATS_NEW = [
     date: '2026-07-30',
     title: '🛟 A Test Studio batch now pauses safely for ComfyUI recovery',
     blurb:
-      'If ComfyUI goes away mid-batch, Studio now pauses with a paste-safe reason and submits no later prompt. Recover or restart ComfyUI, then cancel and resume the batch. Setup’s “Start ComfyUI” uses the app’s fixed local-safe profile: it never reads, changes or runs a .bat file, so your own launcher stays untouched.',
+      'If ComfyUI goes away mid-batch, Studio now pauses with a paste-safe reason and submits no later prompt. Recover or restart ComfyUI, then cancel and resume the batch. Setup’s “Start ComfyUI” also works from a phone already allowed by LDS and uses the app’s fixed safe profile: it never reads, changes or runs a .bat file, so your own launcher stays untouched.',
     to: '/studio',
   },
   {

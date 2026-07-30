@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 
+import pytest
+
 
 def test_cluster_status_standalone(client):
     r = client.get('/api/cluster/status')
@@ -387,3 +389,49 @@ def test_the_primary_does_not_put_its_own_paths_on_the_wire(app):
     md = job['payload']['metadata']
     assert 'staged_input_paths' not in md
     assert md['staged_inputs'] == ['a.png'], 'the basenames the peer needs stay'
+
+
+def test_a_stalled_local_comfyui_never_refuses_work_bound_for_another_machine(app):
+    """Divergence 6: the recovery barrier is LOCAL, so it must not strand remote work.
+
+    Upstream 65e96e85 added `require_comfyui_enqueue_ready()` to add_job, and its
+    route gate reads `any(g in LOCAL_ENGINES ...)` — always true on this fork, where
+    API_ENGINES is empty. Taken verbatim, a stalled ComfyUI on THIS machine refuses a
+    batch aimed at a peer or an api: backend whose ComfyUI is perfectly healthy: the
+    one failure the Run-on picker exists to prevent, and unclearable without going to
+    fix a machine the user was not even using. The barrier signatures already match
+    upstream's, so this re-breaks with ZERO conflict markers on a future sync —
+    which is exactly what this test is here to catch.
+    """
+    from app import config as cfg
+    from app.job_queue import (COMFYUI_STALLED_BARRIER_KEY, ComfyUIRecoveryRequired,
+                               queue_manager)
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+
+    with app.app_context():
+        cfg.save_config({'cluster': {'role': 'primary'}})
+        minted = cluster_svc.mint_join_token()
+        peer = cluster_svc.redeem_join_token(minted['token'], name='peer-gpu')
+        backend = cluster_svc.add_backend('rented', 'http://gpu.example:8188')
+
+        # This machine's ComfyUI is stuck with an unresolved remote prompt.
+        queue_manager._set_system_state(
+            COMFYUI_STALLED_BARRIER_KEY, {'job_id': 'unresolved'})
+
+        # A LOCAL job is refused — upstream's barrier still does its job.
+        with pytest.raises(ComfyUIRecoveryRequired):
+            queue_manager.add_job(workflow_data={'1': {}}, prompt='local')
+
+        # …while the two remote lanes still enqueue. Assert the ROW, not just the
+        # absence of a raise: a job that returns an id but stores nothing is the
+        # same outage wearing a green test.
+        peer_job = queue_manager.add_job(workflow_data={'1': {}}, prompt='on-peer',
+                                         worker_id=peer['device_id'])
+        api_job = queue_manager.add_job(workflow_data={'1': {}}, prompt='on-backend',
+                                        worker_id=backend['id'])
+        rows = {r.job_id: r for r in ImageGenerationQueue.query.all()}
+        assert set(rows) == {peer_job, api_job}, 'the local job must not have landed'
+        assert rows[peer_job].worker_id == peer['device_id']
+        assert rows[api_job].worker_id == backend['id']
+        assert all(r.status == 'pending' for r in rows.values())
