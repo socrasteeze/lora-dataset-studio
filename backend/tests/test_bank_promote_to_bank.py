@@ -132,8 +132,24 @@ def test_a_copy_that_cannot_be_written_leaves_no_phantom_bank(app, source):
         from app.services import bank_jobs, image_bank_service as banks
 
         banks_before = ImageBank.query.count()
-        with patch.object(banks.shutil, 'copy2',
-                          side_effect=OSError(28, 'No space left on device')):
+        native_open = open
+
+        class DestinationWriteFailure:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def write(self, _payload):
+                raise OSError(28, 'No space left on device')
+
+        def fail_destination_write(path, mode='r', *args, **kwargs):
+            if mode == 'wb':
+                return DestinationWriteFailure()
+            return native_open(path, mode, *args, **kwargs)
+
+        with patch.object(banks, 'open', fail_destination_write, create=True):
             banks.start_bank_promote(app, 'local', bank_id, ids[:2], 'Candidates')
 
         # The job body reports through bank_jobs (the runner owns exceptions), and
@@ -219,6 +235,19 @@ def test_a_running_job_on_the_source_bank_is_a_409(client, app, source):
     r = client.post(f'/api/bank/{bank_id}/promote-to-bank',
                     json={'name': 'Candidates', 'image_ids': ids[:2]})
     assert r.status_code == 409
+
+
+def test_a_busy_snapshot_that_expires_between_reads_still_refuses_cleanly(
+        app, source, monkeypatch):
+    """A TTL race is a 409, never a ``get(None)['kind']`` server error."""
+    bank_id, _folder, ids = source
+    with app.app_context():
+        from app.services import bank_jobs, image_bank_service as banks
+
+        monkeypatch.setattr(banks.bank_jobs, 'running', lambda _bank_id: True)
+        monkeypatch.setattr(banks.bank_jobs, 'get', lambda _bank_id: None)
+        with pytest.raises(bank_jobs.BankJobBusy, match='background'):
+            banks.start_bank_promote(app, 'local', bank_id, ids[:1], 'Candidates')
 
 
 def test_the_route_returns_202_and_the_new_bank_id(client, app, source):

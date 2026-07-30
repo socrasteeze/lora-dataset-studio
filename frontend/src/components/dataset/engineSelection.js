@@ -21,11 +21,12 @@
    engine) or to COMPARE the two on the same shots (both render every shot).
 
    The storage rule of this repo forbids renaming or re-typing a persisted key:
-   `datasetGenerator` is read by the regenerate path (useDataset.js) and by the
-   ✎ identity-prompt modal, which both want ONE engine. So the string key is
-   KEPT, unchanged, as a mirror of the PRIMARY engine, and the list lives in a
-   new key next to it. A profile that only ever knew the old key reads back as a
-   one-engine selection — i.e. exactly the pre-Krea behaviour. A profile still
+   `datasetGenerator` remains for the ✎ identity-prompt modal and compatibility
+   with profiles that only know one engine. Tile Retry instead reuses each row's
+   stored provenance, never this workspace preference. The string key is KEPT,
+   unchanged, as a mirror of the PRIMARY engine, and the list lives in a new key
+   next to it. A profile that only ever knew the old key reads back as a
+   one-engine selection — i.e. exactly today's behaviour. A profile still
    holding a removed cloud engine in that key reads back as Klein, because
    `canonicalEngines` drops every id this catalogue does not list. */
 
@@ -122,11 +123,11 @@ export function readEngines(storage) {
   return [DEFAULT_ENGINE];
 }
 
-/** Persist the selection AND refresh the legacy mirror, so every existing
- *  single-engine reader (regenerate, the identity-prompt modal) keeps seeing a
- *  valid engine. The mirror is left untouched when nothing is selected — an
- *  empty selection generates nothing, and blanking it would make regenerate
- *  lose its engine. */
+/** Persist the selection AND refresh the legacy mirror, so the ✎ modal and
+ *  older single-engine profiles keep seeing a valid engine. Tile Retry reads
+ *  its engine from the image row, not this mirror. The mirror is left untouched
+ *  when nothing is selected: an empty selection generates nothing, while
+ *  blanking the legacy preference would lose compatibility state. */
 export function writeEngines(storage, engines) {
   const list = canonicalEngines(engines);
   try {

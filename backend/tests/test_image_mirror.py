@@ -58,6 +58,7 @@ def _pixels(path):
     ('PNG', 'image.png'),
     ('WEBP', 'image.webp'),
     ('JPEG', 'image.jpg'),
+    ('BMP', 'image.bmp'),
 ])
 def test_mirror_flips_pixels_and_preserves_real_format(app, fmt, filename):
     from app.config import LOCAL_USER
@@ -88,7 +89,7 @@ def test_double_mirror_restores_pixels_and_preserves_metadata(app):
             name: getattr(before, name) for name in (
                 'dataset_id', 'filename', 'source', 'status', 'framing', 'caption',
                 'variation_label', 'variation_prompt', 'klein_model',
-                'derivation_kind', 'upscale_ratio', 'face_score', 'face_state',
+                'derivation_kind', 'upscale_ratio',
                 'source_metadata', 'created_at',
             )
         }
@@ -97,6 +98,9 @@ def test_double_mirror_restores_pixels_and_preserves_metadata(app):
         assert all(getattr(row, name) == value for name, value in stable.items())
         assert (row.watermark_state, row.watermark_bbox, row.watermark_regions) == (
             None, None, None)
+        # face/content analysis was computed against the pre-mirror pixels this
+        # call just replaced, so _invalidate_image_content_analysis drops it too.
+        assert (row.face_score, row.face_state) == (None, None)
         svc.mirror_image(LOCAL_USER, image_id)
     with Image.open(path) as image:
         assert image.convert('RGB').tobytes() == original_pixels

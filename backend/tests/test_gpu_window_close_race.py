@@ -64,6 +64,11 @@ def test_a_beat_that_wakes_during_close_can_never_re_arm_the_flag(app, monkeypat
     #   THIRD version of this test green against the unfixed code).
     # flag_ttl=18 gives a 6s beat interval and a flag alive until t=18s.
     monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.05)
+    # gpu_window._normalise_flag_ttl floors flag_ttl at _MIN_FLAG_TTL_SECONDS
+    # (30, a production safety floor upstream added); without lowering it here
+    # too, flag_ttl=18 below would silently become 30 and this test's whole
+    # timing derivation (interval, TTL lifetime) would no longer hold.
+    monkeypatch.setattr(gpu_window, '_MIN_FLAG_TTL_SECONDS', 0.01)
     beat_writing = threading.Event()
     real_set = queue_manager._set_system_state
     held = {'once': False}
@@ -79,6 +84,13 @@ def test_a_beat_that_wakes_during_close_can_never_re_arm_the_flag(app, monkeypat
         return real_set(key, value, ttl_seconds=ttl_seconds)
 
     with app.app_context():
+        # The heartbeat renews from its OWN thread via _in_app_context, which
+        # falls back to queue_manager._app when Flask's app context (thread-
+        # local) isn't already pushed there. TESTING=True skips _start_workers
+        # (and therefore init_app) at app creation, so without this the beat
+        # can never push a context at all and "loses ownership" on its very
+        # first renewal — same idiom as test_job_queue.py.
+        queue_manager.init_app(app)
         monkeypatch.setattr(queue_manager, '_set_system_state', stalled_set)
         with gpu_window.gpu_exclusive_vision_window(flag_ttl=18):
             assert beat_writing.wait(timeout=12), 'no beat ever reached its write'
@@ -96,6 +108,7 @@ def test_the_flag_is_gone_the_instant_the_window_closes(app, monkeypatch):
     from app.services import image_bank_service as banks
 
     monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.01)
+    monkeypatch.setattr(gpu_window, '_MIN_FLAG_TTL_SECONDS', 0.01)
     with app.app_context():
         with gpu_window.gpu_exclusive_vision_window(flag_ttl=0.5):
             assert banks._gpu_busy_reason() is not None   # correctly busy inside
@@ -109,6 +122,7 @@ def test_an_exception_inside_the_window_still_clears_the_flag(app, monkeypatch):
     from app import gpu_window
 
     monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.01)
+    monkeypatch.setattr(gpu_window, '_MIN_FLAG_TTL_SECONDS', 0.01)
     with app.app_context():
         with pytest.raises(RuntimeError):
             with gpu_window.gpu_exclusive_vision_window(flag_ttl=0.5):
@@ -121,9 +135,15 @@ def test_a_long_pass_still_keeps_its_flag_alive(app, monkeypatch):
     """The heartbeat's whole reason for existing must survive the fix: a pass
     that outlives its TTL must NOT have the GPU taken from under it."""
     from app import gpu_window
+    from app.job_queue import queue_manager
 
     monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.02)
+    monkeypatch.setattr(gpu_window, '_MIN_FLAG_TTL_SECONDS', 0.01)
     with app.app_context():
+        # See the comment in test_a_beat_that_wakes_during_close_can_never_
+        # re_arm_the_flag: the heartbeat needs queue_manager._app to push its
+        # own context, which TESTING=True never sets up on its own.
+        queue_manager.init_app(app)
         with gpu_window.gpu_exclusive_vision_window(flag_ttl=0.12):
             time.sleep(0.5)                 # several TTLs' worth
             assert _flag(app) is not None, 'the flag lapsed under a live pass'
@@ -137,6 +157,7 @@ def test_a_window_re_acquired_by_someone_else_is_never_stomped(app, monkeypatch)
     from app.job_queue import queue_manager
 
     monkeypatch.setattr(gpu_window, '_HEARTBEAT_FLOOR_SECONDS', 0.01)
+    monkeypatch.setattr(gpu_window, '_MIN_FLAG_TTL_SECONDS', 0.01)
     with app.app_context():
         with gpu_window.gpu_exclusive_vision_window(flag_ttl=5):
             # Simulate a lapse + re-acquisition by a different caller.

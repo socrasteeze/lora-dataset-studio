@@ -6,11 +6,19 @@ be revoked is worse than the always-unload behaviour it replaces, because it
 swaps a predictable 12.8 s reload for an unpredictable silent eviction (WDDM
 pages instead of raising OOM, so nothing would even report it).
 """
+import io
 from unittest.mock import patch
 
 import pytest
+from PIL import Image
 
 from app.services import vision_keepalive as vk
+
+
+def _png() -> bytes:
+    buf = io.BytesIO()
+    Image.new('RGB', (8, 8), (200, 50, 50)).save(buf, 'PNG')
+    return buf.getvalue()
 
 
 @pytest.fixture(autouse=True)
@@ -148,7 +156,7 @@ def test_an_unreachable_ollama_hands_back_the_lease(app):
             patch('app.services.vision_ollama.requests.post', _down):
         keep = vk.keep_alive_for_isolated_call()
         assert keep == f'{vk.DEFAULT_WARM_SECONDS}s'
-        assert vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep) == ''
+        assert vision_ollama.describe_image_ollama(_png(), 'p', keep_alive=keep) == ''
     assert vk.lease_is_live() is False
 
 
@@ -163,7 +171,7 @@ def test_head_crop_failure_does_not_leave_a_lease(app):
 
     with app.app_context(), \
             patch('app.services.vision_ollama.requests.post', _down):
-        assert fds.detect_head_bbox(b'not-an-image') is None
+        assert fds.detect_head_bbox(_png()) is None
     assert vk.lease_is_live() is False
 
 
@@ -224,7 +232,7 @@ def test_auto_start_failure_hands_back_the_lease(app):
                          return_value={'ok': False, 'error': 'not installed'}):
         keep = vk.keep_alive_for_isolated_call()
         with pytest.raises(RuntimeError, match='not installed'):
-            vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep,
+            vision_ollama.describe_image_ollama(_png(), 'p', keep_alive=keep,
                                                 auto_start_local=True)
     assert vk.lease_is_live() is False
 
@@ -254,7 +262,7 @@ def test_auto_start_retry_success_keeps_the_lease(app):
             patch.object(ollama_control, 'ensure_captioning_ready',
                          return_value={'ok': True, 'reachable': True}):
         keep = vk.keep_alive_for_isolated_call()
-        out = vision_ollama.describe_image_ollama(b'img', 'p', keep_alive=keep,
+        out = vision_ollama.describe_image_ollama(_png(), 'p', keep_alive=keep,
                                                   auto_start_local=True)
     assert out == 'a caption' and len(calls) == 2
     assert vk.lease_is_live() is True
@@ -262,24 +270,25 @@ def test_auto_start_retry_success_keeps_the_lease(app):
 
 # -- the wiring: the paths that take the GPU actually revoke -----------------
 
-def test_the_comfyui_queue_revokes_before_submitting(app):
-    """The load-bearing hook. Without it, keep-warm would just relocate the cost
-    from a reload we control to an eviction we don't."""
+def test_the_comfyui_queue_proves_ollama_released_before_submitting(app):
+    """The load-bearing handoff runs before the workflow reaches ComfyUI.
+
+    `ensure_released_for_comfy` subsumes an optional warm-lease revoke and the
+    mandatory `/api/ps` ownership check. It must finish before `/prompt`.
+    """
     from app.job_queue import queue_manager
     with app.app_context():
         queue_manager.add_job(workflow_data={'1': {}}, prompt='p')
     order = []
-    with patch('app.services.vision_keepalive.revoke',
-               side_effect=lambda *a, **k: order.append('revoke')), \
+    with patch('app.services.vision_keepalive.ensure_released_for_comfy',
+               side_effect=lambda *a, **k: (order.append('fence'), True)[1]), \
          patch('app.job_queue._submit',
                side_effect=lambda *a, **k: (order.append('submit'), 'pid-1')[1]), \
          patch('app.job_queue._poll_outputs', return_value=('out.png', False)), \
          patch('app.job_queue._dispatch_completion'):
         with app.app_context():
             assert queue_manager.process_one() is True
-    # Revoked BEFORE the workflow reaches ComfyUI, not after — ComfyUI sizes its
-    # own loads against the VRAM it finds free, so the order is the whole point.
-    assert order == ['revoke', 'submit']
+    assert order == ['fence', 'submit']
 
 
 def test_head_crop_asks_the_policy_instead_of_hardcoding_zero(app):

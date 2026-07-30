@@ -528,27 +528,42 @@ def test_cancel_run_commits_whole_batch_before_interrupting_comfyui(app):
     from app.config import LOCAL_USER
     with app.app_context():
         ds = svc.create_dataset(LOCAL_USER, 'Stop batch', 'stopbatch')
-        running_id = queue_manager.add_job(workflow_data={'1': {}})
         queued_id = queue_manager.add_job(workflow_data={'1': {}})
+        running_id = queue_manager.add_job(workflow_data={'1': {}})
         running = ImageGenerationQueue.query.filter_by(job_id=running_id).one()
         running.update_status('sent_to_comfy', comfyui_prompt_id='prompt-stop')
+        # The plain-pending cell is queried/processed before the one needing a
+        # real ComfyUI round trip (insertion order == query order here, no
+        # explicit sort in cancel_run), so its cancellation is already durable
+        # by the time the external confirmation below fires.
         svc.db.session.add_all([
             LoraTestImage(dataset_id=ds.id, run_id='run-stop', checkpoint='z image\\a.safetensors',
-                          strength=1.0, status='pending', job_id=running_id),
-            LoraTestImage(dataset_id=ds.id, run_id='run-stop', checkpoint='z image\\b.safetensors',
                           strength=1.0, status='pending', job_id=queued_id),
+            LoraTestImage(dataset_id=ds.id, run_id='run-stop', checkpoint='z image\\b.safetensors',
+                          strength=1.0, status='pending', job_id=running_id),
         ])
         svc.db.session.commit()
 
-        def assert_batch_is_already_stopped(_prompt_id, _job_id):
-            assert {j.status for j in ImageGenerationQueue.query.all()} == {'cancelled'}
-            assert {c.status for c in LoraTestImage.query.all()} == {'cancelled'}
-            return True
+        from app.utils.comfyui import ComfyPromptState
 
-        with patch.object(queue_manager, 'interrupt_comfyui_job',
-                          side_effect=assert_batch_is_already_stopped) as interrupt:
+        def assert_rest_of_batch_is_already_stopped(_prompt_id, _job_id):
+            # This exact row is still mid-cancellation (its cell/queue status
+            # only reach 'cancelled' once this confirmation returns); every
+            # OTHER row in the batch must already be settled.
+            others = {j.status for j in ImageGenerationQueue.query
+                     .filter(ImageGenerationQueue.job_id != running_id)}
+            assert others == {'cancelled'}
+            cells = {c.job_id: c.status for c in
+                    LoraTestImage.query.filter_by(run_id='run-stop')}
+            assert cells[running_id] == 'pending'   # not finalized until this returns
+            assert 'cancelled' in cells.values()    # the other cell already is
+            return ComfyPromptState.DELETED
+
+        with patch('app.utils.comfyui.cancel_comfyui_prompt_state',
+                  side_effect=assert_rest_of_batch_is_already_stopped) as cancel_exact, \
+             patch('app.utils.comfyui.comfyui_prompt_is_absent', return_value=True):
             assert lts.cancel_run(LOCAL_USER, run_id='run-stop') == 2
-        interrupt.assert_called_once_with('prompt-stop', running_id)
+        cancel_exact.assert_called_once_with('prompt-stop', running_id)
 
 
 def json_dump_keys(payload):

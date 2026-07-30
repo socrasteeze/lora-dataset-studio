@@ -896,15 +896,24 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     # Remote peers: skip local Comfy input — artifacts are published from
     # staged_input_paths by the job queue.
     uid = uuid.uuid4().hex[:8]
-    comfy_input = f"edit_source_{uid}_{os.path.basename(source_filename)}"
-    staged_input_paths = {comfy_input: os.path.abspath(source_path)}
-    staged_inputs = [comfy_input]
     if not remote:
         comfy_input_dir = comfy_fs.ensure_input_usable(_comfy_input_dir())
-        comfy_fs.stage_input_copy(source_path, comfy_input, comfy_input_dir)
-        # Every name staged for THIS job, so its completion can delete them again.
-        # Without this list each improved image left a full-resolution duplicate in
-        # ComfyUI's input folder forever (measured: 3 896 orphans on one install).
+        source_stem = os.path.splitext(os.path.basename(str(source_filename)))[0] or 'source'
+        # The input directory may belong to a remote/containerised ComfyUI. Stage a
+        # fresh upright PNG there rather than copying camera EXIF/XMP/GPS bytes.
+        staged_source = comfy_fs.stage_input_image(
+            source_path, f"edit_source_{uid}_{source_stem}.png", comfy_input_dir)
+        comfy_input = os.path.basename(staged_source)
+    else:
+        # Remote peers: skip local Comfy input -- artifacts are published from
+        # staged_input_paths by the job queue, and stage their own copy under
+        # this name on arrival, so the extension is not load-bearing here.
+        comfy_input = f"edit_source_{uid}_{os.path.basename(source_filename)}"
+    staged_input_paths = {comfy_input: os.path.abspath(source_path)}
+    # Every name staged for THIS job, so its completion can delete them again.
+    # Without this list each improved image left a full-resolution duplicate in
+    # ComfyUI's input folder forever (measured: 3 896 orphans on one install).
+    staged_inputs = [comfy_input]
 
     workflow["52"]["inputs"]["image"] = comfy_input
     # Prompt into the CLIPTextEncode widget directly (node 6). The old RES4LYF
@@ -944,9 +953,15 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
         if not ref_path or not os.path.exists(ref_path):
             logger.warning(f"klein multi-ref: extra ref missing on disk: {ref_path}")
             continue
-        ref_input = f"edit_ref{i}_{uid}_{os.path.basename(ref_path)}"
         if not remote:
-            comfy_fs.stage_input_copy(ref_path, ref_input, comfy_input_dir)
+            ref_stem = os.path.splitext(os.path.basename(str(ref_path)))[0] or f'ref{i}'
+            staged_ref = comfy_fs.stage_input_image(
+                ref_path, f"edit_ref{i}_{uid}_{ref_stem}.png", comfy_input_dir)
+            ref_input = os.path.basename(staged_ref)
+        else:
+            # Remote peers stage their own copy on arrival (see the source-image
+            # staging above) -- the extension is not load-bearing here either.
+            ref_input = f"edit_ref{i}_{uid}_{os.path.basename(ref_path)}"
         staged_inputs.append(ref_input)
         staged_input_paths[ref_input] = os.path.abspath(ref_path)
         load_id, scale_id = f"ds_ref{i}_load", f"ds_ref{i}_scale"

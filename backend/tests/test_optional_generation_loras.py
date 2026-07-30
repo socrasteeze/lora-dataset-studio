@@ -489,8 +489,15 @@ def test_regenerate_applies_the_preset_regardless_of_label(app, tmp_path, monkey
         svc.db.session.add(img)
         svc.db.session.commit()
         captured = []
-        monkeypatch.setattr(queue_manager, 'add_job',
-                            lambda **kw: (captured.append(kw), kw['job_id'])[1])
+        real_add_job = queue_manager.add_job
+
+        def capturing_add_job(**kw):
+            # A real (uncommitted-elsewhere) queue row, not just a captured dict:
+            # regenerating a SECOND time cancels the still-pending first job, and
+            # that now needs a real ImageGenerationQueue row to prove cancellable.
+            captured.append(kw)
+            return real_add_job(**kw)
+        monkeypatch.setattr(queue_manager, 'add_job', capturing_add_job)
         svc.regenerate_image(LOCAL_USER, img.id, generation_lora_preset='Just one')
         assert _gen_chain(captured[0]['workflow_data']) == \
             [os.path.join('klein', 'gen-a.safetensors')]

@@ -1,10 +1,30 @@
 import io, json, zipfile
+import pytest
 from PIL import Image
 
 
 def _png(color=(255, 0, 0)):
     buf = io.BytesIO(); Image.new('RGB', (64, 64), color).save(buf, 'PNG')
     return buf.getvalue()
+
+
+def _webp(color=(255, 0, 0)):
+    buf = io.BytesIO(); Image.new('RGB', (64, 64), color).save(buf, 'WEBP', lossless=True)
+    return buf.getvalue()
+
+
+def _compact_png_header(width, height):
+    """Enough PNG structure for Pillow to read IHDR without pixel data."""
+    import struct
+    import zlib
+
+    def chunk(kind, data):
+        return (struct.pack('>I', len(data)) + kind + data
+                + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff))
+
+    return (b'\x89PNG\r\n\x1a\n'
+            + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0))
+            + chunk(b'IEND', b''))
 
 
 def test_create_and_payload(app):
@@ -41,6 +61,54 @@ def test_export_zip_layout(app):
         assert 'Training family: Z-Image' in info
         assert 'Activation token: zoe' in info
         assert 'rank 12-16' not in info and 'de-distill adapter' not in info
+
+
+def test_export_zip_bakes_exif_orientation_without_mutating_masters(app):
+    """Training ZIPs use visual geometry for both a real reference and a kept row.
+
+    The exported PNGs are disposable derivatives; the JPEG masters keep their
+    original bytes and EXIF while the ZIP gets upright, metadata-free pixels.
+    """
+    from app.services import face_dataset_service as svc
+    from app.models import FaceDatasetImage
+    from app.config import LOCAL_USER
+    import os
+
+    with app.app_context():
+        ds = svc.create_dataset(LOCAL_USER, 'Orientation ZIP', 'orientation_zip')
+        directory = svc._dataset_dir(ds.id)
+        os.makedirs(directory, exist_ok=True)
+        image = Image.new('RGB', (40, 20), (160, 70, 20))
+        exif = image.getexif()
+        exif[274] = 6
+        exif[271] = 'Private Camera'
+        ref_path = os.path.join(directory, 'ref-camera.jpg')
+        kept_path = os.path.join(directory, 'kept-camera.jpg')
+        image.save(ref_path, 'JPEG', quality=95, subsampling=0, exif=exif)
+        image.save(kept_path, 'JPEG', quality=95, subsampling=0, exif=exif)
+        ref_before = open(ref_path, 'rb').read()
+        kept_before = open(kept_path, 'rb').read()
+        ds.ref_filename = 'ref-camera.jpg'
+        svc.db.session.add(FaceDatasetImage(
+            dataset_id=ds.id, filename='kept-camera.jpg', status='keep',
+            framing='face', caption='a pose',
+        ))
+        svc.db.session.commit()
+        archive = zipfile.ZipFile(io.BytesIO(svc.build_export_zip(LOCAL_USER, ds.id)))
+        names = archive.namelist()
+        ref_name = next(name for name in names if name.endswith('_000_ref.png'))
+        kept_name = next(name for name in names if name.endswith('_001.png'))
+        ref_payload = archive.read(ref_name)
+        kept_payload = archive.read(kept_name)
+
+    assert open(ref_path, 'rb').read() == ref_before
+    assert open(kept_path, 'rb').read() == kept_before
+    for payload in (ref_payload, kept_payload):
+        assert b'Private Camera' not in payload and b'Exif' not in payload
+        with Image.open(io.BytesIO(payload)) as exported:
+            exported.load()
+            assert exported.format == 'PNG' and exported.size == (20, 40)
+            assert not exported.getexif()
 
 
 def test_style_exports_content_only_in_zip_and_sidecars(app):
@@ -331,14 +399,14 @@ def test_backup_roundtrip_restores_everything(app):
     with app.app_context():
         ds = svc.create_dataset(LOCAL_USER, 'Bak', 'bak', train_type='sdxl')
         d = svc._dataset_dir(ds.id); os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, 'ref.webp'), 'wb').write(_png())
+        open(os.path.join(d, 'ref.webp'), 'wb').write(_webp())
         ds.ref_filename = 'ref.webp'
         ds.best_settings = '{"strength": 0.8}'
         ds.train_settings = '{"rank": 32, "resolution": 1024}'
         # Machine-local custom component paths must remain outside portable backups.
         ds.train_vae_path = r'C:\models\private-vae.safetensors'
         ds.train_te_path = r'C:\models\private-text-encoder.safetensors'
-        open(os.path.join(d, 'a.webp'), 'wb').write(_png((0, 255, 0)))
+        open(os.path.join(d, 'a.webp'), 'wb').write(_webp((0, 255, 0)))
         svc.db.session.add(FaceDatasetImage(dataset_id=ds.id, filename='a.webp', status='keep',
                                             framing='bust', caption='a green coat',
                                             face_score=0.61, face_state='scorable',
@@ -370,6 +438,89 @@ def test_backup_roundtrip_restores_everything(app):
         assert os.path.isfile(os.path.join(svc._dataset_dir(restored.id), 'a.webp'))
 
 
+def test_backup_roundtrip_keeps_a_preserved_bmp(app):
+    """BMP is a supported source master, so a portable backup must neither
+    silently omit it nor change its extension on restore."""
+    import os
+    from PIL import Image
+    from app.config import LOCAL_USER
+    from app.models import FaceDatasetImage
+    from app.services import face_dataset_service as svc
+
+    with app.app_context():
+        ds = svc.create_dataset(LOCAL_USER, 'BMP backup', 'bmp_backup')
+        filename = 'master.bmp'
+        path = os.path.join(svc._dataset_dir(ds.id), filename)
+        Image.new('RGB', (19, 13), (12, 90, 210)).save(path, 'BMP')
+        svc.db.session.add(FaceDatasetImage(dataset_id=ds.id, filename=filename,
+                                            source='import', status='keep'))
+        svc.db.session.commit()
+        restored = svc.import_backup_zip(LOCAL_USER, svc.build_backup_zip(LOCAL_USER, ds.id))
+        row = FaceDatasetImage.query.filter_by(dataset_id=restored.id).one()
+        restored_path = os.path.join(svc._dataset_dir(restored.id), row.filename)
+        restored_filename = row.filename
+    assert restored_filename == filename
+    with Image.open(restored_path) as restored_image:
+        assert restored_image.format == 'BMP' and restored_image.size == (19, 13)
+
+
+@pytest.mark.parametrize(
+    ('filename', 'payload', 'message'),
+    [
+        ('compact-bomb.png', _compact_png_header(20_000, 9_000),
+         'unsafe image header'),
+        ('extension-lie.jpg', _png(), 'extension does not match'),
+    ],
+    ids=('compact-pixel-bomb', 'content-extension-lie'),
+)
+def test_backup_restore_rejects_unsafe_images_before_any_dataset_promotion(
+        app, filename, payload, message):
+    """A backup never gets to promote a compact bomb or lying image extension."""
+    import os
+    import pytest
+    from app.config import LOCAL_USER
+    from app.models import FaceDataset
+    from app.services import face_dataset_service as svc
+
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
+        z.writestr('manifest.json', json.dumps({
+            'format': svc.BACKUP_FORMAT, 'version': svc.BACKUP_VERSION,
+            'name': 'Unsafe restore', 'trigger_word': 'unsafe_restore',
+        }))
+        z.writestr('images.json', json.dumps([{'filename': filename, 'status': 'keep'}]))
+        z.writestr(f'images/{filename}', payload)
+
+    with app.app_context(), pytest.raises(ValueError, match=message):
+        svc.import_backup_zip(LOCAL_USER, archive.getvalue())
+        assert False, 'unreachable: an unsafe image must reject before DB creation'
+    with app.app_context():
+        assert FaceDataset.query.filter_by(name='Unsafe restore').count() == 0
+        assert os.listdir(svc.cfg.dataset_images_root()) == []
+
+
+def test_backup_restore_keeps_validated_image_bytes_unchanged(app):
+    """The new validation gate rejects bad inputs without altering good masters."""
+    import os
+    from app.config import LOCAL_USER
+    from app.models import FaceDatasetImage
+    from app.services import face_dataset_service as svc
+
+    payload = _png((20, 120, 220))
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
+        z.writestr('manifest.json', json.dumps({
+            'format': svc.BACKUP_FORMAT, 'version': svc.BACKUP_VERSION,
+            'name': 'Validated restore', 'trigger_word': 'validated_restore',
+        }))
+        z.writestr('images.json', json.dumps([{'filename': 'valid.png', 'status': 'keep'}]))
+        z.writestr('images/valid.png', payload)
+    with app.app_context():
+        restored = svc.import_backup_zip(LOCAL_USER, archive.getvalue())
+        row = FaceDatasetImage.query.filter_by(dataset_id=restored.id).one()
+        assert open(os.path.join(svc._dataset_dir(restored.id), row.filename), 'rb').read() == payload
+
+
 def test_backup_roundtrip_preserves_optional_watermark_regions_and_accepts_legacy(app):
     import os
     from app.services import face_dataset_service as svc
@@ -380,7 +531,7 @@ def test_backup_roundtrip_preserves_optional_watermark_regions_and_accepts_legac
         ds = svc.create_dataset(LOCAL_USER, 'Watermark backup', 'wmbackup')
         d = svc._dataset_dir(ds.id)
         os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, 'marked.webp'), 'wb').write(_png())
+        open(os.path.join(d, 'marked.webp'), 'wb').write(_webp())
         regions = '[[0.1, 0.1, 0.2, 0.2], [0.7, 0.7, 0.8, 0.8]]'
         svc.db.session.add(FaceDatasetImage(
             dataset_id=ds.id, filename='marked.webp', status='keep',
@@ -407,7 +558,7 @@ def test_backup_roundtrip_preserves_optional_watermark_regions_and_accepts_legac
             z.writestr('images.json', json.dumps([
                 {'filename': 'legacy.webp', 'status': 'keep'},
             ]))
-            z.writestr('images/legacy.webp', _png((0, 0, 255)))
+            z.writestr('images/legacy.webp', _webp((0, 0, 255)))
         legacy_restored = svc.import_backup_zip(LOCAL_USER, legacy.getvalue())
         legacy_img = FaceDatasetImage.query.filter_by(dataset_id=legacy_restored.id).one()
         assert legacy_img.watermark_regions is None
@@ -451,8 +602,8 @@ def test_backup_extra_refs_cannot_exfiltrate_and_restore_only_real_ref_files(app
         ds = svc.create_dataset(LOCAL_USER, 'Safe refs export', 'safe_refs_export')
         dsdir = svc._dataset_dir(ds.id)
         outside = os.path.join(os.path.dirname(dsdir), 'outside.webp')
-        open(outside, 'wb').write(_png((1, 2, 3)))
-        open(os.path.join(dsdir, 'extra.webp'), 'wb').write(_png((4, 5, 6)))
+        open(outside, 'wb').write(_webp((1, 2, 3)))
+        open(os.path.join(dsdir, 'extra.webp'), 'wb').write(_webp((4, 5, 6)))
         ds.ref_extra_filenames = json.dumps([
             '../outside.webp', 'extra.webp', 'EXTRA.webp', 'missing.webp',
         ])
@@ -479,12 +630,12 @@ def test_backup_extra_refs_cannot_exfiltrate_and_restore_only_real_ref_files(app
                 ]),
             }))
             z.writestr('images.json', '[]')
-            z.writestr('ref/../../secret.webp', _png())
-            z.writestr('ref/valid.webp', _png())
-            z.writestr('ref/extra2.webp', _png())
-            z.writestr('ref/extra3.webp', _png())
-            z.writestr('ref/extra4.webp', _png())
-            z.writestr('images/image-only.webp', _png())
+            z.writestr('ref/../../secret.webp', _webp())
+            z.writestr('ref/valid.webp', _webp())
+            z.writestr('ref/extra2.webp', _webp())
+            z.writestr('ref/extra3.webp', _webp())
+            z.writestr('ref/extra4.webp', _webp())
+            z.writestr('images/image-only.webp', _webp())
         restored = svc.import_backup_zip(LOCAL_USER, legacy.getvalue())
         assert json.loads(restored.ref_extra_filenames) == [
             'valid.webp', 'extra2.webp', 'extra3.webp',
@@ -568,7 +719,7 @@ def test_backup_restore_extraction_failure_leaves_no_dataset_or_partial_folder(a
             z.writestr('images.json', json.dumps([
                 {'filename': 'partial.webp', 'status': 'keep'},
             ]))
-            z.writestr('images/partial.webp', _png())
+            z.writestr('images/partial.webp', _webp())
 
         def fail_mid_copy(src, dst, _length):
             dst.write(src.read(8))
@@ -600,7 +751,7 @@ def test_backup_restore_commit_failure_rolls_back_promoted_folder(app, monkeypat
             z.writestr('images.json', json.dumps([
                 {'filename': 'complete.webp', 'status': 'keep'},
             ]))
-            z.writestr('images/complete.webp', _png())
+            z.writestr('images/complete.webp', _webp())
 
         promoted_before_commit = []
         session = svc.db.session()
@@ -778,11 +929,25 @@ def test_regenerate_without_prompt_keeps_existing(app, monkeypatch):
     and the stored prompt is what feeds the engine (plain 🔄 / reject path)."""
     from app.services import face_dataset_service as svc
     from app.services import klein_edit_helper
-    from app.models import FaceDatasetImage
+    from app.models import FaceDatasetImage, ImageGenerationQueue
     from app.config import LOCAL_USER
     seen = {}
-    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit',
-                        lambda **k: seen.update(k) or 'job-keep')
+
+    def fake_enqueue(**k):
+        seen.update(k)
+        # Regenerating a SECOND time cancels the still-pending first job, which
+        # now needs a real (trivially cancellable) queue row to prove against.
+        # Every call reuses the same fixed job_id, so reset rather than re-add.
+        row = ImageGenerationQueue.query.filter_by(job_id='job-keep').first()
+        if row is None:
+            row = ImageGenerationQueue(job_id='job-keep', user_id=str(LOCAL_USER),
+                                       status='pending', workflow_data='{}')
+            svc.db.session.add(row)
+        else:
+            row.status = 'pending'
+        svc.db.session.commit()
+        return 'job-keep'
+    monkeypatch.setattr(klein_edit_helper, 'enqueue_klein_edit', fake_enqueue)
     with app.app_context():
         ds, img = _ds_with_ref_and_generated(svc, FaceDatasetImage, LOCAL_USER)
         svc.regenerate_image(LOCAL_USER, img.id)              # no prompt
@@ -985,7 +1150,7 @@ def test_klein_generate_activity_cleared_on_cancel(app, monkeypatch):
     # cancel_pending tries to cancel the queued job — stub the queue away.
     with app.app_context():
         import app.job_queue as jq
-        monkeypatch.setattr(jq.queue_manager, 'cancel_job', lambda *a, **k: None)
+        monkeypatch.setattr(jq.queue_manager, 'cancel_job', lambda *a, **k: True)
         ds = svc.create_dataset(LOCAL_USER, 'KC', 'kc')
         d = svc._dataset_dir(ds.id); os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, 'ref.webp'), 'wb') as fh:
@@ -1000,12 +1165,13 @@ def test_klein_generate_activity_cleared_on_cancel(app, monkeypatch):
 
 def test_cancel_pending_reports_renders_comfyui_never_confirmed_stopping(app, monkeypatch):
     """The row/tile is removed either way, but if ComfyUI never confirmed the
-    interrupt for an in-flight render, cancel_pending must say so — silently
+    cancellation for an in-flight render, cancel_pending must say so — silently
     counting it as 'cancelled' would hide a render still running on the GPU."""
     from app.services import face_dataset_service as svc
     from app.config import LOCAL_USER
     from app.models import FaceDatasetImage, ImageGenerationQueue
     from app.extensions import db
+    from app.utils.comfyui import ComfyPromptState
     with app.app_context():
         import app.job_queue as jq
         ds = svc.create_dataset(LOCAL_USER, 'KC3', 'kc3')
@@ -1014,18 +1180,24 @@ def test_cancel_pending_reports_renders_comfyui_never_confirmed_stopping(app, mo
         for _ in range(2):
             jid = jq.queue_manager.add_job(workflow_data={'1': {}})
             row = ImageGenerationQueue.query.filter_by(job_id=jid).one()
-            row.status = 'processing'
+            # 'sent_to_comfy' (not 'processing'): only this status resolves
+            # synchronously inside cancel_job, via _stall_comfy_job ->
+            # reconcile_stalled_comfy_job's fresh ComfyUI proof. 'processing'
+            # only ever marks 'cancel_requested' and defers to a later poll.
+            row.status = 'sent_to_comfy'
             row.comfyui_prompt_id = f'prompt-{jid}'
             db.session.add(FaceDatasetImage(
                 dataset_id=ds.id, status='pending', filename=None, job_id=jid))
             job_ids.append(jid)
         db.session.commit()
 
-        # First job's interrupt is confirmed sent; the second's is not (timing
-        # race, prompt not yet visible in ComfyUI's /queue, ...).
-        results = iter([True, False])
-        monkeypatch.setattr(jq.queue_manager, 'interrupt_comfyui_job',
-                            lambda *a, **k: next(results))
+        # First job's prompt is confirmed gone; the second's state cannot be
+        # proven (timing race, prompt not yet visible in ComfyUI's history, ...).
+        states = iter([ComfyPromptState.DELETED, ComfyPromptState.UNKNOWN])
+        monkeypatch.setattr('app.utils.comfyui.cancel_comfyui_prompt_state',
+                            lambda *a, **k: next(states))
+        monkeypatch.setattr('app.utils.comfyui.comfyui_prompt_is_absent',
+                            lambda *a, **k: True)
 
         cancelled, unconfirmed = svc.cancel_pending(LOCAL_USER, ds.id)
 

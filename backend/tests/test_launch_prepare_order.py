@@ -37,8 +37,10 @@ def test_the_busy_flag_is_re_read_before_the_expensive_freeze():
     assert len(busy) >= 2, 'the busy flag must be read again after the export'
     assert any(b < prepare for b in busy), \
         'a launch that is going to be refused must not pay for the freeze'
-    # …and the authoritative copy still lives under the lock, after it.
-    lock = body.index('with _queue_lock:')
+    # …and the authoritative copy still lives under the lock, after it. The GPU
+    # arbiter now shares this exact critical section (the Ollama handoff must
+    # be atomic with queue ownership), so the statement also names it.
+    lock = body.index('with _queue_lock, GPU_ARBITER_LOCK:')
     assert any(b > lock for b in busy), \
         'the check inside _queue_lock is the authority and must stay'
     assert prepare < lock, \
