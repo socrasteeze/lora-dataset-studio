@@ -18,6 +18,8 @@ import GuidePage from './pages/GuidePage'
 import CloudRunsPage from './pages/CloudRunsPage'
 import CanvasPage from './pages/CanvasPage'
 import { recommendedMet } from './hooks/useSetupSteps'
+import { usePeerActivity } from './hooks/usePeerActivity'
+import { isPeerWorking, peerChipLabel, peerChipTitle, peerTabTitle } from './utils/peerActivity'
 import { HelpModeProvider, useHelpMode, TipHost } from './help/HelpMode'
 import HeaderMenu from './components/common/HeaderMenu'
 import { versionLabel } from './utils/versionLabel'
@@ -154,8 +156,54 @@ function HelpModeToggle({ onToggle }) {
   )
 }
 
+/* 🖥 The peer's "I am working for a Primary" chip.
+   Renders nothing on a standalone/Primary install and nothing on an idle peer:
+   a header lit whenever the app COULD work would be lit permanently, which is
+   the same as off (see ActivityButton's note above).
+
+   PRESENTATIONAL on purpose — it is mounted TWICE (the desktop nav and the
+   mobile cluster are both always in the DOM, one merely hidden by CSS), so it
+   must not own the poller or the document title: two of either would mean two
+   requests per period and two effects overwriting each other's saved "original"
+   title. NavBar makes the single hook call and passes the state down. */
+function PeerWorkingChip({ activity }) {
+  const working = isPeerWorking(activity)
+  const label = peerChipLabel(activity)
+  const title = peerChipTitle(activity)
+  if (!working) return null
+  return (
+    <span role="status" title={title} aria-label={title}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[0.6875rem] font-medium text-emerald-200">
+      <span aria-hidden className="relative inline-flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+      </span>
+      <span aria-hidden>🖥</span>
+      <span className="hidden sm:inline">{label}</span>
+    </span>
+  )
+}
+
 function NavBar() {
   const { caps } = useCapabilities()
+  // ONE poller for the peer flag, shared by both chip mount points below.
+  const peerActivity = usePeerActivity()
+  const peerWorking = isPeerWorking(peerActivity)
+  // Nothing else manages document.title (it is static in index.html), so this
+  // owns it: capture the original ONCE and always put it back, including on
+  // unmount — a tab left claiming "Working" is worse than no indicator, because
+  // it is a false claim rather than a gap.
+  // Depends on the FLAG only, never on the activity object: that arrives new
+  // from every poll, and re-running this per poll would restore-then-reapply the
+  // title on a 15 s heartbeat for no gain. The synthetic argument says exactly
+  // that — only "is it working" reaches the title.
+  useEffect(() => {
+    const original = document.title
+    document.title = peerWorking
+      ? peerTabTitle({ role: 'peer', busy: true }, original)
+      : original
+    return () => { document.title = original }
+  }, [peerWorking])
   // 🏋️ Live indicator on Runs: a training can hold the GPU for hours (local) or
   // bill by the minute (cloud), and from any other page nothing said so.
   const activity = useTrainingActivity()
@@ -285,12 +333,15 @@ function NavBar() {
                 </>
               )}
             </HeaderMenu>
+            <PeerWorkingChip activity={peerActivity} />
             <ActivityButton />
             <WhatsNewButton />
             <CheckUpdatesButton />
           </div>
         </nav>
         <div className="ml-auto flex items-center gap-1 md:hidden">
+          {/* Same chip; its label collapses to the dot + 🖥 below sm. */}
+          <PeerWorkingChip activity={peerActivity} />
           <ActivityButton />
           <WhatsNewButton />
           <CheckUpdatesButton />

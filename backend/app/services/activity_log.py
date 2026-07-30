@@ -57,8 +57,16 @@ LEVELS = ('info', 'ok', 'warn', 'error')
 
 
 def record(source, message, level='info', bank_id=None, dataset_id=None,
-           detail=None):
-    """Append one event. Never raises — see the module note."""
+           detail=None, device=None):
+    """Append one event. Never raises — see the module note.
+
+    ``device``: the human NAME of the machine that did the work when it was not
+    this one ("Laptop 4090"), else None. A pass that ran on a compute peer read
+    identically to a local one before this — same 'score started', same
+    'finished' — which made a remote run indistinguishable from a local one in
+    the only place the app narrates itself. Deliberately the name and never the
+    device uuid: this log is what a user pastes into a bug report.
+    """
     try:
         if level not in LEVELS:
             level = 'info'
@@ -73,6 +81,7 @@ def record(source, message, level='info', bank_id=None, dataset_id=None,
                 'bank_id': bank_id,
                 'dataset_id': dataset_id,
                 'detail': str(detail) if detail is not None else None,
+                'device': str(device) if device else None,
             })
     except Exception:      # noqa: BLE001 — logging must never break the work
         pass
@@ -141,6 +150,10 @@ def snapshot(user_id) -> dict:
                 'started_at': snap.get('started_at'),
                 'stale_seconds': _age(bank_jobs, bank_id, now),
                 'bank_id': bank_id,
+                # None for a local pass; the peer's name when the work is
+                # happening on another machine (which is also why a stale age
+                # here is not the same worry — nothing local is hung).
+                'device': snap.get('device'),
             })
     except Exception:      # noqa: BLE001
         pass

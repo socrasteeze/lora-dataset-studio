@@ -30,6 +30,23 @@ from . import bank_jobs
 
 logger = logging.getLogger(__name__)
 
+def _log(message, level='info', detail=None, device=None, bank_id=None):
+    """Narrate the remote round trip into the activity log.
+
+    These are the entries that did not exist at all: a remote pass takes no
+    local GPU window on purpose, so the panel's "GPU taken exclusively" line
+    cannot fire for it, and the log fell silent between 'score started' and
+    'score finished' — minutes or hours during which nothing said the work had
+    left the machine. Guarded like every other logging path: it must never
+    break the pass it describes."""
+    try:
+        from . import activity_log
+        activity_log.record('peer', message, level=level, detail=detail,
+                            device=device, bank_id=bank_id)
+    except Exception:      # noqa: BLE001
+        pass
+
+
 POLL_SECONDS = 2.0
 # A whole pass rides ONE ClusterJob (chunking would break the style/person
 # clustering the scripts compute over everything they see). The ceiling exists
@@ -82,7 +99,7 @@ def _check_peer_capability(device_id, required_cap) -> None:
 
 def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
                     cache_path, progress_re, detail_label,
-                    required_cap=None) -> dict | None:
+                    required_cap=None, bank_id=None) -> dict | None:
     """Stage → enqueue → poll → remap. Returns the script's result dict with
     hub-keyed ``results``/``clusters``, or None when the pass was stopped.
     Raises RuntimeError with the peer's reason on failure — including, up
@@ -111,9 +128,12 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
         'cancel_file': cache_name + '.cancel',
         **(extra_payload or {}),
     }
+    label = cluster_svc.device_label(device_id)
     bank_jobs.progress(job, done=0, total=len(staged),
                        detail=f'{detail_label} — sending {len(staged)} image(s) '
                               f'to the peer')
+    _log(f'sending {len(staged)} image(s) for the {detail_label}', 'info',
+         detail=f'to {label}' if label else None, device=label, bank_id=bank_id)
     job_id = cluster_remote.enqueue_infer_on_device(
         device_id, script=os.path.basename(script), stdin=stdin,
         image_paths=staged, timeout=REMOTE_PASS_TIMEOUT_SECONDS)
@@ -128,12 +148,20 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
         if row is None:
             raise RuntimeError('remote pass vanished from the cluster queue')
         if row.status == 'completed':
+            _log(f'{label or "the peer"} finished the {detail_label}', 'ok',
+                 device=label, bank_id=bank_id)
             break
         if row.status in ('failed', 'cancelled'):
-            raise RuntimeError(row.error_message
-                               or f'remote pass {row.status} on the peer')
+            reason = row.error_message or f'remote pass {row.status} on the peer'
+            _log(f'{label or "the peer"} could not finish the {detail_label}',
+                 'error', detail=reason, device=label, bank_id=bank_id)
+            raise RuntimeError(reason)
         if time.monotonic() > deadline:
             cluster_svc.cancel_cluster_job(job_id)
+            _log(f'{label or "the peer"} stopped answering', 'error',
+                 detail=f'no result after '
+                        f'{REMOTE_PASS_TIMEOUT_SECONDS // 3600}h',
+                 device=label, bank_id=bank_id)
             raise RuntimeError('remote pass timed out — is the peer still up?')
         # The peer relays the script's stderr lines; the same regex the local
         # driver uses turns them into the bank's own progress bar.
@@ -150,6 +178,11 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
         elif not detail_sent and row.status in ('claimed', 'running'):
             bank_jobs.progress(job, detail=f'{detail_label} — peer is starting up '
                                            f'(downloading images / loading models)')
+            # The counterpart to the local window's 'GPU taken exclusively':
+            # from here the PEER's card is busy, and this machine's is not.
+            _log(f'{label or "the peer"} is running the {detail_label}', 'info',
+                 detail='its GPU is busy; this machine stays free',
+                 device=label, bank_id=bank_id)
             detail_sent = True
         db.session.expire(row)
         time.sleep(POLL_SECONDS)

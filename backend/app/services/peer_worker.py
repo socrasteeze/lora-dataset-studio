@@ -42,6 +42,11 @@ class PeerWorker:
         self._running = False
         self._busy = False
         self._current_job_id = None
+        # WHAT it is doing, not just that it is busy. 'a job is running' is not
+        # an answer on a machine whose whole purpose is running other people's
+        # work — the kind and the phase are what make the peer explain itself.
+        self._current_kind = None
+        self._phase = None
         self._last_error = None
         self._connected = False
 
@@ -68,9 +73,22 @@ class PeerWorker:
             'connected': self._connected,
             'busy': self._busy,
             'current_job_id': self._current_job_id,
+            'current_kind': self._current_kind,
+            'phase': self._phase,
             'last_error': self._last_error,
             'primary_url': (cfg.get('cluster.primary_url') or '').rstrip('/'),
         }
+
+    def _log(self, message, level='info', detail=None):
+        """Record into THIS machine's activity log. A peer used to run an hour
+        of someone else's work with its own 📋 panel completely empty, so from
+        the peer there was no way to tell the app was doing anything at all.
+        Guarded: the log never breaks the job."""
+        try:
+            from . import activity_log
+            activity_log.record('peer', message, level=level, detail=detail)
+        except Exception:      # noqa: BLE001
+            pass
 
     def _headers(self) -> dict:
         token = (cfg.get('cluster.peer_token') or '').strip()
@@ -156,11 +174,17 @@ class PeerWorker:
 
         self._busy = True
         self._current_job_id = job.get('job_id')
+        self._current_kind = job.get('kind')
+        self._phase = None
+        self._log(f'claimed a {job.get("kind") or "job"} from the Primary',
+                  detail=f'job {str(job.get("job_id") or "")[:8]}')
         try:
             self._execute(job)
         finally:
             self._busy = False
             self._current_job_id = None
+            self._current_kind = None
+            self._phase = None
 
     def _download_artifacts(self, job_id: str, names: list[str], dest_dir: Path) -> dict[str, Path]:
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -211,7 +235,14 @@ class PeerWorker:
 
     def _progress(self, job_id: str, progress: dict) -> dict:
         """Report progress; the RESPONSE is the hub's one channel back to a
-        running job — {'cancelled': True} means Stop was pressed there."""
+        running job — {'cancelled': True} means Stop was pressed there.
+
+        Every kind already funnels its phases through here, so this is also the
+        one place that can keep the LOCAL phase fresh for status()/the header
+        chip without a second bookkeeping path to forget to update."""
+        phase = (progress or {}).get('phase')
+        if phase:
+            self._phase = str(phase)
         try:
             r = requests.post(
                 self._url(f'/api/cluster/peer/jobs/{job_id}/heartbeat'),
@@ -237,8 +268,11 @@ class PeerWorker:
                 self._run_training(job)
             else:
                 self._complete(job_id, error=f'unsupported kind: {kind}')
+            self._log(f'finished the {kind or "job"} for the Primary', 'ok')
         except Exception as e:
             logger.exception('peer_worker: job %s failed', job_id)
+            self._log(f'the {kind or "job"} failed', 'error',
+                      detail=str(e)[:200])
             try:
                 self._complete(job_id, error=str(e)[:500])
             except Exception:

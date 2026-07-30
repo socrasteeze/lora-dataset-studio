@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  activityHeadline, formatAge, formatClock, mergeEvents, nextCursor,
-  SLOW_AFTER_SECONDS, stallState, STUCK_AFTER_SECONDS,
+  activityHeadline, eventPrefix, formatAge, formatClock, mergeEvents, nextCursor,
+  runningWhere, SLOW_AFTER_SECONDS, stallState, STUCK_AFTER_SECONDS,
 } from './activityLog.js'
 
 /* ── is it stuck? ──────────────────────────────────────────────────────────── */
@@ -118,3 +118,34 @@ test('timestamps render as a 24-hour clock, and junk renders as nothing', () => 
   assert.match(formatClock(0, 'en-GB'), /^\d{2}:\d{2}:\d{2}$/)
   assert.equal(formatClock('nonsense', 'en-GB'), '')
 })
+
+// ── Where did this run? ───────────────────────────────────────────────────
+// A pass sent to a compute peer logged word-for-word what a local one logged,
+// so the panel could not answer the one question a remote run raises.
+
+test('eventPrefix names the machine when the work was not local', () => {
+  assert.equal(eventPrefix({ source: 'bank', device: 'Laptop 4090' }),
+    'bank · Laptop 4090');
+  assert.equal(eventPrefix({ source: 'peer', device: 'Laptop 4090' }),
+    'peer · Laptop 4090');
+});
+
+test('eventPrefix is unchanged for local work — no empty separator', () => {
+  assert.equal(eventPrefix({ source: 'bank' }), 'bank');
+  assert.equal(eventPrefix({ source: 'bank', device: null }), 'bank');
+  assert.equal(eventPrefix({ source: 'gpu', device: '' }), 'gpu');
+  assert.equal(eventPrefix({ source: 'bank', device: '   ' }), 'bank');
+});
+
+test('eventPrefix survives a malformed event rather than rendering "[]"', () => {
+  assert.equal(eventPrefix({}), 'app');
+  assert.equal(eventPrefix(null), 'app');
+  assert.equal(eventPrefix({ source: '  ' }), 'app');
+});
+
+test('runningWhere marks a remote row and stays silent for a local one', () => {
+  assert.equal(runningWhere({ device: 'Laptop 4090' }), ' · on Laptop 4090');
+  assert.equal(runningWhere({}), '');
+  assert.equal(runningWhere({ device: '' }), '');
+  assert.equal(runningWhere(null), '');
+});

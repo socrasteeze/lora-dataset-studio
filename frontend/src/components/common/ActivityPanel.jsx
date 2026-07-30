@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
 import {
-  activityHeadline, formatAge, formatClock, mergeEvents, nextCursor, stallState,
+  activityHeadline, eventPrefix, formatAge, formatClock, mergeEvents, nextCursor,
+  runningWhere, stallState,
 } from '../../utils/activityLog'
 
 /** 📋 Activity — what the whole app is doing, in one place.
@@ -112,7 +113,9 @@ export default function ActivityPanel({ onClose }) {
                     className="rounded border border-border bg-surface p-2 text-xs">
                     <div className="flex flex-wrap items-center gap-x-2">
                       <span className="font-medium text-content">{r.label}</span>
-                      <span className="text-content-muted">{r.what}</span>
+                      <span className="text-content-muted">
+                        {r.what}{runningWhere(r)}
+                      </span>
                       {r.total > 0 && (
                         <span className="text-content-subtle">{r.done}/{r.total}</span>
                       )}
@@ -129,7 +132,9 @@ export default function ActivityPanel({ onClose }) {
           )}
           {queued.length > 0 && (
             <p className="text-[0.6875rem] text-content-subtle">
-              Waiting: {queued.map((q) => `#${q.bank_id}`).join(', ')} — one at a time.
+              Waiting: {queued.map((q) => (
+                q.device_id && q.device_id !== 'local' ? `#${q.bank_id} (remote)` : `#${q.bank_id}`
+              )).join(', ')} — one at a time.
             </p>
           )}
         </div>
@@ -148,7 +153,7 @@ export default function ActivityPanel({ onClose }) {
             ) : events.map((e) => (
               <div key={e.id} className="flex gap-2">
                 <span className="shrink-0 text-content-subtle">{formatClock(e.at)}</span>
-                <span className="shrink-0 text-content-subtle">[{e.source}]</span>
+                <span className="shrink-0 text-content-subtle">[{eventPrefix(e)}]</span>
                 <span className={TONE[e.level] || TONE.info}>
                   {e.message}{e.detail ? ` — ${e.detail}` : ''}
                 </span>

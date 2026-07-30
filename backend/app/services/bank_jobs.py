@@ -24,13 +24,17 @@ _FINISHED_TTL = 5 * 60    # finished snapshot lifetime
 _STALE_TTL = 60 * 60      # running job with no progress for this long = dead
 
 
-def _log(bank_id, message, level='info', detail=None):
+def _log(bank_id, message, level='info', detail=None, device=None):
     """Mirror a job transition into the activity log. Imported lazily and
-    swallowed whole: the log is never allowed to break the work it describes."""
+    swallowed whole: the log is never allowed to break the work it describes.
+
+    ``device`` = the peer's NAME when this pass ran there, so the panel can say
+    WHERE the work happened instead of narrating a remote run in words
+    indistinguishable from a local one."""
     try:
         from . import activity_log
         activity_log.record('bank', message, level=level, bank_id=bank_id,
-                            detail=detail)
+                            detail=detail, device=device)
     except Exception:      # noqa: BLE001
         pass
 
@@ -42,10 +46,15 @@ class BankJobBusy(Exception):
         self.kind = kind
 
 
-def start(app, bank_id, kind, fn, total=0):
+def start(app, bank_id, kind, fn, total=0, device_label=None):
     """Run ``fn(job)`` in a daemon thread under an app context. One live job
     per bank — raises BankJobBusy otherwise. ``fn`` reports through
-    ``progress``/``bump`` and should poll ``cancelled(job)`` between items."""
+    ``progress``/``bump`` and should poll ``cancelled(job)`` between items.
+
+    ``device_label``: the NAME of the compute peer running this pass, or None
+    for this machine. It rides every transition into the activity log and out
+    through ``get()``, because "which machine is doing this" is invisible
+    otherwise — a remote pass and a local one produced identical events."""
     now = time.time()
     with _lock:
         cur = _jobs.get(bank_id)
@@ -54,10 +63,10 @@ def start(app, bank_id, kind, fn, total=0):
         job = {'kind': kind, 'done': 0, 'total': int(total or 0), 'error': None,
                'cancelled': False, 'finished': False, 'detail': None,
                'started_at': now, '_touched': now, '_cancel_hook': None,
-               'pipeline': None}
+               'pipeline': None, 'device': device_label or None}
         _jobs[bank_id] = job
     _log(bank_id, f'{kind} started', 'info',
-         detail=f'{total} image(s)' if total else None)
+         detail=f'{total} image(s)' if total else None, device=device_label)
 
     def _run():
         try:
@@ -66,7 +75,8 @@ def start(app, bank_id, kind, fn, total=0):
         except Exception as e:  # noqa: BLE001 — a background crash must surface in the UI
             with _lock:
                 job['error'] = f'{type(e).__name__}: {e}'
-            _log(bank_id, f'{kind} failed', 'error', detail=job['error'])
+            _log(bank_id, f'{kind} failed', 'error', detail=job['error'],
+                 device=device_label)
         finally:
             with _lock:
                 job['finished'] = True
@@ -74,10 +84,12 @@ def start(app, bank_id, kind, fn, total=0):
                 cancelled_, detail_, done_ = (job['cancelled'], job['detail'],
                                               job['done'])
             if cancelled_:
-                _log(bank_id, f'{kind} stopped', 'warn', detail=detail_)
+                _log(bank_id, f'{kind} stopped', 'warn', detail=detail_,
+                     device=device_label)
             elif not job['error']:
                 _log(bank_id, f'{kind} finished', 'ok',
-                     detail=detail_ or (f'{done_} done' if done_ else None))
+                     detail=detail_ or (f'{done_} done' if done_ else None),
+                     device=device_label)
 
     # Under TESTING the job runs INLINE: the test suite uses a per-connection
     # sqlite:///:memory: DB, so a real worker thread would open a fresh, EMPTY
@@ -146,7 +158,8 @@ def cancel(bank_id) -> bool:
         job = _jobs.get(bank_id)
         if not job or job['finished']:
             return False
-        _log(bank_id, f"stop requested for {job['kind']}", 'warn')
+        _log(bank_id, f"stop requested for {job['kind']}", 'warn',
+             device=job.get('device'))
         job['cancelled'] = True
         job['_touched'] = time.time()
         hook = job['_cancel_hook']
@@ -160,7 +173,8 @@ def cancel(bank_id) -> bool:
 
 def get(bank_id):
     """Snapshot for the payload: {kind, done, total, error, cancelled,
-    finished, detail, started_at, pipeline} or None. Purges expired entries."""
+    finished, detail, started_at, device, pipeline} or None. Purges expired
+    entries."""
     now = time.time()
     with _lock:
         job = _jobs.get(bank_id)
@@ -173,6 +187,10 @@ def get(bank_id):
         snap = {k: job[k] for k in ('kind', 'done', 'total', 'error',
                                     'cancelled', 'finished', 'detail',
                                     'started_at')}
+        # Which machine is doing it — the running row's counterpart to the
+        # device on each logged transition. .get() so a job dict built by an
+        # older path (or a test) is not a KeyError.
+        snap['device'] = job.get('device')
         snap['pipeline'] = dict(job['pipeline']) if job['pipeline'] else None
         return snap
 

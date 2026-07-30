@@ -176,6 +176,40 @@ def peer_connect_local():
     })
 
 
+@bp.get('/activity')
+def cluster_activity():
+    """The CHEAP live-state endpoint — safe to poll.
+
+    Deliberately not /status: that one calls local_capabilities() →
+    capabilities.probe(), which makes blocking HTTP calls to ComfyUI and Ollama.
+    Polling it every 15 s for a header indicator would hammer both and stall the
+    request whenever either is down. This route reads only in-memory worker
+    state and (on a Primary) already-heartbeated device rows.
+    """
+    role = cluster_svc.role()
+    data = {'role': role}
+    if role == 'peer':
+        st = peer_worker.status()
+        data.update(busy=bool(st.get('busy')),
+                    kind=st.get('current_kind'),
+                    phase=st.get('phase'),
+                    connected=bool(st.get('connected')),
+                    current_job_id=st.get('current_job_id'))
+    elif role == 'primary':
+        from ..models import ClusterDevice, ClusterJob
+        peers = []
+        for row in (ClusterDevice.query
+                    .filter(ClusterDevice.revoked_at.is_(None))
+                    .order_by(ClusterDevice.name.asc()).all()):
+            d = row.to_dict(online_ttl_seconds=cluster_svc.ONLINE_TTL_SECONDS)
+            peers.append({'id': d['id'], 'name': d['name'],
+                          'online': d['online'], 'busy': d['busy']})
+        data['peers'] = peers
+        data['pending_remote_jobs'] = (
+            ClusterJob.query.filter_by(status='pending').count())
+    return jsonify(data)
+
+
 # ── Remote ComfyUI API backends (browser routes, any role) ───────────────
 
 @bp.get('/backends')
