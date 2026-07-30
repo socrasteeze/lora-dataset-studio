@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-loading-is-not-stuck',
+    date: '2026-07-29',
+    title: 'A pass loading its model no longer looks frozen',
+    blurb:
+      '🏷️ Caption sitting at 0 / 61 with the GPU marked busy and nothing moving is drawn exactly like a hang — but it is usually just the model loading, which can take a minute. The passes that load something before they can count their first image now say so: “captioning — loading the caption model (the first image can take a minute)”, and “scoring pass (CUDA) — loading the model”. The note is taken back the moment the first image is counted, so it can never linger at 300/500. Reported by a user who understandably pressed Stop.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-see-the-peer-working',
     date: '2026-07-29',
     title: 'You can finally see that the other machine is doing the work',
