@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 
 /** 🚀 Launch all — the overnight funnel. The user picks which passes run and how
@@ -21,19 +22,26 @@ const QUALITY_FLAGS = [
 ]
 
 export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, onQueue }) {
-  // A heavy pass is "ready" when its tool is installed; scan/auto-reject always are.
+  // Which machine runs the passes that can travel — Score and 👥 Group by
+  // person move to a compute peer; every other step runs here regardless.
+  const [deviceId, setDeviceId] = useState(loadSavedDeviceId)
+  const remote = deviceId && deviceId !== 'local'
+  // A heavy pass is "ready" when its tool is installed; scan/auto-reject always
+  // are. With a peer picked, Score/Faces answer to the PEER's stack — checked
+  // there when the pass starts, so the local verdict no longer gates them.
   const ready = useMemo(() => ({
     scan: true,
     auto_reject: true,
-    score: !!caps?.bank_scoring,
+    score: !!caps?.bank_scoring || remote,
     // Stage 2 reuses Score's embeddings — ready exactly when Score is (and it's
-    // skipped at run time if Score didn't actually produce any).
-    semantic_dedup: !!caps?.bank_scoring,
+    // skipped at run time if Score didn't actually produce any). A REMOTE score
+    // brings its embeddings home, so this follows the same verdict.
+    semantic_dedup: !!caps?.bank_scoring || remote,
     watermark: !!visionReady,
-    faces: !!caps?.face_scoring,
+    faces: !!caps?.face_scoring || remote,
     framing: !!visionReady,
     caption: !!visionReady,
-  }), [caps, visionReady])
+  }), [caps, visionReady, remote])
 
   const STEPS = [
     { key: 'scan', label: '🔎 Scan quality',
@@ -83,6 +91,7 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
     steps: [...steps],
     reject_flags: autoRejectOn ? [...rejectFlags] : [],
     resolve_dups: autoRejectOn && resolveDups,
+    device_id: deviceId || 'local',
   })
   const queue = () => onQueue(config())
 
@@ -216,6 +225,20 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
             </span>
           </div>
         )}
+
+        {/* Self-hides when this install has no compute peers. Only ✨ Score and
+            👥 Group by person travel — the note says so, because a picker that
+            silently applies to nothing is worse than none. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <DevicePicker value={deviceId} onChange={setDeviceId} kind="bank-pass"
+            className="text-[0.6875rem]" />
+          {remote && (
+            <span className="text-[0.6875rem] text-content-subtle">
+              ✨ Score and 👥 Group by person run there — with its models, over the
+              network; everything else runs here.
+            </span>
+          )}
+        </div>
 
         <div className="flex justify-end gap-2">
           <button type="button" onClick={dismiss} disabled={busy}

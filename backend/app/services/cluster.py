@@ -610,18 +610,38 @@ def pull_next_job(device: ClusterDevice) -> dict | None:
 
 
 def peer_job_heartbeat(device: ClusterDevice, job_id: str,
-                       progress: dict | None = None) -> None:
+                       progress: dict | None = None) -> dict:
+    """Returns {'ok': True, 'cancelled': bool} — the heartbeat is the one
+    channel the hub has to tell a peer mid-job that Stop was pressed. The peer
+    checks the flag and aborts (the infer scripts via their own cancel-file
+    sentinel, the vision loop between images)."""
     job = ClusterJob.query.filter_by(job_id=job_id, device_id=device.id).first()
     if job is None:
         raise ValueError('job not found')
+    if job.status == 'cancelled':
+        return {'ok': True, 'cancelled': True}
     if job.status not in ('claimed', 'running'):
-        return
+        return {'ok': True, 'cancelled': False}
     job.status = 'running'
     job.last_heartbeat = datetime.utcnow()
     if progress is not None:
         job.progress = json.dumps(progress)
     device.last_heartbeat = datetime.utcnow()
     db.session.commit()
+    return {'ok': True, 'cancelled': False}
+
+
+def cancel_cluster_job(job_id: str) -> bool:
+    """Hub-side Stop for a remote job. Pending jobs simply never get pulled
+    (the claim filters on 'pending'); a claimed/running one is flagged so the
+    NEXT heartbeat tells the peer to abort. True when a live row was flagged."""
+    updated = (ClusterJob.query
+               .filter_by(job_id=job_id)
+               .filter(ClusterJob.status.in_(('pending', 'claimed', 'running')))
+               .update({'status': 'cancelled',
+                        'completed_at': datetime.utcnow()}))
+    db.session.commit()
+    return bool(updated)
 
 
 def complete_cluster_job(device: ClusterDevice, job_id: str, *,

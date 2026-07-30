@@ -268,8 +268,8 @@ def peer_job_heartbeat(job_id):
         return err
     data = request.get_json(silent=True) or {}
     try:
-        cluster_svc.peer_job_heartbeat(device, job_id, progress=data.get('progress'))
-        return jsonify({'ok': True})
+        return jsonify(cluster_svc.peer_job_heartbeat(
+            device, job_id, progress=data.get('progress')))
     except ValueError as e:
         return jsonify({'error': str(e)}), 404
 

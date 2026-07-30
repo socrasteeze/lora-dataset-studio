@@ -42,13 +42,19 @@ def enqueue_vision_on_device(device_id, image_paths, *, prompt, prefer_json=Fals
 
 def enqueue_infer_on_device(device_id, *, script, stdin, image_paths=None,
                             timeout=3600, python=None, job_id=None) -> str:
+    """`image_paths` entries may be plain paths or ``(path, dest_name)`` pairs.
+    A bank spanning several folders routinely holds two `img_001.jpg` — staging
+    by bare basename would silently overwrite one with the other, so callers
+    that stage a whole pass pass unique dest names (the bank runner prefixes
+    the image id)."""
     device_id = cluster_svc.normalize_device_id(device_id)
     if device_id == cluster_svc.LOCAL_DEVICE_ID:
         raise ValueError('use local infer path for device=local')
     job_id = job_id or str(uuid.uuid4())
     names = []
     for p in image_paths or []:
-        names.append(cluster_svc.stage_file_artifact(job_id, p))
+        src, dest = p if isinstance(p, (tuple, list)) else (p, None)
+        names.append(cluster_svc.stage_file_artifact(job_id, src, dest_name=dest))
     cluster_svc.enqueue_generic(
         device_id=device_id,
         kind='infer',
