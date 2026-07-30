@@ -9,7 +9,7 @@ import FolderPickerField from '../components/common/FolderPicker'
 import GpuBusyNotice from '../components/common/GpuBusyNotice'
 import { hiddenCount, previewSlots } from '../components/bank/bankPreview'
 import { bankListSyncToast, forgetMissingConfirm } from '../components/bank/bankSync'
-import { BANK_SORTS, DEFAULT_BANK_SORT, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
+import { BANK_SORTS, DEFAULT_BANK_SORT, bankMatches, normalizeBankSort, sortBanks } from '../components/bank/bankSort'
 import { overlapNotice } from '../components/bank/bankOverlap'
 import { allExcludedWarning, normalizeExcluded, splitPlan } from '../components/bank/bankSplit'
 import { queueAllCandidates, queueAllConfirm, queueAllResult } from '../components/bank/bankQueueAll'
@@ -186,6 +186,10 @@ export default function BankPage() {
   const [creating, setCreating] = useState(false)
   // The list order is a display preference, so it lives client-side and sticks
   // (a library of twenty banks is unusable in creation order — see bankSort).
+  // TRANSIENT on purpose — the sort persists, this does not. Same call the
+  // dataset library makes (DatasetListPanel): a filter restored on load reads
+  // as "my banks are gone", which is the worst thing a library can say.
+  const [query, setQuery] = useState('')
   const [sort, setSort] = useState(() => {
     try { return normalizeBankSort(localStorage.getItem(SORT_KEY)) } catch { return DEFAULT_BANK_SORT }
   })
@@ -313,7 +317,15 @@ export default function BankPage() {
 
   // How many banks "Queue all" would take. Same rule the server uses
   // (banks_needing_triage), so the button's number matches what it queues.
+  // Deliberately counted over ALL banks, never the filtered view: the button
+  // queues what the SERVER decides, and a number that shrank when you typed
+  // would be a lie about what pressing it does.
   const queueAllCount = queueAllCandidates(banks, queue).length
+
+  // Sort first, then filter, then group — grouping LAST so a filtered pair
+  // still forms its group, and a group filtered down to one member correctly
+  // dissolves into a loose row (bankGroups needs 2+).
+  const visibleBanks = sortBanks(banks || [], sort).filter((b) => bankMatches(b, query))
 
   // Computed once: the row list, the "Will create N" count and the all-excluded
   // warning are three views of the same decision.
@@ -645,8 +657,20 @@ export default function BankPage() {
         </p>
       ) : (
         <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm text-content-muted">{banks.length} bank(s)</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-content-muted">
+            {visibleBanks.length === banks.length
+              ? `${banks.length} bank(s)`
+              : `showing ${visibleBanks.length} of ${banks.length}`}
+          </p>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find a bank…"
+            aria-label="Find a bank"
+            className="min-w-[9rem] flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-content placeholder:text-content-subtle focus:border-primary focus:outline-none sm:max-w-xs"
+          />
           <label className="flex items-center gap-2 text-xs text-content-muted">
             Sort
             <select value={sort} onChange={(e) => changeSort(e.target.value)}
@@ -660,6 +684,11 @@ export default function BankPage() {
             column is sized on max-content, so the unbreakable source PATH inside
             a card stretched it past the viewport and scrolled the whole page
             sideways on a phone — with `truncate` never getting a chance to fire. */}
+        {visibleBanks.length === 0 && (
+          <p className="rounded-lg border border-border bg-surface-raised px-3 py-4 text-sm text-content-muted">
+            No bank matches “{query.trim()}” — clear the box to see all {banks.length}.
+          </p>
+        )}
         <ul className="grid gap-3 grid-cols-1 sm:grid-cols-2">
           {/* Banks that share an EXACT name become one card. Nothing is merged:
               every image still belongs to exactly one bank, so no path resolver
@@ -667,7 +696,7 @@ export default function BankPage() {
               combined counts, one queue action and one promote. A member can opt
               out ("Keep separate"), which is a property of the BANK and survives
               a rename away and back. */}
-          {groupRows(sortBanks(banks, sort)).map((row) => {
+          {groupRows(visibleBanks).map((row) => {
             if (row.kind === 'group') {
               return (
                 <BankGroupCard key={row.key} row={row} queueStateOf={queueStateOf}

@@ -61,3 +61,18 @@ export function sortBanks(banks, sortId) {
   const cmp = COMPARATORS[normalizeBankSort(sortId)]
   return rows.sort((a, b) => cmp(a, b) || num(a.id) - num(b.id))
 }
+
+/** Does this bank match a free-text query? Matches the NAME and the source
+ *  FOLDER — the only two strings on a bank row, and the folder matters because
+ *  banks are often named alike while living in very different places.
+ *
+ *  Same rule as the dataset library's `datasetMatches` (utils/datasetLibrary.js):
+ *  trimmed, lowercased, substring. Deliberately not fuzzy — a filter that
+ *  matches things you did not type is worse than one that misses. An empty
+ *  query matches everything, so callers need no special case. */
+export function bankMatches(bank, query = '') {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return true
+  const b = bank || {}
+  return `${b.name || ''} ${b.source_path || ''}`.toLowerCase().includes(q)
+}
