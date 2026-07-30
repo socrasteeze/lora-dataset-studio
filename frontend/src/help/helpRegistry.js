@@ -897,6 +897,9 @@ const TOPICS = [
     ['token', 'require', 'access', 'remote', 'phone', 'security', 'lan']),
   setting('server.access_token', 'server', 'server-token', 'Access token',
     ['token', 'access', 'remote', 'phone', 'password', 'qr']),
+  setting('server.auto_open_browser', 'server', 'server-auto-open-browser',
+    'Open a browser tab on launch',
+    ['browser', 'tab', 'launch', 'startup', 'open', 'auto', 'pin', 'new tab']),
   // maintenance
   setting('paths.dataset_images_root', 'maintenance', 'dataset-images-root', 'Dataset images root',
     ['data', 'storage', 'path', 'dataset', 'images', 'root', 'location', 'disk']),

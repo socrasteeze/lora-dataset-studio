@@ -14,6 +14,24 @@ def test_defaults_when_no_file(tmp_path, monkeypatch):
     assert config.get('engines.default') == 'klein'
     assert config.is_configured() is False
 
+def test_the_launch_browser_tab_defaults_to_on(tmp_path, monkeypatch):
+    """run.py gates the auto-open on this. It must read True when absent, so an
+    existing config.json written before the setting shipped keeps opening a tab
+    — an upgrade must not silently change how the app launches."""
+    config = _fresh(monkeypatch, tmp_path)
+    assert config.get('server.auto_open_browser') is True
+    # And it survives a save that touches a DIFFERENT server key: the toggle
+    # lives in the same section as the port, so a shallow merge there would
+    # have wiped it.
+    config.save_config({'server': {'port': 8080}})
+    assert config.get('server.port') == 8080
+    assert config.get('server.auto_open_browser') is True
+    # Turning it off persists as a real False, not a dropped key.
+    config.save_config({'server': {'auto_open_browser': False}})
+    assert config.get('server.auto_open_browser') is False
+    on_disk = json.loads((tmp_path / 'config.json').read_text(encoding='utf-8'))
+    assert on_disk['server']['auto_open_browser'] is False
+
 def test_save_and_reload_deep_merge(tmp_path, monkeypatch):
     config = _fresh(monkeypatch, tmp_path)
     config.save_config({'comfyui': {'api_url': 'http://10.0.0.2:8188'}})
