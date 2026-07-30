@@ -197,16 +197,19 @@ class PeerWorker:
         )
         r.raise_for_status()
 
-    def _progress(self, job_id: str, progress: dict):
+    def _progress(self, job_id: str, progress: dict) -> dict:
+        """Report progress; the RESPONSE is the hub's one channel back to a
+        running job — {'cancelled': True} means Stop was pressed there."""
         try:
-            requests.post(
+            r = requests.post(
                 self._url(f'/api/cluster/peer/jobs/{job_id}/heartbeat'),
                 headers=self._headers(),
                 json={'progress': progress},
                 timeout=15,
             )
-        except requests.RequestException:
-            pass
+            return r.json() if r.content else {}
+        except (requests.RequestException, ValueError):
+            return {}
 
     def _execute(self, job: dict):
         kind = job.get('kind')
@@ -320,8 +323,10 @@ class PeerWorker:
                 path = downloaded.get(os.path.basename(name))
                 if path is None:
                     continue
-                self._progress(job_id, {
+                resp = self._progress(job_id, {
                     'phase': 'vision', 'index': i, 'total': len(artifact_names)})
+                if resp.get('cancelled'):
+                    break               # Stop on the hub — abort between images
                 text = vision_ollama.describe_image_ollama(
                     path.read_bytes(),
                     prompt,
@@ -371,6 +376,20 @@ class PeerWorker:
         try:
             downloaded = self._download_artifacts(job_id, artifact_names, work)
             stdin_payload = dict(payload.get('stdin') or {})
+            # The bank scoring/face scripts write their .npz CACHE at the path
+            # named in the payload, and honour a cancel-file sentinel next to
+            # it. Both are hub paths that mean nothing here: point them into
+            # work/out — everything in out/ is uploaded back when the job
+            # completes, which is exactly how the embeddings cache gets home.
+            out_dir = work / 'out'
+            cancel_sentinel = None
+            for key in ('cache', 'cancel_file'):
+                if isinstance(stdin_payload.get(key), str) and stdin_payload[key]:
+                    out_dir.mkdir(exist_ok=True)
+                    local = out_dir / os.path.basename(stdin_payload[key])
+                    stdin_payload[key] = str(local)
+                    if key == 'cancel_file':
+                        cancel_sentinel = local
             # Rewrite any hub-side paths the Primary embedded to local downloads.
             path_map = {os.path.basename(n): str(p) for n, p in downloaded.items()}
             if 'images' in stdin_payload and isinstance(stdin_payload['images'], list):
@@ -403,7 +422,15 @@ class PeerWorker:
             self._progress(job_id, {'phase': 'infer', 'script': script_path.name})
 
             def _on_line(line):
-                self._progress(job_id, {'phase': 'infer', 'line': line[-200:]})
+                resp = self._progress(job_id, {'phase': 'infer', 'line': line[-200:]})
+                # Stop pressed on the hub: the script's OWN cancel mechanism —
+                # the sentinel file it polls — turns the abort into the clean
+                # `cancelled: true` exit these scripts already know how to make.
+                if resp.get('cancelled') and cancel_sentinel is not None:
+                    try:
+                        cancel_sentinel.write_text('1', encoding='utf-8')
+                    except OSError:
+                        pass
 
             stdout, stderr_lines, rc, timed_out = infer_stream.run_infer_script(
                 python, str(script_path), json.dumps(stdin_payload),

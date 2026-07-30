@@ -3367,22 +3367,27 @@ def _resolve_face_device():
     return ('cuda' if use_gpu else 'cpu'), use_gpu
 
 
-def start_faces(app, user_id, bank_id):
+def start_faces(app, user_id, bank_id, device_id=None):
     """Launch the face embedding + person clustering pass over the bank's
-    non-rejected images. Needs the face-scoring extra (Setup ▸ Quality tools)."""
+    non-rejected images. Needs the face-scoring extra (Setup ▸ Quality tools) —
+    on THIS machine for a local run, on the peer for a remote one (its own
+    stack answers when the job arrives; no local gate applies)."""
     from .face_similarity import is_available
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    if not is_available():
+    remote = _remote_pass_device(device_id)
+    if not remote and not is_available():
         raise RuntimeError(
             'face scoring is not installed (Quality tools step in Setup)')
     total = (BankImage.query.filter_by(bank_id=bank_id)
              .filter(BankImage.status != 'reject').count())
-    return bank_jobs.start(app, bank_id, 'faces', _faces_job(bank_id), total=total)
+    return bank_jobs.start(app, bank_id, 'faces',
+                           _faces_job(bank_id, device_id if remote else None),
+                           total=total)
 
 
-def _faces_job(bank_id):
+def _faces_job(bank_id, device_id=None):
     def run(job):
         import json as _json
         import sys
@@ -3398,34 +3403,55 @@ def _faces_job(bank_id):
             if p and os.path.isfile(p):
                 by_path[p] = r.id
         paths = list(by_path)
-        bank_jobs.progress(job, done=0, total=len(paths), detail='face pass')
+        bank_jobs.progress(job, done=0, total=len(paths),
+                           detail='face pass (on the peer)' if device_id
+                                  else 'face pass')
         if not paths:
             return
         _bank_dir(bank_id).mkdir(parents=True, exist_ok=True)
         th = thresholds()
-        # Device: 'cpu' (default, never touches the GPU/ComfyUI) or 'cuda'.
-        # 'auto' = GPU when the face interpreter actually exposes CUDA
-        # (onnxruntime-gpu installed), else CPU. The GPU path is used ONLY when
-        # CUDA is truly available AND must run inside the GPU-exclusive window so
-        # it never competes with a training / scoring pass; a CPU pass stays out
-        # of the window (it can run alongside GPU work).
-        from ..gpu_window import gpu_exclusive_vision_window
-        from contextlib import nullcontext
-        device, use_gpu = _resolve_face_device()
         cache_path = _face_cache_path(bank_id)
-        payload = _json.dumps({
-            'images': paths,
-            'models_root': cfg.get('face_scoring.models_root') or None,
-            'cache': str(cache_path),
-            'cancel_file': str(cache_path) + '.cancel',
-            'threshold': th['face_threshold'],
-            'device': device,
-        })
-        python = cfg.get('face_scoring.python') or sys.executable
-        window = gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu else nullcontext()
-        data, stderr_tail, returncode = _drive_infer_subprocess(
-            job, python, _EMBED_SCRIPT, payload, cache_path, _PROGRESS_RE, window,
-            stall_label='face')
+        if device_id:
+            # One job for the whole pass — chunking would break the person
+            # clustering. 'auto' device: the PEER's interpreter decides whether
+            # it has CUDA; the hub's answer describes the wrong machine.
+            from . import bank_remote
+            try:
+                data = bank_remote.run_remote_pass(
+                    job, device_id, script=_EMBED_SCRIPT, by_path=by_path,
+                    extra_payload={'threshold': th['face_threshold'],
+                                   'device': 'auto'},
+                    cache_path=cache_path, progress_re=_PROGRESS_RE,
+                    detail_label='face pass')
+            except bank_remote.RemotePassCancelled:
+                bank_jobs.progress(job, detail='stopped — the peer was told to '
+                                               'abort; partial work on it was '
+                                               'discarded')
+                return
+            stderr_tail, returncode = [], 0
+        else:
+            # Device: 'cpu' (default, never touches the GPU/ComfyUI) or 'cuda'.
+            # 'auto' = GPU when the face interpreter actually exposes CUDA
+            # (onnxruntime-gpu installed), else CPU. The GPU path is used ONLY when
+            # CUDA is truly available AND must run inside the GPU-exclusive window so
+            # it never competes with a training / scoring pass; a CPU pass stays out
+            # of the window (it can run alongside GPU work).
+            from ..gpu_window import gpu_exclusive_vision_window
+            from contextlib import nullcontext
+            device, use_gpu = _resolve_face_device()
+            payload = _json.dumps({
+                'images': paths,
+                'models_root': cfg.get('face_scoring.models_root') or None,
+                'cache': str(cache_path),
+                'cancel_file': str(cache_path) + '.cancel',
+                'threshold': th['face_threshold'],
+                'device': device,
+            })
+            python = cfg.get('face_scoring.python') or sys.executable
+            window = gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu else nullcontext()
+            data, stderr_tail, returncode = _drive_infer_subprocess(
+                job, python, _EMBED_SCRIPT, payload, cache_path, _PROGRESS_RE, window,
+                stall_label='face')
         # Stopped by the user — say exactly what's kept, never a mute ✗ (the cached
         # embeddings are safe; relaunching skips them and only finishes the rest).
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):
@@ -3529,29 +3555,50 @@ def score_device_info(bank_id=None) -> dict:
     return out
 
 
-def start_score(app, user_id, bank_id):
+def _remote_pass_device(device_id) -> bool:
+    """True when a pass should run on a peer instead of here. Score/Faces only
+    accept a PEER — an 'api:' backend is a bare ComfyUI with no scoring stack,
+    so it is refused at start (a clear 400) rather than failing an hour later."""
+    from . import cluster as cluster_svc
+    d = cluster_svc.normalize_device_id(device_id)
+    if d == cluster_svc.LOCAL_DEVICE_ID:
+        return False
+    if cluster_svc.is_backend_id(d):
+        raise ValueError('this pass needs the full app on the other machine — '
+                         'a remote ComfyUI backend only renders images. '
+                         'Join it as a compute peer instead.')
+    return True
+
+
+def start_score(app, user_id, bank_id, device_id=None):
     """Launch the scoring pass (LAION aesthetic + NSFW + style clustering) over
     the bank's non-rejected images. Needs the bank-scoring extra (Setup ▸ Quality
     tools). Serialized against training/vision ONLY when it will really run on
     the GPU: refusing a CPU pass because 'the GPU is busy' would block an hour of
-    work that never wanted the card."""
+    work that never wanted the card. A PEER ``device_id`` moves the whole pass to
+    that machine: its stack, its models, its GPU — and no local gate applies,
+    because none of them describes the machine doing the work."""
     from ..capabilities import probe_bank_scoring
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    if not probe_bank_scoring().get('ok'):
+    remote = _remote_pass_device(device_id)
+    if not remote and not probe_bank_scoring().get('ok'):
         raise RuntimeError('bank scoring is not installed '
                            '(Quality tools step in Setup)')
-    _device, use_gpu = _resolve_score_device()
-    reason = _gpu_busy_reason() if use_gpu else None
-    if reason:
-        raise RuntimeError(reason)
+    if not remote:
+        _device, use_gpu = _resolve_score_device()
+        reason = _gpu_busy_reason() if use_gpu else None
+        if reason:
+            raise RuntimeError(reason)
     total = (BankImage.query.filter_by(bank_id=bank_id)
              .filter(BankImage.status != 'reject').count())
-    return bank_jobs.start(app, bank_id, 'score', _score_job(bank_id), total=total)
+    return bank_jobs.start(app, bank_id, 'score',
+                           _score_job(bank_id, device_id if remote else None),
+                           total=total)
 
 
-def _score_job(bank_id):
+def _score_job(bank_id, device_id=None):
     def run(job):
         import json as _json
         import sys
@@ -3570,35 +3617,62 @@ def _score_job(bank_id):
             if p and os.path.isfile(p):
                 by_path[p] = r.id
         paths = list(by_path)
-        device, use_gpu = _resolve_score_device()
         # Say WHICH device, every time. On CPU this pass is ~20× slower (CLIP
         # ViT-L is the whole cost), and a progress bar crawling for an hour with
-        # no explanation reads as a hang.
-        bank_jobs.progress(job, done=0, total=len(paths),
-                           detail=f'scoring pass ({device.upper()})')
+        # no explanation reads as a hang. A remote pass names the peer instead —
+        # the LOCAL device probe answers a machine that will not do the work.
+        if device_id:
+            use_gpu = False
+            bank_jobs.progress(job, done=0, total=len(paths),
+                               detail='scoring pass (on the peer)')
+        else:
+            device, use_gpu = _resolve_score_device()
+            bank_jobs.progress(job, done=0, total=len(paths),
+                               detail=f'scoring pass ({device.upper()})')
         if not paths:
             return
         _bank_dir(bank_id).mkdir(parents=True, exist_ok=True)
         th = thresholds()
         cache_path = _score_cache_path(bank_id)
-        payload = _json.dumps({
-            'images': paths,
-            'models_root': cfg.get('bank_scoring.models_root') or None,
-            'cache': str(cache_path),
-            'cancel_file': str(cache_path) + '.cancel',
-            'style_threshold': th['style_threshold'],
-        })
-        python = cfg.get('bank_scoring.python') or sys.executable
-        # The GPU-exclusive window frees ComfyUI's VRAM and blocks any training
-        # start for the whole pass — so it is taken ONLY when the child really
-        # runs on the card, exactly like the face pass. Holding it through an
-        # hour of CPU inference was the worst of both worlds: the GPU idle and
-        # unusable, the work slow anyway.
-        window = (gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu
-                  else nullcontext())
-        data, stderr_tail, returncode = _drive_infer_subprocess(
-            job, python, _SCORE_SCRIPT, payload, cache_path, _SCORE_PROGRESS_RE,
-            window, stall_label='scoring')
+        if device_id:
+            # The whole pass moves to the peer as ONE job (chunking would break
+            # the style clustering, which is computed over everything the
+            # script sees). No models_root: the peer's own env resolves its
+            # models. The returned data is re-keyed to hub paths, so the
+            # consumption below cannot tell where it ran.
+            from . import bank_remote
+            try:
+                data = bank_remote.run_remote_pass(
+                    job, device_id, script=_SCORE_SCRIPT, by_path=by_path,
+                    extra_payload={'style_threshold': th['style_threshold']},
+                    cache_path=cache_path, progress_re=_SCORE_PROGRESS_RE,
+                    detail_label='scoring pass')
+            except bank_remote.RemotePassCancelled:
+                bank_jobs.progress(job, detail='stopped — the peer was told to '
+                                               'abort; partial work on it was '
+                                               'discarded')
+                return
+            stderr_tail, returncode = [], 0
+        else:
+            payload = _json.dumps({
+                'images': paths,
+                'models_root': cfg.get('bank_scoring.models_root') or None,
+                'cache': str(cache_path),
+                'cancel_file': str(cache_path) + '.cancel',
+                'style_threshold': th['style_threshold'],
+            })
+            python = cfg.get('bank_scoring.python') or sys.executable
+            # The GPU-exclusive window frees ComfyUI's VRAM and blocks any training
+            # start for the whole pass — so it is taken ONLY when the child really
+            # runs on the card, exactly like the face pass. Holding it through an
+            # hour of CPU inference was the worst of both worlds: the GPU idle and
+            # unusable, the work slow anyway. A REMOTE pass never takes it: the
+            # card it uses is another machine's.
+            window = (gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu
+                      else nullcontext())
+            data, stderr_tail, returncode = _drive_infer_subprocess(
+                job, python, _SCORE_SCRIPT, payload, cache_path, _SCORE_PROGRESS_RE,
+                window, stall_label='scoring')
         # Stopped by the user — say exactly what's kept, never a mute ✗ (the cached
         # scores/embeddings are safe; relaunching skips them and finishes the rest).
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):
@@ -4600,7 +4674,7 @@ def _caption_prereq() -> str | None:
 
 
 def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
-                   resolve_dups=False):
+                   resolve_dups=False, device_id=None):
     """Launch the chained triage pipeline. ``steps`` selects which passes run
     (canonical order enforced); ``reject_flags`` + ``resolve_dups`` configure the
     auto-reject step. One background job like every other pass — BankJobBusy when
@@ -4612,9 +4686,13 @@ def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
     if not steps:
         raise ValueError('no pipeline steps selected')
     reject_flags = [f for f in (reject_flags or []) if f in PIPELINE_REJECT_FLAGS]
+    # Validates the pick up front (peers only): a bad device is a 400 at launch,
+    # not a skipped step discovered an hour into the queue.
+    remote = _remote_pass_device(device_id)
     return bank_jobs.start(
         app, bank_id, 'pipeline',
-        _pipeline_job(user_id, bank_id, steps, reject_flags, bool(resolve_dups)),
+        _pipeline_job(user_id, bank_id, steps, reject_flags, bool(resolve_dups),
+                      device_id if remote else None),
         total=0)
 
 
@@ -4654,7 +4732,8 @@ def _bank_counts(bank_id) -> dict:
     }
 
 
-def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups):
+def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
+                  device_id=None):
     def run(job):
         import json as _json
         import time as _time
@@ -4686,7 +4765,8 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups):
                      'detail': None, 'counts': {}}
             try:
                 _run_pipeline_step(job, user_id, bank_id, step,
-                                   reject_flags, resolve_dups, entry)
+                                   reject_flags, resolve_dups, entry,
+                                   device_id=device_id)
             except GpuBusyError as e:
                 # A vision/training job grabbed the GPU mid-pipeline — skip this
                 # pass and keep going (never wake the user for a transient clash).
@@ -4742,7 +4822,8 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups):
     return run
 
 
-def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, entry):
+def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
+                       entry, device_id=None):
     """Run ONE pipeline pass into ``entry``, reusing the standalone pass work.
     Prerequisite missing → entry marked 'skipped' with a reason, pipeline
     continues. Reuses each pass's inner ``run(job)`` so progress, cancellation
@@ -4777,11 +4858,13 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, 
                            + ' — manual ✓/✕ untouched')
         return
     if step == 'score':
-        reason = _score_prereq() or _gpu_busy_reason()
+        # A remote pass answers to the PEER's stack and the PEER's GPU — the
+        # local prereq and the local GPU gate both describe the wrong machine.
+        reason = None if device_id else (_score_prereq() or _gpu_busy_reason())
         if reason:
             entry['status'], entry['reason'] = 'skipped', reason
             return
-        _score_job(bank_id)(job)
+        _score_job(bank_id, device_id)(job)
         c = _bank_counts(bank_id)
         entry['counts'] = {'scored': c['scored'], 'style_groups': c['style_groups']}
         entry['detail'] = job.get('detail') or f"scored {c['scored']} image(s)"
@@ -4810,11 +4893,11 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups, 
         entry['detail'] = job.get('detail') or f"{c['watermark_detected']} with a watermark"
         return
     if step == 'faces':
-        reason = _faces_prereq()
+        reason = None if device_id else _faces_prereq()
         if reason:
             entry['status'], entry['reason'] = 'skipped', reason
             return
-        _faces_job(bank_id)(job)
+        _faces_job(bank_id, device_id)(job)
         c = _bank_counts(bank_id)
         entry['counts'] = {'person_groups': c['person_groups']}
         entry['detail'] = job.get('detail') or f"{c['person_groups']} person cluster(s)"

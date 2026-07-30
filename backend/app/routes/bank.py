@@ -316,13 +316,17 @@ def bank_scan(bank_id):
 
 @bp.post('/bank/<int:bank_id>/faces')
 def bank_faces(bank_id):
-    return _start(banks.start_faces, _app(), LOCAL_USER, bank_id)
+    data = request.get_json(silent=True) or {}
+    return _start(banks.start_faces, _app(), LOCAL_USER, bank_id,
+                  device_id=data.get('device_id'))
 
 
 @bp.post('/bank/<int:bank_id>/score')
 def bank_score(bank_id):
     """Aesthetic + NSFW + style scoring pass (bank-scoring extra). 202/409/503."""
-    return _start(banks.start_score, _app(), LOCAL_USER, bank_id)
+    data = request.get_json(silent=True) or {}
+    return _start(banks.start_score, _app(), LOCAL_USER, bank_id,
+                  device_id=data.get('device_id'))
 
 
 @bp.post('/bank/<int:bank_id>/semantic-dedup')
@@ -472,7 +476,8 @@ def bank_pipeline(bank_id):
     return _start(banks.start_pipeline, _app(), LOCAL_USER, bank_id,
                   steps=data.get('steps') or None,
                   reject_flags=data.get('reject_flags') or None,
-                  resolve_dups=bool(data.get('resolve_dups')))
+                  resolve_dups=bool(data.get('resolve_dups')),
+                  device_id=data.get('device_id'))
 
 
 @bp.post('/bank/<int:bank_id>/queue')
@@ -489,7 +494,8 @@ def bank_queue_add(bank_id):
             _app(), LOCAL_USER, bank_id,
             steps=data.get('steps') or None,
             reject_flags=data.get('reject_flags') or None,
-            resolve_dups=bool(data.get('resolve_dups')))
+            resolve_dups=bool(data.get('resolve_dups')),
+            device_id=data.get('device_id'))
     except bank_queue.BankAlreadyQueued as e:
         # Same 409 SHAPE as _busy() even though no pass holds the bank: the UI
         # reads busy_kind to decide whether it can reword the refusal in the
@@ -536,7 +542,8 @@ def bank_queue_all():
         out = bank_queue.enqueue_many(
             _app(), LOCAL_USER, bank_ids,
             steps=data.get('steps'), reject_flags=data.get('reject_flags'),
-            resolve_dups=bool(data.get('resolve_dups')))
+            resolve_dups=bool(data.get('resolve_dups')),
+            device_id=data.get('device_id'))
     except ValueError as e:
         # The step list is sanitized before anything is enqueued, so this cannot
         # leave a half-queued queue behind.
@@ -576,7 +583,8 @@ def bank_group_queue(bank_id):
         out = bank_queue.enqueue_many(
             _app(), LOCAL_USER, members,
             steps=data.get('steps'), reject_flags=data.get('reject_flags'),
-            resolve_dups=bool(data.get('resolve_dups')))
+            resolve_dups=bool(data.get('resolve_dups')),
+            device_id=data.get('device_id'))
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'members': members, **out}), 202

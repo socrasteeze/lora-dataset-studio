@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-bank-passes-on-a-peer',
+    date: '2026-07-29',
+    title: 'Queue a bank — or the whole group — onto your other machine’s GPU',
+    blurb:
+      'The 🚀 Launch all dialog (and ➕ Add to queue, ⏳ Queue the group, ⏳ Queue all) now has the Run on picker. Pick a compute peer and the two GPU-heavy passes — ✨ Score and 👥 Group by person — run over there with its models and its GPU, while this machine keeps training or generating; queued remote runs no longer wait for the local GPU to free up either. The embeddings come home too, so ✂ Find crops & variants, 🔤 Find by text and Select similar work exactly as if the pass ran here. What still runs locally whatever the picker says: scan, auto-reject, 🚩 watermark detection, 📐 framing and 🏷️ captioning. Peers only — a remote ComfyUI backend has no scoring stack, and the dialog says so. Every image in the pass crosses the network, so this is for real LANs and Tailscale, not hotel Wi-Fi.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-bank-klein-inpaint-run-on',
     date: '2026-07-29',
     title: 'Bank watermark repainting can run on another machine',

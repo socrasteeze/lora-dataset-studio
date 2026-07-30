@@ -50,7 +50,7 @@ def _find(bank_id):
 
 
 def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
-            resolve_dups=False):
+            resolve_dups=False, device_id=None):
     """Add a bank's Launch-all run to the queue. One live entry per bank —
     raises BankAlreadyQueued otherwise, ValueError on an empty step list.
     Returns the queue position (1-based)."""
@@ -65,6 +65,7 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
             raise BankAlreadyQueued(bank_id)
         entry = {'bank_id': bank_id, 'user_id': user_id, 'steps': list(steps),
                  'reject_flags': reject_flags, 'resolve_dups': bool(resolve_dups),
+                 'device_id': device_id or None,
                  'enqueued_at': time.time(), 'state': 'pending'}
         _queue.append(entry)
         position = len(_queue)
@@ -79,7 +80,7 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
 
 
 def enqueue_many(app, user_id, bank_ids, steps=None, reject_flags=None,
-                 resolve_dups=False) -> dict:
+                 resolve_dups=False, device_id=None) -> dict:
     """Queue several banks in one call — the "queue all" primitive.
 
     Returns {'queued': [{bank_id, position}], 'skipped': [{bank_id, reason}]}.
@@ -104,7 +105,8 @@ def enqueue_many(app, user_id, bank_ids, steps=None, reject_flags=None,
     for bank_id in bank_ids:
         try:
             position = enqueue(app, user_id, bank_id, steps=steps,
-                               reject_flags=flags, resolve_dups=resolve_dups)
+                               reject_flags=flags, resolve_dups=resolve_dups,
+                               device_id=device_id)
             queued.append({'bank_id': bank_id, 'position': position})
         except BankAlreadyQueued:
             skipped.append({'bank_id': bank_id, 'reason': 'already queued'})
@@ -165,7 +167,12 @@ def _process_next(app) -> bool:
         with _lock:
             if _find(bank_id) is not entry:
                 return True                      # cancelled while waiting
-        if not bank_jobs.running(bank_id) and banks._gpu_busy_reason() is None:
+        # A run aimed at a peer takes none of the LOCAL GPU — making it wait
+        # for a local training to finish would forfeit the whole point of
+        # renting the other machine. (The Score/Faces steps travel; the steps
+        # that stay here are CPU work.)
+        gpu_ok = entry.get('device_id') or banks._gpu_busy_reason() is None
+        if not bank_jobs.running(bank_id) and gpu_ok:
             break
         time.sleep(_POLL_SECONDS)
 
@@ -176,7 +183,8 @@ def _process_next(app) -> bool:
 
     try:
         banks.start_pipeline(app, entry['user_id'], bank_id, entry['steps'],
-                             entry['reject_flags'], entry['resolve_dups'])
+                             entry['reject_flags'], entry['resolve_dups'],
+                             device_id=entry.get('device_id'))
     except bank_jobs.BankJobBusy:
         # A manual launch grabbed the slot between our check and here — back to
         # pending and let the next loop wait for it to clear.
@@ -240,7 +248,8 @@ def snapshot() -> dict:
     with _lock:
         items = [{'bank_id': e['bank_id'], 'state': e['state'], 'position': i + 1,
                   'steps': list(e['steps']), 'reject_flags': list(e['reject_flags']),
-                  'resolve_dups': e['resolve_dups'], 'enqueued_at': e['enqueued_at']}
+                  'resolve_dups': e['resolve_dups'], 'enqueued_at': e['enqueued_at'],
+                  'device_id': e.get('device_id')}
                  for i, e in enumerate(_queue)]
         running = next((e['bank_id'] for e in _queue if e['state'] == 'running'), None)
     return {'running_bank_id': running, 'items': items}

@@ -111,6 +111,24 @@ settings-reference): a backend has **no auth** (raw ComfyUI API — trusted
 networks only, never port-forwarded), a peer is token-gated and revocable and
 can someday run the non-comfy kinds.
 
+## Bank passes on a peer (added same day, third wave)
+
+✨ Score and 👥 Faces move to a peer as ONE `infer` ClusterJob each (chunking
+would break the style/person clustering the scripts compute over everything
+they see). `services/bank_remote.py` is the hub half: images staged as
+`{image_id}__{basename}` artifacts (duplicate basenames across folders),
+`peer_worker._run_infer` redirects the payload's `cache`/`cancel_file` into its
+`out/` (uploaded home on completion), and the hub re-keys results AND the .npz
+cache to hub paths with sigs recomputed from hub files — losing that cache
+silently would have broken find-by-text/select-similar with no error anywhere.
+Stop rides the heartbeat: `peer_job_heartbeat` now answers
+`{'cancelled': bool}`, the peer writes the scripts' own cancel-file sentinel
+(infer) or breaks between images (vision). `device_id` rides the Launch-all
+dialog config through all four queue routes and the `bank_queue` entries; a
+remote entry skips the local-GPU wait in the drain loop. Peers only —
+`_remote_pass_device` refuses `api:` ids with the reason. Local runs stay
+byte-identical (no device → the historical code path).
+
 ## Non-goals (this wave)
 
 - Browser WebGPU compute  

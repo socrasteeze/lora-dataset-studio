@@ -38,7 +38,13 @@ export default function DevicePicker({ value, onChange, kind = 'comfy', classNam
   }, [kind])
 
   if (devices == null) return null
-  const peers = devices.filter((d) => !d.local)
+  // 'bank-pass' = the bank's Score/Faces passes: they need the FULL app on the
+  // other machine (its scoring stacks), so API backends — bare ComfyUI — are
+  // not offered at all rather than listed disabled.
+  const eligible = kind === 'bank-pass'
+    ? devices.filter((d) => d.local || !d.backend)
+    : devices
+  const peers = eligible.filter((d) => !d.local)
   if (!always && peers.length === 0) return null
 
   const current = value || 'local'
@@ -56,12 +62,16 @@ export default function DevicePicker({ value, onChange, kind = 'comfy', classNam
         className="rounded-md border border-border-strong bg-surface-raised px-2 py-1.5 text-sm text-content max-w-[14rem]"
         aria-label="Run on device"
       >
-        {devices.map((d) => {
+        {eligible.map((d) => {
           const offline = !d.local && !d.online
-          const capOk = kind !== 'comfy' || d.local || d.capabilities?.comfyui
+          const capOk = d.local
+            || (kind === 'comfy' ? d.capabilities?.comfyui
+              : kind === 'bank-pass'
+                ? (d.capabilities?.bank_scoring || d.capabilities?.face_scoring)
+                : true)
           let label = d.name
           if (offline) label += ' (offline)'
-          else if (!capOk) label += ' (no ComfyUI)'
+          else if (!capOk) label += kind === 'bank-pass' ? ' (no scoring stack)' : ' (no ComfyUI)'
           else if (d.busy) label += ' (busy)'
           return (
             <option key={d.id} value={d.id} disabled={offline}>
