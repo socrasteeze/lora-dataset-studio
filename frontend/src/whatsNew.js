@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-bank-klein-inpaint-run-on',
+    date: '2026-07-29',
+    title: 'Bank watermark repainting can run on another machine',
+    blurb:
+      'The bank’s 🧽 Inpaint level with the Klein engine now has the same Run on picker as Generate — aim it at a compute peer or a remote ComfyUI backend and the repaints render there while this machine’s GPU stays free. Only the Klein render travels: LaMa always runs here, and the queued bank passes (Score, faces, dedup, watermark detection) still run on this machine whatever the picker says — that part is designed but not built yet. With a remote device picked, Klein unlocks even when this machine has no Klein weights; the selected machine checks its own when the job arrives.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-remote-comfyui-backends',
     date: '2026-07-29',
     title: 'Rent a GPU with nothing but ComfyUI on the other machine',

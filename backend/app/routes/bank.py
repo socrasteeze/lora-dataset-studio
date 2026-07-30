@@ -369,11 +369,13 @@ def bank_watermark_crop(bank_id):
 
 @bp.post('/bank/<int:bank_id>/watermark/inpaint')
 def bank_watermark_inpaint(bank_id):
-    """Level 2 — repaint what is still flagged. {method:'auto'|'lama'|'klein'}.
+    """Level 2 — repaint what is still flagged. {method:'auto'|'lama'|'klein',
+    device_id?: 'local'|peer|'api:…' — Klein renders only; LaMa stays local}.
     202/409/400/503 (503 carries the actionable reason: engine missing, GPU busy)."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_watermark_inpaint, _app(), LOCAL_USER, bank_id,
-                  method=data.get('method') or 'auto')
+                  method=data.get('method') or 'auto',
+                  device_id=data.get('device_id'))
 
 
 @bp.post('/bank/<int:bank_id>/watermark/undo')

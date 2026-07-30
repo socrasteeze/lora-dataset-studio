@@ -431,7 +431,8 @@ def _wait_for_job(job_id, timeout):
 
 
 def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
-                   denoise=KLEIN_DENOISE, timeout=KLEIN_TIMEOUT, klein_model=None):
+                   denoise=KLEIN_DENOISE, timeout=KLEIN_TIMEOUT, klein_model=None,
+                   device_id=None):
     """Enqueue one full-edit refine job on the PRE-FILLED `crop_img` and return
     (filled_crop_image, None) or (None, error). The crop must already be watermark-free —
     it becomes the KSampler latent AND the ReferenceLatent (no SetLatentNoiseMask). Isolated
@@ -451,28 +452,45 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
         if node not in workflow:
             return None, {'kind': 'failed',
                           'detail': f'workflow node {node} missing — klein_inpaint.json changed'}
+    from . import cluster as cluster_svc
+    remote = (cluster_svc.normalize_device_id(device_id)
+              != cluster_svc.LOCAL_DEVICE_ID)
+    # Model NAMES resolve either way — the workflow needs them — but the
+    # missing-assets raise is a LOCAL disk question; the remote machine's
+    # ComfyUI answers it for itself when the job arrives (same split as
+    # klein_edit_helper).
     unet = keh.unet_for_job(klein_model)
     vae = keh.resolve_klein_vae()
     te = keh.resolve_klein_text_encoder()
-    missing = keh.klein_missing_assets()
-    if any(a in missing for a in keh.KLEIN_REQUIRED):
-        raise keh.KleinModelsMissing(missing)
+    if not remote:
+        missing = keh.klein_missing_assets()
+        if any(a in missing for a in keh.KLEIN_REQUIRED):
+            raise keh.KleinModelsMissing(missing)
 
     # Same filesystem hand-off as the generation lanes (utils/comfy_fs): the crop
     # is WRITTEN into ComfyUI's input folder, which a container/remote install may
     # not share. Guarded so the failure names the folder instead of dying on a raw
     # OSError halfway through a clean.
+    # A REMOTE render never touches the local input folder: the crop goes to a
+    # temp file whose path rides staged_input_paths — the peer publisher and the
+    # BackendWorker upload read exactly that.
     uid = uuid.uuid4().hex[:8]
     crop_name = f'wmklein_crop_{uid}.png'
-    try:
-        comfy_input = comfy_fs.ensure_input_usable(_comfy_input_dir())
-        crop_path = comfy_fs.stage_input_write(
-            crop_name, lambda p: crop_img.convert('RGB').save(p), comfy_input)
-    except comfy_fs.ComfyFolderUnavailable as exc:
-        # 'unavailable', not 'failed': nothing was attempted on the GPU — Klein
-        # simply cannot be reached over the filesystem from this process. The
-        # message already names the folder and what to do about it.
-        return None, {'kind': 'unavailable', 'detail': str(exc)}
+    if remote:
+        import tempfile
+        fd, crop_path = tempfile.mkstemp(prefix='wmklein_', suffix='.png')
+        os.close(fd)
+        crop_img.convert('RGB').save(crop_path)
+    else:
+        try:
+            comfy_input = comfy_fs.ensure_input_usable(_comfy_input_dir())
+            crop_path = comfy_fs.stage_input_write(
+                crop_name, lambda p: crop_img.convert('RGB').save(p), comfy_input)
+        except comfy_fs.ComfyFolderUnavailable as exc:
+            # 'unavailable', not 'failed': nothing was attempted on the GPU — Klein
+            # simply cannot be reached over the filesystem from this process. The
+            # message already names the folder and what to do about it.
+            return None, {'kind': 'unavailable', 'detail': str(exc)}
 
     workflow['114']['inputs']['unet_name'] = unet
     workflow['114']['inputs']['weight_dtype'] = keh._unet_weight_dtype(unet)
@@ -486,10 +504,21 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
     workflow['9']['inputs']['filename_prefix'] = f'wmklein_{uid}'
 
     job_id = str(uuid.uuid4())
+    meta = {'model_name': 'watermark_klein'}
+    if remote:
+        meta['staged_inputs'] = [crop_name]
+        meta['staged_input_paths'] = {crop_name: os.path.abspath(crop_path)}
     try:
-        queue_manager.add_job(job_type='image', user_id=str(user_id), workflow_data=workflow,
-                              prompt=KLEIN_INPAINT_PROMPT, job_id=job_id,
-                              metadata={'model_name': 'watermark_klein'})
+        try:
+            queue_manager.add_job(job_type='image', user_id=str(user_id),
+                                  workflow_data=workflow,
+                                  prompt=KLEIN_INPAINT_PROMPT, job_id=job_id,
+                                  metadata=meta, worker_id=device_id)
+        except ValueError as e:
+            # e.g. the picked backend was removed in Settings mid-pass. One
+            # image's failure, not the whole pass's: the loop counts it and
+            # the report names it.
+            return None, {'kind': 'failed', 'detail': str(e)}
         status, filename, err_msg = _wait_for_job(job_id, timeout)
     finally:
         _cleanup(crop_path)
@@ -513,7 +542,8 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
 
 def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cpu',
                             timeout=KLEIN_TIMEOUT,
-                            klein_model=None) -> tuple[bool, dict | None]:
+                            klein_model=None,
+                            device_id=None) -> tuple[bool, dict | None]:
     """Remove the watermark(s) at normalized `boxes` from `image_path` via PREFILL + Klein
     full-edit refine + pixel-space composite, overwriting the file in place (WEBP q92, same
     as LaMa; the caller preserves the .orig). Returns the `(ok, error)` tuple contract:
@@ -522,8 +552,15 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
     mask+feather. `device` selects the prefill LaMa device ('cpu' by default so the pending
     ComfyUI GPU job runs alone; Klein itself always owns the GPU via ComfyUI).
     `klein_model`: see _run_klein_job — the dataset's pick, or None (auto) when the
-    caller has no dataset to inherit from."""
-    if not is_available():
+    caller has no dataset to inherit from.
+    `device_id`: which machine renders the Klein step ('local'/None = this one;
+    a peer or 'api:' backend otherwise). The PREFILL always runs here — only the
+    ComfyUI round-trip travels, so the local readiness probe is skipped for a
+    remote device: it answers the wrong machine's question."""
+    from . import cluster as cluster_svc
+    remote = (cluster_svc.normalize_device_id(device_id)
+              != cluster_svc.LOCAL_DEVICE_ID)
+    if not remote and not is_available():
         return False, {'kind': 'unavailable',
                        'detail': 'Klein inpaint is not ready (ComfyUI unreachable or models missing)'}
     try:
@@ -552,7 +589,7 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
 
     seed = random.randint(0, 2 ** 63 - 1) if seed is None else int(seed)
     filled_scaled, err = _run_klein_job(user_id, prefilled, seed=seed, timeout=timeout,
-                                        klein_model=klein_model)
+                                        klein_model=klein_model, device_id=device_id)
     if err:
         return False, err
     filled_crop = (filled_scaled if filled_scaled.size == (cw, ch)

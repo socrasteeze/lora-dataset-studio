@@ -176,3 +176,44 @@ test('find survives a missing payload (bank never scanned)', () => {
   assert.equal(s.label, '🚩 Find watermarks');
 });
 
+
+// ── Run-on device: only the Klein render travels ─────────────────────────
+
+test('a remote device unlocks Klein even when the LOCAL verdict is not-ready', () => {
+  const s = inpaintLevelState(levels(), {
+    method: 'klein', kleinReady: false, kleinReason: 'ComfyUI is not running.',
+    deviceId: 'api:abc123def456',
+  });
+  assert.equal(s.disabled, false);
+  // …and the swap is never silent: the note says WHERE readiness gets checked.
+  assert.match(s.remoteNote, /selected machine/);
+});
+
+test('a remote device with local Klein ready needs no note', () => {
+  const s = inpaintLevelState(levels(), {
+    method: 'klein', kleinReady: true, deviceId: 'api:abc123def456',
+  });
+  assert.equal(s.disabled, false);
+  assert.equal(s.remoteNote, null);
+});
+
+test('LaMa ignores the device pick — its gate answers THIS machine', () => {
+  const s = inpaintLevelState(levels(), {
+    method: 'auto', lamaReady: false, deviceId: 'api:abc123def456',
+  });
+  assert.equal(s.disabled, true);
+  assert.match(s.reason, /LaMa/);
+});
+
+test('device "local" (or absent) keeps the historical Klein gate', () => {
+  const off = inpaintLevelState(levels(), {
+    method: 'klein', kleinReady: false, kleinReason: 'ComfyUI is not running.',
+    deviceId: 'local',
+  });
+  assert.equal(off.disabled, true);
+  assert.match(off.reason, /ComfyUI is not running/);
+  const legacy = inpaintLevelState(levels(), {
+    method: 'klein', kleinReady: false, kleinReason: 'ComfyUI is not running.',
+  });
+  assert.equal(legacy.disabled, true);
+});
