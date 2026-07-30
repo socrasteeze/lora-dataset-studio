@@ -649,6 +649,30 @@ def bank_promote_to_bank(bank_id):
     return jsonify({'ok': True, 'id': new_id}), 202
 
 
+@bp.post('/bank/<int:bank_id>/promote-to-new-dataset')
+def bank_promote_to_new_dataset(bank_id):
+    """⬆ Promote's THIRD destination: create the dataset AND promote into it.
+
+    Name + trigger word only — character kind, and the same defaults the Datasets
+    page applies; concept/style, target model and fidelity stay editable in the
+    dataset's own settings rather than being duplicated into this dialog.
+
+    Like /promote-to-bank this cannot use the shared _start envelope, because it
+    has to hand back the new id. 409 while another pass runs on the SOURCE bank,
+    and in that case nothing is created — the busy check happens before the
+    dataset row does, and a lost race discards it."""
+    data = request.get_json(silent=True) or {}
+    try:
+        new_id = banks.start_new_dataset_promote(
+            _app(), LOCAL_USER, bank_id, data.get('image_ids') or [],
+            data.get('name'), data.get('trigger_word'))
+    except bank_jobs.BankJobBusy as e:
+        return _busy(e)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'id': new_id}), 202
+
+
 @bp.get('/bank/<int:bank_id>/selection-size')
 def bank_selection_size(bank_id):
     """How many images a promotion would copy and what they WEIGH — the number

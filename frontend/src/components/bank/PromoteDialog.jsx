@@ -2,28 +2,42 @@ import { useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
 import {
-  canStartPromote, promoteButtonLabel, promoteSummary, weightNotice,
+  PROMOTE_DESTINATIONS, canStartPromote, promoteButtonLabel, promoteSummary,
+  weightNotice,
 } from './bankPromote.js'
+import { triggerWarning } from '../dataset/newDataset.js'
 
-/** ⬆ Promote: copy the selection somewhere it can be worked on. TWO
+/** ⬆ Promote: copy the selection somewhere it can be worked on. THREE
  * destinations.
  *
- * • A DATASET — the original door. Goes through the normal import path (webp
- *   normalization + perceptual dedup vs the dataset).
+ * • An EXISTING DATASET — the original door. Goes through the normal import path
+ *   (webp normalization + perceptual dedup vs the dataset).
+ * • A NEW DATASET — the same door, for a dataset that does not exist yet. It
+ *   used to send the user to the Datasets page to make a blank one and back;
+ *   a bank needs one field to exist and a dataset needs two, which is a reason
+ *   to ask for a second field, not a reason to have no door.
  * • A NEW BANK — for isolating candidates out of a big dump (200 out of 9 000)
  *   and continuing to triage them apart, without committing them to a
  *   training container yet.
  *
- * Either way the bank KEEPS its images and marks them promoted; promotion
- * copies, and two banks never share a file. Which is why the new-bank door
+ * Whichever door, the bank KEEPS its images and marks them promoted; promotion
+ * copies, and two banks never share a file. Which is why the new-BANK door
  * states the measured weight before the click — images are a footnote, video is
- * not. */
-export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted }) {
+ * not — and why neither dataset door does: those re-encode to webp on the way
+ * in, so the source weight would be a checkable lie. */
+export default function PromoteDialog({ bankId, bankName: sourceBankName,
+  selectedIds, onClose, onStarted }) {
   const toast = useToast()
   const [destination, setDestination] = useState('dataset')
   const [datasets, setDatasets] = useState(null)
   const [datasetId, setDatasetId] = useState('')
   const [bankName, setBankName] = useState('')
+  // The new-dataset door. The NAME is prefilled from the bank (harmless and
+  // editable); the TRIGGER is left blank on purpose — deriving one from the name
+  // would be a value the user never chose, and a silent collision with an
+  // existing dataset's trigger only surfaces much later, at training-queue time.
+  const [newDsName, setNewDsName] = useState(sourceBankName || '')
+  const [newDsTrigger, setNewDsTrigger] = useState('')
   const [promotable, setPromotable] = useState(null)
   const [size, setSize] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -61,7 +75,10 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
   }, [bankId, useSelection, selectedIds.join(',')])
 
   const start = async () => {
-    if (!canStartPromote({ destination, datasetId, bankName, busy })) return
+    if (!canStartPromote({
+      destination, datasetId, bankName, busy,
+      datasetName: newDsName, datasetTrigger: newDsTrigger,
+    })) return
     setBusy(true)
     try {
       if (destination === 'bank') {
@@ -74,6 +91,18 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
         // yanking the user off the page that is reporting the work.
         toast.success(`Copying into “${bankName.trim()}” — follow the progress bar. `
           + 'The new bank is in ← Banks once it finishes.', 9000)
+      } else if (destination === 'new-dataset') {
+        await postJson(`/api/bank/${bankId}/promote-to-new-dataset`, {
+          name: newDsName.trim(),
+          trigger_word: newDsTrigger.trim(),
+          image_ids: useSelection ? selectedIds : [],
+        })
+        // Same reasoning as the bank branch: the job is registered on THIS bank,
+        // so the progress bar is here. Landing the user on the new dataset would
+        // also land them on an empty one — the import is still running.
+        toast.success(`Creating “${newDsName.trim()}” and copying into it — follow `
+          + 'the progress bar. The dataset is on the Datasets page once it finishes.',
+        9000)
       } else {
         await postJson(`/api/bank/${bankId}/promote`, {
           dataset_id: Number(datasetId),
@@ -111,9 +140,11 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
 
         <div>
           <p className="text-sm font-medium text-content">Send it to…</p>
-          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-            {tab('dataset', '📁 An existing dataset')}
-            {tab('bank', '🗃 A new image bank')}
+          {/* Rendered FROM the constant so the two cannot drift. A grid rather
+              than flex-1 in a row: three tabs at these label lengths wrap badly
+              inside max-w-md, and 400 px is a real viewport here. */}
+          <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {PROMOTE_DESTINATIONS.map((d) => tab(d.id, d.label))}
           </div>
         </div>
 
@@ -130,7 +161,42 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
           </p>
         )}
 
-        {toBank ? (
+        {destination === 'new-dataset' ? (
+          <div className="space-y-2">
+            <div>
+              <label htmlFor="promote-new-dataset-name" className="block text-sm font-medium text-content">
+                Name of the new dataset
+              </label>
+              <input id="promote-new-dataset-name" type="text" value={newDsName} autoFocus
+                onChange={(e) => setNewDsName(e.target.value)}
+                placeholder="Emma"
+                className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content" />
+            </div>
+            <div>
+              <label htmlFor="promote-new-dataset-trigger" className="block text-sm font-medium text-content">
+                Trigger word
+              </label>
+              <input id="promote-new-dataset-trigger" type="text" value={newDsTrigger}
+                onChange={(e) => setNewDsTrigger(e.target.value)}
+                placeholder="zchar_emma"
+                className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 font-mono text-sm text-content" />
+              {/* Advisory, never blocking: two datasets MAY share a trigger — the
+                  collision the app refuses is trigger + base model + recipe, and
+                  it is only checked when training is queued. Saying it now is
+                  cheap; discovering it after a LoRA is deployed is not. */}
+              {triggerWarning(newDsTrigger, datasets) && (
+                <p className="mt-1 text-xs text-amber-300">
+                  ⚠ {triggerWarning(newDsTrigger, datasets)}
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-content-subtle">
+              A character dataset with the usual defaults. Concept or style, the target
+              model and the fidelity all live in the dataset's own settings afterwards —
+              nothing here is locked in.
+            </p>
+          </div>
+        ) : toBank ? (
           <div>
             <label htmlFor="promote-bank-name" className="block text-sm font-medium text-content">
               Name of the new bank
@@ -162,8 +228,8 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
             </select>
             {datasets != null && datasets.length === 0 && (
               <p className="mt-1 text-xs text-amber-300">
-                No dataset yet — create one on the Datasets page first, or send this selection to a
-                new image bank instead.
+                No dataset yet — pick 🆕 New dataset above to make one right here, or send
+                this selection to a new image bank instead.
               </p>
             )}
           </div>
@@ -175,7 +241,10 @@ export default function PromoteDialog({ bankId, selectedIds, onClose, onStarted 
             Cancel
           </button>
           <button type="button" onClick={start}
-            disabled={!canStartPromote({ destination, datasetId, bankName, busy })}
+            disabled={!canStartPromote({
+              destination, datasetId, bankName, busy,
+              datasetName: newDsName, datasetTrigger: newDsTrigger,
+            })}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
             {promoteButtonLabel({ destination, busy })}
           </button>

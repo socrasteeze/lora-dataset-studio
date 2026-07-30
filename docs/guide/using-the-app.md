@@ -364,8 +364,9 @@ touching the folder itself:
    search box — `red dress`, `sunset`, a file name — and the grid filters to
    matching images, combinable with every other filter. It's the fast way to
    find shots in a 9 000-image dump.
-6. **⬆ Promote** — the kept images are **copied** into the dataset you choose
-   through the normal import path: normalized to webp, near-duplicates already
+6. **⬆ Promote** — the kept images are **copied** into the dataset you choose —
+   or into one **created on the spot**, so the last step of the funnel no longer
+   sends you to the Datasets page and back — through the normal import path: normalized to webp, near-duplicates already
    in the dataset skipped. Any bank caption **rides along**, so a captioned
    selection starts already captioned in the dataset. From there they get
    everything datasets have — captions, watermark cleaning, face scoring against
@@ -714,13 +715,23 @@ after the other:
 The ▶ button on a tile starts the same review **at that image**. A plain click
 on a tile still selects it for the bulk ✓/✕/⬆ bar, so both ways of working stay.
 
-## Promote a shortlist into a new bank
+## Promote a shortlist out of a bank
 
-**⬆ Promote…** has two destinations, and picking the right one saves you a mess.
+**⬆ Promote…** has three destinations, and picking the right one saves you a mess.
 
 - **📁 An existing dataset** — the end of the funnel. The images are normalized
   to webp, deduplicated against what the dataset already holds, and become
   training material.
+- **🆕 A new dataset** — the same door, for a dataset that does not exist yet.
+  Give it a name and a trigger word and it is created on the spot, then filled.
+  It is a **character** dataset with the usual defaults; concept or style, the
+  target model and the fidelity all live in the dataset's own settings
+  afterwards, so nothing is locked in by creating it here. If the trigger word
+  is already used by another dataset you are told, but not stopped — two
+  datasets may share one, and the app only refuses when both would train on the
+  same base model. It is worth knowing early: that refusal arrives when you
+  queue training, and renaming a trigger by then also renames its deployed LoRA
+  and run folder.
 - **🗃 A new image bank** — for when you are not there yet. A 9 000-image dump,
   200 candidates isolated out of it, and you want to keep working on those 200
   apart: give the new bank a name and the selection lands in it, **un-triaged**,
@@ -729,6 +740,11 @@ on a tile still selects it for the bulk ✓/✕/⬆ bar, so both ways of working
 
 With images selected in the grid, those are the ones that go; with nothing
 selected, every **kept** image does.
+
+Whichever door you pick, the promotion runs as a background job **on the bank**,
+so the progress bar stays on the page you clicked from — and if the bank turns
+out to be busy with another pass, nothing is created at all: a dataset or bank
+that was about to receive the copies is discarded rather than left behind empty.
 
 Either way this is a **copy**. Banks never share their files, deliberately: the
 app rewrites images in place (a re-crop, a watermark clean), so two banks reading

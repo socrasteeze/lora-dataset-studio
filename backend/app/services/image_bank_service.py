@@ -53,7 +53,8 @@ from ..utils.dbbusy import write_with_retry
 from . import bank_jobs, bank_queue, bank_undo, path_guard, trash
 from .face_dataset_service import (SCRAPE_IMPORT_MAX, _dhash, _download_scrape_item,
                                    _hamming, _SCRAPE_DL_WORKERS, _watermark_regions_payload,
-                                   import_images, normalize_watermark_regions)
+                                   create_dataset, import_images,
+                                   normalize_watermark_regions)
 from .image_quality import ANALYSIS_MAX_SIDE, quality_metrics
 from .image_provenance import ORIGINS, provenance_metrics
 
@@ -5649,6 +5650,109 @@ def start_promote(app, user_id, bank_id, ids, dataset_id):
     return bank_jobs.start(app, bank_id, 'promote',
                            _promote_job(user_id, bank_id, ids, dataset_id),
                            total=len(ids))
+
+
+# --- ⬆ Promote, THIRD destination: a dataset that does not exist yet ---------
+# The bank could only ever promote into a dataset someone had already created on
+# the Datasets page, so the last step of the funnel sent the user to another page
+# and back. That was not an oversight — a bank needs one thing to exist (a name)
+# and a dataset needs two, the second being a trigger word that is expensive to
+# change afterwards (update_dataset_settings propagates a rename to deployed
+# LoRAs, run folders, exports and job configs). But asking for a second field is
+# not the same as having no door.
+
+def start_new_dataset_promote(app, user_id, bank_id, ids, name, trigger_word):
+    """Create a dataset and promote a selection into it, in one click.
+
+    Name + trigger only: `kind=None` IS the character kind (normalize_kind), and
+    train_type/fidelity default to exactly what the Datasets-page form defaults
+    them to. So this is not a reduced dataset — it is the same one, with the
+    pickers left for its own settings page rather than duplicated into a dialog
+    that is already doing something else.
+
+    Ordering follows start_bank_promote: everything that can refuse refuses
+    BEFORE the dataset row exists, because bank_jobs.start would raise the same
+    409 a moment later having already left a row behind.
+
+    ValueError -> 400 (no bank, blank name/trigger, nothing to promote);
+    BankJobBusy -> 409. Returns the new dataset's id.
+    """
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    name = (name or '').strip()
+    trigger = (trigger_word or '').strip()
+    # Validated HERE and not left to create_dataset: it does not check the name
+    # at all and silently turns a blank trigger into 'zchar' (the rule lives only
+    # in POST /api/dataset/create). Trusting it would answer 202 and hand back a
+    # nameless dataset that collides with the next one created the same way.
+    if not name or not trigger:
+        raise ValueError('name and trigger_word are required')
+    rows = _promote_source_rows(bank_id, ids)
+    if not rows:
+        raise ValueError('nothing to promote — keep or select some images first')
+    if bank_jobs.running(bank_id):
+        raise bank_jobs.BankJobBusy(bank_jobs.get(bank_id)['kind'])
+    ds = create_dataset(user_id, name, trigger)
+    try:
+        # The promotion itself is the EXISTING path, untouched: same job kind,
+        # same _promote_job, same _promote_rows. A second job body is where the
+        # two dataset doors would drift on the resolved (watermark-cleaned)
+        # path, the carried caption and the carried framing.
+        start_promote(app, user_id, bank_id, ids, ds.id)
+    except Exception:
+        # Broader than start_bank_promote's `except BankJobBusy`, deliberately:
+        # a RuntimeError from Thread.start() would otherwise strand a phantom
+        # dataset. Re-raised unchanged, so the route envelope still maps it.
+        _discard_new_dataset(user_id, ds.id)
+        raise
+    return ds.id
+
+
+def _discard_new_dataset(user_id, dataset_id):
+    """Unmake a dataset that never received anything.
+
+    ⚠ Deliberately NOT delete_dataset. That calls
+    lora_training.purge_training_artifacts(user, TRIGGER), which sweeps deployed
+    ComfyUI LoRAs, the ai-toolkit run folder, the export folder and the job
+    config keyed on the trigger — NOT on the dataset id. Two datasets are allowed
+    to share a trigger (the collision the app really refuses is trigger + base +
+    recipe), so discarding a phantom here with delete_dataset would silently
+    destroy a REAL dataset's artifacts, on a path the user never sees.
+
+    Nothing needs it. At this point the row has no images, no runs and nothing on
+    disk: ensure_dataset_dir is lazy and only import_images reaches it, inside a
+    job body that never launched. So a bare row delete is both sufficient and the
+    only safe option — and the emptiness is re-checked rather than assumed.
+
+    NOTE the asymmetry with the bank door, which also discards when it copied
+    ZERO files: not mirrored here on purpose. This promotion runs through the
+    SHARED _promote_job/_promote_rows (the group promote uses them too), so a
+    discard-on-zero would need a forked job body — the duplication _promote_rows
+    exists to prevent. An empty dataset the user explicitly named is a legitimate
+    cheap object, and _promote_detail already reports "0 imported".
+    """
+    try:
+        db.session.rollback()
+    except Exception:      # noqa: BLE001 — teardown must not mask the real failure
+        logger.warning('new-dataset promote: rollback failed', exc_info=True)
+    try:
+        ds = FaceDataset.query.filter_by(id=dataset_id, user_id=str(user_id)).first()
+        if ds is None:
+            return
+        if FaceDatasetImage.query.filter_by(dataset_id=dataset_id).count():
+            logger.warning('new-dataset promote: dataset %s already holds images — kept',
+                           dataset_id)
+            return
+        db.session.delete(ds)
+        db.session.commit()
+    except Exception:      # noqa: BLE001
+        logger.warning('new-dataset promote: could not discard the empty dataset',
+                       exc_info=True)
+        try:
+            db.session.rollback()
+        except Exception:      # noqa: BLE001
+            pass
 
 
 def _promote_rows(job, bank, ids, user_id, dataset_id, stats):
