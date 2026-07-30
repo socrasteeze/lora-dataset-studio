@@ -27,7 +27,7 @@ For containerized or scripted setups, a handful of environment variables overrid
 | `LDS_ENV` | Path to the `.env` secrets file. |
 | `LDS_HOST` | Bind host — takes priority over `server.host`. |
 | `LDS_PORT` | Bind port — takes priority over `server.port`. |
-| `LDS_NO_BROWSER` | `1` disables the browser auto-open at startup (the launcher otherwise opens the actual bound address once the server is up). |
+| `LDS_NO_BROWSER` | `1` disables the browser auto-open at startup regardless of `server.auto_open_browser` — for a one-off or automated launch that never touched Settings. |
 | `FLASK_DEBUG` | `1` enables Flask debug mode. |
 
 ## Overview
@@ -484,6 +484,7 @@ How the app binds and who can reach it. **These are the settings that need a res
 - **Require an access token** → `server.require_token`. Default **off** — a home LAN is treated as trusted, so LAN access is open and there's no token to type on a phone. Turn it **on** to demand a token from remote devices; requests from localhost never need one.
 - **Access token** → `server.access_token`. Shown only when the token gate is on: a read-only field with **Generate new token** and **Copy**. It's persisted, so it survives restarts. Open `http://<machine>:<port>/?token=<token>` once from the remote device and a signed session cookie takes over.
 - **Open it on your phone** — a card with a scannable **QR code** and copyable URLs built from this machine's real LAN IP (and Tailscale IP, if present). No guessing which address to type.
+- **Open a browser tab on launch** → `server.auto_open_browser`. Default **on** — a tab opens automatically once the server is up. Turn it **off** if you keep a tab pinned: no browser lets an app reuse an already-open tab, so every restart otherwise opens a redundant new one. `LDS_NO_BROWSER=1` still overrides this for a one-off launch (see the environment-variable table above) without needing a Settings change.
 
 **Trap:** if you launched via `start.bat` with `LDS_PORT` set, that variable can override the port in your config. The in-app **Save & restart** pins host and port for the relaunch, precisely so the restart lands on the port you chose rather than the one the script forced.
 

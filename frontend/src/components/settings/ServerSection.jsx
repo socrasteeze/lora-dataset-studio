@@ -19,6 +19,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
   const [copiedUrl, setCopiedUrl] = useState(null)   // which reach-URL was just copied (by key)
   const lan = !LOOPBACK_HOSTS.includes(config.server.host)
   const requireToken = !!config.server.require_token
+  const autoOpenBrowser = !!config.server.auto_open_browser
   // Real LAN IPv4 of this machine (backend socket probe), so the remote-access
   // URL is copyable as-is instead of a <this-computer> placeholder. null when the
   // backend couldn't determine it (offline / loopback-only) -> keep the placeholder.
@@ -119,6 +120,24 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
           className={`relative h-6 w-11 shrink-0 scroll-mt-24 rounded-full transition-colors ${lan ? 'bg-emerald-500' : 'bg-surface border border-border-strong'}`}>
           <span aria-hidden
             className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${lan ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
+      </div>
+
+      <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-raised px-3 py-2.5">
+        <div>
+          <p className="text-sm font-medium text-content">Open a browser tab on launch</p>
+          <p className="mt-0.5 text-xs text-content-muted">
+            On (default): a tab opens automatically once the server is up. Off: nothing
+            opens — useful if you keep a tab pinned, since every restart otherwise adds
+            another one (no browser lets an app reuse an already-open tab).
+          </p>
+        </div>
+        <button id="server-auto-open-browser" type="button" role="switch" aria-checked={autoOpenBrowser}
+          onClick={() => setField('server', 'auto_open_browser', !autoOpenBrowser)}
+          aria-label="Open a browser tab on launch"
+          className={`relative h-6 w-11 shrink-0 scroll-mt-24 rounded-full transition-colors ${autoOpenBrowser ? 'bg-emerald-500' : 'bg-surface border border-border-strong'}`}>
+          <span aria-hidden
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${autoOpenBrowser ? 'translate-x-5' : 'translate-x-0'}`} />
         </button>
       </div>
 

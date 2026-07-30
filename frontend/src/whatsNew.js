@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-stop-the-launch-tab',
+    date: '2026-07-29',
+    title: 'Keep a pinned tab? Turn off the tab that pops open on every launch',
+    blurb:
+      'Settings → Server & access has a new switch, Open a browser tab on launch — off, and starting or restarting the app no longer opens a new tab alongside the one you already have pinned. On by default, so nothing changes unless you flip it.',
+    to: '/settings/server',
+  },
+  {
     id: '2026-07-29-bank-passes-on-a-peer',
     date: '2026-07-29',
     title: 'Queue a bank — or the whole group — onto your other machine’s GPU',

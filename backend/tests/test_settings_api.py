@@ -399,7 +399,10 @@ def test_logs_tail_empty_when_no_log(client):
 def test_settings_payload_includes_server_defaults(client):
     cfg = client.get('/api/settings').get_json()['config']
     assert cfg['server'] == {'host': '127.0.0.1', 'port': 5050,
-                             'require_token': False, 'access_token': ''}
+                             'require_token': False, 'access_token': '',
+                             # On by default: an install that predates the
+                             # toggle must keep opening its tab.
+                             'auto_open_browser': True}
 
 
 def test_put_settings_saves_require_token(client):

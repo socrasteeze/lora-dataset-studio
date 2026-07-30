@@ -142,7 +142,11 @@ if __name__ == '__main__':
     # server is up — replaces start.bat's hardcoded, fired-too-early 127.0.0.1.
     _browse_url, _ = _local_browse_url(host, port, os.environ.get('LDS_ACCESS_TOKEN'))
     print(f"[LDS] Serving at {_browse_url}")
-    if os.environ.get('LDS_NO_BROWSER') != '1':
+    # Settings ▸ Server & access owns the persisted on/off switch; LDS_NO_BROWSER=1
+    # stays as the env-level override for a one-off or automated launch that
+    # never touched Settings.
+    if cfg_get('server.auto_open_browser', True) \
+            and os.environ.get('LDS_NO_BROWSER') != '1':
         _open_browser_when_ready(host, port, os.environ.get('LDS_ACCESS_TOKEN'))
     app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1',
             host=host,

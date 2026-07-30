@@ -40,7 +40,14 @@ DEFAULTS = {
     # default — no token to type on a phone. Turn it ON to demand a token from
     # remote devices (access_token is then generated + persisted here so it
     # survives restarts and is copyable from Settings). Loopback never needs it.
-    'server': {'host': '127.0.0.1', 'port': 5050, 'require_token': False, 'access_token': ''},
+    'server': {'host': '127.0.0.1', 'port': 5050, 'require_token': False, 'access_token': '',
+               # On by default (unchanged launch behaviour). Off = run.py never
+               # calls webbrowser.open() — for a user who keeps a tab pinned,
+               # every restart/reboot otherwise pops a redundant new one, and
+               # there is no cross-browser way to reuse an existing tab instead
+               # of opening another. LDS_NO_BROWSER=1 still overrides this for
+               # one-off/automated launches without touching Settings.
+               'auto_open_browser': True},
     # Cluster / remote GPU workers. standalone = today's single-machine behaviour.
     # primary = this install owns datasets and accepts compute peers.
     # peer = this install dials a Primary and only runs GPU jobs for it.
