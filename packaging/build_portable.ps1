@@ -5,10 +5,10 @@
 
 .DESCRIPTION
   Produces packaging/dist/LoRA-Dataset-Studio-local-legacy-win64.zip: a self-contained folder the
-  end user extracts and runs by double-clicking "LoRA Dataset Studio.exe" — no Python
+  end user extracts and runs by double-clicking "LoRA Dataset Studio.exe" -- no Python
   install, no terminal. The heavy externals (ComfyUI, ai-toolkit, Ollama, ML extras)
   stay OUT of the bundle: the in-app Setup wizard installs them. This is why we ship a
-  real standalone CPython (which HAS pip) instead of a single frozen exe — the wizard's
+  real standalone CPython (which HAS pip) instead of a single frozen exe -- the wizard's
   `pip install -r backend/requirements-ml.txt` runs against the bundled interpreter.
 
   Bundle layout (mirrors the repo so backend/config.py resolves REPO_ROOT/FRONTEND_DIST
@@ -71,7 +71,7 @@ Get-Content (Join-Path $Root 'backend\requirements.txt') |
 & $PyExe -m pip install --no-warn-script-location --disable-pip-version-check -r $reqRun
 if ($LASTEXITCODE -ne 0) { throw 'pip install of runtime deps failed.' }
 
-# 3) App files — mirror the repo so REPO_ROOT/FRONTEND_DIST resolve unchanged.
+# 3) App files -- mirror the repo so REPO_ROOT/FRONTEND_DIST resolve unchanged.
 Step 'Staging app files'
 robocopy (Join-Path $Root 'backend') (Join-Path $Stage 'backend') /E `
   /XD __pycache__ tests .venv /XF *.pyc | Out-Null
@@ -84,13 +84,13 @@ Copy-Item -Force (Join-Path $Root 'README.md') $Stage -ErrorAction SilentlyConti
 Copy-Item -Force (Join-Path $Root 'LICENSE')   $Stage -ErrorAction SilentlyContinue
 
 # 4) Launcher exe (host python + PyInstaller; tkinter is bundled automatically).
-#    PyInstaller needs CPython 3.9-3.12 — bare `python` may resolve to a newer one
+#    PyInstaller needs CPython 3.9-3.12 -- bare `python` may resolve to a newer one
 #    (the exact trap start.bat dodges for the ML extras), so resolve a compatible
 #    host interpreter through the py launcher first, newest supported first.
 Step 'Building the launcher exe (PyInstaller)'
 # PS 5.1 gotcha: with $ErrorActionPreference='Stop', a NATIVE command writing to
 # stderr WHILE redirected (2>$null / *>$null) raises a terminating
-# NativeCommandError — pip's "WARNING: Package(s) not found" killed the build.
+# NativeCommandError -- pip's "WARNING: Package(s) not found" killed the build.
 # Relax EAP around the native probes and trust $LASTEXITCODE instead.
 $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
@@ -99,7 +99,7 @@ foreach ($v in '3.12', '3.11', '3.10', '3.9') {
   $exe = & py "-$v" -c 'import sys; print(sys.executable)' 2>$null
   if ($LASTEXITCODE -eq 0 -and $exe) { $HostPy = "$exe".Trim(); break }
 }
-if (-not $HostPy) { $HostPy = 'python' }   # last resort — may fail on 3.13+
+if (-not $HostPy) { $HostPy = 'python' }   # last resort -- may fail on 3.13+
 Write-Host "    host python for PyInstaller: $HostPy"
 & $HostPy -m pip show pyinstaller *> $null
 if ($LASTEXITCODE -ne 0) {

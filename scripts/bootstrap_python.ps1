@@ -1,11 +1,11 @@
 <#
-  bootstrap_python.ps1 — fetch a self-contained CPython when the machine has no
+  bootstrap_python.ps1 -- fetch a self-contained CPython when the machine has no
   CPython 3.10-3.12 that start.bat can build its .venv on.
 
   Downloads the official `install_only` build from astral-sh/python-build-standalone
   (the runtime source used by the Windows start.bat flow), verifies its SHA-256 against
   the GitHub asset digest, and extracts it to <Dest> so <Dest>\python.exe is a ready
-  3.12 interpreter — no system install, no admin rights, nothing added to PATH.
+  3.12 interpreter -- no system install, no admin rights, nothing added to PATH.
 
   Idempotent: a valid existing <Dest>\python.exe (already 3.10-3.12) is reused, so
   a second run is instant. Windows x86_64 only; needs PowerShell 5.1+ and the
