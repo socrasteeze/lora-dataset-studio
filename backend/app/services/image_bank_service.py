@@ -3422,7 +3422,7 @@ def _faces_job(bank_id, device_id=None):
                     extra_payload={'threshold': th['face_threshold'],
                                    'device': 'auto'},
                     cache_path=cache_path, progress_re=_PROGRESS_RE,
-                    detail_label='face pass')
+                    detail_label='face pass', required_cap='face_scoring')
             except bank_remote.RemotePassCancelled:
                 bank_jobs.progress(job, detail='stopped — the peer was told to '
                                                'abort; partial work on it was '
@@ -3646,7 +3646,7 @@ def _score_job(bank_id, device_id=None):
                     job, device_id, script=_SCORE_SCRIPT, by_path=by_path,
                     extra_payload={'style_threshold': th['style_threshold']},
                     cache_path=cache_path, progress_re=_SCORE_PROGRESS_RE,
-                    detail_label='scoring pass')
+                    detail_label='scoring pass', required_cap='bank_scoring')
             except bank_remote.RemotePassCancelled:
                 bank_jobs.progress(job, detail='stopped — the peer was told to '
                                                'abort; partial work on it was '

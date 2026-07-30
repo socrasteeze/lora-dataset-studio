@@ -50,15 +50,50 @@ def _map_home(peer_key: str, name_to_hub: dict) -> str | None:
     return name_to_hub.get(os.path.basename(str(peer_key)))
 
 
+_REQUIRED_CAP_HINT = {
+    'bank_scoring': 'bank-scoring',
+    'face_scoring': 'face-scoring',
+}
+
+
+def _check_peer_capability(device_id, required_cap) -> None:
+    """Refuse up front when the peer's OWN last heartbeat already reported the
+    needed stack missing — rather than staging every image in the bank across
+    the network only to fail on the first one. An explicit False blocks; an
+    absent/empty blob (never heartbeated yet) does not, so a peer that just
+    joined is not refused on a technicality it hasn't had the chance to report."""
+    if not required_cap:
+        return
+    from ..models import ClusterDevice
+    row = ClusterDevice.query.filter_by(id=device_id).first()
+    if row is None:
+        return
+    try:
+        caps = json.loads(row.capabilities or '{}')
+    except (TypeError, ValueError):
+        caps = {}
+    if caps.get(required_cap) is False:
+        hint = _REQUIRED_CAP_HINT.get(required_cap, required_cap)
+        raise RuntimeError(
+            f"the peer's last check-in reported {hint} as not installed — "
+            f'run Setup ▸ Quality tools on the peer, or Run on a different '
+            f'device')
+
+
 def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
-                    cache_path, progress_re, detail_label) -> dict | None:
+                    cache_path, progress_re, detail_label,
+                    required_cap=None) -> dict | None:
     """Stage → enqueue → poll → remap. Returns the script's result dict with
     hub-keyed ``results``/``clusters``, or None when the pass was stopped.
-    Raises RuntimeError with the peer's reason on failure."""
+    Raises RuntimeError with the peer's reason on failure — including, up
+    front via ``required_cap`` ('bank_scoring' | 'face_scoring'), when the
+    peer's own heartbeat already said it lacks the stack this pass needs."""
     from ..extensions import db
     from ..models import ClusterJob
     from . import cluster as cluster_svc
     from . import cluster_remote
+
+    _check_peer_capability(device_id, required_cap)
 
     name_to_hub = {}
     staged = []

@@ -22,6 +22,18 @@ POLL_IDLE_SECONDS = 2
 POLL_ERROR_SECONDS = 5
 HEARTBEAT_SECONDS = 30
 
+# Which of THIS machine's python envs runs each known infer script — mirrors
+# the interpreter each pass picks when it runs locally (image_bank_service).
+# The human-readable name feeds the error when that env is missing its deps.
+_SCRIPT_ENV_KEYS = {
+    'bank_score_infer.py': 'bank_scoring.python',
+    'face_embed_infer.py': 'face_scoring.python',
+}
+_SCRIPT_ENV_NAMES = {
+    'bank_score_infer.py': 'bank-scoring',
+    'face_embed_infer.py': 'face-scoring',
+}
+
 
 class PeerWorker:
     def __init__(self):
@@ -414,10 +426,17 @@ class PeerWorker:
 
             # Interpreter comes from THIS machine's config only — a peer-supplied
             # `python` would reintroduce the arbitrary-execution grant the script
-            # confinement above just closed.
-            python = ((cfg.get('bank_scoring.python') or '').strip()
-                      or (cfg.get('aitoolkit.python') or '').strip()
-                      or sys.executable)
+            # confinement above just closed. And it is chosen PER SCRIPT: the
+            # faces script needs the face-scoring env (cv2/onnx/insightface),
+            # the score script the bank-scoring one — a single chain ran a fully
+            # configured faces pass in the wrong venv and died on cv2.
+            env_key = _SCRIPT_ENV_KEYS.get(script_path.name)
+            if env_key:
+                python = ((cfg.get(env_key) or '').strip() or sys.executable)
+            else:
+                python = ((cfg.get('bank_scoring.python') or '').strip()
+                          or (cfg.get('aitoolkit.python') or '').strip()
+                          or sys.executable)
             timeout = int(payload.get('timeout') or 3600)
             self._progress(job_id, {'phase': 'infer', 'script': script_path.name})
 
@@ -440,7 +459,17 @@ class PeerWorker:
                 return
             if rc != 0:
                 tail = infer_stream.stderr_tail(stderr_lines)
-                self._complete(job_id, error=f'infer exit {rc}: {tail or stdout[:300]}')
+                detail = tail or stdout[:300]
+                env_name = _SCRIPT_ENV_NAMES.get(script_path.name)
+                if env_name and 'ModuleNotFoundError' in (tail or ''):
+                    # A missing package reads as a bare traceback otherwise —
+                    # this is the one failure mode with an obvious fix (install
+                    # the extra on THIS machine), so name it instead of leaving
+                    # the user to grep a stack trace for the answer.
+                    detail = (f"this peer's {env_name} python is missing its "
+                             f'dependencies — run Setup ▸ Quality tools on the '
+                             f'peer ({detail})')
+                self._complete(job_id, error=f'infer exit {rc}: {detail}')
                 return
             try:
                 result_obj = json.loads(stdout) if stdout.strip() else {}
