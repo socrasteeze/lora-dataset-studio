@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-30-promote-into-a-brand-new-dataset',
+    date: '2026-07-30',
+    title: 'Send a bank selection straight into a dataset that does not exist yet',
+    blurb:
+      '⬆ Promote could only ever fill a dataset you had already created, so the last step of triaging a dump meant leaving for the Datasets page to make a blank one and coming back. There is now a 🆕 New dataset door beside the other two: give it a name and a trigger word and it is created and filled in one click. It is a character dataset with the usual defaults — concept or style, the target model and the fidelity are all still in the dataset\'s own settings, so nothing is decided for you. If the trigger word is already used by another dataset you are told which one, but not stopped: two datasets may share a trigger, and the app only refuses when both would train on the same base model. Better to hear it now than when you queue training, because by then renaming also renames the deployed LoRA.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-29-loading-is-not-stuck',
     date: '2026-07-29',
     title: 'A pass loading its model no longer looks frozen',

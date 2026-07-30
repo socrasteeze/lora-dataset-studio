@@ -3,6 +3,7 @@ import ShotIllustration from './ShotIllustration';
 import TileSizeControl from '../shared/TileSizeControl';
 import FullBackupControls from './FullBackupControls';
 import { HelpBadge } from '../../help/HelpMode';
+import { canCreateDataset } from './newDataset';
 import { requestHelpTip } from '../../help/helpTips';
 import {
   datasetKind, datasetMatches, groupDatasets, kindsPresent,
@@ -351,13 +352,11 @@ function NewDatasetForm({ onCreate, onClose }) {
   // Style : esthétique globale absorbée par le LoRA — captions de contenu pur
   // obligatoires, aucun trigger d'activation, pas de fidélité visage.
   const style = kind === 'style';
-  // Mirrors the server rule EXACTLY (POST /api/dataset/create): name is always
-  // required; trigger_word is required for character/concept (it's the token
-  // that summons them) but NOT for style (the server may retain an internal id
-  // for filenames/runs, but it never enters training captions or prompts).
-  // Without this, an empty-trigger character/concept create used to reach the
-  // server with the button enabled and 400 silently (no toast, no feedback).
-  const canCreate = name.trim() && (!concept || conceptDesc.trim()) && (style || trigger.trim());
+  // The rule (and the reasoning that used to sit here) moved into
+  // newDataset.js the moment ⬆ Promote gained a "🆕 A new dataset" door: two
+  // copies of a rule that mirrors the server is two chances to stop mirroring
+  // it. Same behaviour, now tested.
+  const canCreate = canCreateDataset({ name, trigger, kind, conceptDesc });
   return (
     <div id="new-dataset-form" className="mx-auto w-full max-w-4xl rounded-xl border border-border bg-surface p-3 flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-2">

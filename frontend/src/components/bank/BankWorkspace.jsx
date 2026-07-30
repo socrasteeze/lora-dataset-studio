@@ -1982,6 +1982,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
       {promoteOpen && (
         <PromoteDialog bankId={bankId}
+          bankName={payload?.name || ''}
           selectedIds={[...selected]}
           onClose={() => setPromoteOpen(false)}
           // refreshImages too: a promotion marks the rows it carried, and the ⬆

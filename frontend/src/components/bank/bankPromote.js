@@ -1,11 +1,15 @@
-/* ⬆ Promote — the DECIDABLE part of the two-destination dialog, kept free of
+/* ⬆ Promote — the DECIDABLE part of the three-destination dialog, kept free of
  * JSX so `node --test` can run it.
  *
- * Promoting used to lead exactly one place: a dataset. A dataset is the strict,
- * training-bound container — pulling 200 candidates out of a 9 000-image dump to
- * keep working on them is a different intent, and a dataset commits material the
- * user has not decided on yet. So there are two doors now, and the copy has to
- * say plainly which one is open and what it costs.
+ * Promoting used to lead exactly one place: an EXISTING dataset. A dataset is the
+ * strict, training-bound container — pulling 200 candidates out of a 9 000-image
+ * dump to keep working on them is a different intent, and a dataset commits
+ * material the user has not decided on yet. So a NEW BANK door was added.
+ *
+ * The third door closes the remaining gap: the funnel's last step still sent the
+ * user to the Datasets page to make a blank dataset and back again. A bank needs
+ * one thing to exist (a name) and a dataset needs two — but asking for a second
+ * field is not the same as having no door.
  *
  * The cost line is not decoration. Images average ~300 KB, so 200 of them are
  * ~60 MB and nobody needs a warning — but a video bank is three orders of
@@ -14,7 +18,18 @@
  * measuring; it never guesses one.
  */
 
-export const PROMOTE_DESTINATIONS = ['dataset', 'bank']
+import { canCreateDataset } from '../dataset/newDataset.js'
+
+/* The tab row's single source of truth. It used to be a bare id list referenced
+ * only by its own test — a decorative constant that would silently disagree with
+ * the JSX on the first edit. The dialog now renders FROM this, so it cannot.
+ * The two dataset doors sit adjacent, and the labels are short because three
+ * tabs have to survive a 400 px viewport. */
+export const PROMOTE_DESTINATIONS = [
+  { id: 'dataset', label: '📁 Existing dataset' },
+  { id: 'new-dataset', label: '🆕 New dataset' },
+  { id: 'bank', label: '🗃 New image bank' },
+]
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
 
@@ -50,9 +65,11 @@ export function promoteCount({ useSelection, selectedCount, promotable, size }) 
 /** The weight sentence, or null when there is nothing honest to say.
  *
  *  Only for the NEW BANK destination: that copy is byte-for-byte, so the
- *  measured size IS the disk cost. A dataset promotion re-encodes to webp on the
+ *  measured size IS the disk cost. BOTH dataset doors re-encode to webp on the
  *  way in, so quoting the source weight there would be a number the user could
- *  check and find wrong. */
+ *  check and find wrong — this deliberately stays silent for 'new-dataset' too,
+ *  and a test pins that. The instinct when adding a destination is to teach
+ *  every helper about it; here the correct change is none. */
 export function weightNotice({ destination, size }) {
   if (destination !== 'bank') return null
   if (!size) return 'Measuring what that weighs on disk…'
@@ -71,6 +88,14 @@ export function promoteSummary({ destination, useSelection, selectedCount,
     return `${many} will be COPIED into a brand-new bank, left un-triaged so you can `
       + 'work on them apart. This bank keeps every one of them, marked as promoted.'
   }
+  // ABOVE the no-target branch below on purpose: a dataset that does not exist
+  // yet has nothing "already in" it and no target to choose, so falling through
+  // would print "into the CHOSEN dataset" about a dataset being named right now.
+  if (destination === 'new-dataset') {
+    return `${many} will be COPIED into a brand-new dataset — normalized to webp,`
+      + ' near-duplicates within the selection collapsed. The bank and its source'
+      + ' folder are left as they are.'
+  }
   if (!useSelection && !datasetChosen) {
     return 'Kept image(s) not yet in the chosen dataset will be COPIED into it'
       + ' — normalized to webp, near-duplicates already in the dataset skipped.'
@@ -84,16 +109,27 @@ export function promoteSummary({ destination, useSelection, selectedCount,
     + ' folder are left as they are.'
 }
 
-/** May the confirm button arm? A dataset needs a target, a new bank needs a
- *  name — and neither may fire twice. */
-export function canStartPromote({ destination, datasetId, bankName, busy }) {
+/** May the confirm button arm? An existing dataset needs a target, a new bank
+ *  needs a name, a new dataset needs a name AND a trigger — and none may fire
+ *  twice.
+ *
+ *  The new-dataset case DELEGATES to canCreateDataset rather than restating the
+ *  rule: a second copy of a rule that mirrors the server is a second chance to
+ *  stop mirroring it, which is exactly why that helper was extracted. */
+export function canStartPromote({ destination, datasetId, bankName, busy,
+  datasetName, datasetTrigger }) {
   if (busy) return false
   if (destination === 'bank') return String(bankName || '').trim().length > 0
+  if (destination === 'new-dataset') {
+    return canCreateDataset({ name: datasetName, trigger: datasetTrigger })
+  }
   return !!datasetId
 }
 
 /** Label of the confirm button — it has to name what it is about to make. */
 export function promoteButtonLabel({ destination, busy }) {
   if (busy) return 'Starting…'
-  return destination === 'bank' ? 'Create bank' : 'Promote'
+  if (destination === 'bank') return 'Create bank'
+  if (destination === 'new-dataset') return 'Create dataset'
+  return 'Promote'
 }
