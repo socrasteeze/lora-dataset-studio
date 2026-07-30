@@ -50,6 +50,78 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-30-retry-reference-edit-show-engine',
+    date: '2026-07-30',
+    title: 'Retry a reference edit exactly as it ran',
+    blurb:
+      'An Edit reference candidate now names the engine that actually produced it. Retry repeats the same instruction and selected engine; choose Try another prompt only when you want to change the edit.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-30-krea-shot-card-adherence',
+    date: '2026-07-30',
+    title: 'Krea 2 now follows the dataset shots you selected',
+    blurb:
+      'Krea 2 Edit used to let the reference photo dominate a dataset run, so distinct cards could repeat its pose. Its calibrated Krea-only profile now gives the selected card priority for angle, expression, pose and scene, while keeping identity from the reference. Face cards render 1:1 and bust/body/back cards 3:4 through Krea Fit v1.2, so a square reference no longer squeezes a full-body or sitting card into a bust crop. Klein keeps its own generation path unchanged.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-30-studio-safe-pause-comfyui-start',
+    date: '2026-07-30',
+    title: '🛟 A Test Studio batch now pauses safely for ComfyUI recovery',
+    blurb:
+      'If ComfyUI goes away mid-batch, Studio now pauses with a paste-safe reason and submits no later prompt. Recover or restart ComfyUI, then cancel and resume the batch. Setup’s “Start ComfyUI” uses the app’s fixed local-safe profile: it never reads, changes or runs a .bat file, so your own launcher stays untouched.',
+    to: '/studio',
+  },
+  {
+    id: '2026-07-30-runs-test-in-studio',
+    date: '2026-07-30',
+    title: 'Open the right Test Studio straight from a training run',
+    blurb:
+      'Every run that still belongs to a dataset now carries 🧪 Test in Studio in Runs — active local and cloud runs, recent cards, and even a folded dataset group. One click opens Test Studio with that run’s dataset already selected, so you can compare its checkpoints without first hunting through the library.',
+    to: '/cloud',
+  },
+  {
+    id: '2026-07-30-keep-an-improvement-without-training-on-both',
+    date: '2026-07-30',
+    title: '✓ Keep an improved image without accidentally training on both',
+    blurb:
+      'Keeping a completed ✨ Upscale & improve candidate now returns its original to Undecided automatically — from one tile or a bulk Keep, even when both were selected. Nothing is deleted: both files and the comparison remain, and you can keep the original again if you deliberately want both in training.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-07-30-preserve-imported-photo-files',
+    date: '2026-07-30',
+    title: 'Keep the photo you imported, not an automatic WebP copy',
+    blurb:
+      'New un-cropped JPG, PNG, WebP and BMP imports now stay byte-for-byte in their original format by default. Training still gets disposable PNG pairs only when it starts, so the dataset keeps its master files. WebP normalization remains available as an opt-in policy; Auto head-crop deliberately creates a derived WebP, and older WebPs cannot be reversed into originals.',
+    to: '/settings/captioning',
+  },
+  {
+    id: '2026-07-30-krea-raw-lokr-likeness-starter',
+    date: '2026-07-30',
+    title: 'Start a Krea 2 Raw LoKr likeness run from a named recipe',
+    blurb:
+      'A new Character-only Krea 2 Raw · LoKr likeness preset puts the reported community starting point in one place: LoKr factor 16, 32/32, 768 px, Automagic2, Sigmoid, Balanced and differential guidance 3. Those Krea-only controls are now visible in Expert options and every run records them for comparison. It is a starting point, not a likeness promise: inspect your own checkpoints, and type 3000 in Steps only when you deliberately want that target instead of the adaptive policy.',
+    to: '/datasets?section=training&panel=advanced',
+  },
+  {
+    id: '2026-07-30-dataset-to-bank-keeps-useful-context',
+    date: '2026-07-30',
+    title: '🗃️ Turn a dataset back into a bank without losing its useful context',
+    blurb:
+      '↑ Import to bank now carries captions, keep/reject curation, framing, watermark and provenance into the copied bank, whichever analysis choice you make. The default restores compatible final-file technical analysis; Start fresh skips only reuse of prior analysis. Face and Score AI results are deliberately not reused after normalization, and the original dataset is untouched. Suggested by the owner.',
+    to: '/datasets?section=export&panel=to-bank',
+  },
+  {
+    id: '2026-07-29-test-studio-random-dataset-captions',
+    date: '2026-07-29',
+    title: 'Give Test Studio a real dataset caption in one click',
+    blurb:
+      '🎲 Caption can now pull a random nonblank caption from a kept image in a dataset you choose, so a useful Studio test prompt is never far from the work you already curated. Pick the source once and it stays locked in this browser; use ▾ to change it. If you have typed a prompt, Studio asks before replacing it. Suggested by the owner.',
+    to: '/studio',
+  },
+  {
     id: '2026-07-30-stop-bat-and-terminal-activity',
     date: '2026-07-30',
     title: 'Stop the server for real — and watch its work in the terminal',

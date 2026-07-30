@@ -290,6 +290,8 @@ def test_queue_refuses_before_sending_and_explains(app, probe, monkeypatch):
     sent = {}
 
     class _Ok:
+        status_code = 200
+
         def raise_for_status(self):
             pass
 
@@ -297,7 +299,7 @@ def test_queue_refuses_before_sending_and_explains(app, probe, monkeypatch):
             return {'prompt_id': 'p1'}
 
     monkeypatch.setattr(comfyui.requests, 'post',
-                        lambda url, json=None, headers=None, timeout=None:
+                        lambda url, json=None, headers=None, timeout=None, **_kwargs:
                         (sent.update(json or {}), _Ok())[1])
     monkeypatch.setattr(comfyui, '_ensure_comfyui_before_generation', lambda: (True, 'up'))
 
@@ -316,6 +318,8 @@ def test_a_valid_graph_still_goes_out(app, probe, monkeypatch):
     sent = {}
 
     class _Ok:
+        status_code = 200
+
         def raise_for_status(self):
             pass
 
@@ -323,7 +327,7 @@ def test_a_valid_graph_still_goes_out(app, probe, monkeypatch):
             return {'prompt_id': 'p1'}
 
     monkeypatch.setattr(comfyui.requests, 'post',
-                        lambda url, json=None, headers=None, timeout=None:
+                        lambda url, json=None, headers=None, timeout=None, **_kwargs:
                         (sent.update(json or {}), _Ok())[1])
     monkeypatch.setattr(comfyui, '_ensure_comfyui_before_generation', lambda: (True, 'up'))
 

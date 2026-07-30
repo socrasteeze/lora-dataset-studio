@@ -1,17 +1,24 @@
+from __future__ import annotations
+
 import logging
 import threading
 import uuid
 from contextlib import contextmanager
-from .job_queue import queue_manager
+from contextvars import ContextVar
+
+from flask import has_app_context
+
+from .job_queue import GPU_ARBITER_LOCK, queue_manager
 
 logger = logging.getLogger(__name__)
+
 
 class GpuBusyError(RuntimeError):
     pass
 
 
 # Floor for the TTL-re-arm heartbeat interval (module-level so tests can shrink
-# it); the effective interval is max(this, flag_ttl / 3) — always well inside
+# it); the effective interval is max(this, ttl / 3) — always well inside
 # the TTL, so the flag can only lapse if the whole process dies.
 _HEARTBEAT_FLOOR_SECONDS = 10
 
@@ -28,112 +35,280 @@ def _log(message, level='info', detail=None):
         pass
 
 
-def recover_stale_vision_window():
-    """Clear a persisted vision lock during server startup.
+# The token is intentionally context-local. A Vision batch can propagate it to
+# its worker threads to renew the same persisted ownership record, but an
+# unrelated request never inherits permission simply because a DB flag exists.
+_vision_window_context: ContextVar[tuple[str, int] | None] = ContextVar(
+    'vision_window_context', default=None)
+# Process-local complement to the persisted TTL. It remains true for a long
+# Vision/CUDA operation even if a background renewal fails, and is cleared only
+# after its heartbeat has stopped and the outer window has exited.
+_active_vision_window_tokens: set[str] = set()
+# Sane production bounds on a caller-supplied flag_ttl. Module-level (like
+# _HEARTBEAT_FLOOR_SECONDS above) so the fork's own race tests can shrink
+# _MIN_FLAG_TTL_SECONDS to drive a window with a tiny, fast, deterministic TTL
+# instead of waiting out a real one — upstream's own test suite never needed
+# this override because it has no equivalent fast/deterministic race tests.
+_MIN_FLAG_TTL_SECONDS = 30
+_MAX_FLAG_TTL_SECONDS = 3600
 
-    Vision work runs synchronously inside this Python process. If the process is
-    starting, no vision request from the previous process can still be alive, but
-    its database-backed TTL flag may be. Keeping that flag is what caused a restart
-    after interrupted captioning to report "GPU busy" for up to 30 minutes.
-    """
-    previous = queue_manager._get_system_state('vision_in_progress')
-    if not previous:
+
+def _normalise_flag_ttl(value) -> float:
+    # float, not int: truncating a fractional flag_ttl to 0 defeats the fork's
+    # own race tests, which deliberately drive this with a sub-second TTL
+    # (alongside a correspondingly-lowered _MIN_FLAG_TTL_SECONDS) to exercise
+    # the heartbeat deterministically and fast.
+    try:
+        ttl = float(value)
+    except (TypeError, ValueError):
+        ttl = 300.0
+    return max(_MIN_FLAG_TTL_SECONDS, min(_MAX_FLAG_TTL_SECONDS, ttl))
+
+
+def _in_app_context(callback):
+    """Run a tiny state update from a propagated worker context when needed."""
+    if has_app_context():
+        return callback()
+    app = queue_manager._app
+    if app is None:
         return False
-    queue_manager._set_system_state('vision_in_progress', None)
-    logger.warning('startup recovery: cleared stale vision/GPU lock from the previous process')
-    return True
+    with app.app_context():
+        return callback()
+
+
+def vision_window_is_owned() -> bool:
+    """Whether this execution context belongs to an active Vision GPU window."""
+    return _vision_window_context.get() is not None
+
+
+def vision_gpu_window_blocks_gpu() -> bool:
+    """Whether an in-process Vision/CUDA window still owns the local GPU.
+
+    This does not consult the TTL-backed database flag: it is the fail-closed
+    fallback for a long operation whose renewal temporarily fails.
+    """
+    with GPU_ARBITER_LOCK:
+        return bool(_active_vision_window_tokens)
+
+
+def bind_vision_window_context(callback):
+    """Bind only the Vision token to a worker; never copy Flask contextvars."""
+    owned = _vision_window_context.get()
+    if owned is None:
+        return callback
+
+    def _bound(*args, **kwargs):
+        context_token = _vision_window_context.set(owned)
+        try:
+            return callback(*args, **kwargs)
+        finally:
+            _vision_window_context.reset(context_token)
+
+    return _bound
+
+
+def _renew_owned_vision_token(token: str, ttl: int) -> bool:
+    """Refresh exactly one claimed token, including from a heartbeat thread."""
+    def _renew():
+        try:
+            with GPU_ARBITER_LOCK:
+                if queue_manager._get_system_state('vision_in_progress') != token:
+                    return False
+                queue_manager._set_system_state('vision_in_progress', token,
+                                                ttl_seconds=ttl)
+                return True
+        except Exception:
+            logger.exception('vision GPU window renewal failed')
+            return False
+
+    return bool(_in_app_context(_renew))
+
+
+def _heartbeat_interval_seconds(ttl: int) -> float:
+    """Refresh well before expiry without creating a busy polling loop.
+    Floored by _HEARTBEAT_FLOOR_SECONDS (module-level so tests can shrink it
+    to drive the heartbeat fast, rather than waiting out a real TTL/3)."""
+    return max(_HEARTBEAT_FLOOR_SECONDS, min(60.0, float(ttl) / 3.0))
+
+
+def renew_gpu_exclusive_vision_window(flag_ttl=None) -> bool:
+    """Refresh this context's persisted Vision ownership before an Ollama call.
+
+    A worker that outlives the outer Vision window cannot revive it: it must
+    still own the exact token in ``SystemState``. ``False`` is fail-closed and
+    callers must not start another local inference after it.
+    """
+    owned = _vision_window_context.get()
+    if owned is None:
+        return False
+    token, previous_ttl = owned
+    ttl = _normalise_flag_ttl(previous_ttl if flag_ttl is None else flag_ttl)
+    return _renew_owned_vision_token(token, ttl)
+
+
+def recover_stale_vision_window():
+    """Clear only a persisted Vision lock during server startup.
+
+    A stalled ComfyUI barrier is a different ownership record and must remain
+    intact across startup. Vision work itself cannot survive this Python process,
+    so its token is safe to clear.
+    """
+    def _recover():
+        with GPU_ARBITER_LOCK:
+            previous = queue_manager._get_system_state('vision_in_progress')
+            if not previous:
+                return False
+            queue_manager._set_system_state('vision_in_progress', None)
+            logger.warning('startup recovery: cleared stale vision/GPU lock from the previous process')
+            return True
+
+    return bool(_in_app_context(_recover))
+
 
 @contextmanager
 def gpu_exclusive_vision_window(flag_ttl=300):
-    if queue_manager._get_system_state('vision_in_progress'):
+    """Give one Vision operation exclusive ownership of the local GPU.
+
+    This is a handoff, not a per-image cleanup: a batch enters once, asks
+    ComfyUI to release its models once, then keeps Ollama hot for all of its
+    calls. A ComfyUI batch does the inverse at its first prompt, never between
+    its cells.
+    """
+    if _vision_window_context.get() is not None:
+        # Re-entering from the same request would obscure ownership and can make
+        # a stale worker look valid. Batches propagate the token only to renew.
         raise GpuBusyError('a vision task is already running')
-    if queue_manager._get_system_state('training_in_progress'):
-        raise GpuBusyError('training is running')
+
+    ttl = _normalise_flag_ttl(flag_ttl)
     token = uuid.uuid4().hex
-    queue_manager._set_system_state('vision_in_progress', token, ttl_seconds=flag_ttl)
-    _log('GPU taken exclusively', 'warn',
-         detail='ComfyUI unloaded; training cannot start until this releases')
-    # The TTL exists so a crashed process can't hold the GPU hostage — but a
-    # LEGITIMATE batch can outlive it (a big caption run on a slow vision model
-    # beats 30 min easily), and once the flag lapses the job queue's GPU gate
-    # reopens and image jobs start rendering on top of the vision pass. Re-arm
-    # the TTL from a heartbeat for as long as the window is open and we still
-    # own the token. A crash kills the heartbeat with the process, so the
-    # crash-recovery semantics (TTL lapse + boot-time recover) are unchanged.
+    context_token = _vision_window_context.set((token, ttl))
+    claimed = False
+    active_registered = False
     heartbeat_stop = threading.Event()
-    try:
-        from flask import current_app
-        _app = current_app._get_current_object()
-    except RuntimeError:
-        _app = None   # no app context (bare test harness) -> no heartbeat, old behavior
-
-    # The beat's check-and-rearm and the close's check-and-clear are the SAME
-    # critical section, and they have to be mutually exclusive — not merely
-    # ordered by a join with a timeout.
-    #
-    # This used to be `heartbeat.join(timeout=5)` alone, with a comment saying
-    # beats are two fast local DB ops so the join is effectively instant. That
-    # holds until SQLite's single write lock is contended, which this app hits
-    # often enough to carry write_with_retry and a `db_busy` error shape. When
-    # the join times out, the sequence is: beat passes its stop-check and reads
-    # the flag as still ours -> close clears the flag -> beat completes its
-    # write and re-arms it with a fresh TTL, then exits because stop is set.
-    # The result is a flag nothing is holding and nothing will refresh, so
-    # everything refuses "GPU busy" for the full 30-minute TTL. Owner-reported
-    # after cancelling a pass: "I had even canceled it and now it's showing
-    # this."
-    guard = threading.Lock()
-    closed = {'yes': False}
-
-    def _rearm_until_closed():
-        interval = max(_HEARTBEAT_FLOOR_SECONDS, flag_ttl / 3)
-        while not heartbeat_stop.wait(interval):
-            try:
-                with guard:
-                    # Re-checked INSIDE the lock: the window may have closed
-                    # while this beat was waiting on it, and a write after that
-                    # is the phantom lock.
-                    if closed['yes']:
-                        return
-                    with _app.app_context():
-                        if queue_manager._get_system_state('vision_in_progress') != token:
-                            return   # lapsed AND re-acquired by another caller — never stomp it
-                        queue_manager._set_system_state('vision_in_progress', token,
-                                                        ttl_seconds=flag_ttl)
-            except Exception:
-                logger.debug('vision-window TTL heartbeat failed; next beat retries',
-                             exc_info=True)
-
     heartbeat = None
-    if _app is not None:
-        heartbeat = threading.Thread(target=_rearm_until_closed, daemon=True,
-                                     name='vision-window-heartbeat')
-        heartbeat.start()
     try:
+        with GPU_ARBITER_LOCK:
+            try:
+                if vision_gpu_window_blocks_gpu():
+                    raise GpuBusyError('a vision task is already running')
+                if queue_manager._get_system_state('vision_in_progress'):
+                    raise GpuBusyError('a vision task is already running')
+                if queue_manager._get_system_state('training_in_progress'):
+                    raise GpuBusyError('training is running')
+                if queue_manager.has_comfyui_stalled_barrier():
+                    raise GpuBusyError(
+                        'ComfyUI recovery is required before a vision task can use the GPU.')
+                if queue_manager.has_comfyui_work():
+                    raise GpuBusyError(
+                        'ComfyUI has queued or active work; wait for it or cancel it before running vision.')
+            except GpuBusyError:
+                raise
+            except Exception as exc:
+                raise GpuBusyError(
+                    'Could not confirm GPU ownership safely; try again after checking ComfyUI.') from exc
+
+            queue_manager._set_system_state('vision_in_progress', token, ttl_seconds=ttl)
+            claimed = True
+            _active_vision_window_tokens.add(token)
+            active_registered = True
+            try:
+                from .utils.comfyui import ComfyVramFreeVerdict, free_comfyui_vram
+                verdict = free_comfyui_vram()
+            except Exception:
+                logger.exception('vision GPU window: ComfyUI /free raised unexpectedly')
+                verdict = None
+
+            if verdict not in (
+                    ComfyVramFreeVerdict.FREED,
+                    ComfyVramFreeVerdict.COMFYUI_OFFLINE):
+                if queue_manager._get_system_state('vision_in_progress') == token:
+                    queue_manager._set_system_state('vision_in_progress', None)
+                _active_vision_window_tokens.discard(token)
+                active_registered = False
+                claimed = False
+                raise GpuBusyError(
+                    'ComfyUI did not confirm that its GPU models were released. '
+                    'Wait for it to recover, then try the vision task again.')
+
+        _log('GPU taken exclusively', 'warn',
+             detail='ComfyUI unloaded; training cannot start until this releases')
+
+        # Some CUDA subprocesses and local image passes legitimately run for
+        # longer than their initial TTL. The heartbeat owns only this exact token;
+        # cleanup stops and joins it before clearing, so a stale thread cannot
+        # revive a released or replacement window.
+        #
+        # The beat's check-and-rearm (_renew_owned_vision_token) and the close's
+        # check-and-clear (_clear_owned, below) are the SAME critical section
+        # under GPU_ARBITER_LOCK, which is what makes them mutually exclusive —
+        # not the `heartbeat.join(timeout=2)` below, which is a tidy-up only.
+        # A join alone used to be the whole story, with a comment saying beats
+        # are two fast local DB ops so the join is effectively instant. That
+        # held until SQLite's single write lock is contended (this app hits
+        # that often enough to carry write_with_retry and a `db_busy` error
+        # shape): when the join timed out, a beat mid-write would land its
+        # re-arm AFTER the close's clear, leaving a flag nothing was holding
+        # and nothing would refresh — everything then refused "GPU busy" for
+        # the full TTL. Owner-reported after cancelling a pass: "I had even
+        # canceled it and now it's showing this." Sharing GPU_ARBITER_LOCK
+        # between the two closes it: whichever runs second under the lock sees
+        # the other's already-committed state, so the clear can never be
+        # overwritten by a beat that was merely slow to acquire it.
+        def _heartbeat():
+            while not heartbeat_stop.wait(_heartbeat_interval_seconds(ttl)):
+                if not _renew_owned_vision_token(token, ttl):
+                    # The process-local active-token fence remains set until the
+                    # outer window exits, so Queue/Training stay blocked even if
+                    # this persisted TTL has expired.
+                    logger.error(
+                        'vision GPU window heartbeat lost ownership; in-process GPU fence retained')
+                    return
+
+        heartbeat = threading.Thread(
+            target=_heartbeat, name='vision-window-heartbeat', daemon=True)
         try:
-            from .utils.comfyui import free_comfyui_vram
-            free_comfyui_vram()
-        except Exception:
-            pass
+            heartbeat.start()
+        except Exception as exc:
+            with GPU_ARBITER_LOCK:
+                if queue_manager._get_system_state('vision_in_progress') == token:
+                    queue_manager._set_system_state('vision_in_progress', None)
+                _active_vision_window_tokens.discard(token)
+            active_registered = False
+            claimed = False
+            raise GpuBusyError('Could not keep the Vision GPU reservation alive safely.') from exc
+
         yield
     finally:
         heartbeat_stop.set()
-        # Taking `guard` is what actually closes the race: a beat mid-write holds
-        # it, so we wait for that write and then clear on top of it; a beat that
-        # has not started sees closed=True under the same lock and never writes.
-        # The join stays as a tidy-up (the thread is done within one wait), but
-        # nothing correctness-critical rests on it any more.
-        with guard:
-            closed['yes'] = True
-            # only clear the flag if we still own it (it may have expired and been re-acquired)
-            if queue_manager._get_system_state('vision_in_progress') == token:
-                queue_manager._set_system_state('vision_in_progress', None)
-                _log('GPU released', 'ok')
-            else:
-                # Someone else owns the flag now — ours lapsed and was
-                # re-acquired. Worth a line: it is the shape a "GPU busy" that
-                # outlives its owner takes.
-                _log('GPU window closed, but the flag belongs to another pass',
-                     'warn')
-        if heartbeat is not None:
-            heartbeat.join(timeout=5)
+        # `join` here is a tidy-up, not the mutual exclusion — see the long
+        # comment above the heartbeat's definition. `_clear_owned` below shares
+        # GPU_ARBITER_LOCK with the beat's own re-arm, so even if the beat is
+        # still mid-write when this join times out, the clear simply waits its
+        # turn for the lock and then correctly overwrites whatever the beat
+        # just wrote.
+        if heartbeat is not None and heartbeat is not threading.current_thread():
+            heartbeat.join(timeout=2)
+        try:
+            if claimed:
+                def _clear_owned():
+                    with GPU_ARBITER_LOCK:
+                        # only clear the flag if we still own it (it may have
+                        # expired and been re-acquired by another caller)
+                        if queue_manager._get_system_state('vision_in_progress') == token:
+                            queue_manager._set_system_state('vision_in_progress', None)
+                            _log('GPU released', 'ok')
+                        else:
+                            # Someone else owns the flag now — ours lapsed and
+                            # was re-acquired. Worth a line: it is the shape a
+                            # "GPU busy" that outlives its owner takes.
+                            _log('GPU window closed, but the flag belongs to '
+                                 'another pass', 'warn')
+                _in_app_context(_clear_owned)
+        finally:
+            # Keep this after stop/join and database cleanup. Even if the app
+            # context is unavailable during teardown, the in-process fence must
+            # not outlive the actual Vision work.
+            if active_registered:
+                with GPU_ARBITER_LOCK:
+                    _active_vision_window_tokens.discard(token)
+            _vision_window_context.reset(context_token)
