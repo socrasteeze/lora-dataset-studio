@@ -33,6 +33,47 @@ _SCRIPT_ENV_NAMES = {
     'bank_score_infer.py': 'bank-scoring',
     'face_embed_infer.py': 'face-scoring',
 }
+# Where THIS machine keeps the weights for each script. The hub cannot send this
+# — its path describes its own disk — but omitting it entirely is worse than
+# wrong: the scripts fall back to the insightface/HF default cache and DOWNLOAD
+# the model again (~344 MB for antelopev2) even on a peer that already has it
+# configured and on disk.
+_SCRIPT_MODELS_ROOT_KEYS = {
+    'bank_score_infer.py': 'bank_scoring.models_root',
+    'face_embed_infer.py': 'face_scoring.models_root',
+}
+
+
+# A tqdm/pip progress line is the WORST last-line candidate for an error
+# message: it is the most likely thing a downloading script prints last, and it
+# says nothing about the failure. Recognised so the real line can be found.
+_NOISE_MARKERS = ('%|', 'it/s]', 'KB/s]', 'MB/s]', 'B/s]')
+
+
+def _script_error(stdout) -> str | None:
+    """The error the infer script itself reported, if it exited as clean JSON."""
+    text = (stdout or '').strip()
+    if not text:
+        return None
+    # The scripts print ONE JSON line; a stray log line before it must not
+    # defeat the parse, so try the last non-empty line too.
+    for candidate in (text, text.splitlines()[-1].strip()):
+        try:
+            obj = json.loads(candidate)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(obj, dict) and obj.get('error'):
+            return str(obj['error'])[:400]
+    return None
+
+
+def _useful_stderr(lines) -> str | None:
+    """The last stderr line that is not a progress bar."""
+    for ln in reversed(list(lines or ())):
+        ln = (ln or '').strip()
+        if ln and not any(m in ln for m in _NOISE_MARKERS):
+            return ln[:400]
+    return None
 
 
 class PeerWorker:
@@ -422,6 +463,22 @@ class PeerWorker:
         try:
             downloaded = self._download_artifacts(job_id, artifact_names, work)
             stdin_payload = dict(payload.get('stdin') or {})
+            # Where the weights live, from the PEER's config — same principle as
+            # the interpreter above, and the same bug when it is missing: with no
+            # models_root the scripts silently fall back to the insightface/HF
+            # default cache and re-download the model on a machine that already
+            # had it configured.
+            mr_key = _SCRIPT_MODELS_ROOT_KEYS.get(script_path.name)
+            if mr_key:
+                local_root = (cfg.get(mr_key) or '').strip()
+                if local_root:
+                    stdin_payload['models_root'] = local_root
+                else:
+                    # Not configured here: let the script use its OWN default
+                    # cache rather than inherit a hub path that does not exist
+                    # on this disk.
+                    stdin_payload.pop('models_root', None)
+
             # The bank scoring/face scripts write their .npz CACHE at the path
             # named in the payload, and honour a cancel-file sentinel next to
             # it. Both are hub paths that mean nothing here: point them into
@@ -492,10 +549,20 @@ class PeerWorker:
                 self._complete(job_id, error='infer script timed out')
                 return
             if rc != 0:
+                # These scripts fail as CLEAN JSON on stdout by design
+                # ({'ok': False, 'error': 'model load failed: …'}), so that is
+                # the authoritative message — and it must be preferred over the
+                # stderr tail. Reported: a peer run died with
+                # "infer exit 1: 100%|██████| 352210/352210 [00:02, …KB/s]" —
+                # the tail was a tqdm DOWNLOAD BAR while the real reason sat in
+                # stdout, unread.
+                detail = _script_error(stdout) or ''
                 tail = infer_stream.stderr_tail(stderr_lines)
-                detail = tail or stdout[:300]
+                if not detail:
+                    detail = _useful_stderr(stderr_lines) or tail or stdout[:300]
                 env_name = _SCRIPT_ENV_NAMES.get(script_path.name)
-                if env_name and 'ModuleNotFoundError' in (tail or ''):
+                if env_name and 'ModuleNotFoundError' in ' '.join(
+                        list(stderr_lines or ())[-12:]):
                     # A missing package reads as a bare traceback otherwise —
                     # this is the one failure mode with an obvious fix (install
                     # the extra on THIS machine), so name it instead of leaving

@@ -367,3 +367,120 @@ def test_hub_proceeds_when_the_peer_has_not_reported_yet(app, tmp_path,
                 by_path={str(tmp_path / 'a.jpg'): 1}, extra_payload={},
                 cache_path=tmp_path / 'c.npz', progress_re=re.compile(r'(\d)'),
                 detail_label='face pass', required_cap='face_scoring')
+
+
+# ── Reported: "infer exit 1: 100%|████| 352210/352210 [00:02<00:00, KB/s]" ──
+# Two bugs in one line. The peer was never told its OWN models_root, so
+# insightface ignored the models already on that machine and re-downloaded
+# antelopev2 (~344 MB); and when the load then failed, the error the script
+# printed as clean JSON on stdout was discarded in favour of the download bar
+# that happened to be the last stderr line.
+
+def test_the_peer_supplies_its_own_models_root(app, monkeypatch):
+    from app import config as cfg
+    from app.services.peer_worker import peer_worker
+    with app.app_context():
+        cfg.save_config({'face_scoring': {'models_root': 'D:/peer/models/face'},
+                         'bank_scoring': {'models_root': 'D:/peer/models/score'}})
+    seen = {}
+    monkeypatch.setattr(
+        'app.services.infer_stream.run_infer_script',
+        lambda py, sc, payload, t, on_line=None:
+        seen.update(json.loads(payload)) or ('{"ok": true}', [], 0, False))
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_upload_artifact',
+                        lambda job_id, path, name=None: 'x')
+    monkeypatch.setattr(peer_worker, '_complete', lambda job_id, **kw: None)
+    peer_worker.init_app(app)
+
+    peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
+    assert seen['models_root'] == 'D:/peer/models/face'
+    peer_worker._run_infer(_infer_job('bank_score_infer.py', images=[]))
+    assert seen['models_root'] == 'D:/peer/models/score'
+
+
+def test_a_hub_models_root_is_never_inherited(app, monkeypatch):
+    """Unconfigured here → the script uses its OWN default cache. A hub path
+    would point at a disk this machine does not have."""
+    from app import config as cfg
+    from app.services.peer_worker import peer_worker
+    with app.app_context():
+        cfg.save_config({'face_scoring': {'models_root': ''}})
+    seen = {}
+    monkeypatch.setattr(
+        'app.services.infer_stream.run_infer_script',
+        lambda py, sc, payload, t, on_line=None:
+        seen.update(json.loads(payload)) or ('{"ok": true}', [], 0, False))
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_upload_artifact',
+                        lambda job_id, path, name=None: 'x')
+    monkeypatch.setattr(peer_worker, '_complete', lambda job_id, **kw: None)
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job(
+        'face_embed_infer.py', images=[], models_root='C:/hub/only/here'))
+    assert 'models_root' not in seen
+
+
+def test_the_scripts_own_json_error_beats_a_download_bar(app, monkeypatch):
+    from app.services import infer_stream
+    from app.services.peer_worker import peer_worker
+    monkeypatch.setattr(
+        infer_stream, 'run_infer_script',
+        lambda *a, **k: (
+            json.dumps({'ok': False, 'results': {}, 'clusters': {},
+                        'error': 'model load failed: OSError: antelopev2 missing'}),
+            ['Downloading...',
+             '100%|██████████| 352210/352210 [00:02<00:00, 170897.35KB/s]'],
+            1, False))
+    done = {}
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_complete',
+                        lambda job_id, **kw: done.update(kw))
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
+    assert 'model load failed' in done['error']
+    assert 'antelopev2 missing' in done['error']
+    assert 'KB/s' not in done['error'], 'the progress bar must not be the message'
+
+
+def test_without_a_json_error_a_progress_bar_is_still_skipped(app, monkeypatch):
+    from app.services import infer_stream
+    from app.services.peer_worker import peer_worker
+    monkeypatch.setattr(
+        infer_stream, 'run_infer_script',
+        lambda *a, **k: ('', ['Traceback (most recent call last):',
+                              'ValueError: bad threshold',
+                              '100%|██████| 10/10 [00:01<00:00, 9.9it/s]'],
+                         1, False))
+    done = {}
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_complete',
+                        lambda job_id, **kw: done.update(kw))
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
+    assert 'ValueError: bad threshold' in done['error']
+
+
+def test_a_missing_module_is_still_named_behind_a_progress_bar(app, monkeypatch):
+    """The ModuleNotFoundError hint must survive noise after it — the earlier
+    version only looked at the LAST line and so missed it."""
+    from app.services import infer_stream
+    from app.services.peer_worker import peer_worker
+    monkeypatch.setattr(
+        infer_stream, 'run_infer_script',
+        lambda *a, **k: ('', ["ModuleNotFoundError: No module named 'cv2'",
+                              '100%|██████| 5/5 [00:00<00:00, 50it/s]'],
+                         1, False))
+    done = {}
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, dest: {})
+    monkeypatch.setattr(peer_worker, '_complete',
+                        lambda job_id, **kw: done.update(kw))
+    peer_worker.init_app(app)
+    peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
+    assert 'face-scoring' in done['error']
+    assert 'Quality tools' in done['error']
