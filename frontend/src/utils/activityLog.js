@@ -105,3 +105,24 @@ export function formatClock(at, locale) {
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleTimeString(locale, { hour12: false })
 }
+
+/** The bracketed prefix for one log line: the source, plus the machine when the
+ *  work did NOT happen here.
+ *
+ *  A pass sent to a compute peer used to log word-for-word what a local one
+ *  logged — same "score started", same "finished" — so the only place the app
+ *  narrates itself could not answer "where did this run". The device name (never
+ *  its uuid) rides the event; this turns it into `bank · Laptop 4090`. */
+export function eventPrefix(e) {
+  const src = String((e && e.source) || '').trim() || 'app'
+  const device = e && e.device ? String(e.device).trim() : ''
+  return device ? `${src} · ${device}` : src
+}
+
+/** " · on <device>" for a running row, or '' when it is running here. Separate
+ *  from eventPrefix because the running list already shows the bank's own name
+ *  in the same line and a second bracket there reads as a second job. */
+export function runningWhere(row) {
+  const device = row && row.device ? String(row.device).trim() : ''
+  return device ? ` · on ${device}` : ''
+}

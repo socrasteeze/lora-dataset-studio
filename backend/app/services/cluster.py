@@ -531,6 +531,27 @@ def normalize_device_id(device_id: str | None) -> str:
     return d
 
 
+def device_label(device_id: str | None) -> str | None:
+    """The human NAME of a device for logs and progress lines, or None for local.
+
+    Never the uuid. The activity log is the surface users read and paste into
+    bug reports, and 'a3f9c1e2-…' answers nothing there while also being an
+    identifier we have no reason to publish. A device whose row is gone (revoked
+    mid-pass, config hand-edited) degrades to a short generic rather than
+    leaking the id anyway — the pass itself already reports that failure."""
+    d = normalize_device_id(device_id)
+    if d == LOCAL_DEVICE_ID:
+        return None
+    if is_backend_id(d):
+        entry = backend_by_id(d)
+        return (entry or {}).get('name') or 'a remote ComfyUI backend'
+    try:
+        row = ClusterDevice.query.filter_by(id=d).first()
+    except Exception:      # noqa: BLE001 — a log label must never raise
+        row = None
+    return (row.name if row is not None and row.name else 'a compute peer')
+
+
 def require_remote_device(device_id: str) -> ClusterDevice:
     device_id = normalize_device_id(device_id)
     if device_id == LOCAL_DEVICE_ID:

@@ -28,6 +28,8 @@ export default function DevicesSection({ config, setField, handleSave, configDef
   const [backendName, setBackendName] = useState('')
   const [backendUrl, setBackendUrl] = useState('')
   const [backendTest, setBackendTest] = useState(null)
+  // Live worker/peer state from the poll-safe endpoint (see the effect below).
+  const [live, setLive] = useState(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -51,6 +53,22 @@ export default function DevicesSection({ config, setField, handleSave, configDef
   }, [])
 
   useEffect(() => { refresh() }, [refresh])
+  // Live half, on its own cheap endpoint. /status probes ComfyUI and Ollama over
+  // HTTP (capabilities.probe), so it must NOT be polled — but without any poll
+  // this card sat frozen for the whole length of a remote pass, which is exactly
+  // when someone opens it. /activity reads worker state only.
+  useEffect(() => {
+    let alive = true
+    const tick = async () => {
+      try {
+        const d = await apiFetch('/api/cluster/activity', { background: true })
+        if (alive) setLive(d)
+      } catch { /* keep the last-known state; a blip must not blank the card */ }
+    }
+    tick()
+    const t = setInterval(tick, 5000)
+    return () => { alive = false; clearInterval(t) }
+  }, [])
   useEffect(() => {
     setPeerUrl(config.cluster?.primary_url || '')
     setPeerName(config.cluster?.device_name || '')
@@ -274,7 +292,12 @@ export default function DevicesSection({ config, setField, handleSave, configDef
             </div>
           )}
           <ul className="mt-4 space-y-2">
-            {(status?.peers || []).map((p) => (
+            {(status?.peers || []).map((p0) => {
+              // Merge the live row over the mount-time one: name/capabilities
+              // come from /status, online+busy from the 5 s /activity poll.
+              const l = (live?.peers || []).find((x) => x.id === p0.id)
+              const p = l ? { ...p0, online: l.online, busy: l.busy } : p0
+              return (
               <li key={p.id}
                 className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
                 <span aria-hidden className={`h-2 w-2 rounded-full ${p.online ? 'bg-emerald-400' : 'bg-white/20'}`} />
@@ -294,7 +317,8 @@ export default function DevicesSection({ config, setField, handleSave, configDef
                 <button type="button" onClick={() => revoke(p.id)}
                   className="text-xs text-rose-400 hover:underline">Revoke</button>
               </li>
-            ))}
+              )
+            })}
             {!(status?.peers || []).length && (
               <li className="text-sm text-content-muted">No peers yet.</li>
             )}
@@ -349,9 +373,21 @@ export default function DevicesSection({ config, setField, handleSave, configDef
             <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
               <dt className="text-content-muted">Worker</dt>
               <dd>{status.peer_worker.running ? 'running' : 'stopped'}
-                {status.peer_worker.connected ? ' · connected' : ' · not connected'}</dd>
+                {(live?.connected ?? status.peer_worker.connected)
+                  ? ' · connected' : ' · not connected'}
+                {live?.busy && <span className="text-emerald-300"> · working now</span>}
+              </dd>
               <dt className="text-content-muted">Current job</dt>
-              <dd className="font-mono text-xs">{status.peer_worker.current_job_id || '—'}</dd>
+              <dd className="text-xs">
+                {live?.busy
+                  ? `${live.kind || 'job'}${live.phase ? ` · ${live.phase}` : ''}`
+                  : '—'}
+                {live?.current_job_id && (
+                  <span className="ml-1 font-mono text-content-subtle">
+                    ({String(live.current_job_id).slice(0, 8)})
+                  </span>
+                )}
+              </dd>
               {status.peer_worker.last_error && (
                 <>
                   <dt className="text-content-muted">Last error</dt>

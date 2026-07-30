@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-29-see-the-peer-working',
+    date: '2026-07-29',
+    title: 'You can finally see that the other machine is doing the work',
+    blurb:
+      'Sending a bank pass to a peer used to look like nothing happening anywhere. Now the Primary’s 📋 Activity names the machine on every line ([bank · Laptop 4090]) and logs the round trip — sending the images, “Laptop 4090 is running the scoring pass — its GPU is busy; this machine stays free”, then the result. The peer says so too: a 🖥 Working for Primary chip in its header, its browser tab title turns into “● Working — …” so a pinned tab shows it without switching, and its own 📋 lists what it claimed. Settings → Devices also stopped being frozen — the peer list and worker card now refresh while you watch. One honest note: ComfyUI on the peer shows nothing for ✨ Score and 👥 Group by person because those passes never touch ComfyUI; a generation job does appear in its queue.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-29-stop-the-launch-tab',
     date: '2026-07-29',
     title: 'Keep a pinned tab? Turn off the tab that pops open on every launch',

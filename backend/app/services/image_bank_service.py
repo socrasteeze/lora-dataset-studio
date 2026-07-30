@@ -3384,7 +3384,8 @@ def start_faces(app, user_id, bank_id, device_id=None):
              .filter(BankImage.status != 'reject').count())
     return bank_jobs.start(app, bank_id, 'faces',
                            _faces_job(bank_id, device_id if remote else None),
-                           total=total)
+                           total=total,
+                           device_label=_device_label(device_id if remote else None))
 
 
 def _faces_job(bank_id, device_id=None):
@@ -3422,7 +3423,8 @@ def _faces_job(bank_id, device_id=None):
                     extra_payload={'threshold': th['face_threshold'],
                                    'device': 'auto'},
                     cache_path=cache_path, progress_re=_PROGRESS_RE,
-                    detail_label='face pass', required_cap='face_scoring')
+                    detail_label='face pass', required_cap='face_scoring',
+                    bank_id=bank_id)
             except bank_remote.RemotePassCancelled:
                 bank_jobs.progress(job, detail='stopped — the peer was told to '
                                                'abort; partial work on it was '
@@ -3555,6 +3557,15 @@ def score_device_info(bank_id=None) -> dict:
     return out
 
 
+def _device_label(device_id) -> str | None:
+    """The peer's NAME for the activity log, or None for a local pass. Thin
+    wrapper so the four start_* entry points don't each import cluster."""
+    if not device_id:
+        return None
+    from . import cluster as cluster_svc
+    return cluster_svc.device_label(device_id)
+
+
 def _remote_pass_device(device_id) -> bool:
     """True when a pass should run on a peer instead of here. Score/Faces only
     accept a PEER — an 'api:' backend is a bare ComfyUI with no scoring stack,
@@ -3595,7 +3606,8 @@ def start_score(app, user_id, bank_id, device_id=None):
              .filter(BankImage.status != 'reject').count())
     return bank_jobs.start(app, bank_id, 'score',
                            _score_job(bank_id, device_id if remote else None),
-                           total=total)
+                           total=total,
+                           device_label=_device_label(device_id if remote else None))
 
 
 def _score_job(bank_id, device_id=None):
@@ -3646,7 +3658,8 @@ def _score_job(bank_id, device_id=None):
                     job, device_id, script=_SCORE_SCRIPT, by_path=by_path,
                     extra_payload={'style_threshold': th['style_threshold']},
                     cache_path=cache_path, progress_re=_SCORE_PROGRESS_RE,
-                    detail_label='scoring pass', required_cap='bank_scoring')
+                    detail_label='scoring pass', required_cap='bank_scoring',
+                    bank_id=bank_id)
             except bank_remote.RemotePassCancelled:
                 bank_jobs.progress(job, detail='stopped — the peer was told to '
                                                'abort; partial work on it was '
@@ -4108,7 +4121,11 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None
         raise RuntimeError(reason)
     return bank_jobs.start(app, bank_id, 'watermark_inpaint',
                            _watermark_inpaint_job(bank_id, method, device_id),
-                           total=total)
+                           total=total,
+                           # Klein only: LaMa never travels, so a device picked
+                           # with method='auto' must not label the pass remote.
+                           device_label=(_device_label(device_id)
+                                         if method == 'klein' else None))
 
 
 def _watermark_inpaint_job(bank_id, method, device_id=None):
@@ -4693,7 +4710,8 @@ def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
         app, bank_id, 'pipeline',
         _pipeline_job(user_id, bank_id, steps, reject_flags, bool(resolve_dups),
                       device_id if remote else None),
-        total=0)
+        total=0,
+        device_label=_device_label(device_id if remote else None))
 
 
 def _bank_counts(bank_id) -> dict:

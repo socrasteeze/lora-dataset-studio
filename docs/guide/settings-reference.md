@@ -507,6 +507,14 @@ There are **two ways** to use another machine's GPU, and they can coexist in the
 - **Primary URL / join token** (peer only) — paste the Primary’s Tailscale URL and a one-time join token from the Primary’s Devices card. After join, the peer pulls jobs outbound (sleep-friendly) and uploads results back; datasets never move.
 - **Generate join token** (primary only) — mint a short-lived token, copy it once to the peer. Revoke a peer anytime; its pending jobs fail cleanly.
 
+**How to tell a remote pass is actually running.** Three places, because a pass on another machine used to be indistinguishable from a local one:
+
+- **On the Primary**, 📋 Activity brackets the machine on every line — `[bank · Laptop 4090] score finished` — and the running row reads `score · on Laptop 4090`. The round trip gets its own `[peer]` entries: *sending N image(s)*, then ***Laptop 4090 is running the scoring pass*** (its GPU is busy; this machine stays free), then finished or failed with the peer's reason. That middle line is the remote counterpart to the local **GPU taken exclusively** entry — a remote pass never takes this machine's GPU window, which is why the local line cannot appear for one.
+- **On the peer**, its header shows a pinging **🖥 Working for Primary · <what>** chip while a job runs, and its **browser tab title** becomes `● Working — LoRA Dataset Studio` so a pinned or background tab shows it without being opened. Its own 📋 Activity lists what it claimed and finished. All three clear within a poll of the job ending.
+- **In Settings → Devices**, the peer list and the peer's own worker card now refresh every few seconds while the section is open (they used to be frozen from the moment you opened it).
+
+**ComfyUI on the peer shows nothing for ✨ Score or 👥 Group by person, and that is correct** — those passes are Python scripts that never touch ComfyUI, so its queue has nothing to display. A **generation** job sent to a peer *does* appear in that peer's ComfyUI queue.
+
 **Limits that stay visible:**
 
 - **A backend is only as safe as the network between you.** Raw ComfyUI has no authentication: anyone who can reach that URL can render on — and read outputs from — that machine. Tailscale or a home LAN is the intended setting; never a port forwarded to the internet. When you need a credential you can revoke, use a peer.
