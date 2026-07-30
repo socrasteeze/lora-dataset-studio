@@ -29,8 +29,8 @@ from ..services.face_variations import (NSFW_VARIATION_CATALOG, VARIATION_CATALO
                                         sanitize_custom_shots,
                                         MAX_CUSTOM_SHOTS_PER_SUBJECT)
 from ..utils.comfyui import KREA_ALLOWED_SAMPLERS, KREA_ALLOWED_SCHEDULERS, get_krea_loras
-from ._common import (_map_error, _require_comfyui, _studio_arch_mismatch_response,
-                      _studio_missing_response)
+from ._common import (_map_error, _require_comfyui, _require_no_stalled_comfyui,
+                      _studio_arch_mismatch_response, _studio_missing_response)
 
 bp = Blueprint('datasets', __name__, url_prefix='/api')
 
@@ -715,6 +715,18 @@ def dataset_generate(dataset_id):
     from ..services import cluster as cluster_svc
     remote_device = (cluster_svc.normalize_device_id(data.get('device_id'))
                      != cluster_svc.LOCAL_DEVICE_ID)
+    # Same rule for the durable ComfyUI recovery barrier, and it has to be said
+    # explicitly: upstream gates this on `any(g in svc.LOCAL_ENGINES ...)`, which
+    # is ALWAYS true here because API_ENGINES is empty (Divergence 1b), so that
+    # test cannot tell a local run from a remote one. Left as upstream wrote it,
+    # a stalled ComfyUI on THIS machine would refuse a batch bound for a peer or
+    # an api: backend whose ComfyUI is perfectly healthy — the one failure the
+    # Run-on picker exists to avoid, and unclearable without fixing a machine the
+    # user was not using. The device is the only thing that distinguishes them.
+    if not remote_device:
+        gate = _require_no_stalled_comfyui()
+        if gate:
+            return gate
     if not remote_device and any(g == 'klein' for g, _ in batches):
         from ..services import klein_edit_helper as keh
         missing_nodes = keh.klein_missing_nodes()
@@ -958,7 +970,11 @@ def dataset_image_caption_preview(dataset_id, image_id):
     ds = svc.get_dataset(LOCAL_USER, dataset_id)
     if not ds:
         return jsonify({'error': 'not found'}), 404
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    elif not isinstance(data, dict):
+        return jsonify({'error': 'JSON body must be an object'}), 400
     active = dataset_activity.get(dataset_id)
     if active and active.get('kind') in dataset_activity.CANCELLABLE_KINDS:
         return jsonify({'error': 'a captioning batch is in progress on this dataset'}), 409
@@ -967,7 +983,7 @@ def dataset_image_caption_preview(dataset_id, image_id):
         with gpu_exclusive_vision_window(flag_ttl=600):
             result = svc.preview_caption(
                 LOCAL_USER, dataset_id, image_id,
-                backend=data.get('backend'), ollama_model=data.get('ollama_model'),
+                backend=data.get('backend'), ollama_model=data.get('ollama_model', ''),
                 vocabulary=data.get('vocabulary'), instructions=data.get('instructions'),
                 should_cancel=lambda: dataset_activity.cancel_requested(dataset_id))
     except Exception as e:
@@ -1245,6 +1261,9 @@ def dataset_klein_model_set(dataset_id):
 @bp.post('/dataset/image/<int:image_id>/improve')
 def dataset_image_improve(image_id):
     """Create a regular Klein-upscaled candidate without touching the source."""
+    gate = _require_no_stalled_comfyui()
+    if gate:
+        return gate
     try:
         result = svc.improve_existing_image(LOCAL_USER, image_id)
     except Exception as e:
@@ -1266,6 +1285,9 @@ def dataset_image_reimprove(image_id):
 
     The generic /regenerate route stays closed to these rows on purpose (it would
     restart from the dataset reference and make an unrelated variation)."""
+    gate = _require_no_stalled_comfyui()
+    if gate:
+        return gate
     try:
         result = svc.reimprove_image(LOCAL_USER, image_id)
     except Exception as e:
@@ -1291,6 +1313,9 @@ def dataset_improve_batch(dataset_id):
     ids = data.get('image_ids')
     if not isinstance(ids, list):
         return jsonify({'error': 'image_ids must be a list'}), 400
+    gate = _require_no_stalled_comfyui()
+    if gate:
+        return gate
     try:
         result = svc.start_bulk_improve(
             current_app._get_current_object(), LOCAL_USER, dataset_id, ids)
@@ -1633,6 +1658,9 @@ def lora_test_run(dataset_id):
     gate = _require_comfyui()
     if gate:
         return gate
+    gate = _require_no_stalled_comfyui()
+    if gate:
+        return gate
     d = request.get_json(silent=True) or {}
     try:
         res = lts.create_run(LOCAL_USER, dataset_id,
@@ -1702,6 +1730,9 @@ def lora_test_confirm_comfyui_restart(dataset_id):
 @bp.post('/dataset/<int:dataset_id>/lora-test/resume')
 def lora_test_resume(dataset_id):
     gate = _require_comfyui()
+    if gate:
+        return gate
+    gate = _require_no_stalled_comfyui()
     if gate:
         return gate
     if not svc.get_dataset(LOCAL_USER, dataset_id):

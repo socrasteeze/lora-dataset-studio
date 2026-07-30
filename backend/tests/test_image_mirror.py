@@ -89,8 +89,7 @@ def test_double_mirror_restores_pixels_and_preserves_metadata(app):
             name: getattr(before, name) for name in (
                 'dataset_id', 'filename', 'source', 'status', 'framing', 'caption',
                 'variation_label', 'variation_prompt', 'klein_model',
-                'derivation_kind', 'upscale_ratio',
-                'source_metadata', 'created_at',
+                'derivation_kind', 'upscale_ratio', 'source_metadata', 'created_at',
             )
         }
         svc.mirror_image(LOCAL_USER, image_id)
