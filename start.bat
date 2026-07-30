@@ -136,4 +136,11 @@ rem may be a LAN/Tailscale address, not 127.0.0.1) and only once the server is
 rem actually accepting connections. Opening a hardcoded 127.0.0.1 here fired
 rem before the server bound and greeted LAN/tailnet setups with "cannot connect".
 rem Set LDS_NO_BROWSER=1 to disable the auto-open.
+rem
+rem Supervisor loop: Settings / Update & restart exit with code 3 so we relaunch
+rem in THIS console (same process tree, Ctrl+C keeps working). Bare python /
+rem IDE / portable launcher never set LDS_SUPERVISOR and keep the old path.
+set "LDS_SUPERVISOR=1"
+:run
 "%VPY%" backend\run.py
+if errorlevel 3 if not errorlevel 4 goto run

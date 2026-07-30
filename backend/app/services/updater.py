@@ -589,14 +589,23 @@ def _restart_helper_code(py, run_py, workdir, port, *, install_requirements=Fals
 
 
 def schedule_restart(delay: float = 1.2, *, install_requirements: bool = False) -> None:
-    """Relaunch the server, then hard-exit this process. A DETACHED helper waits for our
-    port to free (this process fully gone) before binding, so we never hit the Windows
-    'address already in use' rebind race a bare os.execv can trigger. The helper inherits
-    our env, so LDS_HOST/LDS_PORT and the LDS_ACCESS_TOKEN (hence the bind + the token)
-    stay identical across the restart. When ``install_requirements`` is true,
-    pip runs in that helper only after the old port is free (and therefore after
-    this process released imported package files). ``delay`` lets the HTTP
-    response flush first."""
+    """Relaunch the server, then hard-exit this process.
+
+    When ``LDS_SUPERVISOR=1`` (set by ``start.bat``'s launch loop), skip the
+    detached helper and exit with code **3** after ``delay``. The launcher
+    relaunches ``run.py`` in the *same* console once this process is fully gone
+    — no rebind race, no ``CREATE_NEW_CONSOLE``, and Ctrl+C keeps working.
+    ``install_requirements`` is a no-op on that path: start.bat's hash-gated
+    pip step runs on every loop iteration.
+
+    Without the marker (bare ``python backend/run.py``, an IDE, the portable
+    launcher), today's DETACHED helper waits for our port to free before
+    binding, so we never hit the Windows 'address already in use' rebind race a
+    bare os.execv can trigger. The helper inherits our env, so LDS_HOST/LDS_PORT
+    and the LDS_ACCESS_TOKEN stay identical across the restart. When
+    ``install_requirements`` is true, pip runs in that helper only after the old
+    port is free. ``delay`` lets the HTTP response flush first."""
+    supervised = os.environ.get('LDS_SUPERVISOR') == '1'
     py = sys.executable
     run_py = os.path.abspath(sys.argv[0])
     workdir = os.path.dirname(run_py) or None
@@ -605,12 +614,16 @@ def schedule_restart(delay: float = 1.2, *, install_requirements: bool = False) 
     # another app, the helper stalled its whole 60 s retry budget against a
     # port that would never free before relaunching (observed live 2026-07-12).
     port = int(os.environ.get('LDS_PORT') or _cfg_get('server.port') or 5000)
-    helper = _restart_helper_code(py, run_py, workdir, port,
-                                  install_requirements=install_requirements)
+    helper = None if supervised else _restart_helper_code(
+        py, run_py, workdir, port, install_requirements=install_requirements)
 
     def _spawn_then_exit():
         import time
         time.sleep(delay)
+        if supervised:
+            # Exit 3 is the supervisor's "please relaunch" signal. start.bat
+            # tests for exactly 3 (if errorlevel 3 if not errorlevel 4).
+            os._exit(3)
         flags = 0
         if os.name == 'nt':
             flags = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008  # DETACHED_PROCESS

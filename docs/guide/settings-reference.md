@@ -28,6 +28,7 @@ For containerized or scripted setups, a handful of environment variables overrid
 | `LDS_HOST` | Bind host — takes priority over `server.host`. |
 | `LDS_PORT` | Bind port — takes priority over `server.port`. |
 | `LDS_NO_BROWSER` | `1` disables the browser auto-open at startup regardless of `server.auto_open_browser` — for a one-off or automated launch that never touched Settings. |
+| `LDS_CONSOLE` | Overrides `console.level` for this process (`off` / `events` / `heartbeat` / `all`) — terminal activity stream verbosity without editing `config.json`. |
 | `FLASK_DEBUG` | `1` enables Flask debug mode. |
 
 ## Overview
@@ -664,6 +665,8 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `server.host` | Interface the Flask server binds to (default `127.0.0.1`, local-only). |
 | `server.port` | Port the server listens on (default `5050`). |
 | `server.require_token` | On a non-loopback bind, require remote clients to present an access token (default `false` — a trusted LAN needs none). Toggle and token also live in Settings → Server & access. |
+| `console.level` | What the start.bat / run.py terminal narrates from the activity log: `off` (silent), `events` (default — one line per state change), `heartbeat` (plus a line per running job every `console.heartbeat_seconds`), `all` (plus progress ticks, throttled to at most one per job per second). Same events the 📋 Activity panel shows. Overridable by `LDS_CONSOLE`. Config.json only — no Settings UI. |
+| `console.heartbeat_seconds` | Interval for heartbeat lines when `console.level` is `heartbeat` or `all` (default `30`, clamped 5–600). |
 | `paths.dataset_images_root` | Where dataset images are stored. Empty string defaults to `<data dir>/datasets`. |
 | `dataset_import.max_side` | Longest side kept for an image imported into a dataset, in px (default `1024`; `0` = original size). Ratio always preserved, never enlarged, hard ceiling 8192 px (WebP's own limit is 16383). Not retroactive. Editable in Settings → Captioning & quality. |
 | `dataset_import.encoding` | How an imported image is written: `standard` (WebP q92, default), `high` (WebP q100), `lossless` (pixel-identical, ~5x the disk). Editable in Settings → Captioning & quality. |

@@ -216,3 +216,66 @@ def test_a_junk_cursor_is_ignored_rather_than_500ing(app, client):
     r = client.get('/api/system/activity?since=nonsense&limit=nonsense')
     assert r.status_code == 200
     assert [e['message'] for e in r.get_json()['events']] == ['only']
+
+
+# --- the new recorders (dataset / queue / training) ---------------------------
+
+def test_a_caption_batch_records_its_start_and_its_finish(app):
+    from app.services import activity_log, dataset_activity
+
+    with app.app_context():
+        tok = dataset_activity.begin(42, 'caption', total=9, engine='ollama')
+        dataset_activity.end(tok)
+    messages = [r['message'] for r in activity_log.events()
+                if r['source'] == 'dataset']
+    assert 'caption started' in messages
+    assert 'caption finished' in messages
+    started = next(r for r in activity_log.events()
+                   if r['message'] == 'caption started')
+    assert started['dataset_id'] == 42
+    assert '9 image(s)' in (started.get('detail') or '')
+
+
+def test_a_queued_bank_records_enqueue_and_finish(app, tmp_path, monkeypatch):
+    from app.services import activity_log, bank_queue, image_bank_service as svc
+
+    # Neutralize heavy passes so the synchronous TESTING drain completes.
+    for name in ('_score_prereq', '_watermark_prereq', '_faces_prereq',
+                 '_framing_prereq', '_caption_prereq'):
+        monkeypatch.setattr(svc, name, lambda: None)
+    monkeypatch.setattr(svc, '_gpu_busy_reason', lambda: None)
+
+    def _fake(*_a, **_k):
+        def run(job):
+            return None
+        return run
+    for name in ('_score_job', '_watermark_job', '_faces_job',
+                 '_framing_job', '_caption_job'):
+        monkeypatch.setattr(svc, name, _fake)
+    monkeypatch.setattr(svc, 'rebuild_semantic_dup_groups', lambda *_a, **_k: 0)
+
+    bank_queue.reset()
+    with app.app_context():
+        bank_id = _bank(tmp_path, name='Queued')
+        bank_queue.enqueue(app, 'local', bank_id, steps=['scan'])
+    messages = [r['message'] for r in activity_log.events()
+                if r['source'] == 'queue']
+    assert 'bank queued' in messages
+    assert 'pipeline starting' in messages
+    assert 'pipeline done, dequeued' in messages
+    bank_queue.reset()
+
+
+def test_a_training_run_records_start_and_end_via_activity_helper(app):
+    """Training transitions go through ``_activity``; exercise the same path
+    launch/stop/watcher use so the panel and console stay in sync."""
+    from app.services import activity_log, lora_training as lt
+
+    with app.app_context():
+        lt._activity(7, 'training started', 'info', detail='500 steps, pid 1')
+        lt._activity(7, 'training finished', 'ok')
+    rows = [r for r in activity_log.events() if r['source'] == 'training']
+    assert [r['message'] for r in rows] == [
+        'training started', 'training finished']
+    assert rows[0]['dataset_id'] == 7
+    assert rows[1]['level'] == 'ok'

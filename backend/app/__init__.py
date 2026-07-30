@@ -393,6 +393,15 @@ def create_app(config_object=None):
             root.addHandler(fh)
             if root.level > logging.INFO or root.level == logging.NOTSET:
                 root.setLevel(logging.INFO)
+        # Terminal activity stream: dedicated non-propagating logger so job
+        # narration reaches the console without putting every 2 s poll on
+        # stderr or into app.log. See activity_console module docstring.
+        try:
+            from .services import activity_console
+            activity_console.attach()
+            activity_console.start_heartbeat(app)
+        except Exception:  # noqa: BLE001 — visibility must never break boot
+            pass
 
     # Flask-WTF looks in request.form before it checks the CSRF header.  For a
     # multipart upload that parses the body in its before_request hook, before the

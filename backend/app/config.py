@@ -48,6 +48,13 @@ DEFAULTS = {
                # of opening another. LDS_NO_BROWSER=1 still overrides this for
                # one-off/automated launches without touching Settings.
                'auto_open_browser': True},
+    # Terminal activity stream (the console's second consumer of activity_log).
+    # level: off | events (default) | heartbeat | all. LDS_CONSOLE overrides
+    # level for one-off/automated launches without touching config.json.
+    'console': {
+        'level': 'events',
+        'heartbeat_seconds': 30,
+    },
     # Cluster / remote GPU workers. standalone = today's single-machine behaviour.
     # primary = this install owns datasets and accepts compute peers.
     # peer = this install dials a Primary and only runs GPU jobs for it.

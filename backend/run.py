@@ -40,6 +40,16 @@ def _reexec_into_venv():
 
 _reexec_into_venv()
 
+# Windows consoles (and the portable launcher redirecting stdout to a file)
+# often sit on a legacy code page; the app uses emoji heavily. Reconfigure
+# early so a bare print/log of those glyphs cannot UnicodeEncodeError-kill a
+# worker thread. errors='replace' keeps going even when a glyph is unknown.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from bootstrap_dependencies import ensure_pillow_consistent
 
