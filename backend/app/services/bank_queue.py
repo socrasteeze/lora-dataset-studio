@@ -21,8 +21,11 @@ Same contract as ``bank_jobs``:
   is shown by its own bank_jobs snapshot); the queue only ever lists what is
   still pending or currently running.
 """
+import logging
 import threading
 import time
+
+logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
 _queue: list = []              # ordered list of entries (see enqueue())
@@ -163,18 +166,39 @@ def _process_next(app) -> bool:
     # Wait until this bank has no live job AND the GPU is free. This is what lets
     # a queued bank wait its turn behind a manual launch or a training run,
     # rather than being rejected. Aborts early if the entry is cancelled.
+    # This loop is unbounded on purpose — a queued bank waits its turn rather
+    # than being rejected — but it used to wait in COMPLETE silence: no logger in
+    # this module, no reason in the snapshot. A stuck vision/GPU flag therefore
+    # froze the whole queue with nothing anywhere to say why, which reads exactly
+    # like "it just doesn't queue". Say it once, and publish it.
+    said = None
     while True:
         with _lock:
             if _find(bank_id) is not entry:
+                entry['waiting_for'] = None
                 return True                      # cancelled while waiting
         # A run aimed at a peer takes none of the LOCAL GPU — making it wait
         # for a local training to finish would forfeit the whole point of
         # renting the other machine. (The Score/Faces steps travel; the steps
         # that stay here are CPU work.)
-        gpu_ok = entry.get('device_id') or banks._gpu_busy_reason() is None
-        if not bank_jobs.running(bank_id) and gpu_ok:
+        gpu_reason = None if entry.get('device_id') else banks._gpu_busy_reason()
+        busy_here = bank_jobs.running(bank_id)
+        if not busy_here and gpu_reason is None:
             break
+        why = ('another pass is running on this bank' if busy_here
+               else gpu_reason)
+        if why != said:
+            # Once per REASON, not once per 2 s tick: a queue waiting an hour
+            # must not write 1800 identical lines.
+            said = why
+            with _lock:
+                entry['waiting_for'] = why
+            logger.info('bank_queue: bank %s is waiting — %s', bank_id, why)
         time.sleep(_POLL_SECONDS)
+    if said is not None:
+        logger.info('bank_queue: bank %s stopped waiting, starting now', bank_id)
+    with _lock:
+        entry['waiting_for'] = None
 
     with _lock:
         if _find(bank_id) is not entry:
@@ -244,12 +268,16 @@ def clear() -> int:
 
 def snapshot() -> dict:
     """{running_bank_id, items:[{bank_id, state, position, steps, reject_flags,
-    resolve_dups, enqueued_at}]} — position is 1-based over the whole queue."""
+    resolve_dups, enqueued_at, device_id, waiting_for}]} — position is 1-based
+    over the whole queue."""
     with _lock:
         items = [{'bank_id': e['bank_id'], 'state': e['state'], 'position': i + 1,
                   'steps': list(e['steps']), 'reject_flags': list(e['reject_flags']),
                   'resolve_dups': e['resolve_dups'], 'enqueued_at': e['enqueued_at'],
-                  'device_id': e.get('device_id')}
+                  'device_id': e.get('device_id'),
+                  # Why this entry has not started yet, or None. The panel shows
+                  # it so a stalled queue explains itself instead of looking dead.
+                  'waiting_for': e.get('waiting_for')}
                  for i, e in enumerate(_queue)]
         running = next((e['bank_id'] for e in _queue if e['state'] == 'running'), None)
     return {'running_bank_id': running, 'items': items}

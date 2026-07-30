@@ -4497,7 +4497,7 @@ def _framing_job(bank_id, rescan):
         bank_jobs.progress(job, done=0, total=len(rows), detail='framing')
         if not rows:
             return
-        classified = errors = 0
+        classified = errors = missing = 0
 
         def prepared():
             """Path resolution reads the row, so it belongs on the job's own
@@ -4526,7 +4526,7 @@ def _framing_job(bank_id, rescan):
                     if error is not None:  # one bad file never sinks the pass
                         errors += 1
                     elif raw is None:      # file gone: leave the row as it was
-                        pass
+                        missing += 1
                     # Empty output = Ollama unreachable, NOT "unknown": leave the
                     # framing NULL so a retry can finish it (same reasoning as the
                     # watermark/dataset classifier), never mislabel everything.
@@ -4548,7 +4548,15 @@ def _framing_job(bank_id, rescan):
         detail = f'done — {classified} classified'
         if errors:
             detail += f', {errors} unreadable'
+        # Files that were not THERE are their own outcome. Unreported, a bank
+        # whose source folder walked away classified nothing and still said
+        # "done — 0 classified", which reads as "the model found nothing".
+        if missing:
+            detail += f', {missing} file(s) missing from disk'
         bank_jobs.progress(job, detail=detail)
+        if missing and not classified:
+            logger.warning('bank framing: bank=%s every image missing from disk (%s)',
+                           bank_id, bank.source_path)
     return run
 
 
@@ -4614,6 +4622,24 @@ def _caption_job(bank_id, ids, force, vocabulary=None):
             if p and os.path.isfile(p):
                 by_path[p] = r.id
         paths = list(by_path)
+        # An unreachable source folder makes EVERY isfile() fail, so `paths`
+        # empties and the pass "finishes" having done nothing — the same trap
+        # _scan_job guards with MOVED_FOLDER_MSG. Distinguish the two zero
+        # cases: nothing left to do is a success, a folder that walked away is
+        # a failure and must say so.
+        if not paths:
+            if rows and not os.path.isdir(bank.source_path or ''):
+                logger.warning('bank caption: bank=%s source folder unreachable (%s)',
+                               bank_id, bank.source_path)
+                bank_jobs.fail(job, MOVED_FOLDER_MSG)
+                return
+            bank_jobs.progress(job, done=0, total=0,
+                               detail='nothing to caption — every image already '
+                                      'has one')
+            return
+        backend_name = (cfg.get('captioning.backend') or 'auto').lower()
+        logger.info('bank caption started: bank=%s backend=%s images=%d force=%s',
+                    bank_id, backend_name, len(paths), bool(force))
         # Say what the silence IS. Nothing reports until the first caption
         # lands, and loading the model can take a minute or more (JoyCaption
         # loads as one batch; a cold Ollama pulls the vision model into VRAM) —
@@ -4623,8 +4649,6 @@ def _caption_job(bank_id, ids, force, vocabulary=None):
         bank_jobs.progress(job, done=0, total=len(paths),
                            detail='captioning — loading the caption model '
                                   '(the first image can take a minute)')
-        if not paths:
-            return
         captioned = 0
 
         def _on_caption(path, caption):
@@ -4640,20 +4664,42 @@ def _caption_job(bank_id, ids, force, vocabulary=None):
         # The vocabulary register rides in as the SAME appended instruction the
         # dataset pass uses (None when unset → byte-identical to the plain pass).
         extra = vocabulary_instruction(vocabulary)
-        with gpu_exclusive_vision_window(flag_ttl=1800):
-            caption_paths(
-                paths,
-                extra_instructions=extra,
-                should_cancel=lambda: bank_jobs.cancelled(job),
-                on_caption=_on_caption,
-                # The first non-zero count means the model is up: drop the
-                # loading note then, and only then. `detail=None` leaves it
-                # alone (see bank_jobs.progress), so the note survives every
-                # 0-count report instead of being cleared by the first one.
-                progress=lambda d, t: bank_jobs.progress(
-                    job, done=d, total=t, detail='captioning' if d else None))
+        try:
+            with gpu_exclusive_vision_window(flag_ttl=1800):
+                caption_paths(
+                    paths,
+                    extra_instructions=extra,
+                    should_cancel=lambda: bank_jobs.cancelled(job),
+                    on_caption=_on_caption,
+                    # The first non-zero count means the model is up: drop the
+                    # loading note then, and only then. `detail=None` leaves it
+                    # alone (see bank_jobs.progress), so the note survives every
+                    # 0-count report instead of being cleared by the first one.
+                    progress=lambda d, t: bank_jobs.progress(
+                        job, done=d, total=t, detail='captioning' if d else None))
+        except Exception:
+            # The bank lane logged NOTHING — start, finish or failure — which is
+            # why "it just stopped working" left no trace on the Primary. The
+            # dataset lane has logged all three for months.
+            logger.exception('bank caption failed: bank=%s images=%d',
+                             bank_id, len(paths))
+            raise
         if bank_jobs.cancelled(job):
+            logger.info('bank caption stopped: bank=%s %d/%d captioned',
+                        bank_id, captioned, len(paths))
             bank_jobs.progress(job, detail=f'cancelled — {captioned} captioned so far')
+            return
+        logger.info('bank caption finished: bank=%s %d/%d captioned',
+                    bank_id, captioned, len(paths))
+        # Every engine answered and NOT ONE caption landed. Today that reports
+        # `done — 0 captioned`, a success. The common cause is Ollama going away
+        # mid-run: describe_image_ollama is best-effort and returns '' per image
+        # (vision_ollama.py), so the pass counts every image as handled and
+        # writes nothing. A pass that produced nothing did not succeed.
+        if not captioned:
+            bank_jobs.fail(job, 'no captions were produced — the caption engine '
+                                'answered nothing for every image. Check Ollama / '
+                                'JoyCaption in Settings ▸ Captioning, then retry.')
             return
         bank_jobs.progress(job, detail=f'done — {captioned} captioned')
     return run
@@ -4726,9 +4772,37 @@ def _framing_prereq() -> str | None:
 
 
 def _caption_prereq() -> str | None:
-    if (cfg.get('captioning.backend') or 'auto').lower() == 'none':
+    """Why the caption step cannot run, or None.
+
+    Every sibling prereq probes the real tool (_framing_prereq and
+    _watermark_prereq call probe_ollama_model; _score_prereq and _faces_prereq
+    probe their extras). This one only read a config STRING, so it was the one
+    heavy pass that could be declared ready with both engines dead — the
+    pipeline then ran it and failed inside, instead of skipping with a reason.
+    """
+    backend = (cfg.get('captioning.backend') or 'auto').lower()
+    if backend == 'none':
         return 'no captioning backend configured (Settings ▸ Captioning & quality)'
-    return None
+    from ..capabilities import probe_ollama_model
+    if backend == 'joycaption':
+        from .joycaption import availability
+        av = availability()
+        return None if av.get('ok') else (
+            f"JoyCaption is not ready — {av.get('detail') or 'check Settings ▸ Captioning'}")
+    if backend == 'ollama':
+        return (None if probe_ollama_model().get('ok')
+                else 'vision model not available (Settings ▸ Captioning & quality)')
+    # auto: either engine will do, so it is only unready when BOTH are.
+    if probe_ollama_model().get('ok'):
+        return None
+    try:
+        from .joycaption import availability
+        if availability().get('ok'):
+            return None
+    except Exception:      # noqa: BLE001 — a probe fault must not block the step
+        pass
+    return ('no caption engine is ready — pull the Ollama vision model or install '
+            'JoyCaption (Settings ▸ Captioning & quality)')
 
 
 def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,

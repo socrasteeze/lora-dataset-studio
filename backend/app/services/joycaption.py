@@ -12,6 +12,7 @@ import collections
 import json
 import logging
 import os
+import queue
 import subprocess
 import threading
 import time
@@ -58,7 +59,8 @@ def _reflect_stage(line: str, activity_token) -> None:
 
 def caption_images_joycaption(paths, prompt: str | None = None,
                               max_tokens: int = 300, timeout: int = 1800,
-                              activity_token=None, should_cancel=None) -> dict:
+                              activity_token=None, should_cancel=None,
+                              on_caption=None, progress=None) -> dict:
     """Caption une LISTE d'images en un seul chargement de modèle.
     Retourne {chemin: caption}. Vide si indispo/échec (non-fatal).
 
@@ -68,6 +70,16 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     que rien ne se passait). Chargement du modèle, progression du download et erreurs
     apparaissent désormais au fil de l'eau. ``activity_token`` (optionnel) reflète en plus
     les jalons dans l'indicateur d'activité du dataset.
+
+    ``on_caption(path, caption)`` / ``progress(done, total)`` (optionnels) : fired as each
+    image lands, so a caller can persist incrementally and show a moving counter. Without
+    them a batch reported NOTHING for its whole run — measured at 4.3 s an image, i.e.
+    ~22 minutes of a frozen "0 / 307" that reads as a hang, and a user pressing Stop on a
+    pass that was working perfectly.
+
+    Both run on the CALLING thread, never on the stdout reader: the bank's handler commits
+    to the DB, which needs the Flask app context the caller holds and the reader thread
+    does not. The reader only queues; the caller drains while waiting for the child.
 
     ``should_cancel`` (optionnel) : polled at each image BOUNDARY for a graceful Stop.
     stdout is streamed per image, so each caption already delivered is KEPT; when the flag
@@ -106,6 +118,9 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     errors: dict[str, str] = {}
     cancelled = {'flag': False}
     stderr_tail: collections.deque = collections.deque(maxlen=25)
+    # Reader thread → caller thread. See the docstring: the callbacks must not
+    # run on the reader, which has no app context.
+    landed: queue.Queue = queue.Queue()
 
     def _consume_json_line(line: str) -> None:
         """Parse one stdout JSON line: a per-image {i,path,caption|error}, or the final
@@ -120,8 +135,10 @@ def caption_images_joycaption(paths, prompt: str | None = None,
             p = obj['path']
             if obj.get('caption'):
                 captions[p] = str(obj['caption']).strip()
+                landed.put((p, captions[p]))
             elif obj.get('error'):
                 errors[p] = str(obj['error'])
+                landed.put((p, None))      # counts toward progress, writes nothing
         elif 'captions' in obj:
             for p, cap in (obj.get('captions') or {}).items():
                 if cap and p not in captions:
@@ -170,8 +187,47 @@ def caption_images_joycaption(paths, prompt: str | None = None,
         proc.stdin.close()
     except OSError:
         pass
+
+    total = len(paths)
+    seen = {'n': 0}
+
+    def _pump():
+        """Deliver everything the reader has queued, ON THIS thread. A callback
+        that raises must not kill the batch — the captions are still coming."""
+        while True:
+            try:
+                path, caption = landed.get_nowait()
+            except queue.Empty:
+                return
+            seen['n'] += 1
+            if caption and on_caption:
+                try:
+                    on_caption(path, caption)
+                except Exception:      # noqa: BLE001
+                    logger.exception('joycaption: on_caption failed for %s', path)
+            if progress:
+                try:
+                    progress(seen['n'], total)
+                except Exception:      # noqa: BLE001
+                    logger.exception('joycaption: progress callback failed')
+
+    # Wait in SHORT slices instead of one long wait(), so the queue above is
+    # drained WHILE the child works — a single wait() would deliver every
+    # callback at the end, which is the frozen-counter bug this exists to fix.
+    # Deliberately still wait(), not poll(): wait(timeout=…) is the contract this
+    # function already had, and switching to poll() would silently require every
+    # existing and future test double to grow a method it never needed.
+    _deadline = time.monotonic() + timeout
     try:
-        proc.wait(timeout=timeout)
+        while True:
+            try:
+                proc.wait(timeout=min(0.2, max(0.0, _deadline - time.monotonic())))
+                break
+            except subprocess.TimeoutExpired:
+                _pump()
+                if time.monotonic() >= _deadline:
+                    raise
+        _pump()
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
@@ -188,6 +244,10 @@ def caption_images_joycaption(paths, prompt: str | None = None,
                      ' | '.join(list(stderr_tail)[-5:]) or '(none)')
     t_out.join(timeout=5)
     t_err.join(timeout=5)
+    # Final drain: the reader can queue between the loop's last pump and its own
+    # exit, and those captions are as real as any other — losing them would make
+    # the counter stop one short of the truth on every run.
+    _pump()
 
     # `captions`/`errors` were filled by the stdout drain as each per-image line arrived, so
     # a graceful Stop (or a timeout) still returns everything produced so far.
