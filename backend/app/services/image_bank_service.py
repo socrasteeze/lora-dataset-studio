@@ -3987,12 +3987,20 @@ def _watermark_crop_job(bank_id):
     return run
 
 
-def _watermark_inpaint_prereq(method) -> str | None:
+def _watermark_inpaint_prereq(method, device_id=None) -> str | None:
     """Why level 2 can't run right now, or None. Actionable text — an unavailable
-    engine must say what to install, never fail silently mid-pass."""
+    engine must say what to install, never fail silently mid-pass.
+
+    A REMOTE device (peer / API backend) skips the local Klein probe: the
+    machine that will render checks its own assets at run time, and a missing
+    model there fails the job with a reason — same trade as dataset generate.
+    LaMa is never remote, so its prereq is unconditional."""
+    from . import cluster as cluster_svc
     from . import watermark_klein, watermark_lama
+    remote = (cluster_svc.normalize_device_id(device_id)
+              != cluster_svc.LOCAL_DEVICE_ID)
     if method == 'klein':
-        if not watermark_klein.is_available():
+        if not remote and not watermark_klein.is_available():
             return ('Klein inpainting needs ComfyUI running and the Klein weights '
                     '(Setup ▸ Generation models)')
         return None
@@ -4001,12 +4009,14 @@ def _watermark_inpaint_prereq(method) -> str | None:
     return None
 
 
-def start_watermark_inpaint(app, user_id, bank_id, method='auto'):
+def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None):
     """Level 2 — repaint what is STILL flagged after the crop level.
     ``method``: 'auto'/'lama' (LaMa, non-generative, small off-centre marks; marks
     on the subject stay flagged for manual review) or 'klein' (masked Flux.2 Klein
-    through ComfyUI, which also handles on-subject marks). RuntimeError (→ 503) on
-    a missing engine or a busy GPU, ValueError (→ 400) on a bad method / empty pool."""
+    through ComfyUI, which also handles on-subject marks). ``device_id``: which
+    machine renders the KLEIN jobs ('local'/None = this one); LaMa ignores it.
+    RuntimeError (→ 503) on a missing engine or a busy GPU, ValueError (→ 400)
+    on a bad method / empty pool."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -4016,17 +4026,18 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto'):
     total = _clean_pool_query(bank_id).count()
     if not total:
         raise ValueError('nothing left to inpaint — every flagged image is handled')
-    problem = _watermark_inpaint_prereq(method)
+    problem = _watermark_inpaint_prereq(method, device_id)
     if problem:
         raise RuntimeError(problem)
     reason = _gpu_busy_reason()
     if reason:
         raise RuntimeError(reason)
     return bank_jobs.start(app, bank_id, 'watermark_inpaint',
-                           _watermark_inpaint_job(bank_id, method), total=total)
+                           _watermark_inpaint_job(bank_id, method, device_id),
+                           total=total)
 
 
-def _watermark_inpaint_job(bank_id, method):
+def _watermark_inpaint_job(bank_id, method, device_id=None):
     def run(job):
         from contextlib import nullcontext
         from . import watermark_klein, watermark_lama
@@ -4040,11 +4051,17 @@ def _watermark_inpaint_job(bank_id, method):
         counts = {'inpainted': 0, 'klein': 0, 'review': 0, 'failed': 0,
                   'skipped': 0, 'empty': 0}
         error = None
+        from . import cluster as cluster_svc
+        remote = (cluster_svc.normalize_device_id(device_id)
+                  != cluster_svc.LOCAL_DEVICE_ID)
         lama_ok = watermark_lama.is_available()
-        klein_ok = method == 'klein' and watermark_klein.is_available()
+        # A remote device makes its own Klein-readiness call — the local probe
+        # answers the wrong machine's question there.
+        klein_ok = method == 'klein' and (remote or watermark_klein.is_available())
         # LaMa on the GPU pauses ComfyUI through the exclusive vision window;
         # Klein must NOT take that window — ComfyUI owns the GPU there and
-        # holding it would deadlock its worker (same split as the dataset route).
+        # holding it would deadlock its worker (same split as the dataset route);
+        # a remote render likewise never holds the LOCAL GPU.
         device = 'cpu' if method == 'klein' else watermark_lama.resolve_device()
         pending = []            # (row, dst_path, [bbox]) for the single LaMa batch
         window = (gpu_exclusive_vision_window(flag_ttl=1800)
@@ -4105,7 +4122,8 @@ def _watermark_inpaint_job(bank_id, method):
                         # owe the user is the name of the model that will run, which
                         # the panel now states (BankWatermarkPanel → /api/klein-model).
                         ok, err = watermark_klein.inpaint_watermark_klein(
-                            bank.user_id, str(dst), [list(b) for b in boxes])
+                            bank.user_id, str(dst), [list(b) for b in boxes],
+                            device_id=device_id)
                         if ok:
                             row.watermark_state = 'cleaned'
                             row.watermark_clean_method = 'klein'

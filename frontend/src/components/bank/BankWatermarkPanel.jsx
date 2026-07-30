@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
+import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
 import KleinModelSetting from '../shared/KleinModelSetting'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useToast } from '../common/Toast'
@@ -58,6 +59,9 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
   const toast = useToast()
   const [levels, setLevels] = useState(null)
   const [method, setMethod] = useState('auto')
+  // Which machine renders the KLEIN jobs (LaMa never travels). Shares the
+  // remembered pick with the generation picker on purpose — one habit.
+  const [deviceId, setDeviceId] = useState(loadSavedDeviceId)
   const [comparing, setComparing] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
 
@@ -96,6 +100,7 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
     lamaReady: !!caps.watermark_inpaint,
     kleinReady: !!caps.watermark_klein,
     kleinReason,
+    deviceId,
   })
   const note = rescanNote(levels)
   // What the hand-edited masks change for the two levels below (and, loudest, an
@@ -149,9 +154,13 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
             '✂ Auto-crop started — Stop any time.')} />
         <LevelCard index={3} title="Repaint what's left" state={inpaint}
           blurb="Repaints the marks a crop can't remove. LaMa is fast; Klein is slower but also clears marks on the subject."
-          onRun={() => run(`/api/bank/${bankId}/watermark/inpaint`, { method },
+          onRun={() => run(`/api/bank/${bankId}/watermark/inpaint`,
+            { method, device_id: deviceId },
             '🧽 Inpainting started — Stop any time.')} />
       </div>
+      {inpaint.remoteNote && (
+        <p className="text-[0.6875rem] text-content-subtle">🖥️ {inpaint.remoteNote}</p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
@@ -165,15 +174,22 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
             LaMa <span className="font-normal opacity-70">fast</span>
           </button>
           <button type="button" aria-pressed={method === 'klein'} onClick={() => setMethod('klein')}
-            disabled={!caps.watermark_klein}
+            disabled={!caps.watermark_klein && deviceId === 'local'}
             title={caps.watermark_klein
               ? 'Klein: masked Flux.2 inpaint through ComfyUI. Slower, and the only engine that clears a mark ON the subject.'
-              : (kleinReason || 'Klein inpainting needs ComfyUI running + the Klein models (Setup ▸ ComfyUI).')}
+              : deviceId !== 'local'
+                ? 'Klein renders on the selected machine — its own ComfyUI checks the models when the job runs.'
+                : (kleinReason || 'Klein inpainting needs ComfyUI running + the Klein models (Setup ▸ ComfyUI).')}
             className={`rounded-md px-2.5 py-1 font-semibold disabled:opacity-40 ${method === 'klein'
               ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
             Klein <span className="font-normal opacity-70">quality</span>
           </button>
         </div>
+        {/* Which machine renders the Klein jobs. Self-hides when this install
+            has no peers/backends; LaMa ignores it (it never travels), which the
+            state helper says whenever the pick actually changes behaviour. */}
+        <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy"
+          className="text-[0.6875rem]" />
         {/* WHICH Klein model is about to repaint these images. A bank has no
             dataset to inherit a choice from, so there is nothing to pick here —
             but "no choice" was never a reason to stay silent about the model.

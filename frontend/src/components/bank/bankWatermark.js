@@ -100,10 +100,17 @@ export function cropLevelState(levels, { live = false } = {}) {
  * install path spelled out — never a silent failure mid-pass. */
 export function inpaintLevelState(levels, {
   live = false, method = 'auto', lamaReady = false, kleinReady = false, kleinReason = null,
+  deviceId = 'local',
 } = {}) {
   const c = levelCounts(levels);
   const wantsKlein = method === 'klein';
-  const engineReady = wantsKlein ? kleinReady : lamaReady;
+  // A remote device (peer or api: backend) renders Klein on ITS machine, so the
+  // LOCAL readiness verdict answers the wrong question there — that machine's
+  // ComfyUI checks its own assets when the job arrives, and a missing model
+  // fails the image with a reason. LaMa never travels, so ITS gate ignores the
+  // picker entirely.
+  const remote = !!deviceId && deviceId !== 'local';
+  const engineReady = wantsKlein ? (kleinReady || remote) : lamaReady;
   // `kleinReason` is the ONE shared sentence (utils/localEngineReason) naming the
   // actual gap — a stopped ComfyUI, a named missing weight, a present-but-broken
   // one, a widget value this install does not have. The catch-all below is only
@@ -122,11 +129,18 @@ export function inpaintLevelState(levels, {
           ? 'Nothing left — every flagged image has been handled.'
           : 'Nothing flagged — run 🚩 Find watermarks first.')
         : null;
+  // Stated even when the button is live: the local verdict said "not ready",
+  // and the only reason the pass can still run is that another machine will do
+  // the rendering — that swap must never be silent.
+  const remoteNote = wantsKlein && remote && !kleinReady
+    ? 'Klein readiness will be checked on the selected machine when the job runs.'
+    : null;
   return {
     done: c.inpainted,
     remaining: c.flagged,
     disabled: reason !== null,
     reason,
+    remoteNote,
     label: `🧽 Inpaint (${c.flagged})`,
   };
 }
