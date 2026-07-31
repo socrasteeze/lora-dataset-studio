@@ -66,6 +66,16 @@ DEFAULTS = {
         'level': 'events',
         'heartbeat_seconds': 30,
     },
+    # Troubleshooting only, off by default. db_trace_seconds > 0 makes the log
+    # report which thread is holding SQLite's single write lock, and the
+    # statement that opened it, whenever a write transaction stays open longer
+    # than that. It exists because "database is locked" is only ever raised on
+    # the VICTIM: the message names the connection that gave up waiting and
+    # says nothing about the one that was holding. LDS_DB_TRACE overrides it
+    # for a one-off hunt without touching config.json.
+    'diagnostics': {
+        'db_trace_seconds': 0,
+    },
     # Cluster / remote GPU workers. standalone = today's single-machine behaviour.
     # primary = this install owns datasets and accepts compute peers.
     # peer = this install dials a Primary and only runs GPU jobs for it.

@@ -117,6 +117,18 @@ def _positive_env_int(name, default):
 SQLITE_BUSY_TIMEOUT_MS = 15000
 
 
+def _busy_timeout_ms() -> int:
+    """The wait actually applied, honouring LDS_SQLITE_BUSY_TIMEOUT_MS.
+
+    The override exists for ONE purpose: hunting a holder. At 15 s a
+    misbehaving pass is absorbed by the wait and only its victims are visible;
+    at 500 ms it surfaces in seconds. That is a debugging posture, not a
+    setting — left low, ordinary clicks fail during normal batch saves — so the
+    shipped constant above stays the default and the env var is the opt-in.
+    """
+    return _positive_env_int('LDS_SQLITE_BUSY_TIMEOUT_MS', SQLITE_BUSY_TIMEOUT_MS)
+
+
 def _configure_sqlite_connection(dbapi_con, _connection_record):
     """Apply the app's SQLite guarantees to every newly-opened connection.
 
@@ -130,7 +142,7 @@ def _configure_sqlite_connection(dbapi_con, _connection_record):
     try:
         cur.execute('PRAGMA foreign_keys=ON')
         cur.execute('PRAGMA journal_mode=WAL')
-        cur.execute(f'PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}')
+        cur.execute(f'PRAGMA busy_timeout={_busy_timeout_ms()}')
         cur.execute('PRAGMA synchronous=NORMAL')
     finally:
         cur.close()
@@ -426,6 +438,15 @@ def create_app(config_object=None):
                 app.config['PEER_ARTIFACT_MAX_UPLOAD_BYTES'])
 
     db.init_app(app)
+    # Off unless a threshold is configured. See utils/dbtrace: the app has
+    # shipped the same "held the write transaction across slow work" bug three
+    # times, and every time the only evidence was the error raised on the
+    # VICTIM, which never names the holder.
+    try:
+        from .utils import dbtrace
+        dbtrace.install(app, cfg.get('diagnostics.db_trace_seconds'))
+    except Exception:
+        logger.exception('could not start the db write-transaction trace')
     csrf.init_app(app)
 
     from werkzeug.exceptions import RequestEntityTooLarge
