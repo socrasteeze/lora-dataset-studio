@@ -167,6 +167,34 @@ def snapshot(user_id) -> dict:
     except Exception:      # noqa: BLE001
         pass
 
+    # --- work this machine is doing FOR a Primary ----------------------------
+    # A peer's panel used to say "nothing is running" while its own header chip
+    # said "Working for Primary" and its log carried "claimed a infer" — because
+    # `running[]` was assembled purely from bank_jobs/dataset_activity, and a
+    # peer's work lives in peer_worker, which owns neither. The two halves of
+    # the same UI contradicted each other, and the one that said idle was wrong.
+    try:
+        from .peer_worker import peer_worker      # the singleton, not the module
+        peer = peer_worker.status()
+        if peer.get('busy'):
+            running.append({
+                'kind': 'peer',
+                'label': 'Working for the Primary',
+                'what': peer.get('current_kind') or 'job',
+                'done': None, 'total': None,
+                # The phase is all a peer can honestly say: the counts belong to
+                # the hub, which owns the pass. Naming the phase still separates
+                # "downloading" from "running the model" from a real hang.
+                'detail': peer.get('phase') or 'running',
+                # peer_worker tracks no start time, and inventing one would make
+                # the panel's age column lie.
+                'started_at': None,
+                'stale_seconds': None,
+                'job_id': peer.get('current_job_id'),
+            })
+    except Exception:      # noqa: BLE001 — never empty the panel over this
+        pass
+
     # --- dataset batches -----------------------------------------------------
     try:
         from ..models import FaceDataset

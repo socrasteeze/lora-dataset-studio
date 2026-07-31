@@ -138,58 +138,81 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
         device_id, script=os.path.basename(script), stdin=stdin,
         image_paths=staged, timeout=REMOTE_PASS_TIMEOUT_SECONDS)
 
-    deadline = time.monotonic() + REMOTE_PASS_TIMEOUT_SECONDS
-    detail_sent = False
-    while True:
-        if bank_jobs.cancelled(job):
-            cluster_svc.cancel_cluster_job(job_id)
-            raise RemotePassCancelled()
-        row = ClusterJob.query.filter_by(job_id=job_id).first()
-        if row is None:
-            raise RuntimeError('remote pass vanished from the cluster queue')
-        if row.status == 'completed':
-            _log(f'{label or "the peer"} finished the {detail_label}', 'ok',
-                 device=label, bank_id=bank_id)
-            break
-        if row.status in ('failed', 'cancelled'):
-            reason = row.error_message or f'remote pass {row.status} on the peer'
-            _log(f'{label or "the peer"} could not finish the {detail_label}',
-                 'error', detail=reason, device=label, bank_id=bank_id)
-            raise RuntimeError(reason)
-        if time.monotonic() > deadline:
-            cluster_svc.cancel_cluster_job(job_id)
-            _log(f'{label or "the peer"} stopped answering', 'error',
-                 detail=f'no result after '
-                        f'{REMOTE_PASS_TIMEOUT_SECONDS // 3600}h',
-                 device=label, bank_id=bank_id)
-            raise RuntimeError('remote pass timed out — is the peer still up?')
-        # The peer relays the script's stderr lines; the same regex the local
-        # driver uses turns them into the bank's own progress bar.
-        try:
-            prog = json.loads(row.progress or '{}')
-        except (TypeError, ValueError):
-            prog = {}
-        line = str(prog.get('line') or '')
-        m = progress_re.search(line)
-        if m:
-            bank_jobs.progress(job, done=int(m.group(1)), total=int(m.group(2)),
-                               detail=f'{detail_label} (on the peer)')
-            detail_sent = True
-        elif not detail_sent and row.status in ('claimed', 'running'):
-            bank_jobs.progress(job, detail=f'{detail_label} — peer is starting up '
-                                           f'(downloading images / loading models)')
-            # The counterpart to the local window's 'GPU taken exclusively':
-            # from here the PEER's card is busy, and this machine's is not.
-            _log(f'{label or "the peer"} is running the {detail_label}', 'info',
-                 detail='its GPU is busy; this machine stays free',
-                 device=label, bank_id=bank_id)
-            detail_sent = True
-        db.session.expire(row)
-        time.sleep(POLL_SECONDS)
+    # The fetch counter is per job and only feeds a progress bar, so it
+    # must not survive the pass on ANY exit — cancel and failure both
+    # raise out of the loop below.
+    try:
+        deadline = time.monotonic() + REMOTE_PASS_TIMEOUT_SECONDS
+        detail_sent = False
+        while True:
+            if bank_jobs.cancelled(job):
+                cluster_svc.cancel_cluster_job(job_id)
+                raise RemotePassCancelled()
+            row = ClusterJob.query.filter_by(job_id=job_id).first()
+            if row is None:
+                raise RuntimeError('remote pass vanished from the cluster queue')
+            if row.status == 'completed':
+                _log(f'{label or "the peer"} finished the {detail_label}', 'ok',
+                     device=label, bank_id=bank_id)
+                break
+            if row.status in ('failed', 'cancelled'):
+                reason = row.error_message or f'remote pass {row.status} on the peer'
+                _log(f'{label or "the peer"} could not finish the {detail_label}',
+                     'error', detail=reason, device=label, bank_id=bank_id)
+                raise RuntimeError(reason)
+            if time.monotonic() > deadline:
+                cluster_svc.cancel_cluster_job(job_id)
+                _log(f'{label or "the peer"} stopped answering', 'error',
+                     detail=f'no result after '
+                            f'{REMOTE_PASS_TIMEOUT_SECONDS // 3600}h',
+                     device=label, bank_id=bank_id)
+                raise RuntimeError('remote pass timed out — is the peer still up?')
+            # The peer relays the script's stderr lines; the same regex the local
+            # driver uses turns them into the bank's own progress bar.
+            try:
+                prog = json.loads(row.progress or '{}')
+            except (TypeError, ValueError):
+                prog = {}
+            line = str(prog.get('line') or '')
+            m = progress_re.search(line)
+            if m:
+                bank_jobs.progress(job, done=int(m.group(1)), total=int(m.group(2)),
+                                   detail=f'{detail_label} (on the peer)')
+            elif row.status in ('claimed', 'running'):
+                # EVERY tick, not once. This branch used to fire a single "peer is
+                # starting up" line and latch, and bank_jobs.progress is the only
+                # thing that refreshes `_touched` — so for the whole transfer the
+                # activity panel saw a job that had not been touched in minutes and
+                # reported "probably stuck". On a 5 000-image bank that is a quarter
+                # of an hour of calling a perfectly healthy pass broken.
+                #
+                # The peer pulls each image over the artifact route, so the hub can
+                # simply count what it has served and say so.
+                fetched = cluster_svc.artifacts_fetched(job_id)
+                if fetched < len(staged):
+                    bank_jobs.progress(
+                        job, done=0, total=len(staged),
+                        detail=f'{detail_label} — sending images to '
+                               f'{label or "the peer"} ({fetched}/{len(staged)})')
+                else:
+                    bank_jobs.progress(
+                        job, detail=f'{detail_label} — {label or "the peer"} has the '
+                                    f'images and is loading its model')
+                if not detail_sent:
+                    # The counterpart to the local window's 'GPU taken exclusively':
+                    # from here the PEER's card is busy, and this machine's is not.
+                    _log(f'{label or "the peer"} is running the {detail_label}', 'info',
+                         detail='its GPU is busy; this machine stays free',
+                         device=label, bank_id=bank_id)
+                    detail_sent = True
+            db.session.expire(row)
+            time.sleep(POLL_SECONDS)
 
-    data = _read_result(job_id)
-    _install_cache(job_id, cache_name, cache_path, name_to_hub)
-    return _remap_home(data, name_to_hub)
+        data = _read_result(job_id)
+        _install_cache(job_id, cache_name, cache_path, name_to_hub)
+        return _remap_home(data, name_to_hub)
+    finally:
+        cluster_svc.forget_artifact_fetches(job_id)
 
 
 def _read_result(job_id) -> dict:

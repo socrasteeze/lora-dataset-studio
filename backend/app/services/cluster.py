@@ -107,6 +107,32 @@ def stage_file_artifact(job_id: str, src_path: str | Path, dest_name: str | None
     return name
 
 
+# How many artifacts a peer has pulled for a job. In-memory and best-effort: it
+# drives a progress bar, never a decision. It exists because the transfer is the
+# LONGEST silent stretch of a remote pass — a 5 000-image bank is ~15 minutes of
+# the peer downloading before its script prints anything at all, and with nothing
+# reporting it the hub's own activity panel called a healthy pass "probably
+# stuck". Counting the GETs the peer is already making costs nothing.
+_artifact_fetches: dict[str, int] = {}
+_artifact_fetch_lock = threading.Lock()
+
+
+def note_artifact_fetched(job_id: str) -> None:
+    with _artifact_fetch_lock:
+        _artifact_fetches[job_id] = _artifact_fetches.get(job_id, 0) + 1
+
+
+def artifacts_fetched(job_id: str) -> int:
+    with _artifact_fetch_lock:
+        return _artifact_fetches.get(job_id, 0)
+
+
+def forget_artifact_fetches(job_id: str) -> None:
+    """Drop a finished job's counter so this dict cannot grow without bound."""
+    with _artifact_fetch_lock:
+        _artifact_fetches.pop(job_id, None)
+
+
 def artifact_path(job_id: str, name: str) -> Path:
     safe = os.path.basename(name).replace('\\', '_').replace('/', '_')
     path = job_artifact_dir(job_id) / safe
