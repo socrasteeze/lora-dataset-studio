@@ -27,6 +27,7 @@ import {
 } from './bankProvenance.js'
 import BankWatermarkMaskDialog from './BankWatermarkMaskDialog'
 import { canEditMask } from './bankWatermarkMask.js'
+import { dupStateSuffix } from './bankDupBadge.js'
 
 // How many upcoming images we pull metadata for in one go (the decision helpers
 // below the image). The grid page only holds the ids it rendered.
@@ -72,9 +73,17 @@ function Facts({ img }) {
         && chip('sharp', `sharpness ${Math.round(img.blur_score)}`, 'bg-white/10 text-white/70')}
       {img.face_cluster != null && chip('face', `👤 #${img.face_cluster}`, 'bg-white/10 text-sky-200')}
       {img.framing && chip('framing', `📐 ${img.framing}`, 'bg-white/10 text-teal-200')}
-      {img.dup_group != null && chip('dup', `≈ dup #${img.dup_group}`, 'bg-white/10 text-fuchsia-200')}
+      {/* Kept even once the group is resolved, unlike the grid tile — there is
+          room here to SAY "resolved" rather than leave a bare id implying the
+          image is still an undecided duplicate. */}
+      {img.dup_group != null
+        && chip('dup', `≈ dup #${img.dup_group}${dupStateSuffix(img, 'dup')}`,
+          img.dup_unresolved === true
+            ? 'bg-white/10 text-fuchsia-200' : 'bg-white/5 text-fuchsia-200/60')}
       {img.semantic_dup_group != null
-        && chip('sdup', `✂ same shot #${img.semantic_dup_group}`, 'bg-white/10 text-orange-200')}
+        && chip('sdup', `✂ same shot #${img.semantic_dup_group}${dupStateSuffix(img, 'sdup')}`,
+          img.semantic_dup_unresolved === true
+            ? 'bg-white/10 text-orange-200' : 'bg-white/5 text-orange-200/60')}
       {(img.flags || []).map((f) => chip(f, FLAG_TEXT[f] || f, 'bg-amber-500/20 text-amber-200'))}
       {img.status === 'keep' && chip('st', '✓ already kept', 'bg-emerald-500/25 text-emerald-200')}
       {img.status === 'reject' && chip('st', '✕ already rejected', 'bg-rose-500/25 text-rose-200')}

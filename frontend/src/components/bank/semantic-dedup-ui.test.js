@@ -5,14 +5,21 @@ import test from 'node:test';
 const ws = fs.readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');
 const panel = fs.readFileSync(new URL('./DupGroupsPanel.jsx', import.meta.url), 'utf8');
 const dialog = fs.readFileSync(new URL('./LaunchAllDialog.jsx', import.meta.url), 'utf8');
+// The ≈/✂ marks moved out of the JSX into a pure helper so the "is this group
+// still open?" rule could be unit-tested — see bankDupBadge.js.
+const badge = fs.readFileSync(new URL('./bankDupBadge.js', import.meta.url), 'utf8');
 
 test('the semantic near-duplicate badge is distinct from the exact-duplicate one', () => {
   // Exact dups use ≈ (fuchsia); semantic dups use ✂ (orange) — a different mark
   // AND a different colour so the two stages never read as the same thing.
-  assert.match(ws, /≈\$\{img\.dup_group\}/);
-  assert.match(ws, /text-fuchsia-200/);
-  assert.match(ws, /✂\$\{img\.semantic_dup_group\}/);
-  assert.match(ws, /text-orange-200/);
+  assert.match(badge, /mark: '≈'/);
+  assert.match(badge, /text-fuchsia-200/);
+  assert.match(badge, /mark: '✂'/);
+  assert.match(badge, /text-orange-200/);
+  // …and the two stages stay separate rows in the table, keyed to their own
+  // column and their own live-state flag.
+  assert.match(badge, /group: 'dup_group', flag: 'dup_unresolved'/);
+  assert.match(badge, /group: 'semantic_dup_group', flag: 'semantic_dup_unresolved'/);
 });
 
 test('the workspace renders both stages through the shared panel with distinct kinds', () => {

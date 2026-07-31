@@ -912,14 +912,21 @@ def _promoted_dataset_by_image(image_ids) -> dict:
     return out
 
 
-def _page_images(rows, th: dict) -> list:
-    """One page of grid payloads, with the ⬆ promoted state resolved in a single
-    extra query for the whole page (never one per row)."""
+def _page_images(rows, th: dict, bank_id, live=None) -> list:
+    """One page of grid payloads, with the ⬆ promoted state AND the live duplicate
+    state each resolved in a single extra query for the whole page (never one per
+    row). ``live`` lets a caller that renders many pages in a loop —
+    dup_groups_payload — compute it once over the union instead of per group."""
     promoted_by = _promoted_dataset_by_image([r.id for r in rows])
-    return [_image_dict(r, th, promoted_by) for r in rows]
+    if live is None:
+        live = _live_dup_groups(bank_id, rows)
+    return [_image_dict(r, th, promoted_by, live) for r in rows]
 
 
-def _image_dict(row: BankImage, th: dict, promoted_by: dict | None = None) -> dict:
+def _image_dict(row: BankImage, th: dict, promoted_by, live) -> dict:
+    # `live` is REQUIRED, not defaulted, even though this is private with one
+    # caller: a default would let a future call site silently un-badge every tile
+    # — or, defaulted the other way, silently restore the bug it exists to fix.
     # ⬆ promoted = the dataset that holds this image TODAY (back-link), falling
     # back to the legacy one-way flag for promotions that predate it. Deriving it
     # means the badge disappears when the user deletes the image in the dataset,
@@ -962,8 +969,16 @@ def _image_dict(row: BankImage, th: dict, promoted_by: dict | None = None) -> di
         'origin': row.origin, 'origin_evidence': row.origin_evidence,
         'subfolder': _subfolder_of(row.relpath),
         'flags': image_flags(row, th),
+        # The raw ids are HISTORY and are kept: nothing clears them, and undo
+        # depends on them surviving a resolve. `*_unresolved` is the LIVE answer
+        # — the same predicate the ≈ chip and the resolution panel ask
+        # (_unresolved_dup_groups_q). Read `dup_group != null` as "is a
+        # duplicate" and you get 10 060 badges under a chip reading 0.
         'dup_group': row.dup_group,
         'semantic_dup_group': row.semantic_dup_group,
+        'dup_unresolved': row.dup_group in live['dup_group'],
+        'semantic_dup_unresolved':
+            row.semantic_dup_group in live['semantic_dup_group'],
         'face_state': row.face_state, 'face_cluster': row.face_cluster,
         'framing': row.framing,
         'status': row.status, 'reject_reason': row.reject_reason,
@@ -1085,6 +1100,46 @@ def _unresolved_dup_groups_q(bank_id, col=BankImage.dup_group):
                     BankImage.status != 'reject')
             .group_by(col)
             .having(func.count(BankImage.id) >= 2))
+
+
+# The two dedup stages as (payload attr, column), so the live lookup below is one
+# loop instead of two copies of the same query.
+_DUP_STAGES = (('dup_group', BankImage.dup_group),
+               ('semantic_dup_group', BankImage.semantic_dup_group))
+
+
+def _live_dup_groups(bank_id, rows) -> dict:
+    """{attr: {group ids ON THIS PAGE that are still unresolved}}.
+
+    The tile badge has to mean "is a duplicate", not "was once in a duplicate
+    group" — and only the second was true. `rebuild_dup_groups` is the scan's,
+    and ONLY the scan's; nothing clears the column afterwards. `resolve_dups`
+    rejects the losers and leaves it, `delete_rejected` drops the rejected rows
+    and never regroups, so the survivor keeps a group id it is now alone in.
+    Measured on a real bank: 10 060 badged rows against 0 unresolved groups,
+    while the ≈ chip — which asks _unresolved_dup_groups_q — correctly read 0.
+
+    Computed, never stored. Clearing dup_group on resolve would be the obvious
+    fix and is the wrong one: bank_undo snapshots ONLY (status, reject_reason)
+    by documented design, so undo would restore the statuses and the group would
+    stay gone. The raw ids are history and must survive.
+
+    Scoped to the group ids this page actually carries, matched on the indexed
+    column, so the cost is bounded by PAGE size and not bank size — and a stage
+    with nothing grouped on the page costs no query at all.
+    """
+    out = {attr: set() for attr, _col in _DUP_STAGES}
+    if bank_id is None or not rows:
+        return out
+    for attr, col in _DUP_STAGES:
+        gids = sorted({getattr(r, attr, None) for r in rows} - {None})
+        if not gids:
+            continue
+        for i0 in range(0, len(gids), _SQL_IN_CHUNK):
+            out[attr].update(
+                g for (g,) in _unresolved_dup_groups_q(bank_id, col)
+                .filter(col.in_(gids[i0:i0 + _SQL_IN_CHUNK])).all())
+    return out
 
 
 def _res_bucket_case():
@@ -1473,7 +1528,7 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         total = len(ordered_rows)
         off = max(0, int(offset))
         page = ordered_rows[off:off + max(1, min(500, int(limit)))]
-        return {'images': _page_images(page, th), 'total': total, 'offset': off}
+        return {'images': _page_images(page, th, bank_id), 'total': total, 'offset': off}
     q = BankImage.query.filter_by(bank_id=bank_id)
     if status in ('pending', 'keep', 'reject'):
         q = q.filter(BankImage.status == status)
@@ -1491,10 +1546,25 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         for f in ('blur', 'noise', 'uniform', 'small', 'soft_detail', 'bars'):
             q = q.filter(~_flag_filter(f, th))
     elif flag == 'dups':
-        q = q.filter(BankImage.dup_group.isnot(None))
+        # The SAME predicate as the ≈ chip and the resolution panel: a member of
+        # a group that STILL has >=2 non-rejected members. `dup_group IS NOT
+        # NULL` alone means "was once grouped", and nothing ever clears it — so
+        # on a fully resolved bank this reached "Select all in filter" / ▶ Review
+        # and handed back 10 060 rows, 6 887 of them already rejected, under a
+        # chip that honestly read 0.
+        #
+        # Deliberately NOT also `status != 'reject'`: that would make
+        # reject ∩ dups always empty and destroy "show me the duplicates I
+        # rejected". A still-open group's rejected member belongs in this filter.
+        q = q.filter(BankImage.dup_group.isnot(None),
+                     BankImage.dup_group.in_(
+                         _unresolved_dup_groups_q(bank_id).scalar_subquery()))
         order = (BankImage.dup_group.asc(), BankImage.id.asc())
     elif flag == 'semantic_dups':
-        q = q.filter(BankImage.semantic_dup_group.isnot(None))
+        q = q.filter(BankImage.semantic_dup_group.isnot(None),
+                     BankImage.semantic_dup_group.in_(
+                         _unresolved_dup_groups_q(
+                             bank_id, BankImage.semantic_dup_group).scalar_subquery()))
         order = (BankImage.semantic_dup_group.asc(), BankImage.id.asc())
     elif flag == 'no_face':
         # Literally "no face was found" — ONLY face_state == 'no_face'. The other
@@ -1573,7 +1643,7 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
     order_by = order if isinstance(order, tuple) else (order,)
     rows = q.order_by(*order_by).offset(max(0, int(offset))) \
             .limit(max(1, min(500, int(limit)))).all()
-    return {'images': _page_images(rows, th), 'total': total,
+    return {'images': _page_images(rows, th, bank_id), 'total': total,
             'offset': max(0, int(offset))}
 
 
@@ -2107,12 +2177,18 @@ def dup_groups_payload(user_id, bank_id, offset=0, limit=50,
     total = len(gids)
     page = gids[max(0, int(offset)):max(0, int(offset)) + max(1, min(200, int(limit)))]
     groups = []
+    by_gid = {gid: (BankImage.query
+                    .filter(BankImage.bank_id == bank_id, col == gid)
+                    .order_by(BankImage.id.asc()).all())
+              for gid in page}
+    # ONE live-state lookup for the whole panel page. _page_images would
+    # otherwise ask per group, and this loop renders up to 200 of them.
+    live = _live_dup_groups(bank_id, [r for rs in by_gid.values() for r in rs])
     for gid in page:
-        rows = (BankImage.query.filter(BankImage.bank_id == bank_id, col == gid)
-                .order_by(BankImage.id.asc()).all())
+        rows = by_gid[gid]
         groups.append({'group': gid,
                        'best_id': _best_of(rows).id if rows else None,
-                       'images': _page_images(rows, th)})
+                       'images': _page_images(rows, th, bank_id, live)})
     return {'groups': groups, 'total': total, 'offset': max(0, int(offset))}
 
 
@@ -2461,9 +2537,18 @@ def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
         for f in ('blur', 'noise', 'uniform', 'small', 'soft_detail', 'bars'):
             q = q.filter(~_flag_filter(f, th))
     elif flag == 'dups':
-        q = q.filter(BankImage.dup_group.isnot(None))
+        # Same qualification as list_images — this function's own docstring calls
+        # itself a deliberate mirror of those WHERE clauses, so a divergence here
+        # is exactly the debt it warns about. Unqualified, a diversity pick on a
+        # resolved bank drew from 3 173 orphaned singletons.
+        q = q.filter(BankImage.dup_group.isnot(None),
+                     BankImage.dup_group.in_(
+                         _unresolved_dup_groups_q(bank_id).scalar_subquery()))
     elif flag == 'semantic_dups':
-        q = q.filter(BankImage.semantic_dup_group.isnot(None))
+        q = q.filter(BankImage.semantic_dup_group.isnot(None),
+                     BankImage.semantic_dup_group.in_(
+                         _unresolved_dup_groups_q(
+                             bank_id, BankImage.semantic_dup_group).scalar_subquery()))
     elif flag == 'no_face':
         q = q.filter(BankImage.face_state == 'no_face')
     elif flag in _QUALITY_FLAGS + _SCORE_FLAGS:

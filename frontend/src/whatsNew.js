@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-duplicate-mark-means-still-to-resolve',
+    date: '2026-07-31',
+    title: 'The ≈ mark on a thumbnail now means "still to decide"',
+    blurb:
+      'Reported by a user: thumbnails were marked as duplicates while the Duplicates filter showed nothing. The filter was right. The mark stayed on an image for ever once it had been in a duplicate group — including on the copies you had already rejected, and on the one you kept after the others were deleted. On one bank that was 10,060 images wearing a duplicate mark under a chip that correctly read 0. The mark now asks the same question the chip does: does this group still hold two or more images you have not decided on? Rejected images still show ✕ duplicate, so you never lose the reason one was dropped, and opening an image full-screen still names its group and says whether it is resolved. Also fixed the same way: "Select all in filter" under ≈ Duplicates used to pick up every image that had ever been grouped — mostly ones you had already rejected — and now selects only what is genuinely still open. Nothing was changed in your data: the marks disappear because they are finally being judged live.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-31-remote-pass-shows-the-transfer',
     date: '2026-07-31',
     title: 'A pass running on your second machine stops looking stuck',

@@ -19,6 +19,8 @@ import BankThresholdsPanel from './BankThresholdsPanel.jsx'
 // Source-folder re-walk messages (pure/testable).
 import { folderSyncToast, forgetMissingConfirm } from './bankSync.js'
 import { UNDO_HINT, undoBannerText, undoOffer, undoResultMessage } from './bankUndo.js'
+// ≈/✂ marks, shown only while a group is still open (pure/testable).
+import { dupBadges, dupStateSuffix } from './bankDupBadge.js'
 // Four progress states, not two — including the honest "I don't know" (pure/testable).
 import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } from './progressPresence.js'
 // An occupied bank refuses in OUR words, never in the server's (pure/testable).
@@ -396,7 +398,8 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
           + (detailSummary(img)?.soft ? ` · only ~${detailSummary(img).real} px of real detail` : '')
           + (img.origin && img.origin !== 'unknown' ? ` · ${img.origin}` : '')
           + (img.style_cluster ? ` · style #${img.style_cluster}` : '')
-          + (img.semantic_dup_group ? ` · same shot #${img.semantic_dup_group}` : '')
+          + (img.semantic_dup_group
+            ? ` · same shot #${img.semantic_dup_group}${dupStateSuffix(img, 'sdup')}` : '')
           + (img.caption ? `\n${img.caption}` : '')}
         className="block w-full">
         {/* ?r= is a cache buster, not a parameter the server reads: the thumb
@@ -431,8 +434,14 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
         {img.origin === 'ai' && badge('AI', 'bg-black/60 text-violet-200')}
         {img.origin === 'camera' && badge('Camera', 'bg-black/60 text-emerald-200')}
         {img.style_cluster != null && badge(`🎨${img.style_cluster}`, 'bg-black/60 text-fuchsia-200')}
-        {img.dup_group != null && badge(`≈${img.dup_group}`, 'bg-black/60 text-fuchsia-200')}
-        {img.semantic_dup_group != null && badge(`✂${img.semantic_dup_group}`, 'bg-black/60 text-orange-200')}
+        {/* Only groups that are STILL open — see bankDupBadge. A resolved
+            group's images used to keep their mark for ever. */}
+        {dupBadges(img).map((b) => (
+          <span key={b.key} title={b.title}
+            className={`rounded px-1 py-px text-[10px] font-semibold leading-none ${b.cls}`}>
+            {b.text}
+          </span>
+        ))}
         {img.caption && badge('🏷️', 'bg-black/60 text-emerald-200')}
       </span>
       {/* ▶ starts the fast-triage lightbox AT this image. It's a separate hit
