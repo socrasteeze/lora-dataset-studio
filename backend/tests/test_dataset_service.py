@@ -1150,7 +1150,9 @@ def test_klein_generate_activity_cleared_on_cancel(app, monkeypatch):
     # cancel_pending tries to cancel the queued job — stub the queue away.
     with app.app_context():
         import app.job_queue as jq
-        monkeypatch.setattr(jq.queue_manager, 'cancel_job', lambda *a, **k: True)
+        monkeypatch.setattr(
+            jq.queue_manager, 'cancel_job_outcome',
+            lambda *a, **k: 'cancelled')
         ds = svc.create_dataset(LOCAL_USER, 'KC', 'kc')
         d = svc._dataset_dir(ds.id); os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, 'ref.webp'), 'wb') as fh:
@@ -1163,48 +1165,78 @@ def test_klein_generate_activity_cleared_on_cancel(app, monkeypatch):
         assert da.get(ds.id) is None
 
 
-def test_cancel_pending_reports_renders_comfyui_never_confirmed_stopping(app, monkeypatch):
-    """The row/tile is removed either way, but if ComfyUI never confirmed the
-    cancellation for an in-flight render, cancel_pending must say so — silently
-    counting it as 'cancelled' would hide a render still running on the GPU."""
-    from app.services import face_dataset_service as svc
+def test_cancel_pending_keeps_card_when_comfyui_cancel_is_unconfirmed(app, monkeypatch):
+    """A failed remote proof must leave a second Stop/recovery handle in the UI."""
     from app.config import LOCAL_USER
-    from app.models import FaceDatasetImage, ImageGenerationQueue
-    from app.extensions import db
-    from app.utils.comfyui import ComfyPromptState
+    from app.job_queue import queue_manager
+    from app.models import FaceDatasetImage
+    from app.services import dataset_activity as da
+    from app.services import face_dataset_service as svc
+
     with app.app_context():
-        import app.job_queue as jq
-        ds = svc.create_dataset(LOCAL_USER, 'KC3', 'kc3')
+        da.reset()
+        ds = svc.create_dataset(LOCAL_USER, 'Recovery handle', 'recovery-handle')
+        image = FaceDatasetImage(
+            dataset_id=ds.id,
+            source='generated',
+            status='pending',
+            job_id='comfy-recovery-job',
+        )
+        svc.db.session.add(image)
+        svc.db.session.commit()
+        image_id = image.id
+        outcomes = iter(('retry', 'cancelled'))
+        monkeypatch.setattr(
+            queue_manager, 'cancel_job_outcome', lambda *a, **k: next(outcomes))
 
-        job_ids = []
-        for _ in range(2):
-            jid = jq.queue_manager.add_job(workflow_data={'1': {}})
-            row = ImageGenerationQueue.query.filter_by(job_id=jid).one()
-            # 'sent_to_comfy' (not 'processing'): only this status resolves
-            # synchronously inside cancel_job, via _stall_comfy_job ->
-            # reconcile_stalled_comfy_job's fresh ComfyUI proof. 'processing'
-            # only ever marks 'cancel_requested' and defers to a later poll.
-            row.status = 'sent_to_comfy'
-            row.comfyui_prompt_id = f'prompt-{jid}'
-            db.session.add(FaceDatasetImage(
-                dataset_id=ds.id, status='pending', filename=None, job_id=jid))
-            job_ids.append(jid)
-        db.session.commit()
+        result = svc.cancel_pending(LOCAL_USER, ds.id)
 
-        # First job's prompt is confirmed gone; the second's state cannot be
-        # proven (timing race, prompt not yet visible in ComfyUI's history, ...).
-        states = iter([ComfyPromptState.DELETED, ComfyPromptState.UNKNOWN])
-        monkeypatch.setattr('app.utils.comfyui.cancel_comfyui_prompt_state',
-                            lambda *a, **k: next(states))
-        monkeypatch.setattr('app.utils.comfyui.comfyui_prompt_is_absent',
-                            lambda *a, **k: True)
+        assert result == {
+            'cancelled': 0, 'recovery_pending': 1,
+            'retry_pending': 1, 'restart_required': 0, 'recovery_error': 0,
+        }
+        preserved = svc.db.session.get(FaceDatasetImage, image_id)
+        assert preserved is not None
+        assert preserved.status == 'pending'
+        assert preserved.job_id == 'comfy-recovery-job'
+        activity = da.get(ds.id)
+        assert activity and activity['kind'] == 'generate'
 
-        cancelled, unconfirmed = svc.cancel_pending(LOCAL_USER, ds.id)
+        retried = svc.cancel_pending(LOCAL_USER, ds.id)
+        assert retried == {
+            'cancelled': 1, 'recovery_pending': 0,
+            'retry_pending': 0, 'restart_required': 0, 'recovery_error': 0,
+        }
+        assert svc.db.session.get(FaceDatasetImage, image_id) is None
+        assert da.get(ds.id) is None
+        da.reset()
 
-        assert cancelled == 2
-        assert unconfirmed == 1
-        # Both rows are gone from the dataset regardless of confirmation.
-        assert FaceDatasetImage.query.filter_by(dataset_id=ds.id).count() == 0
+
+def test_cancel_pending_preserves_card_behind_corrupt_global_barrier(app):
+    """Invalid barrier JSON is still a global lock, never proof a card is safe."""
+    from app.config import LOCAL_USER
+    from app.job_queue import COMFYUI_STALLED_BARRIER_KEY
+    from app.models import FaceDatasetImage, SystemState
+    from app.services import face_dataset_service as svc
+
+    with app.app_context():
+        ds = svc.create_dataset(LOCAL_USER, 'Corrupt recovery', 'corrupt-recovery')
+        card = FaceDatasetImage(
+            dataset_id=ds.id, source='generated', status='pending',
+            job_id='missing-but-not-safe')
+        svc.db.session.add(card)
+        svc.db.session.add(SystemState(
+            key=COMFYUI_STALLED_BARRIER_KEY, value='{invalid-json'))
+        svc.db.session.commit()
+        card_id = card.id
+
+        result = svc.cancel_pending(LOCAL_USER, ds.id)
+        assert result == {
+            'cancelled': 0, 'recovery_pending': 1,
+            'retry_pending': 0, 'restart_required': 0, 'recovery_error': 1,
+        }
+        preserved = svc.db.session.get(FaceDatasetImage, card_id)
+        assert preserved is not None and preserved.job_id == 'missing-but-not-safe'
 
 
 # --- Import d'un dataset existant (ZIP kohya) --------------------------------

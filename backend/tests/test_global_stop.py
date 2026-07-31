@@ -265,3 +265,50 @@ def test_the_clear_route_works_when_the_flag_really_is_stale(app, client):
     assert r.status_code == 200
     assert r.get_json()['cleared'] == ['vision_in_progress']
     assert client.get('/api/system/gpu-flags').get_json()['any_set'] is False
+
+
+# --- the generations target actually calls cancel_pending ---------------------
+# Every case above stubs _datasets_with_pending to [], so cancel_pending was
+# never reached from here. When upstream replaced its (cancelled, unconfirmed)
+# tuple with a named recovery dict, this fork-only module kept unpacking two
+# values — it merged with ZERO conflict markers, the whole suite stayed green,
+# and ⏹ Stop everything would have raised on the first press with anything in
+# flight. These drive the real call.
+
+def _stop_with_generations(app, results):
+    """stop_everything with one dataset in flight, cancel_pending stubbed."""
+    from app.services import face_dataset_service as ds
+    from app.services import global_stop, lora_training
+    from app.utils import comfyui
+    seq = iter(results)
+    with patch.object(comfyui, 'free_comfyui_vram', lambda *a, **k: True), \
+         patch.object(lora_training, 'stop_training', lambda *a, **k: False), \
+         patch.object(global_stop, '_datasets_with_pending', lambda uid: [1]), \
+         patch.object(ds, 'cancel_pending', lambda *a, **k: next(seq)), \
+         patch.object(global_stop, '_SETTLE_SECONDS', 0):
+        return global_stop.stop_everything(app, 'local')
+
+
+def test_stopping_proven_generations_reports_stopped(app):
+    with app.app_context():
+        report = _stop_with_generations(app, [
+            {'cancelled': 3, 'recovery_pending': 0, 'retry_pending': 0,
+             'restart_required': 0, 'recovery_error': 0}])
+        t = _target(report, 'Generations')
+        assert t['state'] == 'stopped', t
+        assert '3 cancelled' in t['detail']
+
+
+def test_a_generation_that_cannot_be_proven_is_never_claimed_stopped(app):
+    """And the wording must not promise the card is gone — it is deliberately
+    KEPT now, because dropping it orphaned the global recovery barrier."""
+    with app.app_context():
+        report = _stop_with_generations(app, [
+            {'cancelled': 1, 'recovery_pending': 2, 'retry_pending': 1,
+             'restart_required': 1, 'recovery_error': 0}])
+        t = _target(report, 'Generations')
+        assert t['state'] == 'unconfirmed', t
+        assert 'KEPT' in t['detail'], 'the card is preserved — say so'
+        assert 'restart' in t['detail'].lower()
+        assert 'rows are gone' not in t['detail'], (
+            'this promise is no longer true and this module exists to not lie')
