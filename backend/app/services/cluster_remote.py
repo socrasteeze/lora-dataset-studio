@@ -18,14 +18,25 @@ logger = logging.getLogger(__name__)
 
 def enqueue_vision_on_device(device_id, image_paths, *, prompt, prefer_json=False,
                              fmt=None, job_id=None) -> str:
-    """Stage images and create a vision ClusterJob. Returns job_id."""
+    """Stage images and create a vision ClusterJob. Returns job_id.
+
+    `image_paths` entries may be plain paths or ``(path, dest_name)`` pairs —
+    the same contract as enqueue_infer_on_device, and for the same reason. A
+    bank spanning several folders routinely holds two `img_001.jpg`; staging by
+    bare basename overwrites one with the other, and because the peer returns
+    its results keyed by artifact name, the survivor's verdict would then be
+    written onto BOTH rows. That is silent corruption, not an error. Measured on
+    a real bank: 163 of 23 408 images collide. Callers staging a whole pass pass
+    unique dest names (the bank runner prefixes the image id).
+    """
     device_id = cluster_svc.normalize_device_id(device_id)
     if device_id == cluster_svc.LOCAL_DEVICE_ID:
         raise ValueError('use local vision path for device=local')
     job_id = job_id or str(uuid.uuid4())
     names = []
     for p in image_paths:
-        names.append(cluster_svc.stage_file_artifact(job_id, p))
+        src, dest = p if isinstance(p, (tuple, list)) else (p, None)
+        names.append(cluster_svc.stage_file_artifact(job_id, src, dest_name=dest))
     cluster_svc.enqueue_generic(
         device_id=device_id,
         kind='vision',

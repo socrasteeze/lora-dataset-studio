@@ -211,6 +211,17 @@ export default function DevicesSection({ config, setField, handleSave, configDef
       {role !== 'peer' && (
         <Card id="remote-comfyui-backends" title="Remote ComfyUI backends"
           help="The lighter way to rent a GPU: the other box runs ONLY ComfyUI (started with --listen), no second app install. This machine sends inputs and fetches results over ComfyUI's own API. Works in any role, Primary account not needed.">
+          {/* The two remote models look alike in the picker and are not
+              interchangeable — one runs bank passes, the other cannot. Say so
+              HERE, where the user is choosing between them. */}
+          <p className="mb-3 text-xs text-content-muted">
+            <strong className="text-content">Generation only.</strong> A backend renders images
+            (Generate, Upscale &amp; improve, Test Studio, Klein watermark inpaint). It cannot run
+            the bank&apos;s Score, Faces, framing or watermark passes — those need the full app on
+            the other machine, so add it as a <em>compute peer</em> above instead.
+            {' '}A backend is reached over plain HTTP with <strong className="text-content">no
+            authentication</strong>: only add one on a network you trust, or over Tailscale.
+          </p>
           {backends === null ? (
             <p className="text-sm text-content-muted">Loading…</p>
           ) : backends.length === 0 ? (
@@ -274,6 +285,16 @@ export default function DevicesSection({ config, setField, handleSave, configDef
       {role === 'primary' && (
         <Card title="Compute peers"
           help="Generate a join token on this Primary, then paste it into the peer install (Settings → Devices → Peer). Tailscale MagicDNS hostnames work best.">
+          {/* The counterpart of the note on the backends card — the two are not
+              interchangeable and the picker cannot show that on one line. */}
+          <p className="mb-3 text-xs text-content-muted">
+            <strong className="text-content">The full app on the other machine.</strong> A peer
+            runs generation <em>and</em> the bank&apos;s heavy passes — ✨ Score, 👥 Faces, 📐
+            Framing and 🚩 Watermarks all move to its GPU, using its own models. It needs LDS
+            installed there plus a join token, and it authenticates with a revocable token.
+            Captions still run here for now. A bank&apos;s scan, auto-reject and duplicate steps
+            always stay on this machine — they read the database, not the GPU.
+          </p>
           <div className="flex flex-wrap items-end gap-2">
             <div>
               <label htmlFor="join-label" className="block text-xs text-content-muted">Label (optional)</label>
