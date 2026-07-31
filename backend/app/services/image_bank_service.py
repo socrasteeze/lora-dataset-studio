@@ -47,7 +47,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from PIL import Image, ImageOps
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, func, or_, update
 
 from .. import config as cfg
 from ..extensions import db
@@ -71,6 +71,11 @@ IMG_EXTS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp')
 BANK_MAX_FILES = 50000
 THUMB_MAX_SIDE = 320
 _COMMIT_EVERY = 25          # scan DB flush cadence
+# Results buffered before a vision pass opens the write transaction. Counted in
+# IMAGES SEEN, never in successes: the old `% 25` gates counted only the images
+# the model answered for, so a degraded Ollama dirtied row after row and never
+# reached a commit — one transaction stretched over the whole pass.
+_VISION_FLUSH_EVERY = 25
 _PROMOTE_CHUNK = 20         # files per import_images call (bounded memory)
 _SQL_IN_CHUNK = 500         # SQLite bound-variable ceiling is 999
 # A quality pass that keeps finding NOTHING on disk is not looking at a bank of
@@ -3905,32 +3910,44 @@ def _watermark_job(bank_id, rescan):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        rows = _watermark_scan_query(bank_id, rescan).order_by(BankImage.id.asc()).all()
-        bank_jobs.progress(job, done=0, total=len(rows), detail='watermark scan')
-        if not rows:
+        # Read once, before anything commits, and carry plain tuples — see the
+        # same two reasons spelled out in _framing_job.
+        source_path = bank.source_path
+        root = os.path.realpath(source_path)
+        items = (_watermark_scan_query(bank_id, rescan)
+                 .order_by(BankImage.id.asc())
+                 .with_entities(BankImage.id, BankImage.relpath,
+                                BankImage.watermark_clean_method).all())
+        bank_jobs.progress(job, done=0, total=len(items), detail='watermark scan')
+        if not items:
             return
-        detected = clean = errors = checked = unanswered = 0
+        detected = clean = errors = checked = unanswered = seen = 0
+        pending = {}
 
         def prepared():
             """Yielded on the JOB's thread, one image per free slot in the pool.
-            Everything that reads the database or has a side effect lives here,
-            so it stays off the workers, keeps its original order, and is only
-            paid for by images the pass actually reaches (which matters: the
-            discard below is destructive)."""
-            for row in rows:
+            Everything with a side effect lives here, so it stays off the
+            workers, keeps its original order, and is only paid for by images
+            the pass actually reaches (which matters: the discard below is
+            destructive)."""
+            for row_id, relpath, clean_method in items:
                 # Always detect on the SOURCE pixels: a re-scan of an already
                 # cleaned image drops its cleaned version first (otherwise we
                 # would be asking "is there a watermark?" about our own edit).
-                if row.watermark_clean_method:
-                    _discard_clean_blob(bank_id, row)
-                yield row, abs_image_path(bank, row)
+                # The FILE deletion stays here, lazy; its row update is STAGED,
+                # because a write_with_retry rollback must not be able to lose
+                # the record of a file that is already gone.
+                if clean_method:
+                    _discard_clean_blob_files(bank_id, row_id)
+                    pending.setdefault(row_id, {})['watermark_clean_method'] = None
+                yield row_id, _abs_under(root, relpath)
 
         def ask(item):
             """WORKER thread: read the file, ask Ollama. Touches no session — the
             path was resolved above, on the owning thread. Returns None (not '')
             for a file that is gone, so the caller can tell "nothing to analyse"
             from "the model answered nothing"."""
-            _row, path = item
+            _row_id, path = item
             if not path or not os.path.isfile(path):
                 return None
             return describe_image_ollama(
@@ -3942,11 +3959,11 @@ def _watermark_job(bank_id, rescan):
             try:
                 # The calls overlap (see vision_pool); the loop body — every
                 # database write below — still runs here, on this one thread.
-                for (row, _path), raw, error in map_vision(
+                for (row_id, _path), raw, error in map_vision(
                         prepared(), ask,
                         should_cancel=lambda: bank_jobs.cancelled(job)):
                     if error is not None:  # one bad file never sinks the pass
-                        row.watermark_state = 'error'
+                        pending.setdefault(row_id, {})['watermark_state'] = 'error'
                         errors += 1
                     elif raw is None:      # file gone: leave the row as it was
                         pass
@@ -3963,21 +3980,32 @@ def _watermark_job(bank_id, rescan):
                     else:
                         bbox = _parse_watermark_bbox(raw)
                         if bbox:
-                            row.watermark_state = 'detected'
-                            # Keep the box — the crop/inpaint levels route on it.
-                            row.watermark_bbox = _json.dumps([round(v, 4) for v in bbox])
+                            pending.setdefault(row_id, {}).update(
+                                watermark_state='detected',
+                                # Keep the box — crop/inpaint route on it.
+                                watermark_bbox=_json.dumps(
+                                    [round(v, 4) for v in bbox]))
                             detected += 1
                         else:
-                            row.watermark_state = 'none'
-                            row.watermark_bbox = None
+                            pending.setdefault(row_id, {}).update(
+                                watermark_state='none', watermark_bbox=None)
                             clean += 1
                         checked += 1
-                        if checked % 25 == 0:
-                            db.session.commit()
+                    # Bounded by IMAGES SEEN, not by successes. This branch is
+                    # why it matters here: `checked` skipped the 'error' case
+                    # above, which DOES write, so a run of unreadable files
+                    # buffered rows without ever reaching a flush — a pass
+                    # killed mid-run then lost every stamp it had earned.
+                    seen += 1
+                    if seen % _VISION_FLUSH_EVERY == 0:
+                        _flush_row_updates(pending)
                     bank_jobs.bump(job)
             finally:
-                db.session.commit()
-                unload_vision_model()  # hand the VRAM back to ComfyUI
+                try:
+                    _flush_row_updates(pending)
+                finally:
+                    # The VRAM comes back even if the database does not.
+                    unload_vision_model()
         if bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail=f'cancelled — {detected} with a watermark '
                                            f'so far')
@@ -4034,16 +4062,60 @@ def _needs_rescan_count(bank_id) -> int:
             .filter(BankImage.watermark_regions.is_(None)).count())
 
 
+def _discard_clean_blob_files(bank_id, image_id) -> None:
+    """The FILE half of forgetting a cleaned version: delete the blob and drop
+    the stale thumbnail. Split out so a pass that stages its row updates as
+    plain data (see _flush_row_updates) can do the destructive part where it
+    belongs — lazily, per image reached — without also dirtying the session
+    there.
+
+    Safe to run before the row update lands: resolved_image_path checks
+    `watermark_clean_method` and THEN `cleaned.is_file()`, so a row still
+    claiming a blob whose file is gone serves the source, which is exactly the
+    post-discard behaviour. A crash in between leaves the row rescannable."""
+    try:
+        clean_image_path(bank_id, image_id).unlink()
+    except OSError:
+        pass
+    drop_derived(bank_id, image_id)
+
+
 def _discard_clean_blob(bank_id, row) -> None:
     """Forget a cleaned version: delete the blob, drop the stale thumbnail and
     clear the method so the readers fall back to the source. No commit (the
     caller owns the transaction)."""
-    try:
-        clean_image_path(bank_id, row.id).unlink()
-    except OSError:
-        pass
-    drop_derived(bank_id, row.id)
+    _discard_clean_blob_files(bank_id, row.id)
     row.watermark_clean_method = None
+
+
+def _flush_row_updates(pending: dict) -> None:
+    """Apply buffered BankImage updates in ONE short write transaction.
+
+    ``pending`` is {row_id: {column: value}} of PLAIN data, which is what makes
+    this safe to hand to write_with_retry: a lock error rolls the session back,
+    discarding everything staged, so the unit of work has to be replayable.
+    Staging the values on ORM rows in the loop instead — which is what these
+    passes used to do — would let that rollback silently throw away 25 answers
+    already paid for in Ollama time.
+
+    The point is not the batching, it is that nothing slow happens between the
+    transaction opening and the commit. That is utils/dbbusy's rule stated
+    literally, and the reason the framing and watermark passes could hold
+    SQLite's single write lock for ~20 s at a stretch against a 15 s
+    busy_timeout: everything the user clicked meanwhile died as "database is
+    locked", and a second machine's heartbeat dropped it offline entirely.
+
+    Mutates ``pending`` empty. Rows may carry different column sets (the
+    watermark pass stages a discard on some rows and a verdict on others);
+    SQLAlchemy groups them internally, and a partial entry leaves the columns
+    it does not name untouched.
+    """
+    if not pending:
+        return
+    batch = [{'id': row_id, **values} for row_id, values in pending.items()]
+    pending.clear()
+    write_with_retry(lambda: db.session.execute(
+        update(BankImage).execution_options(synchronize_session=False), batch))
 
 
 def _clean_bbox(row):
@@ -4621,26 +4693,40 @@ def _framing_job(bank_id, rescan):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
+        # Read ONCE, before anything commits. Every commit expires the row, so a
+        # `bank.source_path` inside the loop would re-SELECT it — and autoflush
+        # turns that read into a write. See _flush_row_updates.
+        source_path = bank.source_path
+        root = os.path.realpath(source_path)
         q = (BankImage.query.filter_by(bank_id=bank_id)
              .filter(BankImage.status != 'reject'))
         if not rescan:
             q = q.filter(BankImage.framing.is_(None))
-        rows = q.order_by(BankImage.id.asc()).all()
-        bank_jobs.progress(job, done=0, total=len(rows), detail='framing')
-        if not rows:
+        # PLAIN TUPLES, not ORM rows. Two reasons, both load-bearing: an ORM row
+        # is expired by every commit, so the generator's next pull re-SELECTs it
+        # and autoflush opens the write transaction (which then stays open
+        # across the next 25 Ollama calls); and a bank of 80 000 rows would put
+        # 80 000 entities in the identity map, making each commit's expire_all()
+        # a sweep over all of them.
+        items = (q.order_by(BankImage.id.asc())
+                  .with_entities(BankImage.id, BankImage.relpath).all())
+        bank_jobs.progress(job, done=0, total=len(items), detail='framing')
+        if not items:
             return
-        classified = errors = missing = 0
+        classified = errors = missing = seen = 0
+        pending = {}
 
         def prepared():
-            """Path resolution reads the row, so it belongs on the job's own
-            thread — pulled one image per free slot in the pool."""
-            for row in rows:
-                yield row, abs_image_path(bank, row)
+            """Path resolution stays lazy and on the job's own thread — one
+            image per free slot — but reads plain strings now, not rows. The
+            bank folder is resolved ONCE (see _abs_under)."""
+            for row_id, relpath in items:
+                yield row_id, _abs_under(root, relpath)
 
         def ask(item):
             """WORKER thread: file + network only, no session. None means the
             file is gone, as opposed to '' meaning the model said nothing."""
-            _row, path = item
+            _row_id, path = item
             if not path or not os.path.isfile(path):
                 return None
             return describe_image_ollama(
@@ -4652,7 +4738,7 @@ def _framing_job(bank_id, rescan):
             try:
                 # The calls overlap (see vision_pool); every write below still
                 # happens here, on this one thread.
-                for (row, _path), raw, error in map_vision(
+                for (row_id, _path), raw, error in map_vision(
                         prepared(), ask,
                         should_cancel=lambda: bank_jobs.cancelled(job)):
                     if error is not None:  # one bad file never sinks the pass
@@ -4666,14 +4752,22 @@ def _framing_job(bank_id, rescan):
                         pass
                     else:
                         framing, _label = _parse_classify(raw)
-                        row.framing = framing        # face|bust|body|back|unknown
+                        # face|bust|body|back|unknown
+                        pending[row_id] = {'framing': framing}
                         classified += 1
-                        if classified % 25 == 0:
-                            db.session.commit()
+                    # Bounded by IMAGES SEEN, not by successes: the old gate
+                    # counted only classified rows, so an unreachable Ollama
+                    # never reached a commit at all.
+                    seen += 1
+                    if seen % _VISION_FLUSH_EVERY == 0:
+                        _flush_row_updates(pending)
                     bank_jobs.bump(job)
             finally:
-                db.session.commit()
-                unload_vision_model()  # hand the VRAM back to ComfyUI
+                try:
+                    _flush_row_updates(pending)
+                finally:
+                    # The VRAM comes back even if the database does not.
+                    unload_vision_model()
         if bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail=f'cancelled — {classified} classified so far')
             return
@@ -4688,7 +4782,7 @@ def _framing_job(bank_id, rescan):
         bank_jobs.progress(job, detail=detail)
         if missing and not classified:
             logger.warning('bank framing: bank=%s every image missing from disk (%s)',
-                           bank_id, bank.source_path)
+                           bank_id, source_path)
     return run
 
 
