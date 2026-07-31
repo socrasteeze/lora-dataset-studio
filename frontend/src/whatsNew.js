@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-passes-no-longer-take-the-database-hostage',
+    date: '2026-07-31',
+    title: 'A running pass no longer freezes the rest of the app',
+    blurb:
+      'This is the cause behind "I queued jobs and nothing ran for an hour" — the part the previous fixes could only soften. The database allows exactly one writer at a time, and the watermark and framing passes were taking hold of it and keeping it for about twenty seconds at a stretch, over and over, for as long as they ran. Long enough that curating another bank failed with "the database is busy", and long enough that a second machine\'s check-in timed out — which does not merely delay that machine, it drops it offline and makes it skip a turn, so its queue stopped moving too. Both passes now save in short bursts between images and hold the database only for the instant it takes to write. Creating a bank from a very large folder, the quality scan, copying images between banks and the auto-crop pass all got the same treatment, and a second machine\'s check-in now retries a busy moment instead of giving up on it. Nothing about what the passes DO has changed — every result is the same, they just stop sitting on the database while they think.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-31-queued-jobs-no-longer-stall-on-a-busy-database',
     date: '2026-07-31',
     title: 'Queued generations no longer stall behind a busy database',
