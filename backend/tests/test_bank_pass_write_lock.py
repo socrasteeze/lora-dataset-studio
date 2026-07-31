@@ -30,6 +30,7 @@ Every test here was verified to FAIL against the unfixed code before being kept
 — and one of them had to be rewritten to earn that, which is recorded in its
 own docstring rather than quietly fixed.
 """
+import os
 import sqlite3
 import threading
 import time
@@ -179,6 +180,66 @@ def test_a_degraded_ollama_still_saves_as_it_goes(tmp_path, monkeypatch):
         from app.models import BankImage
         assert BankImage.query.filter_by(bank_id=bank_id,
                                          watermark_state='error').count() == 60
+
+
+def test_creating_a_bank_saves_as_it_walks(tmp_path, monkeypatch):
+    """_register_bank flushed in the loop and committed ONCE at the end.
+
+    A flush opens the write transaction just as a commit does, but never closes
+    it — so creating a bank held SQLite's single writer across up to
+    BANK_MAX_FILES (50 000) os.path.getsize syscalls. refresh_bank hit exactly
+    this and was fixed by changing flush to commit; its comment says so. The
+    twin below it never got the same fix.
+
+    Asserted as durability rather than as a stopwatch: at realistic test sizes
+    50 000 syscalls' worth of hold cannot be reproduced, so a timing assertion
+    here would be the kind that passes both ways. Mid-walk visibility from a
+    second connection discriminates exactly and deterministically — under the
+    old code NOTHING is committed until the very end.
+    """
+    from app import config as cfg
+
+    count = 600                      # > the 500-row batch, so a flush is due
+    src = tmp_path / 'many'
+    src.mkdir()
+    blob = (tmp_path / 'seed.jpg')
+    from PIL import Image
+    Image.new('RGB', (8, 8)).save(str(blob), 'JPEG')
+    payload = blob.read_bytes()
+    for i in range(count):
+        (src / f'{i:04d}.jpg').write_bytes(payload)
+
+    application = _file_backed_app(tmp_path)
+    client = application.test_client()
+    db_path = str(tmp_path / 'studio.db')
+    landed_midway = {}
+
+    real_getsize = os.path.getsize
+    state = {'n': 0}
+
+    def counting_getsize(path):
+        state['n'] += 1
+        if state['n'] == 560:        # past the first batch boundary
+            conn = sqlite3.connect(db_path, timeout=2.0)
+            try:
+                landed_midway['n'] = conn.execute(
+                    'SELECT count(*) FROM bank_image').fetchone()[0]
+            finally:
+                conn.close()
+        return real_getsize(path)
+
+    monkeypatch.setattr(os.path, 'getsize', counting_getsize)
+    with application.app_context():
+        cfg.save_config({})
+        r = client.post('/api/bank/create',
+                        json={'name': 'MANY', 'folder': str(src)})
+    assert r.status_code == 200, r.get_json()
+
+    assert 'n' in landed_midway, 'the probe point was never reached'
+    assert landed_midway['n'] >= 500, (
+        f'only {landed_midway["n"]} rows were committed 560 files into the '
+        'walk — the insert loop is flushing instead of committing, so it holds '
+        'the write lock for the whole walk')
 
 
 def test_a_vision_pass_holds_no_long_write_transaction(tmp_path, monkeypatch):

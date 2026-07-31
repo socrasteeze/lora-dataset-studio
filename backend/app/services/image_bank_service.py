@@ -45,6 +45,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
 from PIL import Image, ImageOps
 from sqlalchemy import and_, case, func, or_, update
@@ -365,15 +366,29 @@ def _register_bank(user_id, name, source_path, rels, root_only=False):
     bank = ImageBank(user_id=user_id, name=name, source_path=source_path,
                      root_only=bool(root_only))
     db.session.add(bank)
-    db.session.flush()          # need bank.id for the child rows
+    # COMMIT, not flush — the same fix, and the same reasoning, as refresh_bank's
+    # insert loop below: a flush OPENS the write transaction, and the loop then
+    # held SQLite's single write lock across up to BANK_MAX_FILES os.path.getsize
+    # syscalls, so anything the user clicked meanwhile died as "database is
+    # locked". A partial commit is safe here for the reason it is safe there:
+    # refresh_bank is strictly additive and re-walks the folder on open, so a
+    # bank left holding a subset of its files simply completes on the next walk.
+    # root_only is persisted above, so that re-walk is correctly scoped too.
+    db.session.commit()
+    # Not cosmetic. The commit above EXPIRED `bank`, so reading bank.id inside
+    # the loop would re-SELECT it — and autoflush would turn that read into a
+    # flush, reopening the very transaction the commit just closed. This is why
+    # refresh_bank's version came out clean: it uses its bank_id PARAMETER and
+    # never touches an ORM attribute in the loop.
+    new_bank_id = bank.id
     for i, rel in enumerate(rels, 1):
         try:
             size = os.path.getsize(os.path.join(source_path, rel))
         except OSError:
             size = None
-        db.session.add(BankImage(bank_id=bank.id, relpath=rel, file_size=size))
+        db.session.add(BankImage(bank_id=new_bank_id, relpath=rel, file_size=size))
         if i % 500 == 0:
-            db.session.flush()
+            db.session.commit()
     db.session.commit()
     return bank, len(rels)
 
@@ -1724,6 +1739,8 @@ def _scan_job(bank_id, rescan):
         workers = min(8, os.cpu_count() or 4)
         done = 0
         missing = 0
+        pending = {}
+        unreadable_ids = []
         with ThreadPoolExecutor(max_workers=workers) as ex:
             it = iter(items)
             futures = deque()
@@ -1746,41 +1763,52 @@ def _scan_job(bank_id, rescan):
                     done += 1
                     bank_jobs.bump(job)
                     if missing >= _MISSING_ABORT_AT and missing * 2 >= done:
-                        db.session.commit()
+                        _flush_scan_batch(pending, unreadable_ids)
                         bank_jobs.fail(job, MOVED_FOLDER_MSG)
                         return
                     if not bank_jobs.cancelled(job):
                         submit_next()
                     continue
-                row = db.session.get(BankImage, res['id'])
-                if row is not None:
-                    row.quality_state = res['quality_state']
-                    row.width, row.height = res['width'], res['height']
-                    if res['file_size'] is not None:
-                        row.file_size = res['file_size']
-                    row.dhash = res['dhash']
-                    if res['metrics']:
-                        row.blur_score = res['metrics']['blur_score']
-                        row.noise_score = res['metrics']['noise_score']
-                        row.uniformity_score = res['metrics']['uniformity_score']
-                    if res['provenance']:
-                        p = res['provenance']
-                        row.detail_ratio = p['detail_ratio']
-                        row.bars_ratio = p['bars_ratio']
-                        row.jpeg_quality = p['jpeg_quality']
-                        row.origin = p['origin']
-                        row.origin_evidence = p['origin_evidence']
-                    # An unreadable file can never be promoted — auto-reject it
-                    # (only over 'pending': a manual decision is never flipped).
-                    if res['quality_state'] == 'unreadable' and row.status == 'pending':
-                        row.status, row.reject_reason = 'reject', 'unreadable'
+                # Staged as plain data, NOT via db.session.get(). That get() was
+                # a real SELECT, and autoflush turned it into a flush of the
+                # previous rows — opening the write transaction, which then
+                # survived the next futures.popleft().result() on the decode
+                # pool. Same shape as the vision passes; see _flush_row_updates.
+                values = {
+                    'quality_state': res['quality_state'],
+                    'width': res['width'],
+                    'height': res['height'],
+                    'dhash': res['dhash'],
+                }
+                if res['file_size'] is not None:
+                    values['file_size'] = res['file_size']
+                if res['metrics']:
+                    values.update(
+                        blur_score=res['metrics']['blur_score'],
+                        noise_score=res['metrics']['noise_score'],
+                        uniformity_score=res['metrics']['uniformity_score'])
+                if res['provenance']:
+                    p = res['provenance']
+                    values.update(
+                        detail_ratio=p['detail_ratio'], bars_ratio=p['bars_ratio'],
+                        jpeg_quality=p['jpeg_quality'], origin=p['origin'],
+                        origin_evidence=p['origin_evidence'])
+                pending[res['id']] = values
+                # An unreadable file can never be promoted — auto-reject it
+                # (only over 'pending': a manual decision is never flipped).
+                # Evaluated as a WHERE rather than against a row read into
+                # memory, which is strictly MORE correct: the status is judged
+                # at write time, so a decision the user made during the pass
+                # can no longer be overwritten by a value read before it.
+                if res['quality_state'] == 'unreadable':
+                    unreadable_ids.append(res['id'])
                 done += 1
                 if done % _COMMIT_EVERY == 0:
-                    db.session.commit()
+                    _flush_scan_batch(pending, unreadable_ids)
                 bank_jobs.bump(job)
                 if not bank_jobs.cancelled(job):
                     submit_next()
-        db.session.commit()
+        _flush_scan_batch(pending, unreadable_ids)
         if not bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail='grouping duplicates')
             groups = rebuild_dup_groups(bank_id)
@@ -4118,6 +4146,38 @@ def _flush_row_updates(pending: dict) -> None:
         update(BankImage).execution_options(synchronize_session=False), batch))
 
 
+def _flush_scan_batch(pending: dict, unreadable_ids: list) -> None:
+    """_flush_row_updates plus the scan's conditional auto-reject.
+
+    The reject is a separate statement because it is CONDITIONAL: an unreadable
+    file is rejected only while the row is still 'pending', so a verdict the
+    user typed during the pass is never flipped. Expressing that as a WHERE
+    instead of a status read into memory also closes a small race the old code
+    had — it compared against a value read before the decode, not at the moment
+    of writing.
+    """
+    if not pending and not unreadable_ids:
+        return
+    batch = [{'id': row_id, **values} for row_id, values in pending.items()]
+    ids = list(unreadable_ids)
+    pending.clear()
+    unreadable_ids.clear()
+
+    def _apply():
+        if batch:
+            db.session.execute(
+                update(BankImage).execution_options(synchronize_session=False),
+                batch)
+        for i0 in range(0, len(ids), _SQL_IN_CHUNK):
+            (BankImage.query
+             .filter(BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK]),
+                     BankImage.status == 'pending')
+             .update({'status': 'reject', 'reject_reason': 'unreadable'},
+                     synchronize_session=False))
+
+    write_with_retry(_apply)
+
+
 def _clean_bbox(row):
     """The stored bbox as a 4-float tuple, or None when it's unusable."""
     try:
@@ -4243,7 +4303,7 @@ def _watermark_crop_job(bank_id):
             return
         rows = _clean_pool_query(bank_id).order_by(BankImage.id.asc()).all()
         bank_jobs.progress(job, done=0, total=len(rows), detail='auto-crop')
-        cropped = left = failed = 0
+        cropped = left = failed = seen = 0
         try:
             for row in rows:
                 if bank_jobs.cancelled(job):
@@ -4255,17 +4315,20 @@ def _watermark_crop_job(bank_id):
                     # cannot express either, and quietly cropping the detector's
                     # old box would clean pixels the user did NOT point at.
                     left += 1
+                    seen += 1
                     bank_jobs.bump(job)
                     continue
                 bbox = boxes[0] if boxes else None
                 src, width, height = _source_size(bank, row)
                 if not bbox or not src:
                     failed += 1
+                    seen += 1
                     bank_jobs.bump(job)
                     continue
                 route, box = _route_watermark(bbox, width, height, allow_crop=True)
                 if route != 'crop':
                     left += 1              # level 2's job — stays 'detected'
+                    seen += 1
                     bank_jobs.bump(job)
                     continue
                 try:
@@ -4274,6 +4337,7 @@ def _watermark_crop_job(bank_id):
                         Image.DecompressionBombWarning):
                     _discard_clean_blob(bank_id, row)
                     failed += 1
+                    seen += 1
                     bank_jobs.bump(job)
                     continue
                 if _apply_watermark_crop(str(dst), box):
@@ -4284,7 +4348,13 @@ def _watermark_crop_job(bank_id):
                 else:
                     _discard_clean_blob(bank_id, row)
                     failed += 1
-                if (cropped + failed) % 25 == 0:
+                # Counted in images SEEN, like the vision passes. The old
+                # gate was (cropped + failed) % 25, which the two `left` skips
+                # and every `continue` above jumped straight past — including
+                # the one at :_discard_clean_blob, which DIRTIES a row. So a
+                # run of skips deferred the commit indefinitely.
+                seen += 1
+                if seen % _COMMIT_EVERY == 0:
                     db.session.commit()
                 bank_jobs.bump(job)
         finally:
@@ -5995,7 +6065,24 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
         dest = db.session.get(ImageBank, dest_bank_id)
         if not src or not dest:
             return
-        rows = _promote_source_rows(src_bank_id, ids)
+        # Detached SNAPSHOTS, taken before anything commits. Every commit below
+        # expires the ORM objects, so reading src.source_path or r.relpath after
+        # one re-SELECTs it — and autoflush turns that read into a flush, which
+        # opens the write transaction around a full image read AND write. Plain
+        # namespaces keep resolved_image_path and _bank_copy_values working
+        # exactly as written (both only read attributes, neither queries), so
+        # there is still ONE resolver and no second copy of its rules.
+        src_snap = SimpleNamespace(id=src.id, source_path=src.source_path)
+        dest_root, dest_name = dest.source_path, dest.name
+        rows = [SimpleNamespace(
+                    id=r.id, relpath=r.relpath, rotation=r.rotation,
+                    watermark_clean_method=r.watermark_clean_method,
+                    caption=r.caption, source_metadata=r.source_metadata)
+                for r in _promote_source_rows(src_bank_id, ids)]
+        # Nothing reads the ORM rows again, and leaving 50 000 of them in the
+        # identity map would make every commit below an expire_all() over all
+        # of them. Safe here: nothing is pending at this point.
+        db.session.expunge_all()
         bank_jobs.progress(job, done=0, total=len(rows), detail='copying')
         copied, unreadable = [], 0
         for r in rows:
@@ -6003,7 +6090,7 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
                 break
             # RESOLVED path: a watermark-cleaned image must land cleaned, same
             # rule as promoting to a dataset.
-            p = resolved_image_path(src, r)
+            p = resolved_image_path(src_snap, r)
             try:
                 # Read + validate the exact bounded bytes before writing. A
                 # `copy2` after a header-only check could race a live folder
@@ -6017,7 +6104,7 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
                 unreadable += 1
                 bank_jobs.bump(job)
                 continue
-            target = os.path.join(dest.source_path, r.relpath)
+            target = os.path.join(dest_root, r.relpath)
             try:
                 os.makedirs(os.path.dirname(target), exist_ok=True)
                 with open(target, 'wb') as target_file:
@@ -6060,7 +6147,7 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
              .update({'promoted_bank_id': dest_bank_id},
                      synchronize_session=False))
         db.session.commit()
-        detail = f'{len(copied)} image(s) copied into "{dest.name}"'
+        detail = f'{len(copied)} image(s) copied into "{dest_name}"'
         if unreadable:
             detail += f', {unreadable} unreadable'
         bank_jobs.progress(job, detail=detail)
