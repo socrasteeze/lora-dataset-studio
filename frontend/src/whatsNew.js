@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-backend-no-longer-freezes-this-machine',
+    date: '2026-07-31',
+    title: 'Your second machine no longer freezes your first one',
+    blurb:
+      'A remote ComfyUI backend was supposed to render alongside this machine — that is what Settings → Devices promises, and it is why you would add one. It did the opposite: while the other box rendered, this one refused to start anything of its own and sat idle for the whole job, up to fifteen minutes. Worse, it also refused to start a training or a vision pass, so one image on the laptop could hold up a run on the desktop. All of it now really does happen at once: two machines give you two images at a time, and a remote render no longer delays anything local. Nothing changed about what travels — generation only, and each machine still needs the models for the job it runs. Compute peers were never affected. The vision model also stopped unloading itself whenever a remote job was running; it was handing the GPU back to a machine that had not asked for it.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-30-retry-reference-edit-show-engine',
     date: '2026-07-30',
     title: 'Retry a reference edit exactly as it ran',

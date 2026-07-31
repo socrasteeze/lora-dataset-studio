@@ -171,6 +171,113 @@ def test_process_one_skips_while_training_in_progress(app):
         assert row.status == 'completed'
 
 
+def test_a_backend_render_does_not_block_local_work(app):
+    """A remote ComfyUI backend renders on ITS OWN GPU, so it must not freeze
+    this machine's queue.
+
+    The busy check in process_one() used to count every active row in the table
+    with no worker_id filter, while the claim query ten lines below it filtered
+    properly. A backend setting its own row to sent_to_comfy therefore blocked
+    local work for the whole remote render -- up to POLL_TIMEOUT_SECONDS, 15
+    minutes -- contradicting backend_worker.py's own docstring and the promise
+    already published in README.md:292 and :912.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+    with app.app_context():
+        backend = cluster_svc.add_backend('Laptop', 'http://laptop:8188')
+        remote = queue_manager.add_job(workflow_data={'1': {}}, worker_id=backend['id'])
+        row = ImageGenerationQueue.query.filter_by(job_id=remote).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='remote-prompt')
+        db.session.commit()
+
+        local = queue_manager.add_job(workflow_data={'1': {}})
+        with patch('app.job_queue._submit', return_value='local-prompt'), \
+             patch('app.job_queue._poll_outputs', return_value=('out.png', False)), \
+             patch('app.job_queue._dispatch_completion'):
+            assert queue_manager.process_one() is True
+
+        assert ImageGenerationQueue.query.filter_by(job_id=local).one().status == 'completed'
+        # The backend's own row is untouched -- the local worker neither claimed
+        # nor finalized work belonging to another machine's dispatcher.
+        assert ImageGenerationQueue.query.filter_by(job_id=remote).one().status == 'sent_to_comfy'
+
+
+def test_a_local_render_still_blocks_local_work(app):
+    """The mirror of the test above, so the fix cannot be over-applied.
+
+    Scoping the busy check to local rows must not weaken it INTO those rows: one
+    local ComfyUI is still one GPU, and a second local prompt on top of an
+    in-flight one is the race the check exists to prevent.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    with app.app_context():
+        busy = queue_manager.add_job(workflow_data={'1': {}})
+        row = ImageGenerationQueue.query.filter_by(job_id=busy).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='local-prompt')
+        db.session.commit()
+
+        waiting = queue_manager.add_job(workflow_data={'1': {}})
+        with patch('app.job_queue._submit') as submit:
+            assert queue_manager.process_one() is False
+            submit.assert_not_called()
+        assert ImageGenerationQueue.query.filter_by(job_id=waiting).one().status == 'pending'
+
+
+def test_backend_rows_do_not_make_local_ollama_unload(app):
+    """vision_keepalive.gpu_is_contended shared the same missing filter: a job
+    rendering on another machine made THIS machine drop its keep-warm vision
+    lease for a GPU nobody was contending."""
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+    from app.services import vision_keepalive as vk
+    with app.app_context():
+        assert vk.gpu_is_contended() is False
+        backend = cluster_svc.add_backend('Laptop', 'http://laptop:8188')
+        remote = queue_manager.add_job(workflow_data={'1': {}}, worker_id=backend['id'])
+        row = ImageGenerationQueue.query.filter_by(job_id=remote).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='remote-prompt')
+        db.session.commit()
+        assert vk.gpu_is_contended() is False
+
+        # …but a LOCAL pending job still contends, as it always did.
+        queue_manager.add_job(workflow_data={'1': {}})
+        assert vk.gpu_is_contended() is True
+
+
+def test_a_backend_render_does_not_block_a_training_launch(app):
+    """`has_comfyui_work` gates the training launch (lora_training) and the
+    vision GPU window (gpu_window) — both asking "is the LOCAL card free?".
+
+    Unscoped it answered "busy" for a job rendering on another machine, so a
+    laptop rendering one image stopped the desktop from starting a training.
+    backend_worker.py's docstring promises the opposite ("the laptop can keep
+    rendering while the desktop trains"), as does README.md:912.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+    with app.app_context():
+        assert queue_manager.has_comfyui_work() is False
+        backend = cluster_svc.add_backend('Laptop', 'http://laptop:8188')
+        remote = queue_manager.add_job(workflow_data={'1': {}}, worker_id=backend['id'])
+        row = ImageGenerationQueue.query.filter_by(job_id=remote).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='remote-prompt')
+        db.session.commit()
+        assert queue_manager.has_comfyui_work() is False
+
+        # A LOCAL job still holds the card — the guard must not be weakened.
+        queue_manager.add_job(workflow_data={'1': {}})
+        assert queue_manager.has_comfyui_work() is True
+
+
 def test_process_one_skips_while_vision_in_progress(app):
     from app.job_queue import queue_manager
     with app.app_context():
