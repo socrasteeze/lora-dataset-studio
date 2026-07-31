@@ -484,3 +484,66 @@ def test_a_missing_module_is_still_named_behind_a_progress_bar(app, monkeypatch)
     peer_worker._run_infer(_infer_job('face_embed_infer.py', images=[]))
     assert 'face-scoring' in done['error']
     assert 'Quality tools' in done['error']
+
+
+# --- artifact names must survive a bank that spans folders -------------------
+
+def test_vision_staging_never_collides_on_duplicate_basenames(app, tmp_path,
+                                                              monkeypatch):
+    """Silent corruption guard, not a crash guard.
+
+    A bank spanning folders routinely holds two `img_001.jpg` — measured on a
+    real bank, 163 of 23 408. The peer returns its results keyed by ARTIFACT
+    NAME, so staging by bare basename does not merely lose one file: the
+    survivor's verdict is then written onto BOTH rows. Nothing raises; the wrong
+    answer is simply saved.
+
+    enqueue_vision_on_device therefore takes (path, dest_name) pairs, exactly
+    like enqueue_infer_on_device, and the bank runner prefixes the image id.
+    """
+    from app.services import cluster as cluster_svc
+    from app.services import cluster_remote
+
+    a = tmp_path / 'sub1'
+    b = tmp_path / 'sub2'
+    for d in (a, b):
+        d.mkdir(parents=True, exist_ok=True)
+    same = 'img_001.jpg'
+    Image.new('RGB', (16, 16), (200, 10, 10)).save(str(a / same))
+    Image.new('RGB', (16, 16), (10, 10, 200)).save(str(b / same))
+
+    made = {}
+    monkeypatch.setattr(cluster_svc, 'enqueue_generic',
+                        lambda **kw: made.update(kw))
+    monkeypatch.setattr(cluster_svc, 'normalize_device_id', lambda d: d)
+
+    with app.app_context():
+        job_id = cluster_remote.enqueue_vision_on_device(
+            PEER,
+            [(str(a / same), f'11__{same}'), (str(b / same), f'22__{same}')],
+            prompt='describe')
+
+    names = made['payload']['artifacts']
+    assert len(set(names)) == 2, f'the two images collapsed into one: {names}'
+    assert names == [f'11__{same}', f'22__{same}']
+    # Both really landed on disk under their own name.
+    for n in names:
+        assert cluster_svc.artifact_path(job_id, n).is_file()
+    # …and they are still the DIFFERENT images, not one written twice.
+    blobs = {cluster_svc.artifact_path(job_id, n).read_bytes() for n in names}
+    assert len(blobs) == 2, 'one image overwrote the other'
+
+
+def test_vision_staging_still_accepts_plain_paths(app, tmp_path, monkeypatch):
+    """The raw /jobs/vision route passes bare paths and must keep working."""
+    from app.services import cluster as cluster_svc
+    from app.services import cluster_remote
+
+    p = tmp_path / 'only.jpg'
+    Image.new('RGB', (16, 16)).save(str(p))
+    made = {}
+    monkeypatch.setattr(cluster_svc, 'enqueue_generic', lambda **kw: made.update(kw))
+    monkeypatch.setattr(cluster_svc, 'normalize_device_id', lambda d: d)
+    with app.app_context():
+        cluster_remote.enqueue_vision_on_device(PEER, [str(p)], prompt='x')
+    assert made['payload']['artifacts'] == ['only.jpg']

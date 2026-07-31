@@ -3985,7 +3985,7 @@ def _watermark_scan_query(bank_id, rescan):
     return q
 
 
-def start_watermark(app, user_id, bank_id, rescan=False):
+def start_watermark(app, user_id, bank_id, rescan=False, device_id=None):
     """Launch the overlaid-watermark scan over the bank's non-rejected images,
     reusing the SAME Qwen3-VL detector the datasets use. Needs the vision model
     pulled; serialized against training/vision (503 when the GPU is held)."""
@@ -4002,22 +4002,30 @@ def start_watermark(app, user_id, bank_id, rescan=False):
     # (no Ollama) failed a release on it while two agents read it as a flake.
     if bank_jobs.running(bank_id):
         raise bank_jobs.BankJobBusy((bank_jobs.get(bank_id) or {}).get('kind') or 'background')
-    if not probe_ollama_model().get('ok'):
-        raise RuntimeError('the vision model is not available '
-                           '(Settings ▸ Captioning & quality)')
-    reason = _gpu_busy_reason()
-    if reason:
-        raise RuntimeError(reason)
+    # Both gates describe THIS machine's model and card; a pass aimed at a peer
+    # runs on neither. Same reasoning as start_score / start_framing.
+    remote = _remote_pass_device(device_id)
+    if not remote:
+        if not probe_ollama_model().get('ok'):
+            raise RuntimeError('the vision model is not available '
+                               '(Settings ▸ Captioning & quality)')
+        reason = _gpu_busy_reason()
+        if reason:
+            raise RuntimeError(reason)
+    device_id = device_id if remote else None
     return bank_jobs.start(app, bank_id, 'watermark',
-                           _watermark_job(bank_id, rescan),
-                           total=_watermark_scan_query(bank_id, rescan).count())
+                           _watermark_job(bank_id, rescan, device_id),
+                           total=_watermark_scan_query(bank_id, rescan).count(),
+                           device_label=_device_label(device_id))
 
 
-def _watermark_job(bank_id, rescan):
+def _watermark_job(bank_id, rescan, device_id=None):
     def run(job):
+        import contextlib
         import json as _json
         from .face_dataset_service import WATERMARK_BBOX_PROMPT, _parse_watermark_bbox
         from .vision_ollama import describe_image_ollama, unload_vision_model
+        from . import bank_remote
         from .vision_pool import map_vision
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
@@ -4068,13 +4076,24 @@ def _watermark_job(bank_id, rescan):
                 WATERMARK_BBOX_PROMPT, num_predict=400,
                 prefer_json=True, fmt='json', keep_alive='5m')
 
-        with gpu_exclusive_vision_window(flag_ttl=1800):
+        # Remote runs the DETECTION on the peer's Ollama and takes no window
+        # here. The destructive half stays local either way: prepared() unlinks
+        # a stale cleaned blob before the image is staged, so the peer always
+        # judges the SOURCE pixels — the reason that discard exists.
+        if device_id:
+            window = contextlib.nullcontext()
+            source = bank_remote.run_remote_vision(
+                job, device_id, items=list(prepared()),
+                prompt=WATERMARK_BBOX_PROMPT, detail_label='watermark scan',
+                bank_id=bank_id)
+        else:
+            window = gpu_exclusive_vision_window(flag_ttl=1800)
+            source = map_vision(prepared(), ask,
+                                should_cancel=lambda: bank_jobs.cancelled(job))
+        with window:
             try:
-                # The calls overlap (see vision_pool); the loop body — every
-                # database write below — still runs here, on this one thread.
-                for (row_id, _path), raw, error in map_vision(
-                        prepared(), ask,
-                        should_cancel=lambda: bank_jobs.cancelled(job)):
+                # Every database write below still runs here, on this one thread.
+                for (row_id, _path), raw, error in source:
                     if error is not None:  # one bad file never sinks the pass
                         pending.setdefault(row_id, {})['watermark_state'] = 'error'
                         errors += 1
@@ -4807,7 +4826,7 @@ def watermark_levels(user_id, bank_id) -> dict | None:
 
 
 # --- framing pass (reuses the dataset face/bust/body/back classifier) -------
-def start_framing(app, user_id, bank_id, rescan=False):
+def start_framing(app, user_id, bank_id, rescan=False, device_id=None):
     """Classify every non-rejected image by SHOT TYPE (face / bust / body / back),
     reusing the SAME Qwen3-VL classifier the datasets use (CLASSIFY_PROMPT). Feeds
     the 📐 Framing filter chips and the coverage advice. Needs the vision model
@@ -4826,24 +4845,34 @@ def start_framing(app, user_id, bank_id, rescan=False):
     # (no Ollama) failed a release on it while two agents read it as a flake.
     if bank_jobs.running(bank_id):
         raise bank_jobs.BankJobBusy((bank_jobs.get(bank_id) or {}).get('kind') or 'background')
-    if not probe_ollama_model().get('ok'):
-        raise RuntimeError('the vision model is not available '
-                           '(Settings ▸ Captioning & quality)')
-    reason = _gpu_busy_reason()
-    if reason:
-        raise RuntimeError(reason)
+    # Both gates below describe THIS machine — the model it can reach and the
+    # card it owns. A pass aimed at a peer runs on neither, so applying them
+    # would refuse a run this machine was never going to do (same reasoning as
+    # start_score's remote branch).
+    remote = _remote_pass_device(device_id)
+    if not remote:
+        if not probe_ollama_model().get('ok'):
+            raise RuntimeError('the vision model is not available '
+                               '(Settings ▸ Captioning & quality)')
+        reason = _gpu_busy_reason()
+        if reason:
+            raise RuntimeError(reason)
+    device_id = device_id if remote else None
     q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
     if not rescan:
         q = q.filter(BankImage.framing.is_(None))
     return bank_jobs.start(app, bank_id, 'framing',
-                           _framing_job(bank_id, rescan), total=q.count())
+                           _framing_job(bank_id, rescan, device_id),
+                           total=q.count(), device_label=_device_label(device_id))
 
 
-def _framing_job(bank_id, rescan):
+def _framing_job(bank_id, rescan, device_id=None):
     def run(job):
+        import contextlib
         from .face_dataset_service import CLASSIFY_PROMPT, _parse_classify
         from .vision_ollama import describe_image_ollama, unload_vision_model
         from .vision_pool import map_vision
+        from . import bank_remote
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -4889,13 +4918,23 @@ def _framing_job(bank_id, rescan):
                 CLASSIFY_PROMPT, num_predict=400,
                 prefer_json=True, fmt='json', keep_alive='5m')
 
-        with gpu_exclusive_vision_window(flag_ttl=1800):
+        # Local: overlap the calls on this machine's Ollama, inside the GPU
+        # window. Remote: the peer runs them on ITS Ollama and this machine
+        # takes no window at all — which is the whole point of picking a device.
+        # Both sources yield the identical (row_id, raw, error) shape, so the
+        # loop below is one loop.
+        if device_id:
+            window = contextlib.nullcontext()
+            source = bank_remote.run_remote_vision(
+                job, device_id, items=list(prepared()), prompt=CLASSIFY_PROMPT,
+                detail_label='framing pass', bank_id=bank_id)
+        else:
+            window = gpu_exclusive_vision_window(flag_ttl=1800)
+            source = map_vision(prepared(), ask,
+                                should_cancel=lambda: bank_jobs.cancelled(job))
+        with window:
             try:
-                # The calls overlap (see vision_pool); every write below still
-                # happens here, on this one thread.
-                for (row_id, _path), raw, error in map_vision(
-                        prepared(), ask,
-                        should_cancel=lambda: bank_jobs.cancelled(job)):
+                for (row_id, _path), raw, error in source:
                     if error is not None:  # one bad file never sinks the pass
                         errors += 1
                     elif raw is None:      # file gone: leave the row as it was
@@ -5397,11 +5436,13 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         entry['detail'] = f'{n} semantic near-duplicate group(s) to review'
         return
     if step == 'watermark':
-        reason = _watermark_prereq() or _gpu_busy_reason()
+        # Same shape as score/faces: a remote pass runs on the peer's Ollama and
+        # its card, so neither local gate describes it.
+        reason = None if device_id else (_watermark_prereq() or _gpu_busy_reason())
         if reason:
             entry['status'], entry['reason'] = 'skipped', reason
             return
-        _watermark_job(bank_id, rescan=False)(job)
+        _watermark_job(bank_id, rescan=False, device_id=device_id)(job)
         c = _bank_counts(bank_id)
         entry['counts'] = {'watermarks': c['watermark_detected']}
         entry['detail'] = job.get('detail') or f"{c['watermark_detected']} with a watermark"
@@ -5417,16 +5458,22 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         entry['detail'] = job.get('detail') or f"{c['person_groups']} person cluster(s)"
         return
     if step == 'framing':
-        reason = _framing_prereq() or _gpu_busy_reason()
+        reason = None if device_id else (_framing_prereq() or _gpu_busy_reason())
         if reason:
             entry['status'], entry['reason'] = 'skipped', reason
             return
-        _framing_job(bank_id, rescan=False)(job)
+        _framing_job(bank_id, rescan=False, device_id=device_id)(job)
         c = _bank_counts(bank_id)
         entry['counts'] = {'framing_classified': c['framing_classified']}
         entry['detail'] = job.get('detail') or f"{c['framing_classified']} classified by framing"
         return
     if step == 'caption':
+        # NOT remote-capable, deliberately. caption_paths owns the engine choice
+        # (joycaption | ollama | auto) in one place, and the peer's vision kind
+        # only speaks Ollama — sending it would mean re-deriving that rule here,
+        # which is exactly the client/server drift that has bitten this app
+        # before. So captions stay on the hub whatever the device pick, and
+        # LaunchAllDialog says so rather than implying otherwise.
         reason = _caption_prereq() or _gpu_busy_reason()
         if reason:
             entry['status'], entry['reason'] = 'skipped', reason

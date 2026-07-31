@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-bank-vision-passes-run-on-the-peer',
+    date: '2026-07-31',
+    title: 'Framing and watermark scanning now run on your second machine',
+    blurb:
+      'Sending a bank to another machine only ever moved two of its passes — scoring and faces — while everything else stayed here, three of them holding this machine’s graphics card. Framing and watermark detection now go too, running on the other machine’s own vision model, so a queued bank leans on the GPU you picked instead of this one. The device list also says what each kind of machine can actually do: a full second install runs the bank’s heavy passes, a bare ComfyUI renders images only and cannot run them at all — and two machines that happen to share a name are finally told apart in the picker. Honest about the rest: captions still run here for now, and a bank’s scan, auto-reject and duplicate steps always will, because they read the database rather than the graphics card.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-31-duplicate-mark-means-still-to-resolve',
     date: '2026-07-31',
     title: 'The ≈ mark on a thumbnail now means "still to decide"',

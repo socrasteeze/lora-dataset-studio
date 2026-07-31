@@ -67,11 +67,18 @@ export default function DevicePicker({ value, onChange, kind = 'comfy', classNam
           const capOk = d.local
             || (kind === 'comfy' ? d.capabilities?.comfyui
               : kind === 'bank-pass'
-                ? (d.capabilities?.bank_scoring || d.capabilities?.face_scoring)
+                // Ollama counts now: the framing and watermark passes travel as
+                // vision jobs, so a peer with Ollama but no scoring stack is
+                // still useful for a pipeline — it just skips Score/Faces.
+                ? (d.capabilities?.bank_scoring || d.capabilities?.face_scoring
+                   || d.capabilities?.ollama)
                 : true)
-          let label = d.name
+          // Two machines can share a name (a peer and a ComfyUI backend added
+          // from the same box routinely do). Say which is which, or the picker
+          // offers two identical-looking rows that behave differently.
+          let label = d.local ? d.name : `${d.name} · ${d.backend ? 'ComfyUI only' : 'peer'}`
           if (offline) label += ' (offline)'
-          else if (!capOk) label += kind === 'bank-pass' ? ' (no scoring stack)' : ' (no ComfyUI)'
+          else if (!capOk) label += kind === 'bank-pass' ? ' (no vision or scoring stack)' : ' (no ComfyUI)'
           else if (d.busy) label += ' (busy)'
           return (
             <option key={d.id} value={d.id} disabled={offline}>
