@@ -24,25 +24,46 @@ def test_create_returns_ok_envelope(client):
     assert full['name'] == 'Lola' and full['trigger_word'] == 'lola'
 
 
-def test_cancel_reports_unconfirmed_renders(client, monkeypatch):
-    """The cancel route must forward how many in-flight renders ComfyUI never
-    confirmed stopping — dropping that would let the UI claim a clean stop
-    while a render keeps going on the GPU."""
+def test_cancel_forwards_every_recovery_count(client, monkeypatch):
+    """The cancel route must forward what ComfyUI never confirmed stopping —
+    dropping it would let the UI claim a clean stop while a render keeps going
+    on the GPU.
+
+    The shape changed in the 2026-07-31 upstream sync: one `unconfirmed` count
+    became a named taxonomy. The principle is the fork's and is unchanged; the
+    taxonomy simply says what to DO next, which a bare count could not — retry
+    the known prompt, or restart ComfyUI and confirm it.
+    """
     ds_id = _create(client).get_json()['id']
     monkeypatch.setattr('app.routes.datasets.svc.cancel_pending',
-                        lambda *_a, **_k: (3, 1))
+                        lambda *_a, **_k: {'cancelled': 3, 'recovery_pending': 2,
+                                           'retry_pending': 1, 'restart_required': 1,
+                                           'recovery_error': 0})
     resp = client.post(f'/api/dataset/{ds_id}/cancel')
     assert resp.status_code == 200
-    assert resp.get_json() == {'ok': True, 'cancelled': 3, 'unconfirmed': 1}
+    body = resp.get_json()
+    assert body['ok'] is True
+    assert body['cancelled'] == 3
+    # Each one reaches the UI: the toast branches on them individually.
+    assert body['recovery_pending'] == 2
+    assert body['retry_pending'] == 1
+    assert body['restart_required'] == 1
 
 
-def test_cancel_omits_unconfirmed_when_every_render_was_confirmed(client, monkeypatch):
+def test_cancel_reports_a_fully_confirmed_stop_as_clean(client, monkeypatch):
+    """The other half: when every prompt WAS proven gone, nothing must suggest
+    otherwise — a permanent 'may still be rendering' warning is its own lie."""
     ds_id = _create(client).get_json()['id']
     monkeypatch.setattr('app.routes.datasets.svc.cancel_pending',
-                        lambda *_a, **_k: (2, 0))
+                        lambda *_a, **_k: {'cancelled': 2, 'recovery_pending': 0,
+                                           'retry_pending': 0, 'restart_required': 0,
+                                           'recovery_error': 0})
     resp = client.post(f'/api/dataset/{ds_id}/cancel')
     assert resp.status_code == 200
-    assert resp.get_json() == {'ok': True, 'cancelled': 2}
+    body = resp.get_json()
+    assert body['ok'] is True and body['cancelled'] == 2
+    assert not any(body[k] for k in ('recovery_pending', 'retry_pending',
+                                     'restart_required', 'recovery_error'))
 
 
 def test_create_requires_name_and_trigger(client):

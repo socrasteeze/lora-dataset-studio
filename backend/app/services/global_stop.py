@@ -169,23 +169,35 @@ def stop_everything(app, user_id) -> dict:
     except Exception as e:      # noqa: BLE001
         targets.append(_target('Dataset batches', 'failed', str(e)))
 
-    # 4. In-flight generations. cancel_pending already reports the subset whose
-    #    interrupt could not be confirmed — that honesty is carried through here
-    #    rather than flattened into a success.
+    # 4. In-flight generations. cancel_pending already reports what it could not
+    #    prove — that honesty is carried through here rather than flattened into
+    #    a success.
+    #
+    #    Upstream replaced its (cancelled, unconfirmed) tuple with a named
+    #    recovery taxonomy, and this module is fork-only so nothing flagged the
+    #    change: it merged with zero conflict markers and the old tuple unpack
+    #    would have raised on the first Stop. The wording had to change too — the
+    #    old text promised "their rows are gone either way", and the whole point
+    #    of upstream's fix is that a card whose ComfyUI state cannot be proven is
+    #    now KEPT, because dropping it orphaned the global recovery barrier and
+    #    left every GPU action reporting busy with nothing left to recover.
     try:
         from . import face_dataset_service as ds
-        cancelled = unconfirmed = 0
+        cancelled = pending = restart_required = 0
         for dsid in _datasets_with_pending(user_id):
-            c, u = ds.cancel_pending(user_id, dsid)
-            cancelled += c
-            unconfirmed += u
-        if not cancelled:
+            r = ds.cancel_pending(user_id, dsid)
+            cancelled += r.get('cancelled', 0)
+            pending += r.get('recovery_pending', 0)
+            restart_required += r.get('restart_required', 0)
+        if not cancelled and not pending:
             targets.append(_target('Generations', 'idle', 'nothing in flight'))
-        elif unconfirmed:
-            targets.append(_target(
-                'Generations', 'unconfirmed',
-                f'{cancelled} cancelled, {unconfirmed} may still be rendering on '
-                'ComfyUI — their rows are gone either way'))
+        elif pending:
+            detail = (f'{cancelled} cancelled, {pending} could not be confirmed '
+                      'and were KEPT so you can stop them again')
+            if restart_required:
+                detail += (f' ({restart_required} need ComfyUI restarted and the '
+                           'restart confirmed first)')
+            targets.append(_target('Generations', 'unconfirmed', detail))
         else:
             targets.append(_target('Generations', 'stopped',
                                    f'{cancelled} cancelled'))
