@@ -168,7 +168,7 @@ def test_the_peer_redirects_the_cache_into_its_out_folder(app, monkeypatch,
 
     captured = {}
 
-    def fake_run(python, script, stdin_json, timeout, on_line=None):
+    def fake_run(python, script, stdin_json, timeout, on_line=None, **_kw):
         captured.update(json.loads(stdin_json))
         return json.dumps({'ok': True, 'results': {}}), [], 0, False
 
@@ -385,7 +385,7 @@ def test_the_peer_supplies_its_own_models_root(app, monkeypatch):
     seen = {}
     monkeypatch.setattr(
         'app.services.infer_stream.run_infer_script',
-        lambda py, sc, payload, t, on_line=None:
+        lambda py, sc, payload, t, on_line=None, **_kw:
         seen.update(json.loads(payload)) or ('{"ok": true}', [], 0, False))
     monkeypatch.setattr(peer_worker, '_download_artifacts',
                         lambda job_id, names, dest: {})
@@ -410,7 +410,7 @@ def test_a_hub_models_root_is_never_inherited(app, monkeypatch):
     seen = {}
     monkeypatch.setattr(
         'app.services.infer_stream.run_infer_script',
-        lambda py, sc, payload, t, on_line=None:
+        lambda py, sc, payload, t, on_line=None, **_kw:
         seen.update(json.loads(payload)) or ('{"ok": true}', [], 0, False))
     monkeypatch.setattr(peer_worker, '_download_artifacts',
                         lambda job_id, names, dest: {})

@@ -41,15 +41,24 @@ def stderr_tail(lines) -> str:
     return next((ln.strip() for ln in reversed(list(lines or ())) if ln.strip()), '')
 
 
-def run_infer_script(python, script, payload, timeout, on_line=None):
+def run_infer_script(python, script, payload, timeout, on_line=None,
+                     env=None, cwd=None):
     """Run ``python script``, feed it ``payload`` on stdin, stream its stderr
     lines to ``on_line`` as they arrive.
+
+    ``env``/``cwd`` are for scripts whose weights live outside the default
+    cache. Omitting them is not neutral: JoyCaption resolves its model through
+    HF_HOME, so a run without it re-downloads ~8 GB onto a machine that already
+    had the model — the same failure that made a peer re-fetch 352 MB when its
+    models_root was dropped. None keeps the inherited environment, which is what
+    every existing caller wants.
 
     Returns ``(stdout, stderr_lines, returncode, timed_out)``.
     """
     proc = subprocess.Popen(
         [python, script], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
+        env=env, cwd=cwd,
         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     lines: deque = deque(maxlen=_TAIL_LINES)
 

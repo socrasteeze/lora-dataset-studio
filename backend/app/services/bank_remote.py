@@ -120,13 +120,16 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
         name_to_hub[name] = path
         staged.append((path, name))
 
-    cache_name = os.path.basename(str(cache_path))
+    # No cache for every pass: the caption script writes no .npz. Passing None
+    # keeps the cancel sentinel (which the scripts poll) without inventing a
+    # cache name the peer would then try to upload.
+    cache_name = os.path.basename(str(cache_path)) if cache_path else None
     stdin = {
         # Artifact names, not hub paths: the peer rewrites each entry to its
         # downloaded copy by basename, and these names ARE their basenames.
         'images': [name for _p, name in staged],
         'cache': cache_name,           # peer redirects into its out/ and uploads back
-        'cancel_file': cache_name + '.cancel',
+        'cancel_file': (cache_name or 'pass') + '.cancel',
         **(extra_payload or {}),
     }
     label = cluster_svc.device_label(device_id)
@@ -146,7 +149,8 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
                           detail_label=detail_label, label=label, bank_id=bank_id,
                           progress_from=_stderr_progress(progress_re))
         data = _read_result(job_id)
-        _install_cache(job_id, cache_name, cache_path, name_to_hub)
+        if cache_name:
+            _install_cache(job_id, cache_name, cache_path, name_to_hub)
         return _remap_home(data, name_to_hub)
     finally:
         cluster_svc.forget_artifact_fetches(job_id)
@@ -332,7 +336,9 @@ def _remap_home(data: dict, name_to_hub: dict) -> dict:
     maps nowhere is dropped — consumption treats it as 'not scored', which is
     exactly what it is."""
     out = dict(data)
-    for field in ('results', 'clusters'):
+    # `captions` joins the list for the caption pass: joycaption_infer returns
+    # {peer_path: caption}, keyed exactly like `results`.
+    for field in ('results', 'clusters', 'captions'):
         src = data.get(field) or {}
         out[field] = {home: v for k, v in src.items()
                       if (home := _map_home(k, name_to_hub)) is not None}

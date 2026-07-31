@@ -32,6 +32,24 @@ _SCRIPT_ENV_KEYS = {
 _SCRIPT_ENV_NAMES = {
     'bank_score_infer.py': 'bank-scoring',
     'face_embed_infer.py': 'face-scoring',
+    'joycaption_infer.py': 'ai-toolkit',
+}
+# Scripts whose interpreter is NOT a plain config key. JoyCaption runs in the
+# ai-toolkit venv, and `aitoolkit.python` is only ONE way that is configured —
+# installs without a venv folder (conda, uv, system python) set it, installs
+# with one do not, and cfg.aitoolkit_path('venv_python') is the helper that
+# knows both. Reading the bare key would send a perfectly good peer to
+# sys.executable, which is the shape of the wrong-venv bug that produced a
+# ModuleNotFoundError on a fully configured faces pass.
+_SCRIPT_ENV_RESOLVERS = {
+    'joycaption_infer.py': lambda: cfg.aitoolkit_path('venv_python'),
+}
+# …and the environment those scripts need. HF_HOME is not optional for
+# JoyCaption: without it the 8B model resolves to the default HF cache and is
+# DOWNLOADED AGAIN on a machine that already has it (see infer_stream's note).
+_SCRIPT_ENV_VARS = {
+    'joycaption_infer.py': lambda: {'HF_HOME': str(cfg.aitoolkit_path('hf_home')),
+                                    'PYTHONIOENCODING': 'utf-8'},
 }
 # Where THIS machine keeps the weights for each script. The hub cannot send this
 # — its path describes its own disk — but omitting it entirely is worse than
@@ -522,12 +540,28 @@ class PeerWorker:
             # the score script the bank-scoring one — a single chain ran a fully
             # configured faces pass in the wrong venv and died on cv2.
             env_key = _SCRIPT_ENV_KEYS.get(script_path.name)
-            if env_key:
+            resolver = _SCRIPT_ENV_RESOLVERS.get(script_path.name)
+            if resolver is not None:
+                try:
+                    python = str(resolver() or '').strip() or sys.executable
+                except Exception:      # noqa: BLE001 — an unconfigured extra
+                    python = sys.executable
+            elif env_key:
                 python = ((cfg.get(env_key) or '').strip() or sys.executable)
             else:
                 python = ((cfg.get('bank_scoring.python') or '').strip()
                           or (cfg.get('aitoolkit.python') or '').strip()
                           or sys.executable)
+            # Extra environment for scripts whose weights live outside the
+            # default cache. Inherit, never replace: dropping the parent env
+            # would take PATH and the CUDA variables with it.
+            script_env = None
+            make_env = _SCRIPT_ENV_VARS.get(script_path.name)
+            if make_env is not None:
+                try:
+                    script_env = dict(os.environ, **make_env())
+                except Exception:      # noqa: BLE001
+                    script_env = None
             timeout = int(payload.get('timeout') or 3600)
             self._progress(job_id, {'phase': 'infer', 'script': script_path.name})
 
@@ -544,7 +578,7 @@ class PeerWorker:
 
             stdout, stderr_lines, rc, timed_out = infer_stream.run_infer_script(
                 python, str(script_path), json.dumps(stdin_payload),
-                timeout, on_line=_on_line)
+                timeout, on_line=_on_line, env=script_env)
             if timed_out:
                 self._complete(job_id, error='infer script timed out')
                 return

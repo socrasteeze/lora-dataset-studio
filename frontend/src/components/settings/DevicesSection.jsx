@@ -290,10 +290,11 @@ export default function DevicesSection({ config, setField, handleSave, configDef
           <p className="mb-3 text-xs text-content-muted">
             <strong className="text-content">The full app on the other machine.</strong> A peer
             runs generation <em>and</em> the bank&apos;s heavy passes — ✨ Score, 👥 Faces, 📐
-            Framing and 🚩 Watermarks all move to its GPU, using its own models. It needs LDS
-            installed there plus a join token, and it authenticates with a revocable token.
-            Captions still run here for now. A bank&apos;s scan, auto-reject and duplicate steps
-            always stay on this machine — they read the database, not the GPU.
+            Framing, 🚩 Watermarks and 🏷️ Captions all move to its GPU, using its own models —
+            captions with whichever captioner that machine has. It needs LDS installed there
+            plus a join token, and it authenticates with a revocable token. A bank&apos;s scan,
+            auto-reject and duplicate steps always stay on this machine — they read the
+            database, not the GPU.
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div>

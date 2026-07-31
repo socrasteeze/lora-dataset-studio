@@ -37,8 +37,8 @@ Browser (any machine) → Primary LDS (datasets + queue)
 | Kind | Hub entry | Peer execution | Result path |
 |------|-----------|----------------|-------------|
 | `comfy` | `ImageGenerationQueue.worker_id` + `ClusterJob`; generate / improve paths pass `device_id` | Local ComfyUI; output uploaded | **Closed** — hub `_finish_comfy_bridge` → `_dispatch_completion` |
-| `vision` | `POST /api/cluster/jobs/vision` | Ollama `describe_image_ollama` batch | **Live (2026-07-31)** — the bank's 📐 Framing and 🚩 Watermark passes, via `bank_remote.run_remote_vision` |
-| `infer` | `POST /api/cluster/jobs/infer` | `backend/infer/<name>.py` (own install only) via `infer_stream` | **Live** — the bank's ✨ Score and 👥 Faces passes, via `bank_remote.run_remote_pass` |
+| `vision` | `POST /api/cluster/jobs/vision` | Ollama `describe_image_ollama` batch | **Live (2026-07-31)** — the bank's 📐 Framing, 🚩 Watermark and (Ollama-only peers) 🏷️ Caption passes, via `bank_remote.run_remote_vision` |
+| `infer` | `POST /api/cluster/jobs/infer` | `backend/infer/<name>.py` (own install only) via `infer_stream` | **Live** — the bank's ✨ Score, 👥 Faces and (JoyCaption peers) 🏷️ Caption passes, via `bank_remote.run_remote_pass` |
 | `training` | `POST /api/dataset/<id>/train` with remote `device_id`, or `/api/cluster/jobs/training` | Zip + config with `{{DATASET_DIR}}` / `{{OUTPUT_DIR}}`; `run_peer_training` | **Open** — checkpoints upload as artifacts; no `TrainingRunRecord`, no Training-page progress |
 
 Only `comfy` is a finished user-facing feature. `complete_cluster_job` bridges back
@@ -68,12 +68,16 @@ described — a picker that silently does nothing is worse than one that isn't o
 ## Limits (keep visible in review / README)
 
 - **What a user can send to a peer, as of 2026-07-31:** generation, and the bank's
-  ✨ Score, 👥 Faces, 📐 Framing and 🚩 Watermark passes. **Captions still run on the
-  hub** — `caption_paths` owns the engine choice (JoyCaption | Ollama) and the peer's
-  vision kind speaks only Ollama; routing it by the peer's own reported capability is
-  the next step, not a limitation of the transport. A bank's `scan`, `auto_reject` and
-  `semantic_dedup` steps never travel: they read the database and the hub's cached
-  embeddings, so sending them would be strictly slower.
+  ✨ Score, 👥 Faces, 📐 Framing, 🚩 Watermark **and 🏷️ Caption** passes — five of the
+  eight pipeline steps. Captions route by the peer's OWN reported capability
+  (`_peer_caption_kind`): a peer with JoyCaption runs its own
+  `joycaption_infer.py` as an `infer` job in its own ai-toolkit venv; a peer with
+  only Ollama gets a `vision` job. The hub never re-decides which engine — that
+  rule lives in `caption_paths`, on whichever machine runs it. A peer that reports
+  neither falls back to the hub and says so, rather than failing after staging.
+  A bank's `scan`, `auto_reject` and `semantic_dedup` steps never travel: they read
+  the database and the hub's cached embeddings, so sending them would be strictly
+  slower.
 - **The trust points one way: a peer runs what its Primary sends.** The peer will
   only run scripts from its own `backend/infer/` with its own configured Python —
   it refuses a path or interpreter the Primary names — but a Primary you do not
