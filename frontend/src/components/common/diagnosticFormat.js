@@ -36,7 +36,18 @@ export function formatDiagnostic(d) {
   if (rt.gpu) rtBits.push(rt.gpu)
   if (rt.vram_total_gb != null) rtBits.push(`VRAM ${rt.vram_total_gb}GB${rt.vram_free_gb != null ? ` (${rt.vram_free_gb} free)` : ''}`)
   if (rt.queue_running != null) rtBits.push(`queue ${rt.queue_running} running / ${rt.queue_pending ?? 0} pending`)
-  L.push(`reachable=${yn(c.comfyui_reachable)} · klein_model=${yn(c.klein_model)}${rtBits.length ? ' · ' + rtBits.join(' · ') : ''}`)
+  L.push(`reachable=${yn(c.comfyui_reachable)}${rtBits.length ? ' · ' + rtBits.join(' · ') : ''}`)
+  // `klein_model` is a NAME scan — it looks for a folder or file called "klein"
+  // under diffusion_models. `klein=` on the Engines line above is the resolver,
+  // which honours the klein.unet override anywhere under any registered root.
+  // They disagree on every custom/shared model layout, and printing the raw
+  // flag as `klein_model=no` next to `klein=yes` read as a fault: a real
+  // diagnostic sent an investigation down that path for an hour before the two
+  // were traced to different probes. Say what it means, only when it applies.
+  if (c.comfyui_reachable && !c.klein_model && e.klein) {
+    L.push('  klein model resolved from a custom path (nothing named "klein" '
+           + 'under diffusion_models) — expected on a shared/extra_model_paths setup')
+  }
 
   L.push('── Captioning (Ollama) ──')
   L.push(`reachable=${yn(c.ollama_reachable)} · vision_model_ready=${yn(c.vision_model_ready)}`)
