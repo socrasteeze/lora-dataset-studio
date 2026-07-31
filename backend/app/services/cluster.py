@@ -20,6 +20,7 @@ from pathlib import Path
 from .. import config as cfg
 from ..extensions import db
 from ..models import ClusterDevice, ClusterJoinToken, ClusterJob, ImageGenerationQueue
+from ..utils.dbbusy import write_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -489,38 +490,53 @@ def rename_device(device_id: str, name: str) -> dict:
     if device_id == LOCAL_DEVICE_ID:
         cfg.save_config({'cluster': {'device_name': name}})
         return {'id': LOCAL_DEVICE_ID, 'name': name}
-    row = ClusterDevice.query.get(device_id)
-    if row is None or row.revoked_at:
-        raise ValueError('device not found')
-    row.name = name[:120]
-    db.session.commit()
-    return row.to_dict()
+    def _apply():
+        row = ClusterDevice.query.get(device_id)
+        if row is None or row.revoked_at:
+            raise ValueError('device not found')
+        row.name = name[:120]
+        return row
+
+    return write_with_retry(_apply).to_dict()
 
 
 def revoke_device(device_id: str) -> None:
     if device_id == LOCAL_DEVICE_ID:
         raise ValueError('cannot revoke the local device')
-    row = ClusterDevice.query.get(device_id)
-    if row is None:
-        raise ValueError('device not found')
-    row.revoked_at = datetime.utcnow()
-    # Fail any pending/claimed jobs aimed at this peer.
-    for job in (ClusterJob.query
-                .filter_by(device_id=device_id)
-                .filter(ClusterJob.status.in_(('pending', 'claimed', 'running')))
-                .all()):
-        _fail_cluster_job(job, 'device revoked')
-    db.session.commit()
+    def _apply():
+        row = ClusterDevice.query.get(device_id)
+        if row is None:
+            raise ValueError('device not found')
+        row.revoked_at = datetime.utcnow()
+        # Fail any pending/claimed jobs aimed at this peer.
+        for job in (ClusterJob.query
+                    .filter_by(device_id=device_id)
+                    .filter(ClusterJob.status.in_(('pending', 'claimed', 'running')))
+                    .all()):
+            _fail_cluster_job(job, 'device revoked')
+
+    write_with_retry(_apply)
 
 
 def heartbeat(device: ClusterDevice, capabilities_blob: dict | None = None,
               busy: bool | None = None) -> dict:
-    device.last_heartbeat = datetime.utcnow()
-    if capabilities_blob is not None:
-        device.capabilities = json.dumps(capabilities_blob)
-    if busy is not None:
-        device.busy = 1 if busy else 0
-    db.session.commit()
+    """Retried, because for a PEER a lost write is not a delay — it is a
+    disconnect. peer_worker calls raise_for_status(), so the 503 this raises
+    under contention sets _connected = False and makes the peer skip that
+    tick's job pull entirely. That is most of "I queued jobs and nothing ran
+    for an hour": one contended write per 20 s took the second machine off the
+    board. The SPA replays a db_busy 503; the peer does not.
+
+    Re-runnable by construction — three assignments from arguments, no reads.
+    """
+    def _apply():
+        device.last_heartbeat = datetime.utcnow()
+        if capabilities_blob is not None:
+            device.capabilities = json.dumps(capabilities_blob)
+        if busy is not None:
+            device.busy = 1 if busy else 0
+
+    write_with_retry(_apply)
     return {'ok': True, 'server_time': datetime.utcnow().isoformat()}
 
 
@@ -573,43 +589,58 @@ def create_cluster_job(*, device_id: str, kind: str, payload: dict,
     if kind not in _VALID_KINDS:
         raise ValueError(f'unsupported kind: {kind}')
     require_remote_device(device_id)
+    # The id is computed OUTSIDE the retried unit so a replay reuses it rather
+    # than minting a second one; the row itself is constructed inside, because
+    # a rollback discards the instance that was added.
     job_id = job_id or str(uuid.uuid4())
-    row = ClusterJob(
-        job_id=job_id,
-        device_id=device_id,
-        kind=kind,
-        status='pending',
-        payload=json.dumps(payload or {}),
-        image_job_id=image_job_id,
-    )
-    db.session.add(row)
-    db.session.commit()
-    return row
+
+    def _apply():
+        row = ClusterJob(
+            job_id=job_id,
+            device_id=device_id,
+            kind=kind,
+            status='pending',
+            payload=json.dumps(payload or {}),
+            image_job_id=image_job_id,
+        )
+        db.session.add(row)
+        return row
+
+    return write_with_retry(_apply)
 
 
 def pull_next_job(device: ClusterDevice) -> dict | None:
     """Atomically claim the oldest pending job for this peer."""
-    job = (ClusterJob.query
-           .filter_by(device_id=device.id, status='pending')
-           .order_by(ClusterJob.created_at.asc())
-           .first())
-    if job is None:
-        return None
-    # Claim race: only succeed if still pending.
-    updated = (ClusterJob.query
-               .filter_by(job_id=job.job_id, status='pending')
-               .update({
-                   'status': 'claimed',
-                   'claimed_at': datetime.utcnow(),
-                   'last_heartbeat': datetime.utcnow(),
-               }))
-    db.session.commit()
-    if not updated:
+    # TWO retried units, not one. `if not updated: return None` below is a real
+    # early exit — a replay spanning it would re-claim a job it had already
+    # claimed on the first attempt.
+    def _claim():
+        job = (ClusterJob.query
+               .filter_by(device_id=device.id, status='pending')
+               .order_by(ClusterJob.created_at.asc())
+               .first())
+        if job is None:
+            return None, 0
+        # Claim race: only succeed if still pending.
+        updated = (ClusterJob.query
+                   .filter_by(job_id=job.job_id, status='pending')
+                   .update({
+                       'status': 'claimed',
+                       'claimed_at': datetime.utcnow(),
+                       'last_heartbeat': datetime.utcnow(),
+                   }))
+        return job, updated
+
+    job, updated = write_with_retry(_claim)
+    if job is None or not updated:
         return None
     db.session.refresh(job)
-    device.busy = 1
-    device.last_heartbeat = datetime.utcnow()
-    db.session.commit()
+
+    def _mark_busy():
+        device.busy = 1
+        device.last_heartbeat = datetime.utcnow()
+
+    write_with_retry(_mark_busy)
 
     payload = job.payload_dict()
     # The peer routes everything by artifact BASENAME (see peer_worker), so the
@@ -636,59 +667,72 @@ def peer_job_heartbeat(device: ClusterDevice, job_id: str,
     channel the hub has to tell a peer mid-job that Stop was pressed. The peer
     checks the flag and aborts (the infer scripts via their own cancel-file
     sentinel, the vision loop between images)."""
-    job = ClusterJob.query.filter_by(job_id=job_id, device_id=device.id).first()
-    if job is None:
-        raise ValueError('job not found')
-    if job.status == 'cancelled':
-        return {'ok': True, 'cancelled': True}
-    if job.status not in ('claimed', 'running'):
+    # The whole unit — query, the three early returns, and the write — lives
+    # inside _apply. A rollback DETACHES `job`, so a replay has to re-read it;
+    # leaving the query outside would replay against a stale object.
+    def _apply():
+        job = ClusterJob.query.filter_by(job_id=job_id, device_id=device.id).first()
+        if job is None:
+            raise ValueError('job not found')
+        if job.status == 'cancelled':
+            return {'ok': True, 'cancelled': True}
+        if job.status not in ('claimed', 'running'):
+            return {'ok': True, 'cancelled': False}
+        job.status = 'running'
+        job.last_heartbeat = datetime.utcnow()
+        if progress is not None:
+            job.progress = json.dumps(progress)
+        device.last_heartbeat = datetime.utcnow()
         return {'ok': True, 'cancelled': False}
-    job.status = 'running'
-    job.last_heartbeat = datetime.utcnow()
-    if progress is not None:
-        job.progress = json.dumps(progress)
-    device.last_heartbeat = datetime.utcnow()
-    db.session.commit()
-    return {'ok': True, 'cancelled': False}
+
+    return write_with_retry(_apply)
 
 
 def cancel_cluster_job(job_id: str) -> bool:
     """Hub-side Stop for a remote job. Pending jobs simply never get pulled
     (the claim filters on 'pending'); a claimed/running one is flagged so the
     NEXT heartbeat tells the peer to abort. True when a live row was flagged."""
-    updated = (ClusterJob.query
-               .filter_by(job_id=job_id)
-               .filter(ClusterJob.status.in_(('pending', 'claimed', 'running')))
-               .update({'status': 'cancelled',
-                        'completed_at': datetime.utcnow()}))
-    db.session.commit()
-    return bool(updated)
+    # One filtered bulk UPDATE, already idempotent (the status filter excludes
+    # rows a replay would have cancelled on its first attempt).
+    return bool(write_with_retry(lambda: (
+        ClusterJob.query
+        .filter_by(job_id=job_id)
+        .filter(ClusterJob.status.in_(('pending', 'claimed', 'running')))
+        .update({'status': 'cancelled', 'completed_at': datetime.utcnow()}))))
 
 
 def complete_cluster_job(device: ClusterDevice, job_id: str, *,
                          result: dict | None = None,
                          error: str | None = None,
                          output_artifact: str | None = None) -> None:
-    job = ClusterJob.query.filter_by(job_id=job_id, device_id=device.id).first()
-    if job is None:
-        raise ValueError('job not found')
-    if job.status in ('completed', 'failed', 'cancelled'):
-        return
-    failed = bool(error)
-    job.status = 'failed' if failed else 'completed'
-    job.completed_at = datetime.utcnow()
-    job.last_heartbeat = datetime.utcnow()
-    job.error_message = error
-    result_body = dict(result or {})
-    if output_artifact:
-        result_body['output_artifact'] = output_artifact
-    job.result = json.dumps(result_body)
-    device.busy = 0
-    device.last_heartbeat = datetime.utcnow()
-    db.session.commit()
+    # Highest-value retry of the set: losing this write means a remote job that
+    # really finished is never marked done, and the hub waits for it forever.
+    def _apply():
+        job = ClusterJob.query.filter_by(job_id=job_id, device_id=device.id).first()
+        if job is None:
+            raise ValueError('job not found')
+        if job.status in ('completed', 'failed', 'cancelled'):
+            return None
+        job.status = 'failed' if bool(error) else 'completed'
+        job.completed_at = datetime.utcnow()
+        job.last_heartbeat = datetime.utcnow()
+        job.error_message = error
+        result_body = dict(result or {})
+        if output_artifact:
+            result_body['output_artifact'] = output_artifact
+        job.result = json.dumps(result_body)
+        device.busy = 0
+        device.last_heartbeat = datetime.utcnow()
+        return job
 
+    job = write_with_retry(_apply)
+    if job is None:
+        return
+
+    # OUTSIDE the retried unit, deliberately: this dispatches completion, and
+    # replaying it after a lock error would dispatch twice.
     if job.kind == 'comfy' and job.image_job_id:
-        _finish_comfy_bridge(job, failed=failed, error=error,
+        _finish_comfy_bridge(job, failed=bool(error), error=error,
                              output_artifact=output_artifact)
 
 

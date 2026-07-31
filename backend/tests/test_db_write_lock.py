@@ -255,3 +255,50 @@ def test_dbtrace_never_logs_bound_parameters(app, monkeypatch, caplog):
 
     assert 'write transaction held' in text, 'the tracer did not run at all'
     assert secret not in text, 'the tracer logged a bound parameter'
+
+
+# --- the peer's writes are retried too ---------------------------------------
+
+def test_a_contended_peer_heartbeat_is_retried_not_lost(app, monkeypatch):
+    """For a peer, a lost write is a DISCONNECT, not a delay.
+
+    Every bank curation write already had write_with_retry; the cluster writes
+    did not. That asymmetry is most of "I queued jobs and nothing ran for an
+    hour": peer_worker calls raise_for_status(), so the db_busy 503 raised
+    under contention sets _connected = False and makes the peer skip that
+    tick's job pull entirely. The SPA replays a 503; the peer does not.
+
+    The observed spacing in the wild was exactly 20 s — the 15 s busy_timeout
+    plus peer_worker's 5 s error backoff — which is what identified this.
+    """
+    from datetime import datetime
+
+    from app.models import ClusterDevice
+    from app.services import cluster as cluster_svc
+
+    monkeypatch.setattr('app.utils.dbbusy.time.sleep', lambda _s: None)
+    with app.app_context():
+        device = ClusterDevice(id='peer-1', name='Laptop',
+                               auth_token_hash='x', busy=0,
+                               created_at=datetime.utcnow())
+        db.session.add(device)
+        db.session.commit()
+
+        state = {'n': 0}
+        real_commit = db.session.commit
+
+        def flaky_commit():
+            state['n'] += 1
+            if state['n'] == 1:
+                raise _locked()
+            return real_commit()
+
+        monkeypatch.setattr(db.session, 'commit', flaky_commit)
+        out = cluster_svc.heartbeat(device, capabilities_blob={'ollama': True},
+                                    busy=True)
+        monkeypatch.undo()
+
+        assert out['ok'] is True
+        refreshed = db.session.get(ClusterDevice, 'peer-1')
+        assert refreshed.busy == 1, 'the heartbeat was lost to the busy writer'
+        assert refreshed.last_heartbeat is not None
