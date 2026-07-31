@@ -130,19 +130,23 @@ def gpu_is_contended() -> bool:
     any job that is not finished. Reads two local tables — never touches the
     network, so it cannot block a caption call. Any error answers True: see the
     "unknown means unload" note in the module docstring.
+
+    Scoped to rows THIS machine owns. A job queued to a remote ComfyUI backend
+    or a compute peer renders on that machine's GPU and contends for nothing
+    here, so counting it only unloaded the local vision model for no reason.
     """
     try:
-        from ..job_queue import queue_manager
+        from ..job_queue import local_rows_only, queue_manager
         if queue_manager._get_system_state('training_in_progress'):
             return True
         if queue_manager.has_comfyui_stalled_barrier():
             return True
         from ..models import ImageGenerationQueue
-        pending = (ImageGenerationQueue.query
-                   .filter(ImageGenerationQueue.status.in_(
-                       ('pending', 'processing', 'sent_to_comfy',
-                        'cancel_requested', 'stalled')))
-                   .first())
+        pending = local_rows_only(
+            ImageGenerationQueue.query
+            .filter(ImageGenerationQueue.status.in_(
+                ('pending', 'processing', 'sent_to_comfy',
+                 'cancel_requested', 'stalled')))).first()
         return pending is not None
     except Exception as exc:
         # No app/database context, a migration in flight, anything at all: the

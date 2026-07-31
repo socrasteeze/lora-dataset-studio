@@ -510,6 +510,40 @@ against `backend_worker.py` before resolving anything, and keep the fork's
 do NOT strip the "unused" `worker_url` params during any cleanup pass —
 they are upstream surface AND fork load-bearing now.
 
+### 6a. `local_rows_only` — every "is the GPU busy?" query must be scoped
+
+Activating `worker_id` created a second, quieter obligation that took until
+2026-07-31 to satisfy: **any query that asks "is this machine's GPU busy?" must
+filter to rows this machine owns.** Upstream has no live `worker_id` concept, so
+every such query there is correctly unscoped — and each one adopted verbatim is
+a silent bug here, because a remote backend writes `processing`/`sent_to_comfy`
+into the same shared table.
+
+Three sites had it wrong, all blocking LOCAL work on a REMOTE render:
+`process_one`'s admission check (froze the local worker for the whole remote
+job, up to 15 min), `has_comfyui_work` (blocked a training launch and the vision
+GPU window), and `vision_keepalive.gpu_is_contended` (unloaded the local vision
+model for a card nobody was contending). All three now route through
+`job_queue.local_rows_only(query)`.
+
+**Merge trap:** these are ordinary-looking queries with no fork marker in them.
+An upstream rewrite of `process_one`, `has_comfyui_work` or `gpu_is_contended`
+will clean-merge and quietly drop the filter — no conflict, no grep hit, and the
+regression is invisible until someone owns two machines. After any sync touching
+those functions, re-grep `status.in_(` in `job_queue.py` and
+`vision_keepalive.py` and confirm each GPU-busy query still goes through
+`local_rows_only`. `backend/tests/test_job_queue.py` guards all three
+(`test_a_backend_render_does_not_block_local_work`,
+`test_a_backend_render_does_not_block_a_training_launch`,
+`test_backend_rows_do_not_make_local_ollama_unload`), each paired with a mirror
+test proving a LOCAL row still blocks — so the filter cannot be over-applied
+into removing the guard.
+
+Correctly left unscoped: `_prune_staged_inputs` (over-keeping files is the safe
+direction for a destructive prune) and the four non-queue flags in
+`process_one`'s check (`training_in_progress`, `vision_in_progress`, the vision
+window fence, the stalled barrier) — those really are about this machine.
+
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
 Lessons from actually doing these merges, aimed at an agent seeing this repo

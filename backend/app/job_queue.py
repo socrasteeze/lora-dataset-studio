@@ -109,6 +109,27 @@ def _vision_window_blocks_gpu() -> bool:
         logger.exception('job_queue: could not read the in-process Vision GPU fence')
         return True
 
+def local_rows_only(query):
+    """Narrow an ImageGenerationQueue query to rows THIS machine owns.
+
+    `worker_id` is NULL/'' /'local' for our own ComfyUI; an `api:<hex>` id or a
+    peer uuid belongs to a remote dispatcher with its own thread and its own GPU
+    (backend_worker.py, cluster.py — Divergence 6).
+
+    Shared rather than repeated on purpose. The two questions "is a local job
+    already running?" and "which job may I claim?" MUST use the same predicate,
+    and for a long time they did not: the claim query filtered on worker_id
+    while the busy check above it counted every active row in the table. A
+    remote backend setting its own row to `processing`/`sent_to_comfy` therefore
+    froze the local worker for the whole remote render (up to 15 minutes) —
+    exactly what backend_worker.py's docstring and README.md:292/:912 promise
+    does not happen. One helper, both call sites, so they cannot drift again.
+    """
+    return query.filter((ImageGenerationQueue.worker_id.is_(None))
+                        | (ImageGenerationQueue.worker_id == '')
+                        | (ImageGenerationQueue.worker_id == 'local'))
+
+
 def _claim(job_id) -> bool:
     """Atomically claim a pending job for processing. Returns False if the job
     was cancelled/claimed since the SELECT, preventing cancel-race loss."""
@@ -718,11 +739,21 @@ class JobQueueManager:
             return True
 
     def has_comfyui_work(self) -> bool:
-        """True while LDS has work queued or an unresolved ComfyUI identity."""
-        return (ImageGenerationQueue.query
-                .filter(ImageGenerationQueue.status.in_(
-                    ('pending', 'processing', 'sent_to_comfy', 'cancel_requested', 'stalled')))
-                .first() is not None)
+        """True while THIS machine's ComfyUI has work queued or an unresolved
+        identity.
+
+        Its two callers -- a training launch (lora_training) and the vision GPU
+        window (gpu_window) -- are both asking "is the local card free?", so the
+        answer must ignore rows a remote backend or peer renders on its own GPU.
+        Unscoped, a laptop rendering one image stopped the desktop from *starting*
+        a training, which is the exact inverse of what backend_worker.py's
+        docstring and README.md:912 promise.
+        """
+        return local_rows_only(
+            ImageGenerationQueue.query
+            .filter(ImageGenerationQueue.status.in_(
+                ('pending', 'processing', 'sent_to_comfy',
+                 'cancel_requested', 'stalled')))).first() is not None
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
@@ -827,28 +858,26 @@ class JobQueueManager:
         dispatch_cancelled = False
 
         with GPU_ARBITER_LOCK:
-            # Any unresolved active row is itself a fail-closed GPU owner after a
-            # crash/mapping error; do not silently start a second prompt.
+            # Any unresolved LOCAL active row is itself a fail-closed GPU owner
+            # after a crash/mapping error; do not silently start a second prompt.
+            # The four flags are about THIS machine's GPU and stay unfiltered;
+            # the active-row test is scoped, or a remote backend's render blocks
+            # a local card it never touched (see local_rows_only).
             if (_vision_window_blocks_gpu()
                     or self._get_system_state('training_in_progress')
                     or self._get_system_state('vision_in_progress')
                     or self.has_comfyui_stalled_barrier()
-                    or ImageGenerationQueue.query.filter(
+                    or local_rows_only(ImageGenerationQueue.query.filter(
                         ImageGenerationQueue.status.in_(
                             ('processing', 'sent_to_comfy', 'cancel_requested', 'stalled'))
-                    ).first() is not None):
+                    )).first() is not None):
                 return False
 
-            # This LOCAL worker only ever claims jobs with no worker_id (or
-            # 'local'). A worker_id of 'api:<hex>' or a peer uuid belongs to a
-            # remote backend/peer's own dispatcher (see backend_worker.py,
-            # Divergence 6) -- claiming it here would render it on the wrong
-            # machine.
-            job = (ImageGenerationQueue.query
-                   .filter_by(status='pending')
-                   .filter((ImageGenerationQueue.worker_id.is_(None))
-                           | (ImageGenerationQueue.worker_id == '')
-                           | (ImageGenerationQueue.worker_id == 'local'))
+            # This LOCAL worker only ever claims jobs it owns -- claiming a
+            # remote dispatcher's row would render it on the wrong machine. Same
+            # predicate as the busy check above, by construction.
+            job = (local_rows_only(
+                       ImageGenerationQueue.query.filter_by(status='pending'))
                    .order_by(ImageGenerationQueue.priority.desc(),
                              ImageGenerationQueue.created_at.asc()).first())
             if job is None:
