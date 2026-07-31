@@ -9,6 +9,7 @@ someone else's work with its own panel empty.
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
@@ -272,3 +273,75 @@ def test_cluster_activity_reports_the_primary_shape(app, client):
     assert [p['name'] for p in d['peers']] == ['Laptop 4090']
     assert set(d['peers'][0]) == {'id', 'name', 'online', 'busy'}
     assert d['pending_remote_jobs'] == 0
+
+
+# --- the transfer is the longest silent stretch of a remote pass --------------
+
+def test_the_hub_reports_the_transfer_instead_of_going_silent(app, monkeypatch):
+    """Reported live: a 5372-image scoring pass sat on "peer is starting up
+    (downloading images / loading models)" and the panel flagged it
+    "no update for 5m — probably stuck". It was healthy — the peer was pulling
+    ~367 images a minute, ~15 minutes of transfer before its script prints
+    anything at all.
+
+    The cause was a latch: the hub sent that detail ONCE and set detail_sent,
+    and bank_jobs.progress is the only thing that refreshes `_touched`. So for
+    the whole transfer the job looked untouched. It now reports every tick, and
+    counts the artifact GETs the peer is already making.
+    """
+    from app.services import bank_jobs
+    from app.services import cluster as cluster_svc
+
+    with app.app_context():
+        cluster_svc.forget_artifact_fetches('job-x')
+        assert cluster_svc.artifacts_fetched('job-x') == 0
+        for _ in range(7):
+            cluster_svc.note_artifact_fetched('job-x')
+        assert cluster_svc.artifacts_fetched('job-x') == 7
+        # Per job, so two passes cannot read each other's numbers.
+        assert cluster_svc.artifacts_fetched('job-y') == 0
+        cluster_svc.forget_artifact_fetches('job-x')
+        assert cluster_svc.artifacts_fetched('job-x') == 0
+
+        # And the touch is what the staleness flag reads.
+        job = bank_jobs.new_job('score') if hasattr(bank_jobs, 'new_job') else {
+            'kind': 'score', 'done': 0, 'total': 0, 'detail': None,
+            '_touched': 0.0}
+        bank_jobs.progress(job, detail='sending images to Laptop (3/10)')
+        first = job['_touched']
+        assert first > 0
+        time.sleep(0.02)
+        bank_jobs.progress(job, detail='sending images to Laptop (4/10)')
+        assert job['_touched'] > first, (
+            'a repeated transfer update must refresh the touch time — that is '
+            'the whole difference between "moving" and "probably stuck"')
+
+
+def test_a_peer_reports_its_own_work_as_running(app, monkeypatch):
+    """The peer's header chip said "Working for Primary" and its log carried
+    "claimed a infer", while the same panel's Running-now section said nothing
+    is running — because running[] was built only from bank_jobs and
+    dataset_activity, and a peer's work lives in neither.
+    """
+    from app.services import activity_log
+    from app.services.peer_worker import peer_worker
+
+    with app.app_context():
+        monkeypatch.setattr(peer_worker, 'status', lambda: {
+            'running': True, 'connected': True, 'busy': True,
+            'current_job_id': 'abc-123', 'current_kind': 'infer',
+            'phase': 'downloading', 'last_error': None, 'primary_url': 'http://hub'})
+        rows = [r for r in activity_log.snapshot('local')['running']
+                if r['kind'] == 'peer']
+        assert rows, 'a busy peer reported nothing running on its own machine'
+        assert rows[0]['what'] == 'infer'
+        assert rows[0]['detail'] == 'downloading'
+        assert rows[0]['job_id'] == 'abc-123'
+
+        # Idle again -> gone. A permanently-lit row is its own lie.
+        monkeypatch.setattr(peer_worker, 'status', lambda: {
+            'running': True, 'connected': True, 'busy': False,
+            'current_job_id': None, 'current_kind': None, 'phase': None,
+            'last_error': None, 'primary_url': 'http://hub'})
+        assert not [r for r in activity_log.snapshot('local')['running']
+                    if r['kind'] == 'peer']

@@ -346,6 +346,12 @@ def peer_download_artifact(job_id, name):
         path = cluster_svc.artifact_path(job_id, name)
     except FileNotFoundError:
         return jsonify({'error': 'artifact not found'}), 404
+    # Counted so the hub can report the transfer instead of going silent for it;
+    # see cluster.note_artifact_fetched. Best-effort by design.
+    try:
+        cluster_svc.note_artifact_fetched(job_id)
+    except Exception:      # noqa: BLE001 — a counter must never fail a download
+        pass
     # send_file streams. The artifacts crossing this route are dataset zips and
     # training checkpoints — reading one into memory to answer a GET would take
     # the Primary down on the first real training job.

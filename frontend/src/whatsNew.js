@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-remote-pass-shows-the-transfer',
+    date: '2026-07-31',
+    title: 'A pass running on your second machine stops looking stuck',
+    blurb:
+      'Sending a big bank to another machine means copying every image to it first, and on a few thousand images that is a quarter of an hour before its GPU does anything at all. Nothing said so: the panel showed one "peer is starting up" line and then went quiet, so the app decided its own healthy pass had stopped responding and flagged it "probably stuck". It now counts the images across as they go — "sending images to Laptop (1240/5372)" — so you can see it moving. And the second machine no longer contradicts itself: its own activity panel used to say "nothing is running" while the header said it was working for the Primary. It now lists the job it took and what stage it is at.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-31-community-tested-krea-zimage-presets',
     date: '2026-07-31',
     title: 'Start Krea 2 Raw and Z-Image Turbo from five community-tested recipes',

@@ -109,7 +109,7 @@ export default function ActivityPanel({ onClose }) {
               {running.map((r) => {
                 const stall = stallState(r.stale_seconds)
                 return (
-                  <li key={`${r.kind}-${r.bank_id ?? r.dataset_id}-${r.what}`}
+                  <li key={`${r.kind}-${r.bank_id ?? r.dataset_id ?? r.job_id}-${r.what}`}
                     className="rounded border border-border bg-surface p-2 text-xs">
                     <div className="flex flex-wrap items-center gap-x-2">
                       <span className="font-medium text-content">{r.label}</span>
