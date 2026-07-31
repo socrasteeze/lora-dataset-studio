@@ -318,7 +318,10 @@ def test_bank_rotation_regenerates_the_thumbnail_and_reports_new_dimensions(app,
         with Image.open(after) as thumb:
             assert thumb.height > thumb.width
 
-        payload = banks._image_dict(row, banks.thresholds())
+        # Through _page_images, the path the app uses: _image_dict now also needs
+        # the page's live duplicate state, and a test that builds its own would
+        # be asserting against a shape the app never produces.
+        payload = banks._page_images([row], banks.thresholds(), bank_id)[0]
         assert payload['rotation'] == 90
         assert (payload['width'], payload['height']) == (row.height, row.width)
 
