@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-queued-jobs-no-longer-stall-on-a-busy-database',
+    date: '2026-07-31',
+    title: 'Queued generations no longer stall behind a busy database',
+    blurb:
+      'Reported by a user whose queue sat untouched for an hour with nothing running anywhere. The app keeps a reservation on the GPU while a vision pass (captioning, scoring) uses it, refreshed by a heartbeat. That heartbeat wrote to the database — and the database has exactly one writer, so when a bank folder scan held it, the heartbeat lost the race, gave up on the first failure and left the reservation stuck. Every queued job was then refused for as long as the pass took. The heartbeat now retries a busy write instead of quitting, and only stops for the one thing that should stop it: another pass genuinely taking the GPU. The two are also told apart in the log now, so a stuck reservation says which one it was. Separately, the Bank list was re-scanning every bank folder on every request — including the automatic retries that fire when the database is busy, so a struggling database was being sent more work by the very requests it had just rejected. It now scans at most once every few seconds, and opening the tab still picks up files you just dropped in.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-31-backend-no-longer-freezes-this-machine',
     date: '2026-07-31',
     title: 'Your second machine no longer freezes your first one',

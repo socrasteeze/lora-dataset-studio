@@ -507,11 +507,42 @@ FOLDER_SYNC_COOLDOWN = 60.0
 _folder_sync = {}       # bank_id -> {'at': monotonic, 'result': {...}}
 _EMPTY_SYNC = {'added': 0, 'missing': 0, 'unavailable': False, 'error': None}
 
+# The bank LIST forces past the cooldown above, so opening the tab right after
+# dropping files shows them. That bypass had one failure mode, seen in the wild:
+# a `db_busy` 503 is REPLAYED by the SPA (see fetchClient), and every replay was
+# another forced walk of every bank — so a request that failed BECAUSE SQLite's
+# single writer was contended answered by generating more write load, and the
+# retries sustained the contention that caused them.
+#
+# This floor is far below the cooldown, so a genuine navigation still walks, but
+# above the replay backoff, so a storm collapses to one walk. It bounds only the
+# LIST endpoint; refresh_bank(force=True) keeps its "walk now" contract for the
+# callers that depend on it (e.g. re-reading `missing` right after
+# forget_missing).
+FOLDER_SYNC_FORCE_FLOOR = 3.0
+_last_forced_listing = 0.0
+
 
 def reset_folder_sync():
     """Drop the per-bank walk cooldowns (tests: bank ids restart at 1 with an
     in-memory DB, so a stale entry would silently skip the next test's walk)."""
+    global _last_forced_listing
     _folder_sync.clear()
+    _last_forced_listing = 0.0
+
+
+def refresh_banks_for_listing(user_id) -> dict:
+    """refresh_banks() for the bank list endpoint: forced, but at most once per
+    FOLDER_SYNC_FORCE_FLOOR seconds. Inside that floor the per-bank cooldown
+    applies as usual, so the call is served from the cache instead of re-walking
+    every folder. See FOLDER_SYNC_FORCE_FLOOR for why the list needs the floor
+    and refresh_bank does not."""
+    global _last_forced_listing
+    now = time.monotonic()
+    force = (now - _last_forced_listing) >= FOLDER_SYNC_FORCE_FLOOR
+    if force:
+        _last_forced_listing = now
+    return refresh_banks(user_id, force=force)
 
 
 def _sync_cached(bank_id) -> dict:

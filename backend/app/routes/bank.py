@@ -51,7 +51,7 @@ def banks_list():
     show up here instead of needing a rebuild. Strictly additive, ~5 ms a bank,
     and the per-bank outcome rides back in ``folder_sync`` so the UI can say why
     the counters moved."""
-    sync = banks.refresh_banks(LOCAL_USER, force=True)
+    sync = banks.refresh_banks_for_listing(LOCAL_USER)
     rows = banks.list_banks(
         LOCAL_USER, dataset_id=request.args.get('dataset_id') or None)
     for row in rows:

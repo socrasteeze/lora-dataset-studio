@@ -21,6 +21,13 @@ class GpuBusyError(RuntimeError):
 # it); the effective interval is max(this, ttl / 3) — always well inside
 # the TTL, so the flag can only lapse if the whole process dies.
 _HEARTBEAT_FLOOR_SECONDS = 10
+# Consecutive FAILED renewals tolerated before the heartbeat gives up. Each
+# renewal already retries the write 3x with backoff (write_with_retry), so this
+# is the second layer: it covers a writer that stays contended for longer than
+# one beat. 2 is deliberate -- the interval is ttl/3, so two misses still leave
+# a full beat of TTL headroom before the flag could lapse. Losing OWNERSHIP is
+# never tolerated, whatever this is set to; it stops on the first occurrence.
+_HEARTBEAT_MAX_MISSES = 2
 
 
 def _log(message, level='info', detail=None):
@@ -108,17 +115,37 @@ def bind_vision_window_context(callback):
 
 
 def _renew_owned_vision_token(token: str, ttl: int) -> bool:
-    """Refresh exactly one claimed token, including from a heartbeat thread."""
+    """Refresh exactly one claimed token, including from a heartbeat thread.
+
+    The write goes through `write_with_retry`: SQLite has ONE writer, and a busy
+    bank pass or a bank-list folder walk can hold it past the 15 s busy_timeout.
+    Without the retry a single lost race killed the heartbeat outright (measured
+    in the wild: `sqlite3.OperationalError: database is locked` out of
+    `_set_system_state`), which stranded the in-process GPU fence and left the
+    generation queue refusing every job until the pass finally unwound.
+    """
+    from .utils.dbbusy import write_with_retry
+
     def _renew():
         try:
             with GPU_ARBITER_LOCK:
                 if queue_manager._get_system_state('vision_in_progress') != token:
+                    # A real ownership loss: our flag lapsed and someone else
+                    # claimed it. Distinct from the failure below, and the ONLY
+                    # one the heartbeat should stop for.
+                    logger.warning(
+                        'vision GPU window: the flag is no longer ours (token lapsed '
+                        'or re-acquired); stopping this heartbeat')
                     return False
-                queue_manager._set_system_state('vision_in_progress', token,
-                                                ttl_seconds=ttl)
+                write_with_retry(lambda: queue_manager._set_system_state(
+                    'vision_in_progress', token, ttl_seconds=ttl))
                 return True
         except Exception:
-            logger.exception('vision GPU window renewal failed')
+            # Could not REACH the database (writer contention that outlasted the
+            # retries, a teardown mid-flight). Says nothing about ownership, so
+            # it is logged apart from the case above — the previous single
+            # message could not tell a stolen window from a busy disk.
+            logger.exception('vision GPU window renewal could not reach the database')
             return False
 
     return bool(_in_app_context(_renew))
@@ -255,14 +282,31 @@ def gpu_exclusive_vision_window(flag_ttl=300):
         # the other's already-committed state, so the clear can never be
         # overwritten by a beat that was merely slow to acquire it.
         def _heartbeat():
+            # A renewal can fail for two unrelated reasons and only one of them
+            # is terminal. Losing the flag to another pass is: nothing this beat
+            # writes afterwards is legitimate. A busy SQLite writer is NOT --
+            # the window is still ours, the disk is merely contended, and giving
+            # up on the first collision is what stranded the fence in the wild.
+            # Keep beating through transient failures; the TTL is 3x the
+            # interval, so there is room for several before the flag can lapse.
+            misses = 0
             while not heartbeat_stop.wait(_heartbeat_interval_seconds(ttl)):
-                if not _renew_owned_vision_token(token, ttl):
-                    # The process-local active-token fence remains set until the
-                    # outer window exits, so Queue/Training stay blocked even if
-                    # this persisted TTL has expired.
-                    logger.error(
-                        'vision GPU window heartbeat lost ownership; in-process GPU fence retained')
-                    return
+                if _renew_owned_vision_token(token, ttl):
+                    misses = 0
+                    continue
+                misses += 1
+                if misses < _HEARTBEAT_MAX_MISSES:
+                    logger.warning(
+                        'vision GPU window: renewal %d/%d failed; retrying on the next beat',
+                        misses, _HEARTBEAT_MAX_MISSES)
+                    continue
+                # The process-local active-token fence remains set until the
+                # outer window exits, so Queue/Training stay blocked even if
+                # this persisted TTL has expired.
+                logger.error(
+                    'vision GPU window heartbeat gave up after %d failed renewals; '
+                    'in-process GPU fence retained', misses)
+                return
 
         heartbeat = threading.Thread(
             target=_heartbeat, name='vision-window-heartbeat', daemon=True)
