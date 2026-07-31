@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-queued-jobs-no-longer-stall-on-a-busy-database',
+    date: '2026-07-31',
+    title: 'Queued generations no longer stall behind a busy database',
+    blurb:
+      'Reported by a user whose queue sat untouched for an hour with nothing running anywhere, then again an hour later. The database has exactly one writer, and two things were making a brief collision far worse than it should have been. The worst was a read that wrote: internal flags carry an expiry, and reading an expired one deleted it — so when the writer was busy that delete failed, the flag stayed expired, and every background check retried the delete on its next tick, several times a second, from several threads at once. A short collision fed itself into a jam that would not clear. Expired flags now read as gone without writing, and the cleanup backs off the moment the database is busy. Second, the GPU reservation held during a captioning or scoring pass is kept alive by a heartbeat that also writes: it gave up at the first collision and left the reservation stuck, refusing every queued job for the rest of the pass. It now retries, and only stops for the one thing that should stop it — another pass genuinely taking the GPU. Those two causes shared a single log line and are told apart now, so a stuck reservation says which it was. Honest about the limit: this removes the app’s own ability to turn a moment of contention into a lasting one, but what holds the database for that first moment is still being tracked down.',
+    to: '/bank',
+  },
+  {
+    id: '2026-07-31-backend-no-longer-freezes-this-machine',
+    date: '2026-07-31',
+    title: 'Your second machine no longer freezes your first one',
+    blurb:
+      'A remote ComfyUI backend was supposed to render alongside this machine — that is what Settings → Devices promises, and it is why you would add one. It did the opposite: while the other box rendered, this one refused to start anything of its own and sat idle for the whole job, up to fifteen minutes. Worse, it also refused to start a training or a vision pass, so one image on the laptop could hold up a run on the desktop. All of it now really does happen at once: two machines give you two images at a time, and a remote render no longer delays anything local. Nothing changed about what travels — generation only, and each machine still needs the models for the job it runs. Compute peers were never affected. The vision model also stopped unloading itself whenever a remote job was running; it was handing the GPU back to a machine that had not asked for it.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-30-comfyui-recovery-barrier-remote-safe',
     date: '2026-07-30',
     title: 'A stuck ComfyUI now says so, instead of quietly swallowing new work',

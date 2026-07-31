@@ -75,6 +75,19 @@ class _ComfySubmitUnknown(RuntimeError):
 # persisted flags and queue rows remain the recovery record after a restart.
 GPU_ARBITER_LOCK = threading.RLock()
 
+# Per-key cooldown on the lazy delete of an EXPIRED SystemState row, so a
+# contended writer cannot be fed more writes by the readers polling past it.
+# See _get_system_state for the full reasoning. Plain dict: single-item get/set
+# under the GIL is atomic enough, and a lost update here only costs one extra
+# delete attempt.
+_EXPIRED_DELETE_BACKOFF: dict[str, float] = {}
+_EXPIRED_DELETE_BACKOFF_SECONDS = 30.0
+
+
+def reset_expired_delete_backoff():
+    """Tests: drop the per-key cooldowns so a fresh case is not skipped."""
+    _EXPIRED_DELETE_BACKOFF.clear()
+
 
 def gpu_arbiter_lock():
     """Shared in-process lock for the two local GPU consumers."""
@@ -131,6 +144,27 @@ def _vision_window_blocks_gpu() -> bool:
         logger.exception('job_queue: could not read the in-process Vision GPU fence')
         return True
 
+def local_rows_only(query):
+    """Narrow an ImageGenerationQueue query to rows THIS machine owns.
+
+    `worker_id` is NULL/'' /'local' for our own ComfyUI; an `api:<hex>` id or a
+    peer uuid belongs to a remote dispatcher with its own thread and its own GPU
+    (backend_worker.py, cluster.py — Divergence 6).
+
+    Shared rather than repeated on purpose. The two questions "is a local job
+    already running?" and "which job may I claim?" MUST use the same predicate,
+    and for a long time they did not: the claim query filtered on worker_id
+    while the busy check above it counted every active row in the table. A
+    remote backend setting its own row to `processing`/`sent_to_comfy` therefore
+    froze the local worker for the whole remote render (up to 15 minutes) —
+    exactly what backend_worker.py's docstring and README.md:292/:912 promise
+    does not happen. One helper, both call sites, so they cannot drift again.
+    """
+    return query.filter((ImageGenerationQueue.worker_id.is_(None))
+                        | (ImageGenerationQueue.worker_id == '')
+                        | (ImageGenerationQueue.worker_id == 'local'))
+
+
 def _claim(job_id) -> bool:
     """Atomically claim a pending job for processing. Returns False if the job
     was cancelled/claimed since the SELECT, preventing cancel-race loss."""
@@ -177,8 +211,12 @@ def _submit(workflow, client_id):
 def _stall_comfyui_prompt(prompt_id, detail=None) -> bool:
     """Durably pause exactly the still-sent prompt; false means CAS lost."""
     with GPU_ARBITER_LOCK:
-        job = (ImageGenerationQueue.query
-               .filter_by(comfyui_prompt_id=str(prompt_id), status='sent_to_comfy').first())
+        # Scoped for the same reason as _recover_stuck_jobs, at lower odds: a
+        # prompt id is only unique WITHIN one ComfyUI, so two instances can
+        # collide and this would pause the wrong machine's row.
+        job = local_rows_only(
+            ImageGenerationQueue.query
+            .filter_by(comfyui_prompt_id=str(prompt_id), status='sent_to_comfy')).first()
         if job is None:
             return False
         return queue_manager._stall_comfy_job(
@@ -740,11 +778,21 @@ class JobQueueManager:
             return True
 
     def has_comfyui_work(self) -> bool:
-        """True while LDS has work queued or an unresolved ComfyUI identity."""
-        return (ImageGenerationQueue.query
-                .filter(ImageGenerationQueue.status.in_(
-                    ('pending', 'processing', 'sent_to_comfy', 'cancel_requested', 'stalled')))
-                .first() is not None)
+        """True while THIS machine's ComfyUI has work queued or an unresolved
+        identity.
+
+        Its two callers -- a training launch (lora_training) and the vision GPU
+        window (gpu_window) -- are both asking "is the local card free?", so the
+        answer must ignore rows a remote backend or peer renders on its own GPU.
+        Unscoped, a laptop rendering one image stopped the desktop from *starting*
+        a training, which is the exact inverse of what backend_worker.py's
+        docstring and README.md:912 promise.
+        """
+        return local_rows_only(
+            ImageGenerationQueue.query
+            .filter(ImageGenerationQueue.status.in_(
+                ('pending', 'processing', 'sent_to_comfy',
+                 'cancel_requested', 'stalled')))).first() is not None
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
@@ -785,9 +833,19 @@ class JobQueueManager:
         In both cases callbacks and staged-input deletion stay suppressed.
         """
         with GPU_ARBITER_LOCK:
-            active = (ImageGenerationQueue.query
-                      .filter(ImageGenerationQueue.status.in_(
-                          ('processing', 'sent_to_comfy', 'cancel_requested'))).all())
+            # LOCAL rows only (see local_rows_only). backend_worker writes a
+            # REMOTE row into `sent_to_comfy` with the remote prompt id, so an
+            # unscoped sweep here stalls another machine's live render on OUR
+            # restart and installs the SINGLE GLOBAL comfyui_stalled_barrier.
+            # That barrier is now read by require_comfyui_enqueue_ready() from
+            # add_job and six route preflights, so the blast radius is every
+            # local generation lane returning 409 about a machine the user is
+            # not sitting at. Recovering a remote render is the remote
+            # dispatcher's job, not local startup recovery's.
+            active = local_rows_only(
+                ImageGenerationQueue.query
+                .filter(ImageGenerationQueue.status.in_(
+                    ('processing', 'sent_to_comfy', 'cancel_requested')))).all()
             for job in active:
                 # A new worker after process restart has no trustworthy in-memory
                 # poller or submit state. Even a just-claimed row may be past an
@@ -849,28 +907,26 @@ class JobQueueManager:
         dispatch_cancelled = False
 
         with GPU_ARBITER_LOCK:
-            # Any unresolved active row is itself a fail-closed GPU owner after a
-            # crash/mapping error; do not silently start a second prompt.
+            # Any unresolved LOCAL active row is itself a fail-closed GPU owner
+            # after a crash/mapping error; do not silently start a second prompt.
+            # The four flags are about THIS machine's GPU and stay unfiltered;
+            # the active-row test is scoped, or a remote backend's render blocks
+            # a local card it never touched (see local_rows_only).
             if (_vision_window_blocks_gpu()
                     or self._get_system_state('training_in_progress')
                     or self._get_system_state('vision_in_progress')
                     or self.has_comfyui_stalled_barrier()
-                    or ImageGenerationQueue.query.filter(
+                    or local_rows_only(ImageGenerationQueue.query.filter(
                         ImageGenerationQueue.status.in_(
                             ('processing', 'sent_to_comfy', 'cancel_requested', 'stalled'))
-                    ).first() is not None):
+                    )).first() is not None):
                 return False
 
-            # This LOCAL worker only ever claims jobs with no worker_id (or
-            # 'local'). A worker_id of 'api:<hex>' or a peer uuid belongs to a
-            # remote backend/peer's own dispatcher (see backend_worker.py,
-            # Divergence 6) -- claiming it here would render it on the wrong
-            # machine.
-            job = (ImageGenerationQueue.query
-                   .filter_by(status='pending')
-                   .filter((ImageGenerationQueue.worker_id.is_(None))
-                           | (ImageGenerationQueue.worker_id == '')
-                           | (ImageGenerationQueue.worker_id == 'local'))
+            # This LOCAL worker only ever claims jobs it owns -- claiming a
+            # remote dispatcher's row would render it on the wrong machine. Same
+            # predicate as the busy check above, by construction.
+            job = (local_rows_only(
+                       ImageGenerationQueue.query.filter_by(status='pending'))
                    .order_by(ImageGenerationQueue.priority.desc(),
                              ImageGenerationQueue.created_at.asc()).first())
             if job is None:
@@ -1260,11 +1316,34 @@ class JobQueueManager:
             return default
         exp = payload.get('exp')
         if exp is not None and time.time() >= exp:
-            try:
-                db.session.delete(row)
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+            # An expired row is logically ABSENT: the answer is `default`
+            # whether or not the delete lands. Removing it is housekeeping, and
+            # housekeeping must never become write pressure.
+            #
+            # It did. SQLite has one writer; when it is contended the delete
+            # fails, the row stays expired, and EVERY reader retries it on its
+            # next poll -- the 1 Hz queue worker, the UI's gpu-flags poll, the
+            # peer heartbeat path, vision_keepalive. A read that generates
+            # writes is how a brief collision turns into a lock storm that
+            # sustains itself, which is what stranded the GPU reservation in
+            # the wild (`database is locked` out of _set_system_state, minutes
+            # of 503s on unrelated endpoints, a queue that ran nothing).
+            #
+            # So: try once, and on a LOCK error stop trying for a while. A lost
+            # race with another deleter (StaleDataError) is benign and does not
+            # back off -- the row is already gone, which was the goal.
+            now = time.monotonic()
+            if _EXPIRED_DELETE_BACKOFF.get(key, 0.0) <= now:
+                try:
+                    db.session.delete(row)
+                    db.session.commit()
+                    _EXPIRED_DELETE_BACKOFF.pop(key, None)
+                except Exception as exc:
+                    db.session.rollback()
+                    from .utils.dbbusy import is_locked_error
+                    if is_locked_error(exc):
+                        _EXPIRED_DELETE_BACKOFF[key] = (
+                            now + _EXPIRED_DELETE_BACKOFF_SECONDS)
             return default
         return payload.get('v', default)
 
