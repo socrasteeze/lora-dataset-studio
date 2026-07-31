@@ -52,9 +52,9 @@ export const WHATS_NEW = [
   {
     id: '2026-07-31-bank-vision-passes-run-on-the-peer',
     date: '2026-07-31',
-    title: 'Framing and watermark scanning now run on your second machine',
+    title: 'Your second machine now does most of the bank work',
     blurb:
-      'Sending a bank to another machine only ever moved two of its passes — scoring and faces — while everything else stayed here, three of them holding this machine’s graphics card. Framing and watermark detection now go too, running on the other machine’s own vision model, so a queued bank leans on the GPU you picked instead of this one. The device list also says what each kind of machine can actually do: a full second install runs the bank’s heavy passes, a bare ComfyUI renders images only and cannot run them at all — and two machines that happen to share a name are finally told apart in the picker. Honest about the rest: captions still run here for now, and a bank’s scan, auto-reject and duplicate steps always will, because they read the database rather than the graphics card.',
+      'Sending a bank to another machine only ever moved two of its passes — scoring and faces — while everything else stayed here, three of them holding this machine’s graphics card. Framing, watermark detection and captioning now go too. Captions use whichever captioner the other machine has, chosen there rather than here, so a second install with JoyCaption uses JoyCaption and one with only Ollama uses Ollama — and if it has neither, the captions quietly run here and the panel says why instead of failing after sending thousands of images across. Five of the seven passes now lean on the GPU you picked. The device list also says what each kind of machine can actually do: a full second install runs the bank’s heavy passes, a bare ComfyUI renders images only and cannot run them at all — and two machines that happen to share a name are finally told apart in the picker. Honest about the rest: a bank’s scan, auto-reject and duplicate steps always stay here, because they read the database rather than the graphics card.',
     to: '/settings/devices',
   },
   {

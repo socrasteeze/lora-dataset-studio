@@ -3723,6 +3723,8 @@ def _faces_job(bank_id, device_id=None):
 # --- scoring pass (aesthetic · NSFW · style) --------------------------------
 _SCORE_SCRIPT = str(cfg.BACKEND_DIR / 'infer' / 'bank_score_infer.py')
 _SCORE_PROGRESS_RE = re.compile(r'\[score\] (\d+)/(\d+)')
+# joycaption_infer logs `[joycaption] 12/307 ok (511 chars)` per image.
+_CAPTION_PROGRESS_RE = re.compile(r'\[joycaption\] (\d+)/(\d+)')
 
 
 def _gpu_busy_reason() -> str | None:
@@ -4981,7 +4983,8 @@ def _framing_job(bank_id, rescan, device_id=None):
 
 
 # --- caption pass (reuses the dataset caption engines) ----------------------
-def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None):
+def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
+                  device_id=None):
     """Launch the caption pass over a selection (``ids``) or, when empty, every
     non-rejected readable image. Reuses the dataset caption engines (JoyCaption /
     Ollama per Settings) through a dataset-free descriptive brick; the captions
@@ -5002,12 +5005,18 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None)
     vocab = (vocabulary or '').strip().lower() or None
     if vocab and vocab not in CAPTION_VOCABULARIES:
         raise ValueError(f'invalid caption vocabulary: {vocab}')
-    backend = (cfg.get('captioning.backend') or 'auto').lower()
-    if backend == 'none':
-        raise ValueError('no captioning backend configured (Settings ▸ Captioning & quality)')
-    reason = _gpu_busy_reason()
-    if reason:
-        raise RuntimeError(reason)
+    # Both gates describe THIS machine: its configured engine and its card. A
+    # pass aimed at a peer uses the peer's captioner and the peer's GPU.
+    remote = _remote_pass_device(device_id)
+    if not remote:
+        backend = (cfg.get('captioning.backend') or 'auto').lower()
+        if backend == 'none':
+            raise ValueError('no captioning backend configured '
+                             '(Settings ▸ Captioning & quality)')
+        reason = _gpu_busy_reason()
+        if reason:
+            raise RuntimeError(reason)
+    device_id = device_id if remote else None
     ids = [int(i) for i in ids] if ids else None
     q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
     if ids is not None:
@@ -5016,10 +5025,85 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None)
         q = q.filter(or_(BankImage.caption.is_(None), BankImage.caption == ''))
     total = q.count()
     return bank_jobs.start(app, bank_id, 'caption',
-                           _caption_job(bank_id, ids, force, vocab), total=total)
+                           _caption_job(bank_id, ids, force, vocab, device_id),
+                           total=total, device_label=_device_label(device_id))
 
 
-def _caption_job(bank_id, ids, force, vocabulary=None):
+def _remote_caption(job, device_id, peer_kind, paths, by_path, extra,
+                    *, bank_id=None, on_caption=None) -> None:
+    """Caption on a peer, with the peer's own captioner.
+
+    Two shapes, chosen by what the peer REPORTED (never by re-deciding the
+    engine here — see _peer_caption_kind):
+
+    * ``joycaption`` — an ``infer`` job running the peer's OWN
+      backend/infer/joycaption_infer.py, in its OWN ai-toolkit venv, with its
+      OWN HF_HOME. That script already speaks the infer contract (stdin JSON of
+      images, a final {"captions": {path: caption}}), so this is the same
+      machinery Score and Faces ride, with no cache.
+    * ``ollama`` — a ``vision`` job with the caption prompt.
+
+    Captions land through the SAME on_caption the local pass uses, so the row
+    write, the count and the progress bar are the local ones.
+    """
+    from . import bank_remote
+    from .face_variations import DESCRIPTIVE_CAPTION_PROMPT
+
+    prompt = DESCRIPTIVE_CAPTION_PROMPT + (('\n' + extra) if extra else '')
+    if peer_kind == 'joycaption':
+        data = bank_remote.run_remote_pass(
+            job, device_id,
+            script='joycaption_infer.py',
+            by_path={p: by_path[p] for p in paths},
+            extra_payload={'prompt': prompt, 'max_tokens': 300},
+            cache_path=None,                 # this script writes no .npz
+            progress_re=_CAPTION_PROGRESS_RE,
+            detail_label='captioning',
+            bank_id=bank_id)
+        for hub_path, caption in ((data or {}).get('captions') or {}).items():
+            if caption and on_caption:
+                on_caption(hub_path, str(caption).strip())
+        return
+    for (hub_path, _p), raw, error in bank_remote.run_remote_vision(
+            job, device_id,
+            items=[(p, p) for p in paths],
+            prompt=prompt, detail_label='captioning',
+            prefer_json=False, fmt=None, bank_id=bank_id):
+        if error is None and raw and on_caption:
+            on_caption(hub_path, str(raw).strip())
+
+
+def _peer_caption_kind(device_id) -> str | None:
+    """Which captioner a PEER can run, from its own last heartbeat.
+
+    Routing by what the peer HAS, never by re-deciding the engine here. That
+    distinction is the whole design: caption_paths owns "which engine" in one
+    place, and duplicating that rule on the caller's side is the client/server
+    drift this app has been bitten by before. The hub only asks "can that
+    machine caption at all, and with what".
+
+    'joycaption' -> an infer job running the peer's OWN joycaption_infer.py in
+    its OWN ai-toolkit venv. 'ollama' -> a vision job. None -> it cannot, and
+    the caller keeps the pass here rather than failing after staging.
+    """
+    import json as _json
+
+    from ..models import ClusterDevice
+    row = ClusterDevice.query.filter_by(id=device_id).first()
+    if row is None:
+        return None
+    try:
+        caps = _json.loads(row.capabilities or '{}')
+    except (TypeError, ValueError):
+        return None
+    if caps.get('joycaption'):
+        return 'joycaption'
+    if caps.get('ollama'):
+        return 'ollama'
+    return None
+
+
+def _caption_job(bank_id, ids, force, vocabulary=None, device_id=None):
     def run(job):
         from .face_dataset_service import caption_paths, vocabulary_instruction
         from ..gpu_window import gpu_exclusive_vision_window
@@ -5084,19 +5168,42 @@ def _caption_job(bank_id, ids, force, vocabulary=None):
         # The vocabulary register rides in as the SAME appended instruction the
         # dataset pass uses (None when unset → byte-identical to the plain pass).
         extra = vocabulary_instruction(vocabulary)
+        # A peer captions with ITS OWN engine and its own model. The hub only
+        # asks the peer's last heartbeat what it has (see _peer_caption_kind) —
+        # it never re-decides "which captioner", because that rule lives in
+        # caption_paths and a second copy would drift from it.
+        peer_kind = _peer_caption_kind(device_id) if device_id else None
+        # A separate name, NOT a rebind of the closure variable: assigning
+        # `device_id` anywhere inside run() makes it local to run and breaks the
+        # read on the line above.
+        run_on = device_id
+        if device_id and peer_kind is None:
+            # Do not fail after staging thousands of images, and do not pretend
+            # the pick was honoured: run here and say why.
+            logger.info('bank caption: device %s cannot caption; running locally',
+                        device_id)
+            bank_jobs.progress(job, detail='captioning — the chosen machine has no '
+                                           'captioner, so this runs here')
+            run_on = None
         try:
-            with gpu_exclusive_vision_window(flag_ttl=1800):
-                caption_paths(
-                    paths,
-                    extra_instructions=extra,
-                    should_cancel=lambda: bank_jobs.cancelled(job),
-                    on_caption=_on_caption,
-                    # The first non-zero count means the model is up: drop the
-                    # loading note then, and only then. `detail=None` leaves it
-                    # alone (see bank_jobs.progress), so the note survives every
-                    # 0-count report instead of being cleared by the first one.
-                    progress=lambda d, t: bank_jobs.progress(
-                        job, done=d, total=t, detail='captioning' if d else None))
+            if run_on:
+                # No local GPU window: the peer's card does the work.
+                _remote_caption(job, run_on, peer_kind, paths, by_path, extra,
+                                bank_id=bank_id, on_caption=_on_caption)
+            else:
+                with gpu_exclusive_vision_window(flag_ttl=1800):
+                    caption_paths(
+                        paths,
+                        extra_instructions=extra,
+                        should_cancel=lambda: bank_jobs.cancelled(job),
+                        on_caption=_on_caption,
+                        # The first non-zero count means the model is up: drop
+                        # the loading note then, and only then. `detail=None`
+                        # leaves it alone (see bank_jobs.progress), so the note
+                        # survives every 0-count report.
+                        progress=lambda d, t: bank_jobs.progress(
+                            job, done=d, total=t,
+                            detail='captioning' if d else None))
         except Exception:
             # The bank lane logged NOTHING — start, finish or failure — which is
             # why "it just stopped working" left no trace on the Primary. The
@@ -5468,18 +5575,17 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         entry['detail'] = job.get('detail') or f"{c['framing_classified']} classified by framing"
         return
     if step == 'caption':
-        # NOT remote-capable, deliberately. caption_paths owns the engine choice
-        # (joycaption | ollama | auto) in one place, and the peer's vision kind
-        # only speaks Ollama — sending it would mean re-deriving that rule here,
-        # which is exactly the client/server drift that has bitten this app
-        # before. So captions stay on the hub whatever the device pick, and
-        # LaunchAllDialog says so rather than implying otherwise.
-        reason = _caption_prereq() or _gpu_busy_reason()
+        # Travels now — to a peer that reported a captioner of its own. The
+        # ENGINE is still chosen by caption_paths on whichever machine runs it;
+        # the hub only routes by the peer's declared capability, so that rule
+        # never gets a second home. A peer with no captioner falls back here and
+        # says so rather than failing after staging.
+        reason = None if device_id else (_caption_prereq() or _gpu_busy_reason())
         if reason:
             entry['status'], entry['reason'] = 'skipped', reason
             return
         before = _bank_counts(bank_id)['captioned']
-        _caption_job(bank_id, None, False)(job)
+        _caption_job(bank_id, None, False, device_id=device_id)(job)
         after = _bank_counts(bank_id)['captioned']
         entry['counts'] = {'captioned': max(0, after - before), 'total_captioned': after}
         entry['detail'] = job.get('detail') or f"{after} captioned"

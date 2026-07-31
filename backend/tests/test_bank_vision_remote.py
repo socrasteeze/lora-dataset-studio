@@ -174,3 +174,99 @@ def test_a_peer_without_ollama_is_refused_before_anything_is_staged(app):
         db.session.commit()
         with pytest.raises(RuntimeError, match='Ollama'):
             bank_remote._check_peer_capability(PEER, 'ollama')
+
+
+# --- captions, routed by what the peer reports -------------------------------
+
+def _peer_row(caps):
+    from app.extensions import db
+    from app.models import ClusterDevice
+    db.session.add(ClusterDevice(id=PEER, name='Laptop', auth_token_hash='x',
+                                 capabilities=json.dumps(caps)))
+    db.session.commit()
+
+
+def test_a_peer_with_joycaption_gets_an_infer_job_not_a_vision_one(
+        app, tmp_path, monkeypatch):
+    """The hub routes by what the peer HAS, never by re-deciding the engine.
+
+    JoyCaption is a local subprocess, so it rides the infer kind: the peer runs
+    its OWN backend/infer/joycaption_infer.py, in its OWN ai-toolkit venv, with
+    its OWN HF_HOME. Nothing about "which captioner" is decided here.
+    """
+    from app.models import BankImage
+    from app.services import bank_remote, image_bank_service as banks
+
+    sent = {}
+
+    def fake_pass(job, device_id, *, script, by_path, extra_payload, cache_path,
+                  progress_re, detail_label, required_cap=None, bank_id=None):
+        sent.update(script=script, cache_path=cache_path,
+                    n=len(by_path), prompt=extra_payload.get('prompt'))
+        return {'captions': {p: 'a red dress' for p in by_path}}
+
+    monkeypatch.setattr(bank_remote, 'run_remote_pass', fake_pass)
+    monkeypatch.setattr(bank_remote, 'run_remote_vision',
+                        lambda *a, **k: pytest.fail('used the vision kind'))
+
+    with app.app_context():
+        _peer_row({'joycaption': True, 'ollama': True})
+        bank, _ = banks.create_bank('local', 'Cap', str(_two_same_named(tmp_path)))
+        job = banks.start_caption(app, 'local', bank.id, device_id=PEER)
+        assert job['error'] is None, job['error']
+        caps = [r.caption for r in BankImage.query.filter_by(bank_id=bank.id)]
+
+    assert sent['script'] == 'joycaption_infer.py'
+    assert sent['cache_path'] is None, 'the caption script writes no .npz'
+    assert sent['n'] == 2
+    assert caps == ['a red dress', 'a red dress'], caps
+
+
+def test_a_peer_with_only_ollama_gets_a_vision_job(app, tmp_path, monkeypatch):
+    from app.models import BankImage
+    from app.services import bank_remote, image_bank_service as banks
+
+    def fake_vision(job, device_id, *, items, prompt, detail_label, **kw):
+        for row_id, _p in items:
+            yield (row_id, None), 'a blue coat', None
+
+    monkeypatch.setattr(bank_remote, 'run_remote_vision', fake_vision)
+    monkeypatch.setattr(bank_remote, 'run_remote_pass',
+                        lambda *a, **k: pytest.fail('used the infer kind'))
+
+    with app.app_context():
+        _peer_row({'joycaption': False, 'ollama': True})
+        bank, _ = banks.create_bank('local', 'Cap2', str(_two_same_named(tmp_path)))
+        job = banks.start_caption(app, 'local', bank.id, device_id=PEER)
+        assert job['error'] is None, job['error']
+        caps = [r.caption for r in BankImage.query.filter_by(bank_id=bank.id)]
+
+    assert caps == ['a blue coat', 'a blue coat'], caps
+
+
+def test_a_peer_that_cannot_caption_falls_back_here_and_says_so(
+        app, tmp_path, monkeypatch):
+    """Not a failure AFTER staging thousands of images, and not a silently
+    ignored device pick."""
+    from app.services import bank_remote, image_bank_service as banks
+
+    monkeypatch.setattr(bank_remote, 'run_remote_pass',
+                        lambda *a, **k: pytest.fail('staged to a peer that cannot caption'))
+    monkeypatch.setattr(bank_remote, 'run_remote_vision',
+                        lambda *a, **k: pytest.fail('staged to a peer that cannot caption'))
+    ran_locally = {'n': 0}
+    monkeypatch.setattr(
+        'app.services.face_dataset_service.caption_paths',
+        lambda paths, **kw: (ran_locally.update(n=len(paths)),
+                             [kw['on_caption'](p, 'local caption') for p in paths],
+                             {})[-1])
+    monkeypatch.setattr('app.gpu_window.gpu_exclusive_vision_window',
+                        lambda **kw: __import__('contextlib').nullcontext())
+
+    with app.app_context():
+        _peer_row({'joycaption': False, 'ollama': False})
+        bank, _ = banks.create_bank('local', 'Cap3', str(_two_same_named(tmp_path)))
+        job = banks.start_caption(app, 'local', bank.id, device_id=PEER)
+
+    assert job['error'] is None, job['error']
+    assert ran_locally['n'] == 2, 'it did not fall back to the local captioner'
