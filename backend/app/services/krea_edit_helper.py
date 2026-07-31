@@ -247,26 +247,50 @@ def resolve_krea_unet(selected=None):
         return None
     pick = selected or cfg.get('krea.base_model') or ''
     bare_pick = os.path.basename(str(pick).replace('/', os.sep).replace('\\', os.sep))
+    unmatched = ''
     if bare_pick:
         for sub, names in folders:
             if bare_pick in names:
                 return os.path.join(sub, bare_pick)
-        logger.warning('krea.base_model %r not found under any krea folder — '
-                       'falling back to automatic resolution', pick)
+        unmatched = str(pick)
     # Automatic resolution must never PICK a file a loader cannot open: the
     # token match is on the NAME, and a .gguf named …turbo… would win here.
     folders = [(sub, [n for n in names if comfy_model_paths.is_loadable_model(n)])
                for sub, names in folders]
     folders = [(sub, names) for sub, names in folders if names]
     if not folders:
+        if unmatched:
+            logger.warning(
+                'krea.base_model %r matched no model file and no fallback was '
+                'available — the setting wants a model FILENAME, not a folder',
+                unmatched)
         return None
+    chosen = None
     for token in ('turbo', 'raw'):
         for sub, names in folders:
             for n in names:
                 if token in n.lower():
-                    return os.path.join(sub, n)
-    sub, names = folders[0]
-    return os.path.join(sub, names[0])
+                    chosen = os.path.join(sub, n)
+                    break
+            if chosen:
+                break
+        if chosen:
+            break
+    if chosen is None:
+        sub, names = folders[0]
+        chosen = os.path.join(sub, names[0])
+    if unmatched:
+        # Say that the PIN IS NOT IN EFFECT, and name what ran instead. The old
+        # wording ("not found under any krea folder — falling back to automatic
+        # resolution") fired on every single resolution for a user who had set
+        # the value to a FOLDER path, and read as a warning about a broken
+        # install rather than "your choice is being ignored".
+        logger.warning(
+            'krea.base_model %r is not in effect — it matched no model file, so '
+            'krea is running on %s instead. This setting wants a model FILENAME '
+            '(e.g. flux-krea-turbo.safetensors), not a folder.',
+            unmatched, os.path.basename(chosen))
+    return chosen
 
 
 def resolve_krea_text_encoder():

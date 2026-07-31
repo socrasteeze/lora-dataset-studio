@@ -148,3 +148,42 @@ test('log tail is capped at the last 18 lines', () => {
   assert.ok(out.includes('L59') && out.includes('L42'));
   assert.ok(!out.includes('\nL41\n'), 'lines older than the last 18 are trimmed');
 });
+
+// --- the flag that cost an hour of investigation -----------------------------
+// `klein_model` is a NAME scan (is there a folder or file called "klein" under
+// diffusion_models?). `klein` on the Engines line is the RESOLVER, which honours
+// the klein.unet override anywhere under any registered root. On a shared or
+// extra_model_paths install they disagree, and a real diagnostic reading
+// `klein=yes` next to `klein_model=no` was read as a fault and chased for an
+// hour before the two were traced to different probes.
+
+test('a resolved klein model is never reported as missing', () => {
+  const p = fullPayload();
+  p.capabilities.engines.klein = true;   // the resolver found it
+  p.capabilities.klein_model = false;    // the name scan did not
+  p.capabilities.klein_missing = [];
+  const out = formatDiagnostic(p);
+  assert.ok(!/klein_model=no/.test(out),
+    'the raw name-scan flag is still printed as a bare no');
+  assert.match(out, /klein=yes/);
+  assert.match(out, /resolved from a custom path/);
+});
+
+test('the custom-path note is silent when the two probes agree', () => {
+  const p = fullPayload();
+  p.capabilities.engines.klein = true;
+  p.capabilities.klein_model = true;
+  assert.ok(!/resolved from a custom path/.test(formatDiagnostic(p)));
+});
+
+test('a genuinely missing klein engine still says so, via klein_missing', () => {
+  const p = fullPayload();
+  p.capabilities.engines.klein = false;
+  p.capabilities.klein_model = false;
+  p.capabilities.klein_missing = ['klein_model', 'klein_vae'];
+  const out = formatDiagnostic(p);
+  assert.match(out, /klein=no/);
+  assert.match(out, /klein missing assets: klein_model, klein_vae/);
+  // …and no reassuring "custom path" note, which would be a lie here.
+  assert.ok(!/resolved from a custom path/.test(out));
+});
