@@ -61,6 +61,50 @@ def test_system_state_expired_read_deletes_row(app):
         assert db.session.get(SystemState, 'flag') is None
 
 
+def test_an_expired_read_stops_writing_once_the_writer_is_contended(app):
+    """A read must never become an unbounded source of writes.
+
+    Expired rows are lazily deleted on read. SQLite has ONE writer, so when it
+    is contended that delete fails, the row stays expired, and every polling
+    reader retries it forever — the 1 Hz queue worker, the UI's gpu-flags poll,
+    the peer heartbeat path, vision_keepalive. That is how a brief collision
+    became the sustained lock storm that stranded the GPU reservation in the
+    wild. After a lock error the cleanup must back off.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    from app.job_queue import queue_manager, reset_expired_delete_backoff
+    from app.extensions import db
+    from unittest.mock import patch
+    with app.app_context():
+        reset_expired_delete_backoff()
+        queue_manager._set_system_state('flag', True, ttl_seconds=-1)
+
+        locked = OperationalError('DELETE FROM system_state', {},
+                                  Exception('database is locked'))
+        with patch.object(db.session, 'commit', side_effect=locked) as commit:
+            # The answer is still correct — an expired row reads as absent…
+            assert queue_manager._get_system_state('flag') is None
+            assert commit.call_count == 1
+            # …and the next 20 polls do NOT keep hammering the busy writer.
+            for _ in range(20):
+                assert queue_manager._get_system_state('flag') is None
+            assert commit.call_count == 1, (
+                'every expired read retried the delete against a contended writer')
+
+        # A benign lost race (another reader deleted it first) is NOT contention
+        # and must not back off — the row is already gone, which was the goal.
+        reset_expired_delete_backoff()
+        queue_manager._set_system_state('flag2', True, ttl_seconds=-1)
+        from sqlalchemy.orm.exc import StaleDataError
+        with patch.object(db.session, 'commit', side_effect=StaleDataError('0 matched')):
+            assert queue_manager._get_system_state('flag2') is None
+        assert queue_manager._get_system_state('flag2') is None
+        from app.models import SystemState
+        assert db.session.get(SystemState, 'flag2') is None, \
+            'a benign race must not disable the cleanup'
+
+
 def test_system_state_none_deletes(app):
     from app.job_queue import queue_manager
     from app.models import SystemState

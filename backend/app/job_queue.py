@@ -66,6 +66,19 @@ class _ComfySubmitUnknown(RuntimeError):
 # persisted flags and queue rows remain the recovery record after a restart.
 GPU_ARBITER_LOCK = threading.RLock()
 
+# Per-key cooldown on the lazy delete of an EXPIRED SystemState row, so a
+# contended writer cannot be fed more writes by the readers polling past it.
+# See _get_system_state for the full reasoning. Plain dict: single-item get/set
+# under the GIL is atomic enough, and a lost update here only costs one extra
+# delete attempt.
+_EXPIRED_DELETE_BACKOFF: dict[str, float] = {}
+_EXPIRED_DELETE_BACKOFF_SECONDS = 30.0
+
+
+def reset_expired_delete_backoff():
+    """Tests: drop the per-key cooldowns so a fresh case is not skipped."""
+    _EXPIRED_DELETE_BACKOFF.clear()
+
 
 def gpu_arbiter_lock():
     """Shared in-process lock for the two local GPU consumers."""
@@ -1247,11 +1260,34 @@ class JobQueueManager:
             return default
         exp = payload.get('exp')
         if exp is not None and time.time() >= exp:
-            try:
-                db.session.delete(row)
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+            # An expired row is logically ABSENT: the answer is `default`
+            # whether or not the delete lands. Removing it is housekeeping, and
+            # housekeeping must never become write pressure.
+            #
+            # It did. SQLite has one writer; when it is contended the delete
+            # fails, the row stays expired, and EVERY reader retries it on its
+            # next poll -- the 1 Hz queue worker, the UI's gpu-flags poll, the
+            # peer heartbeat path, vision_keepalive. A read that generates
+            # writes is how a brief collision turns into a lock storm that
+            # sustains itself, which is what stranded the GPU reservation in
+            # the wild (`database is locked` out of _set_system_state, minutes
+            # of 503s on unrelated endpoints, a queue that ran nothing).
+            #
+            # So: try once, and on a LOCK error stop trying for a while. A lost
+            # race with another deleter (StaleDataError) is benign and does not
+            # back off -- the row is already gone, which was the goal.
+            now = time.monotonic()
+            if _EXPIRED_DELETE_BACKOFF.get(key, 0.0) <= now:
+                try:
+                    db.session.delete(row)
+                    db.session.commit()
+                    _EXPIRED_DELETE_BACKOFF.pop(key, None)
+                except Exception as exc:
+                    db.session.rollback()
+                    from .utils.dbbusy import is_locked_error
+                    if is_locked_error(exc):
+                        _EXPIRED_DELETE_BACKOFF[key] = (
+                            now + _EXPIRED_DELETE_BACKOFF_SECONDS)
             return default
         return payload.get('v', default)
 
