@@ -86,6 +86,50 @@ def test_system_state_expired_read_deletes_row(app):
         assert db.session.get(SystemState, 'flag') is None
 
 
+def test_an_expired_read_stops_writing_once_the_writer_is_contended(app):
+    """A read must never become an unbounded source of writes.
+
+    Expired rows are lazily deleted on read. SQLite has ONE writer, so when it
+    is contended that delete fails, the row stays expired, and every polling
+    reader retries it forever — the 1 Hz queue worker, the UI's gpu-flags poll,
+    the peer heartbeat path, vision_keepalive. That is how a brief collision
+    became the sustained lock storm that stranded the GPU reservation in the
+    wild. After a lock error the cleanup must back off.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    from app.job_queue import queue_manager, reset_expired_delete_backoff
+    from app.extensions import db
+    from unittest.mock import patch
+    with app.app_context():
+        reset_expired_delete_backoff()
+        queue_manager._set_system_state('flag', True, ttl_seconds=-1)
+
+        locked = OperationalError('DELETE FROM system_state', {},
+                                  Exception('database is locked'))
+        with patch.object(db.session, 'commit', side_effect=locked) as commit:
+            # The answer is still correct — an expired row reads as absent…
+            assert queue_manager._get_system_state('flag') is None
+            assert commit.call_count == 1
+            # …and the next 20 polls do NOT keep hammering the busy writer.
+            for _ in range(20):
+                assert queue_manager._get_system_state('flag') is None
+            assert commit.call_count == 1, (
+                'every expired read retried the delete against a contended writer')
+
+        # A benign lost race (another reader deleted it first) is NOT contention
+        # and must not back off — the row is already gone, which was the goal.
+        reset_expired_delete_backoff()
+        queue_manager._set_system_state('flag2', True, ttl_seconds=-1)
+        from sqlalchemy.orm.exc import StaleDataError
+        with patch.object(db.session, 'commit', side_effect=StaleDataError('0 matched')):
+            assert queue_manager._get_system_state('flag2') is None
+        assert queue_manager._get_system_state('flag2') is None
+        from app.models import SystemState
+        assert db.session.get(SystemState, 'flag2') is None, \
+            'a benign race must not disable the cleanup'
+
+
 def test_system_state_none_deletes(app):
     from app.job_queue import queue_manager
     from app.models import SystemState
@@ -194,6 +238,113 @@ def test_process_one_skips_while_training_in_progress(app):
             assert queue_manager.process_one() is True
         row = ImageGenerationQueue.query.filter_by(job_id=jid).one()
         assert row.status == 'completed'
+
+
+def test_a_backend_render_does_not_block_local_work(app):
+    """A remote ComfyUI backend renders on ITS OWN GPU, so it must not freeze
+    this machine's queue.
+
+    The busy check in process_one() used to count every active row in the table
+    with no worker_id filter, while the claim query ten lines below it filtered
+    properly. A backend setting its own row to sent_to_comfy therefore blocked
+    local work for the whole remote render -- up to POLL_TIMEOUT_SECONDS, 15
+    minutes -- contradicting backend_worker.py's own docstring and the promise
+    already published in README.md:292 and :912.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+    with app.app_context():
+        backend = cluster_svc.add_backend('Laptop', 'http://laptop:8188')
+        remote = queue_manager.add_job(workflow_data={'1': {}}, worker_id=backend['id'])
+        row = ImageGenerationQueue.query.filter_by(job_id=remote).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='remote-prompt')
+        db.session.commit()
+
+        local = queue_manager.add_job(workflow_data={'1': {}})
+        with patch('app.job_queue._submit', return_value='local-prompt'), \
+             patch('app.job_queue._poll_outputs', return_value=('out.png', False)), \
+             patch('app.job_queue._dispatch_completion'):
+            assert queue_manager.process_one() is True
+
+        assert ImageGenerationQueue.query.filter_by(job_id=local).one().status == 'completed'
+        # The backend's own row is untouched -- the local worker neither claimed
+        # nor finalized work belonging to another machine's dispatcher.
+        assert ImageGenerationQueue.query.filter_by(job_id=remote).one().status == 'sent_to_comfy'
+
+
+def test_a_local_render_still_blocks_local_work(app):
+    """The mirror of the test above, so the fix cannot be over-applied.
+
+    Scoping the busy check to local rows must not weaken it INTO those rows: one
+    local ComfyUI is still one GPU, and a second local prompt on top of an
+    in-flight one is the race the check exists to prevent.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    with app.app_context():
+        busy = queue_manager.add_job(workflow_data={'1': {}})
+        row = ImageGenerationQueue.query.filter_by(job_id=busy).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='local-prompt')
+        db.session.commit()
+
+        waiting = queue_manager.add_job(workflow_data={'1': {}})
+        with patch('app.job_queue._submit') as submit:
+            assert queue_manager.process_one() is False
+            submit.assert_not_called()
+        assert ImageGenerationQueue.query.filter_by(job_id=waiting).one().status == 'pending'
+
+
+def test_backend_rows_do_not_make_local_ollama_unload(app):
+    """vision_keepalive.gpu_is_contended shared the same missing filter: a job
+    rendering on another machine made THIS machine drop its keep-warm vision
+    lease for a GPU nobody was contending."""
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+    from app.services import vision_keepalive as vk
+    with app.app_context():
+        assert vk.gpu_is_contended() is False
+        backend = cluster_svc.add_backend('Laptop', 'http://laptop:8188')
+        remote = queue_manager.add_job(workflow_data={'1': {}}, worker_id=backend['id'])
+        row = ImageGenerationQueue.query.filter_by(job_id=remote).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='remote-prompt')
+        db.session.commit()
+        assert vk.gpu_is_contended() is False
+
+        # …but a LOCAL pending job still contends, as it always did.
+        queue_manager.add_job(workflow_data={'1': {}})
+        assert vk.gpu_is_contended() is True
+
+
+def test_a_backend_render_does_not_block_a_training_launch(app):
+    """`has_comfyui_work` gates the training launch (lora_training) and the
+    vision GPU window (gpu_window) — both asking "is the LOCAL card free?".
+
+    Unscoped it answered "busy" for a job rendering on another machine, so a
+    laptop rendering one image stopped the desktop from starting a training.
+    backend_worker.py's docstring promises the opposite ("the laptop can keep
+    rendering while the desktop trains"), as does README.md:912.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+    with app.app_context():
+        assert queue_manager.has_comfyui_work() is False
+        backend = cluster_svc.add_backend('Laptop', 'http://laptop:8188')
+        remote = queue_manager.add_job(workflow_data={'1': {}}, worker_id=backend['id'])
+        row = ImageGenerationQueue.query.filter_by(job_id=remote).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='remote-prompt')
+        db.session.commit()
+        assert queue_manager.has_comfyui_work() is False
+
+        # A LOCAL job still holds the card — the guard must not be weakened.
+        queue_manager.add_job(workflow_data={'1': {}})
+        assert queue_manager.has_comfyui_work() is True
 
 
 def test_process_one_skips_while_vision_in_progress(app):
@@ -687,3 +838,59 @@ def test_failed_job_reason_reaches_dataset_tile(app):
         refreshed = db.session.get(FaceDatasetImage, img.id)
         assert refreshed.status == 'failed'
         assert 'mat1 and mat2' in refreshed.fail_reason
+
+
+def test_startup_recovery_ignores_a_backend_render(app):
+    """Startup recovery must not stall ANOTHER machine's live render.
+
+    _recover_stuck_jobs swept every active row with no worker_id filter, and
+    backend_worker writes a REMOTE row into sent_to_comfy with the remote
+    prompt id. Restarting while a backend renders therefore paused that remote
+    row and installed the SINGLE GLOBAL comfyui_stalled_barrier.
+
+    That used to cost one paused queue worker. It now costs every local
+    generation lane: require_comfyui_enqueue_ready() reads the same global slot
+    from add_job and six route preflights, so the user gets a 409 telling them
+    to recover a ComfyUI on a machine they are not sitting at. The two fixes
+    were correct apart and dangerous together -- see FORK_NOTES Divergence 6a.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    from app.services import cluster as cluster_svc
+    with app.app_context():
+        backend = cluster_svc.add_backend('Laptop', 'http://laptop:8188')
+        remote = queue_manager.add_job(workflow_data={'1': {}}, worker_id=backend['id'])
+        row = ImageGenerationQueue.query.filter_by(job_id=remote).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='remote-prompt')
+        db.session.commit()
+
+        queue_manager._recover_stuck_jobs()
+
+        assert queue_manager.has_comfyui_stalled_barrier() is False, (
+            'local startup recovery installed the global barrier for a remote render')
+        # The remote row is left exactly as its own dispatcher left it.
+        assert ImageGenerationQueue.query.filter_by(job_id=remote).one().status == 'sent_to_comfy'
+        # And the barrier never fires, so local work still enqueues.
+        assert queue_manager.add_job(workflow_data={'1': {}})
+
+
+def test_startup_recovery_still_stalls_a_local_render(app):
+    """The mirror, so the scoping cannot be over-applied into removing recovery.
+
+    A LOCAL row left in sent_to_comfy by a crash is exactly what the barrier is
+    for: this machine's ComfyUI holds a prompt whose outcome we cannot confirm.
+    """
+    from app.extensions import db
+    from app.job_queue import queue_manager
+    from app.models import ImageGenerationQueue
+    with app.app_context():
+        local = queue_manager.add_job(workflow_data={'1': {}})
+        row = ImageGenerationQueue.query.filter_by(job_id=local).one()
+        row.update_status('sent_to_comfy', comfyui_prompt_id='local-prompt')
+        db.session.commit()
+
+        queue_manager._recover_stuck_jobs()
+
+        assert queue_manager.has_comfyui_stalled_barrier() is True, (
+            'a crashed LOCAL render no longer installs the recovery barrier')

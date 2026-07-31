@@ -150,6 +150,49 @@ def test_a_long_pass_still_keeps_its_flag_alive(app, monkeypatch):
     assert _flag(app) is None
 
 
+def test_a_transient_sqlite_lock_does_not_kill_the_heartbeat(app, monkeypatch):
+    """The wild failure: one lost race for SQLite's single writer killed the
+    heartbeat, which stranded the in-process GPU fence and left the queue
+    refusing every job.
+
+    Reported with `sqlite3.OperationalError: database is locked` raised out of
+    `_set_system_state` while a bank folder walk held the writer. The renewal now
+    retries the write, and the beat survives a failure it cannot retry away.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    from app import gpu_window
+    from app.job_queue import queue_manager
+
+    # The beat interval is max(floor, ttl/3), so a TTL long enough to outlive
+    # write_with_retry's backoff would also make the interval far too long to
+    # observe here. Pin the interval directly and keep a comfortable TTL.
+    monkeypatch.setattr(gpu_window, '_heartbeat_interval_seconds', lambda _ttl: 0.05)
+    real_set = queue_manager._set_system_state
+    calls = {'n': 0}
+
+    def locked_at_first(key, value, ttl_seconds=None):
+        # Fail every write_with_retry attempt of the FIRST renewal, so the beat
+        # records a real miss instead of being rescued by the inner retry.
+        if key == 'vision_in_progress' and value is not None:
+            calls['n'] += 1
+            if calls['n'] <= 3:
+                raise OperationalError('UPDATE system_state', {},
+                                       Exception('database is locked'))
+        return real_set(key, value, ttl_seconds=ttl_seconds)
+
+    with app.app_context():
+        queue_manager.init_app(app)
+        with gpu_window.gpu_exclusive_vision_window(flag_ttl=60):
+            monkeypatch.setattr(queue_manager, '_set_system_state', locked_at_first)
+            # One renewal burns 3 attempts across ~0.75 s of backoff; give the
+            # beat after it room to land a successful write.
+            time.sleep(2.0)
+            assert calls['n'] > 3, 'the heartbeat stopped at the first lock error'
+            assert _flag(app) is not None, 'the window lost its flag to a transient lock'
+    assert _flag(app) is None
+
+
 def test_a_window_re_acquired_by_someone_else_is_never_stomped(app, monkeypatch):
     """The pre-existing guarantee, re-pinned: if our flag lapsed and another
     caller took the window, closing ours must not clear THEIR flag."""
