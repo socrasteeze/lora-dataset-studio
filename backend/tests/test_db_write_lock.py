@@ -13,6 +13,7 @@ lost. Three guarantees are pinned here:
   never a 500.
 """
 import os
+import time
 
 import pytest
 from PIL import Image
@@ -43,13 +44,39 @@ def bank(client, tmp_path):
     return r.get_json()['id']
 
 
-def test_connections_wait_for_the_write_lock(app):
+def test_connections_wait_for_the_write_lock(app, monkeypatch):
     """A 5 s wait was routinely blown through by a batch commit; the busy timeout
     has to be generous enough that a well-behaved pass never starves a click."""
+    monkeypatch.delenv('LDS_SQLITE_BUSY_TIMEOUT_MS', raising=False)
     with app.app_context():
         got = db.session.execute(db.text('PRAGMA busy_timeout')).scalar()
     assert got == SQLITE_BUSY_TIMEOUT_MS
     assert SQLITE_BUSY_TIMEOUT_MS >= 15000
+
+
+def test_the_busy_timeout_can_be_dropped_for_a_hunt(monkeypatch):
+    """LDS_SQLITE_BUSY_TIMEOUT_MS is the debugging posture, not a setting.
+
+    At the shipped 15 s a pass holding the write lock is ABSORBED by the wait —
+    only its victims are visible, and they never name the holder. Dropping the
+    wait to ~500 ms surfaces the holder in seconds. It must be an env override
+    and not a config key precisely so it cannot be left on by accident: at
+    500 ms an ordinary click fails during a perfectly normal batch save.
+    """
+    from app import _busy_timeout_ms
+
+    monkeypatch.delenv('LDS_SQLITE_BUSY_TIMEOUT_MS', raising=False)
+    assert _busy_timeout_ms() == SQLITE_BUSY_TIMEOUT_MS
+
+    monkeypatch.setenv('LDS_SQLITE_BUSY_TIMEOUT_MS', '500')
+    assert _busy_timeout_ms() == 500
+
+    # A typo must not silently disable the wait — that would turn every
+    # collision into an instant failure across the whole app.
+    monkeypatch.setenv('LDS_SQLITE_BUSY_TIMEOUT_MS', 'soon')
+    assert _busy_timeout_ms() == SQLITE_BUSY_TIMEOUT_MS
+    monkeypatch.setenv('LDS_SQLITE_BUSY_TIMEOUT_MS', '0')
+    assert _busy_timeout_ms() == SQLITE_BUSY_TIMEOUT_MS
 
 
 def test_is_locked_error_only_matches_the_transient_collision():
@@ -135,3 +162,96 @@ def test_a_status_write_survives_one_lost_race(client, app, bank, monkeypatch):
     assert r.get_json()['changed'] == 1
     with app.app_context():
         assert banks.bank_payload('local', bank)['counts']['reject'] == 1
+
+
+# --- the diagnostic: name the HOLDER, not the victim -------------------------
+
+def test_dbtrace_is_off_unless_a_threshold_is_configured(monkeypatch):
+    """It must cost nothing when nobody asked for it."""
+    from app.utils import dbtrace
+
+    monkeypatch.delenv('LDS_DB_TRACE', raising=False)
+    assert dbtrace.threshold_seconds(None) == 0.0
+    assert dbtrace.threshold_seconds(0) == 0.0
+    assert dbtrace.install(None, 0) is False
+
+    # config.json turns it on; the env var overrides config for a one-off hunt.
+    assert dbtrace.threshold_seconds(2) == 2.0
+    monkeypatch.setenv('LDS_DB_TRACE', '0.5')
+    assert dbtrace.threshold_seconds(2) == 0.5
+    # A typo is off, not "trace everything".
+    monkeypatch.setenv('LDS_DB_TRACE', 'yes')
+    assert dbtrace.threshold_seconds(None) == 0.0
+
+
+def test_dbtrace_names_the_thread_and_statement_holding_the_write_lock(
+        app, tmp_path, monkeypatch, caplog):
+    """The reason this ships instead of being scaffolding.
+
+    "database is locked" is raised on the connection that gave up WAITING. It
+    names the victim and says nothing about the holder, which is why the same
+    bug — a pass holding the write transaction across slow non-DB work — got
+    diagnosed from scratch three times. This asserts the log finally answers
+    "who?": the thread name and the statement that opened the transaction.
+    """
+    import logging
+    import threading
+    from app.utils import dbtrace
+
+    monkeypatch.setattr(dbtrace, '_POLL_SECONDS', 0.02)
+    monkeypatch.setenv('LDS_DB_TRACE', '0.05')
+    assert dbtrace.install(None) is True
+    me = threading.current_thread()
+    original_name = me.name
+    try:
+        with caplog.at_level(logging.WARNING, logger='app.utils.dbtrace'):
+            with app.app_context():
+                # Named BEFORE the statement: the tracer records the thread that
+                # OPENED the transaction, which is the whole point — renaming
+                # afterwards would test nothing.
+                me.name = 'bank-7-framing'
+                # Open a write transaction and then do "slow work" inside it —
+                # exactly the shape utils/dbbusy says a pass must never have.
+                db.session.execute(db.text(
+                    'UPDATE image_bank SET name = name'))
+                time.sleep(0.4)
+                db.session.commit()
+        held = [r.getMessage() for r in caplog.records
+                if 'write transaction held' in r.getMessage()]
+    finally:
+        me.name = original_name
+        dbtrace.shutdown()
+
+    assert held, 'the tracer never reported a transaction it was holding open'
+    assert 'bank-7-framing' in held[0], held[0]
+    assert 'UPDATE image_bank' in held[0], held[0]
+
+
+def test_dbtrace_never_logs_bound_parameters(app, monkeypatch, caplog):
+    """Privacy (CLAUDE.md): parameters carry the user's own folder paths.
+
+    The statement is enough to identify the opener. Logging the values that
+    went into it would put a real source path into a file people paste into
+    bug reports — which is the one thing the redaction helpers exist to stop.
+    """
+    import logging
+    from app.utils import dbtrace
+
+    secret = 'E:/very/private/photos/2019'
+    monkeypatch.setattr(dbtrace, '_POLL_SECONDS', 0.02)
+    monkeypatch.setenv('LDS_DB_TRACE', '0.05')
+    assert dbtrace.install(None) is True
+    try:
+        with caplog.at_level(logging.WARNING, logger='app.utils.dbtrace'):
+            with app.app_context():
+                db.session.execute(
+                    db.text('UPDATE image_bank SET source_path = :p'),
+                    {'p': secret})
+                time.sleep(0.4)
+                db.session.commit()
+        text = '\n'.join(r.getMessage() for r in caplog.records)
+    finally:
+        dbtrace.shutdown()
+
+    assert 'write transaction held' in text, 'the tracer did not run at all'
+    assert secret not in text, 'the tracer logged a bound parameter'
