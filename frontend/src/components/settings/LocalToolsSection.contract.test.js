@@ -131,14 +131,13 @@ test('HF validation results expose success, warning, and error without relying o
   assert.match(primitives, /<span className="sr-only">\{presentation\.label\}: <\/span>\{detail\}/)
 })
 
-test('full-model notices recommend scoped access while accepting global write', () => {
-  assert.doesNotMatch(trainingPanel, /requires a fine-grained <code>HF_CLOUD_TOKEN<\/code>/)
-  assert.doesNotMatch(trainingPanel, /uploaded using a fine-grained <code>HF_CLOUD_TOKEN<\/code>/)
-  assert.equal((trainingPanel.match(/fine-grained token is recommended/g) || []).length, 2)
-  assert.equal(
-    (trainingPanel.match(/global\s+write token is also\s+accepted with a warning/g) || []).length,
-    2,
-  )
+/* Divergence 4: upstream's full-model lane delivers its weights to Hugging Face
+   from a rented pod, and this contract pins the HF_CLOUD_TOKEN guidance beside it.
+   Neither exists here, so the honest assertion is the ABSENCE of that copy — and
+   it fails loudly if a future sync brings the token panel back. */
+test('there is no cloud full-model token panel to describe', () => {
+  assert.doesNotMatch(trainingPanel, /HF_CLOUD_TOKEN/)
+  assert.doesNotMatch(trainingPanel, /fine-grained token is recommended/)
 })
 test('focus=HF_CLOUD_TOKEN lands on the secret input id', () => {
   assert.match(primitives, /id=\{f\.key\}/)

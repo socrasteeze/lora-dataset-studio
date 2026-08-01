@@ -82,12 +82,12 @@ def test_secret_printable_characters_roundtrip_exactly(tmp_path, monkeypatch):
     config = _fresh(monkeypatch, tmp_path)
     value = "sk printable # = ' \\\\ ü"
 
-    config.set_secrets({'OPENAI_API_KEY': value})
+    config.set_secrets({'HF_TOKEN': value})
 
-    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    monkeypatch.delenv('HF_TOKEN', raising=False)
     from dotenv import load_dotenv
     load_dotenv(config.ENV_PATH, override=True)
-    assert config.secret('OPENAI_API_KEY') == value
+    assert config.secret('HF_TOKEN') == value
 
 
 @pytest.mark.parametrize('separator', UNSAFE_SECRET_CHARS)
@@ -96,16 +96,16 @@ def test_set_secrets_rejects_controls_without_mutating_file_or_environment(
     config = _fresh(monkeypatch, tmp_path)
     config.ENV_PATH.write_bytes(b"GEMINI_API_KEY='old-value'\n")
     before = config.ENV_PATH.read_bytes()
-    monkeypatch.setenv('OPENAI_API_KEY', 'runtime-before')
+    monkeypatch.setenv('HF_TOKEN', 'runtime-before')
     monkeypatch.delenv('FLASK_DEBUG', raising=False)
 
     with pytest.raises(ValueError, match='single line'):
         config.set_secrets({
-            'OPENAI_API_KEY': f'new-value{separator}FLASK_DEBUG=1',
+            'HF_TOKEN': f'new-value{separator}FLASK_DEBUG=1',
         })
 
     assert config.ENV_PATH.read_bytes() == before
-    assert config.secret('OPENAI_API_KEY') == 'runtime-before'
+    assert config.secret('HF_TOKEN') == 'runtime-before'
     assert 'FLASK_DEBUG' not in os.environ
 
 
@@ -116,7 +116,7 @@ def test_set_secrets_rejects_controls_without_mutating_file_or_environment(
 def test_set_secrets_refuses_to_normalize_poisoned_existing_env(
         tmp_path, monkeypatch, separator):
     config = _fresh(monkeypatch, tmp_path)
-    poisoned = f'OPENAI_API_KEY=old{separator}FLASK_DEBUG=1\n'.encode('utf-8')
+    poisoned = f'HF_TOKEN=old{separator}FLASK_DEBUG=1\n'.encode('utf-8')
     config.ENV_PATH.write_bytes(poisoned)
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     monkeypatch.delenv('FLASK_DEBUG', raising=False)

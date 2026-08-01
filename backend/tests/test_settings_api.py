@@ -84,7 +84,7 @@ def test_put_settings_rejects_secret_environment_injection(
 
     response = client.put('/api/settings', json={
         'config': {'ollama': {'url': 'http://must-not-save.invalid'}},
-        'secrets': {'OPENAI_API_KEY': f'key{separator}FLASK_DEBUG=1'},
+        'secrets': {'HF_TOKEN': f'key{separator}FLASK_DEBUG=1'},
     })
 
     assert response.status_code == 400
@@ -105,7 +105,7 @@ def test_put_settings_refuses_poisoned_existing_env_before_saving_config(
     import os
     from app import config
     before_url = client.get('/api/settings').get_json()['config']['ollama']['url']
-    poisoned = f'OPENAI_API_KEY=old{separator}FLASK_DEBUG=1\n'.encode('utf-8')
+    poisoned = f'HF_TOKEN=old{separator}FLASK_DEBUG=1\n'.encode('utf-8')
     config.ENV_PATH.write_bytes(poisoned)
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     monkeypatch.delenv('FLASK_DEBUG', raising=False)
@@ -289,120 +289,6 @@ def _cloud_status(*, ok=True, namespace='lds-deliveries', error=None,
         'warning': warning,
         'error': error,
     }
-
-
-def test_put_settings_validates_cloud_token_candidate_before_saving(
-        client, monkeypatch):
-    import os
-    from app.services import cloud_training
-
-    candidate = 'hf_candidate_SECRET_MUST_NOT_BE_RETURNED'
-    seen = []
-
-    def validate(token, _api=None):
-        seen.append(token)
-        return _cloud_status()
-
-    monkeypatch.setattr(
-        cloud_training, 'full_transformer_token_status', validate)
-    response = client.put('/api/settings', json={
-        'secrets': {'HF_CLOUD_TOKEN': candidate},
-    })
-
-    assert response.status_code == 200
-    payload = response.get_json()
-    check = payload['secret_checks']['HF_CLOUD_TOKEN']
-    assert seen == [candidate]
-    assert check == {
-        'ok': True,
-        'detail': (
-            'HF_CLOUD_TOKEN verified: krea/Krea-2-Raw is readable; '
-            'delivery namespace: lds-deliveries.'),
-        'code': 'ready',
-        'configured': True,
-        'severity': 'success',
-        'settings_focus': 'HF_CLOUD_TOKEN',
-        'namespace': 'lds-deliveries',
-    }
-    assert payload['secrets']['HF_CLOUD_TOKEN'] is True
-    assert os.environ['HF_CLOUD_TOKEN'] == candidate
-    assert candidate not in response.get_data(as_text=True)
-
-
-def test_put_settings_accepts_global_write_token_with_warning(
-        client, monkeypatch):
-    from app import config
-    from app.services import cloud_training
-
-    candidate = 'hf_global_write_SECRET_MUST_NOT_BE_RETURNED'
-    warning = (
-        'This global write token is accepted, but it can modify every '
-        'Hugging Face repository available to this account.')
-    monkeypatch.setattr(
-        cloud_training,
-        'full_transformer_token_status',
-        lambda token, _api=None: _cloud_status(
-            namespace='tester', code='broad_access', severity='warning',
-            warning=warning),
-    )
-
-    response = client.put('/api/settings', json={
-        'secrets': {'HF_CLOUD_TOKEN': candidate},
-    })
-
-    assert response.status_code == 200
-    payload = response.get_json()
-    check = payload['secret_checks']['HF_CLOUD_TOKEN']
-    assert check['ok'] is True
-    assert check['code'] == 'broad_access'
-    assert check['severity'] == 'warning'
-    assert check['detail'] == warning
-    assert check['warning'] == warning
-    assert check['namespace'] == 'tester'
-    assert config.secret('HF_CLOUD_TOKEN') == candidate
-    assert candidate not in response.get_data(as_text=True)
-
-
-def test_put_settings_rejects_invalid_cloud_token_atomically(
-        client, monkeypatch):
-    import os
-    from app import config
-    from app.services import cloud_training
-
-    previous = 'hf_previous_valid_token'
-    candidate = 'hf_bad_candidate_MUST_NOT_BE_RETURNED'
-    config.set_secrets({'HF_CLOUD_TOKEN': previous})
-    before_env = config.ENV_PATH.read_bytes()
-    before_url = client.get('/api/settings').get_json()['config']['ollama']['url']
-    seen = []
-
-    def reject(token, _api=None):
-        seen.append(token)
-        return _cloud_status(
-            ok=False,
-            error=(
-                'HF_CLOUD_TOKEN needs exact repo.content.read access to '
-                'krea/Krea-2-Raw.'))
-
-    monkeypatch.setattr(
-        cloud_training, 'full_transformer_token_status', reject)
-    response = client.put('/api/settings', json={
-        'config': {'ollama': {'url': 'http://must-not-save.invalid'}},
-        'secrets': {'HF_CLOUD_TOKEN': candidate},
-    })
-
-    assert response.status_code == 400
-    payload = response.get_json()
-    check = payload['secret_checks']['HF_CLOUD_TOKEN']
-    assert seen == [candidate]
-    assert check['ok'] is False
-    assert check['code'] == 'invalid'
-    assert 'repo.content.read' in check['detail']
-    assert candidate not in response.get_data(as_text=True)
-    assert client.get('/api/settings').get_json()['config']['ollama']['url'] == before_url
-    assert config.secret('HF_CLOUD_TOKEN') == previous
-    assert os.environ['HF_CLOUD_TOKEN'] == previous
-    assert config.ENV_PATH.read_bytes() == before_env
 
 
 def test_put_settings_skips_dense_validation_without_new_cloud_token(
@@ -1000,7 +886,7 @@ def test_config_defaults_is_a_copy_the_caller_cannot_corrupt(client):
 
 def test_config_defaults_carries_no_secret(client, monkeypatch):
     """It is a public payload: DEFAULTS holds knobs, never a key."""
-    # A key in THIS fork's SECRET_KEYS — OPENAI_API_KEY (upstream's choice) is
+    # A key in THIS fork's SECRET_KEYS — HF_TOKEN (upstream's choice) is
     # not one here, so the assertion below would pass without proving anything.
     monkeypatch.setenv('HF_TOKEN', 'sk-secret')
     data = client.get('/api/settings').get_json()
