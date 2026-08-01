@@ -36,6 +36,13 @@ DEFAULT_PROMPT = (
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bank_image_guard import read_validated_bank_image  # noqa: E402
 
+# Library banners belong on the progress channel, not the result one: a bare
+# print() from a dependency used to land on stdout ahead of the JSON line and
+# cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
+# points at stderr, so anything a library prints is progress output.
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
+
 
 def _log(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
@@ -74,13 +81,13 @@ def main() -> int:
     try:
         req = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError as e:
-        print(json.dumps({"captions": {}, "errors": {"_input": f"bad json: {e}"}}))
+        print(json.dumps({"captions": {}, "errors": {"_input": f"bad json: {e}"}}), file=_OUT)
         return 1
     images = [str(p) for p in (req.get("images") or [])]
     prompt = (req.get("prompt") or DEFAULT_PROMPT).strip()
     max_tokens = int(req.get("max_tokens") or 300)
     if not images:
-        print(json.dumps({"captions": {}, "errors": {"_input": "no images"}}))
+        print(json.dumps({"captions": {}, "errors": {"_input": "no images"}}), file=_OUT)
         return 1
 
     import torch
@@ -173,16 +180,16 @@ def main() -> int:
             # for a graceful Stop, every caption printed so far is already kept (a single
             # end-of-run dump would lose them all). Flush so the pipe delivers it before the
             # next — possibly long — generate() call.
-            print(json.dumps({"i": i, "path": path, "caption": caption}), flush=True)
+            print(json.dumps({"i": i, "path": path, "caption": caption}), flush=True, file=_OUT)
             _log(f"[joycaption] {i}/{len(images)} ok ({len(caption)} chars)")
         except Exception as e:  # une image ratée ne casse pas le batch
             errors[path] = str(e)
-            print(json.dumps({"i": i, "path": path, "error": str(e)}), flush=True)
+            print(json.dumps({"i": i, "path": path, "error": str(e)}), flush=True, file=_OUT)
             _log(f"[joycaption] {i}/{len(images)} ERROR: {e}")
 
     # Final aggregate line (backward-compatible with any caller that reads only the last
     # {…}); the streamed per-image lines above are the authoritative source now.
-    print(json.dumps({"captions": captions, "errors": errors}), flush=True)
+    print(json.dumps({"captions": captions, "errors": errors}), flush=True, file=_OUT)
     return 0
 
 

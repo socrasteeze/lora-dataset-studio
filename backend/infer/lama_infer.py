@@ -15,6 +15,14 @@ import math
 import os
 import sys
 
+# Library banners belong on the progress channel, not the result one: a bare
+# print() from a dependency used to land on stdout ahead of the JSON line and
+# cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
+# points at stderr, so anything a library prints is progress output.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
+
 #: The ONE encoding rule shared with the Flask side (mirror / rotate / crop / watermark crop):
 #: an edit of the working image keeps its format and is written without loss.
 IMAGE_ENCODING_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -114,7 +122,7 @@ def main() -> int:
             raw_jobs = [{'image_path': job['image_path'], 'bboxes': _payload_bboxes(job)} for job in raw_jobs]
             batch = True
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"payload: {e}"}))
+        print(json.dumps({"ok": False, "error": f"payload: {e}"}), file=_OUT)
         return 1
     if requested_device == 'cpu':
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
@@ -125,7 +133,7 @@ def main() -> int:
         from simple_lama_inpainting import SimpleLama
     except Exception as e:
         # import KO (paquet absent / torch casse) -> JSON propre, pas de traceback muet.
-        print(json.dumps({"ok": False, "error": f"import: {type(e).__name__}: {e}"}))
+        print(json.dumps({"ok": False, "error": f"import: {type(e).__name__}: {e}"}), file=_OUT)
         return 1
     try:
         cuda = bool(torch.cuda.is_available())
@@ -156,14 +164,14 @@ def main() -> int:
                 results.append({'image_path': image_path, 'ok': False,
                                 'error': f'{type(e).__name__}: {e}'})
         if batch:
-            print(json.dumps({'ok': True, 'device': actual_device, 'results': results}))
+            print(json.dumps({'ok': True, 'device': actual_device, 'results': results}), file=_OUT)
         elif results[0]['ok']:
-            print(json.dumps({'ok': True, 'device': actual_device}))
+            print(json.dumps({'ok': True, 'device': actual_device}), file=_OUT)
         else:
-            print(json.dumps({'ok': False, 'error': results[0]['error']}))
+            print(json.dumps({'ok': False, 'error': results[0]['error']}), file=_OUT)
         return 0
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}))
+        print(json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}), file=_OUT)
         return 1
 
 

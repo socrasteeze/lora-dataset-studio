@@ -19,6 +19,7 @@ grammar (one regex each); this module owns the plumbing:
   display concern, the work is the work.
 """
 from __future__ import annotations
+import json
 import logging
 import subprocess
 import threading
@@ -39,6 +40,33 @@ _TAIL_LINES = 5
 def stderr_tail(lines) -> str:
     """Last non-empty stderr line — the useful half of a child's traceback."""
     return next((ln.strip() for ln in reversed(list(lines or ())) if ln.strip()), '')
+
+
+def parse_result_json(stdout) -> dict | None:
+    """The result object an `infer/*.py` script printed, or None if there is none.
+
+    The protocol is "one JSON line on stdout", but a script's DEPENDENCIES do not
+    know that: InsightFace announces every model it resolves with a bare
+    `print()`, so a healthy faces pass emits a dozen banner lines and then its
+    result. `json.loads(whole_buffer)` therefore raises on a run that worked
+    perfectly — which is exactly how a peer came to report
+    "face pass produced no output" over a stdout that plainly contained
+    `{"ok": true, ...}`.
+
+    So: scan the lines in REVERSE and return the first that parses to a dict.
+    Last-one-wins matches the protocol (the result is printed last) and is
+    tolerant of anything printed before it."""
+    for line in reversed((stdout or '').splitlines()):
+        line = line.strip()
+        if not line.startswith('{'):
+            continue
+        try:
+            obj = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
 
 
 def run_infer_script(python, script, payload, timeout, on_line=None,

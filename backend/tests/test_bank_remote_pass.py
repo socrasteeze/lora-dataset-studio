@@ -547,3 +547,69 @@ def test_vision_staging_still_accepts_plain_paths(app, tmp_path, monkeypatch):
     with app.app_context():
         cluster_remote.enqueue_vision_on_device(PEER, [str(p)], prompt='x')
     assert made['payload']['artifacts'] == ['only.jpg']
+
+
+def _stub_completed_job(monkeypatch, payload, job_id='remote-2'):
+    """A peer job that completes and leaves `payload` as its infer_result."""
+    from app.services import bank_jobs
+    from app.services import cluster as cluster_svc
+
+    def fake_enqueue(device_id, *, script, stdin, image_paths, timeout):
+        art = cluster_svc.job_artifact_dir(job_id)
+        (art / 'infer_result.json').write_text(json.dumps(payload),
+                                               encoding='utf-8')
+        return job_id
+
+    monkeypatch.setattr('app.services.cluster_remote.enqueue_infer_on_device',
+                        fake_enqueue)
+    monkeypatch.setattr(bank_jobs, 'cancelled', lambda job: False)
+    monkeypatch.setattr(bank_jobs, 'progress', lambda job, **kw: None)
+
+    class _Row:
+        status = 'completed'
+        progress = None
+        error_message = None
+
+    class _FakeClusterJob:
+        query = type('Q', (), {'filter_by': staticmethod(
+            lambda **kw: type('F', (), {'first': staticmethod(lambda: _Row())})())})()
+    monkeypatch.setattr('app.models.ClusterJob', _FakeClusterJob)
+
+
+def _run_pass(app, tmp_path, **kw):
+    import re
+    from app.services import bank_remote
+    p = tmp_path / 'img.jpg'
+    Image.new('RGB', (16, 16)).save(str(p))
+    with app.app_context():
+        return bank_remote.run_remote_pass(
+            object(), PEER, script='face_embed_infer.py', by_path={str(p): 1},
+            extra_payload={}, cache_path=None,
+            progress_re=re.compile(r'x(\d)/(\d)'), detail_label='face pass',
+            **kw)
+
+
+def test_a_result_the_hub_cannot_read_names_the_machine_not_a_fake_exit_code(
+        app, tmp_path, monkeypatch):
+    """A peer on older code answers unparseable stdout with {'stdout': …}: no
+    `ok`, no `error`. That used to reach _faces_job and surface as "face pass
+    produced no output (rc=0)" — an exit code nothing in this process ever
+    observed, over a pass that had really run."""
+    _stub_completed_job(monkeypatch, {'stdout': 'set det-size: (640, 640)\n'})
+
+    with pytest.raises(RuntimeError) as e:
+        _run_pass(app, tmp_path)
+
+    assert 'rc=' not in str(e.value), 'the hub invented an exit code'
+    assert 'no result LDS could read' in str(e.value)
+    assert 'set det-size' in str(e.value), "quote the machine's own output"
+
+
+def test_a_caption_result_is_consumable_without_an_ok_key(app, tmp_path,
+                                                          monkeypatch):
+    """joycaption_infer returns {'captions': …, 'errors': …} and never sets
+    `ok`, so the guard above must not key on it — that would refuse every
+    healthy caption pass on a peer."""
+    _stub_completed_job(monkeypatch, {'captions': {}, 'errors': {}})
+
+    assert _run_pass(app, tmp_path)['captions'] == {}

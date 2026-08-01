@@ -202,6 +202,7 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
                           detail_label=detail_label, label=label, bank_id=bank_id,
                           progress_from=_stderr_progress(progress_re))
         data = _read_result(job_id)
+        _require_consumable(data, label)
         if cache_name:
             _install_cache(job_id, cache_name, cache_path, name_to_hub)
         return _remap_home(data, name_to_hub)
@@ -382,6 +383,28 @@ def _read_result(job_id) -> dict:
     except (OSError, ValueError, FileNotFoundError) as e:
         raise RuntimeError(f'remote pass finished but its result could not be '
                            f'read: {e}') from e
+
+
+# Every infer script answers with at least one of these. `ok` is not enough on
+# its own: joycaption_infer returns {'captions': …, 'errors': …} and never sets
+# it, so an ok-only check would refuse a healthy caption pass.
+_RESULT_FIELDS = ('ok', 'error', 'results', 'captions')
+
+
+def _require_consumable(data: dict, label) -> None:
+    """Fail on a result the callers cannot read, BEFORE `_remap_home` — which
+    injects empty results/clusters/captions keys and would hide the difference.
+
+    A peer on older code answers an unparseable stdout with `{'stdout': …}`,
+    which used to reach `_faces_job` and surface as "face pass produced no
+    output (rc=0)" — an exit code the hub never observed, over a pass that had
+    actually run. Name the machine and quote what it sent instead."""
+    if isinstance(data, dict) and any(k in data for k in _RESULT_FIELDS):
+        return
+    raw = str((data or {}).get('stdout') or '').strip()
+    extra = f' — it sent: {raw[-200:]}' if raw else ''
+    raise RuntimeError(f'the pass finished on {label or "the peer"} but it '
+                       f'returned no result LDS could read{extra}')
 
 
 def _remap_home(data: dict, name_to_hub: dict) -> dict:

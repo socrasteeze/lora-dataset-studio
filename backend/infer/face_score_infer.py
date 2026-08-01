@@ -6,7 +6,15 @@ UNE ligne JSON {"ref_ok": bool, "results": {path: {state, sim?, det, bbox_frac, 
 Logs -> stderr.
 Gating 3-etats + padding rescue (valide empiriquement sur test3)."""
 from __future__ import annotations
-import json, sys
+import json, os, sys
+
+# Library banners belong on the progress channel, not the result one: a bare
+# print() from a dependency used to land on stdout ahead of the JSON line and
+# cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
+# points at stderr, so anything a library prints is progress output.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
 
 DET_MIN, BBOX_MIN, YAW_MAX = 0.50, 0.06, 40.0
 
@@ -44,11 +52,11 @@ def main() -> int:
     try:
         req = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError as e:
-        print(json.dumps({"ref_ok": False, "results": {}, "error": f"bad json: {e}"})); return 1
+        print(json.dumps({"ref_ok": False, "results": {}, "error": f"bad json: {e}"}), file=_OUT); return 1
     ref = req.get("ref"); images = [str(p) for p in (req.get("images") or [])]
     models_root = req.get("models_root") or None
     if not ref or not images:
-        print(json.dumps({"ref_ok": False, "results": {}, "error": "missing ref/images"})); return 1
+        print(json.dumps({"ref_ok": False, "results": {}, "error": "missing ref/images"}), file=_OUT); return 1
 
     import numpy as np, cv2
     from insightface.app import FaceAnalysis
@@ -63,7 +71,7 @@ def main() -> int:
         # Un crash de chargement (modeles absents/corrompus) doit sortir en JSON
         # propre — pas en traceback muet que le parent resume en « pas de JSON ».
         print(json.dumps({"ref_ok": False, "results": {},
-                          "error": f"model load failed: {type(e).__name__}: {e}"}))
+                          "error": f"model load failed: {type(e).__name__}: {e}"}), file=_OUT)
         return 1
     import onnxruntime as ort
     _log(f"[face] providers: {ort.get_available_providers()}")
@@ -106,7 +114,7 @@ def main() -> int:
     ref_emb = ref_res.pop("_emb", None)
     if ref_emb is None:
         print(json.dumps({"ref_ok": False, "results": {},
-                          "error": f"ref unusable: {ref_res.get('state')}"})); return 1
+                          "error": f"ref unusable: {ref_res.get('state')}"}), file=_OUT); return 1
 
     results = {}
     for i, p in enumerate(images, 1):
@@ -119,7 +127,7 @@ def main() -> int:
         except Exception as e:
             results[p] = {"state": "error", "error": str(e)}
             _log(f"[face] {i}/{len(images)} ERROR {e}")
-    print(json.dumps({"ref_ok": True, "results": results}))
+    print(json.dumps({"ref_ok": True, "results": results}), file=_OUT)
     return 0
 
 

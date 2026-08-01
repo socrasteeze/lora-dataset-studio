@@ -3608,13 +3608,10 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
             'free again. If you pointed ✨ Score at another Python, that '
             'interpreter may be stalling on CUDA start-up: close ComfyUI and '
             'retry, or use "Back to the app default".')
-    line = next((ln for ln in reversed(stdout.splitlines())
-                 if ln.strip().startswith('{')), '')
-    try:
-        data = json.loads(line) if line else {}
-    except json.JSONDecodeError:
-        data = {}
-    return data, stderr_tail, proc.returncode
+    # Same tolerant read the peer uses — one parser, so a script that works here
+    # cannot fail there for the reason a dependency printed a banner.
+    from .infer_stream import parse_result_json
+    return parse_result_json(stdout) or {}, stderr_tail, proc.returncode
 
 
 # --- subject (face) pass ----------------------------------------------------
@@ -3703,7 +3700,10 @@ def _faces_job(bank_id, device_id=None):
                                                'abort; partial work on it was '
                                                'discarded')
                 return
-            stderr_tail, returncode = [], 0
+            # No exit code to report: nothing ran in this process. A remote
+            # result LDS cannot read has already raised inside run_remote_pass,
+            # naming the machine — never as a fabricated "(rc=0)".
+            stderr_tail, returncode = [], None
         else:
             # Device: 'cpu' (default, never touches the GPU/ComfyUI) or 'cuda'.
             # 'auto' = GPU when the face interpreter actually exposes CUDA
@@ -3735,8 +3735,9 @@ def _faces_job(bank_id, device_id=None):
             return
         if not data.get('ok'):
             tail = data.get('error') or (stderr_tail[-1] if stderr_tail else '')
-            raise RuntimeError(tail or f'face pass produced no output '
-                                       f'(rc={returncode})')
+            raise RuntimeError(tail or 'face pass produced no output'
+                               + (f' (rc={returncode})'
+                                  if returncode is not None else ''))
         results = data.get('results') or {}
         clusters = data.get('clusters') or {}
         done = 0
@@ -3975,7 +3976,8 @@ def _score_job(bank_id, device_id=None):
                                                'abort; partial work on it was '
                                                'discarded')
                 return
-            stderr_tail, returncode = [], 0
+            # See the faces pass: a remote run has no exit code of its own.
+            stderr_tail, returncode = [], None
         else:
             payload = _json.dumps({
                 'images': paths,
@@ -4005,8 +4007,9 @@ def _score_job(bank_id, device_id=None):
             return
         if not data.get('ok'):
             tail = data.get('error') or (stderr_tail[-1] if stderr_tail else '')
-            raise RuntimeError(tail or f'scoring pass produced no output '
-                                       f'(rc={returncode})')
+            raise RuntimeError(tail or 'scoring pass produced no output'
+                               + (f' (rc={returncode})'
+                                  if returncode is not None else ''))
         results = data.get('results') or {}
         clusters = data.get('clusters') or {}
         done = 0

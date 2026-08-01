@@ -70,18 +70,10 @@ _NOISE_MARKERS = ('%|', 'it/s]', 'KB/s]', 'MB/s]', 'B/s]')
 
 def _script_error(stdout) -> str | None:
     """The error the infer script itself reported, if it exited as clean JSON."""
-    text = (stdout or '').strip()
-    if not text:
-        return None
-    # The scripts print ONE JSON line; a stray log line before it must not
-    # defeat the parse, so try the last non-empty line too.
-    for candidate in (text, text.splitlines()[-1].strip()):
-        try:
-            obj = json.loads(candidate)
-        except (TypeError, ValueError):
-            continue
-        if isinstance(obj, dict) and obj.get('error'):
-            return str(obj['error'])[:400]
+    from ..services import infer_stream
+    obj = infer_stream.parse_result_json(stdout)
+    if isinstance(obj, dict) and obj.get('error'):
+        return str(obj['error'])[:400]
     return None
 
 
@@ -606,10 +598,23 @@ class PeerWorker:
                              f'peer ({detail})')
                 self._complete(job_id, error=f'infer exit {rc}: {detail}')
                 return
-            try:
-                result_obj = json.loads(stdout) if stdout.strip() else {}
-            except json.JSONDecodeError:
-                result_obj = {'stdout': stdout}
+            # Tolerant on purpose: a script's dependencies print to stdout too
+            # (InsightFace names every model it resolves), so the result is the
+            # last JSON line, not the whole buffer. Parsing the buffer meant a
+            # perfectly good faces pass came home as {'stdout': '…'} — no `ok`,
+            # no `error` — and the hub reported "produced no output" over a
+            # result that was sitting right there.
+            result_obj = infer_stream.parse_result_json(stdout)
+            if result_obj is None:
+                # rc says success but nothing here is readable: that is a FAILED
+                # job, not a completed one. Saying so with the peer's own output
+                # beats shipping a placeholder the hub can only guess at.
+                detail = (_useful_stderr(stderr_lines)
+                          or (stdout or '').strip()[-300:]
+                          or 'no output at all')
+                self._complete(job_id, error=f'infer exited 0 but printed no '
+                                            f'readable result: {detail}')
+                return
 
             result_path = work / 'infer_result.json'
             result_path.write_text(json.dumps(result_obj), encoding='utf-8')

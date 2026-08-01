@@ -12,6 +12,14 @@ import json
 import os
 import sys
 
+# Library banners belong on the progress channel, not the result one: a bare
+# print() from a dependency used to land on stdout ahead of the JSON line and
+# cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
+# points at stderr, so anything a library prints is progress output.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
+
 
 def _log(msg):
     print(msg, file=sys.stderr, flush=True)
@@ -23,7 +31,7 @@ def main() -> int:
         images = payload.get('images') or []
         out_dir = payload['out_dir']
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"payload: {e}"}))
+        print(json.dumps({"ok": False, "error": f"payload: {e}"}), file=_OUT)
         return 1
     os.makedirs(out_dir, exist_ok=True)
     try:
@@ -31,7 +39,7 @@ def main() -> int:
         from rembg import new_session, remove
         session = new_session('u2net', providers=['CPUExecutionProvider'])
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"rembg init: {e}"}))
+        print(json.dumps({"ok": False, "error": f"rembg init: {e}"}), file=_OUT)
         return 1
     results, written = {}, 0
     for i, p in enumerate(images, 1):
@@ -45,7 +53,7 @@ def main() -> int:
         except Exception as e:
             results[p] = f'error: {e}'
         _log(f'[mask] {i}/{len(images)} {results[p]}')
-    print(json.dumps({"ok": True, "written": written, "results": results}))
+    print(json.dumps({"ok": True, "written": written, "results": results}), file=_OUT)
     return 0
 
 
