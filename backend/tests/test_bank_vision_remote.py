@@ -270,3 +270,75 @@ def test_a_peer_that_cannot_caption_falls_back_here_and_says_so(
 
     assert job['error'] is None, job['error']
     assert ran_locally['n'] == 2, 'it did not fall back to the local captioner'
+
+
+# --- a remote pass must not touch this machine's model -----------------------
+
+@pytest.mark.parametrize('which', ['framing', 'watermark'])
+def test_a_remote_pass_does_not_unload_the_local_vision_model(
+        app, tmp_path, peer, monkeypatch, which):
+    """It loaded nothing here, so it has nothing to hand back.
+
+    The unload sat in an unconditional `finally` that stayed outside the branch
+    when the local/remote sources were split. Today that costs a needless
+    reload; once a local and a remote bank can run at once it would evict the
+    LOCAL pipeline's hot model mid-run.
+    """
+    from app.services import image_bank_service as banks
+    from app.services import vision_ollama
+
+    peer['answer'] = ('{"framing": "face"}' if which == 'framing'
+                      else '{"watermark": false}')
+    unloaded = {'n': 0}
+    monkeypatch.setattr(vision_ollama, 'unload_vision_model',
+                        lambda *a, **k: unloaded.update(n=unloaded['n'] + 1))
+
+    start = banks.start_framing if which == 'framing' else banks.start_watermark
+    with app.app_context():
+        bank, _ = banks.create_bank('local', 'NoUnload', str(_two_same_named(tmp_path)))
+        job = start(app, 'local', bank.id, rescan=True, device_id=PEER)
+
+    assert job['error'] is None, job['error']
+    assert unloaded['n'] == 0, (
+        'a pass that ran entirely on the peer unloaded THIS machine\u2019s model')
+
+
+def test_the_caption_fallback_re_checks_this_machine_before_taking_its_gpu(
+        app, tmp_path, monkeypatch):
+    """_run_pipeline_step skips the local caption prereq AND the GPU check the
+    moment a device is picked. So when the pass falls back to the hub — which it
+    does for a peer that has merely never heartbeated, not just one with no
+    captioner — those gates have to be re-applied, or a "remote" pass seizes the
+    local card having verified nothing."""
+    from app.extensions import db
+    from app.models import ClusterDevice
+    from app.services import image_bank_service as banks
+
+    import contextlib
+
+    took_window = {'n': 0}
+
+    def _spy_window(**_kw):
+        took_window['n'] += 1
+        return contextlib.nullcontext()
+
+    monkeypatch.setattr('app.gpu_window.gpu_exclusive_vision_window', _spy_window)
+    monkeypatch.setattr(banks, '_gpu_busy_reason',
+                        lambda: 'a vision/GPU pass is already running')
+
+    with app.app_context():
+        # never heartbeated -> capabilities NULL -> _peer_caption_kind is None
+        db.session.add(ClusterDevice(id=PEER, name='Laptop', auth_token_hash='x'))
+        db.session.commit()
+        bank, _ = banks.create_bank('local', 'CapGate', str(_two_same_named(tmp_path)))
+        job = banks._caption_job(bank.id, None, False, device_id=PEER)
+        job_dict = {'kind': 'caption', 'done': 0, 'total': 0, 'error': None,
+                    'cancelled': False, 'finished': False, 'detail': None,
+                    'started_at': 0, '_touched': 0, '_cancel_hook': None,
+                    'pipeline': None, 'device': None}
+        job(job_dict)
+
+    assert took_window['n'] == 0, (
+        'the fallback took the local GPU window while it was already held')
+    assert job_dict['error'], 'it silently did nothing instead of refusing'
+    assert 'captioner' in job_dict['error']

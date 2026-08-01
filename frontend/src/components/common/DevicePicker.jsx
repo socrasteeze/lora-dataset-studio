@@ -37,6 +37,25 @@ export default function DevicePicker({ value, onChange, kind = 'comfy', classNam
     return () => { cancelled = true }
   }, [kind])
 
+  // The saved id is ONE global key shared by every picker, and the surfaces do
+  // not agree on what is eligible: a ComfyUI backend picked for generation is
+  // not offerable for a bank pass. With no matching <option> the browser paints
+  // the FIRST one — "this machine" — while the value stays the backend id, so
+  // the dialog said local and posted a peer (a 400 the user could not explain).
+  // Worse when nothing is eligible at all: the picker does not render, and the
+  // stale id is still posted with no control to correct it.
+  //
+  // So reconcile: an id this picker cannot offer falls back to local, visibly,
+  // and tells the parent so what is SHOWN is what will be sent.
+  useEffect(() => {
+    if (devices == null || !value || value === 'local') return
+    const offerable = devices.some((d) => d.id === value && (kind !== 'bank-pass' || !d.backend))
+    if (!offerable) {
+      saveDeviceId('local')
+      onChange?.('local')
+    }
+  }, [devices, value, kind, onChange])
+
   if (devices == null) return null
   // 'bank-pass' = the bank's Score/Faces passes: they need the FULL app on the
   // other machine (its scoring stacks), so API backends — bare ComfyUI — are
