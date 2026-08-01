@@ -387,6 +387,8 @@ def test_launch_refuses_when_concept_slider_extension_missing(app, tmp_path, mon
     root = tmp_path / 'aitoolkit'
     (root / 'venv' / 'Scripts').mkdir(parents=True)
     (root / 'venv' / 'Scripts' / 'python.exe').write_text('fake')
+    (root / 'venv' / 'bin').mkdir(parents=True, exist_ok=True)
+    (root / 'venv' / 'bin' / 'python').write_text('fake')
     (root / 'run.py').write_text('fake')
     (root / 'extensions_built_in' / 'sd_trainer').mkdir(parents=True)
     (root / 'extensions_built_in' / 'sd_trainer' / '__init__.py').write_text(

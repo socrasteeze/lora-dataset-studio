@@ -5,7 +5,7 @@ Klein generation. The inventory of that delivery found three more lanes still
 calling into Klein with `klein_model=None` — i.e. running on a model nobody
 named, and silently swapping in another one when a named model went missing:
 
-  1. the LOCAL reference edit (`_start_local_reference_edit`);
+  1. the LOCAL reference edit (`_enqueue_local_reference_edit`);
   2. the rescue of scraped images under 768 px (`_save_small_scrape_pair`);
   3. the watermark inpaint (`watermark_klein._run_klein_job`), which called
      `resolve_klein_unet()` with no argument at all.
@@ -34,6 +34,20 @@ from PIL import Image
 _VALID_ST = struct.pack('<Q', 2) + b'{}'
 KLEIN_FILE = 'flux-2-klein-9b-fp8.safetensors'
 OTHER_FILE = 'flux-2-klein-32b-heavy.safetensors'
+
+
+def _batch_token(dataset_id):
+    """Register a one-engine batch and hand back its candidate token.
+
+    The enqueue attaches the queue job to a LIVE registry entry and raises if it
+    finds none, so a bare string here would fail as "superseded" rather than
+    exercising the model-resolution this file is about.
+    """
+    from app.services import reference_edit_jobs
+    from app.services import face_dataset_service as svc_
+    started = reference_edit_jobs.start_batch(
+        dataset_id, svc_._dataset_dir(dataset_id), ('klein',), 'x')
+    return started['tokens']['klein']
 
 
 def _png(size=(96, 64)):
@@ -95,8 +109,13 @@ def lanes(app, monkeypatch):
             with open(os.path.join(svc._dataset_dir(ds.id), 'ref.png'), 'wb') as fh:
                 fh.write(_png())
             svc.db.session.commit()
-            svc._start_local_reference_edit(LOCAL_USER, ds.id, ds, 'klein',
-                                            'make it sharper')
+            # The batch restructure moved the snapshotting into the caller, so
+            # the enqueue now takes the token and the resolved ref PATH rather
+            # than deriving them. The lane under test is unchanged.
+            svc._enqueue_local_reference_edit(
+                LOCAL_USER, ds.id, ds, 'klein', 'make it sharper',
+                _batch_token(ds.id),
+                os.path.join(svc._dataset_dir(ds.id), 'ref.png'), [])
             return ds
 
         @staticmethod
@@ -145,7 +164,9 @@ def test_reference_edit_refuses_a_vanished_model_by_name(app, tmp_path):
         svc.set_dataset_klein_model(LOCAL_USER, ds.id, OTHER_FILE)
 
         with pytest.raises(ValueError) as exc:
-            svc._start_local_reference_edit(LOCAL_USER, ds.id, ds, 'klein', 'sharper')
+            svc._enqueue_local_reference_edit(
+                LOCAL_USER, ds.id, ds, 'klein', 'sharper', _batch_token(ds.id),
+                os.path.join(svc._dataset_dir(ds.id), 'ref.png'), [])
         assert OTHER_FILE in str(exc.value)
 
 

@@ -3352,7 +3352,7 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt,
     branches on `engine in LOCAL_ENGINES`. The API engines are removed here
     (Divergence 1), so that branch would be dead in the always-true direction:
     it is DELETED rather than left in place, per the Divergence-1b trap. Every
-    edit is queued; see _start_local_reference_edit.
+    edit is queued; see _enqueue_local_reference_edit.
 
     `app` is accepted and unused, matching upstream's signature so the route and
     the tests stay shaped the same on both sides — the API lane needed it for the
