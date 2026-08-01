@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-01-peer-passes-resume-instead-of-starting-over',
+    date: '2026-08-01',
+    title: 'A pass run on another machine is no longer paid for twice',
+    blurb:
+      'Sending ✨ Score or 👥 Group by person to a second machine used to redo the whole bank every time — and worse, the results it sent back overwrote this machine’s embeddings cache with a version nothing could read, so even local re-runs started from zero. The cache now travels both ways: the other machine is told what is already done, computes only the rest, and the images it can skip are not uploaded at all. Pressing Stop now waits a moment for it to hand back what it finished, and the bank tells you how much was kept. One catch, worth knowing: banks already scored on another machine carry a cache that cannot be repaired, so they pay for one more full pass before this starts saving you anything.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-01-peer-passes-stop-throwing-away-their-own-results',
     date: '2026-08-01',
     title: 'Passes sent to another machine no longer fail after doing all the work',

@@ -503,6 +503,15 @@ class PeerWorker:
                     stdin_payload[key] = str(local)
                     if key == 'cancel_file':
                         cancel_sentinel = local
+                    elif local.name in downloaded:
+                        # The Primary sent its OWN cache along: seed the script
+                        # with it so it recomputes only what is missing. Without
+                        # this the peer starts empty and re-embeds a bank the
+                        # hub had already done — and, because the Primary skips
+                        # uploading images the cache covers, would also find
+                        # those files absent. Copy, never move: out/ is uploaded
+                        # back and the download is the peer's only copy.
+                        shutil.copyfile(str(downloaded[local.name]), str(local))
             # Rewrite any hub-side paths the Primary embedded to local downloads.
             path_map = {os.path.basename(n): str(p) for n, p in downloaded.items()}
             if 'images' in stdin_payload and isinstance(stdin_payload['images'], list):

@@ -6,6 +6,8 @@ STDOUT before the result line, the peer parsed the whole buffer as JSON, and the
 so the hub raised "face pass produced no output (rc=0)" over a result that was
 sitting in the artifact, fully computed."""
 import json
+import os
+from pathlib import Path
 
 import pytest
 
@@ -79,3 +81,40 @@ def test_a_clean_json_failure_still_reports_the_script_reason(monkeypatch, peer)
 
     assert 'model load failed: antelopev2' in (done.get('error') or '')
     assert '352210' not in done['error']
+
+
+def test_the_peer_seeds_the_script_with_the_cache_the_hub_sent(
+        app, monkeypatch, tmp_path):
+    """The other half of "do not pay twice": the Primary ships its .npz, and the
+    peer must put it where the script looks. Without this the peer starts empty,
+    re-embeds a bank the hub had already done — and, since the Primary now skips
+    uploading images the cache covers, would find those files missing too."""
+    sent = tmp_path / 'face_cache.npz'
+    sent.write_bytes(b'NPZ-FROM-THE-HUB')
+    seen = {}
+
+    monkeypatch.setattr(peer_worker, '_download_artifacts',
+                        lambda job_id, names, work: {'face_cache.npz': sent})
+    monkeypatch.setattr(peer_worker, '_upload_artifact',
+                        lambda job_id, path, name=None: name or path.name)
+    monkeypatch.setattr(peer_worker, '_progress', lambda job_id, data: {})
+    monkeypatch.setattr(peer_worker, '_complete', lambda job_id, **kw: None)
+
+    def fake_run(python, script, stdin_json, timeout, on_line=None, **_kw):
+        payload = json.loads(stdin_json)
+        seen['cache'] = payload['cache']
+        seen['seeded'] = Path(payload['cache']).read_bytes()
+        return json.dumps(RESULT), [], 0, False
+
+    monkeypatch.setattr(infer_stream, 'run_infer_script', fake_run)
+    peer_worker.init_app(app)
+    peer_worker._run_infer({
+        'job_id': 'job-seed', 'kind': 'infer',
+        'artifacts': ['face_cache.npz'],
+        'payload': {'script': 'face_embed_infer.py',
+                    'stdin': {'images': [], 'cache': 'C:/hub/face_cache.npz'}}})
+
+    assert seen['seeded'] == b'NPZ-FROM-THE-HUB', \
+        'the script was started with an empty cache'
+    assert seen['cache'].replace(os.sep, '/').endswith('out/face_cache.npz'), \
+        'the cache must stay inside out/, which is what rides home'
