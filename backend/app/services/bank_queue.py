@@ -6,11 +6,25 @@ missing is a way to LINE UP several banks and walk away: today a second bank's
 GPU pass launched while another is running is simply rejected (503), not queued.
 
 This module is that queue. A module-level FIFO holds "run this bank's pipeline"
-requests; ONE global worker thread drains it, starting each bank's pipeline only
-once the bank has no live job AND the GPU is free — so a queued bank WAITS its
-turn instead of being turned away. Each run reuses the existing
+requests; ONE WORKER PER MACHINE drains it, starting each bank's pipeline only
+once the bank has no live job AND (locally) the GPU is free — so a queued bank
+WAITS its turn instead of being turned away. Each run reuses the existing
 ``image_bank_service.start_pipeline`` verbatim, so per-bank progress, the Stop
 button and the pipeline report all behave exactly as a direct launch.
+
+**One lane per device.** This machine is one lane and stays strictly serial:
+two local banks never overlap, exactly as before. Each distinct compute peer
+gets its own lane, so a bank sent there runs ALONGSIDE local work rather than
+behind it — which is the entire point of having a second machine, and was not
+true while a single thread drained everything. One lane per peer and no more,
+because a peer pulls one job at a time (peer_worker): two lanes aimed at one
+peer would not run in parallel, they would queue over there, out of sight of
+this queue's own reporting.
+
+**A merged group is one unit.** Its members are queued as N independent entries
+(the routes expand it with bank_groups.member_ids), but the user sees ONE card —
+so the lanes must never work two of them at once, or that card would show two
+conflicting states. See _unit_of.
 
 Same contract as ``bank_jobs``:
 * **In-memory ONLY** — the queue dies with the process; a restart starts empty
@@ -30,7 +44,19 @@ logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _queue: list = []              # ordered list of entries (see enqueue())
 _worker_lock = threading.Lock()
-_worker: threading.Thread | None = None
+# One worker per LANE, keyed by lane id — see _lane_of. There used to be exactly
+# one, which is why a bank sent to a peer sat behind local work: the remote entry
+# already skipped the local-GPU gate, but it still had to wait for the single
+# thread, so renting the second machine bought nothing in wall-clock.
+_workers: dict = {}
+
+# The lane the current worker serves. A thread-local rather than an argument so
+# _process_next(app) stays a one-arg module-level callable — four test files stub
+# it and two call it directly on a bare thread. Unset (the TESTING inline drain,
+# which has no worker thread) means "any lane".
+_current = threading.local()
+
+_LOCAL_LANE = 'local'
 
 # How often the worker re-checks whether the next bank can start (GPU free /
 # bank idle). Module-level so tests can drop it to 0 for a synchronous drain.
@@ -72,6 +98,32 @@ def _normalized_device(device_id):
         return None
 
 
+def _device_label(device_id):
+    """A peer's display name, or None for this machine. Never fatal — a queue
+    that cannot name a device must still list it."""
+    if not device_id:
+        return None
+    try:
+        from . import cluster as cluster_svc
+        return cluster_svc.device_label(device_id)
+    except Exception:      # noqa: BLE001
+        return None
+
+
+def _group_key_of(user_id, bank_id):
+    """The merged-group key for a bank, or None. Never fatal: a queue that
+    cannot read the group must still queue the bank — it just loses the
+    group-level exclusion for it, and a bank is always its own unit."""
+    try:
+        from ..models import ImageBank
+        from . import bank_groups
+        bank = ImageBank.query.filter_by(id=bank_id, user_id=user_id).first()
+        return bank_groups.group_key(bank)
+    except Exception:      # noqa: BLE001
+        logger.debug('bank_queue: could not read the group key', exc_info=True)
+        return None
+
+
 def _find(bank_id):
     """The live entry for a bank (pending or running), or None. Caller holds _lock."""
     for e in _queue:
@@ -97,6 +149,11 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
     # dropped the entry with a log line and no toast. From the user's side the
     # row simply vanished from the panel. Same refusal, same wording, now at the
     # moment they can act on it.
+    # Read the group BEFORE _lock: _claim_next runs under that lock and must
+    # never issue a query there. The cost is that a rename between enqueueing
+    # and running is not seen — the group rule then treats the bank as its own
+    # unit, which is the safe direction (it can only ever run alone).
+    group_key = _group_key_of(user_id, bank_id)
     device_id = _normalized_device(device_id)
     if device_id:
         banks._remote_pass_device(device_id)      # raises ValueError on a backend id
@@ -110,6 +167,11 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
         entry = {'bank_id': bank_id, 'user_id': user_id, 'steps': list(steps),
                  'reject_flags': reject_flags, 'resolve_dups': bool(resolve_dups),
                  'device_id': device_id,
+                 # Which merged group this bank belongs to, so the lanes cannot
+                 # split one card across two machines. Server-derived, never
+                 # client-supplied — the same rule bank_groups.member_ids
+                 # documents for the queue and promote routes.
+                 'group_key': group_key,
                  'enqueued_at': time.time(), 'state': 'pending'}
         _queue.append(entry)
         position = len(_queue)
@@ -136,9 +198,9 @@ def enqueue_many(app, user_id, bank_ids, steps=None, reject_flags=None,
     point is per-bank and never aborts the batch — a bank already in the queue is
     skipped by name, not treated as a failure of the whole request.
 
-    No queue-engine change: this loops the same enqueue(), and _process_next
-    still starts one bank at a time once the previous is done and the GPU is
-    free. Queueing twelve banks is twelve entries, not twelve concurrent runs.
+    No queue-engine change: this loops the same enqueue(). Queueing twelve
+    banks is twelve entries, not twelve concurrent runs — they still drain one
+    at a time per machine, and everything aimed at this machine is one lane.
     """
     from . import image_bank_service as banks
     steps = banks._sanitize_pipeline_steps(steps)
@@ -161,18 +223,45 @@ def enqueue_many(app, user_id, bank_ids, steps=None, reject_flags=None,
     return {'queued': queued, 'skipped': skipped}
 
 
+def _lane_of(entry) -> str:
+    """Which machine's lane this entry belongs to.
+
+    Derived, never stored: ``device_id`` is already folded to None for every
+    spelling of "this machine" by _normalized_device, so there is no new entry
+    key and the hand-built entry dicts in the tests keep working untouched.
+    """
+    return entry.get('device_id') or _LOCAL_LANE
+
+
+def _unit_of(entry) -> str:
+    """The thing that may only be worked by one machine at a time.
+
+    A merged group is presented to the user as ONE card, so its members must
+    never run on two machines at once — the card would show two conflicting
+    states. Members are queued as N independent entries (routes/bank.py expands
+    the group with bank_groups.member_ids), so without this the lanes would
+    happily split them. An ungrouped bank is a group of one, which is why this
+    is a key and not a special case.
+    """
+    key = entry.get('group_key')
+    return f'group:{key}' if key else f'bank:{entry["bank_id"]}'
+
+
 def _ensure_worker(app):
-    """Start the single global worker thread if it isn't already running."""
-    global _worker
+    """Start a worker for every lane that has work and no live thread."""
     with _worker_lock:
-        if _worker is not None and _worker.is_alive():
-            return
-        _worker = threading.Thread(target=_worker_loop, args=(app,),
-                                   name='bank-queue', daemon=True)
-        _worker.start()
+        for lane in {_lane_of(e) for e in list(_queue)}:
+            live = _workers.get(lane)
+            if live is not None and live.is_alive():
+                continue
+            t = threading.Thread(target=_worker_loop, args=(app, lane),
+                                 name=f'bank-queue:{lane}', daemon=True)
+            _workers[lane] = t
+            t.start()
 
 
-def _worker_loop(app):
+def _worker_loop(app, lane):
+    _current.lane = lane
     with app.app_context():
         _drain(app)
 
@@ -186,12 +275,43 @@ def _drain(app):
         pass
 
 
-def _next_pending():
-    """The head pending entry, or None. Caller holds _lock."""
-    for e in _queue:
-        if e['state'] == 'pending':
+def _claim_next(lane=None):
+    """Select AND claim the head runnable entry of ``lane``, or None.
+
+    Selecting without claiming is what made the old single worker unsafe to
+    duplicate: _next_pending returned an entry that stayed 'pending' for the
+    whole wait loop, so two workers would get the SAME object, both pass the
+    identity check, both set state='running', and the loser's BankJobBusy
+    handler would reset it to 'pending' while the winner was running it.
+
+    ``lane=None`` considers every lane — that is the TESTING inline drain, which
+    has no worker thread and therefore no thread-local.
+
+    Pure enough to test without threads: two calls in a row must never return
+    the same entry.
+    """
+    with _lock:
+        busy_lanes = {_lane_of(e) for e in _queue
+                      if e['state'] == 'running' or e.get('claimed')}
+        busy_units = {_unit_of(e) for e in _queue
+                      if e['state'] == 'running' or e.get('claimed')}
+        for e in _queue:
+            if e['state'] != 'pending' or e.get('claimed'):
+                continue
+            if lane is not None and _lane_of(e) != lane:
+                continue
+            if _lane_of(e) in busy_lanes or _unit_of(e) in busy_units:
+                continue
+            e['claimed'] = True
             return e
     return None
+
+
+def _lane_has_pending(lane) -> bool:
+    """Does this lane have work it just cannot claim right now?"""
+    with _lock:
+        return any(e['state'] == 'pending' and not e.get('claimed')
+                   and _lane_of(e) == lane for e in _queue)
 
 
 def _process_next(app) -> bool:
@@ -199,11 +319,18 @@ def _process_next(app) -> bool:
     entry (so the loop should continue), False when nothing is left to do."""
     from . import bank_jobs
     from . import image_bank_service as banks
-    with _lock:
-        entry = _next_pending()
-        if entry is None:
-            return False
-        bank_id = entry['bank_id']
+    lane = getattr(_current, 'lane', None)
+    entry = _claim_next(lane)
+    if entry is None:
+        # A lane can have work it cannot start YET — another lane is holding
+        # this merged group. Returning False here would end _drain and kill the
+        # worker, and nothing would restart it when the group frees up. Only a
+        # lane with nothing pending at all is actually done.
+        if lane is not None and _lane_has_pending(lane):
+            time.sleep(_POLL_SECONDS)
+            return True
+        return False
+    bank_id = entry['bank_id']
 
     # Wait until this bank has no live job AND the GPU is free. This is what lets
     # a queued bank wait its turn behind a manual launch or a training run,
@@ -255,10 +382,12 @@ def _process_next(app) -> bool:
                              device_id=entry.get('device_id'))
     except bank_jobs.BankJobBusy:
         # A manual launch grabbed the slot between our check and here — back to
-        # pending and let the next loop wait for it to clear.
+        # pending, claim RELEASED so the lane can pick it up again, and let the
+        # next loop wait for it to clear.
         with _lock:
             if _find(bank_id) is entry:
                 entry['state'] = 'pending'
+                entry['claimed'] = False
         time.sleep(_POLL_SECONDS)
         return True
     except (ValueError, RuntimeError) as e:
@@ -326,12 +455,20 @@ def snapshot() -> dict:
                   'steps': list(e['steps']), 'reject_flags': list(e['reject_flags']),
                   'resolve_dups': e['resolve_dups'], 'enqueued_at': e['enqueued_at'],
                   'device_id': e.get('device_id'),
+                  # The peer's NAME, so the panel can say where each bank runs
+                  # without a second fetch — now that two lanes can be running
+                  # at once, two identical "running" rows tell you nothing.
+                  'device_label': _device_label(e.get('device_id')),
                   # Why this entry has not started yet, or None. The panel shows
                   # it so a stalled queue explains itself instead of looking dead.
                   'waiting_for': e.get('waiting_for')}
                  for i, e in enumerate(_queue)]
-        running = next((e['bank_id'] for e in _queue if e['state'] == 'running'), None)
-    return {'running_bank_id': running, 'items': items}
+        running = [e['bank_id'] for e in _queue if e['state'] == 'running']
+    # running_bank_id stays for every existing reader, but it can only name one
+    # bank and there are now as many as there are machines — so publish the list
+    # too, and let new readers use it.
+    return {'running_bank_id': running[0] if running else None,
+            'running_bank_ids': running, 'items': items}
 
 
 def state_for(bank_id):
@@ -348,3 +485,5 @@ def reset():
     """Test helper: forget the whole queue (does not touch running threads)."""
     with _lock:
         _queue.clear()
+    with _worker_lock:
+        _workers.clear()

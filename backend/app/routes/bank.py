@@ -542,8 +542,8 @@ def bank_queue_all():
     built from the SERVER's counts; a client/server disagreement is then
     reported rather than hidden behind a number the client guessed.
 
-    Still one bank at a time — this queues twelve entries, it does not start
-    twelve runs. The worker's gate is untouched."""
+    Still one bank at a time per machine — this queues twelve entries, it does
+    not start twelve runs. Everything aimed at this machine is one lane."""
     data = request.get_json(silent=True) or {}
     try:
         bank_ids = banks.banks_needing_triage(LOCAL_USER)
@@ -582,7 +582,9 @@ def bank_group_queue(bank_id):
     The member list comes from the SERVER (bank_groups.member_ids), never from
     the request: a stale card — a rename in another tab, a bank deleted a second
     ago — would otherwise queue banks that no longer share a name. A group card
-    is a display device; the queue still runs one bank at a time."""
+    is a display device, and the queue keeps it one: however the members are
+    spread over machines, only ever one of them runs at a time (bank_queue's
+    _unit_of), or that single card would show two conflicting states."""
     data = request.get_json(silent=True) or {}
     members = bank_groups.member_ids(LOCAL_USER, bank_id)
     if not members:
