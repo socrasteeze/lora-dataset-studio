@@ -11,8 +11,13 @@ import { useJobs } from '../context/JobsContext';
 import { serializeWatermarkRegions } from '../utils/watermarkRegions';
 import { summarizeScrapeImport } from '../utils/smallImageRescue';
 import { trainingRunSelection } from '../utils/checkpointBrowser';
+import {
+  normalizeTrainingMode,
+  trainingModeSettingsPayload,
+} from '../utils/trainingMode.js';
 import { refreshDatasetIfActive } from '../utils/datasetRefresh';
 import { ENGINE_LABELS } from '../components/dataset/engineSelection.js';
+import { retryRequestForReferenceEdit } from '../components/dataset/referenceEdit.js';
 import { classifyResultMessage } from '../components/dataset/classifyFramingGate.js';
 
 function post(url, body, isForm) {
@@ -938,28 +943,44 @@ export function useDataset() {
 
   // ✦ Edit the reference. STARTS a server-side background job and returns at once
   // (202) — the render is slow, so it must NOT ride the client's fetch (a
-  // backgrounded mobile tab would kill it and lose the result). The candidate is
-  // rediscovered through the payload's `reference_edit`; refresh() here starts the
-  // activity poll that tracks it. Returns false (with a toast) on a start error;
-  // true once the job is queued.
+  // backgrounded mobile tab would kill it and lose the result). The candidate
+  // is rediscovered through the payload's `reference_edit`; refresh() here starts
+  // the activity poll that tracks it. Returns false (with a toast) on a start
+  // error; true once the job is queued.
   //
-  // No `files` parameter, unlike upstream: every engine here renders locally from
-  // file PATHS and the route refuses request-scoped bytes, so there is no transient
-  // upload to forward and the modal has no picker to produce one.
-  const editReference = useCallback(async (prompt, engine) => {
-    const retryRequest = { prompt, engine };
+  // `files` stays in the signature to match the route, but every engine here
+  // renders locally from file PATHS: the modal shows no picker, so the list is
+  // always empty and the service refuses a hand-made request that fills it.
+  const editReference = useCallback(async (
+    prompt, engineOrEngines, files = [], retryBatchId = null,
+  ) => {
+    const engines = [...new Set(
+      (Array.isArray(engineOrEngines) ? engineOrEngines : [engineOrEngines])
+        .filter(Boolean))];
+    if (!engines.length) {
+      toast.error('Select at least one edit engine');
+      return false;
+    }
+    const retryRequest = { prompt, engines, files: Array.from(files || []) };
     const fd = new FormData();
     fd.append('prompt', retryRequest.prompt);
-    fd.append('engine', retryRequest.engine);
+    retryRequest.engines.forEach((engine) => fd.append('engines', engine));
+    // Preserve the old one-engine request contract for older servers and direct
+    // clients. A real multi-engine batch uses only the repeated engines field.
+    if (retryRequest.engines.length === 1) fd.append('engine', retryRequest.engines[0]);
+    retryRequest.files.forEach((f) => fd.append('ref', f));
+    if (retryBatchId) fd.append('retry_batch_id', retryBatchId);
     const d = await postJson(`/api/dataset/${currentId}/ref/edit`, fd, true);
     if (!d.ok) { toast.error(d.error || 'Unexpected error'); return false; }
     // The server remembers the prompt and engine for display/recovery, but not
     // request-scoped File objects. This snapshot is therefore the only honest
     // way to offer an exact Retry without changing backend storage semantics.
-    referenceEditRetryRef.current.set(String(currentId), retryRequest);
-    bumpReferenceEditRetryRevision((revision) => revision + 1);
     const refreshed = await refresh();
-    if (refreshed?.status !== 'applied') {
+    const confirmedRetry = retryRequestForReferenceEdit(
+      { ...retryRequest, batchId: d.batch_id },
+      refreshed?.data?.reference_edit,
+    );
+    if (refreshed?.status !== 'applied' || !confirmedRetry) {
       // The request was accepted, but stale status makes another Retry unsafe:
       // remove the in-memory files and force the modal to disable it until refresh.
       referenceEditRetryRef.current.delete(String(currentId));
@@ -967,19 +988,31 @@ export function useDataset() {
       toast.warning('Edit queued, but its status could not be refreshed. Refresh the page before trying another edit.');
       return false;
     }
+    referenceEditRetryRef.current.set(String(currentId), confirmedRetry);
+    bumpReferenceEditRetryRevision((revision) => revision + 1);
     return true;
   }, [currentId, refresh, toast]);
 
   const retryReferenceEdit = useCallback(async () => {
-    const retryRequest = referenceEditRetryRef.current.get(String(currentId));
+    const retryRequest = retryRequestForReferenceEdit(
+      referenceEditRetryRef.current.get(String(currentId)),
+      data?.reference_edit,
+    );
     if (!retryRequest) return false;
-    return editReference(retryRequest.prompt, retryRequest.engine);
-  }, [currentId, editReference]);
+    return editReference(
+      retryRequest.prompt, retryRequest.engines, retryRequest.files,
+      retryRequest.batchId,
+    );
+  }, [currentId, data, editReference]);
 
   // Keep the ready candidate: the server atomically swaps the reference (old files
   // removed only after the new ones are on disk) and deletes the candidate.
-  const keepEditedReference = useCallback(async () => {
-    const d = await postJson(`/api/dataset/${currentId}/ref/edit/keep`, {});
+  const keepEditedReference = useCallback(async (engine = null, batchId = null) => {
+    const payload = {};
+    if (engine) payload.engine = engine;
+    if (batchId) payload.batch_id = batchId;
+    const d = await postJson(`/api/dataset/${currentId}/ref/edit/keep`,
+      payload);
     if (!d.ok) { toast.error(d.error || 'Unexpected error'); return false; }
     referenceEditRetryRef.current.delete(String(currentId));
     bumpReferenceEditRetryRevision((revision) => revision + 1);
@@ -1115,6 +1148,7 @@ export function useDataset() {
     const d = await postJson(`/api/dataset/${currentId}/train`,
       { base_model: opts.baseModel || '', variant: opts.variant || 'turbo',
         train_type: opts.trainType || 'zimage',
+        training_mode: normalizeTrainingMode(opts.trainingMode),
         allow_caption_mismatch: !!opts.allowCaptionMismatch,
         // Images sans caption : plus un mur — confirm « train anyway » dans
         // TrainingPanel (marqueur UNCAPTIONED:), même flux que le mismatch.
@@ -1162,6 +1196,49 @@ export function useDataset() {
     return r.ok ? await r.json() : null;
   }, [currentId]);
 
+  // Persists the adapter-vs-dense recipe independently from the other advanced
+  // settings. The server returns the canonical exact enum; callers use null as a
+  // rollback signal so a failed save never leaves the control lying.
+  const setDatasetTrainingMode = useCallback(async (trainingMode, selection = {}) => {
+    if (!currentId) {
+      toast.error('No dataset selected');
+      return null;
+    }
+    const payload = trainingModeSettingsPayload(trainingMode, selection);
+    let d;
+    try {
+      d = await postJson(`/api/dataset/${currentId}/train/settings`, payload);
+    } catch (error) {
+      toast.error(error?.message || 'Could not save the training mode');
+      return null;
+    }
+    if (!d.ok) {
+      toast.error(d.error || 'Could not save the training mode');
+      return null;
+    }
+    const saved = {
+      trainingMode: normalizeTrainingMode(d.training_mode || payload.training_mode),
+      trainType: d.train_type ?? selection.trainType,
+      baseModel: Object.prototype.hasOwnProperty.call(d, 'base_model')
+        ? d.base_model
+        : selection.baseModel,
+      variant: d.variant ?? selection.variant,
+      slider: d.slider ?? null,
+    };
+    // A family change must refresh the library grouping and the live dataset,
+    // just like setDatasetTrainType. Refresh is best-effort AFTER the atomic
+    // commit: a failed list poll must never make the caller roll back a save that
+    // the server already accepted.
+    if (selection.trainType !== undefined) {
+      try {
+        await Promise.all([fetchList(), refresh(currentId)]);
+      } catch {
+        toast.warning('Training recipe saved, but the dataset list could not be refreshed yet.');
+      }
+    }
+    return saved;
+  }, [currentId, fetchList, refresh, toast]);
+
   // Persiste un patch de réglages avancés ai-toolkit (rank / resolution /
   // save_every). Renvoie les réglages effectifs, ou null en cas d'échec.
   const setTrainSettings = useCallback(async (patch) => {
@@ -1204,6 +1281,8 @@ export function useDataset() {
       // safe-subset settings (cadence / preview prompts). Both optional.
       ...(opts.fromStep != null ? { from_step: opts.fromStep } : {}),
       ...(opts.overrides ? { overrides: opts.overrides } : {}),
+      resume_mode: opts.resumeMode || 'weights_only',
+      ...(opts.stateBundleId ? { state_bundle_id: opts.stateBundleId } : {}),
     };
     const d = await postJson(`/api/dataset/${currentId}/train/continue`, body);
     if (d.ok) toast.success(`Resumed from step ${d.resumed_from} → ${d.target_steps} — ComfyUI paused`);
@@ -1239,6 +1318,8 @@ export function useDataset() {
       allow_not_ready: !!opts.allowNotReady,
       ...(opts.fromStep != null ? { from_step: opts.fromStep } : {}),
       ...(opts.overrides ? { overrides: opts.overrides } : {}),
+      resume_mode: opts.resumeMode || 'weights_only',
+      ...(opts.stateBundleId ? { state_bundle_id: opts.stateBundleId } : {}),
       ...(opts.gpuName ? { gpu_name: opts.gpuName } : {}),
     };
     const d = await postJson(`/api/dataset/${currentId}/train/cloud/continue-local`, body);
@@ -1449,7 +1530,10 @@ export function useDataset() {
   const watermarkingLive = watermarking
     || actKind === 'watermark_detect' || actKind === 'watermark_clean';
   const busyLive = busy || !!activity;
-  const canRetryReferenceEdit = referenceEditRetryRef.current.has(String(currentId));
+  const canRetryReferenceEdit = Boolean(retryRequestForReferenceEdit(
+    referenceEditRetryRef.current.get(String(currentId)),
+    data?.reference_edit,
+  ));
 
 
   return { datasets, currentId, data, busy: busyLive, localBusy: busy, captioning: captioningLive,
@@ -1463,5 +1547,5 @@ export function useDataset() {
            backupEverything, backupJob, downloadBackup, openBackupsFolder, dismissBackup, restoreJob, dismissRestore,
            refresh, train, stopTraining, continueTraining, continueTrainingInCloud,
            listCheckpoints, importCheckpoint, deleteCheckpoint,
-           trainBaseInfo, setTrainSettings, prepareBase };
+           trainBaseInfo, setTrainSettings, setDatasetTrainingMode, prepareBase };
 }
