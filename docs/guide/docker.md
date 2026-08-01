@@ -6,7 +6,7 @@ LoRA Dataset Studio ships two Compose stacks:
 
 | Stack | Compose file | Includes | Default data |
 |---|---|---|---|
-| **API-only** | `docker-compose.yml` | Core app only | `./data-docker` |
+| **Curation-only** | `docker-compose.yml` | Core app only | `./data-docker` |
 | **GPU + ComfyUI** | `docker-compose.gpu.yml` | Core app, ML extras and ComfyUI in one NVIDIA container | `./data-docker-gpu` plus repo-local ComfyUI folders |
 
 The stacks use separate Compose project names and separate application data. Do not point both at the same `LDS_DATA`: two Flask processes must not share one SQLite database and `config.json`.
@@ -148,15 +148,18 @@ Rebuilding the image does not delete bind-mounted data. `docker compose down` re
 - Budget roughly **20 GB before model downloads**: the CUDA image and its persistent ComfyUI environment are both large. Model stacks add substantially more.
 - Building the LDS-side torch dependencies from the CPU wheel index can save several gigabytes, but Image Bank Score then runs on CPU; ComfyUI still owns the GPU.
 - **Ollama is not included.** Captioning, framing, head-crop and watermark detection need an Ollama on the host or another reachable machine. Configure `LDS_OLLAMA_URL`/the Compose host mapping, then test it in Settings.
-- **Local training is not included.** Connect ai-toolkit on the host where its filesystem is visible, or use cloud training. ComfyUI inside this image is for generation, Studio, Canvas generation and deployment.
+- **Training is not included at all.** Connect ai-toolkit on the host, where its filesystem is visible — there is no rented-GPU lane on this fork to fall back on. ComfyUI inside this image is for generation, Studio, Canvas generation and deployment.
 - Watermark inpainting is currently listed as unsupported in this Docker lane; model-free crop remains available. Track this and other boundaries in [Known limitations](known-limitations.md).
 - Immediately after a container recreate, an extra install can briefly fail while the launcher adopts the large internal virtual environment. The image already ships the ML extras; wait for the adoption message in the log before repairing an optional package.
 - Mounting your own `/userscripts_dir` shadows the LDS launcher shipped there. If only ComfyUI starts, remove that override.
 - Both published ports are unauthenticated at the container layer. LDS can gate its own remote UI; ComfyUI needs its own firewall, VPN or authenticated proxy if it is exposed.
 
-## API-only stack
+## Curation-only stack
 
-The smaller stack is useful for imports, API generation, manual curation/captions, scraping installed after launch, cloud training, backup and publishing:
+The smaller stack is useful for imports, manual curation and captions, scraping
+installed after launch, backup and publishing. It cannot generate images: this
+fork generates only through ComfyUI, which this stack does not contain, and it
+has no rented-GPU training lane either:
 
 ```bash
 cp .env.example .env

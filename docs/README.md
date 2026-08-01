@@ -15,7 +15,7 @@ This is the documentation index for LoRA Dataset Studio. The root [README](../RE
 
 | Guide | Covers |
 |---|---|
-| [README — Setup & install](../README.md#setup--install) | Windows launcher, manual venv, API-only Docker and the beginner GPU Docker path |
+| [README — Setup & install](../README.md#setup--install) | Windows launcher, manual venv, curation-only Docker and the beginner GPU Docker path |
 | [Docker guide](guide/docker.md) | GPU-container CLI, storage, existing ComfyUI data, UID/GID, DNS, updates, resources and limits |
 | [Settings reference](guide/settings-reference.md) | Every UI setting, dependency, model location, environment override and `config.json` key |
 | [Security policy](../SECURITY.md) | Threat model, safe network exposure and private vulnerability reporting |
