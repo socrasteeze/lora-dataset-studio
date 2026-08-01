@@ -50,6 +50,30 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-01-canvas-checkpoint-timeline-and-grid-export',
+    date: '2026-08-01',
+    title: 'Scrub a run’s checkpoints like a timeline, and export a comparison as one image',
+    blurb:
+      'Comparing what a run looked like at 500 steps versus 3000 meant opening saves one at a time and remembering the difference. The Canvas now plays a run’s checkpoints as a timeline you can scrub, so overtraining shows up as a change you watch rather than one you reconstruct. A group of pinned images can also be exported as a single labelled grid — the labels are baked into the image, so the comparison survives being pasted into Discord or a document. New filters narrow the board by model family when a canvas has grown past what fits on screen.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-01-exact-full-state-training-resume',
+    date: '2026-08-01',
+    title: 'Continue a run from exactly where it stopped, optimizer state and all',
+    blurb:
+      'Continuing from a checkpoint restarted the optimizer from scratch: the weights were right, but the momentum the run had built was gone, and the first stretch after a resume quietly relearned it. A checkpoint can now carry its full training state, and ▶ Continue offers Full state alongside Weights only — picking Full state resumes as if the run had never stopped. The choice is per checkpoint and the panel says which saves can offer it, because an older save has no bundle to restore and is honestly labelled weights-only rather than silently inheriting someone else’s optimizer.',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-08-01-compare-reference-edits-side-by-side',
+    date: '2026-08-01',
+    title: 'Run one reference edit on both engines and keep the better result',
+    blurb:
+      'Editing the reference photo meant picking Klein or Krea 2 Edit up front, waiting, and starting over on the other engine if you did not like it. Pick both and the edit runs on each, side by side, and you keep whichever result is better — the two renders queue on your GPU one after another, so the second lands later than the first. Both are free and local, as before. A failed engine reports on its own card instead of taking the whole edit down with it.',
+    to: '/datasets',
+  },
+  {
     id: '2026-07-31-bank-vision-passes-run-on-the-peer',
     date: '2026-07-31',
     title: 'Your second machine now does most of the bank work',
@@ -543,7 +567,7 @@ export const WHATS_NEW = [
     date: '2026-07-28',
     title: 'A Docker image that brings its own ComfyUI — and uses your GPU',
     blurb:
-      'The Docker image could not do the ComfyUI half of the app at all: no Klein or Z-Image generation, no Test Studio, no deploying a trained LoRA, because ComfyUI was a host-native tool the container could not see. A second image now runs ComfyUI inside the same container on your NVIDIA GPU, with the folder paths already filled in — start it with "docker compose -f docker-compose.gpu.yml up --build". The API-only image is unchanged for machines without a GPU. Two honest limits: it is a large download, about 20 GB before you download a single model, and local training still needs ai-toolkit on the host.',
+      'The Docker image could not do the ComfyUI half of the app at all: no Klein or Z-Image generation, no Test Studio, no deploying a trained LoRA, because ComfyUI was a host-native tool the container could not see. A second image now runs ComfyUI inside the same container on your NVIDIA GPU, with the folder paths already filled in — start it with "docker compose -f docker-compose.gpu.yml up --build". The curation-only image is unchanged for machines without a GPU. Two honest limits: it is a large download, about 20 GB before you download a single model, and local training still needs ai-toolkit on the host.',
   },
   {
     id: '2026-07-28-notifications-are-no-longer-hidden-behind-dialogs',
