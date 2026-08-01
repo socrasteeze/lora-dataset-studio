@@ -46,6 +46,14 @@ import json
 import os
 import sys
 
+# Library banners belong on the progress channel, not the result one: a bare
+# print() from a dependency used to land on stdout ahead of the JSON line and
+# cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
+# points at stderr, so anything a library prints is progress output.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
+
 # MUST match bank_score_infer.py — see the contract note above.
 MODEL_NAME = 'ViT-L-14'
 PRETRAINED = 'openai'
@@ -56,7 +64,7 @@ def _log(m):
 
 
 def _emit(obj):
-    print(json.dumps(obj), flush=True)
+    print(json.dumps(obj), flush=True, file=_OUT)
 
 
 def main() -> int:

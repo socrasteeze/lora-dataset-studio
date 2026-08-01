@@ -33,6 +33,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bank_image_guard import read_validated_bank_image  # noqa: E402
 from face_score_infer import _repair_nested_antelopev2  # noqa: E402
 
+# Library banners belong on the progress channel, not the result one: a bare
+# print() from a dependency used to land on stdout ahead of the JSON line and
+# cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
+# points at stderr, so anything a library prints is progress output.
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
+
 
 def _log(m):
     print(m, file=sys.stderr, flush=True)
@@ -139,12 +146,12 @@ def main() -> int:
         req = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError as e:
         print(json.dumps({'ok': False, 'results': {}, 'clusters': {},
-                          'error': f'bad json: {e}'}))
+                          'error': f'bad json: {e}'}), file=_OUT)
         return 1
     images = [str(p) for p in (req.get('images') or [])]
     if not images:
         print(json.dumps({'ok': False, 'results': {}, 'clusters': {},
-                          'error': 'no images'}))
+                          'error': 'no images'}), file=_OUT)
         return 1
     models_root = req.get('models_root') or None
     cache_path = req.get('cache') or None
@@ -184,7 +191,7 @@ def main() -> int:
             app.prepare(ctx_id=0 if used_gpu else -1, det_size=(640, 640))
         except Exception as e:  # noqa: BLE001 — must exit as clean JSON, not a mute traceback
             print(json.dumps({'ok': False, 'results': {}, 'clusters': {},
-                              'error': f'model load failed: {type(e).__name__}: {e}'}))
+                              'error': f'model load failed: {type(e).__name__}: {e}'}), file=_OUT)
             return 1
 
         def biggest(faces):
@@ -198,7 +205,7 @@ def main() -> int:
             cached = len(images) - len(todo)
             _write_count(cache_path, cached)
             print(json.dumps({'ok': True, 'cancelled': True,
-                              'cached': cached, 'remaining': len(todo)}))
+                              'cached': cached, 'remaining': len(todo)}), file=_OUT)
             return 0
         for i, p in enumerate(todo, 1):
             try:
@@ -253,7 +260,7 @@ def main() -> int:
                 cached = len(images) - len(todo) + i
                 _write_count(cache_path, cached)
                 print(json.dumps({'ok': True, 'cancelled': True,
-                                  'cached': cached, 'remaining': len(todo) - i}))
+                                  'cached': cached, 'remaining': len(todo) - i}), file=_OUT)
                 return 0
         if cache_path:
             _save_cache(cache_path, cache)
@@ -265,7 +272,7 @@ def main() -> int:
         results[p] = {'state': str(state), 'det': float(det), 'bbox_frac': float(bfrac)}
     clusters = _cluster(images, cache, threshold)
     print(json.dumps({'ok': True, 'results': results, 'clusters': clusters,
-                      'used_gpu': used_gpu}))
+                      'used_gpu': used_gpu}), file=_OUT)
     return 0
 
 

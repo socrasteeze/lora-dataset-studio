@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-01-peer-passes-stop-throwing-away-their-own-results',
+    date: '2026-08-01',
+    title: 'Passes sent to another machine no longer fail after doing all the work',
+    blurb:
+      '“Group by person” on a second machine ended in “face pass produced no output” — even though the pass had finished and the answer had already come home. The face model prints a few startup lines before its result, and those lines were enough to make the hub throw the whole thing away. It now reads the result the way it always did locally, so captions and scoring stop losing their work the same way. And when a machine really does come back with nothing, the error names that machine and quotes what it actually sent, instead of an exit code nothing ever observed.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-01-canvas-checkpoint-timeline-and-grid-export',
     date: '2026-08-01',
     title: 'Scrub a run’s checkpoints like a timeline, and export a comparison as one image',

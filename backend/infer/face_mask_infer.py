@@ -34,6 +34,14 @@ import json
 import os
 import sys
 
+# Library banners belong on the progress channel, not the result one: a bare
+# print() from a dependency used to land on stdout ahead of the JSON line and
+# cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
+# points at stderr, so anything a library prints is progress output.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
+
 # The face box InsightFace returns runs eyes-to-chin. Growing it around its centre
 # is what turns it into a head box; the upward bias buys the hair, which sits
 # entirely above that centre. Same two constants the app already uses to crop a
@@ -92,7 +100,7 @@ def main() -> int:
         expand = float(payload.get('expand') or 2.0)
         models_root = payload.get('models_root') or None
     except Exception as e:  # noqa: BLE001 — must exit as clean JSON, never a mute traceback
-        print(json.dumps({"ok": False, "error": f"payload: {e}"}))
+        print(json.dumps({"ok": False, "error": f"payload: {e}"}), file=_OUT)
         return 1
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
@@ -106,7 +114,7 @@ def main() -> int:
         from PIL import Image, ImageDraw, ImageFilter
         from insightface.app import FaceAnalysis
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"ok": False, "error": f"import: {type(e).__name__}: {e}"}))
+        print(json.dumps({"ok": False, "error": f"import: {type(e).__name__}: {e}"}), file=_OUT)
         return 1
 
     # antelopev2.zip ships a nested folder; reuse the repair the scoring script
@@ -129,7 +137,7 @@ def main() -> int:
         app = FaceAnalysis(**kwargs)
         app.prepare(ctx_id=-1, det_size=(640, 640))
     except Exception as e:  # noqa: BLE001
-        print(json.dumps({"ok": False, "error": f"model load failed: {type(e).__name__}: {e}"}))
+        print(json.dumps({"ok": False, "error": f"model load failed: {type(e).__name__}: {e}"}), file=_OUT)
         return 1
 
     def detect_all(img):
@@ -206,7 +214,7 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001 — one bad image must not kill the pass
             results[p] = {"state": "error", "error": str(e), "boxes": []}
             _log(f'[facemask] {i}/{len(images)} ERROR {e}')
-    print(json.dumps({"ok": True, "written": written, "results": results}))
+    print(json.dumps({"ok": True, "written": written, "results": results}), file=_OUT)
     return 0
 
 
