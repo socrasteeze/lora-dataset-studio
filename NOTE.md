@@ -1,9 +1,38 @@
 # Hand-off: pass coverage, identity-pass reuse, honest remote failures
 
-Spec only — no code changes on this branch yet. Written from a static read of
-`main`; line numbers may drift. Claims marked **[VERIFY]** are inferences that
-someone with the running app and real peer logs should confirm before
-implementing.
+> **Status on merge (2026-08-01). Parts 1 and 2 are DONE; Part 3 is the open
+> work.** This was written from a static read of an earlier `main`, and the
+> present tense below is now wrong for two of its three parts. Read it as a
+> record of the reasoning, not of the current code.
+>
+> * **Part 1 — identity-pass reuse: shipped** in `d3a39b87`. The root cause was
+>   worse than described: `_install_cache` wrote a fixed
+>   `paths/states/embs/sigs` schema, so a returned faces cache was missing
+>   `dets`/`bfracs`, unreadable by `face_embed_infer._load_cache` — and it
+>   OVERWROTE the good local cache. The hub now ships its cache to the peer and
+>   stops uploading the images it covers, and Stop waits for the peer to hand
+>   back what it finished.
+> * **Part 2 — honest remote failures: shipped** in `6ec8cefb`. The fabricated
+>   `rc=0` is gone, and the actual cause was the peer parsing its whole stdout
+>   buffer as JSON while InsightFace printed a banner ahead of the result.
+> * **Part 3 — pass coverage and "queue only what's missing": NOT started.**
+>   Everything from `## Part 3` down still stands.
+>
+> **One divergence worth knowing before implementing anything here.** Part 1
+> proposed an id-keyed cache with `sigs` and a version inside
+> `face_embed_infer.py`. That script was NOT changed. The hub re-keys the cache
+> to artifact names on the way out and blanks the signatures — the case
+> `_is_stale` already documents as never-stale — enforcing freshness itself,
+> against its own files, before an entry is shipped. Same outcome, without
+> editing a dedicated-interpreter script that cannot be run from the Flask venv.
+>
+> Not repairable by any of the above: caches already corrupted by the old
+> installer are missing arrays that were never uploaded. Those banks pay one
+> more full pass.
+
+Written from a static read of `main`; line numbers may drift. Claims marked
+**[VERIFY]** are inferences that someone with the running app and real peer logs
+should confirm before implementing.
 
 ## Why
 
@@ -306,5 +335,11 @@ Parts 1 and 2 are independently shippable.
 
 ## State
 
-Spec only. Nothing implemented. Branched from `main` so none of this touches
-the baseline until a part is built, tested and reviewed.
+Parts 1 and 2 are implemented and on `main` — see the status block at the top of
+this file for what actually shipped and where it diverged from the proposal.
+Part 3 is untouched: it is the largest surface here and the only part still
+worth reading as a plan rather than as history.
+
+Sequencing above is therefore spent. The remaining order is 3a (the coverage
+predicate table) → 3b (the aggregate query, whose plan is the one real
+performance risk) → 3c/3d → the UI.
