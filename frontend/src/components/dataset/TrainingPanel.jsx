@@ -62,6 +62,16 @@ import { DatasetVersionChip, RunIdChip } from './RunIdentityBadges';
 import {
   cloudGroupsFrom, localRunIdentity, runRowDomId,
 } from '../../utils/runIdentity';
+import {
+  TRAINING_MODE_FULL_TRANSFORMER,
+  TRAINING_MODE_LORA,
+  cloudTierEstimateView,
+  fullTransformerArtifactView,
+  fullTransformerUnavailableReason,
+  isFullTransformerEligible,
+  normalizeTrainingMode,
+  trainingModeLabel,
+} from '../../utils/trainingMode.js';
 
 // Plancher dur / recommandé par famille — miroir de TRAIN_MIN_IMAGES côté serveur
 // (le preflight reste l'autorité ; ceci ne sert qu'à désactiver le bouton tôt).
@@ -121,6 +131,102 @@ function timeAgo(iso) {
 // Family label for a checkpoint group header — mirrors CloudRunsPage's FAMILY_LABEL.
 const GROUP_FAMILY_LABEL = { zimage: 'Z-Image', krea: 'Krea 2', sdxl: 'SDXL', flux: 'FLUX.1', flux2klein: 'FLUX.2 Klein', anima: 'Anima' };
 const groupFamLabel = (f) => GROUP_FAMILY_LABEL[f] || f || 'LoRA';
+
+const FULL_ARTIFACT_TONE = {
+  success: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100',
+  error: 'border-rose-400/45 bg-rose-500/10 text-rose-100',
+  warning: 'border-amber-400/45 bg-amber-500/10 text-amber-100',
+  info: 'border-sky-400/40 bg-sky-500/10 text-sky-100',
+};
+
+function FullTransformerArtifactNotice({ run }) {
+  const view = fullTransformerArtifactView(run);
+  return (
+    <div role={view.tone === 'error' || view.tone === 'warning' ? 'alert' : 'status'}
+      className={`w-fit max-w-full rounded-lg border px-3 py-2 text-[0.6875rem] leading-relaxed ${FULL_ARTIFACT_TONE[view.tone]}`}>
+      <span className="font-semibold">{view.label}</span>
+      <span className="block opacity-90">{view.detail}</span>
+      {view.href && (
+        <a href={view.href} target="_blank" rel="noreferrer"
+          className="mt-1 inline-block font-semibold text-sky-200 underline hover:text-sky-100">
+          Open private model on Hugging Face ↗
+        </a>
+      )}
+      {!view.href && view.repositoryHref && (
+        <a href={view.repositoryHref} target="_blank" rel="noreferrer"
+          title="This link opens only the repository; the weights have not been verified yet"
+          className="mt-1 inline-block font-semibold text-amber-100 underline hover:text-white">
+          Inspect Hugging Face repository (delivery unverified) ↗
+        </a>
+      )}
+    </div>
+  );
+}
+
+// FULL_TRANSFORMER_ADVANCED_RECIPE_START
+/** The dense Krea recipe is intentionally server-owned. Keep this surface
+ * read-only except for `steps`, the sole advanced value carried through offers,
+ * preflight, launch and the final ai-toolkit job config. */
+function FullTransformerAdvancedRecipe({ stepsOverride, setStepsOverride, disabled = false }) {
+  const explicitSteps = String(stepsOverride || '').trim();
+  const factClass = 'rounded-lg border border-sky-400/20 bg-app/45 px-2.5 py-2';
+  return (
+    <section aria-label="Locked Krea 2 full-model recipe"
+      className="rounded-xl border border-sky-400/35 bg-sky-500/[0.07] p-3 text-[0.75rem]">
+      <div className="flex flex-col gap-1">
+        <span className="font-semibold text-sky-100">Recipe sent to AI Toolkit</span>
+        <span className="text-sky-200/85 leading-relaxed">
+          The server locks these values for full-model training. LoRA/LoKr presets and settings
+          are not shown or applied.
+        </span>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className={factClass}>
+          <dt className="text-content-subtle text-[0.625rem] uppercase">Model</dt>
+          <dd className="m-0 mt-0.5 text-content">Official Krea 2 Raw · full transformer · unquantized</dd>
+        </div>
+        <div className={factClass}>
+          <dt className="text-content-subtle text-[0.625rem] uppercase">Compute</dt>
+          <dd className="m-0 mt-0.5 text-content">1024 px · batch 1 · bf16</dd>
+        </div>
+        <div className={factClass}>
+          <dt className="text-content-subtle text-[0.625rem] uppercase">Optimization</dt>
+          <dd className="m-0 mt-0.5 text-content">Adafactor · learning rate 1e-6</dd>
+        </div>
+        <div className={factClass}>
+          <dt className="text-content-subtle text-[0.625rem] uppercase">Memory</dt>
+          <dd className="m-0 mt-0.5 text-content">Gradient checkpointing · cached latents + text embeddings</dd>
+        </div>
+        <div className={factClass}>
+          <dt className="text-content-subtle text-[0.625rem] uppercase">Checkpoints</dt>
+          <dd className="m-0 mt-0.5 text-content">Checkpoint + preview every 250 steps · keep 1 checkpoint</dd>
+        </div>
+        <div className={factClass}>
+          <dt className="text-content-subtle text-[0.625rem] uppercase">Cloud requirements</dt>
+          <dd className="m-0 mt-0.5 text-content">80 GB VRAM GPU · at least 200 GB disk</dd>
+        </div>
+      </dl>
+
+      <label className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-sky-300/30 bg-sky-400/10 px-3 py-2 text-sky-50">
+        <span className="font-semibold">Steps</span>
+        <input type="number" min={500} step={100} value={stepsOverride}
+          onChange={(event) => setStepsOverride(event.target.value)}
+          disabled={disabled}
+          placeholder="adaptive"
+          aria-label="Full-model training steps (leave empty for an adaptive target)"
+          className="w-[6rem] rounded border border-sky-300/40 bg-app/70 px-2 py-1 text-content tabular-nums disabled:opacity-50" />
+        <span className="text-sky-100/80">
+          {explicitSteps ? `${explicitSteps} target steps` : 'empty = server-calculated adaptive target'}
+        </span>
+        <span className="basis-full text-sky-200/70 text-[0.6875rem]">
+          The only editable setting in this full-model recipe.
+        </span>
+      </label>
+    </section>
+  );
+}
+// FULL_TRANSFORMER_ADVANCED_RECIPE_END
 
 /** Panneau d'entraînement LoRA : lance l'UI ai-toolkit (pause ComfyUI),
  * affiche l'état, liste les checkpoints et importe celui choisi.
@@ -188,6 +294,11 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const [variant, setVariant] = useState('turbo');
   // Type de LoRA : 'zimage' (défaut, encodeur Qwen3-4B) ou 'sdxl' (checkpoints ComfyUI).
   const [trainType, setTrainType] = useState('zimage');
+  const [trainingMode, setTrainingMode] = useState(TRAINING_MODE_LORA);
+  const [trainingModeBusy, setTrainingModeBusy] = useState(false);
+  const [trainingModeError, setTrainingModeError] = useState('');
+  const trainingModeRadioRefs = useRef({});
+  const incompatibleModeFallbackRef = useRef('');
   // Navigateur de résultats indépendant : changer la configuration du PROCHAIN
   // entraînement ne doit jamais faire disparaître les checkpoints que l'utilisateur
   // est en train de consulter dans la section dédiée.
@@ -261,7 +372,11 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
   // Surface the dual-captions option once, the first time Advanced opens — it's
   // a checkbox deep in the panel that's easy to never notice.
-  useEffect(() => { if (advancedOpen) requestHelpTip('dual-captions-advanced'); }, [advancedOpen]);
+  useEffect(() => {
+    if (advancedOpen && trainingMode !== TRAINING_MODE_FULL_TRANSFORMER) {
+      requestHelpTip('dual-captions-advanced');
+    }
+  }, [advancedOpen, trainingMode]);
 
   const togglePanel = (panelId, current, setter) => (event) => {
     event.preventDefault();
@@ -276,6 +391,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     let alive = true;
     ds.trainBaseInfo?.().then((info) => {
       if (alive && info) {
+        setTrainingModeError('');
+        incompatibleModeFallbackRef.current = '';
         setBaseInfo(info); setBase(info.base || '');
         // A persisted ABSOLUTE base is the « Custom weights… » path → reopen that mode.
         setCustomBase(looksAbsolute(info.base || ''));
@@ -292,6 +409,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         const safeVariant = normalizeCheckpointVariant(fam, v);
         setVariant(safeVariant);
         setTrainType(info.train_type || 'zimage');
+        setTrainingMode(normalizeTrainingMode(info.training_mode));
         // Initialiser le navigateur une seule fois par dataset. Les refreshs de
         // base-info (conversion, réglages) ne doivent pas écraser son filtre.
         if (checkpointSelectionDataset.current !== ds.currentId) {
@@ -362,10 +480,68 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // regroupé se ré-trie et que le format de caption suive.
   const onTypeChange = async (t) => {
     if (!t || t === trainType || trainTypeBusy) return;
+    setTrainingModeError('');
     const previous = { trainType, base, variant, customBase };
     const nextVariant = defaultTrainingVariant(t);
     const list = baseInfo?.bases_by_type?.[t] || [];
     const nextBase = t === 'sdxl' ? (list[0]?.value || '') : '';
+    const nextSelection = { trainType: t, baseModel: nextBase, variant: nextVariant };
+
+    // Leaving Krea Raw while dense mode is selected is one recipe transition,
+    // not two unrelated writes. Persist LoRA + the destination selection in the
+    // backend's single transaction before the UI shows either change.
+    if (trainingMode === TRAINING_MODE_FULL_TRANSFORMER
+        && !isFullTransformerEligible(nextSelection)) {
+      setTrainTypeBusy(true);
+      setTrainingModeBusy(true);
+      setTrainingModeError('');
+      try {
+        const saved = await ds.setDatasetTrainingMode?.(TRAINING_MODE_LORA, nextSelection);
+        if (!saved) {
+          setTrainingModeError('The new recipe was not saved. The full-model recipe and previous selection are unchanged.');
+          return;
+        }
+        const savedType = saved.trainType ?? t;
+        const savedBase = saved.baseModel ?? nextBase;
+        const savedVariant = normalizeCheckpointVariant(savedType, saved.variant ?? nextVariant);
+        setTrainingMode(normalizeTrainingMode(saved.trainingMode));
+        setTrainType(savedType);
+        setBase(savedBase);
+        setCustomBase(looksAbsolute(savedBase));
+        setVariant(savedVariant);
+        setPresetSel('');
+        setStepsInfo(null);
+        setBaseInfo((current) => current ? {
+          ...current,
+          training_mode: TRAINING_MODE_LORA,
+          train_type: savedType,
+          base: savedBase,
+          variant: savedVariant,
+        } : current);
+        toast.info('This recipe is not compatible with full-model training. LoRA mode was saved.');
+        try {
+          const info = await ds.trainBaseInfo?.();
+          if (info) {
+            setBaseInfo(info);
+            setAdv(info.train_settings || null);
+            setBase(info.base || savedBase);
+            setCustomBase(looksAbsolute(info.base || savedBase));
+            setVariant(normalizeCheckpointVariant(savedType, info.variant || savedVariant));
+          }
+          const checkpointData = await ds.listCheckpoints?.(savedBase, savedType, savedVariant);
+          setStepsInfo(checkpointData?.recommended_steps_info || null);
+        } catch {
+          toast.warning('LoRA mode was saved, but the new family details will refresh later.');
+        }
+      } catch (error) {
+        setTrainingModeError(error?.message || 'Could not save the new training recipe.');
+        toast.error(error?.message || 'Could not change the training recipe');
+      } finally {
+        setTrainingModeBusy(false);
+        setTrainTypeBusy(false);
+      }
+      return;
+    }
     setTrainTypeBusy(true);
     setPresetSel('');
     setStepsInfo(null);
@@ -546,6 +722,146 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       setSliderBusy(false);
     }
   };
+  const fullTransformerSelection = { trainType, variant, baseModel: base, customBase };
+  const fullTransformerEligible = isFullTransformerEligible(fullTransformerSelection);
+  const fullTransformerReason = fullTransformerUnavailableReason(fullTransformerSelection);
+  const fullMode = trainingMode === TRAINING_MODE_FULL_TRANSFORMER;
+
+  const onTrainingModeChange = async (nextValue) => {
+    const nextMode = normalizeTrainingMode(nextValue);
+    if (nextMode === trainingMode || trainingModeBusy) return false;
+    if (nextMode === TRAINING_MODE_FULL_TRANSFORMER && !fullTransformerEligible) {
+      toast.warning(fullTransformerReason || 'Full-model training is not available for this recipe.');
+      return false;
+    }
+    setTrainingModeBusy(true);
+    setTrainingModeError('');
+    try {
+      const saved = ds.setDatasetTrainingMode
+        ? await ds.setDatasetTrainingMode(nextMode, {
+            ...fullTransformerSelection,
+            // Slider + recipe are one transaction. A separate /train/slider call
+            // could leave the dataset half-switched when the second request failed.
+            disableSliderForFullTransformer: nextMode === TRAINING_MODE_FULL_TRANSFORMER,
+          })
+        : null;
+      if (!saved) {
+        setTrainingModeError('The training mode was not saved. The previous selection is unchanged.');
+        return false;
+      }
+      if (nextMode === TRAINING_MODE_FULL_TRANSFORMER && saved.slider?.enabled !== false) {
+        setTrainingModeError('The server did not confirm that Slider was disabled atomically. The displayed selection is unchanged.');
+        toast.error('The switch to full-model training was not confirmed with Slider disabled. Refresh and try again.');
+        return false;
+      }
+      const canonicalMode = normalizeTrainingMode(
+        typeof saved === 'string' ? saved : saved.trainingMode,
+      );
+      const canonicalType = saved.trainType ?? trainType;
+      const canonicalBase = saved.baseModel ?? base;
+      const canonicalVariant = normalizeCheckpointVariant(
+        canonicalType,
+        saved.variant ?? variant,
+      );
+      setTrainingMode(canonicalMode);
+      setTrainType(canonicalType);
+      setBase(canonicalBase);
+      setCustomBase(looksAbsolute(canonicalBase));
+      setVariant(canonicalVariant);
+      if (saved.slider) setSlider(saved.slider);
+      setBaseInfo((current) => current ? {
+        ...current,
+        training_mode: canonicalMode,
+        train_type: canonicalType,
+        base: canonicalBase,
+        variant: canonicalVariant,
+        ...(saved.slider ? { slider: saved.slider } : {}),
+      } : current);
+      return true;
+    } catch (error) {
+      setTrainingModeError(error?.message || 'The training mode was not saved. The previous selection is unchanged.');
+      toast.error(error?.message || 'Could not save the training mode');
+      return false;
+    } finally {
+      setTrainingModeBusy(false);
+    }
+  };
+
+  const onTrainingModeKeyDown = async (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    const nextMode = fullMode ? TRAINING_MODE_LORA : TRAINING_MODE_FULL_TRANSFORMER;
+    if (nextMode === TRAINING_MODE_FULL_TRANSFORMER && !fullTransformerEligible) {
+      trainingModeRadioRefs.current[TRAINING_MODE_LORA]?.focus();
+      return;
+    }
+    const changed = await onTrainingModeChange(nextMode);
+    const focusMode = changed ? nextMode : trainingMode;
+    trainingModeRadioRefs.current[focusMode]?.focus();
+  };
+
+  // Family, Krea variant and official/custom base can all change independently.
+  // Never leave an incompatible dense mode hidden in persisted dataset state.
+  useEffect(() => {
+    if (!baseInfo || !fullMode || fullTransformerEligible) {
+      incompatibleModeFallbackRef.current = '';
+      return undefined;
+    }
+    const fallbackKey = `${trainType}\u0000${variant}\u0000${base}`;
+    if (trainingModeBusy || incompatibleModeFallbackRef.current === fallbackKey) return undefined;
+    incompatibleModeFallbackRef.current = fallbackKey;
+    let alive = true;
+    setTrainingModeBusy(true);
+    setTrainingModeError('');
+    (async () => {
+      let saved = null;
+      try {
+        saved = await ds.setDatasetTrainingMode?.(
+          TRAINING_MODE_LORA,
+          fullTransformerSelection,
+        );
+      } catch (error) {
+        if (alive) toast.error(error?.message || 'Could not save the fallback LoRA recipe');
+      }
+      if (!alive) return;
+      if (saved) {
+        setTrainingMode(TRAINING_MODE_LORA);
+        setBaseInfo((current) => current ? {
+          ...current,
+          training_mode: TRAINING_MODE_LORA,
+          train_type: saved.trainType ?? trainType,
+          base: saved.baseModel ?? base,
+          variant: saved.variant ?? variant,
+        } : current);
+        toast.info(`${fullTransformerReason || 'Recipe incompatible with full-model training'} LoRA mode was saved.`);
+        return;
+      }
+
+      // Do not claim LoRA when persistence failed. Re-read the canonical recipe
+      // and put every selector back on the server state instead.
+      setTrainingModeError('Automatic fallback to LoRA failed. The saved recipe has been restored.');
+      try {
+        const info = await ds.trainBaseInfo?.();
+        if (alive && info) {
+          const serverType = info.train_type || 'zimage';
+          const serverBase = info.base || '';
+          const serverVariant = normalizeCheckpointVariant(
+            serverType,
+            info.variant || defaultTrainingVariant(serverType),
+          );
+          setBaseInfo(info);
+          setTrainType(serverType);
+          setBase(serverBase);
+          setCustomBase(looksAbsolute(serverBase));
+          setVariant(serverVariant);
+          setTrainingMode(normalizeTrainingMode(info.training_mode));
+        }
+      } catch { /* keep the visible error and current state if refresh also fails */ }
+    })().finally(() => { if (alive) setTrainingModeBusy(false); });
+    return () => { alive = false; };
+  }, [baseInfo, fullMode, fullTransformerEligible, fullTransformerReason,
+    trainType, variant, base, ds.setDatasetTrainingMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggleSliderMode = async () => {
     const next = !sliderOn;
     const saved = await saveSlider({ enabled: next });
@@ -750,18 +1066,26 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // is right for the launch buttons (nothing is open to say it in). ▶ Continue
   // passes its own so the reason lands inside the still-open dialog, next to the
   // choices the user would otherwise have had to retype.
-  const preflightOk = async ({ lane, trainType: tt, variant: va, onRefused } = {}) => {
+  const preflightOk = async ({
+    lane, trainType: tt, variant: va, baseModel: bm, onRefused,
+  } = {}) => {
     try {
       const r = await fetch(
         // `masked` rides along so the modal can say "rembg is missing — this run
         // trains unmasked" BEFORE the GPU (or the rented pod) is paid for, instead
         // of the fallback showing up as a flag on a progress view that disappears
         // when the run ends (issue #24, 1Tomber).
-        preflightUrl(ds.currentId, { trainType: tt ?? trainType, variant: va ?? variant,
-                                     lane, masked }),
+        preflightUrl(ds.currentId, {
+          trainType: tt ?? trainType,
+          variant: va ?? variant,
+          baseModel: bm ?? base,
+          trainingMode,
+          lane,
+          masked,
+        }),
         { credentials: 'include' });
+      const d = await r.json().catch(() => ({}));
       if (!r.ok) return true;
-      const d = await r.json();
       if (d.blockers?.length) {
         // A blocker set that is entirely bypassable quality guard-rails
         // (d.can_override) may proceed when the user ticked « Continue anyway »;
@@ -829,11 +1153,13 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       // Cancelling the warning report says nothing further (it IS the answer);
       // a hard blocker is a message the dialog shows.
       if (!(await preflightOk({ lane, trainType: checkpointTrainType,
-        variant: checkpointVariant, onRefused: setContinueError }))) return;
+        variant: checkpointVariant, baseModel: checkpointBase,
+        onRefused: setContinueError }))) return;
       const { response, declined } = await runConfirmableTrainingRequest(
         (continueOpts) => (inCloud ? ds.continueTrainingInCloud : ds.continueTraining)(
           payload.extraSteps, checkpointBase, checkpointVariant, checkpointTrainType,
           { ...continueOpts, fromStep: payload.fromStep, overrides: payload.overrides,
+            resumeMode: payload.resumeMode, stateBundleId: payload.stateBundleId,
             // The hook toasts refusals for its other callers; here the dialog
             // shows them, and two copies of one sentence a centimetre apart read
             // as a bug. Its SUCCESS toast is kept — the dialog is gone by then.
@@ -866,7 +1192,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       const data = await ds.listCheckpoints(base, trainType, variant);
       existing = Array.isArray(data?.checkpoints) ? data.checkpoints : [];
     } catch { /* le lancement normal garde le preflight serveur comme autorité */ }
-    if (!existing.length) return 'resume';                     // pas de run → lancement normal
+    if (!existing.length) return 'new';                        // pas de run → lancement normal
     const latest = Math.max(...existing.map((c) => c.step));
     const final = existing.some((c) => c.final);
     return new Promise((resolve) => {
@@ -916,7 +1242,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const enqueue = async () => {
     if (!(await preflightOk())) return;
     // Mise en file AVEC la base/variante choisie (sinon le job reprend la base persistée).
-    let body = { base_model: base, variant, train_type: trainType, masked: maskedOpt,
+    let body = { base_model: base, variant, train_type: trainType, training_mode: trainingMode, masked: maskedOpt,
                  steps: stepsN,
                  ...(allowNotReady ? { allow_not_ready: true } : {}),
                  ...(trainType === 'sdxl' ? { vae_path: vaePath, te_path: tePath } : {}) };
@@ -956,6 +1282,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     if (!schedAt) return;
     if (!(await preflightOk())) return;
     let body = { at: schedAt, base_model: base, variant, train_type: trainType,
+                 training_mode: trainingMode,
                  masked: maskedOpt, steps: stepsN,
                  ...(allowNotReady ? { allow_not_ready: true } : {}),
                  ...(trainType === 'sdxl' ? { vae_path: vaePath, te_path: tePath } : {}) };
@@ -1266,14 +1593,20 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // Divergence 4: caps.cloud_training is forced off in this fork, so the cloud
   // lane stays dead-but-visible with a static reason.
   const continueLanes = {
-    local: caps.aitoolkit?.valid === false
+    local: fullMode
+      ? { available: false,
+          reason: 'Full-model training is cloud-only. Switch back to LoRA to continue this local checkpoint.' }
+      : caps.aitoolkit?.valid === false
       ? { available: false,
           reason: 'Local training needs ai-toolkit — set it up in Settings, or continue in the cloud.' }
       : status.in_progress
         ? { available: false,
             reason: 'A training is already running on this machine — continue in the cloud, or wait for it to finish.' }
         : { available: true },
-    cloud: !caps.cloud_training
+    cloud: fullMode
+      ? { available: false,
+          reason: 'Continuing a full model is not available in this MVP. Switch back to LoRA to continue a LoRA.' }
+      : !caps.cloud_training
       ? { available: false,
           reason: 'Cloud training needs a rental key set up in Settings.' }
       : { available: true },
@@ -1299,7 +1632,9 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-content font-semibold text-sm"><span aria-hidden>🎓</span> LoRA Training ({typeLabel})</span>
+        <span className="text-content font-semibold text-sm">
+          <span aria-hidden>🎓</span> {fullMode ? 'Full-model training' : 'LoRA Training'} ({typeLabel})
+        </span>
         {!status.installed && (
           <span className="text-amber-300 text-[0.6875rem]">ai-toolkit not ready — point to its Python (its venv/Scripts/python.exe) in Settings › Local tools</span>
         )}
@@ -1438,7 +1773,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            « Advanced options » ci-dessous — replié par défaut, tout y reste
            accessible en un clic. --- */}
       <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
-        <span className="text-content-muted text-[0.625rem] uppercase">LoRA type</span>
+        <span className="text-content-muted text-[0.625rem] uppercase">Model family</span>
         {/* Which family is preselected, and the cloud GPU guard-rails (budget,
             price ceiling, stall timeout), are settings — say so where the choice
             is actually being made.
@@ -1450,8 +1785,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           Defaults &amp; cloud limits
         </SettingsLink>
         <select value={trainType} onChange={(e) => onTypeChange(e.target.value)}
-          disabled={trainTypeBusy || presetBusy}
-          aria-label="Type of LoRA to train"
+          disabled={trainTypeBusy || presetBusy || trainingModeBusy}
+          aria-label="Training model family"
           title="Z-Image (prose, Qwen3 encoder) ~20 img · SDXL (ComfyUI checkpoints) ~30 img · Krea 2 (prose, base fixe Turbo) ~20 img · FLUX.1-dev (prose, gated HF, local-only) ~20 img · FLUX.2 Klein (prose, gated HF, 4B local / 9B cloud) ~20 img · Anima (prose, Qwen3 encoder, anime, public base, local-only) ~20 img"
           className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-50">
           <option value="zimage">Z-Image (~20 img)</option>
@@ -1461,7 +1796,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           <option value="flux2klein">FLUX.2 Klein (~20 img)</option>
           <option value="anima">Anima (~20 img)</option>
         </select>
-        <button type="button" disabled={!status.installed || belowFloor || status.in_progress || baseBlocksTrain || sdxlNeedsBase || customWeightsEmpty || sliderPromptsMissing}
+        {/* D4: upstream offers a LoRA / Full-model radio here. Its own tooltip
+            says "cloud-only", and /train answers full_transformer with a 400 on
+            this fork — so the control could only ever fail. The mode plumbing
+            below stays upstream-shaped (dormant backend is allowed; a dead
+            BUTTON is not), which keeps the next merge's surface small. */}
+        {!fullMode && <button type="button" disabled={!status.installed || belowFloor || status.in_progress || baseBlocksTrain || sdxlNeedsBase || customWeightsEmpty || sliderPromptsMissing}
           title={baseBlocksTrain ? 'Convert the custom base first'
             : customWeightsEmpty ? 'Enter the path to your custom weights .safetensors'
             : sdxlNeedsBase ? 'Choose a base SDXL checkpoint'
@@ -1478,13 +1818,22 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             // échoué AVANT l'archivage (assert_trainable), rien n'a été écarté.
             const mode = await askResumeOrFresh();
             if (!mode) return;
+            // The old "Resume" button called /train and let ai-toolkit infer
+            // what it would restore. Route every existing run through the
+            // shared dialog instead, where Full state vs Weights only is
+            // explicit and checkpoint-specific.
+            if (mode === 'continue') {
+              setContinueInitialStep(null); // null deliberately selects the latest save
+              setContinueOpen(true);
+              return;
+            }
             const fresh = mode === 'fresh';
             // ds.train takes camelCase opts — map the confirmable force flags.
             const OPT_FOR_FLAG = { allow_caption_mismatch: 'allowCaptionMismatch',
                                    allow_uncaptioned: 'allowUncaptioned',
                                    allow_caption_quality: 'allowCaptionQuality',
                                    allow_unverified_weights: 'allowUnverifiedWeights' };
-            let opts = { baseModel: base, variant, trainType, masked: maskedOpt,
+            let opts = { baseModel: base, variant, trainType, trainingMode, masked: maskedOpt,
                          steps: stepsN, fresh,
                          vaePath, tePath, allowNotReady };
             let d = await ds.train(opts);
@@ -1497,8 +1846,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           }}
           className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
           <span aria-hidden>🚀</span> Train the LoRA
-        </button>
-        <HelpBadge topic="action-training-launch" />
+        </button>}
+        {!fullMode && <HelpBadge topic="action-training-launch" />}
         {status.in_progress && (
           <>
             <button type="button"
@@ -1517,7 +1866,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             <HelpBadge topic="action-training-stop" />
           </>
         )}
-        {status.in_progress && status.installed && (keptCount >= trainMinFloor || allowNotReady) && !sliderPromptsMissing && (
+        {!fullMode && status.in_progress && status.installed && (keptCount >= trainMinFloor || allowNotReady) && !sliderPromptsMissing && (
           <button type="button" disabled={queued || baseBlocksTrain} onClick={enqueue}
             title={baseBlocksTrain
               ? 'Convert the selected custom base first'
@@ -1530,9 +1879,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             réglages eux-mêmes vivent dans « Advanced options ». */}
         <span className="ml-auto text-content-subtle text-[0.625rem]"
           title="The configuration the next run will use — change it in Advanced options below">
+          {fullMode ? (
+            <>Full model · official Krea 2 Raw · cloud · {stepsOverride.trim() ? `${stepsN} steps` : 'adaptive steps'}</>
+          ) : (<>
           {sliderOn ? '🎚 slider (Beta) · ' : ''}base “{zimageRecipe?.baseLabel || baseLabel}”{zimageRecipe ? ` · ${zimageRecipe.adapterActive ? 'Turbo adapter v2 ON' : 'no training adapter'}` : ''} · {sliderOn ? 'unmasked (slider)' : maskedRembgMissing ? 'unmasked (rembg missing)' : masked ? 'masked' : 'unmasked'} · {advResLabel} · {stepsOverride.trim() ? `${stepsN} steps` : sliderOn ? `${stepsInfo?.steps ?? 1000} steps (slider policy)` : 'adaptive steps'}{advNetworkType === 'lokr' ? ` · LoKr${advLokrFactor ? ` factor ${advLokrFactor}` : ''}` : ''}{advEma ? ` · EMA ${advEma}` : ''}
+          </>)}
         </span>
       </div>
+
 
       {/* A custom base picked on ANOTHER family was still attached to this
           dataset (one shared column). The run ignores it — say so, once, rather
@@ -1548,7 +1902,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            du dataset ne servent que de substrat de débruitage (captions ignorées).
            Feature expérimentale assumée — le badge Beta et les notes par famille
            disent exactement ce qui est prouvé et ce qui ne l'est pas. --- */}
-      <div id="ds-training-slider" className={`rounded-lg border px-3 py-2 flex flex-col gap-2 ${
+      {!fullMode && (<div id="ds-training-slider" className={`rounded-lg border px-3 py-2 flex flex-col gap-2 ${
         sliderOn ? 'border-purple-400/50 bg-purple-500/5' : 'border-border bg-surface'}`}>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-content"><span aria-hidden>🎚</span> Slider LoRA</span>
@@ -1649,7 +2003,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </p>
           </>
         )}
-      </div>
+      </div>)}
 
       {/* Anime dataset on a non-Anima family: a pointer, not a rule. Deliberately
           NOT a warning (nothing is wrong — SDXL trains an anime character fine) and
@@ -1680,12 +2034,32 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         <summary data-workspace-focus
           onClick={togglePanel('advanced', advancedOpen, setAdvancedOpen)}
           className="cursor-pointer select-none px-3 py-2 text-sm text-content font-semibold">
-          ⚙️ Advanced options
-          <span className="ml-2 font-normal text-content-subtle text-[0.6875rem]">
-            base &amp; variant · rank · resolution · masked · steps · scheduling · presets
-          </span>
+          {fullMode ? (
+            <>
+              ⚙️ Locked full-model recipe · steps
+              <span className="ml-2 font-normal text-sky-200/80 text-[0.6875rem]">
+                Krea 2 Raw · 1024 · cloud
+              </span>
+            </>
+          ) : (
+            <>
+              ⚙️ Advanced options
+              <span className="ml-2 font-normal text-content-subtle text-[0.6875rem]">
+                base &amp; variant · rank · resolution · masked · steps · scheduling · presets
+              </span>
+            </>
+          )}
         </summary>
         <div className="px-3 pt-1 flex flex-col gap-2">
+          {/* FULL_TRANSFORMER_ADVANCED_BRANCH_START — no LoRA control may escape
+              the false branch below: the backend ignores all of them in dense. */}
+          {fullMode ? (
+            <FullTransformerAdvancedRecipe
+              stepsOverride={stepsOverride}
+              setStepsOverride={setStepsOverride}
+              disabled={trainingModeBusy} />
+          ) : (<>
+          {/* LORA_ADVANCED_CONTROLS_START */}
           {/* --- Presets : réglages nommés, ré-applicables et partageables en JSON.
                Appliquer REMPLACE les réglages explicites du dataset ; les clés
                inconnues d'un fichier importé sont ignorées (tolérance de version). --- */}
@@ -1787,6 +2161,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   if (v === CUSTOM_BASE_SENTINEL) { setCustomBase(true); setBase(''); }
                   else { setCustomBase(false); setBase(v); }
                 }}
+                disabled={trainingModeBusy}
                 aria-label="Base model"
                 className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] max-w-[230px]">
                 {(currentBases.length ? currentBases
@@ -1805,6 +2180,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   value must be visible before the next local/cloud launch. */}
               {trainType === 'zimage' && (
                 <select value={variant} onChange={(e) => setVariant(e.target.value)}
+                  disabled={trainingModeBusy}
                   aria-label="Z-Image training recipe"
                   title="Z-Image training recipe — Turbo requires the v2 training adapter; Base and De-Turbo use separate non-distilled repositories without that adapter."
                   className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
@@ -1818,6 +2194,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   transfère vers Turbo à l'inférence. Turbo+adapter = alternative VRAM. */}
               {trainType === 'krea' && (
                 <select value={variant} onChange={(e) => setVariant(e.target.value)}
+                  disabled={trainingModeBusy}
                   aria-label="Krea 2 training base"
                   title="Krea 2 training base — Raw is the official recommendation (best quality; the LoRA transfers to Turbo at inference). Turbo+adapter is the VRAM-friendly alternative. First Raw training downloads the Raw weights (~24 GB) and runs longer."
                   className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
@@ -1830,6 +2207,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   gated sur Hugging Face. */}
               {trainType === 'flux2klein' && (
                 <select value={variant} onChange={(e) => setVariant(e.target.value)}
+                  disabled={trainingModeBusy}
                   aria-label="FLUX.2 Klein model size"
                   title="FLUX.2 Klein model size — 4B fits a 16-24 GB local GPU (recommended); 9B needs 32-48 GB VRAM. Both bases are gated on Hugging Face: accept the license and set a HF token before the first run."
                   className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
@@ -1871,6 +2249,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             {customBase && customSupported && (
               <div className="flex flex-col gap-1">
                 <input type="text" value={base} onChange={(e) => setBase(e.target.value)}
+                  disabled={trainingModeBusy}
                   spellCheck={false}
                   placeholder={trainType === 'sdxl'
                     ? 'C:\\path\\to\\your-sdxl-checkpoint.safetensors'
@@ -1957,7 +2336,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" /> Model &amp; training
             </div>
 
-            <div className="flex flex-col gap-0.5">
+            {!fullMode && (<div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-content text-[0.75rem] w-28 shrink-0">LoRA rank</span>
                 <select value={String(advRankChoice)}
@@ -1976,7 +2355,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 Auto or the researched preset for this family; higher ranks can capture broader, more complex variation
                 but make a larger adapter and can overfit a small repetitive set. The effective rank/alpha is shown above.
               </span>
-            </div>
+            </div>)}
 
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 flex-wrap">
@@ -2079,7 +2458,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
           {/* Expert — last-mile levers. Collapsed by default; every control defaults
               to the current behaviour, so a newcomer who never opens this is unaffected. */}
-          <details className="group rounded-lg border border-indigo-400/40 border-l-[3px] border-l-indigo-400 bg-indigo-500/[0.14] transition-colors hover:bg-indigo-500/20">
+          {!fullMode && (<details className="group rounded-lg border border-indigo-400/40 border-l-[3px] border-l-indigo-400 bg-indigo-500/[0.14] transition-colors hover:bg-indigo-500/20">
             <summary className="flex items-center gap-2 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden px-2.5 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-indigo-100 hover:text-white">
               <span aria-hidden className="text-indigo-300 transition-transform group-open:rotate-90">▸</span>
               <span aria-hidden>🔬</span>
@@ -2405,7 +2784,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 </span>
               </div>
             </div>
-          </details>
+          </details>)}
 
           <label className="flex items-center gap-1.5 text-[0.6875rem] text-content-muted cursor-pointer"
             title={sliderOn
@@ -2490,7 +2869,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </p>
           )}
 
-          {status.installed && (keptCount >= (TRAIN_MIN[trainType]?.[0] ?? 12) || allowNotReady) && (
+          {!fullMode && status.installed && (keptCount >= (TRAIN_MIN[trainType]?.[0] ?? 12) || allowNotReady) && (
             <div className="flex items-center gap-2 flex-wrap">
               <button type="button" disabled={queued || baseBlocksTrain} onClick={openSched}
                 aria-expanded={showSched}
@@ -2506,7 +2885,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </div>
           )}
 
-          {showSched && !queued && (
+          {!fullMode && showSched && !queued && (
             <div className="flex items-center gap-2 flex-wrap rounded-lg border border-amber-400/30 bg-amber-500/5 px-3 py-2">
               <label className="flex items-center gap-2 text-content-muted text-[0.6875rem]">
                 <span className="uppercase">Start at</span>
@@ -2524,6 +2903,9 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               </button>
             </div>
           )}
+          {/* LORA_ADVANCED_CONTROLS_END */}
+          </>)}
+          {/* FULL_TRANSFORMER_ADVANCED_BRANCH_END */}
         </div>
       </details>
 
@@ -2559,7 +2941,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </p>
       )}
 
-      {sliderOn
+      {fullMode
+        ? (
+          <p className="m-0 text-content-subtle text-[0.625rem]">
+            Full model: a small LoRA-sized dataset is only a smoke test; quality requires a much
+            larger, more varied, deduplicated collection.
+          </p>
+        )
+        : sliderOn
         ? keptCount < TRAIN_MIN_SLIDER[1] && (
           <p className="m-0 text-content-subtle text-[0.625rem]">
             Slider mode: minimum {TRAIN_MIN_SLIDER[0]} substrate images,{' '}
@@ -3073,10 +3462,10 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold">
                 ↺ Start fresh
               </button>
-              <button type="button" onClick={() => resolveResume('resume')}
-                title="Continue the existing LoRA from its last checkpoint (only useful with a HIGHER step target)."
+              <button type="button" onClick={() => resolveResume('continue')}
+                title="Choose the checkpoint and explicitly restore either its full verified state or its weights only."
                 className="px-3 py-1.5 rounded-lg border border-border bg-surface text-content text-sm hover:bg-surface-raised">
-                ▶ Continue from step {resumeAsk.latest}
+                ▶ Choose how to continue
               </button>
               <button type="button" onClick={() => resolveResume(null)}
                 className="ml-auto px-3 py-1.5 rounded-lg text-content-muted hover:text-content text-sm">

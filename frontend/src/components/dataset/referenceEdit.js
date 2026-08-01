@@ -84,8 +84,28 @@ export function editRefSupport(engine) {
   return EDIT_REF_SUPPORT[engine] || 'primary_only';
 }
 
-/** One sentence about which references this engine uses, shown at PICK time so
- *  the set of photos feeding the edit is never a surprise afterwards. */
+/** True when this engine accepts the modal's own "+ Add reference images". False
+ *  hides the picker — an input whose files are thrown away is worse than none. */
+export function acceptsExtraEditRefs(engine) {
+  return editRefSupport(engine) === 'all';
+}
+
+/** Whether ANY engine in the selection takes the modal's transient uploads.
+ * Upstream keeps the picker for a mixed batch because its API engines consume
+ * those bytes; every engine here is local, so this is false in practice and the
+ * picker stays hidden. Kept in upstream's shape rather than hardcoded to false —
+ * the answer then follows from EDIT_REF_SUPPORT instead of from a second rule
+ * that could disagree with it. */
+export function acceptsExtraEditRefsForBatch(engines) {
+  return Array.from(engines || []).some((engine) => acceptsExtraEditRefs(engine));
+}
+
+/** One sentence about what this engine does with the extra references, or null
+ *  when it takes everything (nothing to warn about). Shown at PICK time.
+ *
+ *  The "not sent" half matters because the picker DISAPPEARS when you switch to a
+ *  local engine: anything you had staged vanishes from the dialog, and an
+ *  unexplained disappearance reads as a bug. */
 export function editRefNote(engine, { datasetExtraCount = 0 } = {}) {
   const support = editRefSupport(engine);
   const label = ENGINE_LABELS[engine] || engine;
@@ -103,11 +123,25 @@ export function editRefNote(engine, { datasetExtraCount = 0 } = {}) {
 /** What this edit costs and how long it takes. Every engine here renders on the
  *  user's own GPU, so there is no price to state — and stating one anyway (as
  *  upstream's unconditional "Each edit is a paid API call" did on a local render)
- *  damages trust exactly as much as hiding a real one. */
-export function editCostNote(engine) {
-  return `${ENGINE_LABELS[engine] || engine} renders on your own ComfyUI — no API key, no `
-    + 'bill, nothing leaves your machine, so you can retry a prompt as often as you like. '
-    + 'It queues behind any generation already running on your GPU.';
+ *  damages trust exactly as much as hiding a real one.
+ *
+ *  Takes upstream's batch signature so the modal can price a multi-engine pick,
+ *  minus its paid branches: with API_ENGINES empty those are unreachable, and
+ *  D1b's rule is to delete a dead API branch rather than let it look load-bearing. */
+export function editCostNote(engineOrEngines) {
+  const engines = Array.isArray(engineOrEngines)
+    ? [...new Set(engineOrEngines)]
+    : [engineOrEngines].filter(Boolean);
+  if (!engines.length) return 'Select at least one engine to see its cost.';
+  if (engines.length === 1) {
+    const engine = engines[0];
+    return `${ENGINE_LABELS[engine] || engine} renders on your own ComfyUI — no API key, no `
+      + 'bill, nothing leaves your machine, so you can retry a prompt as often as you like. '
+      + 'It queues behind any generation already running on your GPU.';
+  }
+  return `${engines.length} edits will run, all on your own ComfyUI — no API key, no bill, `
+    + 'nothing leaves your machine. They queue one after another on your GPU, so the '
+    + 'last result lands later than the first.';
 }
 
 /** The line under Before/After. Upstream's claimed a refund that never existed;
@@ -163,12 +197,81 @@ export function editBlockedReason(prompt, engine, engineBlocked = null) {
   return null;
 }
 
+/** Batch equivalent of editBlockedReason. Every selected engine must be runnable:
+ * accepting a batch while one selected local engine is known to be unavailable
+ * would promise a comparison the server cannot launch. */
+export function editBatchBlockedReason(prompt, engines, options = []) {
+  const selected = [...new Set(Array.from(engines || []))];
+  if (!selected.length) return 'Select at least one engine';
+  if (selected.some((engine) => !EDIT_ENGINES.includes(engine))) {
+    return editEngineChoiceMessage();
+  }
+  const blocked = selected
+    .map((engine) => options.find((option) => option.engine === engine)?.blocked)
+    .filter(Boolean);
+  if (blocked.length) return blocked.join(' · ');
+  if (!prompt || !prompt.trim()) return 'Describe the edit first';
+  return null;
+}
+
+/** Normalize the server's new per-engine candidate map while retaining the old
+ * one-engine payload as a fallback. Selection order is preserved for a stable
+ * comparison layout; unknown fields remain ignored. */
+export function referenceEditCandidates(referenceEdit) {
+  if (!referenceEdit) return [];
+  const rawCandidates = referenceEdit.candidates;
+  const keyed = {};
+  if (Array.isArray(rawCandidates)) {
+    for (const candidate of rawCandidates) {
+      if (candidate?.engine) keyed[candidate.engine] = candidate;
+    }
+  } else if (rawCandidates && typeof rawCandidates === 'object') {
+    for (const [engine, candidate] of Object.entries(rawCandidates)) {
+      keyed[engine] = candidate || {};
+    }
+  }
+  const order = [];
+  const add = (engine) => {
+    if (engine && !order.includes(engine)) order.push(engine);
+  };
+  if (Array.isArray(referenceEdit.engines)) referenceEdit.engines.forEach(add);
+  Object.keys(keyed).forEach(add);
+  if (!order.length) add(referenceEdit.engine);
+  return order.map((engine) => {
+    const candidate = keyed[engine] || {};
+    const legacy = !rawCandidates && engine === referenceEdit.engine;
+    return {
+      engine,
+      status: candidate.status || (legacy ? referenceEdit.status : 'running'),
+      candidate_filename: candidate.candidate_filename
+        || (legacy ? referenceEdit.candidate_filename : null),
+      error: candidate.error || (legacy ? referenceEdit.error : null),
+    };
+  });
+}
+
+/** Return a saved exact-retry request only while it still belongs to the batch
+ * shown by the server. A dataset id alone is not enough: another tab can replace
+ * the batch while this tab retains prompt, engine and File objects in memory. */
+export function retryRequestForReferenceEdit(request, referenceEdit) {
+  const savedBatchId = typeof request?.batchId === 'string' ? request.batchId : '';
+  const activeBatchId = typeof referenceEdit?.batch_id === 'string'
+    ? referenceEdit.batch_id : '';
+  return savedBatchId && activeBatchId && savedBatchId === activeBatchId
+    ? request : null;
+}
+
 /** The modal's phase, DERIVED from the server's `reference_edit` payload object
  *  (not local state) so it restores correctly after a tab sleep or reload:
  *  'idle' (no pending edit / form), 'running', 'ready' (Before/After), 'failed'. */
 export function editPhase(referenceEdit) {
   const s = referenceEdit?.status;
-  return (s === 'running' || s === 'ready' || s === 'failed') ? s : 'idle';
+  if (s === 'running' || s === 'ready' || s === 'failed') return s;
+  const candidates = referenceEditCandidates(referenceEdit);
+  if (!candidates.length) return 'idle';
+  if (candidates.some((candidate) => candidate.status === 'running')) return 'running';
+  if (candidates.some((candidate) => candidate.status === 'ready')) return 'ready';
+  return 'failed';
 }
 
 /** Advisory shown when a generation batch is live. A Keep is provably safe (the

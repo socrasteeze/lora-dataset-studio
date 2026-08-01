@@ -59,6 +59,7 @@ from bootstrap_dependencies import ensure_pillow_consistent
 ensure_pillow_consistent()
 
 from app import create_app
+from port_utils import find_available_port
 
 try:
     from app.config import get as cfg_get
@@ -118,7 +119,13 @@ def _open_browser_when_ready(host, port, token=None, attempts=60, delay=0.5):
 
 if __name__ == '__main__':
     host = os.environ.get('LDS_HOST') or cfg_get('server.host')
-    port = int(os.environ.get('LDS_PORT') or cfg_get('server.port'))
+    requested_port = int(os.environ.get('LDS_PORT') or cfg_get('server.port'))
+    port = (requested_port if os.environ.get('LDS_AUTO_PORT') == '0'
+            else find_available_port(host, requested_port))
+    if port != requested_port:
+        print(f"[LDS] port {requested_port} is already in use; using {port} instead.",
+              flush=True)
+    os.environ['LDS_PORT'] = str(port)
     is_lan = host not in ('127.0.0.1', 'localhost', '::1')
     if is_lan and cfg_get('server.require_token') \
             and not os.environ.get('LDS_ACCESS_TOKEN') \
@@ -160,6 +167,4 @@ if __name__ == '__main__':
         _open_browser_when_ready(host, port, os.environ.get('LDS_ACCESS_TOKEN'))
     app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1',
             host=host,
-            # LDS_PORT wins over config so the launcher can dodge a busy 5000
-            # (macOS AirPlay, another Flask app, …) without touching config.json.
             port=port, threaded=True, use_reloader=False)
