@@ -488,6 +488,23 @@ rarely needs a description on every shot). Stop it any time — and when you com
 back, a saved report at the top of the bank tells you exactly what ran, what was
 skipped and why, with the headline counts.
 
+**Running it on another machine.** The **Run on** picker at the bottom of the
+dialog sends the heavy passes to a joined compute peer: ✨ Score, 👥 Group by
+person, 🚩 Find watermarks, 📐 Classify framing and 🏷️ Caption can all travel.
+🔎 Scan, 🧹 Auto-reject and ✂ Find crops & variants never do — they read this
+machine's database and embeddings cache, so sending them would be slower.
+
+Each of the five travels **only if that machine reports the stack for it**. Pick
+a peer and the passes it cannot run are greyed out, unticked and unclickable,
+each saying what is missing — a peer with Ollama but no scoring extra offers
+framing, watermarks and captions but not Score. Pick **this machine** again and
+they become selectable. Captions follow the same rule: with a peer selected they
+run there or not at all, on whichever captioner that machine has (JoyCaption if
+it has it, otherwise Ollama). Queueing refuses the same combination, so a screen
+left open since before the peer changed gets a message rather than a run that
+fails an hour in. A peer that has joined but not checked in yet is still
+offered — it only gets a note saying it hasn't reported what it can run.
+
 Got several banks to clean? Instead of babysitting them one at a time, open a
 bank's Launch-all dialog from the Banks page and choose **Add to queue**. The
 **Launch-all queue** works through the banks one at a time, each one waiting its

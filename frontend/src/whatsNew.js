@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-launch-all-greys-out-what-the-machine-cannot-do',
+    date: '2026-07-31',
+    title: 'Launch all now knows what the machine you picked can actually do',
+    blurb:
+      'Picking another machine used to tick every pass it might run — including ones it had already told us it cannot. Scoring would get selected on a machine with no scoring stack, the whole bank would be sent across the network, and the run would die on the first image. Now the moment you pick a machine, the passes it cannot do are greyed out, unticked and unclickable, each saying which piece is missing; pick this machine again and they come straight back, ready to select. That includes captions: with another machine selected, they run there or not at all, rather than quietly coming home. The queue and the Launch button refuse the same combination too, so a stale screen gets a clear message instead of a run that fails an hour later. A machine that has simply not checked in yet is still allowed — it gets a note, not a wall.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-07-31-bank-vision-passes-run-on-the-peer',
     date: '2026-07-31',
     title: 'Your second machine now does most of the bank work',

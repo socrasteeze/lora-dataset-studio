@@ -37,9 +37,13 @@ test('captioning is OFF by default; auto-reject defaults to blur+uniform and kee
 });
 
 test('a heavy pass whose tool is not ready is auto-unchecked and flagged "will skip"', () => {
-  assert.match(dialog, /score:\s*!!caps\?\.bank_scoring/);
-  assert.match(dialog, /watermark:\s*!!visionReady/);
-  assert.match(dialog, /faces:\s*!!caps\?\.face_scoring/);
+  // The per-pass rules moved into passDeviceGate.js when the verdict stopped
+  // being about THIS machine only — it now answers for whichever machine the
+  // picker selected. The rule itself is unchanged for a local run.
+  const gate = fs.readFileSync(new URL('./passDeviceGate.js', import.meta.url), 'utf8');
+  assert.match(gate, /return !!caps\?\.bank_scoring/);
+  assert.match(gate, /return !!caps\?\.face_scoring/);
+  assert.match(gate, /return !!visionReady/);
   assert.match(dialog, /\.filter\(\(k\)\s*=>\s*ready\[k\]\)/);   // default set intersects readiness
   assert.match(dialog, /will skip/);
 });

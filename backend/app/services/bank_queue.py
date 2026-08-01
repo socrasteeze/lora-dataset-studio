@@ -100,6 +100,10 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
     device_id = _normalized_device(device_id)
     if device_id:
         banks._remote_pass_device(device_id)      # raises ValueError on a backend id
+        # …and the picked PASSES against that machine, not just the id. A peer
+        # that reported no scoring stack used to accept a run with ✨ Score in
+        # it and fail an hour later, mid-pipeline.
+        banks.refuse_steps_for_device(device_id, steps)
     with _lock:
         if _find(bank_id) is not None:
             raise BankAlreadyQueued(bank_id)
