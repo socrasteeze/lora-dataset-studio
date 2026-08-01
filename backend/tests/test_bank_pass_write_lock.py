@@ -191,15 +191,25 @@ def test_creating_a_bank_saves_as_it_walks(tmp_path, monkeypatch):
     this and was fixed by changing flush to commit; its comment says so. The
     twin below it never got the same fix.
 
-    Asserted as durability rather than as a stopwatch: at realistic test sizes
-    50 000 syscalls' worth of hold cannot be reproduced, so a timing assertion
-    here would be the kind that passes both ways. Mid-walk visibility from a
-    second connection discriminates exactly and deterministically — under the
-    old code NOTHING is committed until the very end.
+    Asserted as write AVAILABILITY rather than as a stopwatch: at realistic test
+    sizes 50 000 syscalls' worth of hold cannot be reproduced, so a timing
+    assertion here would be the kind that passes both ways. A second connection
+    asking for the write lock mid-walk discriminates exactly and
+    deterministically — that is the thing the user loses, and it is what
+    "database is locked" means to everything else in the app.
+
+    It used to assert mid-walk DURABILITY (rows already committed 560 files in),
+    which was a valid proxy while the fix was "commit every 500 rows". The
+    2026-08-01 upstream sync replaced the loop with a chunked CORE insert that
+    builds its whole row list — every getsize — BEFORE issuing a single
+    statement, so nothing is committed mid-walk and the lock is nonetheless free
+    the entire time. The proxy went false while the property it stood for got
+    stronger, so the assertion now measures the property itself. Both shipped
+    designs pass it; the flush-first one this file was written against does not.
     """
     from app import config as cfg
 
-    count = 600                      # > the 500-row batch, so a flush is due
+    count = 600
     src = tmp_path / 'many'
     src.mkdir()
     blob = (tmp_path / 'seed.jpg')
@@ -212,18 +222,25 @@ def test_creating_a_bank_saves_as_it_walks(tmp_path, monkeypatch):
     application = _file_backed_app(tmp_path)
     client = application.test_client()
     db_path = str(tmp_path / 'studio.db')
-    landed_midway = {}
+    writable_midway = {}
 
     real_getsize = os.path.getsize
     state = {'n': 0}
 
     def counting_getsize(path):
         state['n'] += 1
-        if state['n'] == 560:        # past the first batch boundary
-            conn = sqlite3.connect(db_path, timeout=2.0)
+        if state['n'] == 560:        # well inside the walk
+            # A short timeout on purpose: this stands in for the click the user
+            # makes while the bank is registering. Waiting minutes for it is the
+            # failure, not the wait itself.
+            conn = sqlite3.connect(db_path, timeout=1.0)
             try:
-                landed_midway['n'] = conn.execute(
-                    'SELECT count(*) FROM bank_image').fetchone()[0]
+                conn.execute('BEGIN IMMEDIATE')     # take the single writer
+                conn.rollback()
+                writable_midway['ok'] = True
+            except sqlite3.OperationalError as exc:
+                writable_midway['ok'] = False
+                writable_midway['why'] = str(exc)
             finally:
                 conn.close()
         return real_getsize(path)
@@ -235,11 +252,11 @@ def test_creating_a_bank_saves_as_it_walks(tmp_path, monkeypatch):
                         json={'name': 'MANY', 'folder': str(src)})
     assert r.status_code == 200, r.get_json()
 
-    assert 'n' in landed_midway, 'the probe point was never reached'
-    assert landed_midway['n'] >= 500, (
-        f'only {landed_midway["n"]} rows were committed 560 files into the '
-        'walk — the insert loop is flushing instead of committing, so it holds '
-        'the write lock for the whole walk')
+    assert 'ok' in writable_midway, 'the probe point was never reached'
+    assert writable_midway['ok'], (
+        'the rest of the app could not write 560 files into the walk '
+        f'({writable_midway.get("why")}) — bank creation is holding SQLite\'s '
+        'single writer across its getsize walk')
 
 
 def test_a_vision_pass_holds_no_long_write_transaction(tmp_path, monkeypatch):

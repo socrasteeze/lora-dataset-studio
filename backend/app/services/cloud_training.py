@@ -968,6 +968,32 @@ def _set(run, **fields):
             _sleep(_COMMIT_RETRY_BASE_SECONDS * (2 ** attempt))
 
 
+def _set_soft(run, **fields) -> bool:
+    """Write purely informational monitor state; never fail the run over it.
+
+    ``_set`` is the authoritative writer and must keep raising: a lost status
+    transition would leave a rented pod misrepresented. The per-poll progress
+    heartbeat is different — it only refreshes cosmetic ``phase_detail`` text.
+    On 2026-08-01 a local write lock outlived the retry budget while run #137
+    was training normally on a rented 5090; the heartbeat commit raised out of
+    the monitor thread and the run was recorded as failed with
+    'database is locked', GPU time and all. A cosmetic refresh is allowed to be
+    skipped; the next poll writes the same text a few seconds later.
+
+    Returns whether the write landed, so callers can log the miss.
+    """
+    try:
+        _set(run, **fields)
+        return True
+    except Exception as e:                        # noqa: BLE001 - deliberate
+        if not _is_locked_error(e):
+            raise
+        logger.warning('run %s: progress heartbeat skipped — the database '
+                       'stayed write-locked; training is unaffected',
+                       getattr(run, 'id', '?'))
+        return False
+
+
 def _reconcile_before_launch(app):
     """Seam around the launch-time reconcile_orphans() call (defined below).
     A thin indirection rather than calling reconcile_orphans directly so
@@ -3629,7 +3655,7 @@ def _monitor(app, run_id):
                     _sync_latest_checkpoint(run, remote)
                 status = job.get('status')
                 info = job.get('info') or ''
-                _set(run, phase_detail=f"{status}: {info}"[:500])
+                _set_soft(run, phase_detail=f"{status}: {info}"[:500])
 
                 if status == 'completed':
                     if _is_full_transformer_run(run):
@@ -5023,6 +5049,13 @@ def _gallery_image(r) -> dict:
         # node draws its link to the source pill from these two, so the link
         # cannot drift from the image.
         'record_id': r.record_id,
+        # WHICH LAUNCH made it. Already grouped every cell of one "Generate"
+        # (it is what a grid resumes from) and never left the database. The
+        # canvas needs it: without it, two runs fired at the SAME checkpoint
+        # were indistinguishable, so pinning the second one appended its
+        # pictures to the first one's strip and the board showed one lot where
+        # there were two. Null on images that predate the column.
+        'run_id': r.run_id,
         'created_at': r.created_at.isoformat() if r.created_at else None,
         # ── What the image was actually MADE with ────────────────────────────
         # Every one of these was already persisted per cell (for a faithful
@@ -5806,6 +5839,16 @@ def canvas_dataset_index(user_id) -> dict:
             # same route, same trash, but the user was not told what they were
             # about to break.
             'best_settings_loras': studio.best_settings_lora_filenames(ds),
+            # 🪪 The dataset's REFERENCE face, and what kind of dataset it is.
+            # Read off the row already in hand — no extra query, no disk, so
+            # the "cheap by design" invariant above still holds. The canvas
+            # draws it beside the lane's name: a board full of renders of a
+            # person with the person nowhere on it made every comparison a
+            # memory test. Only meaningful for a character dataset (a concept
+            # or a style has no reference face); `kind` travels so the canvas
+            # decides that instead of guessing from a filename.
+            'ref_filename': ds.ref_filename,
+            'kind': (ds.kind or '').lower() or 'character',
         })
     out.sort(key=lambda d: (d['last_run_at'] or '', d['id']), reverse=True)
     return {'datasets': out}

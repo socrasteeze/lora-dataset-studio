@@ -50,6 +50,70 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-01-bank-image-ceiling-raised',
+    date: '2026-08-01',
+    title: 'A bank now takes 200,000 images, and stops miscounting the ones you deleted',
+    blurb:
+      'The per-bank ceiling went from 50,000 to 200,000 images. It is also counted correctly at last: images you had deleted from the folder still counted against it, so a folder that once hit the limit could refuse every new file for ever — with a message claiming it "now holds more than 50000 images" when it held a fraction of that. Reaching the ceiling no longer refuses the whole batch either: everything that fits is added and the app tells you exactly how many were left out.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-01-delete-rejected-shows-progress',
+    date: '2026-08-01',
+    title: 'Watch 🗑 Delete rejected work, and stop it whenever you like',
+    blurb:
+      'Deleting thousands of rejected files used to freeze the dialog on "Deleting…" for minutes with no count, no way to stop, and no way to tell a slow run from a crashed one. It is an ordinary bank pass now: the progress bar at the top of the bank counts the files as they go, Stop works, and the finished run reports how many left the disk and where they went.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-01-klein-edits-follow-the-instruction',
+    date: '2026-08-01',
+    title: 'Klein edits follow what you asked again',
+    blurb:
+      'Every local Klein edit — the ✦ reference edit, variations, regenerations and the small-image rescue — was quietly mixing in a detail LoRA at 0.8 strength, which pulled results away from the instruction you typed. It only started happening once that LoRA became an automatic download, and nothing showed it or could turn it down. Edits now run without it by default, and a new "Enhancement LoRA on edits" setting lets you add it back on purpose.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-01-studio-combine-loras',
+    date: '2026-08-01',
+    title: 'Load two of your LoRAs in the same test image',
+    blurb:
+      'Test Studio can now COMBINE the LoRAs you check instead of only comparing them side by side. Switch to 🧬 Combine, give each LoRA its own weight, and they render together in one image with every trigger word injected for you. Mixing families stays blocked — Krea and SDXL LoRAs need different base models — and the message now names which two you picked.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-01-studio-enhance-prompt',
+    date: '2026-08-01',
+    title: 'Turn a one-line test prompt into a full one',
+    blurb:
+      'A ✨ Enhance button next to the Test Studio prompt rewrites what you typed into a richer prompt using your local Ollama model — framing, pose, lighting and mood added, identity and trigger words left alone. Without Ollama the button is simply greyed out and tells you what is missing.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-01-setup-checks-in-the-background',
+    date: '2026-08-01',
+    title: 'Stop re-running Setup every time you come back',
+    blurb:
+      'Once LDS has seen your install working, coming back — a new tab, a new browser, another machine, a restarted server — drops you straight into the app instead of the wizard. The same checks now run in the background while you work, with one small line in the corner that fades on its own. You are only interrupted when something that used to work has stopped: the warning names what broke, ignores ComfyUI or Ollama simply not running, and takes "that was on purpose" for an answer.',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-01-canvas-runs-stay-separate-and-in-epoch-order',
+    date: '2026-08-01',
+    title: 'Pin two generation runs to the canvas and compare them side by side',
+    blurb:
+      'Pinning a second run at the same checkpoint no longer folds its images into the first run’s strip — each generation keeps its own strip on the board, so two runs stay two runs. Every strip now reads left to right in training order (500, 1000, 1500…) instead of alphabetically, and an over-cap batch keeps the early epochs rather than an arbitrary slice.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-01-canvas-shows-the-dataset-reference-face',
+    date: '2026-08-01',
+    title: 'See who the renders are meant to be, right on the canvas',
+    blurb:
+      'Each character dataset’s lane on the LoRA Canvas now opens with its reference image, next to the dataset name. Click it to open it full size against the pinned renders. Concept and style datasets are unaffected — they have no reference face.',
+    to: '/canvas',
+  },
+  {
     id: '2026-08-01-queue-only-what-is-missing',
     date: '2026-08-01',
     title: 'Every bank card now says what has been done to it — and Queue all stops redoing it',

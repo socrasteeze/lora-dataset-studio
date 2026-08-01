@@ -114,7 +114,10 @@ def test_a_singleton_left_by_delete_rejected_is_not_badged(client, tmp_path, mon
     _scan(client, bank_id)
     client.post(f'/api/bank/{bank_id}/dups/resolve', json={'strategy': 'best'})
     r = client.post(f'/api/bank/{bank_id}/delete-rejected', json={})
-    assert r.status_code == 200, r.get_json()
+    # 202 since 2026-08-01: the delete is a background bank job (progress + Stop).
+    # Under TESTING bank_jobs runs it inline, so the rows are already gone here.
+    assert r.status_code == 202, r.get_json()
+    assert r.get_json()['rows_removed'] == 1, r.get_json()
 
     by = _by_name(client, bank_id)
     assert len(by) == 1, by.keys()
