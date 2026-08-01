@@ -1,9 +1,11 @@
 /* 🚀 Queue every bank — the decidable half.
  *
- * Queueing is not running: the queue drains ONE bank at a time, waiting for the
- * previous to finish and the GPU to be free. That is the whole reason this is
- * safe to offer as a single button, and the confirm has to say it — "run all"
- * on twelve banks is what people are (rightly) afraid of.
+ * Queueing is not running: the queue drains ONE bank at a time PER MACHINE,
+ * each waiting for the previous to finish and, on this machine, for the GPU to
+ * be free. That is the whole reason this is safe to offer as a single button,
+ * and the confirm has to say it — "run all" on twelve banks is what people are
+ * (rightly) afraid of. Sending banks to a peer does not multiply that: it is
+ * one more lane, not twelve.
  */
 
 import { untriagedCount } from './bankSort.js'
@@ -23,8 +25,9 @@ export function queueAllConfirm(candidates, steps) {
   if (!n) return null
   const passes = (steps || []).length
   return `Queue ${n} bank${n === 1 ? '' : 's'}?\n\n`
-    + `They run ONE AT A TIME, in order — each waits for the previous to finish `
-    + `and for the GPU to be free. Nothing starts in parallel.\n\n`
+    + `They run ONE AT A TIME on each machine, in order — each waits for the `
+    + `previous to finish, and on this machine for the GPU to be free. A bank `
+    + `sent to another machine runs alongside, never twelve at once.\n\n`
     + `${passes} pass${passes === 1 ? '' : 'es'} per bank. Banks with nothing left `
     + `to decide are skipped, and you can cancel any of them from the queue.`
 }
@@ -47,6 +50,6 @@ export function queueAllResult(response) {
   const tail = skipped ? ` ${skipped} skipped (already queued).` : ''
   return {
     type: 'success',
-    text: `${queued} bank(s) queued — they run one at a time.${tail}`,
+    text: `${queued} bank(s) queued — they run one at a time per machine.${tail}`,
   }
 }

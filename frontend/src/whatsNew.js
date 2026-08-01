@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-queue-lanes-and-honest-skipped-passes',
+    date: '2026-07-31',
+    title: 'Your second machine no longer waits in line — and a wasted night finally says so',
+    blurb:
+      'Two fixes to the Launch-all queue. Banks sent to another machine used to sit behind local work in a single line, so renting a second computer bought you nothing: each machine now has its own lane and runs alongside the others, while everything aimed at this one still goes strictly one at a time. Two banks that share a name are one card, and only one of them ever runs, whichever machines they were sent to. The queue panel now names the machine each bank will run on and says what a waiting bank is waiting for. Separately: when a pass was skipped because the graphics card was busy, the bank card showed nothing at all — a night where every heavy pass was skipped looked exactly like a clean one. It now says how many passes were skipped and why. A pass you stopped yourself is still not counted against you.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-31-launch-all-greys-out-what-the-machine-cannot-do',
     date: '2026-07-31',
     title: 'Launch all now knows what the machine you picked can actually do',

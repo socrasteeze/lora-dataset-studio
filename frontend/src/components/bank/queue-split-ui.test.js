@@ -90,7 +90,7 @@ test('queue-all posts the queue route, never one pipeline per bank', () => {
   // entry per bank, drained one at a time by the untouched worker gate.
   assert.match(page, /postJson\('\/api\/bank-queue\/all', config\)/);
   assert.match(page, /⏳ Queue all \{queueAllCount\} bank\(s\)…/);
-  assert.match(page, /One at a time, in order — nothing runs in parallel/);
+  assert.match(page, /One at a time on this machine — a bank sent to another one runs alongside it/);
 });
 
 test('queue-all confirms first, and the toast comes from the SERVER counts', () => {
@@ -120,4 +120,14 @@ test('the drained queue reports its outcome ONCE, never on a poll', () => {
   // fine, a poll is not (see the setInterval assertion above).
   assert.match(page, /queueOutcomeLine\(/);
   assert.doesNotMatch(page, /setInterval\(refresh,/);
+});
+
+test('the queue panel says WHERE each bank runs and why it is waiting', () => {
+  // snapshot() published device_id and waiting_for all along and the panel
+  // dropped both: twelve banks queued to a peer looked byte-identical to twelve
+  // local ones, and a queue stalled on a stuck GPU flag looked simply dead.
+  // With a lane per machine, two "running" rows are otherwise indistinguishable.
+  assert.match(page, /it\.device_label && \(/);
+  assert.match(page, /on \{it\.device_label\}/);
+  assert.match(page, /it\.state !== 'running' && it\.waiting_for/);
 });

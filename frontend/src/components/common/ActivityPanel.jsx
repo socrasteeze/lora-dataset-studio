@@ -134,7 +134,7 @@ export default function ActivityPanel({ onClose }) {
             <p className="text-[0.6875rem] text-content-subtle">
               Waiting: {queued.map((q) => (
                 q.device_id && q.device_id !== 'local' ? `#${q.bank_id} (remote)` : `#${q.bank_id}`
-              )).join(', ')} — one at a time.
+              )).join(', ')} — one at a time per machine.
             </p>
           )}
         </div>

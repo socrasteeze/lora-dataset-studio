@@ -507,16 +507,29 @@ offered — it only gets a note saying it hasn't reported what it can run.
 
 Got several banks to clean? Instead of babysitting them one at a time, open a
 bank's Launch-all dialog from the Banks page and choose **Add to queue**. The
-**Launch-all queue** works through the banks one at a time, each one waiting its
-turn for the GPU rather than failing when another bank — or a training run — is
-using it. A panel on the Banks page shows what's running and what's lined up, and
-lets you cancel a bank or clear the whole queue. Queue three exports before bed
-and they'll be triaged by morning.
+**Launch-all queue** works through the banks one at a time **on each machine**,
+each one waiting its turn for the GPU rather than failing when another bank — or
+a training run — is using it. A panel on the Banks page shows what's running and
+what's lined up, names the machine each bank will run on, and lets you cancel a
+bank or clear the whole queue. Queue three exports before bed and they'll be
+triaged by morning.
+
+**One lane per machine.** Everything aimed at this computer runs strictly in
+order — two banks never share the graphics card. A bank you sent to a compute
+peer gets its own lane and runs *alongside* local work instead of behind it,
+which is the whole reason to have a second machine. One lane per peer, no more:
+a peer takes one job at a time, so a second lane would just queue over there
+where this panel cannot see it.
+
+Two banks that share a name are **one card**, and the queue keeps them one: however
+they are spread across machines, only one of them ever runs at a time. A single
+card cannot honestly show two different states at once.
 
 **⏳ Queue all N bank(s)…** does the whole library in one gesture. It picks every
 bank that still has undecided images — a fully triaged one has nothing for a
 pipeline to decide, so it is skipped — asks which passes to run, and adds one
-queue entry per bank. It **queues**; it does not launch anything in parallel.
+queue entry per bank. It **queues**; twelve banks never become twelve runs — at
+most one per machine is going at a time.
 The confirmation says so with the count, and every bank is still cancellable
 from the queue panel. A bank already in the queue is skipped by name rather than
 counted twice.
@@ -1183,7 +1196,9 @@ duplicates. It is refused outright if any member has a pass running, before
 anything is created.
 
 **Queueing the group** adds one entry **per bank**, exactly like queueing them by
-hand. They still run one at a time.
+hand. They still run one at a time — and unlike unrelated banks, that holds even
+across machines: the group is one card, so only one of its members is ever
+running, whichever machine each was sent to.
 
 One honest limit: if two members point at **overlapping folders on disk**, the
 card's combined counts add the same images more than once. The card says so.
