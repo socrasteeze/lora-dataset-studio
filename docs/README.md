@@ -35,6 +35,7 @@ This is the documentation index for LoRA Dataset Studio. The root [README](../RE
 | [Roadmap](../README.md#roadmap) | Directions currently planned, without date promises |
 | [Changelog](../CHANGELOG.md) | Shipped improvements rolled out of the README |
 | [Contributing](../CONTRIBUTING.md) | Development setup, tests and pull-request conventions |
+| [Design specs](specs/) | Dated records of why a change was built the way it was — read before reworking one of these areas |
 | [Code of Conduct](../CODE_OF_CONDUCT.md) | Community expectations |
 | [License](../LICENSE) | PolyForm Noncommercial License 1.0.0 |
 
