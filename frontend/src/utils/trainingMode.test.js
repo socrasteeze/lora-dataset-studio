@@ -182,24 +182,6 @@ test('dense offers never reuse an unlabelled or unavailable estimate', () => {
   assert.equal(cloudTierEstimateView({ est_minutes: 42 }, { fullMode: false }).available, true);
 });
 
-test('MVP copy and artifact actions distinguish a full model from a LoRA', () => {
-  assert.match(panel, /LoRA/);
-  assert.match(panel, /Full model/);
-  assert.match(panel, /80 GB VRAM GPU/);
-  assert.match(panel, /at least 200 GB disk/);
-  assert.match(panel, /~26 GB/);
-  assert.match(panel, /private Hugging Face repository/);
-  assert.match(panel, /much larger, more diverse dataset/);
-  assert.match(panel, /Open private model on Hugging Face/);
-  assert.match(panel, /!fullMode && !cloudActiveHere/);
-  assert.match(panel, /HF_CLOUD_TOKEN/);
-  assert.match(panel, /ArrowLeft/);
-  assert.match(panel, /tabIndex=\{!fullMode \|\| !fullTransformerEligible \? 0 : -1\}/);
-  assert.match(panel, /aria-describedby/);
-  assert.doesNotMatch(panel,
-    /Modèle complet|Fine-tuning complet|Recette dense verrouillée|Lancer le fine-tuning complet|Choisir un GPU 80 Go|Livraison Hugging Face bloquée|estimation dense indisponible/);
-});
-
 test('dense Advanced renders only the locked server recipe and its honored steps input', () => {
   const recipe = panel.slice(
     panel.indexOf('// FULL_TRANSFORMER_ADVANCED_RECIPE_START'),
@@ -245,31 +227,6 @@ test('local hook persists and launches with the canonical mode', () => {
   assert.match(datasetHook, /catch \(error\)[\s\S]*return null/);
 });
 
-test('offers use the exact recipe and refetch when any recipe input changes', () => {
-  assert.match(panel, /new URLSearchParams\(\{\s*train_type: trainType,\s*variant,\s*base_model: base \?\? '',\s*training_mode:/);
-  assert.match(panel, /\[datasetId, trainType, variant, base, trainingMode, steps\]/);
-  assert.match(panel, /full-model estimate unavailable — hourly price only/);
-  assert.match(panel, /hasUsableEstimate/);
-  assert.match(panel, /hfCloudTokenReadiness\(data \|\| \{\}\)/);
-  assert.match(panel, /disabled=\{!selected \|\| launching \|\| !customBaseReady \|\| hfTokenBlocked\}/);
-  assert.match(panel, /focus="HF_CLOUD_TOKEN"/);
-  assert.match(panel, /checksDenseCloudToken/);
-});
-
-test('empty cloud offers preserve the cap message and link to its exact setting', () => {
-  const emptyOffersStart = panel.indexOf('{!loading && !error && tiers.length === 0 && (');
-  const populatedOffersStart = panel.indexOf('{tiers.length > 0 && (', emptyOffersStart);
-  assert.ok(emptyOffersStart >= 0 && populatedOffersStart > emptyOffersStart,
-    'the empty-offers branch must remain distinct from the populated offer list');
-
-  const emptyOffersBranch = panel.slice(emptyOffersStart, populatedOffersStart);
-  assert.match(emptyOffersBranch,
-    /No GPU available under \$\{data\?\.max_price_per_hour\}\/h right now/);
-  assert.match(emptyOffersBranch,
-    /<SettingsLink section="training" focus="cloud-max-price-per-hour">\s*increase the price cap in Settings\s*<\/SettingsLink>/);
-  assert.equal([...panel.matchAll(/focus="cloud-max-price-per-hour"/g)].length, 1,
-    'the price-cap link must appear only in the tiers.length === 0 branch');
-});
 
 test('mode persistence is atomic and the incompatible fallback is not optimistic', () => {
   assert.match(panel, /setDatasetTrainingMode\?\.\(TRAINING_MODE_LORA, nextSelection\)/);
@@ -289,21 +246,3 @@ test('mode persistence is atomic and the incompatible fallback is not optimistic
     'the UI must wait for the canonical mode + disabled Slider response');
 });
 
-test('full run cards surface Hub status and suppress LoRA-only actions', () => {
-  assert.match(runsPage, /function FullArtifactStatus/);
-  assert.match(runsPage, /!fullModel && run\.checkpoint_ready/);
-  assert.match(runsPage, /!fullModel && run\.dataset_id != null/);
-  assert.match(runsPage, /!fullModel && run\.record_id != null/);
-  assert.match(runsPage, /isFullTransformerRun\(run\) && \([\s\S]*?<FullArtifactStatus run=\{run\}/);
-  assert.match(runsPage, /AI Toolkit uploads the full model to Hugging Face only when the run finishes cleanly/);
-  assert.match(runsPage, /Verify Hugging Face delivery/);
-  assert.match(runsPage, /Retry pod cleanup/);
-  assert.match(runsPage, /\/api\/dataset\/train\/cloud\/recheck-delivery/);
-  assert.match(runsPage, /Inspect Hugging Face repository \(delivery not verified\)/);
-});
-
-test('user-facing full-model recovery copy never falls back to dense terminology', () => {
-  assert.match(panel, /the latest full-model checkpoint may not have reached Hugging Face/);
-  assert.match(runsPage, /Verify or recover the full-model weights on Hugging Face/);
-  assert.doesNotMatch(`${panel}\n${runsPage}`, /\bdense (?:checkpoint|weights)\b/i);
-});

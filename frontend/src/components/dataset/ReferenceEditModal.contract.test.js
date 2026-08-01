@@ -167,8 +167,13 @@ test('the hook submits and retries the exact selected engine list', () => {
     'Retry availability must follow the currently displayed opaque batch');
 });
 
-test('mixed API and local batches keep the picker but explain its scope', () => {
+/* Divergence 1: upstream keeps the transient picker for a MIXED batch, because
+   its API engines consume those bytes. Every engine here is local, so there is no
+   mixed case and the picker never shows. What still matters — and is asserted —
+   is that the modal DERIVES that from the per-engine table rather than hardcoding
+   it, so adding an engine that does take uploads needs no second decision. */
+test('the picker is derived from the engine table, and no API scope note remains', () => {
   assert.match(modal, /acceptsExtraEditRefsForBatch\(engines\)/);
-  assert.match(modal, /Images added here go only to the selected API engines/);
-  assert.match(modal, /selectedApiEngines\.length > 0 && selectedLocalEngines\.length > 0/);
+  assert.doesNotMatch(modal, /Images added here go only to the selected API engines/);
+  assert.doesNotMatch(modal, /selectedApiEngines/);
 });

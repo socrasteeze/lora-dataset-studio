@@ -68,7 +68,6 @@ import {
   cloudTierEstimateView,
   fullTransformerArtifactView,
   fullTransformerUnavailableReason,
-  hfCloudTokenReadiness,
   isFullTransformerEligible,
   normalizeTrainingMode,
   trainingModeLabel,
@@ -1053,7 +1052,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   // WHICH pairs duplicate, editable/rejectable in place) and await the user's
   // Start-anyway / Cancel. Unreachable preflight never blocks.
   const [preflightReport, setPreflightReport] = useState(null);
-  const [hfCloudTokenIssue, setHfCloudTokenIssue] = useState(null);
   const preflightResolver = useRef(null);
   const resolvePreflight = (ok) => {
     setPreflightReport(null);
@@ -1087,18 +1085,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         }),
         { credentials: 'include' });
       const d = await r.json().catch(() => ({}));
-      const tokenReadiness = hfCloudTokenReadiness(d);
-      const checksDenseCloudToken = lane === 'cloud'
-        && normalizeTrainingMode(trainingMode) === TRAINING_MODE_FULL_TRANSFORMER;
-      if (checksDenseCloudToken && tokenReadiness.blocked) {
-        const detail = tokenReadiness.detail
-          || 'HF_CLOUD_TOKEN is missing, invalid, or does not have the required permissions.';
-        setHfCloudTokenIssue(detail);
-        if (onRefused) onRefused(detail);
-        return false;
-      } else if (checksDenseCloudToken && tokenReadiness.signaled) {
-        setHfCloudTokenIssue(null);
-      }
       if (!r.ok) return true;
       if (d.blockers?.length) {
         // A blocker set that is entirely bypassable quality guard-rails
@@ -1901,24 +1887,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </span>
       </div>
 
-      {fullMode && (
-        <div role="status" className="rounded-lg border border-sky-400/45 bg-sky-500/10 px-3 py-2 text-[0.75rem] leading-relaxed">
-          <div className="font-semibold text-sky-100">Experimental · advanced cloud mode · not recommended by default</div>
-          <p className="m-0 mt-1 text-sky-200/90">
-            Krea officially recommends training a LoRA on Raw, then applying it to Turbo.
-            Full-model training requires a much larger, more diverse dataset, an 80 GB GPU,
-            and at least 200 GB of disk.
-          </p>
-          <p className="m-0 mt-1 text-amber-100/95">
-            The ~26 GB model is uploaded using a dedicated <code>HF_CLOUD_TOKEN</code>. A tightly scoped
-            fine-grained token is recommended: read access only to Krea 2 Raw and write access to a single
-            dedicated Hugging Face namespace containing only LDS deliveries. A global write token is also
-            accepted with a warning. Configure it in{' '}
-            <SettingsLink section="local-tools" focus="HF_CLOUD_TOKEN" tone="warning">Settings ▸ Local tools</SettingsLink>.
-            {' '}Stopping the run or hitting the runtime cap may lose the latest full-model checkpoint if it has not been uploaded.
-          </p>
-        </div>
-      )}
 
       {/* A custom base picked on ANOTHER family was still attached to this
           dataset (one shared column). The run ignores it — say so, once, rather
