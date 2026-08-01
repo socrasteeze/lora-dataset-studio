@@ -14,7 +14,23 @@ import { defaultValueAt } from './settingDefaults.js'
    (9B KV) is public and needs no token. */
 const HF_SECRET = {
   key: 'HF_TOKEN', label: 'Hugging Face token', testTarget: null,
-  help: 'Needed for gated training bases (Krea 2, FLUX.1, FLUX.2 Klein) and to read your private custom-base cloud repos — accept each model license, then read a token from hf.co/settings/tokens. Local Klein generation (9B KV) downloads without a token.',
+  help: (
+    <>
+      Needed for gated training bases (Krea 2, FLUX.1, FLUX.2 Klein) and to read your private custom-base cloud repos — accept each model license, then create a token with the{' '}
+      <strong className="font-semibold text-content">read</strong>
+      {' role. Local Klein generation (9B KV) downloads without a token.'}
+    </>
+  ),
+  guide: (
+    <a
+      href="https://huggingface.co/settings/tokens/new?tokenType=read"
+      target="_blank"
+      rel="noreferrer"
+      className="mb-2 inline-block max-w-full text-xs font-medium text-sky-300 underline underline-offset-2 hover:text-sky-200"
+    >
+      Create a read token on Hugging Face ↗
+    </a>
+  ),
 }
 
 /* Ollama's three live states, from capabilities (installed + reachable):
@@ -252,6 +268,8 @@ export default function LocalToolsSection(props) {
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
         <SecretField field={HF_SECRET} {...props} />
+        <div className="rounded-lg border border-sky-400/25 bg-sky-400/5 p-3">
+        </div>
       </Card>
 
       <Card

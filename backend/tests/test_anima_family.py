@@ -19,6 +19,8 @@ def _configure_aitoolkit(tmp_path, app, supports_anima=True):
     root = tmp_path / 'aitoolkit'
     (root / 'venv' / 'Scripts').mkdir(parents=True)
     (root / 'venv' / 'Scripts' / 'python.exe').write_text('fake')
+    (root / 'venv' / 'bin').mkdir(parents=True, exist_ok=True)
+    (root / 'venv' / 'bin' / 'python').write_text('fake')
     (root / 'run.py').write_text('fake')
     ext = root / 'extensions_built_in' / 'diffusion_models' / 'anima'
     ext.mkdir(parents=True)

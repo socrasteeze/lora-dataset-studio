@@ -23,6 +23,7 @@ import time
 import uuid
 import warnings
 import zipfile
+from functools import wraps
 from types import SimpleNamespace
 from typing import BinaryIO
 from urllib.parse import urlsplit
@@ -329,11 +330,40 @@ _IMAGE_PIXEL_EDIT_LOCKS = tuple(threading.Lock() for _ in range(64))
 # requests serial without retaining an unbounded lock map; a collision only
 # makes an unrelated request retry, never permits concurrent scorers.
 _FACE_SCORING_LOCKS = tuple(threading.Lock() for _ in range(64))
+# LDS runs one threaded Flask process (backend/run.py and Dockerfile). Striped
+# locks therefore serialize dataset dedupe snapshots without an unbounded map.
+# RLock permits a promotion to hold the stripe across all chunks while nested
+# import_images calls retain the same protection.
+_DATASET_INGEST_LOCKS = tuple(threading.RLock() for _ in range(64))
 _FACE_SCORING_BUSY_DETAIL = 'face scoring is already running; try again shortly'
 
 
 def _face_scoring_lock(dataset_id):
     return _FACE_SCORING_LOCKS[hash(str(dataset_id)) % len(_FACE_SCORING_LOCKS)]
+
+
+def _dataset_ingest_lock(user_id, dataset_id):
+    return _DATASET_INGEST_LOCKS[
+        hash((str(user_id), str(dataset_id))) % len(_DATASET_INGEST_LOCKS)]
+
+
+def _serialize_dataset_ingest(fn):
+    @wraps(fn)
+    def wrapped(user_id, dataset_id, *args, **kwargs):
+        with _dataset_ingest_lock(user_id, dataset_id):
+            return fn(user_id, dataset_id, *args, **kwargs)
+    return wrapped
+
+
+def _serialize_dataset_image_ingest(fn):
+    @wraps(fn)
+    def wrapped(user_id, image_id, *args, **kwargs):
+        image = db.session.get(FaceDatasetImage, image_id)
+        if image is None:
+            return fn(user_id, image_id, *args, **kwargs)
+        with _dataset_ingest_lock(user_id, image.dataset_id):
+            return fn(user_id, image_id, *args, **kwargs)
+    return wrapped
 
 
 def _face_scoring_busy_error():
@@ -355,6 +385,17 @@ class KleinNodesMissing(Exception):
 # restent sur la principale.
 MAX_EXTRA_REFS = 3
 
+# Bounds on the extra references a reference EDIT may carry. Upstream sizes these
+# for a base64 API request; they matter here for the same reason minus the wire —
+# three dataset extras plus transient anchors must not turn one edit into an
+# unbounded in-memory snapshot, and a restored backup can hand us a preserved
+# JPEG/PNG/BMP off disk. routes/datasets.py enforces both before the read.
+EXTERNAL_REFERENCE_MAX_BYTES = 25 * 1024 * 1024
+# The modal exposes three request-scoped anchors. Enforce the same bound before
+# route reads so a hand-written multipart request cannot create an unbounded
+# in-memory snapshot.
+MAX_EDIT_REFERENCE_UPLOADS = 3
+
 
 def extra_ref_filenames(ds) -> list:
     """Références additionnelles du dataset (JSON en base, parse tolérant)."""
@@ -363,6 +404,46 @@ def extra_ref_filenames(ds) -> list:
     except (ValueError, TypeError):
         return []
     return [f for f in v if isinstance(f, str)] if isinstance(v, list) else []
+
+
+def _all_ref_bytes(ds) -> list:
+    """The primary reference then every persistent extra, as bytes.
+
+    Upstream's version of this is an EGRESS boundary: it strips EXIF/XMP/GPS and
+    downscales to 2048px because the bytes are about to be base64'd into a request
+    to someone else's server. Neither applies here — these bytes never leave the
+    machine, they are written to temporary files that ComfyUI opens locally — and
+    taking that version verbatim would silently downscale every local Klein edit's
+    reference. So this reads the app's own already-normalised WebPs and only keeps
+    the SIZE bound, which is a memory guard rather than a privacy one.
+
+    The primary is mandatory. A missing or unreadable legacy extra is skipped
+    rather than failing the edit: extras are optional identity context, and a
+    restored backup can contain one that no longer resolves.
+    """
+    def _read(path, label):
+        with open(path, 'rb') as fh:
+            raw = fh.read(EXTERNAL_REFERENCE_MAX_BYTES + 1)
+        if len(raw) > EXTERNAL_REFERENCE_MAX_BYTES:
+            raise ValueError(
+                f'{label} is too large '
+                f'(max {EXTERNAL_REFERENCE_MAX_BYTES // (1024 * 1024)} MiB)')
+        if not raw:
+            raise ValueError(f'{label} is unavailable')
+        return raw
+
+    try:
+        out = [_read(_ref_path(ds), 'primary reference')]
+    except (OSError, TypeError, MemoryError) as exc:
+        raise ValueError('primary reference is unavailable') from exc
+    for fn in extra_ref_filenames(ds):
+        try:
+            out.append(_read(os.path.join(_dataset_dir(ds.id), fn),
+                             'extra reference'))
+        except (OSError, TypeError, MemoryError, ValueError):
+            logger.warning(
+                'dataset %s: skipping unavailable extra reference', ds.id)
+    return out
 
 
 _EXTRA_REF_MARKER = '_datasetrefx_'
@@ -1151,7 +1232,8 @@ def remembered_family_settings(ds, family):
     return family_settings_memory(ds).get(normalize_train_type(family))
 
 
-def set_train_type(user_id, dataset_id, train_type) -> bool:
+def set_train_type(user_id, dataset_id, train_type, *, commit=True,
+                   target_training_mode=None) -> bool:
     """Change the target model family later (kept in sync with the TrainingPanel
     selector so the menu re-groups). Normalizes; unknown -> zimage. False if absent.
 
@@ -1170,21 +1252,32 @@ def set_train_type(user_id, dataset_id, train_type) -> bool:
     incoming family's own default) when that family has nothing remembered. The
     other advanced settings stay global on purpose — see the comment on
     _FAMILY_SCOPED_SETTING_KEYS for why quantisation and resolution are not
-    here."""
+    here. ``commit=False`` lets a caller join this family transition to a wider
+    validated settings transaction without an intermediate database state.
+    ``target_training_mode`` is reserved for that wider transaction: the legacy
+    family-only endpoint must validate against the currently persisted mode."""
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return False
     new_fam = normalize_train_type(train_type)
     old_fam = normalize_train_type(getattr(ds, 'train_type', None))
+    from . import lora_training as _lt
+    intended_mode = (_lt.training_mode(ds) if target_training_mode is None
+                     else _lt.normalize_training_mode(target_training_mode))
+    if intended_mode == 'full_transformer' and new_fam != 'krea':
+        raise ValueError(
+            'full_transformer training requires the Krea 2 model family. '
+            'Switch the training mode to LoRA in Training settings before '
+            'changing the model family.')
     if new_fam == old_fam:
-        db.session.commit()
+        if commit:
+            db.session.commit()
         return True
     memory = family_base_memory(ds)
     # Never remember a base the OUTGOING family provably cannot load. Datasets
     # created before this column exist in exactly that state (a Z-Image merge
     # left attached to a Krea 2 dataset); stashing it under 'krea' would freeze
     # the bug into the memory and hand it back on the way home.
-    from . import lora_training as _lt
     outgoing = ds.train_base_model or ''
     if _lt.foreign_base_reason(old_fam, outgoing):
         outgoing = ''
@@ -1218,7 +1311,8 @@ def set_train_type(user_id, dataset_id, train_type) -> bool:
     ds.train_family_settings = json.dumps(smemory)
 
     ds.train_type = new_fam
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return True
 
 
@@ -1731,6 +1825,7 @@ def _undo_rekeep_parent_after_reimprove_trash_failure(img, old_state):
     return bool(result.rowcount)
 
 
+@_serialize_dataset_image_ingest
 def set_image_status(user_id, image_id, status):
     if status not in _VALID_STATUS:
         raise ValueError('invalid status')
@@ -1953,6 +2048,7 @@ def _crop_resize_file(path, x, y, w, h, size=1024, dst=None):
     return True, scale
 
 
+@_serialize_dataset_image_ingest
 def crop_image(user_id, image_id, x, y, w, h):
     """Crop a dataset image to (x,y,w,h), long side capped at 1024, no pad (a box
     smaller than that keeps its own size). Returns bool."""
@@ -2123,6 +2219,7 @@ def _rotated_image_bytes(path, degrees):
     return transformed_image_bytes(path, rotate_transform(degrees))
 
 
+@_serialize_dataset_image_ingest
 def _edit_image_in_place(user_id, image_id, make_payload, *, tag):
     """Promote a re-encoded copy of one owned dataset image over its own file.
 
@@ -2263,6 +2360,7 @@ def rotate_image(user_id, image_id, degrees):
         tag='rotate')
 
 
+@_serialize_dataset_image_ingest
 def delete_image(user_id, image_id):
     """Delete a dataset image row and move its file to the app trash.
 
@@ -2323,6 +2421,7 @@ def _guard_no_active_training(dataset_id, *, action='deleting'):
         raise RuntimeError(_ACTIVE_RUN_TEMPLATE.format(action=action))
 
 
+@_serialize_dataset_ingest
 def delete_dataset(user_id, dataset_id):
     """Delete an owned dataset and move its complete folder to app trash.
 
@@ -2727,6 +2826,10 @@ def write_backup_zip(user_id: int, dataset_id: int, output: BinaryIO) -> None:
         'kind': ds.kind, 'fidelity': ds.fidelity,
         'concept_desc': ds.concept_desc, 'concept_terms': ds.concept_terms,
         'train_type': ds.train_type,
+        # Optional in backup v1: old archives omit it and restore as LoRA.
+        'training_mode': (ds.training_mode
+                          if ds.training_mode in ('lora', 'full_transformer')
+                          else 'lora'),
         'train_base_model': _portable_train_base_model(ds.train_base_model),
         'train_variant': ds.train_variant, 'train_settings': ds.train_settings,
         'best_settings': ds.best_settings,
@@ -2847,6 +2950,9 @@ def _import_backup_zipfile(user_id: int, z: zipfile.ZipFile):
         value = manifest.get(field)
         if value is not None and not isinstance(value, str):
             raise ValueError(f'invalid backup {field}')
+    restored_training_mode = manifest.get('training_mode', 'lora')
+    if restored_training_mode not in ('lora', 'full_transformer'):
+        raise ValueError('invalid backup training_mode')
     if not isinstance(images_meta, list):
         raise ValueError('invalid backup image metadata')
     if len(images_meta) > _BACKUP_MAX_ROWS:
@@ -2941,6 +3047,7 @@ def _import_backup_zipfile(user_id: int, z: zipfile.ZipFile):
         for field in ('concept_terms', 'train_variant', 'train_settings',
                       'best_settings', 'fidelity'):
             setattr(ds, field, manifest.get(field))
+        ds.training_mode = restored_training_mode
         ds.train_base_model = _portable_train_base_model(manifest.get('train_base_model'))
         ds.ref_filename = _backup_basename(manifest.get('ref_filename'))
         ds.ref_original_filename = _backup_basename(
@@ -3105,6 +3212,7 @@ def replace_in_captions(user_id, dataset_id, find, replace, mode='text'):
 BATCH_ACTIONS = ('keep', 'reject', 'pending', 'delete', 'clear_caption')
 
 
+@_serialize_dataset_ingest
 def batch_image_action(user_id, dataset_id, image_ids, action):
     """Apply one whitelisted action to a set of this dataset's images in one call
     (the grid's multi-select). Ownership is checked once on the dataset; ids that
@@ -3169,44 +3277,82 @@ def crop_reference(user_id, dataset_id, x, y, w, h):
     in the ORIGINAL's pixel space (the editor shows the original), and we write the
     derived square to ref_filename WITHOUT touching the original — so the user can
     re-crop wider or tighter any number of times."""
-    ds = get_dataset(user_id, dataset_id)
-    if not ds or not ds.ref_filename:
-        return False
-    ok, _scale = _crop_resize_file(_ref_crop_source_path(ds), x, y, w, h, dst=_ref_path(ds))
-    if ok:
-        invalidate_reference_edit(dataset_id)   # a pending Before/After is now stale
-    return ok
+    with reference_mutation(dataset_id):
+        ds = get_dataset(user_id, dataset_id)
+        if not ds or not ds.ref_filename:
+            return False
+        ok, _scale = _crop_resize_file(
+            _ref_crop_source_path(ds), x, y, w, h, dst=_ref_path(ds))
+        if ok:
+            invalidate_reference_edit(dataset_id)   # a pending Before/After is now stale
+        return ok
 
 
 def recrop_reference_auto(user_id, dataset_id):
     """Re-run the automatic head-crop on the ORIGINAL, overwriting ref_filename.
     Returns (ok, head_detected). CALLER holds the GPU vision window. Lets the user
     reset to the auto framing after manual edits, without re-uploading the photo."""
-    ds = get_dataset(user_id, dataset_id)
-    if not ds or not ds.ref_filename:
-        return False, False
-    try:
-        with open(_ref_crop_source_path(ds), 'rb') as fh:
-            raw = fh.read()
-    except OSError:
-        return False, False
-    webp, detected = face_crop_to_square_webp(raw, pad=REF_CROP_PAD, return_detected=True)
-    with open(_ref_path(ds), 'wb') as fh:
-        fh.write(webp)
-    invalidate_reference_edit(dataset_id)        # a pending Before/After is now stale
-    return True, detected
+    with reference_mutation(dataset_id):
+        ds = get_dataset(user_id, dataset_id)
+        if not ds or not ds.ref_filename:
+            return False, False
+        try:
+            with open(_ref_crop_source_path(ds), 'rb') as fh:
+                raw = fh.read()
+        except OSError:
+            return False, False
+        webp, detected = face_crop_to_square_webp(
+            raw, pad=REF_CROP_PAD, return_detected=True)
+        with open(_ref_path(ds), 'wb') as fh:
+            fh.write(webp)
+        invalidate_reference_edit(dataset_id)    # a pending Before/After is now stale
+        return True, detected
 
 
-def start_reference_edit(app, user_id, dataset_id, engine, prompt, extra_edit_ref_bytes=None):
-    """Start a background reference-edit job and RETURN AT ONCE (the request never
-    blocks for the 1-3 min render, so a backgrounded mobile tab can't kill it).
+def normalize_edit_engines(engines):
+    """Canonical ordered engine selection for both legacy and batch requests."""
+    raw_values = [engines] if isinstance(engines, str) else list(engines or ())
+    selected = []
+    for raw in raw_values:
+        engine = str(raw or '').strip().lower()
+        if not engine:
+            raise ValueError('select at least one engine for the reference edit')
+        if engine not in selected:
+            selected.append(engine)
+    allowed = editable_engines()
+    if not selected:
+        raise ValueError('select at least one engine for the reference edit')
+    # Apply the finite bound after normalization/deduplication. Membership below
+    # makes it structurally unreachable today, but keeps the contract explicit.
+    if len(selected) > len(allowed):
+        raise ValueError(f'select at most {len(allowed)} edit engines')
+    if any(engine not in allowed for engine in selected):
+        raise ValueError(edit_engine_choice_message())
+    return tuple(selected)
+
+
+def _preflight_local_reference_edit(ds, engine):
+    """Run local preflights available without enqueuing a render."""
+    if engine == KREA_ENGINE:
+        from . import krea_edit_helper as helper
+        helper.preflight()
+    # Klein's complete admission check intentionally lives in enqueue_klein_edit.
+
+
+def start_reference_edit(app, user_id, dataset_id, engine, prompt,
+                         extra_edit_ref_bytes=None, retry_batch_id=None):
+    """Start a background reference-edit job and RETURN AT ONCE (the request no
+    longer blocks 1-3 min, so a backgrounded mobile tab can't kill it). Snapshots
+    the reference + extras + modal images HERE, in the request thread (never
+    re-read in the worker), registers the candidate job and a 'edit_reference'
+    activity so the existing payload poll tracks it, then spawns the worker.
 
     LOCAL-ONLY ON THIS FORK. Upstream reaches this function with two lanes — a
     blocking API provider call in a worker thread, and a ComfyUI queue job — and
     branches on `engine in LOCAL_ENGINES`. The API engines are removed here
     (Divergence 1), so that branch would be dead in the always-true direction:
     it is DELETED rather than left in place, per the Divergence-1b trap. Every
-    edit is queued; see _start_local_reference_edit.
+    edit is queued; see _enqueue_local_reference_edit.
 
     `app` is accepted and unused, matching upstream's signature so the route and
     the tests stay shaped the same on both sides — the API lane needed it for the
@@ -3214,22 +3360,82 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt, extra_edit_re
 
     Raises ValueError for a bad engine / empty prompt / missing reference (the
     route maps it to 400/404)."""
-    if engine not in editable_engines():
-        raise ValueError(edit_engine_choice_message())
+    engines = normalize_edit_engines(engine)
     prompt = (prompt or '').strip()
     if not prompt:
         raise ValueError('describe the edit first')
+    # Capture the mutation epoch before *any* dataset/reference-state read. If a
+    # mutation commits after this point, start_batch's CAS rejects the snapshot;
+    # if it committed before this point, the reads below see the new state.
+    reference_revision = reference_edit_jobs.reference_revision(dataset_id)
     ds = get_dataset(user_id, dataset_id)
     if not ds or not ds.ref_filename:
         raise ValueError('reference image required')
     if not os.path.exists(_ref_path(ds)):
         raise ValueError('reference image file missing')
-    # Supersede FIRST: a previous edit still on the GPU is no longer wanted, and
-    # nothing else would ever stop it (its callback will find no entry).
-    prev_job, prev_act = reference_edit_jobs.pending_job(dataset_id)
-    _cancel_local_edit_job(prev_job, prev_act)
-    return _start_local_reference_edit(user_id, dataset_id, ds, engine, prompt,
-                                       extra_edit_ref_bytes)
+    local_engines = tuple(item for item in engines if item in LOCAL_ENGINES)
+    transient_refs = tuple(extra_edit_ref_bytes or ())
+    if len(transient_refs) > MAX_EDIT_REFERENCE_UPLOADS:
+        raise ValueError(
+            f'add at most {MAX_EDIT_REFERENCE_UPLOADS} extra edit references')
+
+    # One immutable primary+persistent-reference snapshot feeds every lane: the
+    # local siblings below consume temporary files written once from these exact
+    # bytes, never a later read of the master.
+    dataset_ref_bytes = tuple(_all_ref_bytes(ds))
+    if transient_refs:
+        # D1: upstream offers these uploads to its API lanes and refuses only the
+        # local ones. Every engine here IS local, so the refusal is unconditional
+        # — and must not point at an API engine the user cannot select.
+        local = local_engines[0]
+        raise ValueError(
+            f'{engine_labels().get(local, local)} renders on your own GPU and cannot take '
+            'the extra reference images added here — remove them to run the edit')
+
+    # Validate every selected local lane before replacing the current results.
+    for local in local_engines:
+        _preflight_local_reference_edit(ds, local)
+    dsdir = _dataset_dir(dataset_id)
+    started = reference_edit_jobs.start_batch(
+        dataset_id, dsdir, engines, prompt,
+        expected_revision=reference_revision,
+        expected_batch_id=retry_batch_id)
+    batch_token, tokens = started['batch_token'], started['tokens']
+    act_token = dataset_activity.begin(
+        dataset_id, 'edit_reference', total=len(engines),
+        engine=engines[0] if len(engines) == 1 else None)
+    if not reference_edit_jobs.attach_activity(dataset_id, batch_token, act_token):
+        dataset_activity.end(act_token)
+        raise RuntimeError('reference edit was superseded while it was starting')
+
+    # Prove admission for every sibling before any of them renders. If the second
+    # enqueue fails, clear cancels the first queue job and closes the shared
+    # activity exactly once.
+    local_snapshot_paths = []
+    try:
+        if local_engines:
+            snapshot_tag = uuid.uuid4().hex[:8]
+            for index, raw in enumerate(dataset_ref_bytes):
+                filename = (
+                    f'{user_id}{reference_edit_jobs.CANDIDATE_MARKER}'
+                    f'snapshot_{snapshot_tag}_{index}.webp')
+                path = os.path.join(dsdir, filename)
+                local_snapshot_paths.append(path)
+                write_image_atomic(path, raw)
+        for local in local_engines:
+            _enqueue_local_reference_edit(
+                user_id, dataset_id, ds, local, prompt, tokens[local],
+                local_snapshot_paths[0], local_snapshot_paths[1:])
+    except Exception:
+        reference_edit_jobs.clear_batch(dataset_id, batch_token, dsdir)
+        raise
+    finally:
+        for path in local_snapshot_paths:
+            reference_edit_jobs._unlink(path)
+
+    # The route returns this exact opaque id to the browser. Reading the registry
+    # after this function returns would race a second tab starting another batch.
+    return started['batch_id']
 
 
 #: Reference images each engine actually consumes, so the UI can say it at pick
@@ -3245,8 +3451,8 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt, extra_edit_re
 LOCAL_EDIT_REF_SUPPORT = {'klein': 'dataset_only', 'krea': 'primary_only'}
 
 
-def _start_local_reference_edit(user_id, dataset_id, ds, engine, prompt,
-                                extra_edit_ref_bytes=None):
+def _enqueue_local_reference_edit(user_id, dataset_id, ds, engine, prompt, token,
+                                  ref_path, extra_ref_paths):
     """Reference edit on the user's OWN GPU: free, private, no key, no bill — and
     therefore the lane that makes "try five prompts until it's right" reasonable.
     On this fork it is the ONLY lane.
@@ -3257,44 +3463,25 @@ def _start_local_reference_edit(user_id, dataset_id, ds, engine, prompt,
     lands. The registry entry is what the modal polls, so the client sees one
     contract (running -> ready|failed).
 
-    Preflight runs BEFORE anything is registered: a missing weight or node pack
-    then surfaces on the click as the SAME actionable 409 the generate route
-    returns (it even starts the download), instead of a spinner that ends in a raw
-    ComfyUI error three minutes later."""
-    if extra_edit_ref_bytes:
-        # Never silently dropped: the modal hides the picker, so reaching here
-        # means a client that didn't know. Say which engine and why.
-        raise ValueError(
-            f'{engine_labels().get(engine, engine)} renders on your own GPU and cannot take '
-            'the extra reference images added here — remove them and try again')
-    dsdir = _dataset_dir(dataset_id)
-    ref_path = _ref_path(ds)
-    if engine == KREA_ENGINE:
-        # Krea checks assets AND the custom-node pack up front; Klein does its own
-        # check inside enqueue_klein_edit (it raises KleinModelsMissing there). The
-        # asymmetry is the helpers', not ours — either way the miss arrives before
-        # any render, as the same 409 the generate route returns.
-        from . import krea_edit_helper as helper
-        helper.preflight()
-
-    token = reference_edit_jobs.start(dataset_id, dsdir, engine, prompt)
-    act_token = dataset_activity.begin(dataset_id, 'edit_reference', total=1, engine=engine)
+    Every enqueue completes before the batch is considered started. A missing
+    weight or node pack therefore surfaces as the same actionable 409 as generate,
+    and any already-enqueued sibling is cancelled rather than left rendering."""
     meta = {'is_reference_edit': True, 'dataset_id': dataset_id}
     try:
         if engine == KREA_ENGINE:
             from . import krea_edit_helper as helper
             job_id = helper.enqueue_krea_edit(
-                user_id=str(user_id), source_filename=ds.ref_filename,
+                user_id=str(user_id), source_filename=os.path.basename(ref_path),
                 source_path=ref_path, edit_prompt=prompt, extra_metadata=meta)
         else:
             from .klein_edit_helper import enqueue_klein_edit
             # The dataset's extra refs DO reach Klein (native ReferenceLatent
-            # chaining). Gated on the table above rather than on the engine name,
-            # so the two can't disagree.
-            extras = ([os.path.join(dsdir, fn) for fn in extra_ref_filenames(ds)]
+            # chaining). Gated on the table above rather than on the engine
+            # name, so the two can't disagree.
+            extras = (list(extra_ref_paths)
                       if LOCAL_EDIT_REF_SUPPORT.get(engine) == 'dataset_only' else [])
             job_id = enqueue_klein_edit(
-                user_id=str(user_id), source_filename=ds.ref_filename,
+                user_id=str(user_id), source_filename=os.path.basename(ref_path),
                 source_path=ref_path, edit_prompt=prompt, extra_ref_paths=extras,
                 # The dataset's model, like every other Klein lane: this edit
                 # produces the REFERENCE the whole dataset is built from, so it is
@@ -3303,9 +3490,6 @@ def _start_local_reference_edit(user_id, dataset_id, ds, engine, prompt,
                 klein_model=dataset_klein_model(ds),
                 sampler_steps=_generation_steps(), extra_metadata=meta)
     except Exception as exc:
-        # Nothing queued: drop the entry rather than leave a spinner with no job.
-        reference_edit_jobs.clear(dataset_id, dsdir)
-        dataset_activity.end(act_token)
         from .klein_edit_helper import KleinModelsMissing
         from .krea_edit_helper import KreaModelsMissing
         if isinstance(exc, (KleinModelsMissing, KreaModelsMissing)):
@@ -3315,18 +3499,16 @@ def _start_local_reference_edit(user_id, dataset_id, ds, engine, prompt,
             raise
         logger.exception('local reference edit could not be queued (dataset %s)', dataset_id)
         raise ValueError(f'{engine_labels().get(engine, engine)}: {exc}') from exc
-    if not reference_edit_jobs.attach_job(dataset_id, token, job_id, act_token,
-                                          user_id=str(user_id)):
+    if not reference_edit_jobs.attach_job(
+            dataset_id, token, job_id, user_id=str(user_id)):
         # Superseded between the enqueue and here: cancel the render nobody awaits.
-        _cancel_local_edit_job(job_id, act_token)
-    return token
+        _cancel_local_edit_job(job_id)
+        raise RuntimeError('reference edit was superseded while it was starting')
+    return job_id
 
 
-def _cancel_local_edit_job(job_id, act_token=None):
-    """Best-effort cancel of an abandoned local edit + close its activity. Never
-    raises: an un-cancellable job just finishes and finds no entry to fill."""
-    if act_token is not None:
-        dataset_activity.end(act_token)
+def _cancel_local_edit_job(job_id):
+    """Best-effort cancel of one just-enqueued job not owned by a live batch."""
     if not job_id:
         return
     try:
@@ -3334,6 +3516,26 @@ def _cancel_local_edit_job(job_id, act_token=None):
         queue_manager.cancel_job(job_id)
     except Exception:
         logger.warning('reference edit: could not cancel queue job %s', job_id, exc_info=True)
+
+
+def _finish_reference_edit_activity(dataset_id, token, fallback_act_token=None,
+                                    shared_activity=False):
+    """Advance one candidate and close the batch activity exactly once."""
+    update = reference_edit_jobs.activity_update(dataset_id, token)
+    if update is not None:
+        progress_token = update.get('activity_token')
+        if progress_token is not None:
+            dataset_activity.progress(
+                progress_token, done=update['done'], total=update['total'])
+        if update.get('end_token') is not None:
+            dataset_activity.end(update['end_token'])
+        elif not update.get('managed') and not shared_activity:
+            dataset_activity.end(fallback_act_token)
+        return
+    # Legacy direct worker calls register no shared token. A managed batch that
+    # disappeared was already ended by its supersede/clear/TTL cleanup.
+    if not shared_activity:
+        dataset_activity.end(fallback_act_token)
 
 
 def link_completed_reference_edit(job_id, filename, failed=False, reason=None):
@@ -3381,70 +3583,208 @@ def link_completed_reference_edit(job_id, filename, failed=False, reason=None):
         # moment activity clears, with ONE final refresh that must already see the
         # outcome.
         if entry is not None:
-            dataset_activity.end(entry['act_token'])
+            _finish_reference_edit_activity(
+                dataset_id, entry['token'], entry.get('act_token'),
+                shared_activity=True)
+
+
+def _validated_comfy_output_name(filename):
+    """Return an opaque Comfy output basename, or ``None`` when untrusted.
+
+    Comfy completion payloads cross a trust boundary.  In particular, a stale
+    completion is still cleaned up, so accepting a path here would turn that
+    cleanup into an arbitrary-file delete.  Keep the accepted shape deliberately
+    narrower than a generic relative path: Comfy reference-edit outputs are
+    always direct children of its output directory.
+    """
+    if not isinstance(filename, str) or not filename or '\x00' in filename:
+        return None
+    if filename in {'.', '..'} or filename != filename.strip():
+        return None
+    if '/' in filename or '\\' in filename or ':' in filename:
+        return None
+    if (os.path.isabs(filename) or ntpath.isabs(filename)
+            or posixpath.isabs(filename) or ntpath.splitdrive(filename)[0]):
+        return None
+    if (os.path.basename(filename) != filename
+            or ntpath.basename(filename) != filename
+            or posixpath.basename(filename) != filename):
+        return None
+    return filename
+
+
+def _resolve_comfy_output(filename):
+    """Resolve a trusted direct-child output without traversing a reparse path.
+
+    The boolean is distinct from ``path is not None``: a valid basename with no
+    configured local output directory may still be fetched through Comfy's
+    ``/view`` endpoint, while any rejected path must fail closed everywhere.
+    """
+    name = _validated_comfy_output_name(filename)
+    d = _comfy_output_dir()
+    if name is None:
+        return None, None, False
+    if not d:
+        return name, None, True
+    try:
+        root = os.path.abspath(os.fspath(d))
+        candidate = os.path.abspath(os.path.join(root, name))
+        if os.path.normcase(os.path.commonpath((root, candidate))) != os.path.normcase(root):
+            return name, None, False
+    except (OSError, TypeError, ValueError):
+        return name, None, False
+
+    # Check the candidate and every existing ancestor using lstat, before a
+    # content read/delete can follow a symlink or Windows junction/reparse point.
+    current = candidate
+    while True:
+        _st, blocked = _safe_lstat(current)
+        if blocked:
+            return name, None, False
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+
+    try:
+        canonical_root = os.path.realpath(root)
+        canonical_candidate = os.path.realpath(candidate)
+        contained = os.path.commonpath((canonical_root, canonical_candidate))
+        if os.path.normcase(contained) != os.path.normcase(canonical_root):
+            return name, None, False
+    except (OSError, ValueError):
+        return name, None, False
+    return name, candidate, True
 
 
 def _comfy_output_path(filename):
-    d = _comfy_output_dir()
-    return os.path.join(d, filename) if d and filename else None
+    _name, candidate, allowed = _resolve_comfy_output(filename)
+    return candidate if allowed else None
+
+
+def _is_reparse_stat(st):
+    attrs = getattr(st, 'st_file_attributes', 0)
+    reparse_flag = getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400)
+    return stat.S_ISLNK(st.st_mode) or bool(attrs & reparse_flag)
+
+
+def _safe_lstat(path):
+    """Return (stat, blocked): metadata errors and reparse points fail closed."""
+    try:
+        st = os.lstat(path)
+    except FileNotFoundError:
+        return None, False
+    except OSError:
+        return None, True
+    return st, _is_reparse_stat(st)
 
 
 def _read_comfy_output(filename):
     """Bytes of a finished ComfyUI output, from disk when we can see its folder,
     else over the /view API (a custom or unconfigured output path). None when
     neither works."""
-    p = _comfy_output_path(filename)
-    if p and os.path.exists(p):
-        try:
-            with open(p, 'rb') as fh:
-                return fh.read()
-        except OSError:
-            pass
-    if not filename:
+    name, p, allowed = _resolve_comfy_output(filename)
+    if not allowed:
         return None
+    if p:
+        root_st, root_blocked = _safe_lstat(os.path.dirname(p))
+        if root_blocked:
+            return None
+        file_st, file_blocked = _safe_lstat(p)
+        if file_blocked or (file_st is not None and not stat.S_ISREG(file_st.st_mode)):
+            return None
+        if root_st is not None and not stat.S_ISDIR(root_st.st_mode):
+            return None
+        if file_st is not None:
+            fd = None
+            try:
+                flags = os.O_RDONLY | getattr(os, 'O_BINARY', 0)
+                flags |= getattr(os, 'O_NOFOLLOW', 0)
+                fd = os.open(p, flags)
+                opened_st = os.fstat(fd)
+                if (not stat.S_ISREG(opened_st.st_mode)
+                        or not os.path.samestat(file_st, opened_st)):
+                    return None
+                with os.fdopen(fd, 'rb') as fh:
+                    fd = None
+                    return fh.read()
+            except OSError:
+                # A file that changed after lstat is treated as hostile rather
+                # than retried through Comfy's /view endpoint.
+                return None
+            finally:
+                if fd is not None:
+                    os.close(fd)
     from ..utils.comfyui import fetch_output_image_bytes
-    return fetch_output_image_bytes(filename)
+    return fetch_output_image_bytes(name)
 
 
 def _drop_comfy_output(filename):
     """Remove an unlinked ComfyUI output. Only ever called on a file this app just
     produced for a transient candidate — never on user data."""
-    p = _comfy_output_path(filename)
-    if p and os.path.isfile(p):
-        try:
-            os.remove(p)
-        except OSError:
-            pass
+    _name, p, allowed = _resolve_comfy_output(filename)
+    if not allowed:
+        return
+    if not p:
+        return
+    root_st, root_blocked = _safe_lstat(os.path.dirname(p))
+    file_st, file_blocked = _safe_lstat(p)
+    if (root_blocked or file_blocked or root_st is None or file_st is None
+            or not stat.S_ISDIR(root_st.st_mode)
+            or not stat.S_ISREG(file_st.st_mode)):
+        return
+    try:
+        os.remove(p)
+    except OSError:
+        pass
 
 
-def keep_reference_edit(user_id, dataset_id):
+def keep_reference_edit(user_id, dataset_id, engine=None, batch_id=None):
     """Promote the READY candidate to be the reference (reuses the atomic,
     fail-safe commit_edited_reference), then delete the candidate file + clear the
     job. Returns the new ref_filename, or None when there is no ready candidate
     (route -> 409) — including a candidate file that vanished under us."""
-    entry = reference_edit_jobs.peek(dataset_id)
-    if not entry or entry['status'] != 'ready' or not entry['candidate_filename']:
-        return None
-    dsdir = _dataset_dir(dataset_id)
-    try:
-        with open(os.path.join(dsdir, entry['candidate_filename']), 'rb') as fh:
-            data = fh.read()
-    except OSError:
-        reference_edit_jobs.clear(dataset_id, dsdir)
-        return None
-    new_ref = commit_edited_reference(user_id, dataset_id, data)
-    reference_edit_jobs.clear(dataset_id, dsdir)
-    return new_ref
+    # The mutation lock closes the claim -> file/DB promotion TOCTOU. Without it,
+    # an upload/crop could commit and invalidate after claim_ready(), only for this
+    # stale candidate to overwrite and delete that newer reference before the
+    # post-commit revision check noticed.
+    with reference_mutation(dataset_id):
+        claim = reference_edit_jobs.claim_ready(
+            dataset_id, engine, batch_id=batch_id)
+        if not claim:
+            return None
+        dsdir = _dataset_dir(dataset_id)
+        try:
+            with open(os.path.join(dsdir, claim['candidate_filename']), 'rb') as fh:
+                data = fh.read()
+        except OSError:
+            reference_edit_jobs.clear_claimed(
+                dataset_id, claim['batch_token'], claim['claim_token'], dsdir)
+            return None
+        try:
+            new_ref = commit_edited_reference(user_id, dataset_id, data)
+        except Exception:
+            # A failed write leaves both the old master and every candidate intact,
+            # so the user can retry Keep after fixing the storage problem.
+            reference_edit_jobs.release_claim(
+                dataset_id, claim['batch_token'], claim['claim_token'])
+            raise
+        cleared = reference_edit_jobs.clear_claimed(
+            dataset_id, claim['batch_token'], claim['claim_token'], dsdir,
+            reference_mutated=True)
+        if cleared is None:
+            # Defensive for TTL/process-lifecycle anomalies. Real reference
+            # mutations cannot interleave here because they use this same lock.
+            reference_edit_jobs.invalidate(dataset_id, dsdir)
+        return new_ref
 
 
 def _clear_reference_edit(dataset_id):
     """Drop the pending edit, delete its candidate, and — for an edit still
     rendering — cancel the ComfyUI job and close its activity. Without the cancel,
-    abandoning an edit left the GPU busy on a result nobody would ever see and the
-    activity badge lit until the TTL."""
-    entry = reference_edit_jobs.clear(dataset_id, _dataset_dir(dataset_id))
-    if entry and entry.get('status') == 'running':
-        _cancel_local_edit_job(entry.get('_job_id'), entry.get('_act_token'))
+    abandoning an edit left the GPU busy on a result nobody would ever see
+    and the ✦ activity badge lit until the TTL."""
+    reference_edit_jobs.clear(dataset_id, _dataset_dir(dataset_id))
 
 
 def discard_reference_edit(dataset_id):
@@ -3454,14 +3794,26 @@ def discard_reference_edit(dataset_id):
     _clear_reference_edit(dataset_id)
 
 
+def reference_mutation(dataset_id):
+    """Context manager shared by every primary-reference mutation path."""
+    return reference_edit_jobs.reference_mutation(dataset_id)
+
+
 def invalidate_reference_edit(dataset_id):
     """Drop any pending edit candidate when the reference itself changes
     (crop/recrop/change/keep): a Before/After computed from the OLD reference would
     be a visual lie. Idempotent — a no-op when nothing is pending."""
-    _clear_reference_edit(dataset_id)
+    with reference_mutation(dataset_id):
+        reference_edit_jobs.invalidate(dataset_id, _dataset_dir(dataset_id))
 
 
 def commit_edited_reference(user_id, dataset_id, image_bytes):
+    """Serialize and promote edited bytes as the dataset's reference."""
+    with reference_mutation(dataset_id):
+        return _commit_edited_reference_locked(user_id, dataset_id, image_bytes)
+
+
+def _commit_edited_reference_locked(user_id, dataset_id, image_bytes):
     """Promote an edited candidate (bytes) to BE the dataset reference. The edited
     image is the new source of truth, so it becomes BOTH ref_filename (working
     crop) and ref_original_filename (the full frame Crop re-reads) — a later crop
@@ -4168,11 +4520,12 @@ def face_crop_to_square_webp(image_bytes: bytes, size: int = 1024, pad: float = 
 
 
 # --- Import + classify (Qwen3-VL) ------------------------------------------
+@_serialize_dataset_ingest
 def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, stats=None,
                   source_metadata=None, captions=None, bank_image_ids=None,
                   framings=None, bank_analysis_snapshots=None,
                   watermark_states=None, watermark_bboxes=None,
-                  watermark_regions=None):
+                  watermark_regions=None, dedupe_seen=None):
     """Store original static bytes (or head-crop) + create import rows (status=keep).
     When crop=True, each image is auto head-cropped via Qwen3-VL - the CALLER
     must then hold the GPU-exclusive window - and is by construction a face,
@@ -4218,6 +4571,10 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
     ``watermark_*`` mirrors the current Bank watermark decision and mask without
     treating either as a historical analysis value.
 
+    ``dedupe_seen`` is an optional internal mutable cache of ``(dhash, row_id)``
+    pairs for chunked imports. When omitted, the importer loads the dataset's
+    existing hashes itself, preserving the standalone-call behavior.
+
     Returns (ids, failed_count)."""
     ds = get_dataset(user_id, dataset_id)
     if not ds:
@@ -4226,7 +4583,8 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
     # chemin « carré padé » ajoutait des bandes noires que le LoRA apprendrait, et
     # forçait tous les imports personnage en carré — un plan buste/corps importé
     # doit rester tel quel (ai-toolkit gère le bucketing multi-ratios).
-    seen = _existing_dhash_rows(dataset_id) if dedupe else None
+    seen = (dedupe_seen if dedupe_seen is not None
+            else _existing_dhash_rows(dataset_id)) if dedupe else None
     metadata_by_index = list(source_metadata) if source_metadata is not None else []
     captions_by_index = list(captions) if captions is not None else []
     bank_ids_by_index = list(bank_image_ids) if bank_image_ids is not None else []
@@ -4304,8 +4662,39 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
             except (OSError, ValueError):
                 fp = None   # unreadable output would have failed above; belt & braces
             if fp is not None:
-                match = next((mid for h, mid in seen
-                              if _hamming(fp, h) <= SCRAPE_DHASH_MAX_DISTANCE), None)
+                match = None
+                stale_ids = set()
+                for cached_hash, mid in tuple(seen):
+                    if _hamming(fp, cached_hash) > SCRAPE_DHASH_MAX_DISTANCE:
+                        continue
+                    live = (FaceDatasetImage.query
+                            .filter(
+                                FaceDatasetImage.id == mid,
+                                FaceDatasetImage.dataset_id == dataset_id,
+                                FaceDatasetImage.status.in_(('keep', 'pending')))
+                            .first())
+                    if live is None or not live.filename:
+                        stale_ids.add(mid)
+                        continue
+                    try:
+                        with Image.open(os.path.join(
+                                _dataset_dir(dataset_id), live.filename)) as im:
+                            live_hash = _dhash(im)
+                    except (OSError, ValueError):
+                        stale_ids.add(mid)
+                        continue
+                    if live_hash != cached_hash:
+                        for cache_index, (_old_hash, cached_id) in enumerate(seen):
+                            if cached_id == mid:
+                                seen[cache_index] = (live_hash, mid)
+                                break
+                    if _hamming(fp, live_hash) <= SCRAPE_DHASH_MAX_DISTANCE:
+                        match = mid
+                        break
+                if stale_ids:
+                    seen[:] = [
+                        (h, mid) for h, mid in seen if mid not in stale_ids
+                    ]
                 if match is not None:
                     if stats is not None:
                         stats['duplicates'] = stats.get('duplicates', 0) + 1
@@ -4359,6 +4748,7 @@ DATASET_ZIP_MAX_IMAGE_BYTES = 128 * 1024 * 1024
 _DATASET_ZIP_IMG_EXTS = ('.jpg', '.jpeg', '.png', '.webp', '.bmp')
 
 
+@_serialize_dataset_ingest
 def _merge_training_images(user_id, dataset_id, entries, captions, stats=None):
     """Cœur commun ZIP/dossier : `entries` = liste de (stem, display_name, getter)
     où `getter()` rend les bytes de l'image, `captions` = {stem: texte}. Chaque
@@ -6675,6 +7065,7 @@ def _clean_inpaint_engine(route, method):
     return 'lama' if route == 'lama' else 'review'
 
 
+@_serialize_dataset_ingest
 def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='auto',
                      allow_crop=None):
     """Apply the crop/inpaint/review routing to every image marked 'detected'. Returns
@@ -6967,6 +7358,7 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
         dataset_activity.end(token)
 
 
+@_serialize_dataset_ingest
 def restore_watermark_original(user_id, dataset_id, image_id) -> dict | None:
     """Undo a watermark Clean on ONE image: copy the preserved `<stem>.orig<ext>` back
     over the current file and flip the row from 'cleaned' (or 'failed') back to

@@ -19,6 +19,8 @@ def _configure_aitoolkit(tmp_path):
     root = tmp_path / 'aitoolkit'
     (root / 'venv' / 'Scripts').mkdir(parents=True)
     (root / 'venv' / 'Scripts' / 'python.exe').write_text('fake')
+    (root / 'venv' / 'bin').mkdir(parents=True, exist_ok=True)
+    (root / 'venv' / 'bin' / 'python').write_text('fake')
     (root / 'run.py').write_text('fake')
     cfg.save_config({'aitoolkit': {'dir': str(root)}})
 
@@ -42,8 +44,12 @@ def _seed(lt, svc, LOCAL_USER, tmp_path, numbered, target_steps, final=True):
     if final:
         with open(os.path.join(run_dir, f'lora_{trigger}.safetensors'), 'wb') as fh:
             fh.write(b'FINAL')
+    # Upstream's record_for_mtime now filters on source=('local', 'legacy'), so a
+    # 'cloud' record is invisible to the lookup that numbers the final save. This
+    # fork has no rented lane at all, so a LOCAL record is the only kind a user
+    # here can produce — seed the case that exists rather than the one that does not.
     db.session.add(TrainingRunRecord(
-        dataset_id=ds.id, family='krea', source='cloud', cloud_run_id=891,
+        dataset_id=ds.id, family='krea', source='local',
         base_model='', variant='base', steps=target_steps, version=1,
         fingerprint='fp', manifest='[]',
         created_at=datetime.datetime.utcnow() - datetime.timedelta(days=1)))

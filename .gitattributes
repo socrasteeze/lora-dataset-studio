@@ -2,6 +2,10 @@
 frontend/** text=auto eol=lf
 docs/** text=auto eol=lf
 
+# These scripts execute inside a Linux container. A CRLF shebang fails before
+# the launcher can log anything, so keep Docker shell launchers explicitly LF.
+packaging/docker/*.sh text eol=lf
+
 # The served bundle is a BUILD ARTIFACT that is also tracked (Flask serves
 # frontend/dist, and releases ship it). That combination makes it the single
 # most dangerous path in an upstream merge: taking upstream's `build(frontend):`

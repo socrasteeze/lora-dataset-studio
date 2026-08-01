@@ -57,7 +57,9 @@ from ..utils.dbbusy import write_with_retry
 from . import (bank_jobs, bank_queue, bank_transfer_metadata, bank_undo,
                image_encoding, path_guard, trash)
 from .face_dataset_service import (SCRAPE_IMPORT_MAX, _dhash, _download_scrape_item,
-                                   _hamming, _SCRAPE_DL_WORKERS, _watermark_regions_payload,
+                                   _dataset_ingest_lock,
+                                   _existing_dhash_rows, _hamming, _SCRAPE_DL_WORKERS,
+                                   _watermark_regions_payload,
                                    _source_metadata_storage, bank_deterministic_analysis,
                                    create_dataset, import_images, _preserved_import_extension,
                                    normalize_watermark_regions)
@@ -6679,9 +6681,17 @@ def _discard_new_dataset(user_id, dataset_id):
             pass
 
 
-def _promote_rows(job, bank, ids, user_id, dataset_id, stats):
+def _promote_rows(job, bank, ids, user_id, dataset_id, stats, dedupe_seen=None):
     """Promote ``ids`` OF ONE BANK into ``dataset_id``. Returns
     (imported, failed) and bumps the job as it goes.
+
+    ``dedupe_seen`` is the dHash cache import_images maintains. Without it every
+    chunk re-opens and re-hashes every image already in the dataset; upstream
+    hoisted that out of the chunk loop, and it belongs HERE rather than in either
+    job body so the single-bank and group paths cannot get different answers
+    about what counts as a duplicate. Passing one cache across a GROUP promotion
+    is stronger still: two members holding the same photo cost one dataset image
+    without a second full re-hash.
 
     Extracted from _promote_job so a GROUP promotion can walk its members
     sequentially into the same dataset through the same code. Reimplementing
@@ -6696,6 +6706,8 @@ def _promote_rows(job, bank, ids, user_id, dataset_id, stats):
             BankImage.id.in_(ids[i0:i0 + _SQL_IN_CHUNK])).all())
     rows.sort(key=lambda r: r.id)
     imported = failed = 0
+    if dedupe_seen is None:
+        dedupe_seen = _existing_dhash_rows(dataset_id)
     for c0 in range(0, len(rows), _PROMOTE_CHUNK):
         if bank_jobs.cancelled(job):
             break
@@ -6741,7 +6753,8 @@ def _promote_rows(job, bank, ids, user_id, dataset_id, stats):
                 bank_analysis_snapshots=snapshots,
                 watermark_states=watermark_states,
                 watermark_bboxes=watermark_bboxes,
-                watermark_regions=watermark_regions)
+                watermark_regions=watermark_regions,
+                dedupe_seen=dedupe_seen)
             imported += len(new_ids)
             failed += bad
             # The dataset row now carries the link back (import_images writes
@@ -6790,7 +6803,12 @@ def _promote_job(user_id, bank_id, ids, dataset_id):
         imported, failed = _promote_rows(job, bank, ids, user_id, dataset_id,
                                          stats)
         bank_jobs.progress(job, detail=_promote_detail(imported, failed, stats))
-    return run
+
+    def run_locked(job):
+        with _dataset_ingest_lock(user_id, dataset_id):
+            return run(job)
+
+    return run_locked
 
 
 def start_group_promote(app, user_id, bank_id, dataset_id):
@@ -6839,6 +6857,10 @@ def _group_promote_job(user_id, plan, dataset_id):
     def run(job):
         stats: dict = {}
         imported = failed = 0
+        # One cache for the whole group: members are walked into the SAME
+        # dataset, so a hash the first member paid for is exactly what the
+        # second one needs to recognise the duplicate.
+        dedupe_seen = _existing_dhash_rows(dataset_id)
         bank_jobs.progress(job, done=0, detail='promoting the group')
         for i, (bank_id, ids) in enumerate(plan.items(), 1):
             if bank_jobs.cancelled(job):
@@ -6852,9 +6874,15 @@ def _group_promote_job(user_id, plan, dataset_id):
             # (caption/framing/source attribution/watermark state/bank
             # analysis snapshot) as the single-bank path — this loop and
             # _promote_job both delegate to it precisely so they cannot drift.
-            got, bad = _promote_rows(job, bank, ids, user_id, dataset_id, stats)
+            got, bad = _promote_rows(job, bank, ids, user_id, dataset_id, stats,
+                                     dedupe_seen=dedupe_seen)
             imported += got
             failed += bad
         bank_jobs.progress(job, detail=_promote_detail(
             imported, failed, stats, prefix=f'done — {len(plan)} bank(s), '))
-    return run
+
+    def run_locked(job):
+        with _dataset_ingest_lock(user_id, dataset_id):
+            return run(job)
+
+    return run_locked

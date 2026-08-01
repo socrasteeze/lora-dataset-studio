@@ -268,6 +268,16 @@ def test_a_peer_that_says_it_cannot_caption_is_refused_up_front(app, tmp_path,
     monkeypatch.setattr(
         'app.services.face_dataset_service.caption_paths',
         lambda paths, **kw: ran_locally.update(n=len(paths)))
+    # THIS machine reads as fully able to caption, and the peer is STILL refused.
+    #
+    # That stub arrived from the other side of the merge, where it fixed a real
+    # CI failure: the old fallback test probed the real Ollama/JoyCaption install
+    # and so only passed on a machine that happened to have one. The behaviour it
+    # protected is gone, but the point is not, and inverting it makes this test
+    # prove something stronger than environment-independence -- that the refusal
+    # comes from the PEER's report and not from "neither side can caption".
+
+    monkeypatch.setattr(banks, '_caption_prereq', lambda: None)
 
     with app.app_context():
         _peer_row({'joycaption': False, 'ollama': False})
