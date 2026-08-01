@@ -227,6 +227,16 @@ test('local hook persists and launches with the canonical mode', () => {
   assert.match(datasetHook, /catch \(error\)[\s\S]*return null/);
 });
 
+test('the training panel offers no rented GPU, and no token to rent one with', () => {
+  // Divergence 4: upstream's 2026-08-01 window added three tests pinning the
+  // rental dialog's offer fetch, its HF_CLOUD_TOKEN banner and its price-cap
+  // link. This fork has no rented lane, so they are INVERTED rather than
+  // deleted — a sync that re-lands the dialog fails here instead of shipping a
+  // panel that quotes an hourly price the app cannot charge.
+  assert.doesNotMatch(panel, /CloudLaunchDialog|CustomBasePushSection/);
+  assert.doesNotMatch(panel, /HF_CLOUD_TOKEN|hfCloudTokenReadiness|before renting the GPU/);
+  assert.doesNotMatch(panel, /train\/cloud\/offers|cloud-max-price-per-hour/);
+});
 
 test('mode persistence is atomic and the incompatible fallback is not optimistic', () => {
   assert.match(panel, /setDatasetTrainingMode\?\.\(TRAINING_MODE_LORA, nextSelection\)/);

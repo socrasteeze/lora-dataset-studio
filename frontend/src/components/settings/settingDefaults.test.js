@@ -156,6 +156,7 @@ const COVERED = [
   // chatgpt_image_model / openrouter_model. Those cards, and their id= anchors,
   // do not exist on this fork.
   ['EnginesSection.jsx', 'klein', 'generation_steps'],
+  ['EnginesSection.jsx', 'klein', 'edit_base_lora_strength'],
   ['EnginesSection.jsx', 'klein', 'improve_megapixels'],
   ['EnginesSection.jsx', 'klein', 'improve_base_lora_strength'],
   ['EnginesSection.jsx', 'klein', 'improve_consistency_strength'],

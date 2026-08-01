@@ -417,7 +417,12 @@ const TOPICS = [
     '/bank', 'using-the-app', 'sort-a-grid-to-review-faster'),
   { id: 'page-setup', kind: 'page', title: 'Setup wizard',
     keywords: ['setup', 'wizard', 'onboarding', 'install', 'install everything',
-      'install all', 'connect', 'tools'],
+      'install all', 'connect', 'tools',
+      // The background re-check: what someone types when they see the corner
+      // line, or the warning that something stopped working.
+      'checking your setup', 'background', 'setup check', 're-check', 'recheck',
+      'why does it keep asking', 'run setup again', 'skip setup',
+      'stopped working', 'no longer responding', 'that was on purpose'],
     guide: { chapter: 'getting-started', anchor: 'the-setup-wizard' },
     app: { route: '/setup' } },
   setupStep('setup-comfyui', 'comfyui', 'Set up ComfyUI & download the Klein model',
@@ -462,6 +467,17 @@ const TOPICS = [
       'z-image base', 'base vs turbo', 'cfg 1', '8 steps', 'blurry base model'],
     guide: { chapter: 'dataset-guide', anchor: '6-after-training-pick-the-right-checkpoint' },
     app: { route: '/studio' } },
+  action('studio-combine-loras', '🧬 Combine: load several LoRAs in the same image',
+    ['studio', 'test studio', 'combine', 'combine loras', 'stack', 'stack loras', 'multi lora',
+     'two loras', '2 loras', 'mix loras', 'merge loras', 'together', 'same image', 'weight',
+     'per-lora weight', 'compare vs combine', 'trigger words', 'both triggers', 'one family',
+     'cannot mix families', 'krea and sdxl'],
+    '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  action('studio-enhance-prompt', '✨ Enhance: enrich the test prompt with the local model',
+    ['studio', 'test studio', 'enhance', 'enhance prompt', 'improve prompt', 'better prompt',
+     'rewrite prompt', 'llm', 'ollama', 'local model', 'prompt magic', 'button greyed out',
+     'enhance disabled', 'ollama not running', 'model not downloaded'],
+    '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('studio-random-dataset-caption', '🎲 Caption: use a random kept dataset caption',
     ['studio', 'test studio', 'caption', 'random caption', 'dataset caption', 'caption button',
      'dice', '🎲', 'choose dataset', 'caption source', 'change dataset', 'switch dataset',
@@ -509,7 +525,27 @@ const TOPICS = [
      'one click pin', 'bulk pin', 'pin all 5', 'images ready button',
      'undo pin all', 'too many images pinned', 'left out', 'contact sheet',
      'why are my images under the tree', 'where did the pinned images go',
-     'pin all button missing', 'pin all does nothing', 'already pinned'],
+     'pin all button missing', 'pin all does nothing', 'already pinned',
+     // Two runs read as one lot until the strip was keyed on the GENERATION
+     // rather than on the checkpoint. Both the symptom and the fix are things
+     // someone searches for by describing what they see.
+     'two runs mixed together', 'my two runs merged', 'runs concatenated',
+     'second run joined the first', 'separate my runs', 'compare two runs',
+     'images in the wrong order', 'epochs out of order', 'steps out of order',
+     'strip not sorted', 'order of the checkpoints on the board'],
+    '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
+  // 🪪 The reference face on the board. Worth its own topic: it is the only
+  // picture on the canvas that is NOT a pinned render, so every question about
+  // it ("why can't I move it / close it / export it") misses the topics above.
+  action('canvas-reference-image', '🪪 The dataset reference face on the board',
+    ['reference image on the canvas', 'reference face', 'dataset reference',
+     'show the reference', 'compare with the reference', 'who is this supposed to be',
+     'likeness', 'does it look like her', 'does it look like him',
+     'reference next to the dataset name', 'ref image canvas', 'enlarge the reference',
+     // …and when it is absent, which is by design for two dataset kinds.
+     'no reference on the canvas', 'reference missing', 'reference not showing',
+     'concept dataset has no reference', 'style dataset has no reference',
+     'why can i not move the reference', 'cannot pin the reference'],
     '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
   action('canvas-pinned-images', '📌 Pin an image onto the board',
     ['pin an image', 'pin to canvas', 'image on the canvas', 'put an image on the board',
@@ -679,6 +715,11 @@ const TOPICS = [
       text: 'Build named generation-LoRA presets in Settings → Image engines, then pick one per run.' }),
   setting('klein.generation_steps', 'engines', 'klein-generation', 'Klein generation steps',
     ['klein', 'steps', 'sampler', 'generation', 'quality', 'slower', 'cleaner', 'sampling', '5 steps']),
+  setting('klein.edit_base_lora_strength', 'engines', 'klein-generation',
+    'Klein enhancement LoRA on edits',
+    ['klein', 'lora', 'realistic', 'enhancement', 'detail', 'edit', 'conformity',
+     'not following', 'ignores the prompt', 'drift', 'style', 'reference edit',
+     'variations', 'regenerate', 'node 139']),
   // Krea 2 Identity Edit — the second LOCAL engine. `grounding_px` first: it is
   // THE consistency ↔ prompt dial, and a bare pixel count means nothing without
   // that sentence, so it carries the widest keyword set of the four.

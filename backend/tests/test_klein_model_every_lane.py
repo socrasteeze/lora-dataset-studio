@@ -36,20 +36,6 @@ KLEIN_FILE = 'flux-2-klein-9b-fp8.safetensors'
 OTHER_FILE = 'flux-2-klein-32b-heavy.safetensors'
 
 
-def _batch_token(dataset_id):
-    """Register a one-engine batch and hand back its candidate token.
-
-    The enqueue attaches the queue job to a LIVE registry entry and raises if it
-    finds none, so a bare string here would fail as "superseded" rather than
-    exercising the model-resolution this file is about.
-    """
-    from app.services import reference_edit_jobs
-    from app.services import face_dataset_service as svc_
-    started = reference_edit_jobs.start_batch(
-        dataset_id, svc_._dataset_dir(dataset_id), ('klein',), 'x')
-    return started['tokens']['klein']
-
-
 def _png(size=(96, 64)):
     buf = io.BytesIO()
     Image.new('RGB', size, (25, 50, 75)).save(buf, 'PNG')
@@ -71,6 +57,24 @@ def _comfy_with(tmp_path, *names):
 
 
 # --------------------------------------------------------------------------
+def _start_reference_edit(svc, ds, prompt):
+    """Drive ONE local (Klein) reference edit through the lane's real entry point.
+
+    The multi-engine compare batch (f55ae7a) renamed `_start_local_reference_edit`
+    to `_enqueue_local_reference_edit` and gave it the batch's per-engine token, so
+    this helper registers the batch the enqueue attaches itself to — the same two
+    steps `start_reference_edit` performs. Calling the private enqueue directly
+    keeps the assertions on the KLEIN arguments instead of on the batch plumbing,
+    which has its own file (test_ref_edit_local_engines.py)."""
+    from app.config import LOCAL_USER
+    from app.services import reference_edit_jobs as rej
+    dsdir = svc._dataset_dir(ds.id)
+    started = rej.start_batch(ds.id, dsdir, ('klein',), prompt)
+    return svc._enqueue_local_reference_edit(
+        LOCAL_USER, ds.id, ds, 'klein', prompt, started['tokens']['klein'],
+        os.path.join(dsdir, ds.ref_filename), [])
+
+
 # Lanes 1 & 2 — a dataset in hand, so the dataset's pick
 # --------------------------------------------------------------------------
 @pytest.fixture()
@@ -109,13 +113,7 @@ def lanes(app, monkeypatch):
             with open(os.path.join(svc._dataset_dir(ds.id), 'ref.png'), 'wb') as fh:
                 fh.write(_png())
             svc.db.session.commit()
-            # The batch restructure moved the snapshotting into the caller, so
-            # the enqueue now takes the token and the resolved ref PATH rather
-            # than deriving them. The lane under test is unchanged.
-            svc._enqueue_local_reference_edit(
-                LOCAL_USER, ds.id, ds, 'klein', 'make it sharper',
-                _batch_token(ds.id),
-                os.path.join(svc._dataset_dir(ds.id), 'ref.png'), [])
+            _start_reference_edit(svc, ds, 'make it sharper')
             return ds
 
         @staticmethod
@@ -164,9 +162,7 @@ def test_reference_edit_refuses_a_vanished_model_by_name(app, tmp_path):
         svc.set_dataset_klein_model(LOCAL_USER, ds.id, OTHER_FILE)
 
         with pytest.raises(ValueError) as exc:
-            svc._enqueue_local_reference_edit(
-                LOCAL_USER, ds.id, ds, 'klein', 'sharper', _batch_token(ds.id),
-                os.path.join(svc._dataset_dir(ds.id), 'ref.png'), [])
+            _start_reference_edit(svc, ds, 'sharper')
         assert OTHER_FILE in str(exc.value)
 
 
