@@ -173,7 +173,14 @@ def _ensure_safe_parent(parent: Path) -> None:
             or stat.S_ISLNK(info.st_mode)
             or (getattr(info, "st_file_attributes", 0) & _REPARSE_POINT)
         ):
-            raise OSError("status parent is not a real directory")
+            # Name the cause: the caller's only remedy differs for a symlink
+            # versus a plain non-directory, and upstream's own test asserts
+            # /link|reparse/ against this message. That test SKIPS on Windows
+            # (it cannot create the symlink), so the mismatch only shows on
+            # POSIX and CI never reached it.
+            raise OSError(
+                "status parent is not a real directory "
+                "(symlink or reparse point)")
         break
     _assert_no_link_components(current)
     for directory in reversed(missing):

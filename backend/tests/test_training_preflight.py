@@ -383,6 +383,8 @@ def test_preflight_route(client, app, monkeypatch):
     tmp = pathlib.Path(tempfile.mkdtemp())
     (tmp / 'venv' / 'Scripts').mkdir(parents=True)
     (tmp / 'venv' / 'Scripts' / 'python.exe').touch()
+    (tmp / 'venv' / 'bin').mkdir(parents=True, exist_ok=True)
+    (tmp / 'venv' / 'bin' / 'python').write_text('fake')
     (tmp / 'run.py').touch()
     with app.app_context():
         from app import config as cfg

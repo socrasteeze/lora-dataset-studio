@@ -14,6 +14,24 @@ pytestmark = pytest.mark.filterwarnings(
     'ignore::pytest.PytestUnhandledThreadExceptionWarning')
 
 
+@pytest.fixture(autouse=True)
+def _isolate_process_lifetime_state():
+    """Each test is a fresh server process.
+
+    Upstream's restart rework added a module-global `_restart_scheduled` that is
+    deliberately STICKY — in production a successful restart ends the process, so
+    there is never a reason to clear it. pytest survives the mocked restart, so
+    the flag leaks and the next test's schedule_restart returns False without
+    spawning anything. Mirrors the fixture upstream ships in test_updater.py; this
+    file is fork-only, so it never received one.
+    """
+    with updater._restart_lock:
+        updater._restart_scheduled = False
+    yield
+    with updater._restart_lock:
+        updater._restart_scheduled = False
+
+
 class _ExitCalled(SystemExit):
     """Raised by the os._exit mock so control flow stops like a real exit."""
     def __init__(self, code):

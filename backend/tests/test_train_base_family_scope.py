@@ -29,6 +29,8 @@ def aitoolkit(tmp_path, app):
     root = tmp_path / 'aitoolkit'
     (root / 'venv' / 'Scripts').mkdir(parents=True)
     (root / 'venv' / 'Scripts' / 'python.exe').write_text('fake')
+    (root / 'venv' / 'bin').mkdir(parents=True, exist_ok=True)
+    (root / 'venv' / 'bin' / 'python').write_text('fake')
     (root / 'run.py').write_text('fake')
     with app.app_context():
         cfg.save_config({'aitoolkit': {'dir': str(root)}})

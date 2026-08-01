@@ -88,6 +88,11 @@ def test_checkpoints_route_stamps_local_and_cloud_lists(client, app, ds, monkeyp
     from app.services import lora_training as lt
     monkeypatch.setattr('app.capabilities.probe',
                         lambda *a, **k: {'aitoolkit': {'valid': True}})
+    # Upstream split the baseline-retrofit probe out of list_checkpoints, and the
+    # route now calls it FIRST — so stubbing only the listing leaves a real
+    # _run_dir lookup that raises on an unconfigured ai-toolkit. This test is
+    # about deployment stamping, not the retrofit.
+    monkeypatch.setattr(lt, 'has_local_checkpoints', lambda *a, **kw: True)
     monkeypatch.setattr(lt, 'list_checkpoints', lambda *a, **kw: [
         {'step': 1000, 'filename': 'a_000001000.safetensors',
          'run_id': 7, 'run_source': 'cloud'},
