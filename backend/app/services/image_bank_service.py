@@ -1380,6 +1380,10 @@ def list_banks(user_id, dataset_id=None) -> list:
     used to ask /bank/<id>/promotable once per bank, so a library of 12 banks
     cost 13 requests to open one panel. One grouped query answers them all."""
     promotable = _promotable_counts(user_id, dataset_id) if dataset_id is not None else None
+    # One aggregate for every bank and every pass. Same reason the promotable
+    # counts ride along: per-bank it would be banks × passes COUNT(*)s to render
+    # one list.
+    coverage = bank_pass_coverage(user_id)
     out = []
     for bank in (ImageBank.query.filter_by(user_id=user_id)
                  .order_by(ImageBank.created_at.desc()).all()):
@@ -1404,6 +1408,10 @@ def list_banks(user_id, dataset_id=None) -> list:
             # queueing twelve banks overnight is precisely when nobody is
             # watching. Steps only; the full report stays in the workspace.
             'pipeline_report': _report_steps(bank),
+            # Per-pass coverage, so "what has this bank actually had done to it"
+            # is answerable without queueing anything to find out. Empty for a
+            # bank with no images rather than a fake all-complete.
+            'pass_coverage': coverage.get(bank.id, {}),
         }
         if promotable is not None:
             row['promotable'] = promotable.get(bank.id, 0)
@@ -1424,6 +1432,114 @@ def _report_steps(bank) -> dict | None:
         'steps': [{'step': e.get('step'), 'status': e.get('status'),
                    'reason': e.get('reason')} for e in steps],
     }
+
+
+# --- pass coverage ----------------------------------------------------------
+# ONE canonical answer to "does this image still need this pass", so the
+# per-image skip inside a pass and the bank-level rollup the queue reads can
+# never disagree. Each predicate is evaluated over non-rejected rows.
+#
+# The marker column matters. `face_state` is right because it is NULL only when
+# the pass never ran and 'no_face' when it ran and found nothing; `face_cluster`
+# would be wrong, being NULL both for "unclustered" and "never processed".
+PASS_PENDING = {
+    'scan':      lambda: BankImage.quality_state.is_(None),
+    'score':     lambda: BankImage.aesthetic_score.is_(None),
+    'faces':     lambda: BankImage.face_state.is_(None),
+    'watermark': lambda: BankImage.watermark_state.is_(None),
+    'framing':   lambda: BankImage.framing.is_(None),
+    'caption':   lambda: or_(BankImage.caption.is_(None),
+                             BankImage.caption == ''),
+}
+# Steps with no per-image marker. They are never counted as "already done" and
+# never cause a bank to be skipped — guessing would be worse than re-running:
+#   auto_reject    — DB-only and cheap, it just re-applies the current flags.
+#   semantic_dedup — bank-global; "pending" would mean embedded rows with no
+#                    group, or rows added since the last run. Expressing that
+#                    cheaply is unproven, so it stays always-pending on purpose
+#                    rather than silently skipping work.
+PASS_ALWAYS_PENDING = ('auto_reject', 'semantic_dedup')
+
+
+def bank_pass_coverage(user_id, bank_ids=None) -> dict:
+    """{bank_id: {step: {'pending': n, 'done': n, 'complete': bool}}}.
+
+    ONE aggregate query for every bank and every step — the bank list renders
+    this, and the naive form is banks × steps COUNT(*)s. Conditional SUMs over a
+    single grouped scan of the rows we already filter on.
+    """
+    if bank_ids is not None and not bank_ids:
+        return {}
+    cols = [func.sum(case((PASS_PENDING[s](), 1), else_=0)).label(s)
+            for s in PASS_PENDING]
+
+    def _base():
+        return (db.session.query(BankImage.bank_id,
+                                 func.count(BankImage.id).label('total'), *cols)
+                .join(ImageBank, ImageBank.id == BankImage.bank_id)
+                .filter(ImageBank.user_id == user_id)
+                .filter(BankImage.status != 'reject'))
+
+    if bank_ids is None:
+        queries = [_base()]
+    else:
+        ids = [int(b) for b in bank_ids]
+        queries = [_base().filter(BankImage.bank_id.in_(
+            ids[i0:i0 + _SQL_IN_CHUNK]))
+            for i0 in range(0, len(ids), _SQL_IN_CHUNK)]
+
+    out = {}
+    for q in queries:
+        for row in q.group_by(BankImage.bank_id).all():
+            total = int(row.total or 0)
+            cov = {}
+            for step in PASS_PENDING:
+                pending = int(getattr(row, step) or 0)
+                cov[step] = {'pending': pending, 'done': total - pending,
+                             'complete': pending == 0 and total > 0}
+            for step in PASS_ALWAYS_PENDING:
+                cov[step] = {'pending': total, 'done': 0, 'complete': False}
+            out[int(row.bank_id)] = cov
+    return out
+
+
+def banks_needing_work(user_id, steps, skip_completed=True) -> list:
+    """Bank ids with something left to do for at least one of ``steps``.
+
+    Replaces "has undecided images" as the queue-all rule. That rule made a
+    FULLY TRIAGED bank invisible — which is exactly the bank worth re-targeting,
+    because triage says nothing about whether it ever had a face pass.
+
+    Note what is deliberately NOT here: this is a queueing decision only. The
+    matching per-image predicate must never be pushed into ✨ Score or
+    👥 Group by person as a row filter — both cluster over every row they are
+    given (style, and person), so narrowing their input would silently change
+    the grouping. Their per-image skip is the embeddings cache, which is the
+    only place that can skip work without changing the answer.
+    """
+    steps = _sanitize_pipeline_steps(steps)
+    if not steps:
+        return []
+    coverage = bank_pass_coverage(user_id)
+    if not skip_completed:
+        # An explicit re-run asks for the work to be done AGAIN, so eligibility
+        # cannot be "has pending work" — that would filter out exactly the banks
+        # the user is asking to redo, and the re-run would queue nothing at all.
+        return sorted(coverage)
+    return sorted(bank_id for bank_id, cov in coverage.items()
+                  if steps_with_pending_work(cov, steps))
+
+
+def steps_with_pending_work(coverage_for_bank, steps) -> list:
+    """The subset of ``steps`` that still has something to do for one bank.
+
+    An unknown step is KEPT, not dropped: a pass without a coverage entry is one
+    we cannot answer for, and silently skipping it would be the queue quietly
+    doing less than it was asked to."""
+    if not coverage_for_bank:
+        return list(steps)
+    return [s for s in steps
+            if coverage_for_bank.get(s, {}).get('pending', 1) > 0]
 
 
 def banks_needing_triage(user_id) -> list:

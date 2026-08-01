@@ -66,6 +66,9 @@ REMOTE_CANCEL_GRACE_SECONDS = 120
 # therefore the "all of it is home" marker, which is what makes it the right
 # thing to wait for after a Stop.
 RESULT_ARTIFACT = 'infer_result.json'
+# The vision worker's equivalent: written and uploaded after the loop breaks on
+# a cancel, so it carries every answer the peer had already produced.
+VISION_RESULT_ARTIFACT = 'vision_result.json'
 
 
 class RemotePassCancelled(Exception):
@@ -277,9 +280,15 @@ def run_remote_vision(job, device_id, *, items, prompt, detail_label,
 
     Ordering note: this yields once the WHOLE batch is home, where the local
     pool yields as each answer lands. The callers do not depend on the
-    difference — they flush every _VISION_FLUSH_EVERY results either way — but
-    a Stop mid-pass therefore keeps only what the peer had already returned,
-    which is what its own between-images cancel check gives us.
+    difference — they flush every _VISION_FLUSH_EVERY results either way.
+
+    Stop keeps what the peer had already answered. That is not free: the peer
+    breaks out of its loop between images, writes vision_result.json with the
+    results so far and uploads it, so the hub waits a bounded moment for that
+    file rather than raising the instant Stop is pressed. Rows the peer never
+    reached are yielded as None, which every caller already treats as "leave
+    this row alone", and each caller's own post-loop `bank_jobs.cancelled`
+    check is what reports the stop.
     """
     from . import cluster as cluster_svc
     from . import cluster_remote
@@ -316,10 +325,20 @@ def run_remote_vision(job, device_id, *, items, prompt, detail_label,
     try:
         _await_remote_job(job, job_id, staged_count=len(staged),
                           detail_label=detail_label, label=label, bank_id=bank_id,
-                          progress_from=_vision_progress)
+                          progress_from=_vision_progress,
+                          stop_waits_for=VISION_RESULT_ARTIFACT)
         data = cluster_remote.read_job_result_json(job_id) or {}
+        # 'items' is what the peer actually writes; 'results' is read as a
+        # fallback only. Looking for 'results' alone found nothing in the file
+        # the peer sends, so EVERY row came back as "the peer never answered"
+        # and each caller left it alone — a framing, watermark or caption pass
+        # on a peer completed having changed nothing at all. Nothing caught it
+        # because every test of this function stubs the function itself.
+        answers = data.get('items')
+        if answers is None:
+            answers = data.get('results') or []
         by_name = {os.path.basename(str(r.get('artifact') or '')): r
-                   for r in (data.get('results') or [])}
+                   for r in answers}
     finally:
         cluster_svc.forget_artifact_fetches(job_id)
 

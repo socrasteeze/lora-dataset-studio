@@ -88,12 +88,13 @@ def test_an_installed_faces_cache_is_readable_by_the_faces_script(
 
     assert set(got) == set(hub_images), \
         'the faces script could not read the cache the peer just sent'
-    state, det, bfrac, emb = got[hub_images[0]]
+    state, det, bfrac, emb, sig = got[hub_images[0]]
     assert str(state) == 'scorable'
     assert (det, bfrac) == (pytest.approx(0.9), pytest.approx(0.3))
+    assert sig == '', 'a legacy entry carries no signature and is never stale'
     with np.load(str(dest), allow_pickle=False) as z:
         assert 'sigs' not in z.files, \
-            'faces has no sigs of its own; the installer must not invent one'
+            'a cache that arrived without sigs must not have one invented for it'
 
 
 def test_an_installed_score_cache_keeps_its_scores_and_gains_hub_sigs(
@@ -309,3 +310,146 @@ def test_the_stopped_line_says_what_was_kept(app):
     assert '1 face embeddings cached (2 remaining)' in kept
     assert 'relaunch to finish' in kept
     assert 'did not hand anything back' in lost
+
+
+# --- an edited image must not answer with a stale face ----------------------
+
+def test_the_face_cache_re_embeds_an_image_replaced_at_the_same_path(tmp_path):
+    """The faces cache keyed on path alone and ignored signatures, so replacing
+    an image in place kept its OLD embedding forever — the person grouping,
+    "find by text" and "select similar" all went on describing a picture that
+    was no longer there. Score has always had this check; faces did not."""
+    embed = _script('face_embed_infer')
+    img = tmp_path / 'face.jpg'
+    Image.new('RGB', (16, 16)).save(str(img))
+    cache_file = tmp_path / 'face_cache.npz'
+
+    cache = {str(img): ('scorable', 0.9, 0.3,
+                        np.ones(4, dtype='float32'), embed._file_sig(str(img)))}
+    embed._save_cache(str(cache_file), cache)
+    loaded = embed._load_cache(str(cache_file))
+    assert not embed._is_stale(str(img), loaded[str(img)]), \
+        'an untouched image must stay cached'
+
+    # Replace the file at the same path — a different image, same name.
+    Image.new('RGB', (32, 32), color=(255, 0, 0)).save(str(img))
+    os.utime(str(img), (0, 0))          # force a different mtime deterministically
+
+    assert embed._is_stale(str(img), loaded[str(img)]), \
+        'the replaced image kept its old embedding'
+
+
+def test_a_cache_written_before_signatures_is_not_thrown_away(tmp_path):
+    """Additive, like the score cache: entries with no sig are never stale, so
+    an existing cache keeps working instead of forcing a full re-embed."""
+    embed = _script('face_embed_infer')
+    img = tmp_path / 'legacy.jpg'
+    Image.new('RGB', (16, 16)).save(str(img))
+    legacy = tmp_path / 'legacy.npz'
+    np.savez(str(legacy), paths=np.array([str(img)]),
+             states=np.array(['scorable']),
+             dets=np.array([0.9], dtype='float32'),
+             bfracs=np.array([0.3], dtype='float32'),
+             embs=np.ones((1, 4), dtype='float32'))      # no sigs array at all
+
+    loaded = embed._load_cache(str(legacy))
+
+    assert set(loaded) == {str(img)}
+    assert not embed._is_stale(str(img), loaded[str(img)])
+
+
+# --- the vision passes: framing, watermark scan, Ollama captions ------------
+
+def _vision_job(app, monkeypatch, *, payload, cancelled=False, upload=True):
+    from app.services import bank_jobs, bank_remote
+    from app.services import cluster as cluster_svc
+
+    job_id = 'vision-1'
+
+    def fake_enqueue(device_id, staged, *, prompt, prefer_json, fmt):
+        if upload:
+            art = cluster_svc.job_artifact_dir(job_id)
+            (art / 'vision_result.json').write_text(json.dumps(payload),
+                                                    encoding='utf-8')
+        return job_id
+
+    class _Row:
+        status = 'running' if cancelled else 'completed'
+        progress = None
+        error_message = None
+
+    class _FakeClusterJob:
+        query = type('Q', (), {'filter_by': staticmethod(
+            lambda **kw: type('F', (), {'first': staticmethod(lambda: _Row())})())})()
+
+    monkeypatch.setattr('app.services.cluster_remote.enqueue_vision_on_device',
+                        fake_enqueue)
+    monkeypatch.setattr('app.models.ClusterJob', _FakeClusterJob)
+    monkeypatch.setattr(bank_jobs, 'cancelled', lambda job: cancelled)
+    monkeypatch.setattr(bank_jobs, 'progress', lambda job, **kw: None)
+    monkeypatch.setattr(cluster_svc, 'cancel_cluster_job', lambda jid: True)
+    monkeypatch.setattr(bank_remote, 'REMOTE_CANCEL_GRACE_SECONDS', 0.5)
+    monkeypatch.setattr(bank_remote, 'POLL_SECONDS', 0.01)
+    return bank_remote
+
+
+def test_a_remote_vision_pass_actually_returns_its_answers(app, hub_images,
+                                                           monkeypatch):
+    """The peer writes {'items': [...]}; the hub read data['results'] and found
+    nothing, so every row came back as "never answered" and every caller left it
+    alone. Framing, watermark scan and Ollama captions on a peer therefore
+    completed having changed NOTHING. No test caught it because every existing
+    test of this function stubs the function itself."""
+    bank_remote = _vision_job(app, monkeypatch, payload={'items': [
+        {'artifact': f'{i}__img{i}.jpg', 'text': f'answer {i}'}
+        for i in range(3)]})
+
+    with app.app_context():
+        got = list(bank_remote.run_remote_vision(
+            object(), PEER, items=[(i, p) for i, p in enumerate(hub_images)],
+            prompt='x', detail_label='framing'))
+
+    assert [raw for _rid, raw, _err in got] == ['answer 0', 'answer 1', 'answer 2']
+
+
+def test_a_peer_answering_the_older_shape_still_works(app, hub_images,
+                                                      monkeypatch):
+    """'results' is kept as a fallback so a peer on older code is not broken by
+    the fix — the same mixed-version case the infer path has to survive."""
+    bank_remote = _vision_job(app, monkeypatch, payload={'results': [
+        {'artifact': '0__img0.jpg', 'text': 'from an older peer'}]})
+
+    with app.app_context():
+        got = list(bank_remote.run_remote_vision(
+            object(), PEER, items=[(0, hub_images[0])], prompt='x',
+            detail_label='framing'))
+
+    assert [raw for _rid, raw, _err in got] == ['from an older peer']
+
+
+def test_a_stopped_vision_pass_keeps_what_the_peer_answered(app, hub_images,
+                                                            monkeypatch):
+    """Stop used to keep nothing here, while the docstring claimed otherwise.
+    The peer breaks between images and uploads what it has; rows it never
+    reached stay None, which the callers already treat as leave-alone."""
+    bank_remote = _vision_job(app, monkeypatch, cancelled=True, payload={
+        'items': [{'artifact': '0__img0.jpg', 'text': 'done before the stop'}]})
+
+    with app.app_context():
+        got = list(bank_remote.run_remote_vision(
+            object(), PEER, items=[(i, p) for i, p in enumerate(hub_images)],
+            prompt='x', detail_label='framing'))
+
+    assert [raw for _rid, raw, _err in got] == ['done before the stop', None, None]
+
+
+def test_a_stop_the_peer_never_answers_yields_nothing_and_does_not_hang(
+        app, hub_images, monkeypatch):
+    bank_remote = _vision_job(app, monkeypatch, cancelled=True, upload=False,
+                              payload={})
+
+    with app.app_context():
+        with pytest.raises(bank_remote.RemotePassCancelled):
+            list(bank_remote.run_remote_vision(
+                object(), PEER, items=[(0, hub_images[0])], prompt='x',
+                detail_label='framing'))

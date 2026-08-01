@@ -22,7 +22,7 @@ const QUALITY_FLAGS = [
   { key: 'small', label: '📐 Small' },
 ]
 
-export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, onQueue }) {
+export default function LaunchAllDialog({ caps, visionReady, scope, onClose, onLaunch, onQueue }) {
   // Which machine runs the passes that can travel. FIVE do: ✨ Score,
   // 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions. scan,
   // auto-reject and ✂ same-shot always run here — they read the database and
@@ -67,6 +67,11 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
       .filter((k) => ready[k])))
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [resolveDups, setResolveDups] = useState(true)
+  // Only the multi-bank scopes narrow per bank; a single bank is queued through
+  // enqueue(), which has no such notion. Offering the choice there would be a
+  // control that silently does nothing.
+  const manyBanks = scope === 'all' || scope === 'group'
+  const [skipCompleted, setSkipCompleted] = useState(true)
 
   // Picking a machine that cannot run a ticked pass UNTICKS it. Its checkbox is
   // about to be disabled, and leaving it ticked would post a run the API now
@@ -114,6 +119,7 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
     reject_flags: autoRejectOn ? [...rejectFlags] : [],
     resolve_dups: autoRejectOn && resolveDups,
     device_id: deviceId || 'local',
+    ...(manyBanks ? { skip_completed: skipCompleted } : {}),
   })
   const queue = () => onQueue(config())
 
@@ -234,6 +240,20 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
 
         <div className="rounded-md border border-indigo-400/40 bg-indigo-500/10 p-3 text-sm">
           <p className="font-semibold text-content">What will run</p>
+          {manyBanks && (
+            <label className="mt-1 flex items-start gap-1.5 text-sm text-content">
+              <input type="checkbox" checked={skipCompleted} className="mt-0.5"
+                onChange={(e) => setSkipCompleted(e.target.checked)} />
+              <span>
+                Skip passes a bank has already had
+                <span className="block text-xs text-content-subtle">
+                  Each bank is queued only with the passes it still needs; one
+                  with nothing left is skipped by name. Untick for a deliberate
+                  re-run.
+                </span>
+              </span>
+            </label>
+          )}
           {nRun === 0 ? (
             <p className="text-content-muted">
               {blockedSteps.length > 0

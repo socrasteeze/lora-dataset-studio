@@ -14,7 +14,9 @@ Protocol (same family as face_score_infer.py):
             drive the UI progress bar).
 
 Embeddings are CACHED in the .npz (parallel arrays paths/embs/states/dets/
-bfracs) and written incrementally every CACHE_EVERY images — killing the pass
+bfracs/sigs; `sigs` is the file signature at embed time, so an image replaced at
+the same path is re-embedded rather than answering with a stale face) and
+written incrementally every CACHE_EVERY images — killing the pass
 mid-way loses at most that slice, and re-clustering at another threshold is
 then near-instant. Clustering = union-find over cosine ≥ threshold on the
 L2-normed embeddings of the SCORABLE faces (biggest face per image — a group
@@ -66,6 +68,38 @@ def _write_count(cache_path, n):
         pass
 
 
+def _file_sig(path):
+    """Cheap identity signature — size + mtime (ns). Same rule and same format
+    as face_score_infer/bank_score_infer, duplicated rather than imported for
+    the same reason the gate constants above are: these run in different
+    dedicated interpreters and must not depend on each other's extras.
+    '' when the file is unreachable, which is never treated as stale."""
+    try:
+        st = os.stat(path)
+        return f'{st.st_size}:{st.st_mtime_ns}'
+    except OSError:
+        return ''
+
+
+def _cache_sig(entry):
+    """Signature of a cache tuple, tolerant of a legacy 4-tuple (no sig)."""
+    return entry[4] if len(entry) > 4 else ''
+
+
+def _is_stale(path, entry):
+    """True when the file differs from what the cache recorded — a same-path
+    edit. Without this an image replaced in place kept its OLD embedding
+    forever: the person grouping, "find by text" and "select similar" all went
+    on describing a picture that is no longer there. An empty stored or current
+    sig is never called stale, so a cache written before signatures shipped
+    keeps working and a file we cannot stat is not churned every run."""
+    stored = _cache_sig(entry)
+    if not stored:
+        return False
+    current = _file_sig(path)
+    return bool(current) and current != stored
+
+
 def _load_cache(path):
     import numpy as np
     out = {}
@@ -75,8 +109,12 @@ def _load_cache(path):
         with np.load(path, allow_pickle=False) as z:
             paths, states = z['paths'], z['states']
             embs, dets, bfracs = z['embs'], z['dets'], z['bfracs']
+            # 'sigs' is additive — a cache written before signatures shipped has
+            # none, so those entries carry an empty sig (never treated as stale).
+            sigs = z['sigs'] if 'sigs' in z.files else [''] * len(paths)
         for i, p in enumerate(paths):
-            out[str(p)] = (states[i], float(dets[i]), float(bfracs[i]), embs[i])
+            out[str(p)] = (states[i], float(dets[i]), float(bfracs[i]), embs[i],
+                           str(sigs[i]))
     except Exception as e:  # noqa: BLE001 — a corrupt cache = recompute, never fatal
         _log(f'[embed] cache unreadable, recomputing: {e}')
         return {}
@@ -95,7 +133,8 @@ def _save_cache(path, cache):
         states=np.array([cache[p][0] for p in paths]),
         dets=np.array([cache[p][1] for p in paths], dtype='float32'),
         bfracs=np.array([cache[p][2] for p in paths], dtype='float32'),
-        embs=np.stack([cache[p][3] for p in paths]).astype('float32'))
+        embs=np.stack([cache[p][3] for p in paths]).astype('float32'),
+        sigs=np.array([_cache_sig(cache[p]) for p in paths]))
     os.replace(tmp, path)
 
 
@@ -161,7 +200,9 @@ def main() -> int:
 
     used_gpu = False   # set when the model actually loads on CUDA below
     cache = _load_cache(cache_path)
-    todo = [p for p in images if p not in cache]
+    # A same-path edit invalidates the stale embedding, exactly as the score
+    # pass already does -- otherwise a replaced image keeps the old face forever.
+    todo = [p for p in images if p not in cache or _is_stale(p, cache[p])]
     _write_count(cache_path, len(images) - len(todo))
     _log(f'[embed] {len(images)} image(s), {len(images) - len(todo)} cached')
 
@@ -216,7 +257,7 @@ def main() -> int:
                 payload = read_validated_bank_image(p)
                 img = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_COLOR)
                 if img is None:
-                    cache[p] = ('unreadable', 0.0, 0.0, zero)
+                    cache[p] = ('unreadable', 0.0, 0.0, zero, _file_sig(p))
                 else:
                     h, w = img.shape[:2]
                     f = biggest(app.get(img))
@@ -228,7 +269,7 @@ def main() -> int:
                     else:
                         scale = 1.0
                     if f is None:
-                        cache[p] = ('no_face', 0.0, 0.0, zero)
+                        cache[p] = ('no_face', 0.0, 0.0, zero, _file_sig(p))
                     else:
                         area = (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1])
                         bbox_frac = float(area / (w * h) / scale)
@@ -242,9 +283,10 @@ def main() -> int:
                         elif abs(yaw) > YAW_MAX:
                             state = 'extreme_pose'
                         cache[p] = (state, round(det, 3), round(bbox_frac, 4),
-                                    f.normed_embedding.astype('float32'))
+                                    f.normed_embedding.astype('float32'),
+                                    _file_sig(p))
             except Exception as e:  # noqa: BLE001 — one broken file must not sink the pass
-                cache[p] = ('error', 0.0, 0.0, zero)
+                cache[p] = ('error', 0.0, 0.0, zero, _file_sig(p))
                 _log(f'[embed] {i}/{len(todo)} ERROR {e}')
                 continue
             finally:
@@ -268,7 +310,10 @@ def main() -> int:
 
     results = {}
     for p in images:
-        state, det, bfrac, _emb = cache.get(p) or ('error', 0.0, 0.0, None)
+        # Positional, not a fixed-width unpack: the tuple grew a `sig` and a
+        # 4-way unpack here raised on every run the moment it did.
+        entry = cache.get(p) or ('error', 0.0, 0.0, None, '')
+        state, det, bfrac = entry[0], entry[1], entry[2]
         results[p] = {'state': str(state), 'det': float(det), 'bbox_frac': float(bfrac)}
     clusters = _cluster(images, cache, threshold)
     print(json.dumps({'ok': True, 'results': results, 'clusters': clusters,

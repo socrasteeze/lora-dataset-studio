@@ -494,6 +494,17 @@ person, 🚩 Find watermarks, 📐 Classify framing and 🏷️ Caption can all 
 🔎 Scan, 🧹 Auto-reject and ✂ Find crops & variants never do — they read this
 machine's database and embeddings cache, so sending them would be slower.
 
+**Each bank card says what has been done to it.** A row of pass badges shows a
+muted glyph for a finished pass and an amber one with a count for what is left —
+so "has this bank ever had a face pass" is answerable without queueing one to
+find out. **Queue all banks** now uses the same answer twice: a bank is eligible
+when a *selected* pass still has work (a fully triaged bank that was never
+face-passed used to be invisible to it), and each bank is queued only with the
+passes it actually needs. A bank with nothing left is skipped by name, with the
+reason. Two passes are never treated as done — 🧹 Auto-reject is cheap and just
+re-applies the current flags, and ✂ Find crops & variants is bank-global with no
+cheap per-image answer, so both always run rather than guess.
+
 **Work already done is not done twice.** ✨ Score and 👥 Group by person keep an
 embeddings cache per bank, and that cache now travels: the other machine is sent
 what this one already has, so it only computes the rest — and the images it
