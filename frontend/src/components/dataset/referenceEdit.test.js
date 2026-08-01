@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   EDIT_ENGINES, defaultEditEngine, editBlockedReason, editEngineChoiceMessage,
   batchLiveNote, editPhase, editEngineOptions, editCostNote, editKeepNote,
-  editRefNote, editRefSupport,
+  editRefNote, acceptsExtraEditRefs, acceptsExtraEditRefsForBatch, editRefSupport,
+  editBatchBlockedReason, referenceEditCandidates,
+  retryRequestForReferenceEdit,
 } from './referenceEdit.js';
 import {
   STORAGE_ENGINES, STORAGE_PRIMARY, ENGINES, API_ENGINES, LOCAL_ENGINES, ENGINE_LABELS,
@@ -90,6 +92,20 @@ test('editBlockedReason surfaces WHY an engine is unavailable, before the click'
   assert.equal(editBlockedReason('add glasses', 'krea', reason), reason);
 });
 
+test('a multi-engine batch requires a selection and gates every selected blocked engine', () => {
+  // Upstream's fixture picks chatgpt as the un-blocked engine; the engines that
+  // exist here are klein and krea, so the same three gates are asserted on those.
+  const options = [
+    { engine: 'klein', blocked: null },
+    { engine: 'krea', blocked: '⚠ Krea model missing' },
+  ];
+  assert.match(editBatchBlockedReason('add glasses', [], options), /at least one/i);
+  assert.match(editBatchBlockedReason('', ['klein'], options), /describe/i);
+  assert.equal(editBatchBlockedReason('add glasses', ['klein'], options), null);
+  assert.match(editBatchBlockedReason('add glasses', ['klein', 'krea'], options),
+    /Krea model missing/);
+});
+
 test('the refusal names the engines that DO edit, derived from the list', () => {
   const msg = editEngineChoiceMessage();
   for (const e of EDIT_ENGINES) assert.ok(msg.includes(ENGINE_LABELS[e]), e);
@@ -141,6 +157,16 @@ test('the cost line never invents a price for a local render', () => {
   }
 });
 
+test('a multi-engine cost note counts the renders and still quotes no price', () => {
+  // Upstream splits this line into paid calls and free local renders. There is
+  // no paid half here, and inventing one would be the same lie in reverse — so
+  // the note counts the queue and says plainly that none of it is billed.
+  const note = editCostNote(['klein', 'krea']);
+  assert.match(note, /2 edits/);
+  assert.match(note, /no bill/);
+  assert.doesNotMatch(note, /paid|API call|refund/i);
+});
+
 test('the Keep line does not claim a refund that never applied', () => {
   const note = editKeepNote();
   assert.match(note, /costs you nothing/);
@@ -165,6 +191,16 @@ test('an unknown engine defaults to the CONSERVATIVE reference support', () => {
   assert.match(editRefNote('something-else'), /main reference only/);
 });
 
+test('the transient reference picker is hidden — no engine here can take it', () => {
+  // Hidden, not ignored: an input whose files are silently dropped returns an
+  // edit that used half of what the user handed it. Both local engines refuse,
+  // so the batch answer is false however they are combined.
+  assert.equal(acceptsExtraEditRefs('klein'), false);
+  assert.equal(acceptsExtraEditRefs('krea'), false);
+  assert.equal(acceptsExtraEditRefsForBatch(['klein', 'krea']), false);
+  assert.equal(acceptsExtraEditRefsForBatch([]), false);
+});
+
 test('batchLiveNote informs only while a generate batch runs, never blocks', () => {
   assert.equal(batchLiveNote(null), null);
   assert.equal(batchLiveNote({ kind: 'caption' }), null);
@@ -178,4 +214,51 @@ test('editPhase derives the modal phase from the server reference_edit object', 
   assert.equal(editPhase({ status: 'ready' }), 'ready');
   assert.equal(editPhase({ status: 'failed' }), 'failed');
   assert.equal(editPhase({ status: 'nonsense' }), 'idle');
+});
+
+test('per-engine candidates preserve selection order and keep partial success usable', () => {
+  const batch = {
+    engines: ['chatgpt', 'klein', 'openrouter'],
+    candidates: {
+      chatgpt: { status: 'ready', candidate_filename: 'chat.webp' },
+      klein: { status: 'failed', error: 'GPU failed' },
+      openrouter: { status: 'ready', candidate_filename: 'router.webp' },
+    },
+  };
+  const candidates = referenceEditCandidates(batch);
+  assert.deepEqual(candidates.map((candidate) => candidate.engine),
+    ['chatgpt', 'klein', 'openrouter']);
+  assert.deepEqual(candidates.filter((candidate) => candidate.status === 'ready')
+    .map((candidate) => candidate.candidate_filename), ['chat.webp', 'router.webp']);
+  assert.equal(editPhase(batch), 'ready');
+});
+
+test('legacy one-engine payload still normalizes to one candidate', () => {
+  assert.deepEqual(referenceEditCandidates({
+    status: 'ready', engine: 'chatgpt', candidate_filename: 'old.webp', error: null,
+  }), [{
+    engine: 'chatgpt', status: 'ready', candidate_filename: 'old.webp', error: null,
+  }]);
+});
+
+test('an exact Retry belongs only to the opaque batch currently displayed', () => {
+  const request = {
+    prompt: 'add glasses',
+    engines: ['chatgpt', 'openrouter'],
+    files: [{ name: 'angle.png' }],
+    batchId: 'batch-A',
+  };
+  assert.equal(
+    retryRequestForReferenceEdit(request, { batch_id: 'batch-A' }),
+    request,
+  );
+  assert.equal(
+    retryRequestForReferenceEdit(request, { batch_id: 'batch-B' }),
+    null,
+  );
+  assert.equal(retryRequestForReferenceEdit(request, null), null);
+  assert.equal(
+    retryRequestForReferenceEdit({ ...request, batchId: null }, { batch_id: 'batch-A' }),
+    null,
+  );
 });

@@ -38,6 +38,16 @@ def _webp(color, size=(300, 300)):
     return b.getvalue()
 
 
+class _SyncThread:
+    def __init__(self, target=None, args=(), kwargs=None, **_unused):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs or {}
+
+    def start(self):
+        self._target(*self._args, **self._kwargs)
+
+
 @pytest.fixture(autouse=True)
 def _clean_registry():
     rej.reset()
@@ -296,15 +306,20 @@ def test_keeping_a_candidate_promotes_it_to_be_the_reference(client, monkeypatch
     did = _create_with_ref(client, monkeypatch, 'Wren', 'zchar_wren')
     calls = []
     _stub_krea(monkeypatch, calls)
-    client.post(f'/api/dataset/{did}/ref/edit',
-                data={'prompt': 'x', 'engine': 'krea'},
-                content_type='multipart/form-data')
+    started = client.post(f'/api/dataset/{did}/ref/edit',
+                          data={'prompt': 'x', 'engine': 'krea'},
+                          content_type='multipart/form-data')
     monkeypatch.setattr(svc, '_read_comfy_output', lambda fn: _webp((9, 9, 9)))
     monkeypatch.setattr(svc, '_drop_comfy_output', lambda fn: None)
     svc.link_completed_reference_edit('krea-job-1', 'out_00001_.png', failed=False)
     before = client.get(f'/api/dataset/{did}').get_json()['ref_filename']
 
-    resp = client.post(f'/api/dataset/{did}/ref/edit/keep')
+    # Keep now REQUIRES the batch id the start call handed back: a stale tab must
+    # not be able to promote a newer batch just because its engine name matches.
+    # Omitting it is a 409 by design, so the test carries it like a real client.
+    batch_id = started.get_json()['batch_id']
+    resp = client.post(f'/api/dataset/{did}/ref/edit/keep',
+                       json={'engine': 'krea', 'batch_id': batch_id})
 
     assert resp.status_code == 200
     after = client.get(f'/api/dataset/{did}').get_json()
