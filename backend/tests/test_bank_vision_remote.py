@@ -262,6 +262,13 @@ def test_a_peer_that_cannot_caption_falls_back_here_and_says_so(
                              {})[-1])
     monkeypatch.setattr('app.gpu_window.gpu_exclusive_vision_window',
                         lambda **kw: __import__('contextlib').nullcontext())
+    # THIS machine's captioner has to read as ready, or the fallback under test
+    # cannot happen and the assertion below reads the "neither side can caption"
+    # refusal instead. caption_paths is stubbed above, but _caption_prereq probes
+    # the real Ollama/JoyCaption install — so without this the test only passes on
+    # a machine that happens to have one. CI has neither, which is exactly how it
+    # was failing there while passing locally.
+    monkeypatch.setattr(banks, '_caption_prereq', lambda: None)
 
     with app.app_context():
         _peer_row({'joycaption': False, 'ollama': False})
