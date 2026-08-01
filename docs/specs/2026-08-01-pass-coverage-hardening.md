@@ -1,9 +1,11 @@
 # Hand-off: pass coverage, identity-pass reuse, honest remote failures
 
-> **Status on merge (2026-08-01). Parts 1 and 2 are DONE; Part 3 is the open
-> work.** This was written from a static read of an earlier `main`, and the
-> present tense below is now wrong for two of its three parts. Read it as a
-> record of the reasoning, not of the current code.
+> **Status (2026-08-01): ALL THREE PARTS ARE DONE.** This was written from a
+> static read of an earlier `main`. Every problem it describes in the present
+> tense is fixed, so read the whole file as a record of the reasoning — not of
+> the current code. Kept rather than deleted because the *why* is still the
+> best explanation of these three areas, and because two of its conclusions
+> turned out to be wrong in ways worth remembering.
 >
 > * **Part 1 — identity-pass reuse: shipped** in `d3a39b87`. The root cause was
 >   worse than described: `_install_cache` wrote a fixed
@@ -15,8 +17,29 @@
 > * **Part 2 — honest remote failures: shipped** in `6ec8cefb`. The fabricated
 >   `rc=0` is gone, and the actual cause was the peer parsing its whole stdout
 >   buffer as JSON while InsightFace printed a banner ahead of the result.
-> * **Part 3 — pass coverage and "queue only what's missing": NOT started.**
->   Everything from `## Part 3` down still stands.
+> * **Part 3 — pass coverage and "queue only what's missing": shipped** in
+>   `8a3bf8b6`. `PASS_PENDING` is the canonical predicate table (3a),
+>   `bank_pass_coverage()` is the single aggregate query behind both the badges
+>   on `GET /api/banks` and the queue's decision (3b), `banks_needing_work()`
+>   replaced the eligibility rule (3c), and `enqueue_many(skip_completed=…)`
+>   narrows each bank's step list (3d).
+>
+> **Two of this file's conclusions were wrong, and the code deliberately
+> departs from them:**
+>
+> * **3a's "adding the missing `score` filter is a direct win" is false.**
+>   ✨ Score computes STYLE CLUSTERS over every row it is handed, exactly as the
+>   faces pass clusters people — so a `aesthetic_score IS NULL` row filter
+>   inside the pass would silently change the grouping. The predicate is a
+>   QUEUEING decision only. The per-image skip that is safe is the embeddings
+>   cache, because it does not change what the pass sees.
+> * **`semantic_dedup` and `auto_reject` are never counted as done.** 3a marked
+>   the former `[VERIFY]`; rather than guess a cheap predicate, both stay
+>   always-pending so the queue cannot skip work it should have run.
+>
+> And one thing this file could not have known: `skip_completed=False` had to
+> relax **eligibility** too, not just the per-bank step list — filtering by
+> pending work first meant a deliberate re-run queued nothing at all.
 >
 > **One divergence worth knowing before implementing anything here.** Part 1
 > proposed an id-keyed cache with `sigs` and a version inside
@@ -335,11 +358,18 @@ Parts 1 and 2 are independently shippable.
 
 ## State
 
-Parts 1 and 2 are implemented and on `main` — see the status block at the top of
-this file for what actually shipped and where it diverged from the proposal.
-Part 3 is untouched: it is the largest surface here and the only part still
-worth reading as a plan rather than as history.
+**Closed.** All three parts are implemented and on `main`; the status block at
+the top of this file records what shipped, where, and the two places the code
+deliberately departs from the plan below. Nothing here is outstanding, and the
+sequencing section is spent.
 
-Sequencing above is therefore spent. The remaining order is 3a (the coverage
-predicate table) → 3b (the aggregate query, whose plan is the one real
-performance risk) → 3c/3d → the UI.
+What this file is still good for: the *reasoning*. Why clustering has to see
+every row, why `face_state` is the right marker and `face_cluster` is not, why
+the coverage rollup must be one aggregate query. Those outlive the tickets.
+
+One item it raised that is genuinely still open, found while implementing it:
+a **peer running older code** answers an unparseable stdout with
+`{'stdout': …}`, and a peer on an older release writes its vision results under
+a different key. Both are handled defensively on this side (a tolerant parser,
+and a fallback key), but there is no version handshake between a Primary and
+its peers — a mixed-version cluster is survivable rather than checked.

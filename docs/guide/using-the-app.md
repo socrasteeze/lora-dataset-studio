@@ -557,10 +557,14 @@ they are spread across machines, only one of them ever runs at a time. A single
 card cannot honestly show two different states at once.
 
 **⏳ Queue all N bank(s)…** does the whole library in one gesture. It picks every
-bank that still has undecided images — a fully triaged one has nothing for a
-pipeline to decide, so it is skipped — asks which passes to run, and adds one
-queue entry per bank. It **queues**; twelve banks never become twelve runs — at
-most one per machine is going at a time.
+bank with work left for a pass you ticked, asks which passes to run, and adds one
+queue entry per bank — carrying only the passes that bank actually needs. A bank
+with nothing left is skipped by name, with the reason. The old rule was "has
+undecided images", which hid a fully triaged bank that had never been
+face-passed — exactly the bank worth re-targeting. Untick **skip passes a bank
+has already had** for a deliberate re-run; that also widens the selection back to
+every bank. It **queues**; twelve banks never become twelve runs — at most one
+per machine is going at a time.
 The confirmation says so with the count, and every bank is still cancellable
 from the queue panel. A bank already in the queue is skipped by name rather than
 counted twice.
