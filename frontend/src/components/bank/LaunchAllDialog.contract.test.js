@@ -7,7 +7,11 @@
  * 1. The readiness map gated 🚩 Watermarks, 📐 Framing and 🏷️ Captions on the
  *    LOCAL vision model long after those three learned to travel. With a peer
  *    picked on a hub whose Ollama was down they arrived UNTICKED and badged
- *    "will skip" — for work the peer would have run happily.
+ *    "will skip" — for work the peer would have run happily. Its first fix,
+ *    `|| remote`, over-corrected into the opposite lie: a truthy device id
+ *    ticked ✨ Score on a peer that had already reported no scoring stack. The
+ *    verdict must come from the SELECTED machine's own capabilities, which is
+ *    what passDeviceGate.stepGate answers.
  * 2. The button counted only the steps that would RUN while config() posted the
  *    full selection: "🚀 Launch 4 passes" enqueuing seven.
  */
@@ -17,25 +21,42 @@ import test from 'node:test';
 
 const src = fs.readFileSync(new URL('./LaunchAllDialog.jsx', import.meta.url), 'utf8');
 
-const READY_BLOCK = src.slice(src.indexOf('const ready = useMemo'),
-  src.indexOf('}), [caps, visionReady, remote])'));
-
-test('every pass that can travel has the peer escape in the ready map', () => {
-  // The five the backend routes on device_id (_run_pipeline_step).
+test('readiness is decided by the selected device, not by "a peer exists"', () => {
+  assert.match(src, /import \{ stepGate \} from '\.\/passDeviceGate\.js'/);
+  const gates = src.slice(src.indexOf('const gates = useMemo'),
+    src.indexOf('const ready = useMemo'));
   for (const key of ['score', 'faces', 'watermark', 'framing', 'caption']) {
-    const line = READY_BLOCK.split('\n').find((l) => l.trim().startsWith(`${key}:`));
-    assert.ok(line, `no ready entry for ${key}`);
-    assert.match(line, /\|\| remote/,
-      `${key} travels to a peer but is still gated on this machine only — `
-      + 'it will arrive unticked and badged "will skip" for work the peer can do');
+    assert.ok(gates.includes(`'${key}'`), `${key} is not gated at all`);
   }
+  assert.match(gates, /stepGate\(k, \{ caps, visionReady, device \}\)/);
+  // Comments stripped: the header above `gates` explains the old `|| remote`
+  // by name, and that prose is worth keeping.
+  const code = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+  assert.doesNotMatch(code, /\|\| remote/,
+    'a truthy device id is not evidence that THAT machine can run the pass');
+});
+
+test('a pass the chosen machine refuses is disabled, not merely badged', () => {
+  assert.match(src, /disabled=\{!!gates\[s\.key\]\?\.blocked\}/,
+    'the checkbox must be unclickable — an amber "will skip" badge on a pass '
+    + 'the peer flatly cannot run is the same lie in a quieter font');
+  assert.match(src, /filter\(\(k\) => !gates\[k\]\?\.blocked\)/,
+    'a blocked pass must be unticked, or config() posts a run the API refuses');
+  assert.match(src, /if \(gates\[k\]\?\.blocked\) return prev/,
+    'toggleStep must refuse a blocked pass too, not only the disabled input');
+});
+
+test('the device the picker resolved reaches the dialog, not just its id', () => {
+  // The id normally comes back from localStorage, so onChange never fires for
+  // it — a restored peer is exactly the selection that must be gated.
+  assert.match(src, /onDevice=\{setDevice\}/);
 });
 
 test('the steps that never travel are NOT given the peer escape', () => {
   // scan / auto_reject are unconditionally true; semantic_dedup follows Score's
   // verdict because it consumes Score's embeddings, which a remote run brings
   // home. None of the three may claim a peer runs them.
-  const note = src.slice(src.indexOf('run there — with its models'));
+  const note = src.slice(src.indexOf('can run there'));
   assert.match(note, /Scan.*Auto-reject.*Same shot always run here/s,
     'the note must name the passes that never travel, not only the ones that do');
 });
@@ -52,8 +73,12 @@ test('the button cannot understate what config() sends', () => {
 });
 
 test('the note names all five travelling passes', () => {
-  const note = src.slice(src.indexOf('run there — with its models') - 400);
+  const at = src.indexOf('can run there');
+  assert.ok(at > 0, 'the remote note is gone');
+  const note = src.slice(at - 400);
   for (const label of ['Score', 'Group by person', 'Watermarks', 'Framing', 'Captions']) {
     assert.ok(note.includes(label), `the note omits ${label}`);
   }
+  // …and stops promising they all run there regardless of what that machine is.
+  assert.match(note.slice(0, 600), /only if that machine reports the stack/);
 });

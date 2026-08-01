@@ -104,3 +104,105 @@ def test_the_queue_route_turns_that_into_a_400(app, tmp_path):
                     json={'steps': ['scan'], 'device_id': 'api:b1156361ded0'})
     assert r.status_code == 400, r.get_json()
     assert 'compute peer' in (r.get_json() or {}).get('error', '')
+
+
+# --- the PASSES are validated against the device, not only its id ------------
+#
+# `steps` were checked against the chosen machine NOWHERE: _remote_pass_device
+# answers one question — is this an 'api:' backend? — and takes no steps at all.
+# So a peer reporting bank_scoring=false accepted a Launch-all containing
+# ✨ Score, returned 202, staged the bank across the network and died on the
+# first image as a mid-pipeline step error.
+
+PEER = '4fa2b7c1-0000-4000-8000-000000000001'
+
+
+def _peer(caps):
+    import json
+
+    from app.extensions import db
+    from app.models import ClusterDevice
+    db.session.add(ClusterDevice(id=PEER, name='Spare box', auth_token_hash='x',
+                                 capabilities=json.dumps(caps)))
+    db.session.commit()
+
+
+def test_queuing_a_pass_the_peer_reported_it_cannot_run_is_refused(app, tmp_path):
+    import pytest
+
+    from app.services import bank_queue
+    from test_image_bank import _mkbank, flat
+
+    with app.app_context():
+        client = app.test_client()
+        bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': flat()}, name='NOSCORE')
+        _peer({'bank_scoring': False, 'face_scoring': True, 'ollama': True})
+        with pytest.raises(ValueError, match='bank-scoring'):
+            bank_queue.enqueue(app, 'local', bank_id,
+                               steps=['scan', 'score'], device_id=PEER)
+        assert bank_queue.snapshot()['items'] == []
+
+
+def test_the_same_peer_still_takes_the_passes_it_can_run(app, tmp_path):
+    """The refusal is per-pass. A partial peer is useful, not useless."""
+    from app.services import bank_queue
+    from test_image_bank import _mkbank, flat
+
+    with app.app_context():
+        client = app.test_client()
+        bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': flat()}, name='PARTIAL')
+        _peer({'bank_scoring': False, 'face_scoring': True, 'ollama': True})
+        try:
+            assert bank_queue.enqueue(app, 'local', bank_id,
+                                      steps=['scan', 'faces', 'framing'],
+                                      device_id=PEER) == 1
+        finally:
+            with bank_queue._lock:
+                bank_queue._queue.clear()
+
+
+def test_a_peer_that_has_not_reported_yet_is_not_refused(app, tmp_path):
+    """Same polarity as _check_peer_capability, on purpose: only an EXPLICIT
+    False blocks. Being unable to describe yourself is not being unable to do
+    the work, and the hub would run this job happily."""
+    from app.services import bank_queue
+    from test_image_bank import _mkbank, flat
+
+    with app.app_context():
+        client = app.test_client()
+        bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': flat()}, name='QUIET')
+        _peer({})
+        try:
+            assert bank_queue.enqueue(app, 'local', bank_id, steps=['score'],
+                                      device_id=PEER) == 1
+        finally:
+            with bank_queue._lock:
+                bank_queue._queue.clear()
+
+
+def test_captions_are_refused_only_when_the_peer_has_neither_engine(app, tmp_path):
+    import pytest
+
+    from app.services import bank_queue
+    from test_image_bank import _mkbank, flat
+
+    with app.app_context():
+        client = app.test_client()
+        bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': flat()}, name='NOCAP')
+        _peer({'joycaption': False, 'ollama': False})
+        with pytest.raises(ValueError, match='JoyCaption or Ollama'):
+            bank_queue.enqueue(app, 'local', bank_id, steps=['caption'],
+                               device_id=PEER)
+
+
+def test_launching_refuses_it_too_with_the_same_wording(app, tmp_path):
+    """Queue and Launch must not disagree about what that machine can do."""
+    with app.app_context():
+        from test_image_bank import _mkbank, flat
+        client = app.test_client()
+        bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': flat()}, name='LNOSCORE')
+        _peer({'bank_scoring': False})
+    r = client.post(f'/api/bank/{bank_id}/pipeline',
+                    json={'steps': ['score'], 'device_id': PEER})
+    assert r.status_code == 400, r.get_json()
+    assert 'bank-scoring' in (r.get_json() or {}).get('error', '')

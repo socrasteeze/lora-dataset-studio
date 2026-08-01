@@ -47,7 +47,11 @@ test('the resolution panel hits the semantic endpoints and uses same-shot wordin
 
 test('Launch all inserts the semantic step right after Score, defaulting on when ready', () => {
   assert.match(dialog, /key:\s*'semantic_dedup'/);
-  assert.match(dialog, /semantic_dedup:\s*!!caps\?\.bank_scoring/);
+  // Its readiness rule lives in passDeviceGate.js now: it follows Score's
+  // verdict on whichever machine will run Score, and is never blocked by the
+  // device because it always runs here.
+  const gate = fs.readFileSync(new URL('./passDeviceGate.js', import.meta.url), 'utf8');
+  assert.match(gate, /if \(key === 'semantic_dedup'\)[\s\S]{0,200}stepGate\('score', ctx\)/);
   const m = dialog.match(/\[([^\]]*)\]\s*\n\s*\.filter\(\(k\)\s*=>\s*ready\[k\]\)/);
   assert.ok(m, 'found the default step set');
   const order = m[1];

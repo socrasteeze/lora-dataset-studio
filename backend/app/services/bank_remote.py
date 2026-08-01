@@ -70,8 +70,66 @@ def _map_home(peer_key: str, name_to_hub: dict) -> str | None:
 _REQUIRED_CAP_HINT = {
     'bank_scoring': 'bank-scoring',
     'face_scoring': 'face-scoring',
+    'joycaption': 'JoyCaption',
     'ollama': 'Ollama with a vision model',
 }
+
+# Which capability a PEER must report before a pipeline pass can travel to it.
+# This map existed only as five scattered call-site keyword arguments plus
+# _peer_caption_kind, so nothing could answer "can that machine run this pass?"
+# without starting the pass. A tuple is an ANY-of: captions run on either engine,
+# so only a peer reporting both missing is refused.
+#
+# The three steps NOT listed here never travel — scan, auto_reject and
+# semantic_dedup read the hub's database and embeddings cache — so no device can
+# block them. Absent from this map means "always allowed", not "unknown".
+PASS_PEER_CAPS = {
+    'score': ('bank_scoring',),
+    'faces': ('face_scoring',),
+    'watermark': ('ollama',),
+    'framing': ('ollama',),
+    'caption': ('joycaption', 'ollama'),
+}
+
+PASS_LABELS = {
+    'score': '✨ Score',
+    'faces': '👥 Group by person',
+    'watermark': '🚩 Find watermarks',
+    'framing': '📐 Classify framing',
+    'caption': '🏷️ Caption',
+}
+
+
+def peer_capabilities(device_id) -> dict | None:
+    """The peer's last self-reported capability blob, or None when there is no
+    such device. An unparsable/absent blob reads as {} — every gate built on
+    this then sees "unknown", never "missing"."""
+    from ..models import ClusterDevice
+    row = ClusterDevice.query.filter_by(id=device_id).first()
+    if row is None:
+        return None
+    try:
+        return json.loads(row.capabilities or '{}')
+    except (TypeError, ValueError):
+        return {}
+
+
+def peer_refusal(device_id, step) -> str | None:
+    """The missing stack that stops ``step`` running on this peer, or None.
+
+    Same polarity as _check_peer_capability, deliberately: only an EXPLICIT
+    False refuses. A peer that has never checked in reports nothing, and being
+    unable to describe yourself is not the same as being unable to do the work.
+    """
+    needed = PASS_PEER_CAPS.get(step)
+    if not needed:
+        return None
+    caps = peer_capabilities(device_id)
+    if caps is None:
+        return None
+    if not all(caps.get(cap) is False for cap in needed):
+        return None
+    return ' or '.join(_REQUIRED_CAP_HINT.get(cap, cap) for cap in needed)
 
 
 def _check_peer_capability(device_id, required_cap) -> None:
@@ -82,14 +140,9 @@ def _check_peer_capability(device_id, required_cap) -> None:
     joined is not refused on a technicality it hasn't had the chance to report."""
     if not required_cap:
         return
-    from ..models import ClusterDevice
-    row = ClusterDevice.query.filter_by(id=device_id).first()
-    if row is None:
+    caps = peer_capabilities(device_id)
+    if caps is None:
         return
-    try:
-        caps = json.loads(row.capabilities or '{}')
-    except (TypeError, ValueError):
-        caps = {}
     if caps.get(required_cap) is False:
         hint = _REQUIRED_CAP_HINT.get(required_cap, required_cap)
         raise RuntimeError(

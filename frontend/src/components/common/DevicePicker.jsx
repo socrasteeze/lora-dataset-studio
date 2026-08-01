@@ -22,7 +22,7 @@ export function saveDeviceId(id) {
  * Compact select: "Run on" — only renders when Primary has at least one peer
  * (or always when `always` is set). Value is a device id (`local` or uuid).
  */
-export default function DevicePicker({ value, onChange, kind = 'comfy', className = '', always = false }) {
+export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy', className = '', always = false }) {
   const [devices, setDevices] = useState(null)
 
   useEffect(() => {
@@ -56,6 +56,17 @@ export default function DevicePicker({ value, onChange, kind = 'comfy', classNam
     }
   }, [devices, value, kind, onChange])
 
+  // Hand the parent the whole device, not just its id — a caller that has to
+  // decide what that machine CAN do needs its capability blob, and the list is
+  // already fetched here. An effect rather than a second argument to onChange,
+  // because the value is normally restored from localStorage: onChange never
+  // fires for that one, and a restored peer is exactly the case that must be
+  // gated. null means "this machine" (or not in the list yet).
+  useEffect(() => {
+    if (devices == null) return
+    onDevice?.(devices.find((d) => d.id === value && !d.local) || null)
+  }, [devices, value, onDevice])
+
   if (devices == null) return null
   // 'bank-pass' = the bank's Score/Faces passes: they need the FULL app on the
   // other machine (its scoring stacks), so API backends — bare ComfyUI — are
@@ -88,10 +99,18 @@ export default function DevicePicker({ value, onChange, kind = 'comfy', classNam
               : kind === 'bank-pass'
                 // Ollama counts now: the framing and watermark passes travel as
                 // vision jobs, so a peer with Ollama but no scoring stack is
-                // still useful for a pipeline — it just skips Score/Faces.
+                // still useful for a pipeline — it just can't do Score/Faces.
                 ? (d.capabilities?.bank_scoring || d.capabilities?.face_scoring
                    || d.capabilities?.ollama)
                 : true)
+          // An OR across three stacks, so "capOk" here means "useful for SOME
+          // pass", never "useful for all of them" — a peer with only Ollama
+          // passes it. Saying more than that from one <option> would be a
+          // second, worse copy of the per-pass gate the Launch dialog now runs;
+          // it names the passes it cannot do, so this only has to be honest.
+          const partial = kind === 'bank-pass' && !d.local && capOk
+            && !(d.capabilities?.bank_scoring && d.capabilities?.face_scoring
+                 && d.capabilities?.ollama)
           // Two machines can share a name (a peer and a ComfyUI backend added
           // from the same box routinely do). Say which is which, or the picker
           // offers two identical-looking rows that behave differently.
@@ -99,6 +118,10 @@ export default function DevicePicker({ value, onChange, kind = 'comfy', classNam
           if (offline) label += ' (offline)'
           else if (!capOk) label += kind === 'bank-pass' ? ' (no vision or scoring stack)' : ' (no ComfyUI)'
           else if (d.busy) label += ' (busy)'
+          // Additive, not part of the chain above: "busy" is transient and
+          // "some passes" is structural, and swallowing either behind the other
+          // loses the one the user needed to see.
+          if (partial) label += ' (some passes)'
           return (
             <option key={d.id} value={d.id} disabled={offline}>
               {label}

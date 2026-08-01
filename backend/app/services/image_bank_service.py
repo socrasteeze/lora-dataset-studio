@@ -3815,6 +3815,36 @@ def _remote_pass_device(device_id) -> bool:
     return True
 
 
+def refuse_steps_for_device(device_id, steps) -> None:
+    """Refuse the picked passes the CHOSEN peer has already said it cannot run.
+
+    Until this existed, ``steps`` were validated against the device NOWHERE:
+    _remote_pass_device answers one question — is this an 'api:' backend id? —
+    and takes no steps at all. So a peer reporting bank_scoring=false accepted a
+    Launch-all with ✨ Score in it, returned 202, staged the bank across the
+    network and died on the first image as a mid-pipeline step error.
+
+    ValueError on purpose, not the RuntimeError _check_peer_capability raises:
+    ValueError is what the routes turn into a 400 and what enqueue_many's
+    per-bank handler already catches.
+    """
+    if not device_id:
+        return
+    from . import bank_remote
+    blocked = []
+    for step in steps:
+        hint = bank_remote.peer_refusal(device_id, step)
+        if hint:
+            blocked.append(f'{bank_remote.PASS_LABELS.get(step, step)} needs {hint}')
+    if not blocked:
+        return
+    from . import cluster as cluster_svc
+    label = cluster_svc.device_label(device_id) or 'that machine'
+    raise ValueError(
+        f"{label} cannot run every pass you picked — {'; '.join(blocked)}. "
+        f'Untick those passes, or Run on a different device.')
+
+
 def start_score(app, user_id, bank_id, device_id=None):
     """Launch the scoring pass (LAION aesthetic + NSFW + style clustering) over
     the bank's non-rejected images. Needs the bank-scoring extra (Setup ▸ Quality
@@ -5372,6 +5402,8 @@ def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
     # Validates the pick up front (peers only): a bad device is a 400 at launch,
     # not a skipped step discovered an hour into the queue.
     remote = _remote_pass_device(device_id)
+    if remote:
+        refuse_steps_for_device(device_id, steps)
     return bank_jobs.start(
         app, bank_id, 'pipeline',
         _pipeline_job(user_id, bank_id, steps, reject_flags, bool(resolve_dups),

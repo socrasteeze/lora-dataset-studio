@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
+import { stepGate } from './passDeviceGate.js'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 
 /** 🚀 Launch all — the overnight funnel. The user picks which passes run and how
@@ -27,26 +28,20 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
   // auto-reject and ✂ same-shot always run here — they read the database and
   // the embeddings cache, so sending them would be slower, not faster.
   const [deviceId, setDeviceId] = useState(loadSavedDeviceId)
+  const [device, setDevice] = useState(null)
   const remote = deviceId && deviceId !== 'local'
-  // A heavy pass is "ready" when its tool is installed; scan/auto-reject always
-  // are. With a peer picked, a travelling pass answers to the PEER's stack —
-  // checked there when the pass starts — so the local verdict no longer gates
-  // it. Leaving the three vision passes gated on the LOCAL vision model was a
-  // real lie: on a hub whose Ollama is down they arrived unticked and badged
-  // "will skip", for work the peer would have done happily.
-  const ready = useMemo(() => ({
-    scan: true,
-    auto_reject: true,
-    score: !!caps?.bank_scoring || remote,
-    // Stage 2 reuses Score's embeddings — ready exactly when Score is (and it's
-    // skipped at run time if Score didn't actually produce any). A REMOTE score
-    // brings its embeddings home, so this follows the same verdict.
-    semantic_dedup: !!caps?.bank_scoring || remote,
-    watermark: !!visionReady || remote,
-    faces: !!caps?.face_scoring || remote,
-    framing: !!visionReady || remote,
-    caption: !!visionReady || remote,
-  }), [caps, visionReady, remote])
+  // A heavy pass is "ready" when its tool is installed on the machine that will
+  // RUN it. Which machine that is, the picker decides — so the verdict follows
+  // the PEER's own capability report when one is picked, and this machine's
+  // otherwise. Answering with `|| remote` (a truthy device id and nothing else)
+  // ticked ✨ Score on a peer that had already said it has no scoring stack.
+  const gates = useMemo(() => Object.fromEntries(
+    ['scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark', 'faces',
+      'framing', 'caption'].map((k) => [k, stepGate(k, { caps, visionReady, device })]),
+  ), [caps, visionReady, device])
+  const ready = useMemo(
+    () => Object.fromEntries(Object.entries(gates).map(([k, g]) => [k, g.ok])),
+    [gates])
 
   const STEPS = [
     { key: 'scan', label: '🔎 Scan quality',
@@ -73,7 +68,21 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [resolveDups, setResolveDups] = useState(true)
 
+  // Picking a machine that cannot run a ticked pass UNTICKS it. Its checkbox is
+  // about to be disabled, and leaving it ticked would post a run the API now
+  // refuses outright. Never the reverse: switching back to this machine
+  // re-enables the box and leaves the choice to the user — the initial
+  // selection is a lazy useState evaluated once, so this effect is the only
+  // re-sync and it must not undo a deliberate untick.
+  useEffect(() => {
+    setSteps((prev) => {
+      const next = new Set([...prev].filter((k) => !gates[k]?.blocked))
+      return next.size === prev.size ? prev : next
+    })
+  }, [gates])
+
   const toggleStep = (k) => setSteps((prev) => {
+    if (gates[k]?.blocked) return prev
     const next = new Set(prev)
     if (next.has(k)) next.delete(k); else next.add(k)
     return next
@@ -85,6 +94,7 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
   })
 
   const autoRejectOn = steps.has('auto_reject')
+  const blockedSteps = STEPS.filter((s) => gates[s.key]?.blocked)
   // The honest preview: the steps that will actually RUN, in order, tagged when
   // one will be skipped because its tool isn't ready.
   const plan = STEPS.filter((s) => steps.has(s.key)).map((s) => ({
@@ -158,19 +168,42 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
           </p>
         </div>
 
+        {blockedSteps.length > 0 && (
+          <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            🚫 {blockedSteps.length === 1 ? 'One pass' : `${blockedSteps.length} passes`}
+            {' '}can’t run on the machine you picked and {blockedSteps.length === 1 ? 'has' : 'have'}
+            {' '}been unticked: {blockedSteps.map((s) => s.label).join(', ')}.
+            {' '}Run on this machine instead to get {blockedSteps.length === 1 ? 'it' : 'them'} back.
+          </p>
+        )}
+
         <ul className="space-y-1.5">
           {STEPS.map((s) => (
             <li key={s.key}>
-              <label className="flex items-start gap-2 rounded-md border border-border bg-surface p-2 text-sm">
+              <label className={`flex items-start gap-2 rounded-md border border-border bg-surface p-2 text-sm${
+                gates[s.key]?.blocked ? ' opacity-50 cursor-not-allowed' : ''}`}>
                 <input type="checkbox" className="mt-0.5" checked={steps.has(s.key)}
+                  disabled={!!gates[s.key]?.blocked}
                   onChange={() => toggleStep(s.key)} />
                 <span className="min-w-0">
                   <span className="font-medium text-content">{s.label}</span>
-                  {!ready[s.key] && (
+                  {/* Three different states, and conflating them is what made
+                      this dialog lie twice already: the machine REFUSES it
+                      (disabled), its tool is missing but it will still be
+                      recorded as skipped (amber), or we simply don't know yet. */}
+                  {gates[s.key]?.blocked ? (
+                    <span className="ml-1.5 rounded bg-red-500/15 px-1.5 py-px text-[10px] font-semibold text-red-300">
+                      {gates[s.key].reason}
+                    </span>
+                  ) : !ready[s.key] ? (
                     <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold text-amber-300">
                       {s.needs} not ready — will skip
                     </span>
-                  )}
+                  ) : gates[s.key]?.warn ? (
+                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold text-amber-300">
+                      {gates[s.key].warn}
+                    </span>
+                  ) : null}
                   <span className="block text-xs text-content-subtle">{s.desc}</span>
                 </span>
               </label>
@@ -202,7 +235,11 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
         <div className="rounded-md border border-indigo-400/40 bg-indigo-500/10 p-3 text-sm">
           <p className="font-semibold text-content">What will run</p>
           {nRun === 0 ? (
-            <p className="text-content-muted">Nothing selected yet — pick at least one pass.</p>
+            <p className="text-content-muted">
+              {blockedSteps.length > 0
+                ? 'Nothing left to run on that machine — pick another one, or tick a pass it can do.'
+                : 'Nothing selected yet — pick at least one pass.'}
+            </p>
           ) : (
             <ol className="mt-1 list-decimal pl-5 text-content-muted space-y-0.5">
               {plan.map((s) => (
@@ -242,12 +279,13 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
             exactly which passes travel and which never do — a picker that
             silently applies to less than it implies is worse than none. */}
         <div className="flex flex-wrap items-center gap-2">
-          <DevicePicker value={deviceId} onChange={setDeviceId} kind="bank-pass"
-            className="text-[0.6875rem]" />
+          <DevicePicker value={deviceId} onChange={setDeviceId} onDevice={setDevice}
+            kind="bank-pass" className="text-[0.6875rem]" />
           {remote && (
             <span className="text-[0.6875rem] text-content-subtle">
               ✨ Score, 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions
-              run there — with its models and its captioner, over the network.
+              can run there — each one only if that machine reports the stack for
+              it; the ones it can&apos;t do are greyed out above.
               🔎 Scan, ✕ Auto-reject and ✂ Same shot always run here: they read
               this machine&apos;s database and embeddings cache.
             </span>
