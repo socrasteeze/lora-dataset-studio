@@ -94,7 +94,7 @@ def test_secret_printable_characters_roundtrip_exactly(tmp_path, monkeypatch):
 def test_set_secrets_rejects_controls_without_mutating_file_or_environment(
         tmp_path, monkeypatch, separator):
     config = _fresh(monkeypatch, tmp_path)
-    config.ENV_PATH.write_bytes(b"GEMINI_API_KEY='old-value'\n")
+    config.ENV_PATH.write_bytes(b"CIVITAI_API_KEY='old-value'\n")
     before = config.ENV_PATH.read_bytes()
     monkeypatch.setenv('HF_TOKEN', 'runtime-before')
     monkeypatch.delenv('FLASK_DEBUG', raising=False)
@@ -118,14 +118,14 @@ def test_set_secrets_refuses_to_normalize_poisoned_existing_env(
     config = _fresh(monkeypatch, tmp_path)
     poisoned = f'HF_TOKEN=old{separator}FLASK_DEBUG=1\n'.encode('utf-8')
     config.ENV_PATH.write_bytes(poisoned)
-    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
+    monkeypatch.delenv('CIVITAI_API_KEY', raising=False)
     monkeypatch.delenv('FLASK_DEBUG', raising=False)
 
     with pytest.raises(ValueError, match='existing .env'):
-        config.set_secrets({'GEMINI_API_KEY': 'safe-value'})
+        config.set_secrets({'CIVITAI_API_KEY': 'safe-value'})
 
     assert config.ENV_PATH.read_bytes() == poisoned
-    assert 'GEMINI_API_KEY' not in os.environ
+    assert 'CIVITAI_API_KEY' not in os.environ
     assert 'FLASK_DEBUG' not in os.environ
 
 def test_secret_strips_trailing_whitespace(tmp_path, monkeypatch):

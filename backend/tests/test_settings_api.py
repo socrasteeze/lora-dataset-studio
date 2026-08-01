@@ -107,19 +107,19 @@ def test_put_settings_refuses_poisoned_existing_env_before_saving_config(
     before_url = client.get('/api/settings').get_json()['config']['ollama']['url']
     poisoned = f'HF_TOKEN=old{separator}FLASK_DEBUG=1\n'.encode('utf-8')
     config.ENV_PATH.write_bytes(poisoned)
-    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
+    monkeypatch.delenv('CIVITAI_API_KEY', raising=False)
     monkeypatch.delenv('FLASK_DEBUG', raising=False)
 
     response = client.put('/api/settings', json={
         'config': {'ollama': {'url': 'http://must-not-save.invalid'}},
-        'secrets': {'GEMINI_API_KEY': 'safe-value'},
+        'secrets': {'CIVITAI_API_KEY': 'safe-value'},
     })
 
     assert response.status_code == 400
     assert 'existing .env' in response.get_json()['error']
     assert client.get('/api/settings').get_json()['config']['ollama']['url'] == before_url
     assert config.ENV_PATH.read_bytes() == poisoned
-    assert 'GEMINI_API_KEY' not in os.environ
+    assert 'CIVITAI_API_KEY' not in os.environ
     assert 'FLASK_DEBUG' not in os.environ
 
 def test_put_settings_clears_skip_when_dir_provided(client, tmp_path):
