@@ -22,7 +22,12 @@ test('the confirm says they run ONE AT A TIME — that is the whole worry', () =
   const c = queueAllConfirm([bank(1), bank(2)], ['scan', 'score'])
   assert.match(c, /Queue 2 banks/)
   assert.match(c, /ONE AT A TIME/)
-  assert.match(c, /Nothing starts in parallel/)
+  // "Nothing starts in parallel" stopped being true when each machine got its
+  // own lane. The worry it answers has not changed — twelve banks must not
+  // become twelve runs — so the sentence bounds the parallelism instead of
+  // denying it.
+  assert.match(c, /never twelve at once/)
+  assert.match(c, /runs alongside/)
   assert.match(c, /2 passes per bank/)
   assert.match(c, /can cancel any of them/)
 })

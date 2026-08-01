@@ -158,6 +158,23 @@ function QueuePanel({ queue, nameOf, onCancel, onClear }) {
             ) : (
               <span className="rounded bg-surface-raised px-1.5 py-px text-[10px] font-semibold text-content-muted">waiting</span>
             )}
+            {/* Which machine, and why it hasn't started. The snapshot has
+                published both all along and this panel dropped them: twelve
+                banks queued to a peer looked byte-identical to twelve local
+                ones, and now that two can run at once, two "running" rows
+                would be indistinguishable. `waiting_for` was read nowhere in
+                the app despite snapshot()'s own comment saying it was shown
+                here — so a queue stalled on a stuck GPU flag looked dead. */}
+            {it.device_label && (
+              <span className="truncate rounded bg-surface-raised px-1.5 py-px text-[10px] text-content-muted">
+                on {it.device_label}
+              </span>
+            )}
+            {it.state !== 'running' && it.waiting_for && (
+              <span className="min-w-0 truncate text-[10px] text-amber-300" title={it.waiting_for}>
+                {it.waiting_for}
+              </span>
+            )}
             <button type="button" onClick={() => onCancel(it.bank_id)}
               aria-label={`Remove ${nameOf(it.bank_id)} from the queue`}
               className="ml-auto px-1.5 text-content-subtle hover:text-rose-300">✕</button>
@@ -625,17 +642,17 @@ export default function BankPage() {
       </form>
 
       {/* One button for "triage everything I have". It QUEUES — one entry per
-          bank, drained one at a time behind an idle GPU — and the confirm says
+          bank, drained one at a time per machine behind an idle GPU — and the confirm says
           so, because "run all" on twelve banks is the thing to be afraid of. */}
       {queueAllCount > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setDialogScope({ kind: 'all' })}
-            title="Line every bank that still has undecided images up to run, one after another"
+            title="Line every bank that still has undecided images up to run, one after another on each machine"
             className="rounded-md border border-indigo-400/50 bg-indigo-500/10 px-3 py-1.5 text-sm font-semibold text-indigo-200 hover:bg-indigo-500/20">
             ⏳ Queue all {queueAllCount} bank(s)…
           </button>
           <span className="text-xs text-content-subtle">
-            One at a time, in order — nothing runs in parallel.
+            One at a time on this machine — a bank sent to another one runs alongside it.
           </span>
         </div>
       )}

@@ -47,7 +47,7 @@ export default function BankGroupCard({
 
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => onQueue?.(row)}
-          title="Queue every bank in this group — one entry each, run one at a time"
+          title="Queue every bank in this group — one entry each, and only ever one of them running at a time"
           className="rounded-md border border-indigo-400/50 px-3 py-1 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/10">
           ⏳ Queue the group…
         </button>
