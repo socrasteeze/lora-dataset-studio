@@ -553,12 +553,20 @@ def bank_queue_all():
     not start twelve runs. Everything aimed at this machine is one lane."""
     data = request.get_json(silent=True) or {}
     try:
-        bank_ids = banks.banks_needing_triage(LOCAL_USER)
+        # Eligibility is "has pending work for a selected pass", not "has
+        # undecided images". The old rule hid a fully triaged bank that had
+        # never had a face pass — the exact bank worth re-targeting.
+        skip_completed = data.get('skip_completed', True) is not False
+        bank_ids = banks.banks_needing_work(LOCAL_USER, data.get('steps'),
+                                            skip_completed=skip_completed)
         out = bank_queue.enqueue_many(
             _app(), LOCAL_USER, bank_ids,
             steps=data.get('steps'), reject_flags=data.get('reject_flags'),
             resolve_dups=bool(data.get('resolve_dups')),
-            device_id=data.get('device_id'))
+            device_id=data.get('device_id'),
+            # Default ON: the client omitting it must get the narrowing, or an
+            # older tab silently re-runs every finished pass.
+            skip_completed=skip_completed)
     except ValueError as e:
         # The step list is sanitized before anything is enqueued, so this cannot
         # leave a half-queued queue behind.
@@ -601,7 +609,10 @@ def bank_group_queue(bank_id):
             _app(), LOCAL_USER, members,
             steps=data.get('steps'), reject_flags=data.get('reject_flags'),
             resolve_dups=bool(data.get('resolve_dups')),
-            device_id=data.get('device_id'))
+            device_id=data.get('device_id'),
+            # Default ON: the client omitting it must get the narrowing, or an
+            # older tab silently re-runs every finished pass.
+            skip_completed=data.get('skip_completed', True) is not False)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, 'members': members, **out}), 202

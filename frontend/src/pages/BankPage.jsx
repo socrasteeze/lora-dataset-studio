@@ -13,6 +13,7 @@ import { BANK_SORTS, DEFAULT_BANK_SORT, bankMatches, normalizeBankSort, sortBank
 import { overlapNotice } from '../components/bank/bankOverlap'
 import { allExcludedWarning, normalizeExcluded, splitPlan } from '../components/bank/bankSplit'
 import { queueAllCandidates, queueAllConfirm, queueAllResult } from '../components/bank/bankQueueAll'
+import { coverageBadges, coverageSummary } from '../components/bank/bankPassCoverage'
 import { pipelineBadge, pipelineReportVerdict, queueOutcomeLine } from '../components/bank/pipelineVerdict'
 import { groupRows } from '../components/bank/bankGroups'
 import BankGroupCard from '../components/bank/BankGroupCard'
@@ -131,6 +132,24 @@ function PipelineVerdictNote({ report }) {
     <p title={badge.title}
       className={`text-xs ${badge.tone === 'error' ? 'text-rose-300' : 'text-amber-300'}`}>
       {badge.label} in the last 🚀 Launch all — open the bank for the report.
+    </p>
+  )
+}
+
+/** What has actually been done to this bank, per pass. Until now the only way
+ *  to find out whether a bank had ever had a face pass was to queue one and
+ *  watch it — and queue-all could not be pointed at "everything not yet
+ *  face-passed" because a fully triaged bank was not even eligible. A muted
+ *  glyph means that pass is finished; an amber one carries what is left. */
+function PassCoverageRow({ coverage }) {
+  const badges = coverageBadges(coverage)
+  if (!badges.length) return null
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+      title={coverageSummary(coverage)}>
+      {badges.map((b) => (
+        <span key={b.key} className={b.cls} title={b.title}>{b.text}</span>
+      ))}
     </p>
   )
 }
@@ -760,6 +779,7 @@ export default function BankPage() {
                   when nobody is watching. A clean run gets no badge: a tick on
                   every card makes the one amber card harder to spot. */}
               <PipelineVerdictNote report={b.pipeline_report} />
+              <PassCoverageRow coverage={b.pass_coverage} />
               <FolderSyncNote sync={b.folder_sync}
                 onRelocate={() => setRelocating(b)}
                 onForget={(missing) => forgetMissing(b, missing)} />
@@ -785,6 +805,7 @@ export default function BankPage() {
 
       {dialogScope && (
         <LaunchAllDialog caps={caps} visionReady={visionReady}
+          scope={dialogScope.kind}
           onClose={() => setDialogScope(null)}
           onLaunch={runNow} onQueue={enqueue} />
       )}

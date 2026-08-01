@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-01-queue-only-what-is-missing',
+    date: '2026-08-01',
+    title: 'Every bank card now says what has been done to it — and Queue all stops redoing it',
+    blurb:
+      'There was no way to tell whether a bank had ever had a face pass except to queue one and watch. Each card now carries a badge per pass: muted when it is finished, amber with a count when there is work left. Queue all banks uses the same answer — it queues each bank only with the passes it still needs, skips one that has nothing left and says so, and it can finally see a fully triaged bank that was never face-passed (that bank used to be invisible to it). Auto-reject and Find crops & variants always run rather than guess. Untick "skip passes already done" in the dialog when you want a deliberate re-run.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-01-remote-vision-passes-actually-return-their-answers',
+    date: '2026-08-01',
+    title: 'Framing, watermark scans and captions sent to another machine were doing nothing at all',
+    blurb:
+      'A vision pass dispatched to a second machine ran, finished and reported success — while changing not a single image. The two machines disagreed about one word in the reply, so every answer was read as "no answer" and quietly discarded. They now land. Pressing Stop also keeps whatever that machine had already answered instead of throwing the batch away.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-01-peer-passes-resume-instead-of-starting-over',
     date: '2026-08-01',
     title: 'A pass run on another machine is no longer paid for twice',

@@ -187,7 +187,7 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
 
 
 def enqueue_many(app, user_id, bank_ids, steps=None, reject_flags=None,
-                 resolve_dups=False, device_id=None) -> dict:
+                 resolve_dups=False, device_id=None, skip_completed=True) -> dict:
     """Queue several banks in one call — the "queue all" primitive.
 
     Returns {'queued': [{bank_id, position}], 'skipped': [{bank_id, reason}]}.
@@ -208,10 +208,21 @@ def enqueue_many(app, user_id, bank_ids, steps=None, reject_flags=None,
         raise ValueError('no pipeline steps selected')
     flags = [f for f in (reject_flags or []) if f in banks.PIPELINE_REJECT_FLAGS]
 
+    # Per bank, narrow to the passes that still have something to do. Queueing
+    # twelve banks to re-run a caption pass that finished last night is the
+    # expensive kind of no-op: it looks like progress for hours.
+    coverage = banks.bank_pass_coverage(user_id, bank_ids) if skip_completed else {}
+
     queued, skipped = [], []
     for bank_id in bank_ids:
+        bank_steps = (banks.steps_with_pending_work(coverage.get(bank_id), steps)
+                      if skip_completed else steps)
+        if not bank_steps:
+            skipped.append({'bank_id': bank_id,
+                            'reason': 'all selected passes already done'})
+            continue
         try:
-            position = enqueue(app, user_id, bank_id, steps=steps,
+            position = enqueue(app, user_id, bank_id, steps=bank_steps,
                                reject_flags=flags, resolve_dups=resolve_dups,
                                device_id=device_id)
             queued.append({'bank_id': bank_id, 'position': position})
