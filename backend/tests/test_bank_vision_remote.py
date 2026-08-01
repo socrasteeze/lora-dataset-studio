@@ -244,10 +244,20 @@ def test_a_peer_with_only_ollama_gets_a_vision_job(app, tmp_path, monkeypatch):
     assert caps == ['a blue coat', 'a blue coat'], caps
 
 
-def test_a_peer_that_cannot_caption_falls_back_here_and_says_so(
-        app, tmp_path, monkeypatch):
-    """Not a failure AFTER staging thousands of images, and not a silently
-    ignored device pick."""
+def test_a_peer_that_says_it_cannot_caption_is_refused_up_front(app, tmp_path,
+                                                                monkeypatch):
+    """The owner's rule: the selected machine decides. If the peer cannot do the
+    pass, the pass does not happen — it is not quietly moved back here.
+
+    This USED to fall back and caption locally, which was defensible until the
+    rule was settled: a machine you explicitly picked silently not being the one
+    that ran the work is the same dishonesty as a pass reported done that never
+    ran. Launch all greys the pass out; the queue and this button refuse it.
+
+    The fallback in _caption_job is not gone — it is the backstop for a
+    capability lost BETWEEN queueing and running, which the test below covers
+    with a peer that has never reported at all.
+    """
     from app.services import bank_remote, image_bank_service as banks
 
     monkeypatch.setattr(bank_remote, 'run_remote_pass',
@@ -257,19 +267,14 @@ def test_a_peer_that_cannot_caption_falls_back_here_and_says_so(
     ran_locally = {'n': 0}
     monkeypatch.setattr(
         'app.services.face_dataset_service.caption_paths',
-        lambda paths, **kw: (ran_locally.update(n=len(paths)),
-                             [kw['on_caption'](p, 'local caption') for p in paths],
-                             {})[-1])
-    monkeypatch.setattr('app.gpu_window.gpu_exclusive_vision_window',
-                        lambda **kw: __import__('contextlib').nullcontext())
+        lambda paths, **kw: ran_locally.update(n=len(paths)))
 
     with app.app_context():
         _peer_row({'joycaption': False, 'ollama': False})
         bank, _ = banks.create_bank('local', 'Cap3', str(_two_same_named(tmp_path)))
-        job = banks.start_caption(app, 'local', bank.id, device_id=PEER)
-
-    assert job['error'] is None, job['error']
-    assert ran_locally['n'] == 2, 'it did not fall back to the local captioner'
+        with pytest.raises(ValueError, match='JoyCaption or Ollama'):
+            banks.start_caption(app, 'local', bank.id, device_id=PEER)
+    assert ran_locally['n'] == 0, 'it captioned here behind the user’s back'
 
 
 # --- a remote pass must not touch this machine's model -----------------------

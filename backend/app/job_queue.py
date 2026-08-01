@@ -24,6 +24,9 @@ from .models import ImageGenerationQueue, SystemState
 
 logger = logging.getLogger(__name__)
 
+# How often the worker checks for jobs abandoned by a dead peer.
+_REAP_EVERY_SECONDS = 60.0
+
 
 def cfg_comfy_input():
     try:
@@ -814,10 +817,24 @@ class JobQueueManager:
             self._thread = None
 
     def _run_loop(self):
+        next_reap = 0.0
         while self._running:
             try:
                 with self._app.app_context():
                     worked = self.process_one()
+                    # A peer that dies mid-job leaves its ClusterJob running for
+                    # ever, and a comfy job drags its ImageGenerationQueue row
+                    # down with it — pending, never retried, never reported.
+                    # This is the only loop that ticks regardless of what the
+                    # peers are doing, so the reaper rides it. Throttled: it is
+                    # a whole-table scan and the loop spins every idle second.
+                    if time.time() >= next_reap:
+                        next_reap = time.time() + _REAP_EVERY_SECONDS
+                        try:
+                            from .services import cluster as cluster_svc
+                            cluster_svc.reap_dead_peer_jobs()
+                        except Exception:      # noqa: BLE001
+                            logger.exception('job_queue: peer job reaper failed')
             except Exception:
                 logger.exception('job_queue: worker loop error')
                 worked = False

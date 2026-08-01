@@ -2264,11 +2264,29 @@ def resolve_dups(user_id, bank_id, strategy='best', group=None, keep_ids=None,
             gids = [int(group)]
         else:
             gids = [g for (g,) in _unresolved_dup_groups_q(bank_id, col).all()]
+        # EVERY group's members in one pass, BEFORE a single mutation.
+        #
+        # This used to be one SELECT per group interleaved with the rejects, and
+        # on a bank with thousands of duplicate groups that is what made the
+        # write lock a problem: with autoflush on, each of those reads flushes
+        # the rejects staged so far, so the write transaction opens at the first
+        # group and is then held across N more round trips. Reading everything
+        # first means the transaction opens once, at the end, and closes
+        # immediately — the same restructuring the vision passes needed.
+        #
+        # Chunked because SQLite caps the variables in an IN (...).
+        by_group: dict = {}
+        for i in range(0, len(gids), _SQL_IN_CHUNK):
+            for r in (BankImage.query
+                      .filter(BankImage.bank_id == bank_id,
+                              col.in_(gids[i:i + _SQL_IN_CHUNK]),
+                              BankImage.status != 'reject')
+                      .order_by(BankImage.id.asc()).all()):
+                by_group.setdefault(getattr(r, attr), []).append(r)
+
         resolved = rejected = 0
         for gid in gids:
-            rows = (BankImage.query.filter(BankImage.bank_id == bank_id, col == gid)
-                    .filter(BankImage.status != 'reject')
-                    .order_by(BankImage.id.asc()).all())
+            rows = by_group.get(gid, [])
             if len(rows) < 2 and gid not in keep_by_group:
                 continue
             if gid in keep_by_group:
@@ -2407,22 +2425,38 @@ def apply_flags(user_id, bank_id, flags, snapshot=None) -> dict:
     th = thresholds()
 
     def _apply():
-        out = {}
+        # Every flag's candidates read BEFORE any of them is rejected. With
+        # autoflush on, the second flag's SELECT would otherwise flush the first
+        # flag's rejects, opening the write transaction on flag one and holding
+        # it across the rest — the same shape resolve_dups had, and the last of
+        # the long holds in a bank pass.
+        picks = []
         for flag in flags or []:
             if flag not in _QUALITY_FLAGS + _SCORE_FLAGS:
                 continue
             crit = _flag_filter(flag, th)
             if crit is None:
                 continue
-            rows = (BankImage.query.filter_by(bank_id=bank_id, status='pending')
-                    .filter(crit).all())
-            for r in rows:
+            picks.append((flag, BankImage.query
+                          .filter_by(bank_id=bank_id, status='pending')
+                          .filter(crit).all()))
+
+        out = {}
+        # An image can carry two flags, and reading up front means both lists
+        # hold it. The FIRST flag still claims it and the second must not count
+        # it again — which is what the interleaved reads used to give for free,
+        # because the reject had already left the second query's `pending`.
+        claimed: set = set()
+        for flag, rows in picks:
+            fresh = [r for r in rows if r.id not in claimed]
+            for r in fresh:
+                claimed.add(r.id)
                 # Safe on a write_with_retry replay: the rollback restores every
                 # row, so re-noting sees the same `before` and Snapshot.note keeps
                 # the earliest one.
                 snapshot.note(r, 'reject', flag)
                 r.status, r.reject_reason = 'reject', flag
-            out[flag] = len(rows)
+            out[flag] = len(fresh)
         return out
 
     out = write_with_retry(_apply)
@@ -3609,6 +3643,11 @@ def start_faces(app, user_id, bank_id, device_id=None):
     if not bank:
         raise ValueError('bank not found')
     remote = _remote_pass_device(device_id)
+    # …and the PASS against that machine, not just the id — the same refusal
+    # Launch all makes, so clicking a pass on its own cannot quietly try
+    # something the peer already said it cannot do.
+    if remote:
+        refuse_steps_for_device(device_id, ['faces'])
     if not remote and not is_available():
         raise RuntimeError(
             'face scoring is not installed (Quality tools step in Setup)')
@@ -3858,6 +3897,11 @@ def start_score(app, user_id, bank_id, device_id=None):
     if not bank:
         raise ValueError('bank not found')
     remote = _remote_pass_device(device_id)
+    # …and the PASS against that machine, not just the id — the same refusal
+    # Launch all makes, so clicking a pass on its own cannot quietly try
+    # something the peer already said it cannot do.
+    if remote:
+        refuse_steps_for_device(device_id, ['score'])
     if not remote and not probe_bank_scoring().get('ok'):
         raise RuntimeError('bank scoring is not installed '
                            '(Quality tools step in Setup)')
@@ -4037,6 +4081,11 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None):
     # Both gates describe THIS machine's model and card; a pass aimed at a peer
     # runs on neither. Same reasoning as start_score / start_framing.
     remote = _remote_pass_device(device_id)
+    # …and the PASS against that machine, not just the id — the same refusal
+    # Launch all makes, so clicking a pass on its own cannot quietly try
+    # something the peer already said it cannot do.
+    if remote:
+        refuse_steps_for_device(device_id, ['watermark'])
     if not remote:
         if not probe_ollama_model().get('ok'):
             raise RuntimeError('the vision model is not available '
@@ -4552,7 +4601,17 @@ def start_watermark_inpaint(app, user_id, bank_id, method='auto', device_id=None
     problem = _watermark_inpaint_prereq(method, device_id)
     if problem:
         raise RuntimeError(problem)
-    reason = _gpu_busy_reason()
+    # The GPU gate describes THIS machine's card, so it only applies to work
+    # that will actually use it. A Klein run rendering on another machine was
+    # being refused because a local vision pass held the flag — a 503 for a run
+    # this machine was never going to do, and exactly the reasoning every other
+    # pass already applies to its own remote branch. LaMa always runs here
+    # whatever is picked, so it keeps the gate unconditionally.
+    from . import cluster as cluster_svc
+    renders_here = not (method == 'klein'
+                        and cluster_svc.normalize_device_id(device_id)
+                        != cluster_svc.LOCAL_DEVICE_ID)
+    reason = _gpu_busy_reason() if renders_here else None
     if reason:
         raise RuntimeError(reason)
     return bank_jobs.start(app, bank_id, 'watermark_inpaint',
@@ -4887,6 +4946,11 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None):
     # would refuse a run this machine was never going to do (same reasoning as
     # start_score's remote branch).
     remote = _remote_pass_device(device_id)
+    # …and the PASS against that machine, not just the id — the same refusal
+    # Launch all makes, so clicking a pass on its own cannot quietly try
+    # something the peer already said it cannot do.
+    if remote:
+        refuse_steps_for_device(device_id, ['framing'])
     if not remote:
         if not probe_ollama_model().get('ok'):
             raise RuntimeError('the vision model is not available '
@@ -5048,6 +5112,11 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
     # Both gates describe THIS machine: its configured engine and its card. A
     # pass aimed at a peer uses the peer's captioner and the peer's GPU.
     remote = _remote_pass_device(device_id)
+    # …and the PASS against that machine, not just the id — the same refusal
+    # Launch all makes, so clicking a pass on its own cannot quietly try
+    # something the peer already said it cannot do.
+    if remote:
+        refuse_steps_for_device(device_id, ['caption'])
     if not remote:
         backend = (cfg.get('captioning.backend') or 'auto').lower()
         if backend == 'none':

@@ -27,7 +27,7 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
   // 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions. scan,
   // auto-reject and ✂ same-shot always run here — they read the database and
   // the embeddings cache, so sending them would be slower, not faster.
-  const [deviceId, setDeviceId] = useState(loadSavedDeviceId)
+  const [deviceId, setDeviceId] = useState(() => loadSavedDeviceId('bank-pass'))
   const [device, setDevice] = useState(null)
   const remote = deviceId && deviceId !== 'local'
   // A heavy pass is "ready" when its tool is installed on the machine that will

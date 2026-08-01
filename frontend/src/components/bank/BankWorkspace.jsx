@@ -4,6 +4,8 @@ import { useToast } from '../common/Toast'
 import GpuBusyNotice from '../common/GpuBusyNotice'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
+import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
+import { stepGate } from './passDeviceGate.js'
 import DupGroupsPanel from './DupGroupsPanel'
 import PromoteDialog from './PromoteDialog'
 import DeleteRejectedDialog from './DeleteRejectedDialog'
@@ -526,6 +528,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // Caption register for the 🏷️ Caption pass ('' = model's own wording). Explicit is
   // the NSFW lane — same registers as the dataset caption, passed per-run.
   const [captionVocab, setCaptionVocab] = useState('')
+  // Which machine runs a pass clicked on its own. Its own remembered value, not
+  // the inpaint picker's — both render on this screen and one key for both let
+  // a ComfyUI backend picked for Klein decide where a bank pass ran.
+  const [passDevice, setPassDevice] = useState(() => loadSavedDeviceId('bank-pass'))
+  const [passDeviceObj, setPassDeviceObj] = useState(null)
+  // The SAME verdict Launch all uses, from the one module that owns it: a pass
+  // the chosen machine cannot run is disabled and says which stack is missing,
+  // and one it CAN run stays enabled even when this machine could not.
+  const passGate = useMemo(() => Object.fromEntries(
+    ['score', 'faces', 'framing', 'caption'].map(
+      (k) => [k, stepGate(k, { caps, visionReady: !!caps.ollama?.vision_model_ready,
+                               device: passDeviceObj })])),
+  [caps, passDeviceObj])
   // Coverage advice (idea by @antonp) — a collapsible read-only panel, fetched
   // on demand (and refreshed whenever it's open and the bank changes).
   const [coverageOpen, setCoverageOpen] = useState(false)
@@ -737,13 +752,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
   const startScan = (rescan) => act(
     () => postJson(`/api/bank/${bankId}/scan`, { rescan: !!rescan }), null)
-  const startFaces = () => act(() => postJson(`/api/bank/${bankId}/faces`, {}), null)
-  const startScore = () => act(() => postJson(`/api/bank/${bankId}/score`, {}), null)
+  // Which machine runs a pass clicked on its own. Launch all has offered this
+  // for a while; these buttons posted {} and kept every pass on this card, so
+  // the same five passes behaved differently depending on which button you
+  // pressed and nothing said so. `local` is folded to nothing server-side.
+  const on = () => (passDevice && passDevice !== 'local' ? { device_id: passDevice } : {})
+  const startFaces = () => act(() => postJson(`/api/bank/${bankId}/faces`, on()), null)
+  const startScore = () => act(() => postJson(`/api/bank/${bankId}/score`, on()), null)
   const startSemanticDedup = () => act(
     () => postJson(`/api/bank/${bankId}/semantic-dedup`, {}), null)
-  const startFraming = () => act(() => postJson(`/api/bank/${bankId}/framing`, {}), null)
+  const startFraming = () => act(() => postJson(`/api/bank/${bankId}/framing`, on()), null)
   const startCaption = () => act(
     () => postJson(`/api/bank/${bankId}/caption`, {
+      ...on(),
       ...(selected.size ? { image_ids: [...selected] } : {}),
       ...(captionVocab ? { vocabulary: captionVocab } : {}),
     }), null)
@@ -1175,24 +1196,24 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               Rescan all
             </PassButton>
           )}
-          <PassButton onClick={startFaces} disabled={live || !caps.face_scoring}
-            title={caps.face_scoring
+          <PassButton onClick={startFaces} disabled={live || !passGate.faces.ok}
+            title={passGate.faces.reason || (passGate.faces.ok
               ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images.'
-              : 'Install the Quality tools (Setup) to sort by person'}>
+              : 'Install the Quality tools (Setup) to sort by person')}>
             👥 Group by person
           </PassButton>
-          <PassButton onClick={startScore} disabled={live || !caps.bank_scoring}
-            title={caps.bank_scoring
+          <PassButton onClick={startScore} disabled={live || !passGate.score.ok}
+            title={passGate.score.reason || (passGate.score.ok
               ? `Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". Runs in the background${
                 holdsTheGpu(scoreDevice) ? ', and holds the GPU (ComfyUI is unloaded and training cannot start) for its duration' : ' on the CPU, leaving the GPU free'}.`
-              : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style'}>
-            ✨ Score{!caps.bank_scoring && ' (needs setup)'}
+              : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style')}>
+            ✨ Score{!passGate.score.ok && ' (needs setup)'}
           </PassButton>
-          <PassButton onClick={startFraming} disabled={live || !visionReady}
-            title={visionReady
+          <PassButton onClick={startFraming} disabled={live || !passGate.framing.ok}
+            title={passGate.framing.reason || (passGate.framing.ok
               ? 'Classify every non-rejected image by shot type — face close-up, bust, full body, back view — with the same Qwen3-VL classifier the datasets use. Powers the 📐 Framing filter and the coverage advice. GPU vision pass.'
-              : 'Pull the vision model (Settings ▸ Captioning & quality) to classify framing'}>
-            📐 Classify framing{!visionReady && ' (needs setup)'}
+              : 'Pull the vision model (Settings ▸ Captioning & quality) to classify framing')}>
+            📐 Classify framing{!passGate.framing.ok && ' (needs setup)'}
           </PassButton>
           <PassButton onClick={startSemanticDedup} disabled={live || scored === 0}
             title={scored > 0
@@ -1200,12 +1221,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               : 'Run ✨ Score first — semantic near-duplicates reuse its embeddings'}>
             ✂ Find crops &amp; variants{scored === 0 && ' (needs Score)'}
           </PassButton>
-          <PassButton onClick={startCaption} disabled={live}
-            title={selected.size
+          <PassButton onClick={startCaption} disabled={live || !passGate.caption.ok}
+            title={passGate.caption.reason || (selected.size
               ? `Caption the ${selected.size} selected image(s) with your caption engine (Settings ▸ Captioning & quality). Captions become searchable and follow the images when you promote them to a dataset.`
-              : 'Caption every not-yet-captioned image (skips rejected) with your caption engine. Captions become searchable tags and follow the images when you promote them to a dataset. Select images first to caption just those.'}>
+              : 'Caption every not-yet-captioned image (skips rejected) with your caption engine. Captions become searchable tags and follow the images when you promote them to a dataset. Select images first to caption just those.')}>
             🏷️ Caption{selected.size ? ` ${selected.size} selected` : ' all'}
           </PassButton>
+          {/* Which machine these passes run on. Launch all has offered this
+              for a while and these buttons ignored it entirely, so the same
+              five passes behaved differently depending on which button you
+              pressed. Self-hides with no peers. 🔎 Scan and ✂ Same shot are
+              absent from the gate on purpose: they never travel. */}
+          <DevicePicker value={passDevice} onChange={setPassDevice}
+            onDevice={setPassDeviceObj} kind="bank-pass"
+            className="text-[0.6875rem]" />
           <label className="flex items-center gap-1 text-xs text-content-subtle">
             <span className="sr-only">Caption vocabulary register</span>
             <select value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}

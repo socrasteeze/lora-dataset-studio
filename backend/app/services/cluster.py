@@ -25,6 +25,10 @@ from ..utils.dbbusy import write_with_retry
 logger = logging.getLogger(__name__)
 
 ONLINE_TTL_SECONDS = 90
+# How long a claimed job may go without its peer checking in before the hub
+# gives up on it. Generously above ONLINE_TTL_SECONDS: a peer that is merely
+# slow, or on a flaky link, must not have its work killed out from under it.
+DEAD_PEER_JOB_GRACE_SECONDS = 10 * 60
 JOIN_TOKEN_TTL_HOURS = 48
 ARTIFACT_SUBDIR = 'cluster_artifacts'
 # Same fence as comfy_fs.STAGED_INPUT_MAX_AGE_SECONDS, for the same reason: long
@@ -760,6 +764,53 @@ def complete_cluster_job(device: ClusterDevice, job_id: str, *,
     if job.kind == 'comfy' and job.image_job_id:
         _finish_comfy_bridge(job, failed=bool(error), error=error,
                              output_artifact=output_artifact)
+
+
+def reap_dead_peer_jobs(grace_seconds: int = DEAD_PEER_JOB_GRACE_SECONDS) -> int:
+    """Fail the jobs of a peer that stopped checking in. Returns how many.
+
+    A peer that dies mid-job — power cut, crash, someone closing the window —
+    left its ClusterJob 'running' forever. For a `comfy` job that is worse than
+    an orphan row: the ImageGenerationQueue row it bridges stays pending with
+    it, so the generation never completes and never fails, nothing retries, and
+    nothing anywhere tells the user. The only recovery was noticing by hand.
+
+    Reuses _fail_cluster_job, so the comfy bridge is dispatched exactly as it is
+    for a peer that reports its own failure — this is a new TRIGGER, not a
+    second completion path.
+
+    Deliberately generous: a job is only reaped once BOTH it and its device have
+    been silent past the grace period. A peer mid-upload of a large artifact is
+    quiet on the job while its device still beats, and killing that would be a
+    self-inflicted failure.
+    """
+    from ..extensions import db
+    cutoff = datetime.utcnow() - timedelta(seconds=max(60, int(grace_seconds)))
+    rows = ClusterJob.query.filter(ClusterJob.status == 'running').all()
+    dead = []
+    for job in rows:
+        seen = job.last_heartbeat or job.claimed_at or job.created_at
+        if seen is None or seen > cutoff:
+            continue
+        device = ClusterDevice.query.filter_by(id=job.device_id).first()
+        if device is not None and device.last_heartbeat and device.last_heartbeat > cutoff:
+            continue                      # the machine is alive; leave its work alone
+        dead.append(job)
+    if not dead:
+        return 0
+
+    def _apply():
+        for job in dead:
+            _fail_cluster_job(
+                job, f'the machine running this stopped responding for over '
+                     f'{max(1, int(grace_seconds) // 60)} minute(s)')
+        db.session.commit()
+        return len(dead)
+
+    n = write_with_retry(_apply) or 0
+    if n:
+        logger.warning('cluster: reaped %d job(s) from a peer that went silent', n)
+    return n
 
 
 def _fail_cluster_job(job: ClusterJob, error: str) -> None:

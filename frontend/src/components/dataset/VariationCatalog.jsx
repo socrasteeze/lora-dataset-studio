@@ -167,7 +167,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
   const frLabel = (fr) => framingLabel(subject, fr);
   const [selected, setSelected] = useState(new Set());
   const [multiplier, setMultiplier] = useState(1);
-  const [deviceId, setDeviceId] = useState(loadSavedDeviceId);
+  const [deviceId, setDeviceId] = useState(() => loadSavedDeviceId('comfy'));
   const [klein, setKlein] = useState(null);
   // 🔞 NSFW mode — local Klein ONLY (the backend refuses NSFW on API engines).
   // Unlocks the uncensored body catalog + a free-prompt custom variation.
