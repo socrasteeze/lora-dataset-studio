@@ -22,13 +22,18 @@ const QUALITY_FLAGS = [
 ]
 
 export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, onQueue }) {
-  // Which machine runs the passes that can travel — Score and 👥 Group by
-  // person move to a compute peer; every other step runs here regardless.
+  // Which machine runs the passes that can travel. FIVE do: ✨ Score,
+  // 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions. scan,
+  // auto-reject and ✂ same-shot always run here — they read the database and
+  // the embeddings cache, so sending them would be slower, not faster.
   const [deviceId, setDeviceId] = useState(loadSavedDeviceId)
   const remote = deviceId && deviceId !== 'local'
   // A heavy pass is "ready" when its tool is installed; scan/auto-reject always
-  // are. With a peer picked, Score/Faces answer to the PEER's stack — checked
-  // there when the pass starts, so the local verdict no longer gates them.
+  // are. With a peer picked, a travelling pass answers to the PEER's stack —
+  // checked there when the pass starts — so the local verdict no longer gates
+  // it. Leaving the three vision passes gated on the LOCAL vision model was a
+  // real lie: on a hub whose Ollama is down they arrived unticked and badged
+  // "will skip", for work the peer would have done happily.
   const ready = useMemo(() => ({
     scan: true,
     auto_reject: true,
@@ -37,10 +42,10 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
     // skipped at run time if Score didn't actually produce any). A REMOTE score
     // brings its embeddings home, so this follows the same verdict.
     semantic_dedup: !!caps?.bank_scoring || remote,
-    watermark: !!visionReady,
+    watermark: !!visionReady || remote,
     faces: !!caps?.face_scoring || remote,
-    framing: !!visionReady,
-    caption: !!visionReady,
+    framing: !!visionReady || remote,
+    caption: !!visionReady || remote,
   }), [caps, visionReady, remote])
 
   const STEPS = [
@@ -86,6 +91,13 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
     ...s, willSkip: !ready[s.key],
   }))
   const nRun = plan.filter((s) => !s.willSkip).length
+  // What config() actually SENDS. The two differ whenever a picked step is not
+  // ready, and the button used to show only nRun — "Launch 4 passes" while
+  // seven were enqueued. The skipped ones are still sent on purpose: the
+  // backend records them as `skipped` in pipeline_report, which is what makes
+  // the bank card able to say a pass did not happen. Dropping them here would
+  // make a bank that ran nothing look clean.
+  const nSent = plan.length
 
   const config = () => ({
     steps: [...steps],
@@ -226,16 +238,18 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
           </div>
         )}
 
-        {/* Self-hides when this install has no compute peers. Only ✨ Score and
-            👥 Group by person travel — the note says so, because a picker that
-            silently applies to nothing is worse than none. */}
+        {/* Self-hides when this install has no compute peers. The note names
+            exactly which passes travel and which never do — a picker that
+            silently applies to less than it implies is worse than none. */}
         <div className="flex flex-wrap items-center gap-2">
           <DevicePicker value={deviceId} onChange={setDeviceId} kind="bank-pass"
             className="text-[0.6875rem]" />
           {remote && (
             <span className="text-[0.6875rem] text-content-subtle">
-              ✨ Score and 👥 Group by person run there — with its models, over the
-              network; everything else runs here.
+              ✨ Score, 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions
+              run there — with its models and its captioner, over the network.
+              🔎 Scan, ✕ Auto-reject and ✂ Same shot always run here: they read
+              this machine&apos;s database and embeddings cache.
             </span>
           )}
         </div>
@@ -254,7 +268,8 @@ export default function LaunchAllDialog({ caps, visionReady, onClose, onLaunch, 
           )}
           <button type="button" onClick={launch} disabled={busy || nRun === 0}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? 'Starting…' : `🚀 Launch${nRun ? ` ${nRun} pass${nRun > 1 ? 'es' : ''}` : ''}`}
+            {busy ? 'Starting…'
+              : `🚀 Launch${nRun ? ` ${nRun === nSent ? nRun : `${nRun} of ${nSent}`} pass${nSent > 1 ? 'es' : ''}` : ''}`}
           </button>
         </div>
       </div>

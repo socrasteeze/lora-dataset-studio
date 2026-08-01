@@ -54,6 +54,24 @@ class BankAlreadyQueued(Exception):
         self.bank_id = bank_id
 
 
+def _normalized_device(device_id):
+    """Fold every "this machine" spelling to None, ONCE, at the boundary.
+
+    The Launch dialog sends the literal string 'local' (LaunchAllDialog.jsx),
+    and `device_id or None` keeps that truthy — so the wait gate below read
+    EVERY dialog-queued bank as remote and skipped the local-GPU wait. The bank
+    then started while a pass held the card and its GPU steps were recorded
+    "skipped — GPU busy", which is precisely the "I queued jobs and nothing ran"
+    report. Every other module already normalizes; this one did not.
+    """
+    try:
+        from . import cluster as cluster_svc
+        d = cluster_svc.normalize_device_id(device_id)
+        return None if d == cluster_svc.LOCAL_DEVICE_ID else d
+    except Exception:      # noqa: BLE001 — an unreadable id is this machine
+        return None
+
+
 def _find(bank_id):
     """The live entry for a bank (pending or running), or None. Caller holds _lock."""
     for e in _queue:
@@ -73,12 +91,21 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
         raise ValueError('no pipeline steps selected')
     reject_flags = [f for f in (reject_flags or [])
                     if f in banks.PIPELINE_REJECT_FLAGS]
+    # Validate the device HERE, where the caller is still holding a response.
+    # start_pipeline does this at launch time, so a direct Launch got an honest
+    # 400 — but a QUEUE returned 202 with a position and then _process_next
+    # dropped the entry with a log line and no toast. From the user's side the
+    # row simply vanished from the panel. Same refusal, same wording, now at the
+    # moment they can act on it.
+    device_id = _normalized_device(device_id)
+    if device_id:
+        banks._remote_pass_device(device_id)      # raises ValueError on a backend id
     with _lock:
         if _find(bank_id) is not None:
             raise BankAlreadyQueued(bank_id)
         entry = {'bank_id': bank_id, 'user_id': user_id, 'steps': list(steps),
                  'reject_flags': reject_flags, 'resolve_dups': bool(resolve_dups),
-                 'device_id': device_id or None,
+                 'device_id': device_id,
                  'enqueued_at': time.time(), 'state': 'pending'}
         _queue.append(entry)
         position = len(_queue)

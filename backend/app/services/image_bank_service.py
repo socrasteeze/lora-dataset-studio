@@ -4138,8 +4138,13 @@ def _watermark_job(bank_id, rescan, device_id=None):
                 try:
                     _flush_row_updates(pending)
                 finally:
-                    # The VRAM comes back even if the database does not.
-                    unload_vision_model()
+                    # LOCAL only. The VRAM comes back even if the database does
+                    # not — but a pass that ran on the PEER loaded nothing here,
+                    # and unloading would evict a model this machine is using for
+                    # something else. (It did: the finally sat outside the
+                    # local/remote branch when the two sources were split.)
+                    if not device_id:
+                        unload_vision_model()
         if bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail=f'cancelled — {detected} with a watermark '
                                            f'so far')
@@ -4962,8 +4967,13 @@ def _framing_job(bank_id, rescan, device_id=None):
                 try:
                     _flush_row_updates(pending)
                 finally:
-                    # The VRAM comes back even if the database does not.
-                    unload_vision_model()
+                    # LOCAL only. The VRAM comes back even if the database does
+                    # not — but a pass that ran on the PEER loaded nothing here,
+                    # and unloading would evict a model this machine is using for
+                    # something else. (It did: the finally sat outside the
+                    # local/remote branch when the two sources were split.)
+                    if not device_id:
+                        unload_vision_model()
         if bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail=f'cancelled — {classified} classified so far')
             return
@@ -5178,8 +5188,22 @@ def _caption_job(bank_id, ids, force, vocabulary=None, device_id=None):
         # read on the line above.
         run_on = device_id
         if device_id and peer_kind is None:
-            # Do not fail after staging thousands of images, and do not pretend
-            # the pick was honoured: run here and say why.
+            # Falling back to THIS machine, so this machine's gates apply again.
+            # They were skipped up in _run_pipeline_step precisely because a
+            # device was picked — so without re-checking here, a "remote" caption
+            # pass took the full local GPU window having verified neither that a
+            # local engine exists nor that the card is free. And peer_kind is
+            # None for more than "no captioner": a peer that has simply never
+            # heartbeated reports {} and lands here too.
+            local_reason = _caption_prereq() or _gpu_busy_reason()
+            if local_reason:
+                # A real refusal, not a silent local grab. bank_jobs.fail keeps
+                # it out of the "done" state so the bank card can show it.
+                logger.info('bank caption: device %s cannot caption and this '
+                            'machine cannot either (%s)', device_id, local_reason)
+                bank_jobs.fail(job, f'the chosen machine has no captioner, and '
+                                    f'this one cannot run it either — {local_reason}')
+                return
             logger.info('bank caption: device %s cannot caption; running locally',
                         device_id)
             bank_jobs.progress(job, detail='captioning — the chosen machine has no '
