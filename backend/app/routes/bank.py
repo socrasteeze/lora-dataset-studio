@@ -357,8 +357,13 @@ def bank_semantic_dedup(bank_id):
 def bank_watermark(bank_id):
     """Overlaid-watermark scan (Qwen3-VL). {rescan:true} re-checks scanned rows."""
     data = request.get_json(silent=True) or {}
+    # start_watermark has accepted a device since the pass learned to travel;
+    # this route simply never passed it on, so "Run on" applied to Launch all
+    # and to nothing else. Clicking the same pass by itself stayed on this
+    # machine's card with nothing in the UI admitting the difference.
     return _start(banks.start_watermark, _app(), LOCAL_USER, bank_id,
-                  rescan=bool(data.get('rescan')))
+                  rescan=bool(data.get('rescan')),
+                  device_id=data.get('device_id'))
 
 
 @bp.get('/bank/<int:bank_id>/watermark/levels')
@@ -448,7 +453,8 @@ def bank_framing(bank_id):
     rows. 202/409/503."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_framing, _app(), LOCAL_USER, bank_id,
-                  rescan=bool(data.get('rescan')))
+                  rescan=bool(data.get('rescan')),
+                  device_id=data.get('device_id'))
 
 
 @bp.get('/bank/<int:bank_id>/coverage')
@@ -471,7 +477,8 @@ def bank_caption(bank_id):
     data = request.get_json(silent=True) or {}
     return _start(banks.start_caption, _app(), LOCAL_USER, bank_id,
                   ids=data.get('image_ids') or None, force=bool(data.get('force')),
-                  vocabulary=data.get('vocabulary') or None)
+                  vocabulary=data.get('vocabulary') or None,
+                  device_id=data.get('device_id'))
 
 
 @bp.post('/bank/<int:bank_id>/pipeline')

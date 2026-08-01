@@ -1,22 +1,12 @@
 /** Run-on device picker for GPU jobs (Primary local + registered peers). */
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
+import { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
 
-const STORAGE_KEY = 'lds.cluster.device_id'
-
-export function loadSavedDeviceId() {
-  try {
-    return localStorage.getItem(STORAGE_KEY) || 'local'
-  } catch {
-    return 'local'
-  }
-}
-
-export function saveDeviceId(id) {
-  try {
-    localStorage.setItem(STORAGE_KEY, id || 'local')
-  } catch { /* private mode */ }
-}
+/* The remembered choice lives in deviceMemory.js — pure, and therefore
+ * testable (node --test cannot import a .jsx). Re-exported here so every
+ * existing `from './DevicePicker'` import keeps working. */
+export { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
 
 /**
  * Compact select: "Run on" — only renders when Primary has at least one peer
@@ -51,7 +41,7 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
     if (devices == null || !value || value === 'local') return
     const offerable = devices.some((d) => d.id === value && (kind !== 'bank-pass' || !d.backend))
     if (!offerable) {
-      saveDeviceId('local')
+      saveDeviceId('local', kind)
       onChange?.('local')
     }
   }, [devices, value, kind, onChange])
@@ -86,7 +76,7 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
         value={current}
         onChange={(e) => {
           const id = e.target.value
-          saveDeviceId(id)
+          saveDeviceId(id, kind)
           onChange?.(id)
         }}
         className="rounded-md border border-border-strong bg-surface-raised px-2 py-1.5 text-sm text-content max-w-[14rem]"

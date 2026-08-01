@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-07-31-dead-peer-jobs-and-shorter-write-holds',
+    date: '2026-07-31',
+    title: 'A job on a machine that dies no longer hangs forever',
+    blurb:
+      'If the other machine lost power or crashed part-way through a job, the job stayed “running” for ever — and for an image generation, the queue entry stayed pending with it: never finished, never failed, never retried, with nothing anywhere saying so. The hub now notices a machine that has stopped checking in and fails its work with a reason, so the queue moves on. A machine that is merely slow or mid-upload is left alone. Two other fixes alongside it: auto-reject and duplicate resolution now read everything before they change anything, which keeps the database unlocked for the rest of the app while a big bank is being triaged; and a repaint sent to another machine is no longer refused because THIS computer’s graphics card happens to be busy.',
+    to: '/settings/devices',
+  },
+  {
+    id: '2026-07-31-single-passes-honour-the-run-on-pick',
+    date: '2026-07-31',
+    title: 'The individual pass buttons finally use the machine you picked',
+    blurb:
+      '“Run on” only ever applied to Launch all. Clicking ✨ Score, 👥 Group by person, 📐 Classify framing or 🏷️ Caption on their own kept every one of them on this computer’s graphics card, so the same pass behaved differently depending on which button you pressed and nothing said so. The Analysis passes row now has its own machine picker, and each button greys out for a pass the machine you chose cannot do — naming what is missing instead of a vague “needs setup”. It remembers its own choice separately from the watermark panel’s engine picker, which sits on the same screen and used to overwrite it.',
+    to: '/bank',
+  },
+  {
     id: '2026-07-31-queue-lanes-and-honest-skipped-passes',
     date: '2026-07-31',
     title: 'Your second machine no longer waits in line — and a wasted night finally says so',

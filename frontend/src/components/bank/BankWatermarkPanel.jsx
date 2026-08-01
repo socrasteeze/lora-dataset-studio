@@ -61,7 +61,12 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
   const [method, setMethod] = useState('auto')
   // Which machine renders the KLEIN jobs (LaMa never travels). Shares the
   // remembered pick with the generation picker on purpose — one habit.
-  const [deviceId, setDeviceId] = useState(loadSavedDeviceId)
+  const [deviceId, setDeviceId] = useState(() => loadSavedDeviceId('comfy'))
+  // …and which machine runs the SCAN, which is a different question with a
+  // different eligible list (a bare ComfyUI backend can render a repaint but
+  // cannot run a vision pass). Remembered under its own kind, so the two
+  // pickers on this panel stop overwriting each other.
+  const [scanDevice, setScanDevice] = useState(() => loadSavedDeviceId('bank-pass'))
   const [comparing, setComparing] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
 
@@ -146,7 +151,8 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
       <div className="flex flex-wrap gap-2">
         <LevelCard index={1} title="Find them" state={find}
           blurb="Scans every non-rejected image for an overlaid logo/URL and records WHERE it sits — the two steps below route on that box."
-          onRun={() => run(`/api/bank/${bankId}/watermark`, {},
+          onRun={() => run(`/api/bank/${bankId}/watermark`,
+            scanDevice && scanDevice !== 'local' ? { device_id: scanDevice } : {},
             '🚩 Watermark scan started — Stop any time.')} />
         <LevelCard index={2} title="Crop it off" state={crop}
           blurb="Cuts the border strip holding the mark. No model, no GPU, and no invented pixel — try this one first."
@@ -158,6 +164,18 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
             { method, device_id: deviceId },
             '🧽 Inpainting started — Stop any time.')} />
       </div>
+      {/* Level 1 is a bank vision pass and travels like the others; levels 2-3
+          do not (a crop is local file work, and the repaint is a ComfyUI job
+          with its own picker below). One "Run on" per question, or the label
+          would have to lie about which level it governs. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+          Level 1 scan
+        </span>
+        <DevicePicker value={scanDevice} onChange={setScanDevice} kind="bank-pass"
+          className="text-[0.6875rem]" />
+      </div>
+
       {inpaint.remoteNote && (
         <p className="text-[0.6875rem] text-content-subtle">🖥️ {inpaint.remoteNote}</p>
       )}

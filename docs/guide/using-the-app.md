@@ -494,6 +494,16 @@ person, 🚩 Find watermarks, 📐 Classify framing and 🏷️ Caption can all 
 🔎 Scan, 🧹 Auto-reject and ✂ Find crops & variants never do — they read this
 machine's database and embeddings cache, so sending them would be slower.
 
+The **Analysis passes** row inside a bank has its own **Run on** picker, so
+clicking ✨ Score, 👥 Group by person, 📐 Classify framing or 🏷️ Caption on its
+own goes to the same machine Launch all would use. It remembers its choice
+separately from the watermark panel further down the page. That panel carries
+**two** pickers, because it asks two different questions: **Level 1 scan** picks
+the machine that looks for watermarks (a vision pass, like the others), while
+**Level 3 engine** picks the machine that *renders* the Klein repaint — which
+can be a bare ComfyUI backend that could not run a vision pass at all. Level 2,
+the crop, is local file work and never travels.
+
 Each of the five travels **only if that machine reports the stack for it**. Pick
 a peer and the passes it cannot run are greyed out, unticked and unclickable,
 each saying what is missing — a peer with Ollama but no scoring extra offers
