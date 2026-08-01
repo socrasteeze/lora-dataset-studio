@@ -5477,8 +5477,15 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
             _sync(current=step, index=i)
             bank_jobs.progress(job, done=0, total=0,
                                detail=f'step {i + 1}/{len(steps)}: {step}')
+            # `blocked` is the verdict the bank card reads: did the MACHINE
+            # refuse this pass, or did the pass decline itself for a stated
+            # prerequisite? The two look identical in prose, and the card used to
+            # have to guess from the reason text — which it got wrong for the
+            # commonest case of all, leaving a night where every GPU pass was
+            # skipped rendering a clean tick. Say it here, once, where it is
+            # known for certain.
             entry = {'step': step, 'status': 'done', 'reason': None,
-                     'detail': None, 'counts': {}}
+                     'detail': None, 'counts': {}, 'blocked': False}
             try:
                 _run_pipeline_step(job, user_id, bank_id, step,
                                    reject_flags, resolve_dups, entry,
@@ -5488,6 +5495,7 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
                 # pass and keep going (never wake the user for a transient clash).
                 entry['status'] = 'skipped'
                 entry['reason'] = f'GPU busy — {e}'
+                entry['blocked'] = True
             except Exception as e:  # noqa: BLE001 — one bad pass never sinks the rest
                 entry['status'] = 'error'
                 entry['reason'] = f'{type(e).__name__}: {e}'
@@ -5507,7 +5515,11 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
                 results.append({'step': step, 'status': 'cancelled' if cancelled
                                 else 'skipped',
                                 'reason': 'cancelled before it ran' if cancelled
-                                else 'not reached', 'detail': None, 'counts': {}})
+                                else 'not reached', 'detail': None, 'counts': {},
+                                # Never ran, and not because it declined itself
+                                # — unless the user stopped it, which is their
+                                # decision and not a fault to badge them with.
+                                'blocked': not cancelled})
         _sync()
 
         report = {
@@ -5536,6 +5548,26 @@ def _pipeline_job(user_id, bank_id, steps, reject_flags, resolve_dups,
             tail = f'cancelled — {done_n}/{len(steps)} steps ran'
         bank_jobs.progress(job, detail=tail)
     return run
+
+
+def _step_declines(entry, prereq, *, gpu_gate=True) -> bool:
+    """Record why a LOCAL step cannot run, and return True when it must not.
+
+    The two reasons look identical in the report and mean opposite things: a
+    stated prerequisite ("install the bank-scoring extra") is the pipeline
+    working as designed, while a busy card means the night did less than it
+    looked like. Only the second sets ``blocked``, which is what puts the
+    ⚠ badge on the bank card — see pipelineVerdict.js.
+    """
+    reason, blocked = prereq, False
+    if not reason and gpu_gate:
+        reason = _gpu_busy_reason()
+        blocked = bool(reason)
+    if not reason:
+        return False
+    entry['status'], entry['reason'] = 'skipped', reason
+    entry['blocked'] = blocked
+    return True
 
 
 def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
@@ -5576,9 +5608,7 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
     if step == 'score':
         # A remote pass answers to the PEER's stack and the PEER's GPU — the
         # local prereq and the local GPU gate both describe the wrong machine.
-        reason = None if device_id else (_score_prereq() or _gpu_busy_reason())
-        if reason:
-            entry['status'], entry['reason'] = 'skipped', reason
+        if not device_id and _step_declines(entry, _score_prereq()):
             return
         _score_job(bank_id, device_id)(job)
         c = _bank_counts(bank_id)
@@ -5601,9 +5631,7 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
     if step == 'watermark':
         # Same shape as score/faces: a remote pass runs on the peer's Ollama and
         # its card, so neither local gate describes it.
-        reason = None if device_id else (_watermark_prereq() or _gpu_busy_reason())
-        if reason:
-            entry['status'], entry['reason'] = 'skipped', reason
+        if not device_id and _step_declines(entry, _watermark_prereq()):
             return
         _watermark_job(bank_id, rescan=False, device_id=device_id)(job)
         c = _bank_counts(bank_id)
@@ -5611,9 +5639,9 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         entry['detail'] = job.get('detail') or f"{c['watermark_detected']} with a watermark"
         return
     if step == 'faces':
-        reason = None if device_id else _faces_prereq()
-        if reason:
-            entry['status'], entry['reason'] = 'skipped', reason
+        # No GPU gate even locally — face scoring is CPU/GPU and never took the
+        # exclusive window, so there is nothing here for a busy card to refuse.
+        if not device_id and _step_declines(entry, _faces_prereq(), gpu_gate=False):
             return
         _faces_job(bank_id, device_id)(job)
         c = _bank_counts(bank_id)
@@ -5621,9 +5649,7 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         entry['detail'] = job.get('detail') or f"{c['person_groups']} person cluster(s)"
         return
     if step == 'framing':
-        reason = None if device_id else (_framing_prereq() or _gpu_busy_reason())
-        if reason:
-            entry['status'], entry['reason'] = 'skipped', reason
+        if not device_id and _step_declines(entry, _framing_prereq()):
             return
         _framing_job(bank_id, rescan=False, device_id=device_id)(job)
         c = _bank_counts(bank_id)
@@ -5636,12 +5662,21 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         # the hub only routes by the peer's declared capability, so that rule
         # never gets a second home. A peer with no captioner falls back here and
         # says so rather than failing after staging.
-        reason = None if device_id else (_caption_prereq() or _gpu_busy_reason())
-        if reason:
-            entry['status'], entry['reason'] = 'skipped', reason
+        if not device_id and _step_declines(entry, _caption_prereq()):
             return
         before = _bank_counts(bank_id)['captioned']
+        err_before = job.get('error')
         _caption_job(bank_id, None, False, device_id=device_id)(job)
+        # _caption_job refuses ITSELF when the chosen machine has no captioner
+        # and this one cannot run it either — with bank_jobs.fail and a plain
+        # return, never an exception. That is right for the standalone button,
+        # but inside the pipeline the step then fell through to 'done': a pass
+        # that never happened, reported as having run, on a bank whose card
+        # therefore showed a clean tick.
+        if job.get('error') and job.get('error') != err_before:
+            entry['status'], entry['reason'] = 'skipped', str(job['error'])
+            entry['blocked'] = True
+            return
         after = _bank_counts(bank_id)['captioned']
         entry['counts'] = {'captioned': max(0, after - before), 'total_captioned': after}
         entry['detail'] = job.get('detail') or f"{after} captioned"

@@ -14,9 +14,32 @@
  */
 
 /** Reasons that mean "this pass could not run because something else had the
- *  machine" — the ones worth waking someone for. Matched on the reason text the
- *  backend writes (`GPU busy — …`, `not reached`, `cancelled before it ran`). */
-const BLOCKED_RE = /gpu busy|not reached/i
+ *  machine" — the ones worth waking someone for.
+ *
+ *  A FALLBACK ONLY. `pipeline_report` is persisted JSON, so every run already in
+ *  a user's database carries prose and nothing else; new runs carry an explicit
+ *  `blocked` flag from the backend and never reach this regex.
+ *
+ *  It also used to be wrong in the way that mattered most. `GPU busy — …` is
+ *  what _pipeline_job writes when the window raises MID-flight, but the common
+ *  path is the PRE-flight gate in _run_pipeline_step, which records
+ *  _gpu_busy_reason()'s own words — "a vision/GPU pass is already running…",
+ *  "training is running on the GPU…" — and neither matched. So a bank whose
+ *  Score, Watermarks, Framing and Captions were every one of them skipped for a
+ *  busy card rendered a clean tick: precisely the wasted night this file exists
+ *  to expose.
+ *
+ *  `cancelled before it ran` is deliberately NOT here, though this docstring
+ *  used to claim it was: a run the user stopped on purpose is not a fault, and
+ *  badging it would be nagging someone about their own decision. */
+const BLOCKED_RE = /gpu busy|not reached|is already running|is running on the gpu/i
+
+/** Did the MACHINE refuse this step, as opposed to the step declining itself?
+ *  Prefer the backend's explicit verdict; fall back to reading its prose. */
+function wasBlocked(step) {
+  if (typeof step?.blocked === 'boolean') return step.blocked
+  return BLOCKED_RE.test(String(step?.reason || ''))
+}
 
 /** {state, errors, skipped, blocked, first_reason} for a stored pipeline_report.
  *
@@ -33,7 +56,7 @@ export function pipelineReportVerdict(report) {
   if (!Array.isArray(steps) || steps.length === 0) return null
   const errored = steps.filter((s) => s?.status === 'error')
   const skipped = steps.filter((s) => s?.status === 'skipped' || s?.status === 'cancelled')
-  const blocked = skipped.filter((s) => BLOCKED_RE.test(String(s?.reason || '')))
+  const blocked = skipped.filter(wasBlocked)
   const worst = errored[0] || blocked[0] || null
   return {
     state: errored.length ? 'error' : blocked.length ? 'partial' : 'ok',

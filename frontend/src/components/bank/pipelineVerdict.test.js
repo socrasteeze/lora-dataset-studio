@@ -95,3 +95,49 @@ test('singular and plural read correctly', () => {
   const oneErr = pipelineReportVerdict(report([step('scan', 'error', 'boom')]))
   assert.match(pipelineBadge(oneErr).label, /1 step failed/)
 })
+
+/* The regex only ever matched the MID-flight string. The common path is the
+ * PRE-flight gate, which records _gpu_busy_reason()'s own words — and matched
+ * nothing, so the wasted night this file exists to expose rendered a clean
+ * tick. New runs carry an explicit `blocked` flag; the prose match survives for
+ * the reports already sitting in user databases. */
+
+test('the PRE-flight GPU refusal is blocked too, from prose alone', () => {
+  for (const reason of ['a vision/GPU pass is already running — try again in a moment',
+    'training is running on the GPU — try again once it finishes']) {
+    const v = pipelineReportVerdict(report([
+      step('scan'),
+      step('framing', 'skipped', reason),
+    ]))
+    assert.equal(v.state, 'partial', `read as clean: ${reason}`)
+    assert.equal(v.blocked, 1)
+  }
+})
+
+test('a user cancel stays unblocked — the docstring, not the behaviour, was wrong', () => {
+  // BLOCKED_RE named `cancelled before it ran` and matched it with nothing.
+  // Making the regex agree with its own docstring would have badged people for
+  // pressing Stop; the docstring was corrected instead.
+  const v = pipelineReportVerdict(report(
+    [step('scan'), step('caption', 'cancelled', 'cancelled before it ran')],
+    { cancelled: true }))
+  assert.equal(v.blocked, 0)
+  assert.equal(v.state, 'ok')
+})
+
+test('the backend flag wins over the prose, in both directions', () => {
+  // No reason text at all — the flag alone must still raise the badge.
+  const flagged = pipelineReportVerdict(report([
+    step('scan'), { step: 'score', status: 'skipped', reason: null, blocked: true },
+  ]))
+  assert.equal(flagged.state, 'partial')
+  // …and a step the backend says declined ITSELF stays quiet even if its prose
+  // happens to contain a matching phrase.
+  const declined = pipelineReportVerdict(report([
+    step('scan'),
+    { step: 'caption', status: 'skipped', blocked: false,
+      reason: 'no caption engine is ready — a vision task is already running elsewhere' },
+  ]))
+  assert.equal(declined.state, 'ok')
+  assert.equal(declined.blocked, 0)
+})

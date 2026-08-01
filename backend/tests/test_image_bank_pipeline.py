@@ -202,6 +202,56 @@ def test_pipeline_skips_gpu_step_when_gpu_busy(client, tmp_path, monkeypatch):
     assert score['status'] == 'skipped'
     assert 'GPU' in score['reason'] or 'training' in score['reason']
     assert log == []
+    # The verdict the bank card reads. Without it the card had to guess from
+    # prose, and BLOCKED_RE matched only the MID-flight "GPU busy — …" text —
+    # so a night where every GPU pass was skipped for a busy card rendered a
+    # clean tick, which is the whole failure the badge exists to expose.
+    assert score['blocked'] is True
+
+
+def test_a_step_that_declines_ITSELF_is_not_marked_blocked(client, tmp_path,
+                                                           monkeypatch):
+    """The distinction the badge is built on: "install the extra" is the
+    pipeline working as designed; "the card is busy" means the night did less
+    than it looked like. Only the second earns a badge."""
+    from app.services import image_bank_service as svc
+    log = []
+    monkeypatch.setattr(svc, '_score_prereq', lambda: 'bank scoring extra not installed')
+    monkeypatch.setattr(svc, '_gpu_busy_reason', lambda: None)
+    monkeypatch.setattr(svc, '_score_job', _fake_pass(log, 'score'))
+
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
+    client.post(f'/api/bank/{bank_id}/pipeline', json={
+        'steps': ['scan', 'score'], 'reject_flags': [], 'resolve_dups': False})
+    score = next(s for s in _report(client, bank_id)['steps'] if s['step'] == 'score')
+    assert score['status'] == 'skipped'
+    assert score['blocked'] is False
+
+
+def test_a_step_the_run_never_reached_is_blocked_but_a_user_cancel_is_not(
+        client, tmp_path, monkeypatch):
+    """Stopping a run is a decision, not a fault — badging someone for their own
+    Stop is nagging. A run that stopped short for any OTHER reason is not."""
+    from app.services import bank_jobs
+    from app.services import image_bank_service as svc
+    monkeypatch.setattr(svc, '_score_prereq', lambda: None)
+    monkeypatch.setattr(svc, '_gpu_busy_reason', lambda: None)
+
+    def _cancel_midway(bank_id_, *a, **k):
+        def run(job):
+            bank_jobs.cancel(bank_id_)
+        return run
+
+    monkeypatch.setattr(svc, '_score_job', _cancel_midway)
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
+    client.post(f'/api/bank/{bank_id}/pipeline', json={
+        'steps': ['scan', 'score', 'caption'], 'reject_flags': [],
+        'resolve_dups': False})
+    report = _report(client, bank_id)
+    assert report['cancelled'] is True
+    cap = next(s for s in report['steps'] if s['step'] == 'caption')
+    assert cap['status'] == 'cancelled'
+    assert cap['blocked'] is False
 
 
 # --- survivors only ----------------------------------------------------------
@@ -273,3 +323,51 @@ def test_pipeline_empty_steps_is_400(client, tmp_path):
 def test_pipeline_unknown_bank_is_400(client):
     r = client.post('/api/bank/999999/pipeline', json={'steps': ['scan']})
     assert r.status_code == 400
+
+
+def test_a_caption_pass_that_refused_itself_is_not_reported_as_done(
+        client, tmp_path, monkeypatch):
+    """_caption_job refuses with bank_jobs.fail and a plain RETURN, never an
+    exception — right for the standalone button, but inside the pipeline the
+    step then fell through to 'done'. A pass that never happened, reported as
+    having run, on a bank whose card therefore showed a clean tick.
+
+    Reached here the way it happens for real: a peer picked, which skips the
+    local gates, and the peer turns out to have no captioner.
+    """
+    import json
+
+    from app.extensions import db
+    from app.models import ClusterDevice
+    from app.services import image_bank_service as svc
+
+    peer = '4fa2b7c1-0000-4000-8000-0000000000c1'
+    monkeypatch.setattr(svc, '_caption_prereq',
+                        lambda: 'no caption engine is ready')
+    monkeypatch.setattr(svc, '_gpu_busy_reason', lambda: None)
+
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': _photo()})
+    with client.application.app_context():
+        db.session.add(ClusterDevice(id=peer, name='Spare box',
+                                     auth_token_hash='x',
+                                     capabilities=json.dumps(
+                                         {'joycaption': False, 'ollama': False})))
+        db.session.commit()
+    # The peer reports it cannot caption at all, so the run is refused before it
+    # starts — the honest outcome, and the one the dialog now prevents.
+    r = client.post(f'/api/bank/{bank_id}/pipeline', json={
+        'steps': ['scan', 'caption'], 'device_id': peer})
+    assert r.status_code == 400, r.get_json()
+
+    # Now the case that still reaches the fallback: the peer has not reported
+    # what it can do, so nothing refuses it up front — and it cannot caption.
+    with client.application.app_context():
+        ClusterDevice.query.filter_by(id=peer).update({'capabilities': '{}'})
+        db.session.commit()
+    r = client.post(f'/api/bank/{bank_id}/pipeline', json={
+        'steps': ['scan', 'caption'], 'device_id': peer})
+    assert r.status_code == 202, r.get_json()
+    cap = next(s for s in _report(client, bank_id)['steps'] if s['step'] == 'caption')
+    assert cap['status'] == 'skipped', 'a pass that never ran was reported done'
+    assert cap['blocked'] is True
+    assert 'captioner' in (cap['reason'] or '')
