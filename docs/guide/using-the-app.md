@@ -494,6 +494,16 @@ person, 🚩 Find watermarks, 📐 Classify framing and 🏷️ Caption can all 
 🔎 Scan, 🧹 Auto-reject and ✂ Find crops & variants never do — they read this
 machine's database and embeddings cache, so sending them would be slower.
 
+**Work already done is not done twice.** ✨ Score and 👥 Group by person keep an
+embeddings cache per bank, and that cache now travels: the other machine is sent
+what this one already has, so it only computes the rest — and the images it
+already covers are not uploaded at all. An image edited since it was scored is
+sent again, because its signature no longer matches. Pressing **Stop** on a
+remote pass now waits a couple of minutes for the other machine to hand back
+what it finished, and the bank says how much was kept; relaunching carries on
+from there rather than starting over. If it has already gone offline, the pass
+stops with nothing kept and says so.
+
 The **Analysis passes** row inside a bank has its own **Run on** picker, so
 clicking ✨ Score, 👥 Group by person, 📐 Classify framing or 🏷️ Caption on its
 own goes to the same machine Launch all would use. It remembers its choice

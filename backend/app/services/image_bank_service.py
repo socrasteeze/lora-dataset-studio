@@ -3471,6 +3471,19 @@ def _stopped_detail(noun, data, cache_path, total):
             'relaunch to finish and cluster')
 
 
+def _remote_stopped_detail(noun, stop, cache_path, total):
+    """The end-of-pass line when Stop was pressed on a REMOTE pass.
+
+    Two genuinely different outcomes, and saying "discarded" for both was the
+    old lie: the peer usually winds down cleanly and hands its cache back, in
+    which case relaunching resumes. `stop.kept` is its own cancel payload, so
+    the wording and the counts come from the same place a local stop uses."""
+    if stop.kept:
+        return _stopped_detail(noun, stop.kept, cache_path, total)
+    return ('Stopped — the peer was told to abort and did not hand anything '
+            'back in time; relaunch to run it again')
+
+
 def _drive_infer_subprocess(job, python, script, payload, cache_path,
                             progress_re, window, stall_label='pass',
                             stall_timeout=_INFER_STALL_TIMEOUT,
@@ -3695,10 +3708,9 @@ def _faces_job(bank_id, device_id=None):
                     cache_path=cache_path, progress_re=_PROGRESS_RE,
                     detail_label='face pass', required_cap='face_scoring',
                     bank_id=bank_id)
-            except bank_remote.RemotePassCancelled:
-                bank_jobs.progress(job, detail='stopped — the peer was told to '
-                                               'abort; partial work on it was '
-                                               'discarded')
+            except bank_remote.RemotePassCancelled as stop:
+                bank_jobs.progress(job, detail=_remote_stopped_detail(
+                    'face embeddings cached', stop, cache_path, len(paths)))
                 return
             # No exit code to report: nothing ran in this process. A remote
             # result LDS cannot read has already raised inside run_remote_pass,
@@ -3971,10 +3983,9 @@ def _score_job(bank_id, device_id=None):
                     cache_path=cache_path, progress_re=_SCORE_PROGRESS_RE,
                     detail_label='scoring pass', required_cap='bank_scoring',
                     bank_id=bank_id)
-            except bank_remote.RemotePassCancelled:
-                bank_jobs.progress(job, detail='stopped — the peer was told to '
-                                               'abort; partial work on it was '
-                                               'discarded')
+            except bank_remote.RemotePassCancelled as stop:
+                bank_jobs.progress(job, detail=_remote_stopped_detail(
+                    'images scored', stop, cache_path, len(paths)))
                 return
             # See the faces pass: a remote run has no exit code of its own.
             stderr_tail, returncode = [], None

@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import time
 
 from . import bank_jobs
@@ -54,9 +55,30 @@ POLL_SECONDS = 2.0
 # GPU sits far under it.
 REMOTE_PASS_TIMEOUT_SECONDS = 6 * 3600
 
+# After Stop, how long the hub waits for the peer to wind down and hand back
+# what it finished. The peer learns of the cancel on its next heartbeat, the
+# script checks the sentinel between images, and flushing a cache is quick — so
+# this is generous for a clean stop and short enough that a peer which has
+# already died does not hold the bank job open.
+REMOTE_CANCEL_GRACE_SECONDS = 120
+
+# peer_worker uploads this LAST, after everything in out/. Its presence is
+# therefore the "all of it is home" marker, which is what makes it the right
+# thing to wait for after a Stop.
+RESULT_ARTIFACT = 'infer_result.json'
+
 
 class RemotePassCancelled(Exception):
-    """Stop was pressed on the hub; the peer has been told to abort."""
+    """Stop was pressed on the hub; the peer has been told to abort.
+
+    ``kept`` is the peer's own cancel payload when it wound down in time and
+    handed its work back ({'cancelled': True, 'cached': N, 'remaining': M}), or
+    None when nothing came home. The callers report those two cases
+    differently, because they are different: one keeps the embeddings."""
+
+    def __init__(self, kept=None):
+        super().__init__('remote pass stopped')
+        self.kept = kept
 
 
 def _artifact_name(image_id, path) -> str:
@@ -180,31 +202,63 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
     stdin = {
         # Artifact names, not hub paths: the peer rewrites each entry to its
         # downloaded copy by basename, and these names ARE their basenames.
+        # EVERY name, including the ones whose file we do not upload below:
+        # the scripts open only what is in `todo`, but cluster over all of it.
         'images': [name for _p, name in staged],
         'cache': cache_name,           # peer redirects into its out/ and uploads back
         'cancel_file': (cache_name or 'pass') + '.cancel',
         **(extra_payload or {}),
     }
     label = cluster_svc.device_label(device_id)
-    bank_jobs.progress(job, done=0, total=len(staged),
-                       detail=f'{detail_label} — sending {len(staged)} image(s) '
-                              f'to the peer')
-    _log(f'sending {len(staged)} image(s) for the {detail_label}', 'info',
-         detail=f'to {label}' if label else None, device=label, bank_id=bank_id)
-    job_id = cluster_remote.enqueue_infer_on_device(
-        device_id, script=os.path.basename(script), stdin=stdin,
-        image_paths=staged, timeout=REMOTE_PASS_TIMEOUT_SECONDS)
+
+    with tempfile.TemporaryDirectory(prefix='lds-ship-cache-') as tmp_dir:
+        shipped, covered = _ship_cache(cache_path, cache_name, name_to_hub,
+                                       tmp_dir)
+        # The whole point: an image the shipped cache already covers is not
+        # uploaded and not recomputed. Derived from `covered` and nowhere else,
+        # so the file and the skip list cannot drift apart.
+        to_send = [(p, n) for p, n in staged if n not in covered]
+        files = list(to_send)
+        if shipped:
+            files.append((shipped, cache_name))
+            _log(f'{len(covered)} image(s) already done — sending the cache '
+                 f'and the remaining {len(to_send)}', 'info',
+                 detail=f'to {label}' if label else None, device=label,
+                 bank_id=bank_id)
+        else:
+            _log(f'sending {len(to_send)} image(s) for the {detail_label}',
+                 'info', detail=f'to {label}' if label else None, device=label,
+                 bank_id=bank_id)
+        bank_jobs.progress(job, done=0, total=len(to_send),
+                           detail=f'{detail_label} — sending {len(to_send)} '
+                                  f'image(s) to the peer')
+        job_id = cluster_remote.enqueue_infer_on_device(
+            device_id, script=os.path.basename(script), stdin=stdin,
+            image_paths=files, timeout=REMOTE_PASS_TIMEOUT_SECONDS)
+    staged = to_send
 
     # The fetch counter is per job and only feeds a progress bar, so it must not
     # survive the pass on ANY exit — cancel and failure both raise below.
     try:
-        _await_remote_job(job, job_id, staged_count=len(staged),
-                          detail_label=detail_label, label=label, bank_id=bank_id,
-                          progress_from=_stderr_progress(progress_re))
+        stopped = _await_remote_job(
+            job, job_id, staged_count=len(staged),
+            detail_label=detail_label, label=label, bank_id=bank_id,
+            progress_from=_stderr_progress(progress_re),
+            stop_waits_for=RESULT_ARTIFACT) == 'stopped'
         data = _read_result(job_id)
-        _require_consumable(data, label)
+        # Install BEFORE judging the result. The embeddings are a separate
+        # artifact and are expensive; a result LDS cannot read is no reason to
+        # throw away a cache that arrived intact — same rule _install_cache
+        # already states for a pass whose scores landed. It is also what makes
+        # a Stop worth waiting for: this is the line that keeps the work.
         if cache_name:
             _install_cache(job_id, cache_name, cache_path, name_to_hub)
+        if stopped:
+            # The pass did not finish, so the caller must not apply these as a
+            # complete result — but the embeddings are now home, and the peer's
+            # own counts say how much. Relaunching resumes from here.
+            raise RemotePassCancelled(kept=data if isinstance(data, dict) else None)
+        _require_consumable(data, label)
         return _remap_home(data, name_to_hub)
     finally:
         cluster_svc.forget_artifact_fetches(job_id)
@@ -301,7 +355,7 @@ def _vision_progress(prog):
 
 
 def _await_remote_job(job, job_id, *, staged_count, detail_label, label, bank_id,
-                      progress_from):
+                      progress_from, stop_waits_for=None):
     """Poll one ClusterJob to completion, mirroring it into the bank's own bar.
 
     Shared by both remote kinds on purpose: cancellation, the timeout, the
@@ -318,10 +372,40 @@ def _await_remote_job(job, job_id, *, staged_count, detail_label, label, bank_id
 
     deadline = time.monotonic() + REMOTE_PASS_TIMEOUT_SECONDS
     detail_sent = False
+    # Set once the user has pressed Stop: from then on we are no longer waiting
+    # for the pass, we are waiting for the peer to WIND DOWN — which it does
+    # cleanly and quickly, flushing its cache on the way. See the grace below.
+    give_up_at = None
     while True:
-        if bank_jobs.cancelled(job):
+        if bank_jobs.cancelled(job) and give_up_at is None:
             cluster_svc.cancel_cluster_job(job_id)
-            raise RemotePassCancelled()
+            # Do NOT raise here. The peer polls its heartbeat, drops the cancel
+            # sentinel the script watches, and the script exits 0 having flushed
+            # its cache — which peer_worker uploads. Raising the instant Stop
+            # was pressed abandoned that upload every time: 73 orphaned .npz
+            # files under data/cluster_artifacts prove the work arrived and
+            # nobody installed it.
+            give_up_at = time.monotonic() + REMOTE_CANCEL_GRACE_SECONDS
+            bank_jobs.progress(
+                job, detail=f'stopping — waiting for {label or "the peer"} to '
+                            f'hand back what it finished')
+        if give_up_at is not None:
+            # Wait on the ARTIFACT, never the row: cancel_cluster_job already
+            # set this row to 'cancelled', and complete_cluster_job returns
+            # early on a terminal row — so the status can never reach
+            # 'completed' here and polling it would burn the whole grace every
+            # single time. peer_worker uploads stop_waits_for LAST, after out/,
+            # so its arrival means the cache is home too.
+            if stop_waits_for and _artifact_exists(job_id, stop_waits_for):
+                _log(f'{label or "the peer"} handed back what it finished',
+                     'ok', device=label, bank_id=bank_id)
+                return 'stopped'
+            if not stop_waits_for or time.monotonic() > give_up_at:
+                # Nothing to wait for, or it never came. Exactly the behaviour
+                # from before the grace existed: stopped, nothing kept.
+                raise RemotePassCancelled()
+            time.sleep(POLL_SECONDS)
+            continue
         row = ClusterJob.query.filter_by(job_id=job_id).first()
         if row is None:
             raise RuntimeError('remote pass vanished from the cluster queue')
@@ -375,6 +459,77 @@ def _await_remote_job(job, job_id, *, staged_count, detail_label, label, bank_id
         time.sleep(POLL_SECONDS)
 
 
+def _ship_cache(cache_path, cache_name, name_to_hub, tmp_dir):
+    """Re-key the hub's existing cache for the peer, and say which artifact
+    names it already covers.
+
+    Returns ``(shipped_path_or_None, covered_names)``. The two are returned
+    TOGETHER on purpose and must stay that way: `covered_names` is what lets the
+    caller skip uploading an image, and skipping an upload is only correct
+    because the embedding for it is in the file being shipped. Faces clustering
+    runs over every embedding the script can see — a peer sent the new images
+    and no cache would return different person groups, silently.
+
+    `sigs` are blanked. The peer's copies are the same bytes with different
+    mtimes, so a hub-computed signature would mismatch there and the script
+    would recompute everything; an EMPTY sig is the case its own `_is_stale`
+    already documents as "never called stale". Freshness is still enforced —
+    here, by the hub, against its own files, before an entry is shipped at all.
+    """
+    if not cache_path or not cache_name or not os.path.isfile(str(cache_path)):
+        return None, set()
+    try:
+        import numpy as np
+
+        hub_to_name = {hub: name for name, hub in name_to_hub.items()}
+        with np.load(str(cache_path), allow_pickle=False) as z:
+            arrays = {name: z[name] for name in z.files}
+        paths = [str(p) for p in arrays['paths']]
+        sigs = [str(s) for s in arrays['sigs']] if 'sigs' in arrays else None
+
+        keep_idx, keep_names = [], []
+        for i, hub in enumerate(paths):
+            name = hub_to_name.get(hub)
+            if name is None:
+                continue            # not in this pass; nothing to send it for
+            if sigs is not None and sigs[i] and not _sig_matches(hub, sigs[i]):
+                continue            # edited since it was scored — let it redo
+            keep_idx.append(i)
+            keep_names.append(name)
+        if not keep_idx:
+            return None, set()
+
+        out = {n: arr[keep_idx] for n, arr in arrays.items() if n != 'paths'}
+        out['paths'] = np.array(keep_names)
+        if sigs is not None:
+            out['sigs'] = np.array([''] * len(keep_idx))
+        shipped = os.path.join(str(tmp_dir), cache_name)
+        np.savez(shipped, **out)
+        return shipped, set(keep_names)
+    except Exception:
+        # Never fail a pass over an optimisation. Without a shipped cache the
+        # caller stages everything, which is exactly the old behaviour.
+        logger.exception('bank_remote: could not prepare the cache for the peer '
+                         '— sending the whole pass instead')
+        return None, set()
+
+
+def _sig_matches(path, sig) -> bool:
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False            # cannot check -> do not claim it is fresh
+    return sig == f'{st.st_size}:{st.st_mtime_ns}'
+
+
+def _artifact_exists(job_id, name) -> bool:
+    from . import cluster as cluster_svc
+    try:
+        return cluster_svc.artifact_path(job_id, name).is_file()
+    except (FileNotFoundError, OSError):
+        return False
+
+
 def _read_result(job_id) -> dict:
     from . import cluster as cluster_svc
     try:
@@ -422,11 +577,27 @@ def _remap_home(data: dict, name_to_hub: dict) -> dict:
 
 
 def _install_cache(job_id, cache_name, cache_path, name_to_hub) -> None:
-    """Bring the .npz home: re-key `paths` to hub paths, recompute `sigs` from
-    the hub's files (the peer's mtimes mean nothing here — a sig mismatch would
-    silently drop every entry on the next read). Guarded end to end: a cache
-    that cannot be installed degrades the embeddings features and says so in
-    the log; it must never fail a pass whose scores already landed."""
+    """Bring the .npz home: re-key `paths` to hub paths, keep EVERY other array
+    the script wrote, and recompute `sigs` from the hub's files (the peer's
+    mtimes mean nothing here — a sig mismatch would silently drop every entry on
+    the next read).
+
+    "Every other array" is the load-bearing word. This used to write a fixed
+    paths/states/embs/sigs schema, which is the Score cache's shape minus its
+    scores and NOT the Faces cache's shape at all: `face_embed_infer._load_cache`
+    reads `dets` and `bfracs` too, so an installed faces cache raised KeyError,
+    logged "cache unreadable, recomputing" and returned {} — after OVERWRITING
+    the good local cache with the lossy one. Every faces pass on such a bank
+    then recomputed from zero, local or remote. Copy what arrived; only `paths`
+    is ours to rewrite.
+
+    `sigs` is written only when the source had it. Score keys staleness on it;
+    Faces has no such array and must not gain one, or the file stops matching
+    what its own script writes.
+
+    Guarded end to end: a cache that cannot be installed degrades the embeddings
+    features and says so in the log; it must never fail a pass whose scores
+    already landed."""
     import numpy as np
 
     from . import cluster as cluster_svc
@@ -439,10 +610,9 @@ def _install_cache(job_id, cache_name, cache_path, name_to_hub) -> None:
         return
     try:
         with np.load(str(src), allow_pickle=False) as z:
-            paths = [str(p) for p in z['paths']]
-            states = [str(s) for s in z['states']]
-            embs = z['embs']
-        keep_paths, keep_states, keep_embs, keep_sigs = [], [], [], []
+            arrays = {name: z[name] for name in z.files}
+        paths = [str(p) for p in arrays['paths']]
+        keep_idx, keep_paths, keep_sigs = [], [], []
         for i, p in enumerate(paths):
             home = _map_home(p, name_to_hub)
             if home is None:
@@ -452,16 +622,18 @@ def _install_cache(job_id, cache_name, cache_path, name_to_hub) -> None:
                 sig = f'{st.st_size}:{st.st_mtime_ns}'
             except OSError:
                 sig = ''
+            keep_idx.append(i)
             keep_paths.append(home)
-            keep_states.append(states[i])
-            keep_embs.append(embs[i])
             keep_sigs.append(sig)
         if not keep_paths:
             return
+        out = {name: arr[keep_idx] for name, arr in arrays.items()
+               if name != 'paths'}
+        out['paths'] = np.array(keep_paths)
+        if 'sigs' in arrays:
+            out['sigs'] = np.array(keep_sigs)
         os.makedirs(os.path.dirname(str(cache_path)), exist_ok=True)
-        np.savez(str(cache_path),
-                 paths=np.array(keep_paths), states=np.array(keep_states),
-                 embs=np.stack(keep_embs), sigs=np.array(keep_sigs))
+        np.savez(str(cache_path), **out)
     except Exception:
         logger.exception('bank_remote: could not install the returned cache — '
                          'scores landed, embeddings features degraded')
