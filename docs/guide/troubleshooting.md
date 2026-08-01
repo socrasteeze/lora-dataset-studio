@@ -234,7 +234,7 @@ volumes:
 
 and then pointing the two override fields at `/srv/comfyui/input` and
 `/srv/comfyui/output`. The shipped `docker-compose.yml` deliberately does **not**
-do this: it runs the app in API-only mode, where ComfyUI is out of scope.
+do this: it runs the app in curation-only mode, where ComfyUI is out of scope.
 
 **How you'll know:** the failure now says so. Settings flags an override folder it
 cannot write into, the Setup wizard warns while you configure (a warning, never a
