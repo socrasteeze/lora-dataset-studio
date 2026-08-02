@@ -524,7 +524,14 @@ DEFAULTS = {
     # face_variations.sanitize_custom_shots — this file is hand-editable, and a
     # label shadowing a built-in one would hijack prompt/aspect/NSFW resolution.
     'custom_shots': {},
-    'updates': {'repo': 'perfectgf/lora-dataset-studio'},      # GitHub repo for the release feed
+    # THIS fork's release feed, not upstream's. `settings.check_update` compares
+    # the latest tag from this repo against APP_VERSION and, on a ZIP install,
+    # offers to download that release's asset over the current one. Pointed at
+    # upstream — which is what it inherited — the first upstream tag that sorted
+    # above our APP_VERSION would have presented itself as an update and then
+    # replaced this fork with upstream's code, removing every divergence it
+    # exists for. It was inert only by accident of string ordering.
+    'updates': {'repo': 'socrasteeze/lora-dataset-studio'},    # GitHub repo for the release feed
 }
 
 _lock = threading.Lock()

@@ -734,7 +734,7 @@ Set one of these **only** to override that search — for instance if your Comfy
 
 | Key | Default | Role |
 |---|---|---|
-| `updates.repo` | `perfectgf/lora-dataset-studio` | The GitHub repo the update checker reads its release feed from. |
+| `updates.repo` | `socrasteeze/lora-dataset-studio` | The GitHub repo the update checker reads its release feed from. Point it at a fork and **Update & restart** follows that fork; point it at upstream from a fork and the next upstream release will look like an update and replace your build with theirs. |
 
 **Run provenance:**
 
@@ -833,6 +833,6 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `identity_prompts.framing_face` / `.framing_bust` / `.framing_body` / `.framing_back` | The per-framing shot-detail block for Klein/Krea. Per subject type. Blank = shipped default. |
 | `identity_prompts.by_subject.<type>.<kind>` | Identity-lock overrides for a **non-human** subject type (`animal`, `creature`, `object`, `other`) × kind (`face_single`, `face_multi`, `klein_identity`). Human overrides stay on the flat `identity_prompts.<kind>` keys. Blank/absent = the shipped default for that subject. |
 | `klein.small_image_prompt` | Optional shared instruction for scraper rescue and single/bulk image improvement (empty = reference image only). |
-| `updates.repo` | GitHub repo the update checker reads its release feed from (default `perfectgf/lora-dataset-studio`). |
+| `updates.repo` | GitHub repo the update checker reads its release feed from (default `socrasteeze/lora-dataset-studio` — this fork's own feed). |
 
 Additional config-file-only keys (ComfyUI folder overrides, cloud internals, quality-tool interpreters, Klein consistency LoRA) are documented in [Config-file-only settings](#config-file-only-settings) above.
