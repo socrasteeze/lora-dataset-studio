@@ -1553,6 +1553,11 @@ PASS_PENDING = {
     'faces':     lambda: BankImage.face_state.is_(None),
     'watermark': lambda: BankImage.watermark_state.is_(None),
     'framing':   lambda: BankImage.framing.is_(None),
+    # tags_state, not tags: it is NULL only when the pass never reached the row,
+    # and 'error' when it ran and the file could not be read. Keying on `tags`
+    # would make an unreadable image pending forever — the same trap the
+    # face_state/face_cluster note above records.
+    'tags':      lambda: BankImage.tags_state.is_(None),
     'caption':   lambda: or_(BankImage.caption.is_(None),
                              BankImage.caption == ''),
 }

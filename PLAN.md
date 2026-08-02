@@ -117,9 +117,19 @@ Goal: lossless generate → triage → tag → train loop.
       (ai-toolkit's trainer already buckets at load time).
 - [ ] Route SwarmUI generation sessions (its `Output/` folder) and scrape piles
       into LDS's **Image Bank** for triage → promote keepers into datasets.
-- [ ] Batch prep: ai-toolkit fork's `scripts/auto_caption.py` (WD14) for tag
-      passes, TagGUI for interactive review, LDS captioning (JoyCaption /
-      abliterated Ollama) for prose + NSFW datasets.
+- [x] Batch prep: WD14 tag passes now run **inside LDS**, as the Image bank's
+      🔖 Tags pass (done 2026-08-02) — not via the ai-toolkit fork's
+      `scripts/auto_caption.py` as planned here. The reason for the change: the
+      original plan treated tagging as a *captioning* step, to be done in
+      whichever tool captions best. It is not — in this workflow it is a
+      **triage** step, and it only pays off if it happens before the expensive
+      captioner, in the same screen where you keep and reject. Shipping it as an
+      external batch script would have kept it in another tool's window, on
+      another folder, with no way to filter the bank by what it found. It writes
+      to LDS's own tag columns, never to captions or to `.txt` sidecars, so
+      Principle 2's sidecar seam is untouched. TagGUI stays the interactive tag
+      editor for dataset `.txt` files; LDS captioning (JoyCaption / abliterated
+      Ollama) still owns prose + NSFW datasets.
 
 ### Phase 4 — one Hugging Face cache
 

@@ -709,6 +709,9 @@ These have no UI control — they're for advanced users editing `config.json` by
 | `bank_scoring.python` | `''` | Interpreter for the Image-bank Score pass (aesthetic / NSFW / style). Empty = current interpreter until Setup installs the managed `data/envs/bank_scoring` venv and records its path here. |
 | `bank_scoring.models_root` | `''` | Optional cache root for Score-pass model weights. |
 | `masks.python` | `''` | Interpreter for the rembg (person-mask) subprocess. |
+| `wd14.python` | `''` | Interpreter for the 🔖 WD14 tagger subprocess. Empty = reuse `masks.python`, then the current interpreter — the tagger needs only `onnxruntime`, which any environment carrying rembg or InsightFace already has. |
+| `wd14.models_root` | `''` | Where the WD14 model files (`model.onnx` + `selected_tags.csv`, ~400 MB) are stored. Empty = `data/models/wd14`. |
+| `wd14.threshold` | `0.35` | Confidence at or above which a tag is kept when the 🔖 Tags pass runs (clamped to 0.05–0.95). The **full** scored output is stored regardless, so this only decides what a pass writes — it does not have to be right first time. |
 | `bank_scoring.text_search_idle_minutes` | How long the 🔤 **Find by text** encoder stays warm after its last query (default `10`, capped at `120`). Loading CLIP costs ~10 s on the CPU; encoding a phrase afterwards costs ~20 ms, so the worker is kept alive to make a refine-and-retry session instant. It holds roughly **2.4 GB of RAM** while it lives, and is released when you close the search panel or when the window elapses. Set to `0` to never keep it warm — every new phrase then pays the ~10 s load, which is the right trade on a memory-tight machine. Already-searched phrases are cached on disk and cost nothing either way. |
 | `watermark.python` | `''` | Interpreter for the LaMa watermark subprocess. **Auto-managed:** leave it empty and the **Install inpainting** button builds a dedicated Python 3.10-3.12 environment for you (`simple-lama-inpainting` needs Pillow&lt;10, so it can't share the app's own Python) and fills this in automatically. Set it yourself only to point at an environment you already have — a manual value is always respected and never overwritten. |
 
@@ -814,6 +817,9 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `face_scoring.green` | Similarity score threshold (0–1) above which an image is flagged "green" (strong match). |
 | `face_scoring.orange` | Similarity score threshold (0–1) above which an image is flagged "orange" (borderline match). |
 | `masks.python` | Python interpreter used to run the rembg subprocess (empty = current interpreter). |
+| `wd14.python` | Python interpreter that runs the 🔖 WD14 tagger (empty = reuse `masks.python`, then the current interpreter). |
+| `wd14.models_root` | Directory where the WD14 model files are stored/downloaded (empty = `data/models/wd14`). |
+| `wd14.threshold` | Confidence cut for the 🔖 Tags pass, 0.05–0.95 (default `0.35`). |
 | `bank_scoring.python` | Python interpreter that runs the ✨ Score pass (empty = the app's own). Auto-filled by Setup with a CPU-only environment; repointable at any CUDA interpreter already on the machine via the bank's **⚡ Use a GPU Python I already have** picker, which verifies every dependency first and never installs into an environment it did not create. |
 | `watermark.python` | Python interpreter used to run the LaMa watermark-inpainting subprocess (empty = reuse `masks.python`, then the current interpreter). |
 | `watermark.device` | LaMa processing device: `auto` (CUDA when available, otherwise CPU), `cuda`, or `cpu`. |

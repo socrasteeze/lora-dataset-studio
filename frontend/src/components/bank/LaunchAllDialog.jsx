@@ -26,7 +26,9 @@ export default function LaunchAllDialog({ caps, visionReady, scope, onClose, onL
   // Which machine runs the passes that can travel. FIVE do: ✨ Score,
   // 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions. scan,
   // auto-reject and ✂ same-shot always run here — they read the database and
-  // the embeddings cache, so sending them would be slower, not faster.
+  // the embeddings cache, so sending them would be slower, not faster. 🔖 Tags
+  // also stays here, for a different reason: no peer advertises the tagger, so
+  // there is nobody to send it to (LOCAL_ONLY_PASSES).
   const [deviceId, setDeviceId] = useState(() => loadSavedDeviceId('bank-pass'))
   const [device, setDevice] = useState(null)
   const remote = deviceId && deviceId !== 'local'
@@ -37,7 +39,7 @@ export default function LaunchAllDialog({ caps, visionReady, scope, onClose, onL
   // ticked ✨ Score on a peer that had already said it has no scoring stack.
   const gates = useMemo(() => Object.fromEntries(
     ['scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark', 'faces',
-      'framing', 'caption'].map((k) => [k, stepGate(k, { caps, visionReady, device })]),
+      'framing', 'tags', 'caption'].map((k) => [k, stepGate(k, { caps, visionReady, device })]),
   ), [caps, visionReady, device])
   const ready = useMemo(
     () => Object.fromEntries(Object.entries(gates).map(([k, g]) => [k, g.ok])),
@@ -58,12 +60,15 @@ export default function LaunchAllDialog({ caps, visionReady, scope, onClose, onL
       desc: 'Face embeddings + person clusters, no reference photo (CPU/GPU).' },
     { key: 'framing', label: '📐 Classify framing', needs: 'Vision model',
       desc: 'Tag each shot face/bust/body/back — powers the framing filter & coverage advice (GPU).' },
+    { key: 'tags', label: '🔖 Tags', needs: 'Image tagging (WD14)',
+      desc: 'Label what is in each shot (hair, clothing, setting) so the bank can be filtered by it — local, CPU-friendly, never writes captions. Runs here only.' },
     { key: 'caption', label: '🏷️ Caption', needs: 'Caption engine',
       desc: 'Describe every image so it becomes searchable and rides to the dataset (GPU).' },
   ]
 
   const [steps, setSteps] = useState(() => new Set(
-    ['scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark', 'faces', 'framing']
+    ['scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark', 'faces', 'framing',
+      'tags']
       .filter((k) => ready[k])))
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [resolveDups, setResolveDups] = useState(true)

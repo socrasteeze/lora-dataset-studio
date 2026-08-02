@@ -62,6 +62,6 @@ test('the badges follow pipeline order, not object key order', () => {
 test('every badged pass is a real pipeline step', () => {
   // The keys are the server's step names. A typo here would silently draw
   // nothing forever, which is the failure mode hardest to notice.
-  const steps = ['scan', 'score', 'watermark', 'faces', 'framing', 'caption']
+  const steps = ['scan', 'score', 'watermark', 'faces', 'framing', 'tags', 'caption']
   assert.deepEqual(COVERAGE_PASSES.map((p) => p.key), steps)
 })

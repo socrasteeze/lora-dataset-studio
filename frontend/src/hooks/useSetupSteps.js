@@ -336,21 +336,22 @@ function ollamaStep(caps, runtimeReadiness) {
 }
 
 function qualityStep(caps) {
-  // Four scoped ML capabilities now (face scoring, masks, watermark inpainting,
-  // bank scoring) — each installs/repairs on its own. The step is ready only when
-  // all of them are in.
+  // Five scoped ML capabilities now (face scoring, masks, watermark inpainting,
+  // bank scoring, image tagging) — each installs/repairs on its own. The step is
+  // ready only when all of them are in.
   const parts = [!!caps.face_scoring, !!caps.masks, !!caps.watermark_inpaint,
-    !!caps.bank_scoring]
+    !!caps.bank_scoring, !!caps.wd14]
   const ready = parts.every(Boolean)
   const partial = parts.some(Boolean)
   return {
     id: 'quality', title: 'Quality tools (ML extras)', recommended: false,
     unlocks: ['Face-similarity scoring', 'Person masks', 'Watermark inpainting',
-      'Bank scoring (aesthetic · NSFW · style)'],
+      'Bank scoring (aesthetic · NSFW · style)', 'Image tagging (WD14)'],
     status: ready ? 'ready' : (partial ? 'partial' : 'available'),
     faceScoring: !!caps.face_scoring, masks: !!caps.masks,
     watermarkInpaint: !!caps.watermark_inpaint,
     bankScoring: !!caps.bank_scoring,
+    wd14: !!caps.wd14,
   }
 }
 
@@ -430,6 +431,7 @@ export function deriveCapabilitySummary(caps) {
     { label: 'Face-similarity scoring', ok: !!c.face_scoring, topic: 'setup-quality' },
     { label: 'Person masks', ok: !!c.masks, topic: 'setup-quality' },
     { label: 'Watermark inpainting', ok: !!c.watermark_inpaint, topic: 'setup-quality' },
+    { label: 'Image tagging (WD14)', ok: !!c.wd14, topic: 'setup-quality' },
     { label: 'LoRA training', ok: !!c.training_visible, topic: 'setup-training' },
     { label: 'Test Studio', ok: !!c.studio_visible,
       topic: 'setup-comfyui', waitingTopic: WAITING,
@@ -505,6 +507,7 @@ export const INSTALL_ALL_ACTION_LABELS = {
   face_scoring: 'Face-similarity scoring',
   masks: 'Person masks',
   watermark_inpaint: 'Watermark inpainting',
+  wd14: 'Image tagging (WD14)',
   ollama_model: 'Vision model (captioning)',
   klein_model: 'Klein model (local generation)',
   klein_text_encoder: 'Klein text encoder',
@@ -595,7 +598,7 @@ export function seedvr2NeedsComfyuiRestart(caps) {
 // serializes pip and parallelizes downloads regardless of fire order, so this order
 // only drives the progress list; it must match the backend's _INSTALL_ALL_ORDER.
 export const INSTALL_ALL_ORDER = [
-  'face_scoring', 'masks', 'watermark_inpaint',
+  'face_scoring', 'masks', 'watermark_inpaint', 'wd14',
   'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
 ]
 
@@ -611,7 +614,9 @@ export function installAllPlan(caps) {
   // presence check calls installed and no loader can open.
   const kleinMissing = brokenOrMissing(cu.klein_missing, cu.klein_invalid)
   const needed = (a) => {
-    if (a === 'face_scoring' || a === 'masks') return mlOk && !c[a]
+    // wd14's pip half targets the app's own Python too, so it shares the wheel-
+    // range gate; its ~400 MB model download rides along in the same action.
+    if (a === 'face_scoring' || a === 'masks' || a === 'wd14') return mlOk && !c[a]
     if (a === 'watermark_inpaint') return !c.watermark_inpaint
     // klein_* — only into a validated ComfyUI tree.
     return !!cu.dir_valid && kleinMissing.includes(a)
@@ -687,6 +692,7 @@ export function installCatalog(caps) {
     mlItem('face_scoring'),
     mlItem('masks'),
     item('watermark_inpaint', c.watermark_inpaint, true, ''),   // auto-provisions its own venv
+    mlItem('wd14'),
     item('ollama_model', o.vision_model_ready, o.reachable && modelName,
       !o.reachable ? 'Start Ollama first (the Captioning step).'
         : !modelName ? 'Set a vision model name first (the Captioning step).' : ''),

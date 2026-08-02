@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-02-tag-a-bank-before-you-caption-it',
+    date: '2026-08-02',
+    title: 'Sort a huge bank by hair colour or clothing — before you caption anything',
+    blurb:
+      'Until now the only way to slice a 9,000-image dump by what was actually in the pictures was to caption it first, which is hours of GPU time spent before you even know which images you want to keep. The bank now has a 🔖 Tags pass: a small local model labels every image with booru tags — blonde hair, red dress, outdoors — and the grid gains tidy dropdowns for hair, clothing, setting, pose and more, plus an "all other tags" list so nothing the model found is hidden. Your search box finds those tags too, so "red dress" works with no captioning pass at all. It never touches your captions: the tags live in their own place, and the captioner still runs later, on the keepers only. It runs on CPU, so it works on a machine that cannot host a captioning model. Install it in Setup ▸ Quality tools (~400 MB, one time).',
+    to: '/bank',
+  },
+  {
     id: '2026-08-02-updates-follow-this-build-not-another-project',
     date: '2026-08-02',
     title: 'Update & restart could have replaced this build with a different project',

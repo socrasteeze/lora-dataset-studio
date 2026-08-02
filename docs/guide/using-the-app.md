@@ -372,7 +372,26 @@ touching the folder itself:
    person, *no reference photo needed*. Click a person card to see only them,
    select all, keep or reject. Embeddings are cached, so re-running after a
    cull is much faster.
-5. **🏷️ Caption & 🔍 search** — caption the bank with the same engines your
+5. **🔖 Tags** — the cheap way to slice the pile. A small local model (WD14,
+   ~400 MB, installed from *Setup ▸ Quality tools*) labels every non-rejected
+   image with **booru tags** — `blonde_hair`, `red_dress`, `outdoors` — and the
+   filter bar gains tidy dropdowns for hair, clothing, headwear, setting, pose
+   and how many people, plus an **All other tags** list so nothing the model
+   found is hidden. They compose with every other filter, and the **search box
+   matches them too**, so `red dress` works before you have captioned anything.
+   The point is the order of operations: captioning a 9 000-image dump costs
+   hours of GPU time, and you would be paying it *before* knowing which images
+   you want. Tag first, throw most of it away, caption the survivors. It runs
+   fine on the **CPU**, so it works on a machine that cannot host a captioning
+   model, and it **never writes a caption** — the tags live in their own place
+   and the captioner below is untouched. **Limits, plainly:** it is a
+   *classifier*, not a describer — it names things it was trained on and will
+   miss the rest; the facet dropdowns are curated shortcuts over a partial list
+   of known tags, which is why All other tags exists; it is available in the
+   **bank only**, not in the dataset workspace; and unlike the other heavy
+   passes it **cannot run on a compute peer** — Launch all will refuse it there
+   rather than fail an hour in.
+6. **🏷️ Caption & 🔍 search** — caption the bank with the same engines your
    datasets use (JoyCaption / Ollama vision, your *Settings*). Hit **🏷️ Caption
    all** to describe every not-yet-captioned image, or select some first to
    caption just those. It runs in the background, frees the GPU like the other
@@ -381,7 +400,7 @@ touching the folder itself:
    search box — `red dress`, `sunset`, a file name — and the grid filters to
    matching images, combinable with every other filter. It's the fast way to
    find shots in a 9 000-image dump.
-6. **⬆ Promote** — the kept images are **copied** into the dataset you choose —
+7. **⬆ Promote** — the kept images are **copied** into the dataset you choose —
    or into one **created on the spot**, so the last step of the funnel no longer
    sends you to the Datasets page and back — through the normal import path: normalized to webp, near-duplicates already
    in the dataset skipped. Any bank caption **rides along**, so a captioned

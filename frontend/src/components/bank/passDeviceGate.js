@@ -31,6 +31,14 @@ export const PASS_PEER_CAPS = {
   caption: ['joycaption', 'ollama'],
 }
 
+/* Passes that CANNOT travel, whatever the peer reports. Mirrors
+ * image_bank_service.LOCAL_ONLY_STEPS, and the polarity is the opposite of
+ * PASS_PEER_CAPS above on purpose: there, silence from a peer means "probably
+ * fine". Here there is nothing to be silent about — no peer advertises the
+ * tagger at all, so the permissive rule would wave every one of them through
+ * and the pass would die on the other side, an hour into an overnight queue. */
+export const LOCAL_ONLY_PASSES = ['tags']
+
 const CAP_HINT = {
   bank_scoring: 'the bank-scoring extra',
   face_scoring: 'the face-scoring extra',
@@ -56,6 +64,8 @@ function localReady(key, caps, visionReady) {
     case 'framing':
     case 'caption':
       return !!visionReady
+    case 'tags':
+      return !!caps?.wd14
     default:
       return true            // scan, auto_reject: always available
   }
@@ -81,6 +91,13 @@ export function stepGate(key, ctx = {}) {
 
   const peer = peerOf(device)
   if (!peer) return { ok: localReady(key, caps, visionReady), blocked: false }
+
+  // A pass that cannot travel is blocked by ANY peer, not by what that peer
+  // reports — the server refuses the whole queue at launch otherwise.
+  if (LOCAL_ONLY_PASSES.includes(key)) {
+    return { ok: false, blocked: true,
+             reason: `${peer.name || 'that machine'} can’t run this — it only runs here` }
+  }
 
   const needed = PASS_PEER_CAPS[key]
   if (!needed) return { ok: true, blocked: false }
