@@ -685,6 +685,7 @@ CAPABILITY_IMPORTS = {
     'masks': 'import rembg',
     'bank_scoring': 'import torch, open_clip, transformers',
     'watermark_inpaint': 'import simple_lama_inpainting',
+    'wd14': 'import onnxruntime',
 }
 
 
@@ -748,6 +749,54 @@ def probe_bank_scoring() -> dict:
     ok = _cached_import('bank_scoring', python, CAPABILITY_IMPORTS['bank_scoring'])
     return {'ok': ok,
             'detail': 'torch + open_clip + transformers import OK' if ok else 'import failed'}
+
+
+def probe_wd14() -> dict:
+    """🏷️ WD14 tagger (image-bank Tags pass). TWO conditions, and both have to
+    hold before this reports ✓, because they fail at different times and the
+    user fixes them in different places:
+
+      • onnxruntime imports in the tagger's interpreter (the pip half — the same
+        cached subprocess probe every other ML extra uses), and
+      • the two model files are actually on disk (the ~400 MB download half).
+
+    Every other capability here is pip-only, so its import probe IS the whole
+    answer. This one is not: pip can be perfectly satisfied while the classifier
+    weights are missing, and a probe that said ✓ there would light up the Tags
+    button for a pass that can only fail on image 1. The child downloads the
+    files on first run, so a missing model is recoverable rather than fatal —
+    but it is a ~400 MB wait the user must be told about UP FRONT, which is
+    exactly what the Setup tile and the button's install hint are for.
+
+    The interpreter falls back the way watermark_inpaint's does: this capability
+    needs nothing insightface/rembg do not already pull in, so a machine that
+    installed either of those is one probe away from having this too."""
+    from .services import wd14_tagger
+    python = wd14_tagger.wd14_python()
+    if not _cached_import('wd14', python, CAPABILITY_IMPORTS['wd14']):
+        return {'ok': False, 'detail': 'onnxruntime import failed'}
+    missing = wd14_tagger.missing_model_files()
+    if missing:
+        return {'ok': False,
+                'detail': 'onnxruntime OK, model not downloaded '
+                          f"({', '.join(missing)})"}
+    return {'ok': True, 'detail': 'onnxruntime + WD14 model OK'}
+
+
+def wd14_gpu_available() -> bool:
+    """True only when the tagger's interpreter can run ONNX on CUDA. Read the
+    same way face_gpu_available() is, and for the same reason the bank pass
+    needs it: a CUDA run takes the GPU-exclusive window (unloading ComfyUI,
+    blocking a training start) and a CPU run must never take one. CPU is a
+    first-class path for this capability — a ~400 MB classifier is exactly the
+    thing you want on a machine that cannot host a captioning model — so the
+    common answer here is False and that is not a degraded state."""
+    from .services import wd14_tagger
+    python = wd14_tagger.wd14_python()
+    return _cached_import(
+        'wd14_gpu', python,
+        "import onnxruntime,sys; "
+        "sys.exit(0 if 'CUDAExecutionProvider' in onnxruntime.get_available_providers() else 1)")
 
 
 def probe_watermark_inpaint() -> dict:
@@ -1469,20 +1518,22 @@ def probe(force=False) -> dict:
     ollama = probe_ollama()
     ollama_installed = probe_ollama_installed()
     aitoolkit = probe_aitoolkit()
-    # These five each shell out a cached-but-possibly-cold subprocess import
+    # These six each shell out a cached-but-possibly-cold subprocess import
     # (insightface/rembg/torch+open_clip+transformers/simple_lama_inpainting/
-    # the ai-toolkit venv's captioning deps — see _cached_import). Run them
-    # concurrently so a cold boot pays the SLOWEST one, not the sum of all five.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+    # onnxruntime/the ai-toolkit venv's captioning deps — see _cached_import).
+    # Run them concurrently so a cold boot pays the SLOWEST one, not the sum.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
         f_face = pool.submit(probe_face_scoring)
         f_masks = pool.submit(probe_masks)
         f_bank = pool.submit(probe_bank_scoring)
         f_watermark = pool.submit(probe_watermark_inpaint)
+        f_wd14 = pool.submit(probe_wd14)
         f_joycaption = pool.submit(probe_joycaption, aitoolkit)
         face_scoring = f_face.result()
         masks = f_masks.result()
         bank_scoring = f_bank.result()
         watermark_inpaint = f_watermark.result()
+        wd14 = f_wd14.result()
         joycaption = f_joycaption.result()
     models = _scan_models()
     # Klein engine readiness is now honest tri-component: the graph needs the UNET
@@ -1698,6 +1749,12 @@ def probe(force=False) -> dict:
         # Bank scoring extra (CLIP aesthetic + NSFW + style clustering). Gates the
         # bank's "Score (aesthetic · NSFW · style)" button; False → install hint.
         'bank_scoring': bank_scoring['ok'],
+        # 🏷️ WD14 tagger. Gates the bank's Tags button; False → install hint. The
+        # detail rides along because this capability can be ✗ for TWO different
+        # reasons (no onnxruntime vs no model download) that the user fixes in
+        # different places — a bare bool would send half of them to the wrong one.
+        'wd14': wd14['ok'],
+        'wd14_detail': wd14['detail'],
         # Lets the front adapt the watermark Clean tooltip: when False, Clean is
         # crop-only (LaMa-routed watermarks are skipped with an install hint).
         'watermark_inpaint': watermark_inpaint['ok'],

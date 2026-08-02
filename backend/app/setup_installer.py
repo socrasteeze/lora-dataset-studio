@@ -241,7 +241,7 @@ _NODE_PACKS = {
 
 INSTALL_ACTIONS = ('ml_extras', 'scrape_extras', 'ollama_model',
                    'face_scoring', 'masks', 'watermark_inpaint',
-                   'bank_scoring') + tuple(_MODEL_DOWNLOADS) + tuple(_NODE_PACKS)
+                   'bank_scoring', 'wd14') + tuple(_MODEL_DOWNLOADS) + tuple(_NODE_PACKS)
 
 _ML_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-ml.txt'
 _SCRAPE_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-scrape.txt'
@@ -306,14 +306,28 @@ _FLASK_VENV_INCOMPATIBLE = frozenset({_WATERMARK_PKG})
 #                 from stepping on a GPU build the user already has.
 #   watermark_inpaint  simple-lama-inpainting (has its own dedicated worker below;
 #                 listed here only so the anti-orphan test sees its package covered).
+#   wd14          the 🏷️ WD14 tagger: onnxruntime (it IS an ONNX model) + numpy +
+#                 headless opencv for decode/resize. NO new package — every one of
+#                 the three is already pinned in requirements-ml.txt for
+#                 face_scoring/masks, so a machine with either of those installed
+#                 needs no pip work at all here (_drop_provided_onnxruntime also
+#                 keeps this from stepping on a GPU onnxruntime build). Pillow is
+#                 deliberately NOT used by the child: a dedicated ML env need not
+#                 have it, and cv2.imdecode over bytes we read ourselves is also
+#                 the unicode-path-safe way in (cv2.imread cannot open one on
+#                 Windows). The ~400 MB of WEIGHTS are not a pip concern — the
+#                 child fetches those on first run (see services/wd14_tagger.py).
 _CAPABILITY_PACKAGES = {
     'face_scoring': ('insightface', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'masks': ('rembg', 'onnxruntime', 'numpy', 'opencv-python-headless'),
     'watermark_inpaint': (_WATERMARK_PKG,),
+    'wd14': ('onnxruntime', 'numpy', 'opencv-python-headless'),
 }
-# The capabilities served by the GENERIC per-capability pip worker
-# (_run_ml_capability). watermark_inpaint keeps its own worker, so it's excluded.
-_CAPABILITY_ML_ACTIONS = ('face_scoring', 'masks')
+# The capabilities whose pip half is the GENERIC scoped install (_run_ml_capability):
+# pip serialization, import-cache invalidation and manual_command() all key off this.
+# watermark_inpaint keeps its own worker entirely, so it's excluded. wd14 is here for
+# its pip half but registers a wrapper worker (_run_wd14) that also fetches weights.
+_CAPABILITY_ML_ACTIONS = ('face_scoring', 'masks', 'wd14')
 
 # Actions whose success makes a NEW importable package appear -> the probe
 # import-cache must be dropped so the capability flips without waiting out the
@@ -519,9 +533,13 @@ def _capability_python(action) -> str:
     matching probe uses, so the install target and the later import can't drift:
       face_scoring -> face_scoring.python  (see capabilities.probe_face_scoring)
       masks        -> masks.python         (see capabilities.probe_masks)
-      watermark_inpaint -> the wrapper chain (watermark.python > masks.python)."""
+      watermark_inpaint -> the wrapper chain (watermark.python > masks.python)
+      wd14         -> the tagger's chain   (wd14.python > masks.python)."""
     if action == 'watermark_inpaint':
         return _watermark_python()
+    if action == 'wd14':
+        from .services import wd14_tagger
+        return wd14_tagger.wd14_python()
     return cfg.get(f'{action}.python') or sys.executable
 
 
@@ -746,6 +764,7 @@ def _check_download_precondition(action):
 # a coherent "X / N" progress display; the real scheduling still comes from start()
 # (pip serialized FIFO, model downloads parallel), so the order here is cosmetic.
 _INSTALL_ALL_ORDER = ('scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint',
+                      'wd14',
                       'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
                       'klein_enhancement_lora')
 
@@ -784,6 +803,15 @@ def _action_needed(action, caps) -> bool:
     if action == 'watermark_inpaint':
         # Auto-provisions its own 3.10-3.12 venv, so it's runnable on any interpreter.
         return not caps.get('watermark_inpaint')
+    if action == 'wd14':
+        # Same interpreter gate as face_scoring/masks — its pip half targets the
+        # app's own Python unless a dedicated ML env is configured. The ~400 MB of
+        # weights are a deliberate part of an unattended "install everything": the
+        # capability is useless without them, and half-installing it would leave a
+        # tile reading ✗ with nothing left for the button to do.
+        if not (caps.get('python') or {}).get('ml_supported', True):
+            return False
+        return not caps.get('wd14')
     if action == 'ollama_model':
         # Only when Ollama is already reachable AND a model name is configured (the pull
         # needs a target) — Ollama itself can't be auto-installed here.
@@ -1547,6 +1575,92 @@ def _run_ml_capability(action) -> int:
     return rc
 
 
+def _run_wd14(action) -> int:
+    """🏷️ WD14 tagger: the scoped pip install PLUS the model download.
+
+    It is the only capability here whose install has two halves, and they must be
+    ONE action. Every other ML extra is pip-only, so `pip succeeded` == `the
+    capability works`. This one needs ~400 MB of weights as well, and splitting
+    that into "install now, download on first use" is precisely the shape that
+    produced issue #24's complaint: the tile would say ✓ Installed the moment pip
+    finished, then the first real run would sit on a silent 400 MB transfer with
+    a progress bar reading 0/9000. probe_wd14 therefore requires BOTH halves, and
+    so does this worker — the tile flips to ✓ when the pass can actually run.
+
+    The download is idempotent and resumable-by-retry: each file lands as .part
+    and is renamed into place only once it is complete and plausibly sized, so an
+    interrupted install leaves nothing that looks finished. Re-clicking Install
+    skips whatever is already there."""
+    rc = _run_ml_capability(action)
+    if rc != 0:
+        return rc
+    from .services import wd14_tagger
+    dest_dir = wd14_tagger.models_dir()
+    missing = wd14_tagger.missing_model_files()
+    if not missing:
+        _append(action, f'model already present: {dest_dir}')
+        return 0
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except OSError as e:
+        _append(action, f'cannot create the model folder {dest_dir}: {e}')
+        return 1
+    _append(action, f'model folder: {dest_dir}')
+    # Total across the files still needed, so one bar covers the whole download
+    # instead of snapping back to 0% between the .onnx and its tag CSV.
+    grand_total = sum(wd14_tagger.MODEL_FILES[n][1] for n in missing)
+    grand_done = 0
+    for name in missing:
+        url, min_bytes = wd14_tagger.MODEL_FILES[name]
+        dest = wd14_tagger.model_path(name)
+        part = dest + '.part'
+        _append(action, f'downloading {url}')
+        try:
+            with requests.get(url, stream=True, timeout=(10, 120),
+                              allow_redirects=True) as resp:
+                if resp.status_code >= 400:
+                    _append(action, f'HTTP {resp.status_code}')
+                    return 1
+                total = int(resp.headers.get('content-length') or 0)
+                done = 0
+                next_mark = 0
+                with open(part, 'wb') as fh:
+                    for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                        if not chunk:
+                            continue
+                        fh.write(chunk)
+                        done += len(chunk)
+                        _set_progress(action, grand_done + done,
+                                      max(grand_total, grand_done + done))
+                        if done >= next_mark:
+                            pct = f' ({done * 100 // total}%)' if total else ''
+                            _append(action, f'{done / 1e6:.0f} / {total / 1e6:.0f} MB{pct}')
+                            next_mark = done + 100 * 1024 * 1024
+            if total and done < total:
+                _append(action, f'incomplete download ({done}/{total} bytes) — retry')
+                os.remove(part)
+                return 1
+            # Size floor BEFORE the rename: a 200-that-is-really-an-error-page must
+            # never take the place of a model file, because from then on every
+            # readiness check would call it present.
+            if done < min_bytes:
+                _append(action, f'{name} is only {done} bytes — that is not the model '
+                                '(the host most likely returned an error page)')
+                os.remove(part)
+                return 1
+            os.replace(part, dest)
+            grand_done += done
+            _append(action, f'done -> {dest}')
+        except requests.RequestException as e:
+            _append(action, f'network error: {e}')
+            try:
+                os.remove(part)
+            except OSError:
+                pass
+            return 1
+    return 0
+
+
 # onnxruntime ships under several DIFFERENT distribution names that all provide
 # the same `onnxruntime` module and cannot coexist in one environment:
 # onnxruntime (CPU), onnxruntime-gpu (CUDA), onnxruntime-directml,
@@ -2291,6 +2405,13 @@ def _run_ollama_model(action) -> int:
 _WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},   # ml_extras + scrape_extras
             'ollama_model': _run_ollama_model,
             **{a: _run_ml_capability for a in _CAPABILITY_ML_ACTIONS},  # face_scoring + masks
+            # wd14 OVERRIDES the generic worker above (dict order — the later key
+            # wins): it shares the scoped pip install but wraps it with the model
+            # download, because for this one capability pip alone is not enough to
+            # make it work. It stays in _CAPABILITY_ML_ACTIONS so the pip
+            # serialization, the import-cache invalidation and manual_command()
+            # all keep treating its pip half like every other scoped install.
+            'wd14': _run_wd14,
             'watermark_inpaint': _run_watermark_inpaint,
             'bank_scoring': _run_bank_scoring,
             **{a: _run_model_download for a in _MODEL_DOWNLOADS},
