@@ -50,6 +50,30 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-02-updates-follow-this-build-not-another-project',
+    date: '2026-08-02',
+    title: 'Update & restart could have replaced this build with a different project',
+    blurb:
+      'The update check was reading its release feed from the project this build is derived from, not from this build. Nothing had gone wrong yet, and only by luck: the version numbers happened to sort in the one order that kept the button quiet. The next release over there would have appeared here as an update — and on a ZIP install, pressing it would have downloaded that project\'s code over this one, taking out everything this build does differently. It now follows its own releases. If you ever point `updates.repo` somewhere else by hand, the settings reference now spells out what that means.',
+    to: '/settings',
+  },
+  {
+    id: '2026-08-02-version-carries-a-fork-marker',
+    date: '2026-08-02',
+    title: 'The version number now says which build you are running',
+    blurb:
+      'Versions gain a trailing F — 2026.08.02.2F. It tells you at a glance, in Settings, in a diagnostic report and on the release itself, that this is the fork rather than the project it tracks, which until now you could only establish by comparing commit hashes. The letter sits at the very end on purpose: update checks compare versions as plain text, so anything earlier in the string would have quietly reordered your releases.',
+    to: '/settings',
+  },
+  {
+    id: '2026-08-02-duplicate-groups-keep-a-copy',
+    date: '2026-08-02',
+    title: 'Some shots lost every copy to the duplicate pass — they are back',
+    blurb:
+      'Resolving duplicates keeps the best copy of each shot and rejects the rest. It never lost the keeper on its own — but the quality scan re-groups the whole bank from scratch every time it runs, rejected images included, so a keeper could be pulled into a bigger lookalike cluster on the next scan, be rejected there, and leave its original partner in a group where everything was already rejected. That shot then had no copy left anywhere, and nothing showed it: the bank still looked cleanly deduplicated because the nearest survivor was just far enough away not to match. Re-grouping now gives any such group its best image back as undecided, so you choose rather than the app quietly deciding for you. Groups where you rejected something for its own sake — blurry, too small, or by hand — are deliberately left exactly as you left them. Existing banks are repaired the next time the scan runs.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-02-stopped-ollama-is-not-an-idle-one',
     date: '2026-08-02',
     title: 'With Ollama switched off, LDS could end up unloading a model you had loaded yourself',

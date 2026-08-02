@@ -34,7 +34,12 @@ jobs:
         shell: pwsh
         run: |
           $releaseRef = "$env:RELEASE_REF_NAME"
-          if ($releaseRef -cnotmatch '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(?:\.[0-9]+)?$') {
+          # vYYYY.MM.DD[.N][F] - the trailing F marks a release of THIS FORK, so a
+          # tag, a ZIP and a Settings -> About screen all say which codebase they
+          # came from without anyone having to compare hashes. It is deliberately
+          # LAST: the update check is a plain string comparison, so a suffix that
+          # sits after the date and the counter keeps ordering intact.
+          if ($releaseRef -cnotmatch '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(?:\.[0-9]+)?F?$') {
             throw "invalid release tag format"
           }
           $v = (Select-String -Path backend/app/version.py -Pattern "APP_VERSION = '([^']+)'").Matches[0].Groups[1].Value
