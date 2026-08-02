@@ -2109,6 +2109,10 @@ def rebuild_dup_groups(bank_id, max_distance=None) -> int:
     db.session.commit()
     _assign_groups(BankImage.dup_group, ((gid, [ids[i] for i in members])
                                          for gid, members in enumerate(groups, start=1)))
+    # Regrouping is what can leave a shot with no surviving copy (see
+    # restore_stranded_dup_keepers), so the repair belongs HERE, against the
+    # groups this call just wrote — not at resolve time, which never causes it.
+    restore_stranded_dup_keepers(bank_id)
     return len(groups)
 
 
@@ -2129,6 +2133,72 @@ def _assign_groups(column, groups) -> None:
         if pending % _GROUP_COMMIT_EVERY == 0:
             db.session.commit()
     db.session.commit()
+
+
+def restore_stranded_dup_keepers(bank_id, col=BankImage.dup_group,
+                                 reason='duplicate') -> int:
+    """Give every duplicate group back a surviving member. Returns the count.
+
+    ``resolve_dups`` keeps one member of each group and rejects the rest, and it
+    can never empty a group on its own — the elected keeper is skipped before a
+    single rejection. Regrouping is what strands a shot, because
+    ``rebuild_dup_groups`` runs over EVERY hashed image, rejected ones included,
+    and renumbers every group from scratch:
+
+        scan 1   group {A, B}          -> keep A, reject B
+        scan 2   A is within `d` of a bigger cluster, so union-find pulls it in;
+                 that group elects X, and A is rejected as a duplicate of X
+                 group {A, B}          -> now BOTH rejected, nobody left
+
+    B's shot then has no surviving copy. The nearest survivor is X, which is
+    within `d` of A and so up to 2*d from B — far enough that a same-threshold
+    search does not find it, which is precisely how this went unnoticed: the
+    bank still looked deduplicated. Measured on this fork's own data before the
+    fix: 444 groups in that state, no survivor within `d` anywhere in ANY bank.
+
+    Only groups whose members were ALL rejected AS DUPLICATES are restored. A
+    group that also contains a 'blur', 'small' or 'manual' reject is left alone
+    — those are decisions about the image itself, and resurrecting one because
+    its neighbours happened to be duplicates would overturn a judgement the user
+    made deliberately.
+    """
+    attr = col.key
+    stranded = [g for (g,) in db.session.query(col)
+                .filter(BankImage.bank_id == bank_id, col.isnot(None))
+                .group_by(col)
+                .having(func.count(BankImage.id) ==
+                        func.sum(case((and_(BankImage.status == 'reject',
+                                            BankImage.reject_reason == reason), 1),
+                                      else_=0)))
+                .all()]
+    if not stranded:
+        return 0
+
+    restored = 0
+
+    def _apply():
+        nonlocal restored
+        restored = 0
+        for i0 in range(0, len(stranded), _SQL_IN_CHUNK):
+            chunk = stranded[i0:i0 + _SQL_IN_CHUNK]
+            by_group: dict = {}
+            for r in (BankImage.query
+                      .filter(BankImage.bank_id == bank_id, col.in_(chunk))
+                      .order_by(BankImage.id.asc()).all()):
+                by_group.setdefault(getattr(r, attr), []).append(r)
+            for rows in by_group.values():
+                if not rows:
+                    continue
+                keeper = _best_of(rows)
+                keeper.status, keeper.reject_reason = 'pending', None
+                restored += 1
+        return restored
+
+    write_with_retry(_apply)
+    if restored:
+        logger.info('bank %s: restored %d duplicate group(s) that regrouping had '
+                    'left with no surviving member', bank_id, restored)
+    return restored
 
 
 # --- semantic near-duplicate groups (stage 2 — crops / re-compressed variants) --

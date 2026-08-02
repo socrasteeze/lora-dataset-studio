@@ -242,3 +242,85 @@ def test_the_live_lookup_is_once_per_page_not_once_per_row(client, tmp_path, app
         'resolved per row, not per page')
     assert without == 0, (
         f'{without} grouped lookups for a page with nothing grouped on it')
+
+
+# --- regrouping must not leave a shot with no surviving copy -----------------
+# resolve_dups can never empty a group: the elected keeper is skipped before any
+# rejection. rebuild_dup_groups can, because it regroups EVERY hashed image —
+# rejected ones included — and renumbers from scratch, so a previous keeper can
+# be pulled into a bigger cluster, rejected there, and leave its old partner in
+# a component where everything is already rejected.
+#
+# Measured on the reporter's database before the fix: 444 groups in exactly that
+# state, with no survivor within the dup distance in ANY bank. The nearest live
+# relative sits up to 2*d away, which is why a same-threshold search still
+# reported the bank as cleanly deduplicated.
+
+def test_regrouping_gives_back_a_survivor_when_every_member_was_a_duplicate(
+        app, client, tmp_path):
+    from app.config import LOCAL_USER
+    from app.services import image_bank_service as banks
+
+    orig, copy = _dup_pair()
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': orig, 'b.jpg': copy})
+    _scan(client, bank_id)
+
+    with app.app_context():
+        from app.models import BankImage
+        rows = BankImage.query.filter_by(bank_id=bank_id).all()
+        assert len({r.dup_group for r in rows}) == 1, 'the pair must be one group'
+        # The state regrouping strands: every member rejected AS A DUPLICATE,
+        # which is what resolve_dups writes and what nothing else does.
+        for r in rows:
+            r.status, r.reject_reason = 'reject', 'duplicate'
+        banks.db.session.commit()
+
+        restored = banks.restore_stranded_dup_keepers(bank_id)
+        assert restored == 1, 'one group, so exactly one shot to give back'
+
+        alive = [r for r in BankImage.query.filter_by(bank_id=bank_id).all()
+                 if r.status != 'reject']
+        assert len(alive) == 1, 'the shot must have exactly one surviving copy'
+        assert alive[0].reject_reason is None
+
+
+def test_a_group_rejected_for_its_own_sake_is_never_resurrected(app, client, tmp_path):
+    """The guard only undoes 'duplicate'. A blurry or hand-rejected image was a
+    judgement about THAT image, and bringing it back because its neighbours
+    happened to be duplicates would overturn a decision the user made."""
+    from app.services import image_bank_service as banks
+
+    orig, copy = _dup_pair()
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': orig, 'b.jpg': copy})
+    _scan(client, bank_id)
+
+    with app.app_context():
+        from app.models import BankImage
+        rows = BankImage.query.filter_by(bank_id=bank_id).all()
+        rows[0].status, rows[0].reject_reason = 'reject', 'duplicate'
+        rows[1].status, rows[1].reject_reason = 'reject', 'blur'
+        banks.db.session.commit()
+
+        assert banks.restore_stranded_dup_keepers(bank_id) == 0
+        assert all(r.status == 'reject'
+                   for r in BankImage.query.filter_by(bank_id=bank_id).all())
+
+
+def test_a_group_that_still_has_a_survivor_is_left_alone(app, client, tmp_path):
+    """The nominal case after a normal resolve: one keeper, the rest rejected.
+    Nothing to repair, and the guard must not touch the rejected members."""
+    from app.services import image_bank_service as banks
+
+    orig, copy = _dup_pair()
+    bank_id, _src = _mkbank(client, tmp_path, {'a.jpg': orig, 'b.jpg': copy})
+    _scan(client, bank_id)
+
+    with app.app_context():
+        from app.models import BankImage
+        rows = BankImage.query.filter_by(bank_id=bank_id).all()
+        rows[0].status, rows[0].reject_reason = 'reject', 'duplicate'
+        banks.db.session.commit()
+
+        assert banks.restore_stranded_dup_keepers(bank_id) == 0
+        still = BankImage.query.filter_by(bank_id=bank_id).all()
+        assert sum(1 for r in still if r.status == 'reject') == 1
