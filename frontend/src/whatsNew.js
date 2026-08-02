@@ -50,6 +50,83 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-review-opens-instantly',
+    date: '2026-08-03',
+    title: '▶ Review opens instantly, even on a 20 000-image bank',
+    blurb:
+      'Pressing ▶ on a tile used to sit there for seconds on a big bank — longer still with a sort active. It was building its list of images the slow way: asking the server for the whole grid, 500 rows at a time, and keeping only the identifiers. On a 22 940-image bank that was 46 requests and 16 MB to end up with 23 000 numbers. It now asks once, for the numbers alone: 3.8 s down to 44 ms, on the same bank. "Select all in filter" took the same shortcut and got the same gain.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-02-bank-passes-survive-a-deleted-image',
+    date: '2026-08-02',
+    title: 'Deleting a bank image while a long pass is running no longer throws the whole pass away',
+    blurb:
+      'Score, watermark, framing, faces, captions and the quality scan all walk thousands of images for minutes or hours. If an image disappeared underneath one of them — most often because you deleted the bank, or its rejected images, while it was still working — the pass died on the spot with a cryptic error, and every image it had already analysed was lost with it. Now the vanished image is simply skipped and the pass finishes; the line at the end tells you how many were skipped, so a pass never quietly claims it analysed more than it did.',
+  },
+  {
+    id: '2026-08-02-dataset-coverage-panel',
+    date: '2026-08-02',
+    title: 'Your dataset can hit a green composition target and still be twenty-five copies of the same shot — a new panel says so',
+    blurb:
+      'The Composition bar counts face / bust / body / back against a target, so it goes green on a set that is entirely front-on, in one outfit, under one light. Those are not things it counts, and that set trains a LoRA that can only reproduce that one look. The new 🔍 Coverage panel, folded under that bar, is the second question: it reads the captions you already generated and reports what your set never shows — no profile views, only one outfit, eye level only, never outdoors — with a plain "generate or import more: profile, three-quarter" line under it. It is honest about being a keyword read of your captions rather than a look at the pixels: with no captions it says so instead of drawing empty bars, under five captions it refuses to judge, and it never keeps, rejects or changes anything. Style and concept datasets are judged on their own axes — "one outfit" is not a defect when the outfit is not what you are teaching.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-08-02-pinokio-one-click-install',
+    date: '2026-08-02',
+    title: 'Install LDS in one click from Pinokio',
+    blurb:
+      'LDS now ships a Pinokio launcher. In Pinokio, paste the repository URL under "Download from URL", click Install, then Start — the Python environment, the requirements and the browser tab are handled for you, with no terminal, no Python install and nothing added to your PATH. Only the core app is set up that way: ComfyUI, Ollama, ai-toolkit and the ML helpers are still connected from Setup, so nothing heavy is downloaded behind your back. Update from Pinokio\'s own Update tab — it fast-forwards the same checkout the in-app updater uses.',
+  },
+  {
+    id: '2026-08-02-terminal-prints-the-address',
+    date: '2026-08-02',
+    title: 'The terminal finally tells you where the app is',
+    blurb:
+      'Starting the server by hand (python backend/run.py) printed no address at all — the usual "Running on http://..." line was being swallowed into data/app.log — so you had to guess the port, which is exactly the case where it may have moved because 5050 was taken. The console now prints "[LDS] Ready on http://…" once the app really answers, whichever way you launched it.',
+  },
+  {
+    id: '2026-08-02-bank-text-search-push-down',
+    date: '2026-08-02',
+    title: 'Text search can finally get rid of what you do not want',
+    blurb:
+      'Typing "a woman without a hat" in 🔤 Find by text never worked — the search engine ignores the word "without", so you got hats, with nothing to tell you it had misfired (measured on a real bank: "without a bikini" returned 60% bikinis against a 10% base rate). There is now a Push down field for the trait you are trying to avoid, plus a -hat shorthand in the query itself, and typing "without" offers to move it there for you. It re-ranks rather than filters: matching images sink instead of disappearing, and after each search the panel tells you what it actually achieved on your bank — including "this changed nothing", which is the one outcome you could never have spotted.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-02-upscale-candidate-visible',
+    date: '2026-08-02',
+    title: 'You can finally see that an upscale is waiting for you',
+    blurb:
+      'An upscale never touches your original: it arrives as a separate tile you keep or reject. Which also meant that from the image you had just sent, nothing appeared to happen — so the pass got re-run on images that already had a result waiting, paying GPU time for a duplicate. The source tile now says it, both while the result is rendering and once it is ready to review. And the candidate names the engine that actually made it, instead of always crediting Klein.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-02-seedvr2-in-the-lightbox',
+    date: '2026-08-02',
+    title: 'Pick your upscaler while you are looking at the image',
+    blurb:
+      'The full-screen inspector only ever offered the Klein pass. That is the one place where the choice matters most: on a drawn dataset the panel already warns you that Klein’s instruction pulls anime skin towards realism, and the pass that does not do that was two screens away in the selection toolbar. Both engines are now side by side in the inspector, each saying what it does to the original — and that warning stays under Klein alone, because SeedVR2 sends no instruction at all.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-02-bank-exclude-words',
+    date: '2026-08-02',
+    title: 'Hide the bank images you have already handled, and work the rest as a checklist',
+    blurb:
+      'The bank search box narrows the grid TO a word. Next to it there is now a 🚫 Exclude box that does the opposite: it hides every image whose caption or file name carries one of the words you type (comma-separated, so "logo, watermark" is one gesture). It composes with the search and every chip — "dresses that are not red" is one line — and it travels with the filter, so Select all, ▶ Review and the curation picks never hand back an image you just hid. Images with no caption are never hidden: they are exactly what the checklist is looking for.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-02-bank-sort-every-measure',
+    date: '2026-08-02',
+    title: 'Sort a bank by anything its passes measured — and it remembers the order you chose',
+    blurb:
+      'The Sort menu covered resolution, aesthetics and sharpness. It now covers every figure the passes persist, both ways: file size, NSFW likelihood, noise, contrast, detail, letterbox bars, JPEG quality and face confidence — grouped by the pass that produces them, so a greyed-out section tells you which pass to run. A chip only ranks what crosses its threshold, so "the noisiest of the ones I am keeping" was a question nothing could answer. Each bank also remembers its own order now, so the dump you review by sharpness opens that way tomorrow.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-02-updates-follow-this-build-not-another-project',
     date: '2026-08-02',
     title: 'Update & restart could have replaced this build with a different project',

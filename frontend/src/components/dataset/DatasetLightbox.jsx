@@ -8,8 +8,10 @@
  * the bar's height back to the photo. `lightboxActionPlacement.js` owns that
  * decision and its stability guarantees.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import KleinImproveNote from './KleinImproveNote';
+import { lightboxImproveButtons } from '../../utils/improveEngines';
+import { useCapabilities } from '../../context/CapabilitiesContext';
 import {
   decideActionPlacement, rememberImageRatio, readImageRatio,
 } from './lightboxActionPlacement';
@@ -17,7 +19,6 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { displayLabel } from '../../utils/labels';
 import PexelsAttribution from './PexelsAttribution';
 
-const IMPROVE_HELP = 'Klein creates a new 2 MP version to validate and leaves the original intact.';
 const COMPARE_HELP = 'Show the original this image was made from, next to it, at the same scale.';
 
 /**
@@ -64,9 +65,9 @@ export default function DatasetLightbox({
   mirrorBusy = false,
   improvePending = false,
   improveReady = false,
-  kleinAvailable = false,
   subjectType = '',
 }) {
+  const { caps } = useCapabilities();
   const [full, setFull] = useState(false); // false = fit screen, true = 100 %
   const [comparing, setComparing] = useState(false);
   const [improving, setImproving] = useState(false);
@@ -155,21 +156,26 @@ export default function DatasetLightbox({
   const canCompare = !!(compare && compare.available && compare.parent?.filename);
   const inCompare = canCompare && comparing;
   const improvementActive = improving || improvePending;
-  const improveDisabled = busy || improvementActive || improveReady || !kleinAvailable;
-  const improveTitle = !kleinAvailable
-    ? `Klein is not available in this setup. ${IMPROVE_HELP}`
-    : improveReady
-      ? `A new version is waiting for validation. ${IMPROVE_HELP}`
-    : improvePending
-      ? `An improvement is already running for this image. ${IMPROVE_HELP}`
-      : IMPROVE_HELP;
+  /* ONE button per engine that can run here, exactly like the selection
+     toolbar. The lightbox is where you are when you are looking at the one
+     image you want to fix, and until now it only offered Klein — so on a DRAWN
+     dataset the amber note warned that Klein pulls the skin towards realism
+     while the pass that does not, SeedVR2, was two screens away (reported by
+     a user with a screenshot of exactly that). The wording, the gating and the
+     per-engine disabled reasons all come from the shared pure module, so this
+     surface can never drift from the toolbar's. */
+  const improveButtons = onImprove
+    ? lightboxImproveButtons({
+      caps, engines: caps?.engines, improving, improvePending, improveReady, busy,
+    })
+    : [];
 
-  const improve = async (event) => {
+  const improve = (engineId, disabled) => async (event) => {
     event.stopPropagation();
-    if (!onImprove || improveDisabled) return;
+    if (!onImprove || disabled) return;
     setImproving(true);
     try {
-      await onImprove(img.id);
+      await onImprove(img.id, engineId);
     } finally {
       setImproving(false);
     }
@@ -315,14 +321,41 @@ export default function DatasetLightbox({
             </button>
           </div>
         )}
-        {onImprove && (
-          <button type="button" onClick={improve} disabled={improveDisabled}
-            aria-busy={improvementActive} title={improveTitle}
-            className="min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-indigo-400/50 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
-            {improveReady
-              ? '✓ Review improvement first'
-              : improvementActive ? '✨ Improving…' : '✨ Upscale & improve'}
-          </button>
+        {improveButtons.map((btn) => (
+          <Fragment key={btn.id}>
+            <button type="button"
+              onClick={improve(btn.id, btn.disabled)} disabled={btn.disabled}
+              aria-busy={improvementActive} title={btn.title}
+              className="min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-indigo-400/50 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
+              {btn.label}
+            </button>
+            {/* Klein's note goes BETWEEN the two buttons in the rail, and only
+                there. The rail is a column, so sitting under Klein is what makes
+                it read as Klein's — which matters, because it warns that Klein's
+                INSTRUCTION ("detailed texture, sharp details") pulls drawn skin
+                towards realism, while SeedVR2 sends no instruction at all.
+                In the BOTTOM bar the buttons are a horizontal ROW, and a
+                full-width paragraph dropped mid-row pushes everything after it
+                onto its own line: a user reported the second improve button
+                stranded alone, centred, at the very bottom of the screen. There
+                the note therefore follows the whole group (see below) — its own
+                first words, "Improve asks Klein to:", carry the attribution that
+                position gave it in the rail. */}
+            {rail && btn.showKleinNote && !improvementActive && (
+              <KleinImproveNote subjectType={subjectType} datasetId={datasetId}
+                className="w-full border-t border-white/10 pt-2" />
+            )}
+          </Fragment>
+        ))}
+        {/* Bottom bar only: the note takes its OWN line under the buttons.
+            `sm:w-auto` used to let it sit INLINE beside them, which was fine
+            with a single improve button and is not with two — the paragraph
+            took the width the second button needed and pushed it off alone.
+            Full-width in a wrap container is a line break, so the buttons wrap
+            among themselves and the note reads under the whole group. */}
+        {!rail && improveButtons.some((b) => b.showKleinNote) && !improvementActive && (
+          <KleinImproveNote subjectType={subjectType} datasetId={datasetId}
+            className="w-full" />
         )}
         {/* Its strength, step count and instruction are all editable, and nothing
             here said so — the reported case for making settings discoverable from
@@ -336,12 +369,7 @@ export default function DatasetLightbox({
             paragraph. The rail is where it fits BEST: it is prose, and a 15rem
             column is a better shape for prose than a strip squeezed to the
             right of six buttons. A rule above it ties it to the ✨ it explains. */}
-        {onImprove && !improvementActive && (
-          <KleinImproveNote subjectType={subjectType} datasetId={datasetId}
-            className={rail
-              ? 'w-full border-t border-white/10 pt-2'
-              : 'w-full sm:w-auto sm:max-w-md'} />
-        )}
+
       </div>
     </div>
   );

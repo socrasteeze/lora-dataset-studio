@@ -747,7 +747,7 @@ On first launch, **Setup** scans the machine and links every missing capability 
 
 ### Option 1 — release ZIP + start.bat (Windows)
 
-Download **`LoRA-Dataset-Studio-windows.zip`** from the [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest) when that asset is present; otherwise use GitHub's **Source code (zip)**. Extract the entire archive, then double-click:
+Download **`LoRA-Dataset-Studio-windows.zip`** from the [latest release](https://github.com/socrasteeze/lora-dataset-studio/releases/latest) when that asset is present; otherwise use GitHub's **Source code (zip)**. Extract the entire archive, then double-click:
 
 ```text
 start.bat
@@ -781,7 +781,7 @@ console.
 From a git checkout, the same launcher works and **Update & restart** can pull fixes directly:
 
 ```bash
-git clone https://github.com/perfectgf/lora-dataset-studio.git
+git clone https://github.com/socrasteeze/lora-dataset-studio.git
 cd lora-dataset-studio
 start.bat
 ```
@@ -847,6 +847,12 @@ driver and NVIDIA Container Toolkit support. Storage relocation, ports,
 existing-ComfyUI adoption, UID/GID, DNS, update commands, resource caps and
 operational limits are documented in the dedicated
 [Docker guide](docs/guide/docker.md).
+
+### Option 5 — Pinokio (one click, any OS)
+
+In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/socrasteeze/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
+
+Only the core app is installed this way — ComfyUI, Ollama, ai-toolkit and the optional ML helpers are still connected from the app's own **Setup** screen. Use Pinokio's **Update** tab rather than the in-app **Update & restart** button: the in-app restart relaunches the server outside Pinokio's control.
 
 ### External tools (install once, connect in Settings)
 

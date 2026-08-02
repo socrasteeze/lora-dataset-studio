@@ -45,6 +45,16 @@ pip install -r backend/requirements.txt
 python backend/run.py
 ```
 
+**Pinokio (one click, any OS):** in [Pinokio](https://pinokio.computer), use
+**Discover → Download from URL** with
+`https://github.com/socrasteeze/lora-dataset-studio.git`, then **Install** and
+**Start**. Pinokio creates the environment (`env/`), installs the core
+requirements and opens Studio on the port it really bound. Two things to know:
+the optional tools are still connected from **Setup**, and updates should go
+through Pinokio's **Update** tab — it runs the same `git pull --ff-only` as the
+in-app updater, but the in-app **Update & restart** button relaunches the server
+in a window Pinokio no longer tracks.
+
 **Docker (curation-only):** `cp .env.example .env`, then `docker compose up --build`.
 Image *generation* on this fork always needs ComfyUI locally — there are no
 Gemini/OpenAI generation keys.

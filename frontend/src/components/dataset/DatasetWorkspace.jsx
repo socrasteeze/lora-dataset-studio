@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import CompositionBar from './CompositionBar';
+import CoveragePanel from './CoveragePanel';
 import ClassifyFramingButton from './ClassifyFramingButton';
 import ReferencePanel from './ReferencePanel';
 import VariationCatalog from './VariationCatalog';
@@ -1110,8 +1111,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onReimprove={ds.reimproveImage} onView={setViewImg}
                   onBatch={ds.batchImages} busy={ds.busy}
                   onImproveBatch={ds.improveBatch} activity={act}
-                  kleinAvailable={Boolean(caps.engines?.klein)}
-                  subjectType={d.subject_type || 'human'}
+                          subjectType={d.subject_type || 'human'}
                   eligibilityImages={images}
                   nonces={ds.nonces} faceThresholds={d.face_thresholds} datasetKind={d.kind || 'character'}
                   faceScoringBlocked={d.face_scoring_blocked}
@@ -1153,6 +1153,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
 
                 <div id="gf-generate" className="scroll-mt-20 flex flex-col gap-2">
                   <CompositionBar composition={d.composition} upscaled={d.composition_upscaled} bodyFidelity={bodyFid} />
+                  {/* The bar above counts shot types against a target and can go
+                      fully green on a set that is the same pose, one outfit, one
+                      light — none of which it counts. This is that second
+                      question, read from the captions already written. */}
+                  <CoveragePanel datasetId={d.id} refreshKey={images.length} />
                   {/* Images imported WITHOUT head-crop have no shot type, so they count
                       for nothing in the bar above (the default on body-fidelity datasets:
                       a whole drag-and-drop import can leave it at 0). The vision pass that
@@ -1894,7 +1899,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
           onMirror={viewImgLive._rescueReviewPreview ? undefined : ds.mirrorImage}
           onRotate={viewImgLive._rescueReviewPreview ? undefined : ds.rotateImage}
           mirrorBusy={Boolean(ds.mirroringIds?.has(viewImgLive.id))}
-          onImprove={canImproveViewImg ? ds.improveImage : undefined}
+          // The lightbox hands back WHICH engine was pressed; a single-✨
+          // surface passes none and the improve.engine setting decides.
+          onImprove={canImproveViewImg
+            ? ((imageId, engine) => ds.improveImage(imageId, { engine }))
+            : undefined}
           improvePending={viewImgImproving}
           improveReady={viewImgImprovementReady}
           busy={ds.busy}
