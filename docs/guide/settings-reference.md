@@ -678,11 +678,11 @@ Set one of these **only** to override that search — for instance if your Comfy
 |---|---|---|
 | `provenance.archive_max_gb` | `5` | Ceiling of the **run image archive** (Settings → Maintenance): the deduplicated copies that let a two-run comparison still show an image you deleted afterwards. Copies are content-addressed, so a whole training history usually costs well under a gigabyte — on a real 20-dataset, 1471-image library, every distinct version of every image ever trained came to about **0.5 GB**. Past the ceiling nothing more is stored and the compare panel says so. Set it to `0` to turn archiving off entirely; the run records, settings and caption text are kept either way. |
 
-**Cloud training (vast.ai):** this fork's Settings → Training has no rental-GPU card, so these are edited by hand. Cloud training itself still works end to end (a dataset with an existing cloud run keeps showing it in **Runs**, and Continue/Retry still work) — there's simply no guided Settings UI to launch a *new* one.
+**Cloud training (vast.ai) — dormant in this fork.** These keys are upstream's and are documented for completeness only. There is **no rented-GPU lane here**: no rental card in Settings → Training, no ☁ launch button, and the **Runs** hub filters cloud rows out entirely, so a cloud run cannot be started, continued, retried or even listed. Setting `VAST_API_KEY` does **not** switch any of it back on — the capability is forced off in the UI. The backend module is kept only so the fork does not diverge from upstream on a file it never runs.
 
 | Key | Default | Role |
 |---|---|---|
-| `VAST_API_KEY` | *(unset)* | Secret, in `.env`. Required to enable cloud training at all. |
+| `VAST_API_KEY` | *(unset)* | Secret, in `.env`. Upstream requires it for cloud training; setting it here enables nothing. |
 | `cloud.max_concurrent_runs` | `1` | Simultaneous cloud pods allowed (1–10). |
 | `cloud.max_price_per_hour` | `0.80` | Safety cap on the hourly offer price in $; pricier hosts are skipped before launch. |
 | `cloud.monthly_budget_usd` | `0` | Hard monthly spend ceiling in $ (`0` = unlimited); launches are blocked past it. |

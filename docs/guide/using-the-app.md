@@ -271,7 +271,7 @@ setup into a single file so you can move to a new machine — or recover from on
 - **What's inside**: every dataset (all images, captions, statuses, face and
   watermark states, references), its **training history** (which runs produced
   which version, the settings each used), plus your **settings** — engine
-  choices, training defaults, cloud tuning, watermark preferences. It's a
+  choices, training defaults, watermark preferences. It's a
   *logical* backup, one entry per dataset, not a raw disk dump.
 - **Include trained LoRAs** (checkbox next to the button): also bundle the
   trained `.safetensors` files themselves. These are large — hundreds of MB per
@@ -1480,7 +1480,7 @@ Two things it will tell you rather than fail at:
 **▶ Continue training from a checkpoint.** Clicking a pill's body opens its
 actions — Download, Deploy, Details, Delete — and **▶ Continue from here**. It
 opens the *same* launch dialog the Checkpoints panel and the Runs page open, on
-*that exact save*: pick where it runs (**Local** or **☁ Cloud**), how many
+*that exact save*: how many
 extra steps, and — folded under *Adjust settings* — the checkpoint cadence, the
 preview prompts, the timestep weighting and the learning rate. Rank, base and
 optimizer are locked to the checkpoint being continued; they are not things a
@@ -1504,9 +1504,7 @@ The dialog also names **what “resume” means**; it never silently guesses:
   run is renamed aside, not deleted, so all its saves remain recoverable.
 
 Each checkpoint says why full state is unavailable when its bundle is missing,
-incomplete, corrupt or incompatible. Cloud continuation currently supports
-weights only; choosing full state there is refused before a pod is created.
-State bundles are published atomically and the newest two are retained alongside
+incomplete, corrupt or incompatible. State bundles are published atomically and the newest two are retained alongside
 the public checkpoints, so a crash during capture cannot masquerade as a usable
 exact save.
 

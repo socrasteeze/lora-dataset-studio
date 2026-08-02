@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml) [![Join our Discord](https://img.shields.io/discord/1525908170331914411?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/j6hnJBFtXE) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/perfectgf) [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/perfectgf)
 
-**A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train locally or in the cloud, then compare checkpoints before export.
+**A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train it on your own GPU, then compare checkpoints before export.
 
-No account, paid tier or telemetry. API engines and rented GPUs are optional; local and manual workflows remain available.
+No account, paid tier, API key or telemetry. **This fork runs entirely on hardware you control**: generation is local (Klein/ComfyUI — no Nano Banana, ChatGPT or OpenRouter), and training runs on your own GPU — there is no rented-GPU lane. Generation and the analysis passes can be sent to another machine on your network; training cannot. Everything else works with no GPU at all.
 
 > New here? Start with [Setup & install](#setup--install), then follow the [end-to-end workflow](docs/guide/workflow.md). The [documentation index](docs/README.md) links every guide. Project news and current development live on [Discord](https://discord.gg/j6hnJBFtXE).
 
@@ -152,7 +152,7 @@ Left in, a site logo is something the LoRA learns. Find → Review → Clean, on
 
 *Details: [5. Scrub watermarks](#5-scrub-watermarks)*
 
-### 🎓 Guided training — local or cloud
+### 🎓 Guided training — on your own GPU
 
 <details>
 <summary>📸 See the researched training presets picker</summary>
@@ -173,12 +173,11 @@ Left in, a site logo is something the LoRA learns. Find → Review → Clean, on
 | **Readiness & launch guards** | Image counts, untriaged rows, suspicious captions, duplicates, VRAM, disk and family compatibility, re-checked at launch |
 | **⚙ Advanced controls** | Rank/alpha, resolution, LoRA or LoKr, dropout, timestep weighting, optimizer, scheduler, EMA, save/sample cadence |
 | **Training queue** | Runs line up instead of colliding on the GPU, with a protected **⏹ Stop training** |
-| **☁️ Cloud training** | Rent a vast.ai GPU (~$1–2/run, no local GPU), same exact config, pod terminated automatically |
-| **Custom base weights** | Train on your own compatible base locally — or in the cloud via a one-time push to a private HF repo |
+| **Custom base weights** | Train on your own compatible base — any family, on your own GPU |
 | **🎚 Slider LoRA (Beta)** | A bipolar LoRA whose ±strength dials a trait at inference, on a fixed 1000-step policy |
 | **Masked training** | Character trains on auto-generated rembg person masks; Concept and Style force person masking off, and Concept can opt into **face** masking instead (learn the act, not the identities) |
 
-*Details: [6. Train](#6-train--guided-advanced-when-you-need-it) · [No GPU? Train in the cloud](#no-gpu-train-in-the-cloud)*
+*Details: [6. Train](#6-train--guided-advanced-when-you-need-it). Training needs a GPU on this machine — see [Minimum requirements](#minimum-requirements).*
 
 ### 🧬 Experiment Lab — the run family tree
 
@@ -241,23 +240,23 @@ Nothing here locks your data in — every stage has an exit.
 | **Merge existing data** | Import a training ZIP or recursively merge a local folder; perceptual duplicates are skipped |
 | **💾 Back up everything** | Every dataset, its training history and your settings in one portable file (API keys excluded), Trained state restored |
 | **Hugging Face publishing** | Publish kept images and captions as a dataset repository — private by default |
-| **📦 Import into ComfyUI** | One click for local checkpoints; automatic for downloaded cloud results |
+| **📦 Import into ComfyUI** | One click for any checkpoint a run produced |
 | **🗑 Trash** | Everything the app deletes lands there and stays recoverable until you empty it |
 
 *Details: [9. Take it with you](#9-take-it-with-you)*
 
-### 🖥️ Local & private, or ☁️ cloud
+### 🖥️ Local & private, start to finish
 
-Same one-click flow either way, and every feature **degrades gracefully** — it stays hidden until its dependency (an API key, a reachable tool, an installed extra) is satisfied. See the [feature matrix by backend](#feature-matrix-by-backend) and [Run it your way](#run-it-your-way).
+Nothing leaves this machine unless you send it there yourself, and every feature **degrades gracefully** — it stays hidden until its dependency (a reachable tool, an installed extra) is satisfied. See the [feature matrix by backend](#feature-matrix-by-backend) and [Run it your way](#run-it-your-way).
 
 ---
 
 ### ❤️ All of that is free, and stays free
 
 No paid tier, no account, no tracker, nothing gated behind a donation — and that
-won't change. It's one person's personal time, and the paid engines and cloud
-training lanes above only get tested because someone pays for the API credits and
-the rented GPUs.
+won't change. It's one person's personal time, and the upstream project this fork
+tracks carries the hardware and API bills behind every lane that gets tested
+before it reaches here.
 
 If this saves you an afternoon, [**buy a coffee on Ko-fi**](https://ko-fi.com/perfectgf)
 or [**sponsor on GitHub**](https://github.com/sponsors/perfectgf). Can't chip in?
@@ -277,7 +276,7 @@ This README follows the app itself: the road you actually walk, from an empty da
 | **[3 · Curate down to the keepers](#3-curate-down-to-the-keepers)** | Keep/reject on a real curation grid, with face-similarity scoring, auto-triage and a live composition meter. |
 | **[4 · Caption for the model](#4-caption-for-the-model)** | Prose or booru tags, model-matched and machine-written, with a Vocabulary preset, a Caption Lab and full find/replace. |
 | **[5 · Scrub watermarks](#5-scrub-watermarks)** | Find overlaid logos/URLs, then crop or inpaint them (fast LaMa or Klein quality) behind a review step. |
-| **[6 · Train](#6-train--guided-advanced-when-you-need-it)** | Guided training over six families and eighteen configuration starters, adaptive steps and guards, sliders — [locally or in the cloud](#no-gpu-train-in-the-cloud). |
+| **[6 · Train](#6-train--guided-advanced-when-you-need-it)** | Guided training over six families and eighteen configuration starters, adaptive steps and guards, sliders — on this machine's GPU. |
 | **[7 · Read the family tree](#7-read-the-family-tree)** | Every continuation and fork drawn as a lineage graph you can inspect, diff, annotate and preview. |
 | **[8 · Pick the best checkpoint](#8-pick-the-best-checkpoint)** | Sweep checkpoint × strength in **Test Studio**, vote, rank, and export a shareable grid. |
 | **[9 · Take it with you](#9-take-it-with-you)** | Training ZIPs, portable backups, merges, Hugging Face publishing, one-click ComfyUI import. |
@@ -290,7 +289,7 @@ This README follows the app itself: the road you actually walk, from an empty da
 - **◉ Every run you have ever trained, on one board** — lineage graphs used to be locked inside a single run's card: one dataset at a time, in a fixed frame. The new **Canvas** tab puts every dataset you have trained on one surface you can zoom and pan — each dataset a lane, each run a card, and a continuation joined to the exact checkpoint it resumed from. **Drag the cards where they make sense to you** and they stay there; a new run slots into free space without disturbing your arrangement, and `✦ Tidy up` gives you the automatic tree back. Click checkpoints across *different datasets* to generate from them in one launch — same prompt, same seed — with the full Test Studio settings, and each checkpoint keeps a gallery of everything ever rendered from it.
 - **🧬 A second local engine that keeps a face from one photo** — **Krea 2 Edit** joins Klein as a free, on-your-GPU way to build a dataset: give it one reference photo and it restages that person into the shots you picked — new angles, new poses, new scenes — with no character LoRA needed, because there isn't one yet. Identity, marks and piercings survive the move; a `reference grounding` dial trades likeness against how literally the shot description is followed. It needs two files placed by hand (a node pack and an editing LoRA) — the app checks for them and, when they are missing, names each one and where it goes rather than failing at generation time.
 - **⚡ "Run the test" starts a grid in a fraction of the time** — launching a Test Studio grid used to re-read the workflow template, re-scan your LoRA folder and write to the database **three separate times for every cell**, then ask ComfyUI for its full node list **twice** (that answer weighs about 9 MB — 4.8 seconds each time). A cell is now one write, the folder is scanned once, and the node list is fetched once and reused: measured on a 50-cell grid, 150 database writes became 50 and the launch itself 129 ms → 56 ms, on top of the duplicate probe disappearing.
-- **Anima — a first-class anime training family** — the anime-focused **Anima** model (2B, on the Cosmos-Predict2 architecture) is now a full training family: pick it like any other, with its own default recipe (extrapolated from ai-toolkit's own defaults — no Anima-specific community study exists yet), prose captions and safety checks. It trains **locally** on an up-to-date ai-toolkit ([support merged upstream](https://github.com/ostris/ai-toolkit/pull/860)); the cloud lane is intentionally held back until the rented-pod image is confirmed to carry it, so a run can never burn a GPU on an arch the pod doesn't know.
+- **Anima — a first-class anime training family** — the anime-focused **Anima** model (2B, on the Cosmos-Predict2 architecture) is now a full training family: pick it like any other, with its own default recipe (extrapolated from ai-toolkit's own defaults — no Anima-specific community study exists yet), prose captions and safety checks. It trains **locally** on an up-to-date ai-toolkit ([support merged upstream](https://github.com/ostris/ai-toolkit/pull/860)).
 - **Stop buttons you can trust** — a full pass over every Stop/Cancel in the app. **Stop generation** is clickable for the whole batch (it used to grey itself out exactly when you needed it), **Stop training** now *verifies* the training process actually died before reporting success (an unkillable process returns an honest error instead of a false "stopped"), and a cancelled render that ComfyUI never confirmed aborting is reported as such instead of silently claimed. A false "may still be running" warning that fired on perfectly normal cancels was also silenced.
 - **No more silent hangs or GPU pile-ups** — an audit of every blocking call and pause path: a stalled Ollama model download now fails with a clear error instead of hanging its setup task forever, and very long caption/vision batches no longer lose their exclusive GPU lock mid-run (which could let queued image generations pile onto the GPU while captioning was still working — the lock now renews itself for as long as the batch runs).
 - **Startup opens the real address** — serving on a LAN or Tailscale address used to greet you with a browser tab at a hardcoded `127.0.0.1`, opened before the server was even up ("cannot connect" every launch). The launcher now opens the address it is *actually* serving on, only once the server accepts connections, with the access token carried along when the token gate is on. Set `LDS_NO_BROWSER=1` to skip the auto-open.
@@ -309,7 +308,6 @@ This README follows the app itself: the road you actually walk, from an empty da
 - **⚡ Twice the speed on the long passes** — the bank's vision passes (watermarks, framing, captions) now send several images to Ollama at once instead of queuing them: **2.03× faster** measured at the default of 4 in flight, tunable in **Settings → Local tools → Ollama**. And **✨ Score** can **borrow a CUDA-capable Python you already have** (ComfyUI's, ai-toolkit's, your own) instead of downloading ~2.5 GB of CUDA wheels for a second copy — the app lists what it can find and you pick.
 - **📥 Bring your own shot catalog, and real catalogs for non-humans** — the variation catalog **imports and exports as JSON**, so any LLM can write a shot list for your subject; the import panel shows what would land and **names every entry it refused, with the reason**, before anything is added. The non-human subject types stopped being stubs: **59** shots for animals (up from 16), **40** for creatures, **30** for objects, **22** for other. A one-off shot you type in can also be **Kept** — it moves into the durable catalog server-side instead of dying with your browser cache.
 - **🔎 A failed run tells you what killed it** — the failure panel quotes the line that actually explains the crash instead of whatever warning was printed last, and the **RTX 50-series PyTorch trap** (a `sm_120` card meeting a torch build that stops at `sm_90`) is recognised by name with its fix. A run that dies in the first seconds still hands you an **Open run folder** button pointing at its log.
-- **☁️ A cloud Stop that can't lie, and a bill that can't run away** — 🛑 Stop now decides on evidence: still reporting, it stops gracefully; silent, the pod is terminated through the vast.ai API before the button claims anything. A run that freezes mid-training is destroyed by a watchdog rather than billing you for a frozen GPU — while the **download of a finished checkpoint** reports its own megabytes, so a slow rescue is never mistaken for a dead run and thrown away.
 
 Much of the above came from people reporting things in public: **wannadecryptor**, **ashish.sinha**, **bbsorry**, **vykas22**, **axelf_**, **vvilams**, **naniii2352**, **j_o_e_l** and **zigzag4794** on Discord, **bobba84**, **strouder**, **shivdbz2010** and **1Tomber** on GitHub, **Psyko_2000** on Reddit. Older improvements roll into [CHANGELOG.md](CHANGELOG.md).
 
@@ -335,7 +333,6 @@ Directions, not dates. These are discussed openly on the project's Discord, and 
   - [4. Caption for the model](#4-caption-for-the-model)
   - [5. Scrub watermarks](#5-scrub-watermarks)
   - [6. Train — guided, advanced when you need it](#6-train--guided-advanced-when-you-need-it)
-    - [No GPU? Train in the cloud](#no-gpu-train-in-the-cloud)
   - [7. Read the family tree](#7-read-the-family-tree)
   - [8. Pick the best checkpoint](#8-pick-the-best-checkpoint)
   - [9. Take it with you](#9-take-it-with-you)
@@ -474,7 +471,7 @@ Captions are what training actually reads — and the right *form* depends on th
 - **Vocabulary preset** — set how nudity is named — **Explicit / Clinical / Safe** — plus your own free-text wording instructions, all layered on top of the built-in guardrails.
 - **Kind-aware rules** — **Concept datasets invert** the caption: it names everything *but* the concept and flags captions that accidentally name the concept itself. **Style datasets** require a distinct content-only caption for every kept image and strip the internal dataset identifier from exported sidecars and sample prompts.
 - **Sweep the set** — a **find/replace + frequency** panel, tag hide/isolate controls, an expanded editor and bulk caption clearing let you fix the whole set at once.
-- **Dual captions (long + short)** — optionally train each image with **both** its full caption and a short one (ai-toolkit's native `short_and_long_captions`, a text-side augmentation so the LoRA leans less on any single wording). The short variant is derived from the long one the next time you caption — text-only, honouring the same kind rules — and editable per image. Local training only for now (the cloud upload doesn't carry the JSON the short is read from), and not on Krea 2 or Anima, whose recipes cache the text embeddings and unload the text encoder — those runs train on the long caption alone and say so before you launch.
+- **Dual captions (long + short)** — optionally train each image with **both** its full caption and a short one (ai-toolkit's native `short_and_long_captions`, a text-side augmentation so the LoRA leans less on any single wording). The short variant is derived from the long one the next time you caption — text-only, honouring the same kind rules — and editable per image. Not available on Krea 2 or Anima, whose recipes cache the text embeddings and unload the text encoder — those runs train on the long caption alone and say so before you launch.
 
 ### Edit the prompt, regenerate the shot
 
@@ -522,40 +519,40 @@ Click **Train** and [ai-toolkit](https://github.com/ostris/ai-toolkit) runs unde
 </p>
 <p align="center"><em>Thirteen researched presets — a Character and a Concept recipe per family, plus a Style recipe — with a sourced one-line why; the picker only shows a recipe when kind, family and variant match.</em></p>
 
-- **Six training families with distinct recipes** — **Z-Image** (Turbo/Base/De-Turbo), **SDXL**, **Krea 2** (Raw/Turbo), **FLUX.1**, **FLUX.2 Klein** (4B/9B), and **Anima** (a 2B anime-focused model on the Cosmos-Predict2 architecture — **local-only for now**, cloud lane lands once the pod image is verified), each with its own safety checks. Custom compatible weights train locally for any family, and Z-Image, Krea 2 and FLUX.2 Klein can also train on a **custom base in the cloud** via a one-time push to a private Hugging Face repo (SDXL and FLUX.1 stay local-only). Z-Image bases can be **converted** to the layout the trainer expects, straight from ComfyUI.
+- **Six training families with distinct recipes** — **Z-Image** (Turbo/Base/De-Turbo), **SDXL**, **Krea 2** (Raw/Turbo), **FLUX.1**, **FLUX.2 Klein** (4B/9B), and **Anima** (a 2B anime-focused model on the Cosmos-Predict2 architecture), each with its own safety checks. Custom compatible weights train for any family. Z-Image bases can be **converted** to the layout the trainer expects, straight from ComfyUI.
 - **Eighteen built-ins** — the **Built-in (researched)** group ships a Character and a Concept recipe for each of the six families, plus a Style recipe for five of them (Anima has no published style source yet, so none is invented). A separate **Built-in (community starting points)** group holds the scoped **Krea 2 Raw · LoKr likeness** starter. It is a [reported Reddit recipe](https://www.reddit.com/r/StableDiffusion/comments/1v2vsqm/almost_perfect_likeness_in_750_steps_krea_2_lokr/), not a guaranteed outcome; the picker keeps it to Character + compatible Krea Raw/Base variants and spells out its settings. Every recipe says whether its choices come from ai-toolkit defaults, vendor guidance or documented community evidence, and the picker only shows it when dataset kind, family and variant match. Save/import/export your own Advanced recipe as JSON too.
 - **Adaptive step policies** — Character ≈ 120 steps/image (1500–3500), Concept `475 × √images` (2000–12000), Style 50 steps/image inside a family/variant-specific safe envelope.
-- **Readiness and launch guards** — minimum image counts, untriaged rows, missing/suspicious captions, near-duplicates, Character composition, VRAM, disk space, base architecture and family/variant compatibility are checked again at launch, queue start, continue and cloud retry. The **pre-training review** — with its editable caption list and its reject-one-of-each duplicate pairs — now opens on **every** lane: a ☁️ cloud launch and **▶ Continue** used to skip it and ship leaking captions and untriaged images straight to a paid GPU. Checks about *your* card (VRAM, PyTorch build) are dropped from a cloud review, because that GPU isn't the one running the job.
+- **Readiness and launch guards** — minimum image counts, untriaged rows, missing/suspicious captions, near-duplicates, Character composition, VRAM, disk space, base architecture and family/variant compatibility are checked again at launch, queue start and continue. The **pre-training review** — with its editable caption list and its reject-one-of-each duplicate pairs — opens on **every** lane, including **▶ Continue**, which used to skip it and take leaking captions and untriaged images into the run.
 - **It names the Python it is about to run** — a configured interpreter that exists and runs but has no `torch` used to pass every check, then kill every run on `No module named 'torch'` while the panel blamed a missing base model or a Hugging Face token. The app now tries `import torch` on that interpreter *before* launching, refuses with the path on screen, points out a Windows Store `python.exe` when that's what was picked, and offers the working venv sitting next to `run.py`. The **Test** button in Settings → Local tools asks the same question.
 - **Advanced controls** — rank/alpha, resolution, LoRA or LoKr, network dropout, timestep weighting, optimizer, learning-rate scheduler/warmup, gradient accumulation, EMA, save/sample cadence and preview prompts. A **training queue** with scheduling lines runs up instead of colliding on the GPU, with a protected **⏹ Stop training**. A **Saves kept** cap lets ai-toolkit trim older intermediate checkpoints during the run (default 4), and everything the app deletes goes to an app-wide **Trash** you empty on your own terms.
 - **Character-only masked training** from auto-generated rembg masks; Concept and Style force masking off so the subject or full-frame aesthetic isn't erased.
-- **Continue +N steps** to extend a run. Local checkpoints have a one-click import into ComfyUI; downloaded cloud results are imported automatically when a ComfyUI LoRA folder is configured.
-- **🎚 Slider LoRA mode (Beta)** — turn any dataset into a **concept slider**: give a positive and a negative prompt and ai-toolkit's `concept_slider` trainer learns a single bipolar LoRA whose ±strength dials the trait at inference (the images are only a denoising substrate, so caption guards the slider never reads are skipped). A fixed 1000-step policy, low default rank, bipolar preview samples and an isolated `_slider` run tag keep it from clobbering a normal setup. All five families are offered behind honest experimental notes — **Krea 2 is the reference** — and it runs **locally or in the cloud** (slider settings are snapshotted at launch so a mid-run edit can't retarget a rented run; the first paid slider run is still unproven — extra-Beta). Test both poles with Test Studio's **negative strengths**.
+- **Continue +N steps** to extend a run, with a one-click import of any checkpoint into ComfyUI.
+- **🎚 Slider LoRA mode (Beta)** — turn any dataset into a **concept slider**: give a positive and a negative prompt and ai-toolkit's `concept_slider` trainer learns a single bipolar LoRA whose ±strength dials the trait at inference (the images are only a denoising substrate, so caption guards the slider never reads are skipped). A fixed 1000-step policy, low default rank, bipolar preview samples and an isolated `_slider` run tag keep it from clobbering a normal setup. All five families are offered behind honest experimental notes — **Krea 2 is the reference**, and slider settings are snapshotted at launch so a mid-run edit can't retarget the run. Test both poles with Test Studio's **negative strengths**.
 - **When a run dies, it says why** — the failure panel quotes the line that actually explains the crash (the traceback, else the last real error) instead of whatever warning happened to be printed last, and known traps are named with their fix — chief among them the **RTX 50-series PyTorch trap**, where a `sm_120` card meets a torch build that doesn't know it. A run that dies in the first seconds still gets an **Open run folder** button pointing at its `training.log`, so the log is never stranded in a folder the app didn't create.
-- **🎚 Slider LoRA mode (Beta)** — turn any dataset into a **concept slider**: give a positive and a negative prompt and ai-toolkit's `concept_slider` trainer learns a single bipolar LoRA whose ±strength dials the trait at inference (the images are only a denoising substrate, so caption guards the slider never reads are skipped). A fixed 1000-step policy, low default rank, bipolar preview samples and an isolated `_slider` run tag keep it from clobbering a normal setup. All five families are offered behind honest experimental notes — **Krea 2 is the reference** — and it runs **locally or in the cloud** (slider settings are snapshotted at launch so a mid-run edit can't retarget a rented run; the first paid slider run is still unproven — extra-Beta). Test both poles with Test Studio's **negative strengths**.
 
-### No GPU? Train in the cloud
+### No local GPU? Then no training here
 
-No local GPU? Add a **vast.ai API key** (Settings → Training, or the setup wizard) and use **☁️ Train in cloud** in the Training panel. The app rents a verified-datacenter GPU, uploads your dataset, trains with the **exact same ai-toolkit configuration** as a local run, downloads the resulting `.safetensors`, and terminates the pod automatically.
+Training runs on this machine's own GPU, through ai-toolkit. **This fork has no
+rented-GPU lane** — no vast.ai key, no pod, no per-run bill, and no cloud button
+in the Training panel. Upstream ships one; it is removed here on purpose, and the
+backend that would drive it stays dormant and unreachable from the UI.
 
-- **Cost** — you pay vast.ai directly and offer prices vary over time. A price cap (`cloud.max_price_per_hour`, default $0.80/h), a monthly budget ceiling, and a hard runtime cap (`cloud.max_runtime_minutes`, default 8 h) are enforced before launch.
-- **Supported families** — **Z-Image, Krea 2 and FLUX.2 Klein**, on an official Hugging Face base *or* **your own custom base** pushed one-time to a private repo on your HF account (private enforced, cached by combo hash so the same base never uploads twice; the pod pulls it with your token). The launch verifies the repo, files and sizes before renting anything. **Klein 9B — 32-48 GB VRAM — is the cloud-first lane** of its family; SDXL and FLUX.1 require local training.
-- **Safety** — pods are labeled `lds-<run-id>`; on every app start, orphaned pods are destroyed automatically. If the app is closed mid-run, the pod keeps training and the app resumes monitoring on restart. Privacy note: the pod belongs to *your* vast.ai account; dataset images and checkpoints transit through it and are destroyed with the pod.
-- **A Stop that can't lie, and a bill that can't run away** — 🛑 **Stop** answers on evidence: if the run is still reporting, it stops it gracefully; if it isn't, the pod is terminated through the vast.ai API before the button ever says "stopped". And a run that goes silent mid-training is destroyed by a **freeze watchdog** (`cloud.freeze_watchdog_minutes`, default 45) instead of billing you for a frozen GPU. **Downloads are never mistaken for silence, at either end**: the base model a fresh pod pulls before step 1 and the finished checkpoint it sends home are both judged on their byte counters, so a slow host is given the time it needs instead of being cut for "no progress". A frozen counter is still silence — a redrawing progress bar does not count as a moving download — and a hard ceiling (`cloud.first_step_download_budget_minutes`, default 3 h) stops a host that will never finish from renting itself out on your card.
+What you *can* do without a local GPU:
+
+- **Everything up to training** — sourcing, curating, captioning by hand, watermark
+  cropping, backup and export all run on any machine with Python and no GPU.
+- **Borrow another machine's card over your own network** (**Settings → Devices**):
+  a full **compute peer** or a bare **remote ComfyUI backend**. That covers image
+  generation and the Image Bank's analysis passes. **It does not cover training** —
+  a run is always launched on the Primary's own GPU.
+- **Bring a LoRA trained elsewhere** and use the Test Studio, the Canvas and the
+  export lanes on it.
 
 ### The Runs hub
 
-**🏋️ Runs** (top nav) collects **cloud and local** training side by side: live step/loss/ETA/samples, the exact recipe and dataset version, **Stop**, cloud **Retry/Continue**, downloads, and **⎘ Share config** — a paste-safe parameter/outcome summary with local paths and keys stripped.
+**🏋️ Runs** (top nav) collects every training run: live step/loss/ETA/samples, the exact recipe and dataset version, **Stop**, **Continue**, downloads, and **⎘ Share config** — a paste-safe parameter/outcome summary with local paths and keys stripped.
 
-<details>
-<summary>📸 See the Runs hub — cloud and local runs side by side</summary>
-
-<p align="center">
-  <img src="docs/screenshots/training/runs-hub.png" alt="The 🏋️ Runs hub listing local 💻 and cloud ☁ training runs side by side, each row showing live step/loss/ETA, sample thumbnails, and Stop / Retry / Continue / Download / Share-config controls" width="820">
-</p>
-<p align="center"><em>Every run, local and cloud, in one place — live progress, the exact settings it used, and one-click Stop / Retry / Continue / Download / Share.</em></p>
-
-</details>
+*(No screenshot here: upstream's shot of this page shows rented-GPU rows beside local ones, and this fork has only the local ones.)*
 
 ---
 
@@ -566,7 +563,7 @@ Every time you continue or fork a run, a **lineage** is born. The Runs page draw
 <p align="center">
   <img src="docs/screenshots/07-lineage-graph.png" alt="◉ Graph view of a run's lineage: a root Z-Image · turbo run with six saved checkpoints and four continuations laid out left to right, edges anchored on the exact checkpoint each run resumed from, the current run glowing indigo, and two set-aside branches dashed in amber" width="820">
 </p>
-<p align="center"><em>Graph — a run's whole lineage as a family tree. The trunk lights the path root → current run, each continuation's edge starts on the checkpoint it resumed from, and set-aside branches stay dashed. Cloud and local runs sit side by side, each tagged on-disk or gone.</em></p>
+<p align="center"><em>Graph — a run's whole lineage as a family tree. The trunk lights the path root → current run, each continuation's edge starts on the checkpoint it resumed from, and set-aside branches stay dashed. Every run sits on the same board, each tagged on-disk or gone.</em></p>
 
 The graph does far more than draw:
 
@@ -575,9 +572,9 @@ The graph does far more than draw:
 - **Take notes** on any run or checkpoint (● marks the annotated ones).
 - **Shift-click two runs to diff** their configs side by side, only the differences highlighted.
 - **Generate a same-prompt / same-seed preview per checkpoint** to compare how the LoRA evolves epoch by epoch, with a 🔍 **big-preview** mode that lays the results out like a ComfyUI grid — so you pick the sweet spot before it overcooks.
-- **Deploy any checkpoint straight from its pill** (📦 Import → ComfyUI), **⬇ download** that exact epoch, or **▶ continue from here** — even from a run that failed at pod teardown but kept its saves.
+- **Deploy any checkpoint straight from its pill** (📦 Import → ComfyUI), **⬇ download** that exact epoch, or **▶ continue from here** — even from a run that failed at the end but kept its saves.
 - **📌 Pin the images onto the board** — any generated image can be pinned next to the checkpoint that made it, from its thumbnail or full-screen, and a finished canvas generation offers **📌 Pin all** for the whole batch at once (it says how many it placed, names anything it left out, and ↩ Undo takes them back off). Pinned images drag, resize and close; their positions are stored with your card layout, so unpinning forgets nothing and the arrangement follows the dataset to another machine.
-- **▶ Continue training from any checkpoint on the board** — the popover used to tell you to go find the run on another page, and which page depended on whether it had trained locally or in the cloud. It now opens the real launch dialog on that exact save: where to run it, how many extra steps, and the full settings. The board is also the first place that offers **both lanes for both kinds of run** — a local checkpoint can be finished on a rented GPU, a cloud epoch on your machine — and a lane that cannot be used says why instead of disappearing.
+- **▶ Continue training from any checkpoint on the board** — the popover used to tell you to go find the run on another page, and which page depended on how it had been launched. It now opens the real launch dialog on that exact save: where to run it, how many extra steps, and the full settings. A checkpoint that cannot be continued says why instead of disappearing.
 - **🖼🖼 Drop one pinned image onto another** and they become a single node, side by side with no border between them — as many as you like, reordered by dropping left or right, and dragged back out to separate. **⬇ Download** any image, or a whole run's gallery as a ZIP whose filenames carry the dataset, run, step and seed, so a render still tells you which checkpoint made it a month later.
 - **⬇ Take the pictures away** — a single image from its pinned node or from the full-screen view, or a whole gallery (a run's, or one checkpoint's) as a ZIP; turn on `Select` first and the same button takes only the images you ticked. Every file keeps its ancestry **in its name** — dataset, run, step, seed — so a saved render is still identifiable weeks later instead of being another `out_00042_.png`. One archive holds at most 500 images and the button says so before you click; a file that has left the disk is named, never quietly missing from the ZIP.
 - **Import & remove** — a single run opens a lineage the moment it has one saved checkpoint (also from a dataset's Checkpoints & LoRAs panel); older continuations reconnect automatically on first start; runs whose files are gone are tagged, not invented.
@@ -659,7 +656,7 @@ Nothing here locks your data in — every stage has an exit.
 - **Merge existing data** — import a training ZIP or recursively merge a local folder containing images and same-stem `.txt` files; perceptual duplicates are skipped.
 - **💾 Back up everything** — one portable backup packs every dataset (images, references, keep/reject decisions, captions, scores), its **training history** and your settings into a single file (API keys deliberately excluded). Restore rebuilds every dataset without overwriting, bringing back each one's **Trained** status and run history; tick **Include trained LoRAs** to bundle the `.safetensors` too.
 - **Hugging Face Hub** — with a write-enabled `HF_TOKEN`, publish kept images and captions as a dataset repository. Publishing is **private by default**; you choose visibility/license and must explicitly confirm sharing rights and consent.
-- **Import into ComfyUI** — local checkpoints import in one click; downloaded cloud results import automatically when a ComfyUI LoRA folder is configured.
+- **Import into ComfyUI** — any checkpoint imports in one click, once a ComfyUI LoRA folder is configured.
 
 ---
 
@@ -699,8 +696,8 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Scraping | `backend/requirements-scrape.txt`; Pexels also needs `PEXELS_API_KEY` and explicit authorization |
 | Local LoRA training: Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein / Anima | ai-toolkit; no ComfyUI is needed for official Hugging Face bases |
 | Local SDXL training | ai-toolkit + a base checkpoint discoverable in ComfyUI's model tree |
-| Cloud training | `VAST_API_KEY`; supported families are shown in the launch UI. Full-model Krea 2 also needs `HF_CLOUD_TOKEN` with Krea base read and repository write access; fine-grained is recommended, global `role=write` is accepted with a warning, and read-only is rejected |
-| LoRA Canvas browsing, layout, notes and diffs | No external service; generating needs ComfyUI and same-family checkpoints, continuing needs the chosen local/cloud training lane |
+| Cloud / rented-GPU training | **Not available in this fork.** Training always runs on this machine's own GPU; the Devices lane covers generation and analysis passes, not training |
+| LoRA Canvas browsing, layout, notes and diffs | No external service; generating needs ComfyUI and same-family checkpoints, continuing needs a working local training setup |
 | Test Studio | ComfyUI reachable + assets for a supported Studio family |
 | Backup/restore and ZIP/folder merge | No external service |
 | Hugging Face publishing | Write-enabled `HF_TOKEN`; repositories are private by default |
@@ -713,7 +710,7 @@ The Docker image installs `backend/requirements.txt` only, so the scraper (`requ
 
 **Full local** — everything above plus Klein/Z-Image generation, captioning via JoyCaption, face scoring, masks, the Image bank scoring pass, training, and Test Studio. Requires ComfyUI and/or ai-toolkit running on the same host (or reachable over the network) and an NVIDIA GPU with 12 GB+ VRAM for Klein/Z-Image inference. Training VRAM depends on the model family — check the family's ai-toolkit preset before queuing a run. The face-scoring and masking helpers (`requirements-ml.txt`) run fine on CPU; they don't need the GPU.
 
-This fork is **local-only for image generation** (no Nano Banana / ChatGPT API engines — Klein/ComfyUI is the only generation path). Either way, if you have no local GPU you can still train — see [No GPU? Train in the cloud](#no-gpu-train-in-the-cloud).
+This fork is **local-only end to end**: no Nano Banana / ChatGPT API engines (Klein/ComfyUI is the only generation path) and no rented-GPU training. Without a GPU on this machine you get everything except generation and training — see [No local GPU? Then no training here](#no-local-gpu-then-no-training-here).
 
 ---
 
@@ -831,7 +828,7 @@ The full path rules, model layouts and three-state Ollama detection are in the [
 
 - **Hugging Face** (gated model downloads and dataset publishing): create a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). Read access is enough for accepted gated models; publishing requires a write-enabled token.
 
-Secrets saved in Settings live in the git-ignored `.env`, never in `config.json` or a commit. Full-model Krea 2 cloud runs use a separate `HF_CLOUD_TOKEN`; a narrowly scoped fine-grained token is recommended, while a global `role=write` token is accepted with a broad-access warning and read-only is rejected. Follow the [cloud-token instructions](docs/guide/settings-reference.md#cloud-training).
+Secrets saved in Settings live in the git-ignored `.env`, never in `config.json` or a commit.
 
 > **Pexels authorization required:** An API key alone does not authorize dataset or machine-learning use. Configure this integration only if Pexels has explicitly authorized this use case, and keep the attribution LDS displays. Read the [official Pexels terms and conditions](https://help.pexels.com/hc/en-us/articles/900005880463-What-are-the-Terms-and-Conditions/).
 
@@ -846,7 +843,7 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 | **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, local and NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality. Available in Docker GPU mode |
 | **LoRA training — Z-Image / SDXL** (ai-toolkit) | 16 GB+ recommended | 10 GB+ free enforced per run | Quantized (qfloat8) + low-VRAM mode |
 | **LoRA training — Krea 2** (ai-toolkit) | **24 GB VRAM** at 1024 px (enforced warning) | ~24 GB base download (Raw) + 10 GB+ free | Under 24 GB, select **Resolution → 768 only** in Advanced options |
-| **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** | base download + 10 GB+ free | Both bases are gated on Hugging Face; the cloud lane is practical for 9B |
+| **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** | base download + 10 GB+ free | Both bases are gated on Hugging Face; 9B needs a card most desktops don't have |
 | **Face scoring / person masks / watermark inpaint** (ML extras) | none (CPU) | ~3 GB (+ CPU torch for LaMa) | Python **3.10–3.12 required** for wheels; installable per capability from Setup |
 
 - **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux/macOS work for curation-only + manual venv.
@@ -861,9 +858,9 @@ Use **Settings** for normal configuration. The complete defaults, `config.json` 
 The short version:
 
 - **Ordinary settings** are written to `config.json` (git-ignored, in your data directory). Copy `config.example.json` to `config.json` to edit by hand — but almost everything has a UI control in **Settings**.
-- **Secrets** (`HF_TOKEN`, `VAST_API_KEY`, optional scraper keys) live in `.env`, never in `config.json` or a commit — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them. (This fork removed the cloud image-generation engines, so there are no `GEMINI_API_KEY` / `OPENAI_API_KEY` secrets.)
+- **Secrets** (`HF_TOKEN`, optional scraper keys) live in `.env`, never in `config.json` or a commit — copy `.env.example` to `.env`, or paste keys into Settings and let the app write them. (This fork removed the cloud image-generation engines and the rented-GPU training lane, so there are no `GEMINI_API_KEY` / `OPENAI_API_KEY` / `VAST_API_KEY` secrets to set.)
 - **A handful of environment variables** override paths for containerized setups: `LDS_DATA_DIR` (runtime data), `LDS_CONFIG` (path to `config.json`), `LDS_ENV` (path to `.env`), `LDS_HOST` (bind host, beats `server.host`), `FLASK_DEBUG` (`1` for Flask debug).
-- **The keys you most often touch** — `server.port` (default `5050`), `comfyui.api_url`, `ollama.vision_model`, `aitoolkit.dir`, `training.default_family`, the `cloud.*` guard-rails — are all in the [full reference](docs/guide/settings-reference.md#configjson-key-reference-all-keys).
+- **The keys you most often touch** — `server.port` (default `5050`), `comfyui.api_url`, `ollama.vision_model`, `aitoolkit.dir`, `training.default_family` — are all in the [full reference](docs/guide/settings-reference.md#configjson-key-reference-all-keys).
 
 ## Exposing the app beyond localhost
 
@@ -920,9 +917,9 @@ trainings, consider giving a little of that time back:
 - [**Ko-fi**](https://ko-fi.com/perfectgf) — one-off, no account needed, from the price of a coffee.
 - [**GitHub Sponsors**](https://github.com/sponsors/perfectgf) — one-off or monthly, and 100% reaches the project (GitHub takes no platform fee).
 
-**Where it goes.** Not into anyone's pocket: the API credits used to test the
-paid generation engines, the rented cloud GPUs used to verify the training lanes
-on hardware most people actually have, and the hours that turn a working script
+**Where it goes.** Not into anyone's pocket: upstream's own API credits and rented
+GPUs, which is how the lanes this fork keeps are verified on hardware most people
+actually have before they reach it, and the hours that turn a working script
 into something you can hand to a stranger — the docs, the guard-rails, the error
 messages that tell you what to do next.
 
