@@ -11,10 +11,11 @@
  * behaviour, redirect included — nothing about a genuine first launch changes.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { setupHealthPhase, shouldRedirectToSetup, regressionNotice, statusMessage,
+  needsDockerDeploymentChoice, shouldProbeDockerChoice,
   SETUP_OK_VISIBLE_MS } from '../../hooks/setupHealth'
 
 // sessionStorage key shared with SetupPage's "Skip setup" link (defense in depth).
@@ -42,7 +43,7 @@ export default function SetupHealthNotice() {
     ;(async () => {
       let s
       try {
-        s = await apiFetch('/api/setup-state')
+        s = await apiFetch('/api/setup-state', { background: true })
       } catch {
         // Server unreachable or an older backend: fall back to "never verified",
         // which is exactly the behaviour that shipped before this feature.
@@ -51,8 +52,22 @@ export default function SetupHealthNotice() {
       if (!alive) return
       setState(s)
       if (!s.verified) {
+        // Only asked for when the answer can change the decision — a Docker
+        // install looks `configured` on its first boot because ComfyUI is
+        // bundled, and would otherwise never be shown the Ollama choice its
+        // own launcher is blocking on.
+        let pendingDockerChoice = false
+        if (shouldProbeDockerChoice({ state: s, caps })) {
+          try {
+            pendingDockerChoice = needsDockerDeploymentChoice(
+              await apiFetch('/api/setup/runtime-readiness', { background: true }))
+          } catch {
+            // Older backend without the route: keep the previous behaviour.
+          }
+          if (!alive) return
+        }
         if (shouldRedirectToSetup({
-          loading: false, caps, state: s,
+          loading: false, caps, state: s, pendingDockerChoice,
           alreadyRedirected: !!sessionStorage.getItem(SETUP_REDIRECT_KEY),
         })) {
           sessionStorage.setItem(SETUP_REDIRECT_KEY, '1')
@@ -65,7 +80,7 @@ export default function SetupHealthNotice() {
       if (pathname === '/setup') { setResult({ regressions: [], skipped: true }); return }
       setChecking(true)
       try {
-        const r = await postJson('/api/setup-state/recheck', {})
+        const r = await postJson('/api/setup-state/recheck', {}, { background: true })
         if (!alive) return
         setResult(r)
         // The forced probe just refreshed the server-side cache; this reads it

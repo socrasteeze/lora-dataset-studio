@@ -7,9 +7,13 @@ export const SETTINGS_SECTIONS = [
     keywords: ['status', 'summary', 'capabilities', 'ready'] },
   { id: 'engines', title: 'Image engines', icon: '🎨', eyebrow: 'generation',
     description: 'The local Klein and Krea 2 Edit engines used to generate dataset images.',
+    // Divergence 1: upstream's cloud-provider keywords stay out. Its SeedVR2
+    // block is kept — that upscaler is a local ComfyUI node pack, not a lane.
     keywords: ['klein', 'krea', 'krea 2 edit', 'engine', 'engines', 'comfyui', 'local',
       'generation', 'grounding',
-      'lora', 'preset', 'texture', 'anatomy', 'nsfw', 'identity', 'prompt', 'guard', 'improve', 'upscale'] },
+      'lora', 'preset', 'texture', 'anatomy', 'nsfw', 'identity', 'prompt', 'guard', 'improve', 'upscale',
+      'seedvr2', 'seed vr2', 'upscaler', 'super resolution', 'restore', 'sharpen', 'fidelity',
+      'colour shift', 'color shift', 'target resolution', 'colour correction', 'blocks to swap'] },
   { id: 'scraping', title: 'Scraping & sources', icon: '🔎', eyebrow: 'sources',
     description: 'Credentials used when scanning image sources.',
     keywords: ['reddit', 'client id', 'civitai', 'pexels', 'pexels api', 'api key', 'scrape', 'scraper',

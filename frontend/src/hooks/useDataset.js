@@ -415,9 +415,15 @@ export function useDataset() {
     await refresh();
   }, [currentId, refresh, toast]);
 
-  // `extraLoras`: optional generation-LoRA preset for this run (Idea by
-  // @waltm) — an already-gated `{ generation_lora_preset? }` fragment from
-  // generationLoraPresetPayload(); an absent key means "no preset".
+  // Divergence 1: upstream's signature takes `batches` — one entry per selected
+  // engine, its API-first fan-out — and has no device argument. This fork sends
+  // a single local engine plus `deviceId`, the "run it on another machine" lane
+  // upstream does not have, so the fork's shape stays and the route matches it.
+  // `extraLoras`: optional generation-LoRA preset fragment(s) for this run (Idea
+  // by @waltm) — an already-gated `{ generation_lora_preset?,
+  // krea_generation_lora_preset? }` object from the two payload builders. One run
+  // can carry both: each engine resolves its OWN key. An absent key means "no
+  // preset" for that engine.
   const generate = useCallback((variations, multiplier, kleinModel, loraStrength, generator, extraLoras, deviceId) => wrap(async () => {
     const d = await postJson(`/api/dataset/${currentId}/generate`,
       { variations, multiplier, klein_model: kleinModel, lora_strength: loraStrength,
@@ -533,14 +539,17 @@ export function useDataset() {
     return d;
   }, [refresh, toast]);
 
-  // Bulk ✨ Klein upscale & improve: ONE call that starts a SERVER job. The batch
+  // Bulk ✨ Upscale & improve: ONE call that starts a SERVER job. The batch
   // used to be a browser loop, so a selection bigger than the backend's fan-out cap
   // was mostly refused, ⏹ Stop could not reach it, and closing the tab killed it.
   // Progress now rides on `activity` (kind 'improve') and survives a reload.
-  const improveBatch = useCallback(async (imageIds) => {
+  const improveBatch = useCallback(async (imageIds, engine) => {
     const ids = (imageIds || []).map((v) => Number(v)).filter(Number.isInteger);
     if (!ids.length) return { ok: false, error: 'nothing selected' };
-    const d = await postJson(`/api/dataset/${currentId}/improve/batch`, { image_ids: ids });
+    // `engine` is the button that was pressed ('klein' | 'seedvr2'). Absent = the
+    // improve.engine setting, which is what the single-tile ✨ and re-improve use.
+    const d = await postJson(`/api/dataset/${currentId}/improve/batch`,
+      engine ? { image_ids: ids, engine } : { image_ids: ids });
     if (!d.ok) toast.error(d.error || 'Could not start the improvement batch');
     await refresh();
     return d;

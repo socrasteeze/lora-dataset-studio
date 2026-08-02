@@ -447,6 +447,12 @@ const TOPICS = [
      'qwen3-vl', 'restart comfyui', 'second engine', 'local engine', '20 gb',
      'corrupted', 'truncated', 'unreadable', 'cannot be loaded', 'download again',
      'krea not ready', 'everything is in place']),
+  setupStep('setup-seedvr2-install', 'install', 'Install the SeedVR2 upscaler',
+    ['seedvr2', 'seed vr2', 'seedvr', 'upscale', 'upscaler', 'upscaling', 'super resolution',
+     'super-resolution', 'restore', 'restoration', 'sharpen', 'fidelity', 'keeps colours',
+     'colour shift', 'color shift', 'changes the image', 'node pack',
+     'ComfyUI-SeedVR2_VideoUpscaler', 'comfyui-manager', 'dit', 'vae', 'models/SEEDVR2',
+     '3b', '7b', 'fp8', 'blocks to swap', 'target resolution', 'install seedvr2']),
   setupStep('setup-ollama', 'ollama', 'Set up Ollama & pull the vision model',
     ['ollama', 'vision model', 'pull model', 'captioning', 'caption', 'auto-framing',
      'framing', 'head-crop', 'head crop', 'qwen', 'install ollama']),
@@ -473,10 +479,19 @@ const TOPICS = [
      'per-lora weight', 'compare vs combine', 'trigger words', 'both triggers', 'one family',
      'cannot mix families', 'krea and sdxl'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  action('studio-stack-results', '🧬 Stack results: composition, weight variants, best weights',
+    ['studio', 'test studio', 'stack', 'stack results', 'stack composition', 'combine results',
+     'weight variants', 'compare weights', 'same stack', 'relaunch', 'two loras results',
+     'which weights', 'best weights', 'save stack', 'star best setting stack', 'net score',
+     'use these weights', 'trigger not recorded'],
+    '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('studio-enhance-prompt', '✨ Enhance: enrich the test prompt with the local model',
     ['studio', 'test studio', 'enhance', 'enhance prompt', 'improve prompt', 'better prompt',
      'rewrite prompt', 'llm', 'ollama', 'local model', 'prompt magic', 'button greyed out',
-     'enhance disabled', 'ollama not running', 'model not downloaded'],
+     'enhance disabled', 'ollama not running', 'model not downloaded',
+     // The fence: the words people type when another tool is holding the model.
+     'already in use outside LDS', 'model in use', 'unload it and continue',
+     'unload model', 'waiting for the model', 'model busy', 'another app is using ollama'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('studio-random-dataset-caption', '🎲 Caption: use a random kept dataset caption',
     ['studio', 'test studio', 'caption', 'random caption', 'dataset caption', 'caption button',
@@ -738,8 +753,13 @@ const TOPICS = [
   setting('krea.identity_lora', 'engines', 'krea-identity-lora', 'Krea 2 Edit identity LoRA',
     ['krea', 'identity', 'edit lora', 'lora', 'krea2_identity_edit', 'civitai',
      'node pack', 'comfyui-krea2edit', 'missing', 'local engine']),
+  setting('krea.generation_lora_presets', 'engines', 'krea-generation-lora-presets',
+    'Krea 2 Edit generation LoRA presets',
+    ['krea', 'krea 2', 'lora', 'loras', 'generation lora', 'preset', 'presets',
+     'always-on', 'always on', 'filter bypass', 'filterbypass', 'bypass', 'nsfw',
+     'uncensored', 'style lora', 'detail slider', 'chain', 'stack', 'strength']),
   // No 'identity_prompts.face' topic: the API-engine identity locks are not
-  // shown in this fork (Divergence 1) — only the local ones below.
+  // shown in this fork (Divergence 1) — only the local one below.
   setting('identity_prompts.klein_identity', 'engines', 'identity-prompts', 'Klein identity prompt',
     ['identity', 'klein', 'restage', 'face', 'prompt', 'preserve', 'pose']),
   // The words Qeeyana (Reddit) actually used are in here verbatim: she had the
@@ -886,6 +906,9 @@ const TOPICS = [
   // training
   setting('training.default_family', 'training', 'training-default-family', 'Default training family',
     ['training', 'family', 'default', 'zimage', 'sdxl', 'krea', 'flux']),
+  // Divergence 4: no rental-GPU card in this fork's Settings → Training, so
+  // none of upstream's VAST_API_KEY / cloud.* topics apply — there is nothing
+  // in the UI for them to anchor to.
   // Dual captions is a per-run Advanced training option (not a global Setting),
   // so it points at the dataset guide's dedicated section rather than
   // settings-reference, and its route is the training workspace section. Its tip

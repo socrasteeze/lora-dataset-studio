@@ -50,6 +50,113 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-02-writes-refuse-an-unreadable-body',
+    date: '2026-08-02',
+    title: 'A save that cannot be read now says so instead of answering OK and storing nothing',
+    blurb:
+      'If you drive the API yourself — a script, a curl command, your own tooling — a request body the app could not parse used to be treated as an empty one: it answered 200 OK, rewrote your settings, and the value you sent was simply gone, with nothing in the log. The most common cause is a raw Windows path, since a lone backslash is not valid JSON. Those requests are now refused with the real parse error and the escaping to use, and nothing on disk is touched. The app\'s own screens were never affected.',
+  },
+  {
+    id: '2026-08-02-ollama-fence-waits-and-offers-the-unload',
+    date: '2026-08-02',
+    title: 'When another tool is holding the Ollama model, LDS now waits for it — or takes it, if you say so',
+    blurb:
+      'If you run another AI tool on the same machine, ✨ Enhance and 🔎 Describe would sometimes refuse with "a local Ollama model is already in use outside LDS". That refusal was right — LDS must never unload a model another app is using — but it was also a dead end: it told you to go unload it by hand, then forgot what you had asked for. Now the refusal carries its own way out. LDS keeps watching, and the moment the model is free (Ollama unloads an idle one by itself after a few minutes) your Enhance or Describe starts again on its own, with the prompt and the image you had. If you would rather not wait, one click on "Unload it and continue" evicts the other model and resumes — and nothing evicts it without that click. One more thing fixed while we were here: restarting LDS while its OWN model was still warm used to make it mistake that model for a stranger\'s and block itself out of it.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-02-anima-shows-its-own-base',
+    date: '2026-08-02',
+    title: 'Anima no longer says it trains on a Z-Image base',
+    blurb:
+      'Picking the Anima family left the Base selector — and the summary line under the Train button — announcing "Official - Z-Image-Turbo", and offered your Z-Image merges as if an Anima run could load them. Anima now names its own base, Anima-Base, and offers nothing else. Your runs were never affected: the launcher always used the official Anima base and ignored the foreign selection, so this was the panel lying about a run it was going to get right. The cloud button on Anima also stops pretending: it says Anima is local-only until the pod image is verified, instead of enabling itself and being refused after the click.',
+    to: '/datasets?section=training&panel=advanced',
+  },
+  {
+    id: '2026-08-02-seedvr2-results-come-back',
+    date: '2026-08-02',
+    title: 'SeedVR2 upscales now actually appear — and the ones you already ran are recovered',
+    blurb:
+      'The first SeedVR2 build rendered correctly and then dropped the result on the floor: ComfyUI finished the image, the job was marked done, and the candidate stayed blank forever with nothing in the log, because nothing had failed. The finished image is now attached to its tile. Any upscale you already ran and never saw is picked up automatically the next time the app starts — the image is still there, it just never made it home. Caught on a real run the day it shipped.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-02-comfyui-recovery-anywhere',
+    date: '2026-08-02',
+    title: 'A ComfyUI job that died in a past session no longer blocks you forever',
+    blurb:
+      'When a generation stops without a known outcome — ComfyUI killed, the machine out of disk — LDS pauses everything on purpose, so it never abandons work that might still be running on the GPU. The catch: there was no way to resolve it. Opening the dataset that owned the job showed nothing either; you were simply refused, everywhere, for as long as the record lasted. Now LDS checks first: if ComfyUI is back and no longer knows that job, it clears it on its own and just tells you. When it cannot prove that — ComfyUI unreachable, the job still running there, or a submission it cannot identify — a banner appears wherever you are, names the dataset and the variation and how long it has been stuck, and clears it in one click once you confirm the restart. A job that is genuinely still running is never touched.',
+  },
+  {
+    id: '2026-08-02-seedvr2-upscaling',
+    date: '2026-08-02',
+    title: 'A second way to upscale — one that does not repaint your images',
+    blurb:
+      'Klein’s ✨ Upscale & improve re-renders detail from a prompt: it rescues a soft photo, and it can move skin tone and colour along the way — which is the wrong trade when the exact look is what you are training on. SeedVR2 is now the other option: it resolves detail at a higher resolution and leaves the content alone. Pick either one straight from the bulk actions on a selection (each button says what it does to the original), or set your default for the single-image pass in Settings ▸ Image engines. Setup ▸ ComfyUI downloads the two models (~3.9 GB) on a click and tells you how to add the node pack. Requested by SurpassHR (GitHub #32).',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-02-docker-first-boot-opens-setup',
+    date: '2026-08-02',
+    title: 'A brand-new Docker install now opens Setup instead of hiding it',
+    blurb:
+      'On the Docker GPU install, ComfyUI comes bundled — which made the app look fully configured on its very first boot, so it dropped you straight into Datasets and never offered the wizard. Meanwhile the launcher window sat waiting up to fifteen minutes for an Ollama choice that only Setup can ask for. A first boot that still owes that choice now opens Setup. Nothing changes for an install that has been seen working: it is still never interrupted, and once you have picked an option you are not asked again.',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-02-dataset-upload-is-visible',
+    date: '2026-08-02',
+    title: 'You can now watch the dataset go up to the rented machine — and it stops billing if it does not',
+    blurb:
+      'Sending a dataset to a cloud pod was the one step that reported nothing at all: a big set could be uploading perfectly, or wedged and going nowhere, and both looked exactly the same for hours while the machine billed. The launch card now shows the files and gigabytes as they land, so a slow upload is visibly a slow upload. A large dataset is still allowed to take as long as it needs — nothing was made stricter — but if NO data at all reaches the machine for 25 minutes the run is given up and the pod released, with a message that says the dataset never arrived rather than leaving you to guess the training crashed. The delay is yours to set in Settings → Training, and full-model runs no longer claim to be "uploading the model" while they are still uploading the dataset.',
+    to: '/cloud',
+  },
+  {
+    id: '2026-08-02-docker-install-and-update-actually-work',
+    date: '2026-08-02',
+    title: 'The Windows Docker install now starts, restarts and updates',
+    blurb:
+      'A real end-to-end run of the one-click Docker install found four faults that made it unusable, and all four are fixed. The launcher now finds a host port that is genuinely free instead of trusting Docker to skip a busy one, so an existing ComfyUI on 8188 (or anything else in the way) no longer stops the install dead — and because it publishes one fixed port, the address stays the same across restarts instead of quietly moving. Launching a second time works: rewriting the small settings marker used to fail on every run after the first, which also meant one-click update could never finish. On Windows the bundled ComfyUI no longer restart-loops on its own folders. When Docker does refuse something you now get the actual reason instead of a PowerShell error about a missing property, and the updater speaks English like the rest of the app.',
+  },
+  {
+    id: '2026-08-02-cloud-launch-is-observable',
+    date: '2026-08-02',
+    title: 'A cloud launch now tells you what it is doing, and for how long',
+    blurb:
+      'Renting a GPU takes minutes, and the button used to say "Launching…" for all of them — impossible to tell a normal wait from a dead one. The launch now shows its steps as it walks them (preparing the dataset, searching for an offer, renting and booting the pod, uploading, starting the job) with the time elapsed, on the dataset panel and on the Runs page. While a pod boots you also see how long it is allowed to take, so a machine that never starts ends with a plain explanation instead of a frozen screen — it is released, it stops billing, and launching again picks a different host. A launch can be cancelled from the Runs page like any run.',
+    to: '/cloud',
+  },
+  {
+    id: '2026-08-02-enhance-says-why-it-refused',
+    date: '2026-08-02',
+    title: '✨ Enhance now tells you what to fix when it cannot run',
+    blurb:
+      'When Enhance could not reach your local model it always said the same thing — that the model returned nothing, and that you should check the model configured in Settings — even when that setting was perfectly correct. The most common cause is different: another tool is already holding a model in Ollama, and the app will not evict it. Enhance now repeats the real reason and the action that clears it, so you stop hunting through Settings for a problem that was never there.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-02-studio-stack-results-view',
+    date: '2026-08-02',
+    title: 'Find the right weights for a 🧬 stack by comparing your runs side by side',
+    blurb:
+      'Testing two LoRAs together used to end in a single anonymous column: you could see the image, not what was in it. The Test Studio now shows a stacked run for what it is — every LoRA of the stack with its weight and its trigger word, and one column per run of that same stack, so the version at 1.00 / 0.55 sits next to the one at 1.00 / 0.80 with the changed weights highlighted and the votes counted per column. Reload any variant’s weights into the sliders in one click, and save the winning set with ★: the best setting of a stack is now its weights, not one lone checkpoint.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-02-cloud-only-installs-see-their-checkpoints',
+    date: '2026-08-02',
+    title: 'Trained in the cloud without ai-toolkit? Your checkpoints show up now',
+    blurb:
+      'The checkpoint list refused to answer at all unless local training was set up, so an install that only ever trains in the cloud saw an empty panel — its own paid-for cloud saves were there on disk, just never displayed. The list now always answers: cloud saves appear whether or not ai-toolkit is configured, and the local half simply stays empty when there is no local trainer. Deleting a cloud-trained LoRA you had deployed to ComfyUI works from the same install too, instead of being listed but undeletable.',
+  },
+  {
+    id: '2026-08-02-quiet-polls-when-the-server-is-unhappy',
+    date: '2026-08-02',
+    title: 'A server that is still starting up no longer buries the app in error toasts',
+    blurb:
+      'Background checks — the progress polls, the setup re-check, the "is ComfyUI up yet?" watcher — already stayed quiet when they could not reach the server at all. They now stay just as quiet when the server answers badly: a container still booting replies "not ready" every few seconds, and that used to become one "Server error. Please try again later." toast per reply until it finished. The screens that depend on those checks still show what went wrong where it belongs, and the moment the server comes back you still get the single "Back online" line.',
+  },
+  {
     id: '2026-08-01-bank-image-ceiling-raised',
     date: '2026-08-01',
     title: 'A bank now takes 200,000 images, and stops miscounting the ones you deleted',
@@ -112,6 +219,28 @@ export const WHATS_NEW = [
     blurb:
       'Each character dataset’s lane on the LoRA Canvas now opens with its reference image, next to the dataset name. Click it to open it full size against the pinned renders. Concept and style datasets are unaffected — they have no reference face.',
     to: '/canvas',
+  },
+  {
+    id: '2026-08-01-choose-how-docker-uses-ollama',
+    date: '2026-08-01',
+    title: 'Choose how your Docker install uses Ollama — and never get a surprise download',
+    blurb:
+      'The Docker Setup page now asks one question instead of making you edit files: no Ollama, the one already running on your computer, or an isolated companion container. Nothing large is downloaded to make that choice — the vision model stays absent until you press Pull, which now streams its real progress and can be cancelled mid-download and resumed later. Switching modes keeps your models: only the container LDS itself created is removed, and its data volume survives.',
+    to: '/setup?step=ollama',
+  },
+  {
+    id: '2026-08-01-docker-with-your-existing-comfyui',
+    date: '2026-08-01',
+    title: 'Run the Docker build against the ComfyUI you already installed',
+    blurb:
+      'start-docker.bat now reuses your existing Windows ComfyUI instead of building a second one: the first launch opens a folder picker, accepts either the ComfyUI folder or the portable folder above it, and reuses your models and outputs in place. start-docker-gpu.bat still builds the fresh isolated ComfyUI for people who want one. Both pick free ports on their own and open the browser while the stack is still warming up.',
+  },
+  {
+    id: '2026-08-01-one-click-docker-update',
+    date: '2026-08-01',
+    title: 'Update the Docker install by double-clicking one file',
+    blurb:
+      'update-docker.bat follows the latest published release (pass "main" for the preview channel), downloads that exact commit, and swaps the code in one transaction. Your .env, config, datasets, run and basedir folders, bank images and Ollama data are never touched. If the new version fails to come up healthy, the previous code is restored and restarted automatically — and a git checkout is never reset or merged behind your back, it just tells you to run git pull --ff-only.',
   },
   {
     id: '2026-08-01-queue-only-what-is-missing',
@@ -242,6 +371,13 @@ export const WHATS_NEW = [
     to: '/datasets?section=add&panel=generate',
   },
   {
+    id: '2026-07-31-generation-lora-double-stack-guard',
+    date: '2026-07-31',
+    title: 'A generation-LoRA preset can no longer double-apply your identity LoRA',
+    blurb: 'A preset row pointing at the same file already loaded as the identity/consistency LoRA used to chain it a second time — summing both strengths into one delta well past what the file was trained for, which showed up as blocky, posterized dataset images. Krea 2 Edit and Klein now skip that row (the rest of the chain still applies), with a log line saying why. Fixed by Cyberschorsch (GitHub), reported by waltm (Discord).',
+    to: '/settings/engines',
+  },
+  {
     id: '2026-07-31-passes-no-longer-take-the-database-hostage',
     date: '2026-07-31',
     title: 'A running pass no longer freezes the rest of the app',
@@ -287,6 +423,13 @@ export const WHATS_NEW = [
     blurb:
       'An Edit reference candidate now names the engine that actually produced it. Retry repeats the same instruction and selected engine; choose Try another prompt only when you want to change the edit.',
     to: '/datasets?section=add',
+  },
+  {
+    id: '2026-07-30-krea-generation-lora-presets',
+    date: '2026-07-30',
+    title: 'Your own LoRAs now apply when Krea builds a dataset',
+    blurb: 'Krea 2 Edit can chain your own LoRA files while it generates dataset images — not just in the Test Studio. Build named combinations in Settings › Image engines, then pick one per run in the workspace\'s 🧬 Krea 2 Edit tuning panel; "None" stays the default. The LoRA has to be trained for Krea 2, only the model side is patched, and a row whose file you have moved is skipped with the rest of the chain still applied. Built by Cyberschorsch (GitHub), idea by waltm (Discord).',
+    to: '/settings/engines',
   },
   {
     id: '2026-07-30-krea-shot-card-adherence',

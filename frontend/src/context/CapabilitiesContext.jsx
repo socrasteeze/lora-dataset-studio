@@ -33,15 +33,28 @@ export function CapabilitiesProvider({ children }) {
   const [caps, setCaps] = useState(EMPTY_CAPS)
   const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(async (force = false) => {
+  // Return the fetched snapshot on success and null on failure. Most callers
+  // only need the state update, while managed-runtime polling needs the verdict:
+  // it must keep retrying if the lightweight probe turned ready but this fuller
+  // refresh failed. `options.background` keeps that automatic retry silent.
+  const refresh = useCallback(async (force = false, options = {}) => {
     try {
-      const data = await apiFetch(`/api/capabilities${force ? '?force=1' : ''}`)
+      const data = await apiFetch(
+        `/api/capabilities${force ? '?force=1' : ''}`,
+        options,
+      )
       // Fork is local-only: never surface remote-rental / cloud-training UI even if a
-      // leftover rental API key exists in .env (FORK_NOTES Divergence 4).
-      setCaps({ ...data, cloud_training: false })
+      // leftover rental API key exists in .env (FORK_NOTES Divergence 4). The
+      // OVERRIDE has to be in the returned value too, not only in state —
+      // upstream's new `return data` is read directly by the background setup
+      // probe, which would otherwise see a capability this app does not have.
+      const local = { ...data, cloud_training: false }
+      setCaps(local)
+      return local
     } catch {
       // Keep the last-known caps on a transient network error rather than
       // resetting to EMPTY_CAPS — that would bounce the user into onboarding.
+      return null
     } finally {
       setLoading(false)
     }

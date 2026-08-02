@@ -27,7 +27,13 @@ def _configure_aitoolkit(tmp_path):
 
 def _seed(lt, svc, LOCAL_USER, tmp_path, numbered, target_steps, final=True):
     """A krea/base dataset whose run dir holds `numbered` saves + the unnumbered
-    final, registered to a cloud run record of `target_steps` steps."""
+    final, registered to a local run record of `target_steps` steps.
+
+    The record is LOCAL on purpose. list_checkpoints resolves provenance with
+    `source=('local', 'legacy')` so an unrelated cloud launch cannot steal a
+    local checkpoint's version and lineage by mtime alone; a cloud record
+    therefore no longer numbers a file in the local run dir. Cloud saves are
+    listed by the route's separate cloud_checkpoint_groups field."""
     from app.extensions import db
     from app.models import TrainingRunRecord
     _configure_aitoolkit(tmp_path)

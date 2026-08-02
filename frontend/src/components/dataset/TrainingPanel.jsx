@@ -1,7 +1,7 @@
 // react-frontend/src/components/dataset/TrainingPanel.jsx
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { getCsrfToken } from '../../api/fetchClient';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { postJson } from '../../hooks/useDataset';
@@ -42,6 +42,7 @@ import {
 } from '../../utils/trainingPresets';
 import { runConfirmableTrainingRequest } from '../../utils/trainingConfirmations';
 import { continueAttemptOutcome } from '../../utils/continueOutcome';
+import { launchButtonLabel } from '../../utils/launchProgress';
 import { HelpBadge } from '../../help/HelpMode';
 import { requestHelpTip } from '../../help/helpTips';
 import { useToast } from '../common/Toast';
@@ -51,6 +52,9 @@ import RunLineageGraph from './RunLineageGraph';
 import TrainingProgress from './TrainingProgress';
 import PreflightModal from './PreflightModal';
 import { laneOfPayload, preflightUrl } from './preflightLane.js';
+// Divergence 4: cloudUnsupportedFamilyReason has no caller here — the whole
+// rented-GPU dialog it gated is rejected — so only the local helper is used.
+import { basesForFamily } from './trainingFamilyScope.js';
 import { failureView } from './trainingFailure';
 import {
   MEMORY_KEYS, MEMORY_LABELS, memoryAdviceText, memoryIsOverridden, memoryPatchFor,
@@ -450,7 +454,9 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   }, [baseInfo?.convert?.status, getBaseInfo, caps.training_visible]);
 
   // Bases selon le type choisi (zimage : officiel + merges ; sdxl : checkpoints ComfyUI).
-  const currentBases = baseInfo?.bases_by_type?.[trainType] || baseInfo?.bases || [];
+  // Une famille non énumérée par le serveur repart VIDE (→ le placeholder
+  // family-aware plus bas), jamais avec le catalogue Z-Image.
+  const currentBases = basesForFamily(baseInfo, trainType);
   // base_dir non configuré → les listers renvoient [] : distinguer « aucun modèle de
   // cette famille » de « ComfyUI pas encore pointé » (le vrai motif sur un clone neuf).
   // Défaut true tant que baseInfo n'est pas chargé, pour ne pas flasher la CTA au montage.
@@ -1505,7 +1511,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const stepsRecipeFamily = stepsInfo?.family_label || trainFamilyLabel(stepsRecipeType);
   const stepsRecipeVariant = stepsInfo?.variant_label
     || checkpointVariantLabel(stepsRecipeType, stepsInfo?.variant || variant);
-  const checkpointBasesRaw = baseInfo?.bases_by_type?.[checkpointTrainType] || baseInfo?.bases || [];
+  const checkpointBasesRaw = basesForFamily(baseInfo, checkpointTrainType);
   const checkpointBaseOptions = checkpointBase && !checkpointBasesRaw.some((item) => item.value === checkpointBase)
     ? [{ value: checkpointBase, label: `custom: ${baseName(checkpointBase)}` }, ...checkpointBasesRaw]
     : checkpointBasesRaw;
@@ -2373,7 +2379,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 VRAM lever. <b className="text-content-muted font-medium">How:</b> multi-scale trains at two sizes so
                 the LoRA holds up from a close-up face to a full-body shot; single 1024 is a bit faster.
                 <b className="text-content-muted font-medium"> 768 only</b> cuts memory use sharply and trains much
-                faster — your best shot at Krea 2 on a GPU under 24 GB, at some cost in fine detail.
+                faster — on the 12B families (Krea 2, FLUX) it is your best shot on a GPU under
+                24 GB, at some cost in fine detail.
                 {sliderOn && (
                   <span className="block mt-1 text-purple-200/90">
                     <b className="font-medium">Slider default: 768 only</b> — the slider loss makes several passes per

@@ -1,14 +1,93 @@
 """Helpers shared by more than one route blueprint."""
+import json
 import logging
 
-from flask import jsonify
+from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from .. import capabilities
 from ..gpu_window import GpuBusyError
-from ..job_queue import ComfyUIRecoveryRequired, require_comfyui_enqueue_ready
+from ..job_queue import (ComfyUIRecoveryRequired, auto_resolve_comfyui_barrier,
+                         require_comfyui_enqueue_ready)
+from ..services.vision_ollama import LocalOllamaFenceError
 
 logger = logging.getLogger(__name__)
+
+
+# Every write route reads its body with `get_json(silent=True) or {}`: a body that
+# does not parse becomes an EMPTY one, so the route runs with no input, saves, and
+# answers 200 while the value the caller sent is simply absent. The natural way to
+# hit it is a raw Windows path in a hand-written body (`"C:\ai-toolkit"` — `\a` is
+# not a JSON escape), which is exactly how it was reported: a settings save that
+# said OK and stored nothing.
+#
+# Rather than convert ~110 call sites (and depend on the next one remembering),
+# the parse is made strict once, at the request boundary: an unreadable body never
+# reaches a view, so it can never be mistaken for an empty one. The call sites keep
+# their `or {}` — past this guard it only means "no body", which stays legitimate.
+_STRICT_JSON_METHODS = frozenset({'POST', 'PUT', 'PATCH', 'DELETE'})
+
+# The two previews that DELIBERATELY degrade instead of refusing: both carry
+# unsaved editor state and answer while the user is mid-keystroke, where showing
+# the currently-effective value beats showing 'error' (see their docstrings).
+# Anything that persists or starts work is strict — no exceptions.
+_TOLERANT_JSON_ENDPOINTS = frozenset({
+    'settings.post_prompt_preview',      # composed prompt for one shot
+    'bank.bank_flag_preview',            # flag counts for unsaved thresholds
+})
+
+
+def reject_unparsable_json_body():
+    """Refuse an /api write whose body is present but is not valid JSON (400).
+
+    Registered as an app-wide ``before_request``. Multipart uploads are skipped
+    (their body is files, not JSON) and an ABSENT body is skipped — many POSTs
+    legitimately carry none. Everything else that arrives on a write method is
+    body the caller meant us to read, so failing to read it must be said out loud
+    and must leave every file untouched.
+
+    A declared binary body is skipped BEFORE ``get_data`` ever runs, not merely
+    excused from the JSON verdict: ``get_data(cache=True)`` buffers the whole
+    WSGI input stream into memory, and a peer's checkpoint upload
+    (`cluster.peer_upload_artifact`, ``application/octet-stream``) reads that
+    same stream itself in 1 MiB chunks. Buffer it here first and the route
+    reads nothing — not a slow upload, an upload that silently writes an empty
+    file, which is worse than any 400 this guard exists to add.
+    """
+    if request.method not in _STRICT_JSON_METHODS:
+        return None
+    if not request.path.startswith('/api/'):
+        return None
+    if request.endpoint in _TOLERANT_JSON_ENDPOINTS:
+        return None
+    mimetype = (request.mimetype or '').lower()
+    if mimetype.startswith('multipart/') or mimetype == 'application/octet-stream':
+        return None
+    raw = request.get_data(cache=True).strip()
+    if not raw:
+        return None
+    if request.mimetype != 'application/json' and not raw.startswith((b'{', b'[')):
+        # Not declared as JSON and not shaped like it: a genuine form body
+        # (`engine=flux&batch_id=3` — /dataset/<id>/ref/edit/keep still accepts
+        # one, and studio's uploads fall back to multipart). Accusing it of being
+        # invalid JSON would be a fresh bug, not a fix. A body that DOES start
+        # like JSON was meant as JSON whatever header carried it — `curl -d`
+        # sends form-urlencoded by default, which is precisely how a
+        # hand-written body arrives here.
+        return None
+    try:
+        json.loads(raw.decode('utf-8'))
+    except UnicodeDecodeError:
+        return jsonify({'error': 'Invalid JSON body: it is not valid UTF-8 text.'}), 400
+    except ValueError as e:
+        msg = f'Invalid JSON body: {e}'
+        if b'\\' in raw:
+            # The overwhelmingly common cause on this app's audience, and the one
+            # the error alone never explains: a pasted Windows path.
+            msg += (' — backslashes in Windows paths must be escaped '
+                    r'("C:\\ai-toolkit", not "C:\ai-toolkit").')
+        return jsonify({'error': msg}), 400
+    return None
 
 
 def _map_error(e: Exception):
@@ -18,6 +97,12 @@ def _map_error(e: Exception):
         return jsonify({'error': 'GPU busy', 'detail': str(e)}), 503
     if isinstance(e, ValueError):
         return jsonify({'error': str(e)}), 400
+    if isinstance(e, LocalOllamaFenceError):
+        # The one refusal that carries its own remedy: the model in the way can
+        # be unloaded with the user's consent, and it often goes away on its own
+        # (Ollama's idle unload). A code — not a sentence to string-match —
+        # tells the UI it may offer both instead of ending the story here.
+        return jsonify({'error': str(e), 'code': 'ollama_fence_blocked'}), 409
     if isinstance(e, RuntimeError):
         return jsonify({'error': str(e)}), 409
     if isinstance(e, IntegrityError):
@@ -50,10 +135,24 @@ def _require_comfyui(*, force=False):
 
 
 def _require_no_stalled_comfyui():
-    """Structured route guard for the durable ComfyUI recovery barrier."""
+    """Structured route guard for the durable ComfyUI recovery barrier.
+
+    The moment of refusal is also the best moment to check whether the barrier
+    is still real: the user is here, ComfyUI is presumably back (that is what
+    the message told them to do), and a prompt id ComfyUI no longer knows is
+    proof the remote job is gone. So try the provable clear once before
+    refusing — the barrier survives every unprovable case untouched, which is
+    what keeps this safe.
+    """
     try:
         require_comfyui_enqueue_ready()
     except ComfyUIRecoveryRequired as e:
+        if auto_resolve_comfyui_barrier() is not None:
+            try:
+                require_comfyui_enqueue_ready()
+                return None
+            except ComfyUIRecoveryRequired as retried:
+                e = retried  # another barrier appeared meanwhile: still refuse
         return jsonify({
             'ok': False,
             'code': 'comfyui_recovery_required',

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { postJson } from '../api/fetchClient';
 import { useToast } from '../components/common/Toast';
 import { useCapabilities } from '../context/CapabilitiesContext';
 import TrainingProgress from '../components/dataset/TrainingProgress';
+import LaunchProgress from '../components/dataset/LaunchProgress';
 import ContinueDialog from '../components/dataset/ContinueDialog';
 import RunLineageTree from '../components/dataset/RunLineageTree';
 import { BaseModelChip, DatasetVersionChip, RunIdChip } from '../components/dataset/RunIdentityBadges';
@@ -26,6 +27,7 @@ import {
   RETRY_CONFIRMABLE_REFUSALS,
 } from '../utils/trainingRefusals';
 import { continueAttemptOutcome } from '../utils/continueOutcome';
+import { podBootFailureView, stopButtonLabel, uploadStallFailureView } from '../utils/launchProgress';
 import { runSilenceWarning, stopOutcomeMessage } from '../utils/runSilence';
 import { runsHubContinueLanes } from '../utils/runsHubContinueLanes';
 import {
@@ -1020,9 +1022,16 @@ export default function CloudRunsPage() {
               <TrainingProgress datasetId={run.dataset_id} trainType={run.train_type} variant={run.variant} cloud />
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* A launch has no checkpoint to lose, so the button that ends
+                    it must not read like the one that abandons a trained run.
+                    Same endpoint either way: the boot wait honours the stop and
+                    destroys the pod (there is no job yet to rescue). */}
                 <button type="button" onClick={() => stop(run)} disabled={stopping[run.run_id]}
+                  title={stopButtonLabel(run.status) === 'Cancel launch'
+                    ? 'Give up this launch and release the machine — nothing has been trained yet'
+                    : 'Stop this run; checkpoints already synced are kept'}
                   className="px-3 py-1.5 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
-                  {stopping[run.run_id] ? 'Stopping…' : 'Stop run'}
+                  {stopping[run.run_id] ? 'Stopping…' : stopButtonLabel(run.status)}
                 </button>
                 {!isFullTransformerRun(run) && run.checkpoint_ready && (
                   <a href={checkpointHref(run)}

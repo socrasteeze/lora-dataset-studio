@@ -8,6 +8,10 @@ No account, paid tier, API key or telemetry. **This fork runs entirely on hardwa
 
 > New here? Start with [Setup & install](#setup--install), then follow the [end-to-end workflow](docs/guide/workflow.md). The [documentation index](docs/README.md) links every guide. Project news and current development live on [Discord](https://discord.gg/j6hnJBFtXE).
 
+### 📖 [The complete guide — every feature, screen by screen →](docs/guide/using-the-app.md)
+
+Everything the app can do, in one long read: [getting started](docs/guide/getting-started.md) · [the full workflow](docs/guide/workflow.md) · [every setting explained](docs/guide/settings-reference.md) · [Docker](docs/guide/docker.md) · [troubleshooting](docs/guide/troubleshooting.md).
+
 ### ▶️ Watch the whole thing, start to finish
 
 A real Character LoRA built end to end in seven minutes, unedited and without narration:
@@ -15,7 +19,7 @@ A real Character LoRA built end to end in seven minutes, unedited and without na
 https://github.com/user-attachments/assets/d51ff89c-34e9-41a9-b47d-08939a8c867b
 
 <p align="center">
-  <img src="docs/screenshots/02-workspace.png" alt="Guided dataset workspace with a progress rail mapping reference, generation, curation, captioning and training" width="820">
+  <img src="docs/screenshots/02-workspace.png" alt="Guided dataset workspace: a progress rail mapping reference, generation, curation, captioning and training, next to the curation grid and its bulk actions" width="820">
 </p>
 <p align="center"><em>One workspace for the whole route: a progress rail shows what's done, what's next and exactly what's blocking Train.<br>All screenshots in this README use a synthetic, AI-generated demo person — no real individual is depicted.</em></p>
 
@@ -38,6 +42,16 @@ The big capabilities, each with what's actually inside it. Every block links dow
 
 Four ways to fill a dataset, and one choice at creation that rewires everything downstream.
 
+| Capability | What it provides |
+|---|---|
+| **Curation grid** | Keep/reject, crop, mirror, rotate, zoom, resize, multi-select and non-destructive upscale candidates from either engine — Klein re-renders detail (sharper, but skin and colour can shift), SeedVR2 resolves detail and leaves the original look alone |
+| **Identity and composition checks** | InsightFace similarity, score-based auto-triage, framing badges and a live Character composition meter |
+| **Model-matched captions** | Prose or booru form selected by target family, with kind-aware Concept leak checks and content-only Style rules |
+| **Caption Lab and recovery** | Find/replace, tag frequencies, expanded editing, targeted re-captioning, stoppable batches and reload-proof recovery |
+| **External caption round trip** | Export ordinary image/`.txt` pairs, caption them in any tool, then re-import without duplicating images or overwriting non-empty LDS captions |
+| **Dual long + short captions** | ai-toolkit text-side augmentation for supported local families; both wordings remain editable per image |
+| **Watermark review** | Detect, review and edit masks; choose crop or LaMa/Klein inpaint; every edit keeps an `.orig` backup and **Restore original** supports another attempt |
+
 | Sub-feature | What it gets you |
 | :-- | :-- |
 | **Character / Concept / Style** | One choice at creation rewires captioning, masking and step-scaling — it isn't just a label |
@@ -48,6 +62,17 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | **✏️ Edit the prompt, regenerate** | Every generated tile reopens its exact prompt inline and re-renders through the same engine, identity guard included |
 
 *Details: [1. Decide what you're teaching](#1-decide-what-youre-teaching) · [2. Fill it with images](#2-fill-it-with-images)*
+
+| Capability | What it provides |
+|---|---|
+| **Guided local training** | ai-toolkit underneath, family-scoped starters, adaptive step policies, launch guards, queueing and advanced controls |
+| **Slider LoRA (Beta)** | Train a bipolar conceptual slider from positive and negative prompt poles, so LoRA strength moves the learned trait in either direction and Test Studio can sweep both sides |
+| **Custom bases and continuation** | Train compatible custom weights, continue from any saved epoch, or use verified full-state resume where available |
+| **Runs hub** | Every run together with progress, logs, stop/retry/continue/download actions and paste-safe config sharing |
+| **Experiment lineage** | Inspect, annotate and diff the exact tree of runs and the checkpoint each continuation resumed from |
+| **LoRA Canvas** | Put every dataset's lineage on one pan/zoom board, rearrange cards, compare runs across datasets, generate from same-family checkpoints, pin/fuse outputs and continue training from a pill — each generation run keeps its own strip in training-step order, with the character dataset's reference face on its lane |
+| **Test Studio** | Fixed-seed checkpoint × strength grids, multi-LoRA comparisons or 🧬 combined stacks (several of your LoRAs in one image, each at its own weight, weight variants compared side by side), a ✨ Enhance button that enriches your prompt through your local Ollama, votes, Wilson ranking, face ranking and shareable exports |
+| **Studio shortcuts and recovery** | Open Studio directly from a run, draw prompts from kept dataset captions, and pause safely when ComfyUI drops instead of launching later cells against changed state |
 
 ### 🗃️ Image bank — a giant unsorted folder becomes a dataset
 
@@ -339,10 +364,10 @@ Directions, not dates. These are discussed openly on the project's Discord, and 
 - **Reference**
   - [Why this instead of ai-toolkit?](#why-this-instead-of-ai-toolkit)
   - [Feature matrix by backend](#feature-matrix-by-backend)
-  - [Run it your way](#run-it-your-way) — full local, curation-only, **Docker (CPU or GPU)**
+  - [Run it your way](#run-it-your-way) — full local, existing-ComfyUI Docker, **Docker (CPU or GPU)**
   - [Setup & install](#setup--install)
-    - [Docker (curation-only, no GPU)](#option-3--docker-curation-only)
-    - [Docker with a GPU (brings its own ComfyUI)](#option-4--docker-with-a-gpu-brings-its-own-comfyui)
+    - [Docker + your existing ComfyUI](#option-3--docker--your-existing-comfyui)
+    - [Docker (GPU + ComfyUI)](#option-4--docker-gpu--comfyui)
   - [Minimum requirements](#minimum-requirements)
   - [Configuration & settings reference](#configuration--settings-reference)
   - [Exposing the app beyond localhost](#exposing-the-app-beyond-localhost)
@@ -685,6 +710,8 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Feature | Requires |
 |---|---|
 | Klein image generation / single or bulk 2 MP improvement | ComfyUI reachable + Klein model installed |
+| SeedVR2 upscaling | ComfyUI reachable + the `ComfyUI-SeedVR2_VideoUpscaler` node pack (installed from ComfyUI, not by this app — it has its own Python dependencies) + two model files the Setup step downloads (~3.9 GB); [exact files](docs/guide/settings-reference.md#seedvr2-upscaling-local) |
+| Krea 2 Edit generation | ComfyUI reachable + `comfyui-krea2edit`, a Krea 2 base, Identity Edit LoRA, Qwen3-VL encoder and Qwen Image VAE; [exact files](docs/guide/settings-reference.md#krea-2-edit-local) |
 | Captioning | Ollama **or** ai-toolkit (JoyCaption) |
 | Dual long + short captions | ai-toolkit + local vision caption derivation; local training only, and unavailable for Krea 2 / Anima |
 | Auto-framing / auto head-crop | Ollama with a vision model |
@@ -704,13 +731,13 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 
 ## Run it your way
 
-**Curation-only** — dataset creation, import/scrape, manual curation/captions, backup and export. Runs on any machine with Python and no GPU; this is what the Docker image ships. No ComfyUI, ai-toolkit or local ML extras required. (This fork removed the cloud API engines — image *generation* always runs locally via ComfyUI, and there is no rented-GPU training lane.)
+| Mode | Good for | What is optional or unavailable |
+|---|---|---|
+| **Docker + existing ComfyUI** | Run LDS in Docker while keeping the ComfyUI already installed on the host | The launcher asks for the ComfyUI folder once; training still needs ai-toolkit on the host — this fork has no cloud fallback |
+| **Docker GPU + fresh ComfyUI** | Run LDS and a new isolated ComfyUI together on an NVIDIA GPU | Existing ComfyUI/models stay untouched; training still needs ai-toolkit on the host — this fork has no cloud fallback |
+| **Full local** | Local engines, ML helpers, ai-toolkit training, Canvas generation and Test Studio | Install/connect only the tools you need; each capability degrades independently |
 
-The Docker image installs `backend/requirements.txt` only, so the scraper (`requirements-scrape.txt`) and the ML extras (`requirements-ml.txt`) are **not** in it — they can be installed from the app afterwards, but a container recreate wipes them. What the container cannot do at all is the ComfyUI half: Klein/Krea generation, the Test Studio, and deploying a trained LoRA. Local training needs ai-toolkit on the host.
-
-**Full local** — everything above plus Klein/Z-Image generation, captioning via JoyCaption, face scoring, masks, the Image bank scoring pass, training, and Test Studio. Requires ComfyUI and/or ai-toolkit running on the same host (or reachable over the network) and an NVIDIA GPU with 12 GB+ VRAM for Klein/Z-Image inference. Training VRAM depends on the model family — check the family's ai-toolkit preset before queuing a run. The face-scoring and masking helpers (`requirements-ml.txt`) run fine on CPU; they don't need the GPU.
-
-This fork is **local-only end to end**: no Nano Banana / ChatGPT API engines (Klein/ComfyUI is the only generation path) and no rented-GPU training. Without a GPU on this machine you get everything except generation and training — see [No local GPU? Then no training here](#no-local-gpu-then-no-training-here).
+This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter API engines (Klein/ComfyUI is the only generation path) and no rented-GPU training. Without a GPU on this machine you get everything except generation and training — see [No local GPU? Then no training here](#no-local-gpu-then-no-training-here).
 
 ---
 
@@ -780,17 +807,28 @@ npm install
 npm run build
 ```
 
-### Option 3 — Docker (curation-only)
+### Option 3 — Docker + your existing ComfyUI
 
-```bash
-cp .env.example .env
-mkdir -p data-docker
-docker compose up --build
-```
+**Beginner Windows flow:** download/extract the GitHub ZIP, start Docker Desktop, then double-click **`start-docker.bat`**. On the first run, select either the ComfyUI folder containing `main.py` and `models`, or its portable parent containing `ComfyUI\main.py`. LDS validates the folder and remembers it for this checkout.
 
-This builds and runs the curation-only mode (see `Dockerfile` / `docker-compose.yml`) — ComfyUI and ai-toolkit are host-native tools and out of scope for this container. Data persists to `./data-docker` on the host, and your keys (Hugging Face, scraper credentials) are mounted in from `.env`.
+Start your usual ComfyUI on the host. LDS uses `http://host.docker.internal:8188` from its container and mounts the selected folder at `/external-comfyui`. If the folder later moves, double-click **`configure-docker.bat`**. The launcher chooses a free Studio port and opens the browser automatically. Local training still needs ai-toolkit on the host — this fork has no cloud fallback.
 
-### Option 4 — Docker with a GPU (brings its own ComfyUI)
+### Option 4 — Docker (GPU + ComfyUI)
+
+**Beginner Windows flow:**
+
+1. On GitHub, choose **Code → Download ZIP**, then extract the complete folder.
+2. Start **Docker Desktop** and wait until it reports that Docker is running.
+3. Double-click **`start-docker-gpu.bat`** in the extracted folder.
+4. Leave the first build/start running; it downloads the image and ComfyUI environment. The launcher prints both actual addresses and opens Studio as soon as Studio responds, while its batch window stays open until ComfyUI finishes its first boot. You do not need to open a second ComfyUI window.
+
+This creates a **fresh, isolated, repo-local** Docker setup: its own ComfyUI, models, application data and Image Bank folder live beside this checkout. **It never touches an existing ComfyUI by default.**
+
+For either Docker launcher, choose Ollama only inside **LDS Setup**: **No Ollama**, **Existing host Ollama**, or **Docker Ollama**. The Docker companion is started only after that explicit choice, and no vision model is downloaded automatically. Pull the selected model from the LDS Ollama card to see progress and cancel it if needed.
+
+The double-click launcher allocates free host ports atomically: Studio uses the first available port in `5050-5149`, and ComfyUI the first available port in `8188-8287`. If `5050` or `8188` is already occupied, the existing service is left running and another port is chosen automatically. Re-running the launcher from the same checkout reopens its current mapped ports without recreating the running container; a conflicting container owned by another checkout is reported and left untouched. The launcher does not edit `.env`.
+
+Advanced CLI:
 
 ```bash
 cp .env.example .env
@@ -798,21 +836,17 @@ mkdir -p run basedir data-docker-gpu          # create the bind mounts FIRST
 docker compose -f docker-compose.gpu.yml up --build
 ```
 
-A second image (`Dockerfile.gpu` / `docker-compose.gpu.yml`, and `start-docker-gpu.bat`
-on Windows) that ships **ComfyUI inside the container**, so Klein/Krea generation,
-the Test Studio and Canvas work without installing ComfyUI on the host. It needs
-an NVIDIA GPU with the container toolkit on the host.
-
-What it still does **not** do: **local LoRA training**. ai-toolkit stays a
-host-native tool, so this image generates and curates but does not train — if you
-came here to train, you want Option 1 or 2.
-
-Point `LDS_COMFY_BASEDIR` at a ComfyUI *parent* folder you already have (the one
-holding `models/`, `input/`, `output/`, `custom_nodes/` — never `models/` itself)
-and nothing downloads twice. `LDS_BANK_SOURCES` mounts a folder of images for the
-🗃️ Image bank to triage in place; inside the container it is `/images`, which is
-what you type in **New bank**. The remaining knobs (UID/GID, ports, RAM/CPU caps,
-DNS) are documented inline in `.env.example`.
+This image ships **ComfyUI inside the container** — Klein/Krea generation, the
+Test Studio and Canvas work without installing ComfyUI on the host — but it
+still does **not** do **local LoRA training**: ai-toolkit stays a host-native
+tool, and this fork has no cloud fallback, so if you came here to train, you
+want Option 1 or 2. For the advanced CLI, the default addresses remain
+`http://127.0.0.1:5050/` for Studio and `http://127.0.0.1:8188/` for ComfyUI;
+`.env` can override them. This lane requires an NVIDIA GPU, a compatible
+driver and NVIDIA Container Toolkit support. Storage relocation, ports,
+existing-ComfyUI adoption, UID/GID, DNS, update commands, resource caps and
+operational limits are documented in the dedicated
+[Docker guide](docs/guide/docker.md).
 
 ### External tools (install once, connect in Settings)
 
@@ -820,9 +854,9 @@ DNS) are documented inline in `.env.example`.
 |---|---|---|
 | [ai-toolkit](https://github.com/ostris/ai-toolkit) | Local LoRA training and JoyCaption | Set its directory and Python interpreter in **Settings → Local tools**; conda, uv, venv and portable Python installs are supported |
 | [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | Klein/Krea local generation, Studio, Canvas generation and deployment; SDXL base discovery | Keep its API reachable and set the install/models paths in **Settings → Local tools** |
-| [Ollama](https://ollama.com) | Auto-captioning, framing, head-crop and watermark detection | Install a vision model, then select/test it in **Settings → Local tools** |
+| [Ollama](https://ollama.com) | Auto-captioning, framing, head-crop and watermark detection | In Docker, choose none/host/companion in **Setup**, then pull the model explicitly from LDS; native installs can use their configured URL |
 
-The full path rules, model layouts and three-state Ollama detection are in the [settings reference](docs/guide/settings-reference.md#local-tools). If a tool remains unavailable, use the [troubleshooting guide](docs/guide/troubleshooting.md).
+The full path rules, model layouts and Ollama deployment/model states are in the [settings reference](docs/guide/settings-reference.md#local-tools). If a tool remains unavailable, use the [troubleshooting guide](docs/guide/troubleshooting.md).
 
 ### Getting API keys
 

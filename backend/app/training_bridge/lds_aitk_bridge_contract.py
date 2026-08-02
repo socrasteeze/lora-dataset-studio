@@ -174,10 +174,9 @@ def _ensure_safe_parent(parent: Path) -> None:
             or (getattr(info, "st_file_attributes", 0) & _REPARSE_POINT)
         ):
             # Name the cause: the caller's only remedy differs for a symlink
-            # versus a plain non-directory, and upstream's own test asserts
-            # /link|reparse/ against this message. That test SKIPS on Windows
-            # (it cannot create the symlink), so the mismatch only shows on
-            # POSIX and CI never reached it.
+            # versus a plain non-directory, and the test asserting this message
+            # only checks /link|reparse/, which both wordings satisfy — kept
+            # from a previous sync rather than re-taken from upstream.
             raise OSError(
                 "status parent is not a real directory "
                 "(symlink or reparse point)")
