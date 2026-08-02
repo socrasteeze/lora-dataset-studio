@@ -18,11 +18,12 @@ pipeline behind one UI.
 |---|---|---|
 | **What works** | Create datasets, import/scrape, curate, caption manually, export ZIP | Everything — plus local (Klein) generation, JoyCaption, face scoring, masks, training, Test Studio |
 | **Needs** | Python 3.10–3.12 | ComfyUI and/or ai-toolkit + an NVIDIA GPU (12 GB+ for local generation) |
-| **Good for** | Laptops, first try, cloud training | The full pipeline on a training rig |
+| **Good for** | Laptops, a first try, curating away from your GPU box | The full pipeline on a training rig |
 
 You can start **curation-only** (import/scrape your own photos) and add the
 local tools later — features light up automatically when their tool is
-detected. This fork has no cloud image-generation API engines.
+detected. This fork has no cloud API engines and no rented-GPU training: generation
+and training both run on hardware you control.
 
 ## First launch
 

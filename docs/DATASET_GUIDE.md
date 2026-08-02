@@ -280,7 +280,7 @@ dialog:
   but the whole point is that you can pick an **earlier, less-cooked epoch**: the
   classic case where step 750 held up better than the over-cooked 1000. Choosing
   an earlier step never destroys the run's later saves — they're set aside intact
-  (on disk locally, in the run's staging for cloud) and the continuation writes
+  on disk, and the continuation writes
   its own.
 - **Extra steps** — how many *more* steps to train; the dialog shows the target
   step you'll land on.
@@ -291,21 +291,18 @@ dialog:
   The timestep knob enables a known **two-phase recipe**: train balanced first,
   then continue with a low-noise-leaning emphasis to polish fine texture.
 
-- **Run it** — **💻 Local** or **☁ Cloud**. A checkpoint is just a
-  file, so where a run trained doesn't decide where it can be finished: a run
-  trained on your GPU can be continued on a rented one (the checkpoint is uploaded
-  and training picks up from it, on a fresh pod, leaving every local save
-  untouched), and a cloud epoch mirrored into your run folder can be finished
-  locally. A lane you can't use right now — no vast.ai key, no ai-toolkit, a
-  training already running here, a cloud limit reached — is disabled **with the
-  reason**, never hidden. The same choice is offered by the **Runs** page's
-  ▶ Continue, where the cloud reason is counted against *that run's* dataset —
-  the page lists runs from all of them.
+- **Run it** — on this machine's GPU. A checkpoint is just a file, so one trained
+  elsewhere can be continued here just the same. This fork has **no rented-GPU
+  lane** — upstream's ☁ Cloud choice is removed, and a continuation always runs
+  on the Primary's own card. When it can't run at all — no ai-toolkit, a training
+  already going here — the button is disabled **with the reason**, never hidden.
+  The **Runs** page's ▶ Continue behaves identically, counting that reason
+  against *that run's* dataset, since the page lists runs from all of them.
 
 You can also click a checkpoint pill in the **◉ Graph** and pick *▶ Continue from
 here*: the dialog opens already set on that step.
 
-Continue works for both **local and cloud** runs from the Runs hub.
+Continue also works from the Runs hub, for any run listed there.
 
 ## 7. Dual captions (long + short)
 
@@ -325,9 +322,9 @@ How the short caption is produced:
   identity / concept / aesthetic stays omitted (that's still the trigger's job).
 - You can **edit it per image** in the **⛶** caption editor, next to the long one.
 
-**Local training only for now.** The cloud pod's dataset upload doesn't carry the
-JSON file the short caption is read from, so **cloud runs train on the long
-caption alone** — turning the toggle on simply has no effect there yet.
+**Not carried by every lane.** A dataset staged for a machine that has no copy of the
+JSON file the short caption is read from trains on the long caption alone; on this
+fork every run is local, so the toggle applies to all of them.
 
 **Not on Krea 2 or Anima.** Those two families pre-cache their text embeddings and
 unload the text encoder to fit their DiT in VRAM. ai-toolkit caches exactly one

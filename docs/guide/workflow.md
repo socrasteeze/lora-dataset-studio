@@ -11,7 +11,7 @@ This is the long-form route from an empty dataset to an exported LoRA. The root 
 | [3. Curate down to the keepers](#3-curate-down-to-the-keepers) | Off-identity, weak and redundant shots are removed |
 | [4. Caption for the model](#4-caption-for-the-model) | Every kept image has family- and kind-appropriate wording |
 | [5. Scrub watermarks](#5-scrub-watermarks) | Marks are reviewed and removed without losing originals |
-| [6. Train](#6-train--guided-advanced-when-you-need-it) | A guarded local or cloud run produces checkpoints |
+| [6. Train](#6-train--guided-advanced-when-you-need-it) | A guarded local run produces checkpoints |
 | [7. Read the family tree](#7-read-the-family-tree) | Runs, continuations, settings and previews remain traceable |
 | [8. Pick the best checkpoint](#8-pick-the-best-checkpoint) | Fixed-seed comparisons identify the useful checkpoint and strength |
 | [9. Take it with you](#9-take-it-with-you) | The dataset, LoRA and history leave in standard or portable formats |
@@ -171,18 +171,18 @@ Readiness messages distinguish a quality warning you may explicitly accept from 
   <img src="../screenshots/training/training-presets.png" alt="Training panel with family-scoped starters and advanced options" width="820">
 </p>
 
-### No GPU? Train in the cloud
+### No GPU? Then no training here
 
-The cloud lane rents a vast.ai GPU for one run, stages the same dataset/config, streams progress and saved epochs home, and terminates the pod automatically. Stop and freeze handling are evidence-based so a silent pod cannot keep billing indefinitely; downloads use byte progress rather than the training-step watchdog.
+Training runs on this machine's own GPU. **This fork has no rented-GPU lane** — upstream ships one, and it is removed here on purpose. Everything before training works with no GPU at all, and **Settings → Devices** can send generation and the Image Bank's analysis passes to another machine on your network, but a training run is always launched on the Primary's own card.
 
-Cloud support is family-specific and shown in the launch UI. Dense Krea 2 uses a separate, narrowly scoped Hugging Face delivery token; follow [Cloud training](settings-reference.md#cloud-training) before the first paid run.
+If this machine has no suitable card, train the LoRA elsewhere and bring the `.safetensors` back: the Test Studio, the Canvas and every export lane work on a checkpoint this app did not produce.
 
 ### The Runs hub
 
-**Runs** places local and cloud jobs together with their stage, progress, ETA, logs, samples, exact recipe, stop/retry/continue/download actions and a paste-safe **Share config** summary. A run can open its dataset's Test Studio directly.
+**Runs** places every training job together with its stage, progress, ETA, logs, samples, exact recipe, stop/retry/continue/download actions and a paste-safe **Share config** summary. A run can open its dataset's Test Studio directly.
 
 <p align="center">
-  <img src="../screenshots/training/runs-hub.png" alt="Runs hub with local and cloud runs side by side" width="820">
+  <img src="../screenshots/training/runs-hub.png" alt="Runs hub listing training runs with live progress and per-run actions" width="820">
 </p>
 
 ## 7. Read the family tree
@@ -230,7 +230,7 @@ Nothing in the workflow locks data into the app:
 | **Merge ZIP/folder** | Images and captions from an existing dataset, with perceptual duplicates skipped |
 | **Portable backup** | Datasets, references, decisions, captions, settings and run history; API keys are excluded |
 | **Hugging Face dataset** | Kept image/caption pairs, private by default and published only after a rights confirmation |
-| **ComfyUI deployment** | A selected local checkpoint or downloaded cloud result copied into the configured LoRA tree |
+| **ComfyUI deployment** | A selected checkpoint copied into the configured LoRA tree |
 | **Trash** | App-managed deletions remain recoverable until Trash is emptied |
 
 When trained LoRAs are included in a portable backup, restore can rebuild both dataset state and training history on another installation.

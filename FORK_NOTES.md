@@ -447,6 +447,26 @@ or Runs rental prompts: delete them again. Contract:
 `frontend/tests/local-only-engines-contract.test.mjs` (also forbids rental UI
 strings).
 
+**The README and the guides described the rental lane as if it shipped, for
+every sync until 2026-08-01.** The removal had always been enforced in CODE and
+recorded here, and never once propagated to the prose, so the front page carried
+a `### No GPU? Train in the cloud` chapter (vast.ai key, price caps, pod safety)
+plus ~20 further claims, and contradicted itself on the same page: *"there is no
+rented-GPU training lane"* eight lines above a pointer to that chapter. The cause
+is structural and worth naming — **the local-only contract reads `frontend/src`
+and `frontend/dist`, and `README.md` is in neither**, so the one gate that would
+have caught it never looked. Fixed across `README.md`, `docs/guide/workflow.md`,
+`docs/DATASET_GUIDE.md`, `docs/guide/getting-started.md`,
+`docs/guide/using-the-app.md`, `docs/guide/known-limitations.md`,
+`docs/guide/settings-reference.md` and `.env.example`. Two of those said
+something stronger than "stale": settings-reference claimed *"Cloud training
+itself still works end to end … Continue/Retry still work"*, which
+`CloudRunsPage.jsx:643` disproves in one line (`.filter(r => r.source !==
+'cloud')`, with the three cloud status values pinned off right below it), and
+`VAST_API_KEY` was documented as *"Required to enable cloud training at all"* —
+setting it enables nothing here. **When a sync re-offers this prose, reject it in
+the docs too, not only in the JSX.**
+
 **The docs are a fourth recurrence surface, and the contract does not cover
 them.** `docs/guide/troubleshooting.md` joined it on 2026-07-28 with a whole new
 **A cloud run seems stuck** chapter (Cloud tab, vast.ai console, pod phases) —
