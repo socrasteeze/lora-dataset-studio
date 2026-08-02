@@ -15,6 +15,7 @@ import {
   extractCredits,
   emptySignal,
   REPO_URL,
+  MAX_BODY_CHARS,
 } from '../scripts/releaseNotes.mjs';
 import { WHATS_NEW } from '../src/whatsNew.js';
 
@@ -147,4 +148,48 @@ test('an empty first release still refuses, and names the tag not a null', () =>
   assert.equal(signal.severity, 'error');
   assert.match(signal.message, /in v2026\.08\.03/);
   assert.doesNotMatch(signal.message, /null|undefined/);
+});
+
+// ── GitHub's body limit ──────────────────────────────────────────────────────
+// A body over 125 000 characters is refused with a flat HTTP 422, and it is
+// refused at the LAST step — after the ZIP is built and uploaded — so the whole
+// release fails and leaves a tag with no release behind it. The fork's first
+// release hit this at 239 853 characters.
+
+const BULK = Array.from({ length: 400 }, (_, i) => ({
+  id: `bulk-${i}`,
+  title: `Entry number ${i}`,
+  blurb: `${'x'.repeat(600)} ${i}`,
+}));
+
+test('a body too large for GitHub is trimmed instead of being refused by it', () => {
+  const body = renderNotes({ tag: 'v1', previousTag: null, entries: BULK });
+  assert.ok(body.length <= MAX_BODY_CHARS,
+    `body is ${body.length} chars, over GitHub's ${MAX_BODY_CHARS} limit`);
+});
+
+test('a trimmed body says how much it dropped rather than looking complete', () => {
+  const body = renderNotes({ tag: 'v1', previousTag: null, entries: BULK });
+  const kept = [...body.matchAll(/^### /gm)].length;
+  assert.ok(kept > 0 && kept < BULK.length, 'some entries kept, some dropped');
+  assert.match(body, new RegExp(`and ${BULK.length - kept} earlier entr`));
+  assert.match(body, /CHANGELOG\.md/);
+});
+
+test('a body that already fits is left exactly as it was', () => {
+  const body = renderNotes({ tag: 'v1', previousTag: 'v0', entries: CURRENT });
+  assert.doesNotMatch(body, /trimmed to fit/);
+  assert.equal([...body.matchAll(/^### /gm)].length, CURRENT.length);
+});
+
+test('credits name only contributors whose entry actually survived the trim', () => {
+  const credited = { id: 'c', title: 'Kept', blurb: 'Fixed by Someone (GitHub).' };
+  const hidden = { id: 'h', title: 'Dropped', blurb: `${'y'.repeat(300)} Reported by Ghost (Discord).` };
+  // A tiny budget keeps the first entry and drops the rest.
+  const body = renderNotes({
+    tag: 'v1', previousTag: null, entries: [credited, ...Array(50).fill(hidden)], budget: 400,
+  });
+  assert.match(body, /Someone \(GitHub\)/);
+  assert.doesNotMatch(body, /Ghost \(Discord\)/,
+    'thanking someone for an entry the reader cannot see is worse than not thanking them');
 });

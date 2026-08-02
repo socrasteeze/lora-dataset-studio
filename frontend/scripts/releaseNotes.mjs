@@ -99,21 +99,51 @@ export function extractCredits(entries) {
   return [...seen];
 }
 
+// GitHub rejects a release body over 125 000 characters with a flat
+// `HTTP 422: body is too long`, AFTER the ZIP has been built and uploaded — so
+// the release fails at the last step and leaves a tag with no release. Budgeted
+// a little under the real ceiling to leave room for the credits line and the
+// truncation notice, which are appended after the entries are counted.
+export const MAX_BODY_CHARS = 125000;
+const BODY_BUDGET = 121000;
+
 /**
  * The release body. `to:` targets are dropped on purpose: they are in-app router
  * paths ('/settings/engines'), which mean nothing on a GitHub page and would
  * render as dead links.
+ *
+ * Entries are dropped from the END if the body would exceed what GitHub accepts,
+ * and the body SAYS how many were dropped. Silently publishing a shorter list
+ * would be worse than the 422: a release that looks complete and is not.
  */
-export function renderNotes({ preamble = '', tag, previousTag, entries }) {
+export function renderNotes({ preamble = '', tag, previousTag, entries, budget = BODY_BUDGET }) {
   const out = [];
   if (preamble.trim()) out.push(preamble.trim(), '');
   out.push(`## 🎁 What's new in ${tag}`, '');
 
+  let used = out.join('\n').length;
+  const included = [];
+  let dropped = 0;
   for (const e of entries) {
+    const block = `### ${e.title}\n\n${String(e.blurb).trim()}\n`;
+    if (used + block.length > budget) { dropped += 1; continue; }
+    used += block.length;
+    included.push(e);
     out.push(`### ${e.title}`, '', String(e.blurb).trim(), '');
   }
 
-  const credits = extractCredits(entries);
+  if (dropped) {
+    out.push(
+      `_… and ${dropped} earlier entr${dropped === 1 ? 'y' : 'ies'}, trimmed to fit `
+      + "GitHub's release-body limit. The full history is in "
+      + `[CHANGELOG.md](${REPO_URL}/blob/${tag}/CHANGELOG.md) and in 🎁 What's new inside the app._`,
+      '',
+    );
+  }
+
+  // Credits come from the entries that actually shipped in this body, so nobody
+  // is thanked for an entry the reader cannot see.
+  const credits = extractCredits(included);
   if (credits.length) {
     out.push('---', '', `**Thanks to ${credits.join(', ')}** — these came from you.`, '');
   }
