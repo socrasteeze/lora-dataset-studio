@@ -52,10 +52,6 @@ logger = logging.getLogger(__name__)
 
 WORKFLOW_IMPROVE_SKIN_PATH = cfg.BACKEND_DIR / 'workflows' / 'improve skin.json'
 
-# Subfolder under each ComfyUI model root where absolute paths outside every
-# registered root are hardlinked/symlinked so stock loader nodes can see them.
-_PINNED_SUBDIR = 'lds-pinned'
-
 # Nodes this helper rewires — fail LOUDLY if the workflow file changes shape
 # instead of silently enqueuing a job with the wrong source/prompt/model.
 # Node 6 = CLIPTextEncode: the per-job prompt is written straight into its `text`
@@ -123,8 +119,29 @@ def _find_model_file(comfy_type, canonical, tokens):
     return None
 
 
+# Config key + ComfyUI folder type per user-pinnable Klein slot. The consistency
+# LoRA rides along for the STATUS payload only — its resolution lives in
+# _configured_lora (it needs the absolute path too), but the Settings badge logic
+# is identical and duplicating it is how the two drift apart.
+# Ported from socrasteeze's branch (GitHub #20).
+KLEIN_OVERRIDE_KEYS = {
+    'unet': ('klein.unet', 'diffusion_models'),
+    'text_encoder': ('klein.text_encoder', 'text_encoders'),
+    'vae': ('klein.vae', 'vae'),
+    'consistency_lora': ('klein.consistency_lora', 'loras'),
+}
+
+
+# Subfolder created under a ComfyUI model root where a pinned absolute path that
+# lives outside every registered root is hardlinked/symlinked, so stock loader
+# nodes can see it. Deliberately NOT a 'klein'-named folder: the Klein model
+# picker and _klein_unet_folders() bucket by folder name, and a staging area must
+# not start advertising itself as a second copy of the user's models.
+_PINNED_SUBDIR = 'lds-pinned'
+
+
 def _same_file(a, b):
-    """True when both paths exist and refer to the same inode/file."""
+    """True when both paths exist and are the same file (inode / file id)."""
     try:
         return os.path.samefile(a, b)
     except OSError:
@@ -132,9 +149,10 @@ def _same_file(a, b):
 
 
 def _link_file(src, dst):
-    """Create dst as a hardlink to src, falling back to a symlink. Returns True
-    on success. Hardlinks are preferred: same-volume Windows links need no
-    admin/Developer Mode and cost no extra disk for multi-GB weights."""
+    """Create `dst` as a hardlink to `src`, falling back to a symlink. True on
+    success. Hardlinks are tried FIRST on purpose: on Windows a same-volume
+    hardlink needs neither admin rights nor Developer Mode (a symlink needs one of
+    them), and neither costs a second copy of a multi-GB weight."""
     try:
         os.link(src, dst)
         return True
@@ -148,12 +166,21 @@ def _link_file(src, dst):
 
 
 def _stage_external_model(comfy_type, abs_path):
-    """Hardlink/symlink an absolute path into <first search root>/lds-pinned/ so
-    ComfyUI's stock loaders can open it. Returns the relative loader name, or
-    None when no root exists or linking fails (permissions / cross-volume with
-    no symlink privilege). Idempotent: reuses an existing link that already
-    points at the same file; on basename collision with a different source,
-    prefixes a short hash of the source path."""
+    """Link an absolute path that sits outside every registered <comfy_type> root
+    into <first root>/lds-pinned/ so ComfyUI's stock loaders can open it, and
+    return the relative loader name. None when there is no root, or when linking
+    fails (cross-volume with no symlink privilege, read-only models folder) — the
+    caller then reports 'outside_roots' and the badge names the fix.
+
+    Idempotent: an existing link to the SAME file is reused, so this is safe on
+    the resolve path that runs on every readiness probe. On a basename collision
+    with a DIFFERENT source it disambiguates with a short hash of the source path
+    rather than overwriting someone else's file.
+
+    This is the one place in the module that writes to the user's ComfyUI tree.
+    It is a deliberate consequence of an explicit pin: the user named a file, and
+    a stock loader node can only be handed a name relative to a registered folder.
+    Ported from socrasteeze's branch (GitHub #20)."""
     roots = comfy_model_paths.search_roots(comfy_type)
     if not roots:
         return None
@@ -164,7 +191,7 @@ def _stage_external_model(comfy_type, abs_path):
     try:
         os.makedirs(dest_dir, exist_ok=True)
     except OSError as e:
-        logger.warning('could not create %s for external pin: %s', dest_dir, e)
+        logger.warning('could not create %s for an external pin: %s', dest_dir, e)
         return None
 
     def _rel(name):
@@ -174,53 +201,72 @@ def _stage_external_model(comfy_type, abs_path):
     if os.path.lexists(cand):
         if _same_file(cand, src):
             return _rel(base)
-        # Different file already owns this basename — disambiguate.
+        # A different file already owns this basename — disambiguate instead of
+        # replacing it: two pinned 'model.safetensors' from two folders is the
+        # normal case, and silently clobbering one of them is unrecoverable.
         digest = hashlib.sha1(
             os.path.normcase(os.path.abspath(src)).encode('utf-8', 'replace')
         ).hexdigest()[:8]
         base = f'{digest}_{os.path.basename(src)}'
         cand = os.path.join(dest_dir, base)
-        if os.path.lexists(cand) and _same_file(cand, src):
-            return _rel(base)
         if os.path.lexists(cand):
+            if _same_file(cand, src):
+                return _rel(base)
+            # Same source path, different file behind it (the user replaced the
+            # file the pin names) -> the stale link is ours to drop.
             try:
                 os.remove(cand)
             except OSError as e:
-                logger.warning('could not replace staged pin %s: %s', cand, e)
+                logger.warning('could not replace the staged pin %s: %s', cand, e)
                 return None
     if not _link_file(src, cand):
         logger.warning(
-            'could not hardlink/symlink %s into %s — leave the file under a '
-            'ComfyUI model folder or register its folder in extra_model_paths.yaml',
+            'could not hardlink or symlink %s into %s — keep the file under a '
+            'ComfyUI model folder, or register its folder in extra_model_paths.yaml',
             src, dest_dir)
         return None
+    logger.info('pinned %s staged as %s', src, _rel(base))
     return _rel(base)
 
 
 def _unet_weight_dtype(unet_ref):
-    """UNETLoader weight_dtype for the resolved Klein UNET name: FP8 builds need
-    fp8_e4m3fn; native bf16 / full weights use default."""
+    """`weight_dtype` for the UNETLoader given the resolved Klein UNET name.
+
+    Both shipped Klein graphs hardcode `fp8_e4m3fn`, which was right while the
+    only reachable model was the canonical fp8 download. A pin makes any UNET
+    reachable, and a native bf16 build handed to an fp8 loader is quantized on
+    load — it renders, so nothing fails, it is just not the weights the user
+    asked for. Filename-based because that is the same signal ComfyUI's own
+    model cards use; the canonical download carries 'fp8', so a stock install
+    keeps exactly today's value.
+    Ported from socrasteeze's branch (GitHub #20)."""
     if unet_ref and 'fp8' in os.path.basename(unet_ref).lower():
         return 'fp8_e4m3fn'
     return 'default'
 
 
 def resolve_model_ref(comfy_type, value):
-    """(relative_loader_name, status) for a user-entered model reference — either
-    a ComfyUI-relative loader name OR an absolute path (~ and env vars expanded).
+    """(relative_loader_name, status) for a user-entered model reference — either a
+    ComfyUI-relative loader name OR an absolute path (~ and env vars expanded).
     status ∈ 'ok' | 'missing' | 'outside_roots' | 'empty'.
 
-    Stock ComfyUI loader nodes can ONLY load names relative to a registered
-    model folder (base models/<type> plus extra_model_paths.yaml roots), so an
-    absolute path is CONVERTED to that relative name when the file sits under
-    one of the <comfy_type> search roots. An absolute path outside every root is
-    hardlinked/symlinked into <root>/lds-pinned/ so the loader can still see it
-    ('ok'); only when that staging fails does the status stay 'outside_roots'
-    (distinct from 'missing' — no such file at all / relative name not found)."""
+    Stock ComfyUI loader nodes can ONLY load names relative to a registered model
+    folder (base models/<type> plus extra_model_paths.yaml roots), so an absolute
+    path is CONVERTED to that relative name when the file sits under one of the
+    <comfy_type> search roots. An absolute path outside every root is instead
+    hardlinked/symlinked into <root>/lds-pinned/ so the loader can still open it
+    ('ok'); only when that staging fails does the status stay 'outside_roots',
+    deliberately distinct from 'missing' (no such file at all / relative name not
+    found): one is a permissions/volume problem, the other is a typo here.
+
+    The single entry point for every user-typed model reference in this module —
+    the three Klein pins, the consistency LoRA and the generation-LoRA preset
+    rows — so "does the app accept a path here?" has one answer, not five."""
     raw = (value or '').strip()
     if not raw:
         return None, 'empty'
-    # Accept both separators regardless of OS (users paste Windows paths).
+    # Accept both separators whatever the OS: users paste Windows paths into a
+    # Linux install's config as readily as the reverse.
     v = os.path.expandvars(os.path.expanduser(raw)).replace('\\', '/').replace('/', os.sep)
     if os.path.isabs(v):
         if not os.path.isfile(v):
@@ -246,46 +292,33 @@ def _configured_model(comfy_type, cfg_key):
     """User-pinned model file for a Klein slot (Settings ▸ Image engine ▸ Klein
     model files): the value of `cfg_key` — a relative loader name or an absolute
     path — resolved to a ComfyUI-relative loader name via resolve_model_ref.
-    '' / unset / unresolvable → None, and the caller falls back to
-    auto-detection — a stale override must degrade to the scan (and its
-    auto-download path), never brick generation. klein_override_status() is what
-    surfaces a configured-but-unresolvable file to the UI, so the fallback is
-    visible rather than silent."""
+    '' / unset / unresolvable → None, and the caller falls back to auto-detection
+    — a stale pin must degrade to the scan (and its auto-download path), never
+    brick generation. `klein_override_status()` is what surfaces a
+    pinned-but-unresolvable file to the UI, so the fallback is visible rather
+    than silent."""
     rel, status = resolve_model_ref(comfy_type, cfg.get(cfg_key))
     if status == 'ok':
         return rel
     if status != 'empty':
-        logger.warning('%s: configured file %r is %s (%s roots) — '
-                       'falling back to auto-detection',
-                       cfg_key, cfg.get(cfg_key), status, comfy_type)
+        logger.warning('%s: pinned file %r is %s (%s roots) — falling back to '
+                       'auto-detection', cfg_key, cfg.get(cfg_key), status, comfy_type)
     return None
 
 
-# Config key + ComfyUI folder type per overridable Klein model slot. The
-# consistency LoRA rides along for the STATUS payload (its resolution lives in
-# _configured_lora, but the Settings badge logic is identical).
-KLEIN_OVERRIDE_KEYS = {
-    'unet': ('klein.unet', 'diffusion_models'),
-    'text_encoder': ('klein.text_encoder', 'text_encoders'),
-    'vae': ('klein.vae', 'vae'),
-    'consistency_lora': ('klein.consistency_lora', 'loras'),
-}
-
-
 def klein_override_status():
-    """{slot: {'configured': str, 'found': bool, 'status': str}} for each
-    user-pinned Klein model file that is SET (empty overrides are omitted;
-    consistency_lora has a non-empty default so it is always reported). Read by
-    capabilities.probe() so the Settings fields can show an honest badge —
-    found / not found / outside ComfyUI's model folders — without it, a typo'd
-    override silently falls back to auto-detection and the user has no way to
-    see their pin isn't in effect."""
+    """{slot: {'configured': str, 'found': bool, 'status': str}} for each pinned
+    Klein model file that is SET (empty pins are omitted; consistency_lora has a
+    non-empty default, so it is always reported). Read by capabilities.probe() so
+    the Settings fields can show an honest badge — found / not found / outside
+    ComfyUI's model folders — without it a typo'd pin silently falls back to
+    auto-detection and the user has no way to see their pin is not in effect."""
     out = {}
     for slot, (key, comfy_type) in KLEIN_OVERRIDE_KEYS.items():
         raw = (cfg.get(key) or '').strip()
         if not raw:
             continue
-        rel, status = resolve_model_ref(comfy_type, raw)
+        _, status = resolve_model_ref(comfy_type, raw)
         out[slot] = {'configured': raw, 'found': status == 'ok', 'status': status}
     return out
 
@@ -369,15 +402,18 @@ def resolve_klein_unet(selected=None):
     a UNETLoader lists files relative to models/unet (or diffusion_models), so the
     bare filename the picker sends is not loadable on its own — the missing
     subfolder prefix was the original bug. Preference: the picker's choice
-    (searched across ALL klein folders), then the user-pinned klein.unet
-    override, then the canonical download, then the first file found."""
+    (searched across ALL klein folders), then the user-pinned klein.unet, then
+    the canonical download, then the first file found."""
     bare_pick = os.path.basename(selected) if selected else None
     if bare_pick:
         for sub, names in _klein_unet_folders():
             if bare_pick in names:
                 return os.path.join(sub, bare_pick)
-    # User-pinned file (Settings): honoured even when it lives OUTSIDE a
-    # 'klein'-named subfolder — the folder-name convention only drives the scan.
+    # The pin is honoured even when the file lives OUTSIDE a 'klein'-named
+    # subfolder — the folder-name convention only ever drove the SCAN, and the
+    # scan is what a pin is there to bypass. Checked before the folder guard
+    # below for the same reason: a pinned model in models/unet/my-tunes/ must
+    # resolve on an install where _klein_unet_folders() finds nothing at all.
     configured = _configured_model('diffusion_models', 'klein.unet')
     if configured:
         return configured
@@ -426,9 +462,9 @@ def unet_for_job(klein_model=None):
 
 
 def resolve_klein_vae():
-    """`vae_name` for node 10 — the user-pinned klein.vae override first, then the
-    canonical flux2-vae.safetensors, else a narrow flux2-vae token match (covers
-    the 'flux2_vae.safetensors.safetensors' double-extension variant some installs
+    """`vae_name` for node 10 — the user-pinned klein.vae first, then the canonical
+    flux2-vae.safetensors, else a narrow flux2-vae token match (covers the
+    'flux2_vae.safetensors.safetensors' double-extension variant some installs
     carry). Never e.g. qwen_image_vae."""
     return (_configured_model('vae', 'klein.vae')
             or _find_model_file('vae', _canonical_name('klein_vae'),
@@ -436,11 +472,10 @@ def resolve_klein_vae():
 
 
 def resolve_klein_text_encoder():
-    """`clip_name` for node 90 — the user-pinned klein.text_encoder override first,
-    then the canonical qwen_3_8b_fp8mixed.safetensors, else a narrow qwen_3_8b
-    token match. NEVER a bare 'qwen' match: qwen3vl_* (Z-Image) and qwen_2.5_vl_*
-    (Qwen-Image) encoders live in the same folder and produce incompatible
-    embeddings."""
+    """`clip_name` for node 90 — the user-pinned klein.text_encoder first, then the
+    canonical qwen_3_8b_fp8mixed.safetensors, else a narrow qwen_3_8b token match.
+    NEVER a bare 'qwen' match: qwen3vl_* (Z-Image) and qwen_2.5_vl_* (Qwen-Image)
+    encoders live in the same folder and produce incompatible embeddings."""
     return (_configured_model('text_encoders', 'klein.text_encoder')
             or _find_model_file('text_encoders', _canonical_name('klein_text_encoder'),
                                 ('qwen_3_8b', 'qwen3_8b', 'qwen-3-8b')))
@@ -461,12 +496,14 @@ def _lora_abs(rel_name):
 
 
 def _configured_lora(cfg_key):
-    """(relative_name, absolute_path) of the LoRA named by config key `cfg_key` —
-    a loras-relative name OR an absolute path (resolve_model_ref converts a path
+    """(relative_name, absolute_path) of the LoRA named by config key `cfg_key` — a
+    loras-relative name OR an absolute path (resolve_model_ref converts a path
     under any registered loras root into the relative name a LoraLoader wants).
-    When unresolvable, the relative name is kept as typed and the path is the
-    base-expected location (for a stable "not found at <path>" log message), or
-    None when no loras root exists."""
+    The relative name carries its subfolder (e.g. 'klein\\Flux2-...safetensors'),
+    which is exactly the string a LoraLoader wants regardless of which registered
+    loras root holds it. When unresolvable the name is kept as typed and the path
+    is the base-expected location (for a stable "not found at <path>" log
+    message), or None when no loras root exists."""
     raw = (cfg.get(cfg_key) or '').strip()
     if not raw:
         return None, None
@@ -475,11 +512,13 @@ def _configured_lora(cfg_key):
         return rel, _lora_abs(rel)
     name = raw.replace('\\', '/').replace('/', os.sep)
     if status == 'outside_roots':
-        # Staging into lds-pinned/ failed (permissions / cross-volume). Report
-        # absent rather than handing ComfyUI an unloadable name.
-        logger.warning('%s: %r exists but could not be linked into a ComfyUI '
-                       'loras folder — move it under models/loras or fix link '
-                       'permissions', cfg_key, raw)
+        # The file EXISTS but no loras root reaches it AND staging into
+        # lds-pinned/ failed (permissions, or a cross-volume link this account
+        # may not create). Report it ABSENT (path None) rather than hand ComfyUI
+        # a name it will fail validation on.
+        logger.warning('%s: %r exists but could not be linked into a ComfyUI loras '
+                       'folder — move it under models/loras, or register its folder '
+                       'in extra_model_paths.yaml', cfg_key, raw)
         return name, None
     roots = comfy_model_paths.search_roots('loras')
     return name, (os.path.join(roots[0], name) if roots else None)
@@ -938,6 +977,8 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     # each new generation overwriting the previous one in the dataset dir.
     workflow["9"]["inputs"]["filename_prefix"] = f"{user_id}_DatasetFace_{uid}"
     workflow["114"]["inputs"]["unet_name"] = unet_ref
+    # The graph's hardcoded fp8_e4m3fn is only right for an fp8 build; a pinned
+    # bf16 UNET must not be quantized on load behind the user's back.
     workflow["114"]["inputs"]["weight_dtype"] = _unet_weight_dtype(unet_ref)
     workflow["10"]["inputs"]["vae_name"] = vae_ref
     workflow["90"]["inputs"]["clip_name"] = te_ref
@@ -1052,9 +1093,10 @@ def enqueue_klein_edit(user_id, source_filename, edit_prompt, klein_model=None,
     consistency_key = (os.path.normcase(os.path.normpath(consistency_lora))
                        if consistency_lora else None)
     for i, entry in enumerate((generation_loras or [])[:MAX_GENERATION_LORAS], start=1):
-        # A preset row may hold a loras-relative name OR an absolute path —
-        # resolve_model_ref converts a path under a registered loras root into
-        # the relative name a LoraLoader wants (outside-roots/missing → skip).
+        # A preset row holds a loras-relative name OR an absolute path — the same
+        # resolve_model_ref every other model reference goes through, so a path
+        # under a registered loras root becomes the name a LoraLoader wants and
+        # anything else (missing / outside every root) skips the row.
         slot_lora, slot_status = resolve_model_ref('loras', entry.get('file'))
         slot_strength = entry.get('strength')
         slot_strength = max(0.0, min(1.5, float(slot_strength))) \

@@ -282,11 +282,17 @@ def bank_images(bank_id):
         semantic_group=_int('semantic_group'),
         subfolder=subfolder if subfolder is not None else None,
         search=args.get('search') or None,
+        exclude=args.get('exclude') or None,
         sort=args.get('sort') or None,
         res_bucket=args.get('res_bucket') or None,
         framing=args.get('framing') or None,
         origin=args.get('origin') or None,
         ids=ids,
+        # ids_only=1 answers {'ids': [...]} for the WHOLE filter in one request —
+        # what ▶ Review and "Select all in filter" actually need. Same filters,
+        # same sort, same route, so the two answers can never disagree about what
+        # the current filter contains.
+        ids_only=args.get('ids_only') == '1',
         offset=_int('offset') or 0, limit=_int('limit') or 200)
     if payload is None:
         return jsonify({'error': 'not found'}), 404
@@ -863,8 +869,9 @@ def bank_apply_flags(bank_id):
 
 def _curation_filters(data):
     """The shared candidate-pool filters for the curation selectors — the same
-    facets as the grid (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩ search),
-    read out of a JSON body. Unknown keys (e.g. the grid's ``sort``) are ignored."""
+    facets as the grid (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩ search ∩
+    NOT exclude), read out of a JSON body. Unknown keys (e.g. the grid's ``sort``,
+    which only orders) are ignored."""
     def _int(name):
         v = data.get(name)
         try:
@@ -881,6 +888,10 @@ def _curation_filters(data):
         # '' is a meaningful subfolder (bank root); '__all__'/None mean "no scope".
         'subfolder': subfolder if subfolder not in (None, '__all__') else None,
         'search': data.get('search') or None,
+        # Hiding images in the grid must hide them from a curation pick too —
+        # otherwise "select 60 diverse" would hand back the very images the user
+        # just declared done.
+        'exclude': data.get('exclude') or None,
     }
 
 
@@ -979,6 +990,11 @@ def bank_search_text(bank_id):
     knob here would be a control over a boundary that does not exist. See
     ``banks.search_by_text``.
 
+    {push_down} (and `-term` inside the query) names what to push DOWN the ranking,
+    with {push_down_weight} for how hard. That IS a defensible knob and the
+    threshold is not: a weight scales a subtraction inside one ranking, where a
+    threshold would claim a relevance boundary the measurements say is absent.
+
     400 = the request cannot be answered (no query, bank never scored).
     503 = the FEATURE is unavailable here (no torch/open_clip, encoder failed) —
     a different thing, and the UI says so differently: one is "do this first",
@@ -991,6 +1007,8 @@ def bank_search_text(bank_id):
         n = 60
     try:
         out = banks.search_by_text(LOCAL_USER, bank_id, data.get('query'), n=n,
+                                   push_down=data.get('push_down'),
+                                   push_down_weight=data.get('push_down_weight'),
                                    filters=_curation_filters(data))
     except TextEncodeError as e:
         return jsonify({'error': str(e), 'reason': 'encoder_unavailable'}), 503

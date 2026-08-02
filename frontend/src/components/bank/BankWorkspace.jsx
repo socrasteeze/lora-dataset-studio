@@ -37,11 +37,13 @@ import { BANK_ZONES, nextBankStep } from './bankGuide.js'
 // Provenance wording (effective resolution, origin, black bars) — pure/testable.
 import { ORIGIN_CHIPS, PROVENANCE_FLAG_LABEL, detailSummary } from './bankProvenance.js'
 // Grid ordering menu (which sorts exist, and which ones have data) — pure/testable.
-import { bankSortOptions } from '../../utils/gridSort.js'
+import { bankSortGroups, loadBankSort, saveBankSort } from '../../utils/gridSort.js'
 // 🔤 Text search wording — "closest", never "matching" — plus the cold-start and
 // CLIP-limitation copy. Pure/testable (node --test cannot parse this JSX).
 import {
-  limitsSentence, pendingLabel, readinessHint, summarize,
+  PUSH_DOWN_DEFAULT_STRENGTH, PUSH_DOWN_STRENGTHS, pushDownCaveat, pushDownNote,
+  limitsSentence, pendingLabel, readinessHint, suggestPushDown, summarize,
+  withoutNegation,
 } from './bankTextSearch.js'
 // ⚖ Balanced pick — the distribution obtained, in words and numbers. Pure logic
 // on purpose: the repartition is what has to be provable (node --test, no JSX).
@@ -106,16 +108,15 @@ const STATUS_RING = {
 /** Fetch EVERY image id matching a filter, page by page (used by the
  * cluster/flag "select all" actions — a cluster can exceed one grid page). */
 async function fetchAllIds(bankId, params) {
-  const ids = []
-  let offset = 0
-  for (;;) {
-    const qs = new URLSearchParams({ ...params, offset: String(offset), limit: '500' })
-    const d = await apiFetch(`/api/bank/${bankId}/images?${qs}`)
-    ids.push(...d.images.map((i) => i.id))
-    offset += d.images.length
-    if (offset >= d.total || d.images.length === 0) break
-  }
-  return ids
+  // ONE request for the ids of the whole filter (`ids_only=1`), in the order the
+  // grid is showing. This used to walk the grid 500 rows at a time and keep only
+  // `i.id` — 46 sequential round trips and 16 MB of image payloads to end up with
+  // 23 000 integers, measured on a 22 940-image bank; with a measure sort active
+  // each of those pages also re-ran the COUNT and the ORDER BY over the whole
+  // table, which is what put seconds in front of ▶ Review.
+  const qs = new URLSearchParams({ ...params, ids_only: '1' })
+  const d = await apiFetch(`/api/bank/${bankId}/images?${qs}`)
+  return d.ids || []
 }
 
 const STEP_SHORT = {
@@ -467,11 +468,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const toast = useToast()
   const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities()
   const [payload, setPayload] = useState(null)
-  const [filter, setFilter] = useState({ status: null, flag: null, cluster: null,
-    style: null, subfolder: null, search: null, sort: 'default', resBucket: null,
+  // `sort` opens on whatever order this bank was last reviewed in (per bank, not
+  // global — see gridSort.bankSortStorageKey). Every other facet starts empty on
+  // purpose: an order is a habit, a filter is a question you asked once.
+  const [filter, setFilter] = useState(() => ({ status: null, flag: null, cluster: null,
+    style: null, subfolder: null, search: null, exclude: null,
+    sort: loadBankSort(bankId), resBucket: null,
     origin: null,
-    framing: null })
+    framing: null }))
   const [searchText, setSearchText] = useState('')
+  // 🚫 The inverse of the search box: hide what already carries a word. Session
+  // state, deliberately NOT remembered like the sort — an order you can see in a
+  // menu is a habit, images missing from a grid for a reason you set last week
+  // reads as data loss.
+  const [excludeText, setExcludeText] = useState('')
   const [subfolders, setSubfolders] = useState([])
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState({ images: [], total: 0 })
@@ -517,6 +527,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // keeps the ranking legible once the grid has switched to it.
   const [textQuery, setTextQuery] = useState('')
   const [textN, setTextN] = useState(60)
+  // 🔤 what to push DOWN the ranking. Not a filter — see bankTextSearch.js.
+  const [textExclude, setTextExclude] = useState('')
+  const [textExcludeW, setTextExcludeW] = useState(PUSH_DOWN_DEFAULT_STRENGTH)
   const [textStatus, setTextStatus] = useState(null)
   const [textPending, setTextPending] = useState(false)
   const [textResult, setTextResult] = useState(null)
@@ -616,7 +629,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // whenever it isn't null, empty string included.
     if (f.subfolder != null) params.subfolder = f.subfolder
     if (f.search) params.search = f.search
-    // Grid sort (resolution / aesthetic / sharpness, each way) — sent to the grid
+    // The exclude terms travel with the search on every surface that reads a
+    // filter — the grid, "Select all in filter", ▶ Review and the curation picks.
+    if (f.exclude) params.exclude = f.exclude
+    // Grid sort (any measured quantity, each way) — sent to the grid
     // AND to fetchAllIds so "Select all in filter" and > Review walk the SAME
     // order the user is looking at. 'default' keeps the server's flag order.
     if (f.sort && f.sort !== 'default') params.sort = f.sort
@@ -647,7 +663,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   useEffect(() => { refreshImagesRef.current = refreshImages }, [refreshImages])
 
   useEffect(() => {
-    refreshPayload({ force: true }); refreshImages()
+    // Opening ANOTHER bank without unmounting (the workspace is not keyed by id)
+    // has to pick up THAT bank's remembered order, not keep the previous one —
+    // and the first fetch must already use it, hence the explicit filter here
+    // instead of a setFilter that the fetch below would race.
+    const f = { ...filter, sort: loadBankSort(bankId) }
+    if (f.sort !== filter.sort) setFilter(f)
+    refreshPayload({ force: true }); refreshImages(f)
     apiFetch(`/api/bank/${bankId}/subfolders`)
       .then((d) => setSubfolders(d.subfolders || []))
       .catch(() => setSubfolders([]))
@@ -709,6 +731,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // sort has no meaning inside the selection view, so it drops back to the grid.
   const setSort = (sort) => {
     const f = { ...filter, sort }
+    saveBankSort(bankId, sort)
     setFilter(f); setOffset(0); exitSelectionView()
     refreshImages(f, 0, { on: false })
   }
@@ -721,6 +744,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText])
+
+  // Same debounce for the exclude box. It is a FILTER like any other, so it goes
+  // through setF: page 1, selection cleared, and it rides to the curation
+  // endpoints too (filterParams) — hiding an image in the grid must also keep it
+  // out of "pick 60 diverse".
+  useEffect(() => {
+    const term = excludeText.trim()
+    if ((filter.exclude || '') === term) return undefined
+    const t = setTimeout(() => setF({ exclude: term || null }), 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [excludeText])
   const goto = (off) => { setOffset(off); refreshImages(filter, off) }
 
   /* `onRefusal` is for a caller that OWNS a surface for the refusal — today the
@@ -1001,7 +1036,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setTextPending(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/search-text`,
-        { query: q, n: textN, ...filterParams(filter) })
+        { query: q, n: textN, push_down: textExclude.trim() || null,
+          push_down_weight: textExcludeW, ...filterParams(filter) })
       setTextResult(d)
       setCurateOpen(null)
       if (!d.image_ids?.length) {
@@ -1022,6 +1058,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }
 
   const counts = payload?.counts
+  // The Sort menu greys an entry out when its pass has measured NOTHING. Face
+  // confidence is the one whose progress the payload reports outside `counts`
+  // (faces_scanned, a sibling key), so it is folded in here rather than by
+  // changing the payload shape every other reader depends on.
+  const sortGroups = bankSortGroups(
+    counts ? { ...counts, faces: payload?.faces_scanned } : counts)
   // ↩ the live offer, minus the one the user already waved away.
   const offer = undoOffer(payload)
   const undoBar = offer && offer.at !== undoDismissedAt ? offer : null
@@ -1369,6 +1411,26 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
             )}
           </div>
+          {/* 🚫 Exclude — the search bar read backwards. Captioning a big bank
+              turns it into a checklist ("which ones have I not tagged with X
+              yet?"), and that question has no answer while the only text tool
+              can just narrow TO a word. Same fields as the search (caption +
+              file name), same debounce, composes with every other facet.
+              Comma-separated: hiding 'logo, watermark' in one pass is the
+              normal case. Its own min-width so the pair wraps to two rows —
+              not two half-unusable boxes — inside a 400 px toolbar. */}
+          <div className="relative min-w-[12rem] max-w-md flex-1">
+            <span aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-content-subtle">🚫</span>
+            <input type="search" value={excludeText} onChange={(e) => setExcludeText(e.target.value)}
+              placeholder="Exclude words… (e.g. logo, watermark)"
+              aria-label="Hide images whose caption or file name contains these words"
+              title="Hides every image whose caption or file name contains one of these words (comma-separated). Matches anywhere in the text, so 'car' also hides 'scarf'. Images with no caption are never hidden."
+              className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
+            {excludeText && (
+              <button type="button" onClick={() => setExcludeText('')} aria-label="Clear the exclude filter"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
+            )}
+          </div>
           {/* Subfolder scoping (a Telegram export nests one folder per chat/date) */}
           {subfolders.length > 1 && (
             <div className="flex items-center gap-1.5">
@@ -1531,23 +1593,36 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <GroupLabel>View</GroupLabel>
           <label className="flex items-center gap-1 text-xs text-content-muted">
             Sort
-            {/* Order the grid on what the passes MEASURED — resolution, aesthetic
-                rating, sharpness — so a review opens on what it is looking for.
+            {/* Order the grid on ANY quantity the passes measured — resolution,
+                file size, aesthetic rating, NSFW likelihood, sharpness, noise,
+                contrast, detail, bars, JPEG quality, face confidence — each way,
+                so a review opens on what it is looking for. Grouped by the pass
+                that produces them: eleven measures is a long flat list, and the
+                grouping doubles as "run THIS pass to unlock these".
                 Images the matching pass never reached sink to the end (never the
                 top), and an entry whose pass has produced nothing yet is greyed
                 out saying which pass to run. The value rides to the server, which
                 sorts in SQL: it applies to the WHOLE filter, not this page, so
-                "Select all in filter" and ▶ Review walk the same order.
-                max-w keeps the control inside a 400 px toolbar. */}
+                "Select all in filter" and ▶ Review walk the same order — and it
+                is remembered per bank, so a dump you review by sharpness opens
+                that way tomorrow. max-w keeps the control inside a 400 px toolbar. */}
             <select value={filter.sort} onChange={(e) => setSort(e.target.value)}
-              title="Order the grid by resolution, aesthetic rating or sharpness. Images a pass never reached sink to the end."
+              title="Order the grid by anything the passes measured — resolution, size, aesthetic, NSFW, sharpness, noise, contrast, detail, bars, JPEG quality, face confidence. Images a pass never reached sink to the end. Remembered for this bank."
               aria-label="Sort the grid"
               className="max-w-[11rem] rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-content">
-              {bankSortOptions(counts).map((o) => (
+              {sortGroups.map((g) => (g.group ? (
+                <optgroup key={g.group} label={g.group}>
+                  {g.options.map((o) => (
+                    <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
+                      {o.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : g.options.map((o) => (
                 <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
                   {o.label}
                 </option>
-              ))}
+              ))))}
             </select>
           </label>
           <span className="ml-auto" />
@@ -1859,6 +1934,48 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   onChange={(e) => setTextQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !textPending) runTextSearch() }}
                   className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-content" />
+                {/* The pedagogy that matters most, because the failure it
+                    prevents is INVISIBLE: "without a hat" comes back full of
+                    hats, confidently, with no signal. Offered, never applied on
+                    its own — a wrong guess acted on silently would be the same
+                    class of bug. */}
+                {suggestPushDown(textQuery) && !textExclude.trim() && (
+                  <p className="text-xs text-amber-300/90">
+                    “without” is ignored by the search.{' '}
+                    <button type="button"
+                      onClick={() => {
+                        setTextExclude(suggestPushDown(textQuery))
+                        setTextQuery(withoutNegation(textQuery))
+                      }}
+                      className="underline underline-offset-2 hover:text-amber-200">
+                      Push “{suggestPushDown(textQuery)}” down instead?
+                    </button>
+                  </p>
+                )}
+                <label htmlFor="bank-text-exclude" className="block text-sm text-content">
+                  Push down (optional)
+                </label>
+                <input id="bank-text-exclude" type="search" value={textExclude}
+                  placeholder="hat, sunglasses"
+                  onChange={(e) => setTextExclude(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !textPending) runTextSearch() }}
+                  className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-content" />
+                <p className="text-xs text-content-subtle">{pushDownCaveat()}</p>
+                {textExclude.trim() && (
+                  <label className="flex flex-wrap items-center gap-2 text-sm text-content">
+                    How hard
+                    <select value={textExcludeW}
+                      onChange={(e) => setTextExcludeW(Number(e.target.value))}
+                      className="rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content">
+                      {PUSH_DOWN_STRENGTHS.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                    <span className="w-full text-xs text-content-subtle">
+                      {PUSH_DOWN_STRENGTHS.find((s) => s.value === textExcludeW)?.hint}
+                    </span>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-sm text-content">
                   How many
                   <input type="number" min={1} max={2000} value={textN}
@@ -1905,6 +2022,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 Clear search
               </button>
             </div>
+            {/* What the push-down did HERE, measured on this bank for this
+                pair of phrases — including "it changed nothing", which is the
+                outcome the user would otherwise never detect. */}
+            {pushDownNote(textResult) && (
+              <p className="text-content-muted">{pushDownNote(textResult)}</p>
+            )}
             {textResult.cached === false && (
               <p className="text-content-subtle">
                 This phrase is now cached — searching it again is instant, even after a restart.

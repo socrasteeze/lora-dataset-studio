@@ -86,35 +86,58 @@ def _local_browse_url(host, port, token=None):
     return url, connect_host
 
 
-def _open_browser_when_ready(host, port, token=None, attempts=60, delay=0.5):
-    """Open the local browser at the real bound address, but only AFTER the
-    server accepts a connection. start.bat used to ``start`` a hardcoded
-    127.0.0.1 URL BEFORE this process had even bound — so a server.host pointing
-    at a LAN / Tailscale address greeted the user with "cannot connect" every
-    launch. Opening here means we know the true host/port/token and can wait for
-    readiness. Best-effort and daemon-threaded: a browser that never opens must
-    never hold up the server. Set LDS_NO_BROWSER=1 to skip entirely."""
-    import socket
+def _announce_when_ready(host, port, token=None, open_browser=False, timeout=180):
+    """Print the address the app is really serving on — and open the browser when
+    asked — once that address answers.
+
+    TWO jobs, one probe, because they want the same moment. start.bat used to
+    ``start`` a hardcoded 127.0.0.1 URL BEFORE this process had even bound, so a
+    server.host pointing at a LAN / Tailscale address greeted the user with
+    "cannot connect" every launch; opening here means we know the true
+    host/port/token and can wait.
+
+    The printed line has to exist at all because Werkzeug's own " * Running on
+    ..." banner never reaches the terminal: ``create_app`` attaches a rotating
+    file handler to the ROOT logger, so that INFO-level banner lands in
+    ``data/app.log``. A plain ``python backend/run.py`` therefore printed NO
+    address, and any launcher that reads the terminal for one (the Pinokio
+    launcher does, to light up its "Open Web UI" tab) waited forever.
+
+    Readiness is /api/health answering 200, not merely a socket accepting: the
+    line — and the tab — must appear when the app can answer, not on a startup
+    error page. The token rides along when the LAN gate is on, since the probe
+    reaches the app through the same guard a browser would. On timeout the
+    address is printed anyway: a slow first boot must not leave a launcher
+    hanging on a line that never comes.
+
+    Best-effort and daemon-threaded: nothing here may hold up the server."""
     import threading
     import time
+    import urllib.request
     import webbrowser
     url, connect_host = _local_browse_url(host, port, token)
+    health = f'http://{connect_host}:{port}/api/health'
+    if token:
+        health += f'?token={token}'
 
-    def _wait_and_open():
-        for _ in range(attempts):
+    def _wait_and_announce():
+        deadline = time.time() + timeout
+        while time.time() < deadline:
             try:
-                with socket.create_connection((connect_host, port), timeout=delay):
-                    break
-            except OSError:
-                time.sleep(delay)
-        else:
-            return  # never came up in time — don't pop a failing tab
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+                with urllib.request.urlopen(health, timeout=1) as response:
+                    if response.status == 200:
+                        break
+            except Exception:
+                time.sleep(0.25)
+        print(f"[LDS] Ready on {url}", flush=True)
+        if open_browser:
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
 
-    threading.Thread(target=_wait_and_open, name='open-browser', daemon=True).start()
+    threading.Thread(target=_wait_and_announce, name='announce-ready',
+                     daemon=True).start()
 
 
 if __name__ == '__main__':
@@ -155,16 +178,18 @@ if __name__ == '__main__':
     # reading cfg_get again there would lie about what's currently serving requests.
     app.config['LDS_BOUND_HOST'] = host
     app.config['LDS_BOUND_PORT'] = port
-    # Open the local browser at the ACTUAL bound address (with token) once the
-    # server is up — replaces start.bat's hardcoded, fired-too-early 127.0.0.1.
-    _browse_url, _ = _local_browse_url(host, port, os.environ.get('LDS_ACCESS_TOKEN'))
-    print(f"[LDS] Serving at {_browse_url}")
+    # Announce the ACTUAL bound address (with token) once the app answers, and
+    # open the local browser there — replaces start.bat's hardcoded,
+    # fired-too-early 127.0.0.1. The announcement is unconditional: a launcher
+    # reading the terminal for the address needs it even when the browser is off.
     # Settings ▸ Server & access owns the persisted on/off switch; LDS_NO_BROWSER=1
     # stays as the env-level override for a one-off or automated launch that
-    # never touched Settings.
-    if cfg_get('server.auto_open_browser', True) \
-            and os.environ.get('LDS_NO_BROWSER') != '1':
-        _open_browser_when_ready(host, port, os.environ.get('LDS_ACCESS_TOKEN'))
+    # never touched Settings, and LDS_OPEN_BROWSER=1 forces it on the other way.
+    _open = os.environ.get('LDS_OPEN_BROWSER') == '1' or (
+        cfg_get('server.auto_open_browser', True)
+        and os.environ.get('LDS_NO_BROWSER') != '1')
+    _announce_when_ready(host, port, os.environ.get('LDS_ACCESS_TOKEN'),
+                         open_browser=_open)
     app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1',
             host=host,
             port=port, threaded=True, use_reloader=False)
