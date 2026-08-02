@@ -764,5 +764,11 @@ def test_download_route_validates_basename(app, client, tmp_path):
     ok = client.get(f'/api/backup/full/download?name={name}')
     assert ok.status_code == 200 and ok.mimetype == 'application/zip'
 
-    for bad in ('../config.json', 'nope.zip', 'sub/dir.zip'):
-        assert client.get(f'/api/backup/full/download?name={bad}').status_code == 404
+    # 'sub\\dir.zip' is here because os.path.basename only treats a backslash as
+    # a separator ON WINDOWS: without the ntpath/posixpath cross-check in
+    # resolve_backup_file this value is a plain filename to a Linux host and
+    # walks straight past the guard. The rejection must not depend on which
+    # machine is serving.
+    for bad in ('../config.json', 'nope.zip', 'sub/dir.zip', 'sub\\dir.zip',
+                '..\\config.json'):
+        assert client.get(f'/api/backup/full/download?name={bad}').status_code == 404, bad
