@@ -18,10 +18,9 @@ import time
 import socket
 import threading
 import logging
-import json
 import requests
 from urllib.parse import urljoin
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple
 
 from .. import config as cfg
 
@@ -104,16 +103,13 @@ class ComfyUIService:
         return self.check_connection()
 
     # ---------------- Prompt ----------------
-    def queue_prompt(self, prompt: Dict, client_id: str):
-        ok, msg = self.ensure_comfyui_running()
-        if not ok:
-            return None, msg
-        payload = json.dumps({"prompt": prompt, "client_id": client_id})
-        r = requests.post(urljoin(cfg.get('comfyui.api_url'), "/prompt"), data=payload,
-                          timeout=10)
-        if r.status_code == 200:
-            return r.json(), None
-        return None, r.text
+    # `queue_prompt` lived here and was deleted 2026-08-02: it had no callers
+    # anywhere, and utils/comfyui.queue_prompt_to_comfyui — which every real
+    # submission goes through — is a strict superset of it. The only behaviour
+    # unique to this copy was behaviour missing from it: no exception handling
+    # (breaking the "never raises" contract job_queue depends on) and no
+    # WORKFLOW_INVALIDE tagging of ComfyUI's 400 body. It had been hardened
+    # once, in the 2026-07-22 no-timeout audit, without ever being called.
 
 
 comfyui_service = ComfyUIService()
