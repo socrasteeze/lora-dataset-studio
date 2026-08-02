@@ -499,23 +499,44 @@ written as ONE self-contained hunk that a future sync can re-apply or drop if
 upstream fixes it their way. **A merge that silently loses one of these turns CI
 red without touching a line of product code**, so check them after every sync.
 
-**One entry, added 2026-07-28 (evening):**
+**One entry, added 2026-07-28 (evening) — and it is carried in TWELVE files,
+not one. Corrected 2026-08-02:** this section said "one entry" and named a
+single file for five days. Anyone told to "drop this hunk when upstream fixes
+the fixture" would have dropped one and left eleven. Counted from the diff, not
+from memory: `git diff --name-only upstream/main -- 'backend/tests/*.py'`
+filtered on hunks adding a `venv/.../bin/python` line.
 
-- `backend/tests/test_local_retry.py` — `_configure_aitoolkit` builds ONLY the
-  Windows venv layout (`venv/Scripts/python.exe`), while
-  `config.aitoolkit_derived_python` branches on `os.name` and looks for
-  `venv/bin/python` on POSIX. On Linux the fake install therefore reads as
-  ABSENT and five tests fail with `ai-toolkit is not configured` (409). The
-  fork's hunk writes both layouts; the resolver picks the one for the platform,
-  so it is inert on Windows and the tests assert the same thing on both.
-  **Verified: 12 passed / 5 failed before, 17 passed after.**
+- The bug, which is the same in every carrier: a test helper (usually named
+  `_configure_aitoolkit`) builds ONLY the Windows venv layout
+  (`venv/Scripts/python.exe`), while `config.aitoolkit_derived_python` branches
+  on `os.name` and looks for `venv/bin/python` on POSIX. On Linux the fake
+  install therefore reads as ABSENT and the tests behind it fail with
+  `ai-toolkit is not configured` (409). Each hunk writes both layouts; the
+  resolver picks the one for the platform, so it is inert on Windows and the
+  tests assert the same thing on both.
+
+- The twelve files: `test_anima_family.py`, `test_continue_flexible.py`,
+  `test_custom_base_paths.py`, `test_final_save_step_number.py`,
+  `test_flux2klein_family.py`, `test_local_retry.py`, `test_runs_lineage.py`,
+  `test_slider_mode.py`, `test_train_base_family_scope.py`,
+  `test_training_preflight.py`, `test_training_queue_atomic.py` (TWO sites, and
+  it additionally carries an `os.name` branch of its own), `test_training_service.py`.
+
+- `test_local_retry.py` is the one that was measured: **12 passed / 5 failed
+  before, 17 passed after.** The other eleven were never counted individually.
+
+  Two files create only the Windows layout and are deliberately NOT carriers:
+  `test_run_snapshot_compare.py` monkeypatches the resolver itself, and
+  `test_setup_installer.py` already writes both.
 
   Why it is carried rather than left, when CI (`windows-latest`) is green on it:
-  the container's failure floor is not free. These five were triaged as merge
+  the container's failure floor is not free. Those five were triaged as merge
   damage once, then as environment, then diagnosed twice — and diagnostic 7
   exists because that floor is what makes a baseline diff necessary at all.
-  Five fewer is five fewer. Drop this hunk the moment upstream makes the fixture
-  OS-agnostic.
+  Five fewer is five fewer. Drop these hunks the moment upstream makes the
+  fixtures OS-agnostic — **all twelve, and check the list rather than trusting
+  this sentence.** Upstream asked for this as a PR on 2026-08-02, so the
+  retirement may come soon.
 
 The section previously held the worked example of how these are meant to end:
 
