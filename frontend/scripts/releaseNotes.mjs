@@ -47,7 +47,12 @@ import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
-export const REPO_URL = 'https://github.com/perfectgf/lora-dataset-studio';
+// THIS fork's repo, not upstream's. It is what the "Full changelog" compare
+// link is built from, and a compare between two tags is only resolvable in the
+// repository that holds them — this fork's tags exist here and nowhere else, so
+// pointing at upstream produced a guaranteed 404. Inherited from upstream and
+// never noticed, because this fork had published no release for it to break.
+export const REPO_URL = 'https://github.com/socrasteeze/lora-dataset-studio';
 
 // Path of the changelog module inside the repo, as git wants it.
 export const WHATS_NEW_REPO_PATH = 'frontend/src/whatsNew.js';
