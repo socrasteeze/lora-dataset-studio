@@ -41,7 +41,7 @@ import threading
 import time
 import uuid
 import warnings
-from collections import deque
+from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
@@ -1111,6 +1111,72 @@ def _framing_counts(bank_id, extra_crit=None) -> dict:
     return {k: int(got.get(k, 0)) for k in _FRAMING_KEYS}
 
 
+# A filter may narrow on at most this many tags at once. Not a safety limit —
+# each one is another LIKE over the same column, and past a handful the query is
+# slower than the answer is useful. The UI offers one value per facet group.
+_MAX_TAG_FILTERS = 8
+
+
+def _clean_tag_filter(tags) -> list:
+    """Whatever the client sent -> a short list of canonical tag names.
+
+    Canonical means what the tagger itself writes: lowercase, underscores, no
+    commas. A comma would be read as a SENTINEL by the LIKE pattern built from
+    this and could match across two different tags, so it is stripped here — at
+    the one place every caller goes through — rather than trusted not to arrive.
+    """
+    if isinstance(tags, str):
+        tags = tags.split(',')
+    out = []
+    for t in (tags or []):
+        name = str(t or '').strip().lower().replace(',', '')
+        if name and name not in out:
+            out.append(name)
+        if len(out) >= _MAX_TAG_FILTERS:
+            break
+    return out
+
+
+def tag_facets_payload(user_id, bank_id, limit=400) -> dict | None:
+    """Every tag present in the bank, with how many non-rejected images carry it.
+
+    Computed on DEMAND, not folded into the bank payload: that payload is polled
+    every couple of seconds while a pass runs, and tallying ~30 tags across 9 000
+    rows on each poll would be paid over and over for an answer that changes only
+    when the tag pass advances. The grid asks for this once and re-asks when the
+    tagged count moves.
+
+    Counting reads `tags_text` only — one short string per row instead of the
+    full scored JSON, which is roughly a tenth of the bytes and needs no parsing.
+    Rejected images are excluded: the facets exist to help decide what to keep,
+    so counting what was already thrown away would misdescribe the pile.
+
+    Returns {'tags': [{'name', 'count'}...] (most common first), 'tagged': n,
+    'truncated': bool}. `truncated` is not decoration — a bank can carry
+    thousands of distinct tags and the UI must be able to say the long tail was
+    cut rather than imply the list is everything.
+    """
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    rows = (db.session.query(BankImage.tags_text)
+            .filter(BankImage.bank_id == bank_id,
+                    BankImage.status != 'reject',
+                    BankImage.tags_text.isnot(None),
+                    BankImage.tags_text != '')
+            .all())
+    counter = Counter()
+    for (text,) in rows:
+        # The sentinel commas make an empty split, so filter them back out.
+        counter.update(t for t in (text or '').split(',') if t)
+    common = counter.most_common(int(limit) + 1)
+    truncated = len(common) > int(limit)
+    return {'tags': [{'name': n, 'count': c} for n, c in common[:int(limit)]],
+            'tagged': len(rows),
+            'distinct': len(counter),
+            'truncated': truncated}
+
+
 def _origin_counts(bank_id) -> dict:
     """Per-state image counts for the 🔎 Origin chips in ONE GROUP BY.
 
@@ -1641,13 +1707,20 @@ def _preview_ids(bank_id, limit=PREVIEW_COUNT) -> list:
 def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
                 group=None, style=None, subfolder=None, search=None,
                 semantic_group=None, sort=None, res_bucket=None, framing=None,
-                origin=None, ids=None, offset=0, limit=200) -> dict | None:
+                origin=None, tags=None, ids=None, offset=0, limit=200) -> dict | None:
     """One PAGE of the bank grid (a 9 000-image bank must never ship whole).
-    Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ search.
+    Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ tags ∩ search.
     ``search`` is a plain full-text term matched (case-insensitive LIKE) against the
-    caption AND the relpath — so captions double as searchable tags for a big dump
-    ("red dress"), combinable with every other filter. Flag filters sort by the
-    relevant score (worst first) so the review reads top-down.
+    caption, the relpath AND the 🏷️ WD14 tags — so a big dump is searchable
+    ("red dress") whether it was captioned, tagged, or both; a two-word term is
+    also tried with an underscore, because booru tags are written `red_dress` and
+    nobody types them that way. Combinable with every other filter.
+    ``tags`` is a list of WHOLE tag names, ANDed: each facet dropdown is an
+    independent question, so picking a second one narrows rather than widens.
+    Matching is whole-tag only — `blonde_hair` never matches `blonde_hair_ribbon`
+    — the same promise utils/tagFilter.js makes for booru captions.
+    Flag filters sort by the relevant score (worst first) so the review reads
+    top-down.
     ``sort`` (a GRID_SORTS id — resolution / aesthetic / sharpness, each way)
     overrides that order: resolution ranks on megapixels (width×height, so
     900×900 outranks 1200×300), aesthetic on the ✨ Score rating, sharpness on
@@ -1772,14 +1845,32 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
             q = q.filter(~BankImage.relpath.contains(os.sep))
         else:
             q = q.filter(BankImage.relpath.startswith(subfolder + os.sep))
+    for tag in _clean_tag_filter(tags):
+        # One WHOLE tag per facet, ANDed: the facet dropdowns are independent
+        # questions ("blonde hair" AND "wearing a shirt"), so narrowing on a
+        # second one must narrow, not widen. The sentinel commas around both
+        # sides are what keep 'blonde_hair' from matching 'blonde_hair_ribbon'
+        # — see models.BankImage.tags_text and services/wd14_tagger.tags_text.
+        esc = tag.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        q = q.filter(BankImage.tags_text.ilike(f'%,{esc},%', escape='\\'))
     term = (search or '').strip()
     if term:
-        # Full-text over caption + relpath. Escape LIKE metacharacters so a literal
-        # '%'/'_' in the query matches itself, then wrap in wildcards.
+        # Full-text over caption + relpath + TAGS. Escape LIKE metacharacters so a
+        # literal '%'/'_' in the query matches itself, then wrap in wildcards.
         esc = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
         like = f'%{esc}%'
-        q = q.filter(or_(BankImage.caption.ilike(like, escape='\\'),
-                         BankImage.relpath.ilike(like, escape='\\')))
+        crits = [BankImage.caption.ilike(like, escape='\\'),
+                 BankImage.relpath.ilike(like, escape='\\'),
+                 BankImage.tags_text.ilike(like, escape='\\')]
+        # Booru tags are written with underscores (`red_dress`), and nobody types
+        # them that way. Without this line the tag pass would leave the search bar
+        # exactly as useless as before it ran, which is the opposite of the point:
+        # tags exist so a big dump becomes searchable WITHOUT a captioning run.
+        if ' ' in term:
+            u = term.replace(' ', '_')
+            u_esc = u.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            crits.append(BankImage.tags_text.ilike(f'%{u_esc}%', escape='\\'))
+        q = q.filter(or_(*crits))
     if res_bucket in _RES_BOUNDS:
         # One resolution tier: [lo, hi) on megapixels (width×height). The NOT-NULL
         # guards drop unscanned rows (a NULL product would satisfy neither bound
@@ -5457,6 +5548,182 @@ def _framing_job(bank_id, rescan, device_id=None):
     return run
 
 
+# --- 🏷️ tag pass (WD14, local ONNX classifier) ------------------------------
+# How many images go into ONE child process. The model is loaded once per chunk,
+# so a bigger chunk amortises that load better — but nothing is committed until
+# the chunk returns, so a bigger chunk is also more work a Stop throws away. 400
+# puts the load (a few seconds) well under 1% of the chunk's run time while
+# capping what a cancel can cost at a couple of minutes.
+_TAG_CHUNK = 400
+
+
+def _tags_prereq() -> str | None:
+    """Why the tag pass cannot run, or None. Probes the real capability like
+    _score_prereq/_faces_prereq do — and, unlike them, that probe covers the
+    model download as well as the pip install, because for this pass those fail
+    at different times and only one of them is a pip problem."""
+    from ..capabilities import probe_wd14
+    p = probe_wd14()
+    if p.get('ok'):
+        return None
+    return f"the WD14 tagger is not ready — {p.get('detail')} (Setup ▸ Quality tools)"
+
+
+def start_tags(app, user_id, bank_id, rescan=False, threshold=None):
+    """Tag every non-rejected image with the local WD14 classifier, so the bank
+    can be sliced by what is IN the pictures — hair colour, clothing, setting —
+    without paying for a captioning pass first.
+
+    Captions are NOT touched: the tags land in their own columns (see
+    models.BankImage.tags). ``rescan`` re-tags rows that already carry tags.
+
+    LOCAL ONLY, by design for this wave: peers advertise no wd14 capability, so
+    sending them a tag pass would be a promise the heartbeat cannot back. The
+    refusal is made HERE, at launch, rather than discovered as a mid-pipeline
+    step error an hour into an overnight queue.
+    """
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    # Occupancy BEFORE the capability probe, and the order is load-bearing for
+    # the reason start_framing documents at length: a bank that is already busy
+    # is busy whether or not the tagger is installed, and probing first reported
+    # the wrong cause — sending the user to install something while the real
+    # answer was "wait, a pass is running".
+    if bank_jobs.running(bank_id):
+        raise bank_jobs.BankJobBusy((bank_jobs.get(bank_id) or {}).get('kind') or 'background')
+    reason = _tags_prereq()
+    if reason:
+        raise RuntimeError(reason)
+    from . import wd14_tagger
+    # The GPU gate applies ONLY when the run would really take the card. The
+    # stock extra is CPU onnxruntime, and a CPU pass that blocked a training
+    # start for an hour would be taking a lock it never uses — the same mistake
+    # _resolve_score_device exists to avoid on the scoring pass.
+    if wd14_tagger.uses_gpu():
+        busy = _gpu_busy_reason()
+        if busy:
+            raise RuntimeError(busy)
+    q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+    if not rescan:
+        q = q.filter(BankImage.tags_state.is_(None))
+    return bank_jobs.start(app, bank_id, 'tags',
+                           _tags_job(bank_id, rescan, threshold),
+                           total=q.count())
+
+
+def _tags_job(bank_id, rescan, threshold=None):
+    def run(job):
+        import contextlib
+        from . import wd14_tagger
+        from ..gpu_window import gpu_exclusive_vision_window
+        bank = db.session.get(ImageBank, bank_id)
+        if not bank:
+            return
+        # Read ONCE, before anything commits: every commit expires the row, so a
+        # `bank.source_path` inside the loop would re-SELECT it — and autoflush
+        # turns that read into a write. Same trap _framing_job documents.
+        source_path = bank.source_path
+        root = os.path.realpath(source_path)
+        q = (BankImage.query.filter_by(bank_id=bank_id)
+             .filter(BankImage.status != 'reject'))
+        if not rescan:
+            q = q.filter(BankImage.tags_state.is_(None))
+        # PLAIN TUPLES, not ORM rows — a bank of 80 000 rows would otherwise put
+        # 80 000 entities in the identity map and make every commit's
+        # expire_all() a sweep over all of them.
+        items = (q.order_by(BankImage.id.asc())
+                  .with_entities(BankImage.id, BankImage.relpath).all())
+        bank_jobs.progress(job, done=0, total=len(items), detail='tagging')
+        if not items:
+            return
+        thr = threshold if threshold is not None else wd14_tagger.threshold()
+        # Only hold the card when the run will actually use it (see start_tags).
+        window = (gpu_exclusive_vision_window(flag_ttl=1800)
+                  if wd14_tagger.uses_gpu() else contextlib.nullcontext())
+        tagged = errors = missing = seen = 0
+        with window:
+            for start in range(0, len(items), _TAG_CHUNK):
+                if bank_jobs.cancelled(job):
+                    break
+                chunk = items[start:start + _TAG_CHUNK]
+                by_path = {}
+                for row_id, relpath in chunk:
+                    path = _abs_under(root, relpath)
+                    if not path or not os.path.isfile(path):
+                        missing += 1
+                        seen += 1
+                        bank_jobs.bump(job)
+                        continue
+                    by_path[path] = row_id
+                if not by_path:
+                    continue
+                base_done = seen
+
+                def _progress(rec, _base=base_done):
+                    # Runs on the stderr reader THREAD: in-memory state only, no
+                    # session and no Flask context (bank_jobs.progress is exactly
+                    # that). The phase names carry the wait the counter cannot —
+                    # a first run downloads ~400 MB before image 1.
+                    if rec.get('phase') in ('downloading', 'loading'):
+                        bank_jobs.progress(job, detail=f"tagging — {rec['phase']}")
+                    elif rec.get('done') is not None:
+                        bank_jobs.progress(job, done=_base + rec['done'],
+                                           detail='tagging')
+
+                out = wd14_tagger.tag_images(list(by_path), threshold_value=thr,
+                                            on_progress=_progress)
+                if not out.get('ok'):
+                    # A failed CHUNK is fatal to the pass, not to the bank: the
+                    # tagger is one subprocess doing one thing, so a failure here
+                    # is a broken install or a dead model — every later chunk
+                    # would fail identically. Say so once and stop, rather than
+                    # grinding through 80 000 images to report the same error.
+                    bank_jobs.progress(
+                        job, detail=f"stopped — {out.get('error') or 'tagging failed'}")
+                    logger.warning('bank tags: bank=%s chunk failed: %s',
+                                   bank_id, out.get('error'))
+                    return
+                pending = {}
+                results = out.get('results') or {}
+                chunk_errors = out.get('errors') or {}
+                for path, row_id in by_path.items():
+                    if path in results:
+                        scores = results[path]
+                        pending[row_id] = {
+                            'tags': wd14_tagger.tags_blob(scores, out.get('model'), thr),
+                            'tags_text': wd14_tagger.tags_text(scores),
+                            'tags_state': 'ok'}
+                        tagged += 1
+                    else:
+                        # An unreadable file is a ROW OUTCOME, not a silent skip:
+                        # left NULL it would be re-attempted by every future run
+                        # forever, and nothing would ever say why.
+                        pending[row_id] = {'tags_state': 'error'}
+                        errors += 1
+                        if path in chunk_errors:
+                            logger.debug('bank tags: %s: %s', path, chunk_errors[path])
+                    seen += 1
+                _flush_row_updates(pending)
+                bank_jobs.progress(job, done=seen)
+        if bank_jobs.cancelled(job):
+            bank_jobs.progress(job, detail=f'cancelled — {tagged} tagged so far')
+            return
+        detail = f'done — {tagged} tagged'
+        if errors:
+            detail += f', {errors} unreadable'
+        # Files that were not THERE are their own outcome. Unreported, a bank
+        # whose source folder walked away tagged nothing and still said
+        # "done — 0 tagged", which reads as "the model found nothing".
+        if missing:
+            detail += f', {missing} file(s) missing from disk'
+        bank_jobs.progress(job, detail=detail)
+        if missing and not tagged:
+            logger.warning('bank tags: bank=%s every image missing from disk (%s)',
+                           bank_id, source_path)
+    return run
+
+
 # --- caption pass (reuses the dataset caption engines) ----------------------
 def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
                   device_id=None):
@@ -5735,7 +6002,13 @@ def _caption_job(bank_id, ids, force, vocabulary=None, device_id=None):
 # dropped (the deliberate cost/quality trade-off: duplicate "keep best" therefore
 # ranks on sharpness/size, not the aesthetic score that isn't computed yet).
 PIPELINE_STEPS = ('scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark',
-                  'faces', 'framing', 'caption')
+                  'faces', 'framing', 'tags', 'caption')
+# Passes that can ONLY run on this machine. 'tags' is here because a peer
+# advertises no wd14 capability in its heartbeat, so bank_remote.peer_refusal —
+# which by design refuses only on an EXPLICIT False — would wave it through and
+# the pass would die on the other side. A step nobody can honestly delegate is
+# refused at launch instead, where the message can say so.
+LOCAL_ONLY_STEPS = ('tags',)
 # Auto-reject inside the pipeline runs right after the quality scan, so it can
 # only act on the CPU-scan flags (and duplicates). The score-derived flags
 # (low_aesthetic/nsfw/watermark) have no data yet at that point.
@@ -5843,6 +6116,11 @@ def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
     # not a skipped step discovered an hour into the queue.
     remote = _remote_pass_device(device_id)
     if remote:
+        local_only = [s for s in steps if s in LOCAL_ONLY_STEPS]
+        if local_only:
+            raise ValueError(
+                f"{', '.join(local_only)} can only run on this machine — "
+                'untick it, or run the whole queue here')
         refuse_steps_for_device(device_id, steps)
     return bank_jobs.start(
         app, bank_id, 'pipeline',
@@ -5879,6 +6157,7 @@ def _bank_counts(bank_id) -> dict:
                                   BankImage.nsfw_score.isnot(None))).count(),
         'watermark_detected': base.filter(BankImage.watermark_state == 'detected').count(),
         'framing_classified': base.filter(BankImage.framing.isnot(None)).count(),
+        'tagged': base.filter(BankImage.tags_state == 'ok').count(),
         'captioned': base.filter(and_(BankImage.caption.isnot(None),
                                        BankImage.caption != '')).count(),
         'dup_groups': dup_groups,
@@ -6095,6 +6374,19 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
         c = _bank_counts(bank_id)
         entry['counts'] = {'framing_classified': c['framing_classified']}
         entry['detail'] = job.get('detail') or f"{c['framing_classified']} classified by framing"
+        return
+    if step == 'tags':
+        # No device branch: start_pipeline already refused a remote queue that
+        # asked for this step (LOCAL_ONLY_STEPS), so reaching here means local.
+        # gpu_gate=False because the pass takes the card only when the runtime
+        # really has CUDA — and in that case _tags_job's own window handles it.
+        # Gating on a busy GPU here would skip a CPU pass that never wanted one.
+        if _step_declines(entry, _tags_prereq(), gpu_gate=False):
+            return
+        _tags_job(bank_id, rescan=False)(job)
+        c = _bank_counts(bank_id)
+        entry['counts'] = {'tagged': c['tagged']}
+        entry['detail'] = job.get('detail') or f"{c['tagged']} tagged"
         return
     if step == 'caption':
         # Travels now — to a peer that reported a captioner of its own. The

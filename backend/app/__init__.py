@@ -259,6 +259,11 @@ _SCHEMA_ADDITIONS = (
     # Manual quarter-turn of a bank image (degrees clockwise, NULL = untouched).
     # Additive: a database that never gains it simply has no rotated images.
     ('bank_image', 'rotation', 'INTEGER'),
+    # 🏷️ WD14 tag pass. Additive and nullable: a bank tagged by a build that has
+    # these columns still opens on one that does not — it just shows no facets.
+    ('bank_image', 'tags', 'TEXT'),
+    ('bank_image', 'tags_text', 'TEXT'),
+    ('bank_image', 'tags_state', 'VARCHAR(16)'),
     ('image_bank', 'pipeline_report', 'TEXT'),
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).
@@ -288,6 +293,7 @@ _INDEX_ADDITIONS = (
     ('bank_image', 'style_cluster'),
     ('bank_image', 'framing'),
     ('bank_image', 'origin'),
+    ('bank_image', 'tags_state'),
     ('lora_test_image', 'record_id'),
 )
 
