@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-import { PASS_PEER_CAPS, stepGate } from './passDeviceGate.js';
+import { LOCAL_ONLY_PASSES, PASS_PEER_CAPS, stepGate } from './passDeviceGate.js';
 
 const peer = (capabilities) => ({ id: 'p1', name: 'G18', local: false, capabilities });
 
@@ -86,4 +86,31 @@ test('the pass→capability map matches the backend', () => {
     backend[key] = [...caps.matchAll(/'(\w+)'/g)].map((m) => m[1]);
   }
   assert.deepEqual(backend, PASS_PEER_CAPS);
+});
+
+test('the local-only pass list matches the backend', () => {
+  // Same drift risk as the map above, with a nastier failure: a pass this list
+  // forgets is offered for a peer, ticked by default, and refused only when the
+  // whole queue is launched.
+  const py = fs.readFileSync(
+    new URL('../../../../backend/app/services/image_bank_service.py', import.meta.url), 'utf8');
+  const line = py.slice(py.indexOf('LOCAL_ONLY_STEPS = ('));
+  const backend = [...line.slice(0, line.indexOf(')')).matchAll(/'(\w+)'/g)].map((m) => m[1]);
+  assert.deepEqual(backend, LOCAL_ONLY_PASSES);
+});
+
+test('a local-only pass is blocked by ANY peer, whatever it reports', () => {
+  // The opposite polarity to the map above, on purpose: no peer advertises the
+  // tagger at all, so the permissive "silence means probably fine" rule would
+  // wave every one of them through.
+  for (const capabilities of [{}, { wd14: true }, { ollama: true }]) {
+    const g = stepGate('tags', { device: peer(capabilities) });
+    assert.equal(g.blocked, true);
+    assert.match(g.reason, /only runs here/);
+  }
+});
+
+test('locally, the tag pass follows the wd14 capability', () => {
+  assert.deepEqual(stepGate('tags', { caps: { wd14: true } }), { ok: true, blocked: false });
+  assert.deepEqual(stepGate('tags', { caps: {} }), { ok: false, blocked: false });
 });
