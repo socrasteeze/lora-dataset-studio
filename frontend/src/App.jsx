@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HashRouter, Routes, Route, Navigate, Outlet, NavLink, useLocation } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, Outlet, NavLink, useLocation } from 'react-router'
 import { apiFetch, postJson } from './api/fetchClient'
 import { JobsProvider } from './context/JobsContext'
 import { ToastProvider, useToast } from './components/common/Toast'
@@ -10,6 +10,7 @@ import { WhatsNewButton, WhatsNewModal } from './components/common/WhatsNew'
 import ActivityPanel from './components/common/ActivityPanel'
 import ConnectionBanner from './components/common/ConnectionBanner'
 import SetupHealthNotice from './components/setup/SetupHealthNotice'
+import ComfyRecoveryBanner from './components/common/ComfyRecoveryBanner'
 import DockerUpdateInstructions from './components/common/DockerUpdateInstructions'
 import DatasetPage from './pages/DatasetPage'
 import BankPage from './pages/BankPage'
@@ -498,7 +499,11 @@ function Shell() {
           the install that stopped working matters more than a new version being
           out, and less than not reaching the server at all. */}
       <ConnectionBanner />
+      {/* Below the setup notice, above the update banner: a paused ComfyUI job
+          blocks work right now, which outranks "a newer version exists" and is
+          outranked by a broken install. */}
       <SetupHealthNotice />
+      <ComfyRecoveryBanner />
       <UpdateBanner />
       <main id="main-content" tabIndex={-1}
         className={canvasRoute

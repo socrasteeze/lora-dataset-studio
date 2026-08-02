@@ -3727,6 +3727,27 @@ def _remote_stopped_detail(noun, stop, cache_path, total):
             'back in time; relaunch to run it again')
 
 
+def _release_db_before_inference():
+    """End the session's transaction before an inference subprocess we may sit
+    in for an HOUR (bank scoring on CPU is measured near that on a big bank).
+
+    The pass reads its rows, hands a path list to a child process, waits, then
+    writes the results back. Reading first is fine; keeping the SAME session
+    transaction open across the wait is not. WAL (app/__init__.py) buys concurrent
+    READERS, never concurrent writers: one stray write joining the transaction
+    ahead of the child — a status stamp, a counter, a `flush()` inherited from the
+    caller — takes the single write lock and holds it for the whole inference, so
+    every other writer in the app dies on `database is locked` after the 5 s
+    busy_timeout. That is the exact failure that abandoned two paid cloud runs on
+    2026-07-26 (see cloud_training._COMMIT_RETRIES), for a five-second holder;
+    this one would hold it for an hour.
+
+    Committing here costs nothing on the nominal path (nothing is pending) and
+    removes the trap for good. Callers must not hold ORM objects across it:
+    `expire_on_commit` is on, so rows are re-fetched after the child returns."""
+    db.session.commit()
+
+
 def _drive_infer_subprocess(job, python, script, payload, cache_path,
                             progress_re, window, stall_label='pass',
                             stall_timeout=_INFER_STALL_TIMEOUT,
@@ -3979,6 +4000,11 @@ def _faces_job(bank_id, device_id=None):
             })
             python = cfg.get('face_scoring.python') or sys.executable
             window = gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu else nullcontext()
+            # Frees the write lock before a subprocess this pass can sit inside
+            # for an hour on a big bank (see _release_db_before_inference). The
+            # remote branch above needs no equivalent call: it never holds an
+            # ORM session across bank_remote's own polling.
+            _release_db_before_inference()
             data, stderr_tail, returncode = _drive_infer_subprocess(
                 job, python, _EMBED_SCRIPT, payload, cache_path, _PROGRESS_RE, window,
                 stall_label='face', busy_detail='face pass')
@@ -4249,6 +4275,9 @@ def _score_job(bank_id, device_id=None):
             # card it uses is another machine's.
             window = (gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu
                       else nullcontext())
+            # See the faces pass for why this call has to sit here, before the
+            # subprocess, and not before the if/else.
+            _release_db_before_inference()
             data, stderr_tail, returncode = _drive_infer_subprocess(
                 job, python, _SCORE_SCRIPT, payload, cache_path, _SCORE_PROGRESS_RE,
                 window, stall_label='scoring',
@@ -4472,6 +4501,19 @@ def _watermark_job(bank_id, rescan, device_id=None):
                     if seen % _VISION_FLUSH_EVERY == 0:
                         _flush_row_updates(pending)
                     bank_jobs.bump(job)
+                    # Never sit in an Ollama call with a transaction open. The
+                    # PERIODIC flush above bounds how much staged work a crash
+                    # can lose; this commit is a DIFFERENT hazard — bump() and
+                    # the queries above it read through the ORM, which autobegins
+                    # a transaction on any read whether or not this iteration
+                    # wrote anything, and leaving that open across the next
+                    # ~1.7 s Ollama call is exactly the class of hold that
+                    # abandoned two paid cloud runs on 2026-07-26 (see
+                    # _release_db_before_inference). Committing every image —
+                    # not every 25 — closes that transaction whatever the
+                    # answer looked like, and costs a millisecond against a
+                    # 1.7 s call.
+                    db.session.commit()
             finally:
                 try:
                     _flush_row_updates(pending)

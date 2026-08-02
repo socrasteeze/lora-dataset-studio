@@ -7,8 +7,10 @@ queue marked the jobs completed, and the dataset rows stayed `pending` with a
 NULL filename — the panel read "0/12" forever and the logs were clean, because
 nothing had failed.
 
-The test walks `DATASET_IMAGE_JOB_NAMES` instead of naming engines one by one,
-so a third engine added to the enqueue side without being added here fails here.
+It then happened AGAIN with SeedVR2, identically. This file covers the routing
+itself, engine by engine; the guard that catches the next unregistered engine
+lives in `test_dataset_job_harvest.py`, which discovers them instead of listing
+them, and so does the repair of rows a miss has already stranded.
 """
 import json
 import pytest
@@ -23,7 +25,7 @@ def _job(model_name, job_id='j1'):
 
 
 @pytest.mark.parametrize('model_name', [
-    'klein_edit_dataset', 'krea_identity_edit_dataset'])
+    'klein_edit_dataset', 'krea_identity_edit_dataset', 'seedvr2_upscale'])
 def test_every_local_engine_links_its_finished_image(app, monkeypatch, model_name):
     """The heart of it: a completed job must reach link_completed_dataset_image."""
     from app import job_queue
@@ -41,22 +43,40 @@ def test_every_local_engine_links_its_finished_image(app, monkeypatch, model_nam
         assert seen['failed'] is False
 
 
-def test_the_declared_set_matches_what_the_engines_actually_stamp(app):
-    """The set is only useful if it stays in step with the enqueue side, so read
-    the stamps from the helpers themselves rather than trusting a literal."""
+def test_a_reference_edit_job_never_reaches_the_row_linker(app, monkeypatch):
+    """A LOCAL ✦ Edit-reference render rides the same enqueue_*_edit helpers, so it
+    carries the same `model_name` — but it has NO FaceDatasetImage row. It must be
+    routed by its own marker (checked first), or link_completed_dataset_image
+    would hunt for a row that does not exist and log a bogus 'no row for job'
+    while the modal spun forever."""
     from app import job_queue
-    from app.services import klein_edit_helper, krea_edit_helper  # noqa: F401
-    import inspect
-    stamped = set()
-    for mod in (klein_edit_helper, krea_edit_helper):
-        src = inspect.getsource(mod)
-        for name in job_queue.DATASET_IMAGE_JOB_NAMES:
-            if f"'{name}'" in src or f'"{name}"' in src:
-                stamped.add(name)
-    assert stamped == set(job_queue.DATASET_IMAGE_JOB_NAMES), (
-        'a name in DATASET_IMAGE_JOB_NAMES is stamped by no engine, or an '
-        f'engine stamps a name the dispatch does not know: {stamped} vs '
-        f'{set(job_queue.DATASET_IMAGE_JOB_NAMES)}')
+    from app.services import face_dataset_service
+    with app.app_context():
+        job = _job('krea_identity_edit_dataset', job_id='ref-1')
+        job.job_metadata = json.dumps({'model_name': 'krea_identity_edit_dataset',
+                                       'dataset_id': 1, 'is_reference_edit': True})
+        seen = {}
+        monkeypatch.setattr(face_dataset_service, 'link_completed_dataset_image',
+                            lambda *a, **k: seen.update(rows=True))
+        monkeypatch.setattr(face_dataset_service, 'link_completed_reference_edit',
+                            lambda jid, fn, failed=False, reason=None:
+                                seen.update(job_id=jid, filename=fn))
+        job_queue._dispatch_completion(job, 'out_00001_.png', False)
+        assert seen.get('job_id') == 'ref-1'
+        assert 'rows' not in seen
+
+
+# The set-vs-engines check used to live here, and it did not work. It iterated a
+# HARDCODED tuple `(klein_edit_helper, krea_edit_helper)`, so it could only ever
+# notice a name declared in the set but stamped by nobody. A THIRD helper module
+# was invisible to it — which is precisely how SeedVR2 shipped stranding its
+# results months after Krea did the same. Its docstring claimed it would catch
+# "a third engine added to the enqueue side"; it could not, and that false
+# promise is worse than no test.
+#
+# It now lives in test_dataset_job_harvest.py, where it DISCOVERS the engines by
+# walking app/services with the AST instead of naming them. Both directions are
+# covered there. Do not reintroduce a version of it that hardcodes a module list.
 
 
 def test_an_unknown_model_name_is_ignored_without_crashing(app, monkeypatch):
