@@ -35,7 +35,9 @@ import copy
 import io
 import json
 import logging
+import ntpath
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -949,8 +951,23 @@ def open_backups_folder() -> str:
 
 def resolve_backup_file(name: str) -> Optional[str]:
     """Absolute path of a produced archive, or None. ``name`` must be a plain
-    basename inside the backups dir (no separators/traversal) that actually exists."""
-    if not name or os.path.basename(name) != name or not name.endswith('.zip'):
+    basename inside the backups dir (no separators/traversal) that actually exists.
+
+    ``name`` arrives straight from the client (``?name=`` on the download
+    route), and the shape check runs on ALL THREE path flavours rather than
+    just the running platform's: ``os.path.basename`` does not treat a
+    backslash as a separator off Windows, so ``sub\\archive.zip`` satisfied a
+    single-flavour check on Linux. The ``is_file()`` below already bounded the
+    damage to reading an existing file, but a guard whose meaning changes with
+    the host is not a guard.
+    """
+    if (not name
+            or name in ('.', '..')
+            or '/' in name or '\\' in name
+            or os.path.basename(name) != name
+            or ntpath.basename(name) != name
+            or posixpath.basename(name) != name
+            or not name.endswith('.zip')):
         return None
     path = cfg.backups_dir() / name
     return str(path) if path.is_file() else None
