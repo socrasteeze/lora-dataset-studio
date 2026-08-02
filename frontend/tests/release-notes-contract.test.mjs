@@ -127,3 +127,24 @@ test('a deliberate plumbing release warns instead of failing, and still publishe
 test('a release with news says nothing at all', () => {
   assert.equal(emptySignal({ entries: [CURRENT[0]], tag: 'v1', previousTag: 'v0' }), null);
 });
+
+// ── The first release, which has nothing to diff against ─────────────────────
+// A repository that has never published one used to be the single case this
+// generator could not serve: release.yml threw before reaching it. A fork is
+// the ordinary way to arrive here.
+
+test('a first release renders without a previous tag to compare against', () => {
+  const body = renderNotes({ tag: 'v2026.08.03', previousTag: null, entries: CURRENT });
+  for (const entry of CURRENT) assert.match(body, new RegExp(entry.title.slice(0, 20)));
+  // No compare link: there is no earlier tag on the remote for it to resolve,
+  // and a /compare/null...v2026.08.03 URL is a 404 in the release body.
+  assert.doesNotMatch(body, /\/compare\//);
+});
+
+test('an empty first release still refuses, and names the tag not a null', () => {
+  const signal = emptySignal({ entries: [], tag: 'v2026.08.03', previousTag: null });
+  assert.ok(signal, 'an empty first release is still an empty release');
+  assert.equal(signal.severity, 'error');
+  assert.match(signal.message, /in v2026\.08\.03/);
+  assert.doesNotMatch(signal.message, /null|undefined/);
+});

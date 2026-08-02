@@ -127,7 +127,10 @@ export function renderNotes({ preamble = '', tag, previousTag, entries }) {
  */
 export function emptySignal({ entries, allowEmpty = false, tag, previousTag }) {
   if (entries.length > 0) return null;
-  const why = `No new What's-new entry between ${previousTag} and ${tag}: this release would `
+  // A first release has no previous tag to name, and "between null and v..."
+  // reads as a bug in the tool rather than as the empty changelog it is.
+  const scope = previousTag ? `between ${previousTag} and ${tag}` : `in ${tag}`;
+  const why = `No new What's-new entry ${scope}: this release would `
     + 'announce nothing. Add one to frontend/src/whatsNew.js, or, if this really is a '
     + 'plumbing-only release, say so on purpose by putting [no-notes] in the tag message.';
   return allowEmpty
@@ -168,11 +171,17 @@ async function importWhatsNewAt(tag, repoRoot) {
   }
 }
 
+// Value-less switches have to be listed: every other `--x` consumes the NEXT
+// argv entry as its value, so a boolean added without being named here silently
+// eats the flag after it (`--first-release --out f` set out=undefined and wrote
+// the notes to stdout — the release step would have uploaded nothing).
+const BOOLEAN_FLAGS = new Set(['--allow-empty', '--first-release']);
+
 function parseArgv(argv) {
-  const opts = { allowEmpty: false };
+  const opts = { allowEmpty: false, firstRelease: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--allow-empty') opts.allowEmpty = true;
+    if (BOOLEAN_FLAGS.has(a)) opts[a.slice(2).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = true;
     else if (a.startsWith('--')) { opts[a.slice(2).replace(/-(\w)/g, (_, c) => c.toUpperCase())] = argv[++i]; }
   }
   return opts;
@@ -184,12 +193,23 @@ async function main() {
   const opts = parseArgv(process.argv.slice(2));
 
   const tag = opts.tag;
-  if (!tag) throw new Error('usage: node scripts/releaseNotes.mjs --tag <vX> [--prev <vY>] [--out <file>] [--allow-empty]');
+  if (!tag) {
+    throw new Error('usage: node scripts/releaseNotes.mjs --tag <vX> [--prev <vY>] '
+      + '[--first-release] [--out <file>] [--allow-empty]');
+  }
 
-  const previousTag = opts.prev || previousTagOf(tag, repoRoot);
-  if (!previousTag) {
+  // --first-release: there is no previous release to diff against, so every
+  // entry in the changelog is new. This is NOT the same as failing to resolve a
+  // previous tag, and the distinction is the whole reason it must be asked for
+  // explicitly: dumping the entire changelog is correct exactly once, and is a
+  // silent disaster any other time. The caller has to know which it is —
+  // release.yml decides from `gh release list` being empty, which is evidence,
+  // not a guess.
+  const previousTag = opts.firstRelease ? null : (opts.prev || previousTagOf(tag, repoRoot));
+  if (!previousTag && !opts.firstRelease) {
     throw new Error(
-      `cannot resolve the tag before ${tag}. Pass --prev <tag> explicitly; `
+      `cannot resolve the tag before ${tag}. Pass --prev <tag> explicitly, or `
+      + '--first-release if this repository has genuinely never published one; '
       + 'guessing would dump the entire changelog into one release.',
     );
   }
@@ -197,7 +217,10 @@ async function main() {
   // --at <tag> regenerates the notes of a PAST release from the changelog as it
   // stood at that tag (CI never uses it: the checkout already is the tag).
   const { WHATS_NEW } = opts.at ? await importWhatsNewAt(opts.at, repoRoot) : await import('../src/whatsNew.js');
-  const entries = newEntries(WHATS_NEW, idsAtTag(previousTag, repoRoot));
+  // No previous release means nothing has been announced yet, so nothing is
+  // filtered out — an empty id set, never a git read against a tag that is not
+  // there.
+  const entries = newEntries(WHATS_NEW, previousTag ? idsAtTag(previousTag, repoRoot) : new Set());
 
   const preamblePath = opts.preamble || path.join(repoRoot, '.github', 'RELEASE_PREAMBLE.md');
   const preamble = readFileSync(preamblePath, 'utf8');
@@ -215,7 +238,7 @@ async function main() {
   if (opts.out) writeFileSync(opts.out, body, 'utf8');
   else process.stdout.write(body);
   process.stderr.write(`release notes: ${entries.length} new entr${entries.length === 1 ? 'y' : 'ies'} `
-    + `between ${previousTag} and ${tag}\n`);
+    + `${previousTag ? `between ${previousTag} and ${tag}` : `in ${tag} (first release)`}\n`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

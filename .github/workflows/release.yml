@@ -65,17 +65,29 @@ jobs:
 
           # Failed tag workflows may leave newer Git tags with NO release. Diff
           # from the last release users could actually download, never from the
-          # nearest tag in Git history.
+          # nearest tag in Git history — and never from a tag in this repo's
+          # history that belongs to UPSTREAM. A fork that has fetched upstream
+          # carries upstream's tags locally, so `git describe` cheerfully names
+          # a release this repository never published.
           $previousRelease = gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[0].tagName'
           if ($LASTEXITCODE -ne 0) {
             throw "cannot resolve the previous published GitHub release (gh release list exited $LASTEXITCODE)"
           }
           $previousRelease = "$previousRelease".Trim()
-          if (-not $previousRelease) {
-            throw "cannot resolve the previous published GitHub release: gh release list returned no release"
+          if ($previousRelease) {
+            $notesArgs = @('--prev', $previousRelease)
+          } else {
+            # No published release at all: this is the FIRST one, and every
+            # entry in the changelog is new. That used to throw here, which made
+            # a repository's first release the one release this workflow could
+            # not cut. `gh release list` returning empty is evidence, not a
+            # guess, so the generator is told plainly rather than left to infer
+            # it from a missing tag.
+            Write-Host "::notice title=First release::No previously published release; announcing the whole changelog."
+            $notesArgs = @('--first-release')
           }
 
-          node scripts/releaseNotes.mjs --tag "$env:RELEASE_REF_NAME" --prev $previousRelease --out ../release-notes.md @extra
+          node scripts/releaseNotes.mjs --tag "$env:RELEASE_REF_NAME" @notesArgs --out ../release-notes.md @extra
           if ($LASTEXITCODE -ne 0) { throw "release notes generation failed (exit $LASTEXITCODE)" }
           # Same body in the run log, so an empty or wrong release is visible
           # from the Actions page without downloading anything.
