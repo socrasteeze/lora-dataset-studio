@@ -1,6 +1,9 @@
+import errno
 from unittest.mock import patch
 
 import pytest
+import requests
+import urllib3
 
 from app.services import ollama_gpu_fence as fence
 
@@ -296,3 +299,90 @@ def test_nothing_short_of_the_consent_route_ever_unloads_a_foreign_model(fence_d
         assert fence.ensure_released_for_comfy() is False
         assert fence.release_owned_models(ollama_url=endpoint) is False
     post.assert_not_called()
+
+
+# --- a refused connection is not an idle runner -----------------------------
+# Ollama being STOPPED and Ollama answering "nothing is loaded" both mean no
+# model is resident, and every release path may treat them alike. Ownership may
+# not: a claim on a process that is not running is a claim on nothing, and it
+# was being written to disk and believed after a restart.
+
+def _refused():
+    """The exception `requests` raises when nothing is listening on the port.
+
+    Built as the real stack builds it — a socket ConnectionRefusedError, wrapped
+    by urllib3's NewConnectionError, wrapped by requests' ConnectionError — so
+    this also exercises `_connection_refused`'s walk down the __cause__ chain.
+    A flat `ConnectionError('refused')` would prove nothing: NewConnectionError
+    is not an OSError and carries no errno of its own.
+    """
+    sock = ConnectionRefusedError(errno.ECONNREFUSED, 'Connection refused')
+    conn = urllib3.exceptions.NewConnectionError(
+        None, 'Failed to establish a new connection')
+    conn.__cause__ = sock
+    exc = requests.exceptions.ConnectionError(conn)
+    exc.__cause__ = conn
+    return exc
+
+
+def _refused_winerror():
+    """The same thing as Windows actually delivers it (WinError 10061)."""
+    return requests.exceptions.ConnectionError(OSError(10061, 'refused'))
+
+
+@pytest.mark.parametrize('refused', [_refused, _refused_winerror],
+                         ids=['posix-errno', 'winerror-10061'])
+def test_a_stopped_ollama_is_never_claimed_as_a_model_lds_owns(fence_data_dir, refused):
+    """Regression: a refused connection read as 'empty' — the PERMISSIVE state —
+    so the admission path claimed the model and persisted a keep-warm lease for
+    a runner that never loaded it. The call is still admitted (it fails on its
+    own connection error, which names the real problem), but LDS records no
+    ownership it cannot back up."""
+    endpoint = 'http://127.0.0.1:11434'
+    claims = fence_data_dir / 'ollama_fence_claims.json'
+    with patch.object(fence.requests, 'get', side_effect=refused()):
+        assert fence.mark_before_generate(endpoint, 'lds-model', keep_alive='5m') == 'local'
+
+    assert fence._owned_models == {}, 'LDS claimed a residency on a stopped daemon'
+    assert not claims.exists(), 'a keep-warm lease was persisted for a model that never loaded'
+
+
+def test_a_stopped_ollama_cannot_make_lds_evict_a_model_the_user_loads_later(fence_data_dir):
+    """The damage the phantom claim actually does. LDS 'owns' a name it never
+    loaded; when the user later loads that same model themselves and Ollama
+    comes back, the release path sees nothing unowned and unloads it — the one
+    thing test_nothing_short_of_the_consent_route... forbids."""
+    endpoint = 'http://127.0.0.1:11434'
+    with patch.object(fence.requests, 'get', side_effect=_refused()):
+        fence.mark_before_generate(endpoint, 'shared-model', keep_alive='5m')
+
+    # Ollama is back, and the resident model is the USER's.
+    with patch.object(fence, '_configured_local_endpoint', return_value=('local', endpoint)), \
+            patch.object(fence.requests, 'get', return_value=_ps('shared-model')), \
+            patch.object(fence.requests, 'post') as post:
+        assert fence.ensure_released_for_comfy() is False
+    post.assert_not_called()
+
+
+def test_a_stopped_ollama_still_counts_as_a_free_runner_for_release(fence_data_dir):
+    """The payoff of the original mapping, which must not regress: a daemon that
+    is not running is holding no VRAM, so ComfyUI is free to go."""
+    endpoint = 'http://127.0.0.1:11434'
+    with patch.object(fence, '_configured_local_endpoint', return_value=('local', endpoint)), \
+            patch.object(fence.requests, 'get', side_effect=_refused()), \
+            patch.object(fence.requests, 'post') as post:
+        assert fence.ensure_released_for_comfy() is True
+        assert fence.unload_foreign_models()['reason'] == 'already-free'
+    post.assert_not_called()
+
+
+def test_a_stopped_ollama_is_not_reported_as_reachable(fence_data_dir):
+    """fence_status is polled by the surfaces that were refused, to notice the
+    moment the fence lifts. Reporting a stopped daemon as reachable-and-idle
+    told them to carry on waiting for something that was not there."""
+    endpoint = 'http://127.0.0.1:11434'
+    with patch.object(fence, '_configured_local_endpoint', return_value=('local', endpoint)), \
+            patch.object(fence.requests, 'get', side_effect=_refused()):
+        status = fence.fence_status()
+    assert status['reachable'] is False
+    assert status['blocked'] is False and status['models'] == []
