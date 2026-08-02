@@ -681,6 +681,45 @@ that means *this machine*", not "every one we have seen fail".
 verified to FAIL without the scoping (the barrier installs and the local
 `add_job` raises `ComfyUIRecoveryRequired`).
 
+## Divergence 7: fixes carried AHEAD of upstream, pending their own
+
+Not a policy divergence and not a permanent one: bugs found here, reported
+upstream, and fixed here because waiting would leave this fork exposed. Upstream
+has said it is taking each of these, so **expect a conflict on the next sync and
+prefer THEIR version when it arrives** — unless the reasoning below says
+otherwise. Delete an entry the moment its upstream fix lands.
+
+**One entry, added 2026-08-02:**
+
+- `backend/app/services/ollama_gpu_fence.py` — `_probe` returning `'down'` for a
+  refused connection, instead of `'empty'`. Upstream's `61f80c5c` (merged here
+  in `cec9d4fe`) added claim persistence on top of a pre-existing refused →
+  `'empty'` mapping, which turned a harmless quirk into a lease persisted for a
+  model that never loaded — and, downstream of that, LDS unloading a model the
+  USER had loaded under the same name. Fixed here in `1701c4e7`.
+
+  **What to check when upstream's version arrives**, because these are the parts
+  that are easy to get subtly different:
+  - a stopped daemon must still satisfy the RELEASE paths (`_release_endpoint`,
+    `unload_foreign_models`, and the post-unload proof). Nothing resident means
+    nothing to release, and a daemon that is not running is the strongest form
+    of that proof. If their fix makes a refused probe fail those, ComfyUI stops
+    being handed the card whenever Ollama is off — a regression this fork's
+    `test_a_stopped_ollama_still_counts_as_a_free_runner_for_release` exists to
+    catch, and which passes either way against the OLD code, so it will not
+    announce itself.
+  - `mark_before_generate` must return something that lets the call proceed and
+    fail on its own connection error. Returning `'blocked'` is the tempting
+    shape and it lies: the user is told a model is in use outside LDS by a
+    daemon that is not running.
+  - `fence_status` must report `reachable: False`. The surfaces refused by the
+    fence poll it to notice the moment the fence lifts.
+
+  Also removed here, and worth keeping removed: `_CLAIM_MAX_AGE_S`, which sat in
+  an `or` beside a 30-second slack test that always fired first. It could not
+  execute, while documenting a guarantee ("a claim never speaks for a runner an
+  hour later") that nothing provided.
+
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
 Lessons from actually doing these merges, aimed at an agent seeing this repo

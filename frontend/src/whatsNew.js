@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-02-stopped-ollama-is-not-an-idle-one',
+    date: '2026-08-02',
+    title: 'With Ollama switched off, LDS could end up unloading a model you had loaded yourself',
+    blurb:
+      'A refused connection was being read as "Ollama is running and idle" — the permissive answer — so with Ollama stopped LDS recorded itself as the owner of a model that had never loaded, and wrote that ownership down where it survived a restart. The damage came later: load that same model yourself, and the next time LDS handed the graphics card to ComfyUI it saw nothing it did not own and unloaded it, which is the one thing the Ollama fence exists to prevent. It now tells a stopped daemon apart from an idle one. Nothing is claimed on a daemon that is not running, the request simply fails with the real "Ollama is not reachable" error instead of a misleading "another model is in use", and a stopped Ollama is no longer reported as reachable to the screens that wait for it to free up. Handing the card to ComfyUI while Ollama is off still works exactly as before — with nothing running there is nothing to release.',
+    to: '/settings/local-tools',
+  },
+  {
     id: '2026-08-02-writes-refuse-an-unreadable-body',
     date: '2026-08-02',
     title: 'A save that cannot be read now says so instead of answering OK and storing nothing',
