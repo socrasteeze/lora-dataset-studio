@@ -52,11 +52,23 @@ npm run build    # writes frontend/dist/
 
 **If you change anything under `frontend/src`, run `npm run build` and commit the regenerated `frontend/dist/` in the same PR** — otherwise people running from source won't see your change. There's no TypeScript/ESLint step; a clean `npm run build` is the bar.
 
+On this fork the rebuilt bundle goes in **its own `build(frontend):` commit**
+rather than mixed into the source commit — same PR, separate commit. The
+requirement is that dist ships with the change, not that it shares a commit with
+it; `CLAUDE.md` step 2 is only about that granularity. A PR that changes
+`frontend/src` and carries no dist at all is incomplete either way.
+
 **This fork is local-only for image generation** (no Nano Banana / OpenAI Setup
 keys). After merging upstream, rebuild `frontend/dist` even if you only took
 upstream's dist commit — Flask serves the bundle, and upstream's can resurrect
 removed UI. See `FORK_NOTES.md` and run
 `node --test tests/local-only-engines-contract.test.mjs` from `frontend/`.
+
+Flask serves `frontend/dist` **off disk, per request**, so a rebuilt bundle
+reaches every browser the moment it is written while the Python process keeps
+running the code it started with. If you rebuild without restarting, you are
+running a new frontend against an old backend — which is a real bug source, not
+a theoretical one (see `frontend/src/components/bank/bankIds.js`).
 
 ## Tests
 

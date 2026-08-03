@@ -47,6 +47,18 @@ Run through this before calling a wave done:
 2. **Source-only commits.** Never commit `frontend/dist/**` alongside sources;
    the dist rebuild is a separate consolidated `build(frontend):` commit at the
    end of the wave.
+   **This is a rule about commit GRANULARITY, not about whether dist ships.**
+   Both `CONTRIBUTING.md` (here and upstream) require that a change under
+   `frontend/src` reaches people with its rebuilt bundle — "commit the
+   regenerated `frontend/dist/` in the same PR" — because the repo ships
+   prebuilt and people run from source. This rule only says *which commit* it
+   goes in: its own `build(frontend):` one, at the end of the wave, never mixed
+   into a source commit. Read as "keep dist out of the PR" it is wrong, and a
+   rail fix was pushed to an upstream branch with no bundle behind it on exactly
+   that misreading — caught only by reading their PR template afterwards.
+   **For an upstream PR, their `CONTRIBUTING.md` and
+   `.github/PULL_REQUEST_TEMPLATE.md` are the authority, not this file** — read
+   both before building the branch (see "Sending a PR UPSTREAM" below).
 3. **🎁 What's new** (`frontend/src/whatsNew.js`): prepend one benefit-first
    entry per user-visible feature or fix. Between releases this panel is the
    ONLY way users learn something shipped. Plumbing/refactors don't need one.
@@ -114,6 +126,39 @@ releases can be cut on one day). Skipping step 3 therefore now costs a release,
 not just a panel line: a tag whose body would announce NOTHING fails the release
 job in seconds. A genuine plumbing-only release says so on purpose by carrying
 `[no-notes]` in its annotated tag message.
+
+## Sending a PR UPSTREAM (the reverse direction of a sync)
+
+Contributing a fix back is not a wave, and almost every rule above changes shape.
+
+- **Branch off `upstream/main`, never off this fork's `main`.** A branch cut from
+  `main` carries the entire divergence into a public PR — the cloud-engine
+  removals included. Build it in a throwaway `git worktree` and apply the change
+  to *upstream's* copies of the files, rather than copying this fork's files
+  over: the two trees differ, and copying re-proposes the divergence.
+- **Their `CONTRIBUTING.md` and `.github/PULL_REQUEST_TEMPLATE.md` are the
+  authority, not this file.** Read both before building the branch. The known
+  collision is the dist rule (see checklist step 2). There is no lint gate
+  upstream — they track no `eslint.config.js`; a clean `npm run build` is the bar.
+- **Run the FULL backend suite against the branch**, not just the file touched.
+  A branch that changes zero backend files can still come back red, and that is
+  how the `test_bank_score_gpu_window.py` carrier was found. **When something
+  fails, re-run it on pristine detached `upstream/main` with a clean
+  `git status` before believing the change caused it** — then say so in the PR,
+  with both numbers, instead of quietly ticking the box.
+- **Author as the repo owner's GitHub identity**, since the PR comes from their
+  account: their GitHub login, with GitHub's `<numeric-id>+<login>@users.
+  noreply.github.com` form as the email. Read both off `gh api user` at the
+  time — do NOT write the address into this file or any tracked file, because
+  `test_no_personal_data.py` catches emails everywhere and will fail the suite
+  (it did, on this very bullet). The noreply form attributes the commit to their
+  account without publishing a personal address. Pass it per command
+  (`git -c user.name=… -c user.email=… commit`). **Never `git config` it:**
+  worktrees share `.git/config`, so setting it there silently re-identities this
+  fork's own commits too.
+- **Never open the PR from here.** Pushing the branch to `origin` is fine when
+  asked; creating the PR is a GitHub write through a personally authenticated
+  `gh`. Hand over the compare URL and the body.
 
 ## Community input
 
