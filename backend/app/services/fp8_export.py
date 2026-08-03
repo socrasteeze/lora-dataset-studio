@@ -434,5 +434,3 @@ def typical_fp8_bytes(bf16_bytes) -> int:
         return int(max(0, int(bf16_bytes or 0)) * 0.40)
     except (TypeError, ValueError):
         return 0
-
-
