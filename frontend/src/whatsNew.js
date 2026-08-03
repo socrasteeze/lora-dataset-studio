@@ -50,12 +50,44 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-caption-mismatch-names-your-family',
+    date: '2026-08-03',
+    title: 'The caption-mismatch warning names YOUR model family, not Z-Image',
+    blurb:
+      'If your captions did not match the family you picked, the app refused the launch with a message that always said “this Z-Image dataset… but Z-Image expects prose” — even when you were training Krea 2, FLUX.1 or FLUX.2 Klein. The sentence was frozen into the code while the truth depends on the family. It now names the one you actually chose, so the advice matches what you are looking at.',
+    to: '/datasets?section=training&panel=launch',
+  },
+  {
+    id: '2026-08-03-anima-hybrid-captions',
+    date: '2026-08-03',
+    title: 'Anima takes booru tags too — the app stops calling them a mistake',
+    blurb:
+      'Anima is a hybrid-prompting model: booru tags and natural language are both first-class on it. The app only knew half of that and treated a booru-captioned Anima dataset as a caption mismatch, so a perfectly valid dataset had to be force-launched past a red warning. Both forms now train without a warning and without forcing, the caption-style selector says so on Anima, and prose stays the preselected default. Every other family keeps its guard exactly as it was — SDXL still refuses prose. Prompted by a correction from Witty_Mycologist_995 (Reddit).',
+    to: '/datasets?section=captions&panel=generate',
+  },
+  {
+    id: '2026-08-03-improve-note-cites-the-setting',
+    date: '2026-08-03',
+    title: 'The amber “drawn dataset” note now names the setting it came from',
+    blurb:
+      'Next to Improve, a caution used to announce “This dataset is drawn.” — a verdict the app never actually reached, because it only ever read the subject type you picked. On a photoreal dataset left marked Anime the sentence was simply wrong, with nothing to tell you where it came from. It now says the subject type is set to anime, so when the setting and your images disagree you can see which one to change. The advice itself is unchanged.',
+    to: '/datasets?section=images&panel=review',
+  },
+  {
     id: '2026-08-03-folder-picker-paste-a-path',
     date: '2026-08-03',
     title: 'You can finally paste a path when choosing a folder',
     blurb:
       'Browse… opened the Windows folder tree from the XP era: no address bar, no Quick Access, and no way to paste — so a path someone sent you, or one you had just copied out of Explorer, had to be clicked down to one folder at a time. It now opens the modern Windows folder picker, with an address bar you can paste into and your usual shortcuts down the side. The in-app browser — the one you get over the LAN, on a tablet, or on Linux, where no Windows dialog exists — gained the same thing: a path box at the top, Enter to jump. If the modern dialog cannot be used on your machine, the old one still opens rather than nothing at all.',
     to: '/datasets',
+  },
+  {
+    id: '2026-08-03-bank-tag-chips',
+    date: '2026-08-03',
+    title: 'Click an image’s 🏷️ tags to find the other images that share them',
+    blurb:
+      'Every captioned tile now has a clickable 🏷️ badge. It opens that image’s caption as chips — woman, red, dress, balcony — and ticking them narrows the grid to the images whose captions mention them. It is the readable cousin of 🎯 Similar to selected: that one matches the overall look and cannot say why, this one matches attributes you picked and shows you exactly which. Several chips mean AND, so each tick narrows further, and chips match as whole words — “car” will not drag back “scarf”.',
+    to: '/bank',
   },
   {
     id: '2026-08-03-review-opens-instantly',

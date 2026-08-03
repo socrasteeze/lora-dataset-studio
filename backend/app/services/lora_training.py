@@ -832,6 +832,18 @@ _ARCH_LABEL = {'sdxl': 'an SDXL', 'sd15': 'a Stable Diffusion 1.5',
 # behaviour of the surviving definition), and the lower one deleted.
 _FAMILY_LABEL = {'zimage': 'Z-Image', 'sdxl': 'SDXL', 'krea': 'Krea 2',
                  'flux': 'FLUX.1', 'flux2klein': 'FLUX.2 Klein', 'anima': 'Anima'}
+# Caption FORM each family is prompted with — the only input of the
+# MISMATCH_CAPTION guard (assert_trainable). Three values:
+#   'booru'  the model is tag-native (SDXL booru checkpoints, e.g. bigLove);
+#   'prose'  natural language only (the default for every family not listed);
+#   None     HYBRID — both forms are first-class, so no mismatch can exist.
+# Anima is the hybrid case: its model card documents booru tags AND natural
+# language as supported prompting styles (Cosmos-Predict2 2B backbone, Qwen LLM
+# text encoder — an LLM text encoder is what makes both readable). LDS used to
+# lump it with 'prose' by omission and refused booru-captioned anima datasets;
+# that was half a truth, and the mirror image of the "booru only" half someone
+# else had. Anything absent from this table keeps the historical prose default.
+_EXPECTED_CAPTION_FORM = {'sdxl': 'booru', 'anima': None}
 # Confirmable-refusal marker (mirrors UNCAPTIONED:/MISMATCH_CAPTION:): the UI
 # strips it, asks window.confirm, and retries with allow_unverified_weights.
 _UNVERIFIED_MARKER = 'CUSTOM_WEIGHTS_UNVERIFIED: '
@@ -8400,7 +8412,9 @@ def assert_trainable(dataset_id, train_type=None, allow_caption_mismatch=False,
                      variant=None, allow_not_ready=False) -> None:
     """Lève ValueError si le dataset n'est pas prêt : trop peu d'images gardées,
     captions manquantes, ou STYLE de caption incohérent avec le type de modèle
-    (SDXL booru-native attend des tags booru ; Z-Image attend de la prose). Le
+    (SDXL booru-native attend des tags booru ; Z-Image attend de la prose ; anima
+    est HYBRIDE — les deux formes sont natives, donc aucun mismatch n'existe pour
+    elle, cf. _EXPECTED_CAPTION_FORM). Le
     `train_type` effectif est passé par l'appelant car il n'est persisté qu'APRÈS
     cet appel. `allow_caption_mismatch=True` = override explicite (bouton « forcer »).
     `allow_uncaptioned=True` = confirm explicite « train anyway » : les captions
@@ -8480,7 +8494,11 @@ def assert_trainable(dataset_id, train_type=None, allow_caption_mismatch=False,
     # Garde-fou style ↔ type : un LoRA SDXL entraîné sur des captions PROSE = mismatch
     # booru-native → « images disjointes » (recherche 2026-06-14) ; et l'inverse pour Z-Image.
     # `ttype` a déjà été résolu en tête (plancher d'images) — on le réutilise.
-    expected = 'booru' if ttype == 'sdxl' else 'prose'
+    # `None` = famille HYBRIDE : les deux formes sont first-class, aucun mismatch
+    # n'existe, le garde se tait (voir _EXPECTED_CAPTION_FORM).
+    expected = _EXPECTED_CAPTION_FORM.get(ttype, 'prose')
+    if expected is None:
+        return
     from .face_variations import caption_style
     caps = (FaceDatasetImage.query
             .filter_by(dataset_id=dataset_id, status='keep')
@@ -8495,8 +8513,13 @@ def assert_trainable(dataset_id, train_type=None, allow_caption_mismatch=False,
                     "MISMATCH_CAPTION: this SDXL dataset has PROSE captions, but a booru "
                     "model (bigLove type) is prompted with tags. Re-caption in 'Booru tags' mode "
                     "before training, or force the training.")
+            # `label`, not a hard-coded "Z-Image": this branch fires for EVERY
+            # prose family (Krea 2, FLUX.1, FLUX.2 Klein…), and telling a Klein
+            # user they have a Z-Image dataset is the same disease as the anima
+            # bug above — a claim frozen into a string where the truth is
+            # per-family. `label` was already resolved for the image floor.
             raise ValueError(
-                "MISMATCH_CAPTION: this Z-Image dataset has booru TAG captions, but Z-Image "
+                f"MISMATCH_CAPTION: this {label} dataset has booru TAG captions, but {label} "
                 "expects prose. Re-caption in 'Prose' mode, or force the training.")
 
 
