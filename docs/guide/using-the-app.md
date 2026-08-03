@@ -1038,6 +1038,35 @@ Unlike the sort, the exclude box is **not remembered** between visits: an order
 you can see in a menu is a habit, but images missing from a grid for a reason you
 set last week reads as data loss.
 
+## Filter a bank on a small screen
+
+The bank's filter panel — the search boxes, every chip row, the 🔖 tag facets and
+the 🎚 thresholds — is a lot of controls on a phone: roughly fifteen wrapped rows
+before the first thumbnail. It now opens **folded** on a small screen (and
+**expanded** on a desktop), behind one line that names every filter currently
+narrowing the grid, e.g. *"✓ Kept · 🌫 Blurry · 1–2 MP +2 more"*. Tap the header to
+open or close it — the choice is remembered for next time, across every bank.
+
+A folded panel never hides *what* it is doing: the summary line is built from
+the same list of active facets as the "N shown of M" count above the grid, so
+the two can never disagree, and the full list is always available in the
+header's tooltip. **✕ Clear all** appears next to it whenever something is
+active, and turns every filter off in one tap — search, exclude, status,
+quality/score/group flags, resolution, origin, framing and both kinds of tag
+filter. It leaves the **sort order** alone: a ranking is not a filter, and
+resetting it on every "start over" would be a second, unrelated surprise.
+
+Selecting thumbnails and deciding on them used to mean opposite ends of the
+page — tap tiles at the bottom, then scroll all the way back up past the filter
+panel to reach ✓ Keep / ✕ Reject. Those buttons — plus ↺ Undecided, the two
+rotate buttons and Clear — now live in a bar **pinned to the bottom of the
+screen** the moment anything is selected. It takes up real space at the end of
+the page rather than floating over it: the page grows to make room for it, so
+scrolling all the way down still shows you the last row of thumbnails and the
+pagination controls with nothing hidden behind the bar. The ↩ Undo offer after
+a bulk decision appears in the same bar, right where the buttons that made the
+decision are.
+
 ## Sort a grid to review faster
 
 Filters answer *which images*; sorting answers *which one first*. Both grids
@@ -1252,8 +1281,9 @@ would make it pay a price it does not owe.
 touch your files at all. The turn is remembered against the image and applied to
 what the app shows you and to what it copies when you **⬆ Promote**; your
 original keeps its exact bytes, whatever you do. Select the images and use
-**↺ Rotate left** / **↻ Rotate right** in the selection bar to fix a whole
-sideways batch at once, or turn one image without leaving **▶ Review** with the
+**↺ Rotate left** / **↻ Rotate right** in the selection bar — pinned to the
+bottom of the screen once anything is selected — to fix a whole sideways batch
+at once, or turn one image without leaving **▶ Review** with the
 ↺ / ↻ buttons (keyboard: `[` and `]`). Rotating in Review never decides
 anything — the image stays under your cursor so you can judge it once it is the
 right way up.
