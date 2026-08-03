@@ -53,3 +53,14 @@ test('managed-bind guidance names the host variable and an explicit recreate', (
   assert.match(server, /\{!bindManaged && \([\s\S]{0,180}<ResetToDefault/,
     'the disabled port must not keep an apparently actionable reset control');
 });
+
+test('the upstream-ahead line stays informational — no action wired to it', () => {
+  const block = maintenance.match(
+    /\{!applying && upstreamAheadLabel\(upstream\) && \([\s\S]*?\n {6}\)\}/,
+  )?.[0] || '';
+  assert.ok(block, 'the upstream-ahead block must exist in MaintenanceSection.jsx');
+  assert.doesNotMatch(block, /onClick/,
+    'the upstream-ahead line is informational only — a future edit must not turn it into a button');
+  assert.doesNotMatch(block, /postJson\(['"]\/api\/update\/apply['"]/,
+    'the upstream-ahead line must never trigger the fork\'s own apply/restart action');
+});
