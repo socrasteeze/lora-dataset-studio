@@ -334,6 +334,28 @@ def test_keep_without_a_ready_candidate_is_a_409_not_a_crash(client, monkeypatch
     assert client.post(f'/api/dataset/{did}/ref/edit/keep').status_code == 409
 
 
+def test_keep_reports_a_failed_commit_instead_of_erroring_twice(client, monkeypatch):
+    """A Keep that fails must answer WHY, not raise a second exception.
+
+    Ported from upstream's `test_ref_edit.py`, which this fork does not carry —
+    that is the API-lane suite (Divergence 1). The bug it pins is real here too:
+    the 500 handler logs through a module-level `logger`, and until upstream's
+    b1a3d7bd defined one, that line raised NameError from inside the very
+    `except` that exists to turn a failed Keep into an honest 500. This fork had
+    dodged it with an inline getLogger; the route now uses upstream's shape, so
+    this test is what keeps that logger defined.
+    """
+    did = _create_with_ref(client, monkeypatch, 'Boom', 'zchar_boom')
+
+    def _explode(*a, **k):
+        raise OSError('disk went away mid-commit')
+
+    monkeypatch.setattr(svc, 'keep_reference_edit', _explode)
+    resp = client.post(f'/api/dataset/{did}/ref/edit/keep', json={})
+    assert resp.status_code == 500
+    assert 'previous reference is unchanged' in resp.get_json()['error']
+
+
 def test_discarding_a_running_edit_cancels_the_render(client, monkeypatch):
     """An edit on our own GPU CAN be cancelled, and leaving it running would hold
     the GPU for a result nobody will ever see."""
