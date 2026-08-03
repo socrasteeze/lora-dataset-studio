@@ -39,8 +39,13 @@ test('the id snapshot is fetched lean — one request, ids only', () => {
   // the ORDER BY. Measured after: 3771 ms → 44 ms with a measure sort active.
   assert.match(BANK, /ids_only: '1'/,
     'the id snapshot must ask for the lean answer')
-  assert.match(BANK, /return d\.ids \|\| \[\]/,
-    'and read the ids straight off it')
+  // Was `return d.ids || []`, asserted here literally — which pinned a bug
+  // instead of catching one: a backend too old to know `ids_only` answers with
+  // an ordinary page and no `ids` key at all, and `|| []` reported that as an
+  // empty filter. The lean fetch is still the contract; reading it is now
+  // bankIds.idsFromResponse (see tests/bank-ids-guard-contract.test.mjs).
+  assert.match(BANK, /return idsFromResponse\(d\)/,
+    'and read the ids straight off it, through the guard')
   // The pagination loop must NOT come back: it is the bug.
   assert.doesNotMatch(BANK, /ids\.push\(\.\.\.d\.images\.map/,
     'walking the paginated grid to collect ids is what made Review slow')
