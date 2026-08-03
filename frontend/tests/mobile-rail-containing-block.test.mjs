@@ -67,3 +67,24 @@ test('the reason is written down where the class is', () => {
   assert.match(src, /containing block/,
     'the dataset rail must keep the note explaining why `relative` is load-bearing')
 })
+
+// The Bank's own horizontally-scrolling strips weren't covered by the RAILS
+// loop above (they have no `lg:hidden` — they're always-on cover strips, not
+// a responsive nav rail) but share the identical hazard: an overflow-x-auto
+// scroller that isn't itself a containing block. Each strip's cover badge is
+// independently wrapped in its own `relative` button today, so nothing
+// escapes YET — this pins the defensive `relative` so that stays true even if
+// a future edit drops the inner wrapper or adds a new unwrapped child.
+const BANK_RAILS = [
+  ['../src/components/bank/BankWorkspace.jsx', 'person- and style-cluster cover strips', 2],
+  ['../src/components/bank/BankWatermarkPanel.jsx', 'before/after sample strip', 1],
+]
+
+for (const [file, label, expectedCount] of BANK_RAILS) {
+  test(`the Bank's ${label} is a containing block`, () => {
+    const src = read(file)
+    const matches = [...src.matchAll(/className="(relative flex gap-2 overflow-x-auto pb-1)"/g)]
+    assert.equal(matches.length, expectedCount,
+      `${file}: expected ${expectedCount} relative overflow-x-auto strip(s), found ${matches.length}`)
+  })
+}

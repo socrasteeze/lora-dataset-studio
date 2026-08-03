@@ -80,6 +80,24 @@
     font-style: normal;
     font-weight: 600;
   }
+  /* iOS Safari auto-zooms the page on focusing any text-like input whose
+     EFFECTIVE font-size is under 16px — and the zoom-in/zoom-out transition
+     is how a pre-existing horizontal overflow elsewhere on the page (an
+     absolutely-positioned element escaping a `position: static` scroller, a
+     popover anchored with no left/right offset — see
+     tests/mobile-rail-containing-block.test.mjs and the Bank curate-popover
+     fix) gets "stuck" as a persistently scrollable page: the browser
+     recomputes its fit-to-width scale during the transition, using whatever
+     the document's width happens to be at that moment. Belt-and-suspenders:
+     even with every known overflow source fixed, this stops the TRIGGER
+     itself below the app's own `sm` breakpoint (640px), so a future overflow
+     slip can't reproduce the same stuck-zoom symptom. Desktop keeps every
+     existing text-xs/text-sm control exactly as it is today. */
+  @media (max-width: 639px) {
+    input, select, textarea {
+      font-size: 16px;
+    }
+  }
   ::-webkit-scrollbar {
     @apply w-1.5;
   }
