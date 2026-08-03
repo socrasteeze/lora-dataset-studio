@@ -425,6 +425,53 @@ def extra_ref_filenames(ds) -> list:
     return [f for f in v if isinstance(f, str)] if isinstance(v, list) else []
 
 
+def _sanitize_modal_edit_reference(image_bytes, *, label='reference image'):
+    """Validate one dialog upload and return an upright, metadata-free WebP.
+
+    Krea consumes a temporary file, not request-scoped bytes. Re-encoding here
+    gives it the same normalized input contract as the dataset's stored reference
+    while rejecting animated, unsupported, corrupt, oversized, or unsafe images
+    before a live edit batch is superseded.
+    """
+    if not isinstance(image_bytes, (bytes, bytearray)) or not image_bytes:
+        raise ValueError(f'{label} must be a non-empty image')
+    raw = bytes(image_bytes)
+    if len(raw) > EXTERNAL_REFERENCE_MAX_BYTES:
+        raise ValueError(
+            f'{label} is too large '
+            f'(max {EXTERNAL_REFERENCE_MAX_BYTES // (1024 * 1024)} MiB)')
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(raw)) as source:
+                _preserved_import_header_extension(source, label=label)
+                source.load()
+                oriented = ImageOps.exif_transpose(source)
+                has_alpha = ('A' in oriented.getbands()
+                             or 'transparency' in getattr(oriented, 'info', {}))
+                if has_alpha:
+                    rgba = oriented.convert('RGBA')
+                    clean = Image.new('RGB', rgba.size, (255, 255, 255))
+                    clean.paste(rgba, mask=rgba.getchannel('A'))
+                else:
+                    clean = Image.new('RGB', oriented.size)
+                    clean.paste(oriented.convert('RGB'))
+        out = io.BytesIO()
+        clean.save(out, 'WEBP', quality=92)
+        payload = out.getvalue()
+    except ValueError:
+        raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        raise ValueError(f'{label} rejected an unsafe image header') from exc
+    except (OSError, UnidentifiedImageError, SyntaxError, MemoryError) as exc:
+        raise ValueError(f'{label} is unreadable') from exc
+    if len(payload) > EXTERNAL_REFERENCE_MAX_BYTES:
+        raise ValueError(
+            f'{label} is too large after preparation '
+            f'(max {EXTERNAL_REFERENCE_MAX_BYTES // (1024 * 1024)} MiB)')
+    return payload
+
+
 def _all_ref_bytes(ds) -> list:
     """The primary reference then every persistent extra, as bytes.
 
@@ -3488,6 +3535,10 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt,
     `app` is accepted and unused, matching upstream's signature so the route and
     the tests stay shaped the same on both sides — the API lane needed it for the
     worker thread's app context, the queue lane has its own.
+    The engines take their second reference from DIFFERENT places (Klein: the
+    dataset's extra angles, by path; Krea: one image uploaded in this dialog),
+    which is a fact of their graphs — see LOCAL_EDIT_REF_SUPPORT — and is stated
+    in the UI at pick time rather than discovered as a silent drop here.
 
     Raises ValueError for a bad engine / empty prompt / missing reference (the
     route maps it to 400/404)."""
@@ -3514,14 +3565,27 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt,
     # local siblings below consume temporary files written once from these exact
     # bytes, never a later read of the master.
     dataset_ref_bytes = tuple(_all_ref_bytes(ds))
-    if transient_refs:
-        # D1: upstream offers these uploads to its API lanes and refuses only the
-        # local ones. Every engine here IS local, so the refusal is unconditional
-        # — and must not point at an API engine the user cannot select.
+    # Which selected local engines can actually receive the dialog's uploads —
+    # computed BEFORE the refusal below, because it is what the refusal turns on.
+    modal_local = local_engines_taking_modal_refs(local_engines)
+    # Sanitize the dialog's uploads HERE — once, and before anything
+    # destructive. start_batch below SUPERSEDES the batch on screen: it unlinks
+    # the previous candidate and cancels a render still in flight. A rejected
+    # image (HEIC, animated GIF, truncated PNG — all of which pass the browser's
+    # image/* filter) must therefore fail before it, or dropping the wrong file
+    # destroys a candidate the user had not kept yet. Before Krea accepted a
+    # dialog image, every local upload was refused and this ordering did not exist.
+    modal_bytes = tuple(
+        _sanitize_modal_edit_reference(raw, label=f'extra edit reference {index}')
+        for index, raw in enumerate(transient_refs, 1) if raw)
+    if transient_refs and not modal_local:
+        # Refuse ONLY when nothing selected can read these bytes. Krea now can,
+        # so this is the narrower, still-true "the engine you picked has nowhere
+        # to put them" — with no pointer to an API lane this fork does not ship.
         local = local_engines[0]
         raise ValueError(
-            f'{engine_labels().get(local, local)} renders on your own GPU and cannot take '
-            'the extra reference images added here — remove them to run the edit')
+            f'{engine_labels().get(local, local)} has no slot for the extra reference images '
+            'added here — remove them, or pick an engine that takes one')
 
     # Validate every selected local lane before replacing the current results.
     for local in local_engines:
@@ -3543,25 +3607,44 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt,
     # enqueue fails, clear cancels the first queue job and closes the shared
     # activity exactly once.
     local_snapshot_paths = []
+    local_modal_paths = []
     try:
         if local_engines:
             snapshot_tag = uuid.uuid4().hex[:8]
+            # The primary is always needed. The dataset's EXTRAS only when a
+            # selected engine reads them — Krea reads the dialog instead, so a
+            # Krea-only edit used to write files nobody would ever open. Derived
+            # from the support table, never from engine names.
+            wants_dataset_extras = bool(local_engines_taking_dataset_refs(local_engines))
             for index, raw in enumerate(dataset_ref_bytes):
+                if index and not wants_dataset_extras:
+                    break
                 filename = (
                     f'{user_id}{reference_edit_jobs.CANDIDATE_MARKER}'
                     f'snapshot_{snapshot_tag}_{index}.webp')
                 path = os.path.join(dsdir, filename)
                 local_snapshot_paths.append(path)
                 write_image_atomic(path, raw)
+            # The dialog's own uploads, given the SAME treatment as the primary:
+            # already-validated bytes, written once, handed over as paths. Only
+            # staged when an engine will read them; otherwise the request has no
+            # business writing temporary files into the dataset folder.
+            for index, raw in enumerate(modal_bytes if modal_local else ()):
+                filename = (
+                    f'{user_id}{reference_edit_jobs.CANDIDATE_MARKER}'
+                    f'modalref_{snapshot_tag}_{index}.webp')
+                path = os.path.join(dsdir, filename)
+                local_modal_paths.append(path)
+                write_image_atomic(path, raw)
         for local in local_engines:
             _enqueue_local_reference_edit(
                 user_id, dataset_id, ds, local, prompt, tokens[local],
-                local_snapshot_paths[0], local_snapshot_paths[1:])
+                local_snapshot_paths[0], local_snapshot_paths[1:], local_modal_paths)
     except Exception:
         reference_edit_jobs.clear_batch(dataset_id, batch_token, dsdir)
         raise
     finally:
-        for path in local_snapshot_paths:
+        for path in local_snapshot_paths + local_modal_paths:
             reference_edit_jobs._unlink(path)
 
     # The route returns this exact opaque id to the browser. Reading the registry
@@ -3569,21 +3652,78 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt,
     return started['batch_id']
 
 
-#: Reference images each engine actually consumes, so the UI can say it at pick
-#: time. Klein chains the dataset's extra refs as native ReferenceLatent nodes;
-#: Krea's Krea2EditModelPatch takes ONE source (a second slot exists but what it
-#: does to identity has not been measured — see enqueue_krea_edit). Neither takes
-#: the modal's transient uploads: both engines want file PATHS and the transient
-#: images are request-scoped bytes. Refused loudly by the route.
+#: Which second reference each LOCAL engine takes, and — the part that matters —
+#: WHERE it comes from. The two local engines want opposite things, so one pool
+#: cannot serve both:
+#:
+#:   * 'dataset_only' (Klein) — the dataset's extra refs, chained as native
+#:     ReferenceLatent nodes, no ceiling of its own. Those are ANGLES OF THE SAME
+#:     FACE and they lock identity across every generation, not just this edit.
+#:     Persistent input, so the dataset's reference card is their home.
+#:   * 'modal_one' (Krea) — ONE image uploaded in the edit dialog, and none of
+#:     the dataset's. Its node pack trained the `_b` slot for a DIFFERENT subject
+#:     ("scene first, subject second"), which makes the dataset pool precisely
+#:     the wrong source: everything in it is another angle of the same person,
+#:     the one photo that slot mis-handles (documented failure: the subject comes
+#:     back duplicated). It is a per-edit compositional input — "put her in this
+#:     room", "next to him" — so it belongs to the edit, not to the dataset.
+#:
+#: That split IS the design. The first version of this feature fed Krea from the
+#: dataset pool and therefore guaranteed the wrong photo on every run.
 #: LOAD-BEARING, not documentation: the enqueue below reads it, so a third local
-#: engine cannot be added without deciding what it does with the extra refs. The
-#: values are mirrored in frontend EDIT_REF_SUPPORT (contract-tested), because the
-#: UI has to say this at pick time, not discover it as a silent drop.
-LOCAL_EDIT_REF_SUPPORT = {'klein': 'dataset_only', 'krea': 'primary_only'}
+#: engine cannot be added without deciding where its references come from. The
+#: values are mirrored in frontend EDIT_REF_SUPPORT (contract-tested), because
+#: the UI has to say this at pick time, not discover it as a silent drop.
+LOCAL_EDIT_REF_SUPPORT = {'klein': 'dataset_only', 'krea': 'modal_one'}
+
+#: How many DATASET extras each support value forwards. None = no ceiling beyond
+#: the dataset's own MAX_EXTRA_REFS. A support value absent from this map takes
+#: none — which is what a newly added engine should do until someone decides.
+LOCAL_EDIT_REF_LIMITS = {'dataset_only': None}
+
+#: How many of the MODAL's own uploads each support value forwards. They reach a
+#: local engine as temporary FILES written from the request bytes — the same
+#: hand-off the primary reference already used, which is why "local engines
+#: cannot take the images added here" was always a routing decision rather than
+#: a limitation of the graphs.
+MODAL_EDIT_REF_LIMITS = {'modal_one': 1}
+
+
+def local_edit_extra_refs(engine, extra_ref_paths):
+    """The DATASET extras THIS engine consumes, in order (Klein's angles).
+
+    One place decides, so the enqueue below and what the modal claims can never
+    disagree — the failure this prevents is a UI promising angles to an engine
+    whose graph was never going to read them."""
+    limit = LOCAL_EDIT_REF_LIMITS.get(LOCAL_EDIT_REF_SUPPORT.get(engine), 0)
+    paths = list(extra_ref_paths or [])
+    return paths if limit is None else paths[:limit]
+
+
+def local_edit_modal_refs(engine, modal_ref_paths):
+    """The MODAL's uploads THIS engine consumes, in order (Krea's second subject)."""
+    limit = MODAL_EDIT_REF_LIMITS.get(LOCAL_EDIT_REF_SUPPORT.get(engine), 0)
+    return list(modal_ref_paths or [])[:limit]
+
+
+def local_engines_taking_dataset_refs(engines):
+    """The selected local engines that read the dataset's extra angles. Empty
+    means nothing will open them, which is what lets the caller skip writing
+    temporary copies no consumer exists for."""
+    return [e for e in (engines or [])
+            if LOCAL_EDIT_REF_LIMITS.get(LOCAL_EDIT_REF_SUPPORT.get(e), 0) != 0]
+
+
+def local_engines_taking_modal_refs(engines):
+    """Selected local engines that read the dialog's own uploads. An empty result
+    with uploads present is what turns them into a loud refusal instead of a
+    silent drop."""
+    return [e for e in (engines or [])
+            if MODAL_EDIT_REF_LIMITS.get(LOCAL_EDIT_REF_SUPPORT.get(e), 0)]
 
 
 def _enqueue_local_reference_edit(user_id, dataset_id, ds, engine, prompt, token,
-                                  ref_path, extra_ref_paths):
+                                  ref_path, extra_ref_paths, modal_ref_paths=()):
     """Reference edit on the user's OWN GPU: free, private, no key, no bill — and
     therefore the lane that makes "try five prompts until it's right" reasonable.
     On this fork it is the ONLY lane.
@@ -3603,14 +3743,17 @@ def _enqueue_local_reference_edit(user_id, dataset_id, ds, engine, prompt, token
             from . import krea_edit_helper as helper
             job_id = helper.enqueue_krea_edit(
                 user_id=str(user_id), source_filename=os.path.basename(ref_path),
-                source_path=ref_path, edit_prompt=prompt, extra_metadata=meta)
+                source_path=ref_path, edit_prompt=prompt, extra_metadata=meta,
+                # From the DIALOG, never from the dataset's angles: the `_b` slot
+                # wants a different subject, and the dataset pool holds only more
+                # views of the same one. One image — the slot has room for one.
+                extra_ref_paths=local_edit_modal_refs(engine, modal_ref_paths))
         else:
             from .klein_edit_helper import enqueue_klein_edit
             # The dataset's extra refs DO reach Klein (native ReferenceLatent
             # chaining). Gated on the table above rather than on the engine
             # name, so the two can't disagree.
-            extras = (list(extra_ref_paths)
-                      if LOCAL_EDIT_REF_SUPPORT.get(engine) == 'dataset_only' else [])
+            extras = local_edit_extra_refs(engine, extra_ref_paths)
             job_id = enqueue_klein_edit(
                 user_id=str(user_id), source_filename=os.path.basename(ref_path),
                 source_path=ref_path, edit_prompt=prompt, extra_ref_paths=extras,
@@ -8054,14 +8197,24 @@ def _improve_preflight(engine):
 
 
 def _enqueue_improve(engine, *, user_id, source, source_path, prompt, label,
-                     dataset):
+                     dataset, extra_metadata=None):
     """Hand ONE improve off to the chosen engine and return its job id.
 
     The two engines take deliberately different arguments — Klein needs a prompt,
     a consistency-LoRA strength and a step count; SeedVR2 needs none of them
     (there is no prompt in a restoration) — so this is where that difference
-    stops, and every caller above it stays engine-agnostic."""
-    meta = _improve_extra_metadata(source, label, engine=engine)
+    stops, and every caller above it stays engine-agnostic.
+
+    `extra_metadata` overrides what the finished job is linked back TO. Default
+    (None) keeps the dataset-image contract every existing caller relies on. The
+    ◉ Canvas improve passes its own because its source is a `LoraTestImage`, not
+    a `FaceDatasetImage`: the two live in different tables with independent id
+    spaces, and the completion callback is chosen by this metadata. The engine
+    dispatch below stays the single place that knows Klein from SeedVR2 — that is
+    the whole point of routing the second lane through here rather than growing a
+    parallel copy of it."""
+    meta = (dict(extra_metadata) if extra_metadata is not None
+            else _improve_extra_metadata(source, label, engine=engine))
     if engine == 'seedvr2':
         from . import seedvr2_helper
         return seedvr2_helper.enqueue_seedvr2_upscale(
