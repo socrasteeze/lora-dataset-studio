@@ -270,6 +270,53 @@ def test_latest_release_degrades_offline(monkeypatch):
     assert 'reason' in updater.latest_release()
 
 
+def test_upstream_ahead_status_none_without_a_sha(monkeypatch):
+    monkeypatch.setattr(updater, 'current_sha', lambda root=None: None)
+    assert updater.upstream_ahead_status() is None
+
+
+def test_upstream_ahead_status_reports_ahead_by(monkeypatch):
+    import requests
+    monkeypatch.setattr(updater, 'current_sha', lambda root=None: 'abc1234')
+    monkeypatch.setattr(requests, 'get',
+                        lambda *a, **k: _FakeResp(200, {'ahead_by': 7, 'behind_by': 2}))
+    s = updater.upstream_ahead_status()
+    assert s['ok'] is True and s['ahead_by'] == 7 and s['behind_by'] == 2
+    assert s['compare_url'] == f'https://github.com/{updater.UPSTREAM_REPO}/compare/abc1234...main'
+
+
+def test_upstream_ahead_status_degrades_offline(monkeypatch):
+    import requests
+    monkeypatch.setattr(updater, 'current_sha', lambda root=None: 'abc1234')
+    def boom(*a, **k):
+        raise requests.ConnectionError('offline')
+    monkeypatch.setattr(requests, 'get', boom)
+    s = updater.upstream_ahead_status()
+    assert s['ok'] is False and 'reason' in s
+
+
+def test_upstream_ahead_status_degrades_on_non_200(monkeypatch):
+    import requests
+    monkeypatch.setattr(updater, 'current_sha', lambda root=None: 'abc1234')
+    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(404))
+    s = updater.upstream_ahead_status()
+    assert s['ok'] is False and '404' in s['reason']
+
+
+def test_upstream_ahead_status_degrades_on_malformed_json(monkeypatch):
+    import requests
+    monkeypatch.setattr(updater, 'current_sha', lambda root=None: 'abc1234')
+
+    class _Bad:
+        status_code = 200
+
+        def json(self):
+            raise ValueError('not json')
+    monkeypatch.setattr(requests, 'get', lambda *a, **k: _Bad())
+    s = updater.upstream_ahead_status()
+    assert s['ok'] is False and 'reason' in s
+
+
 def test_staged_app_root_handles_wrapped_and_flat(tmp_path):
     wrapped = tmp_path / 'w'
     _make_app_tree(wrapped / 'LoRA-Dataset-Studio', version_marker='x')

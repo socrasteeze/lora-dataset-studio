@@ -444,9 +444,11 @@ def _reset_update_cache():
     from app.routes import settings as sroutes
     sroutes._update_cache.update(ts=0.0, data=None)
     sroutes._git_check_cache.update(ts=0.0, data=None)
+    sroutes._upstream_check_cache.update(ts=0.0, data=None)
     yield
     sroutes._update_cache.update(ts=0.0, data=None)
     sroutes._git_check_cache.update(ts=0.0, data=None)
+    sroutes._upstream_check_cache.update(ts=0.0, data=None)
 
 
 class _FakeResp:
@@ -455,6 +457,35 @@ class _FakeResp:
         self._body = body or {}
     def json(self):
         return self._body
+
+
+def test_upstream_check_reports_ahead_by(client, monkeypatch, _reset_update_cache):
+    from app.services import updater
+    monkeypatch.setattr(updater, 'upstream_ahead_status', lambda root=None, timeout=6: {
+        'ok': True, 'sha': 'abc1234', 'ahead_by': 5, 'behind_by': 0,
+        'compare_url': f'https://github.com/{updater.UPSTREAM_REPO}/compare/abc1234...main'})
+    d = client.get('/api/update/upstream-check').get_json()
+    assert d['ok'] is True and d['ahead_by'] == 5
+
+
+def test_upstream_check_absent_for_non_git_install(client, monkeypatch, _reset_update_cache):
+    from app.services import updater
+    monkeypatch.setattr(updater, 'upstream_ahead_status', lambda root=None, timeout=6: None)
+    d = client.get('/api/update/upstream-check').get_json()
+    assert d['ok'] is True and d['ahead_by'] is None
+
+
+def test_upstream_check_is_cached(client, monkeypatch, _reset_update_cache):
+    from app.services import updater
+    calls = []
+
+    def fake(root=None, timeout=6):
+        calls.append(1)
+        return {'ok': True, 'ahead_by': 1}
+    monkeypatch.setattr(updater, 'upstream_ahead_status', fake)
+    client.get('/api/update/upstream-check')
+    client.get('/api/update/upstream-check')
+    assert len(calls) == 1
 
 
 def test_update_check_detects_newer_release(client, monkeypatch, _reset_update_cache):
