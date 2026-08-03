@@ -57,67 +57,97 @@ export function defaultEditEngine(storage, usable = null) {
   return EDIT_ENGINES.find(ok) || DEFAULT_ENGINE;
 }
 
+/** Ceiling on the dialog's own uploads, mirroring
+ *  face_dataset_service.MAX_EDIT_REFERENCE_UPLOADS. It lives here rather than in
+ *  the JSX so the per-engine limits below can be derived from it and tested. */
+export const MAX_EDIT_REFS = 3;
+
 /* ── What each engine consumes ──────────────────────────────────────────────
    Two things separate the engines from each other, and both have to reach the
    user BEFORE the click rather than after a three-minute render: which
-   references it uses, and whether this install can run it. (Upstream has a third,
-   cost — every engine here is free, so there is nothing to disclose.) */
+   references it uses, and whether this install can run it. Every engine here is
+   local and free, so there is no paid-lane branch to disclose. */
 
 /** Reference images each engine actually consumes. Mirrors
  *  face_dataset_service.LOCAL_EDIT_REF_SUPPORT — the graphs are the authority:
  *   - 'dataset_only' : primary + the dataset's extra refs, chained as native
- *                      ReferenceLatent nodes (Klein).
- *   - 'primary_only' : the reference and nothing else (Krea's edit patch takes
- *                      one source; what a second does to identity is unmeasured).
- *
- *  Upstream has a third value, 'all', for the API engines — they additionally
- *  took transient images uploaded in the modal. No engine here can: both local
- *  graphs want file PATHS, and the route refuses request-scoped bytes outright.
- *  So the modal has no "+ Add reference images" picker at all, and the unknown-
- *  engine default below is the CONSERVATIVE one rather than upstream's 'all' —
- *  defaulting to "takes everything" would promise a capability no engine has. */
+ *                      ReferenceLatent nodes (Klein). It has no slot for an
+ *                      image added in this dialog, so those are refused with
+ *                      Klein named, never silently dropped.
+ *   - 'modal_one'    : primary + ONE image added in THIS dialog, and none of the
+ *                      dataset's (Krea). Its `_b` slot was trained for a
+ *                      different subject, so the dataset's pool — which holds
+ *                      angles of the same face — is the wrong source for it.
+ *                      Per-edit composition, not persistent identity.
+ *  Unknown engines default conservatively to primary-only; this fork has no API
+ *  engine whose transient-upload support could justify an 'all' fallback. */
 export const EDIT_REF_SUPPORT = {
   klein: 'dataset_only',
-  krea: 'primary_only',
+  krea: 'modal_one',
 };
 export function editRefSupport(engine) {
   return EDIT_REF_SUPPORT[engine] || 'primary_only';
 }
 
-/** True when this engine accepts the modal's own "+ Add reference images". False
- *  hides the picker — an input whose files are thrown away is worse than none. */
-export function acceptsExtraEditRefs(engine) {
-  return editRefSupport(engine) === 'all';
+/** How many of THIS dialog's uploads an engine reads. 0 hides the picker for it —
+ *  an input whose files are thrown away is worse than none. Mirrors
+ *  face_dataset_service.MODAL_EDIT_REF_LIMITS. */
+const MODAL_REF_LIMITS = { modal_one: 1 };
+export function modalRefLimit(engine) {
+  return MODAL_REF_LIMITS[editRefSupport(engine)] || 0;
 }
 
-/** Whether ANY engine in the selection takes the modal's transient uploads.
- * Upstream keeps the picker for a mixed batch because its API engines consume
- * those bytes; every engine here is local, so this is false in practice and the
- * picker stays hidden. Kept in upstream's shape rather than hardcoded to false —
- * the answer then follows from EDIT_REF_SUPPORT instead of from a second rule
- * that could disagree with it. */
+/** True when this engine accepts the modal's own "+ Add reference images". */
+export function acceptsExtraEditRefs(engine) {
+  return modalRefLimit(engine) > 0;
+}
+
+/** How many uploads the picker may hold for the CURRENT local selection. */
+export function maxEditRefsForBatch(engines) {
+  return Array.from(engines || [])
+    .reduce((best, engine) => Math.max(best, modalRefLimit(engine)), 0);
+}
+
+/** The picker stays as soon as ONE selected engine reads these bytes. Krea does
+ *  (its single `_b` slot); Klein instead reads the dataset's persistent angles. */
 export function acceptsExtraEditRefsForBatch(engines) {
   return Array.from(engines || []).some((engine) => acceptsExtraEditRefs(engine));
 }
 
-/** One sentence about what this engine does with the extra references, or null
+/** One sentence about where THIS engine's second reference comes from, or null
  *  when it takes everything (nothing to warn about). Shown at PICK time.
  *
- *  The "not sent" half matters because the picker DISAPPEARS when you switch to a
- *  local engine: anything you had staged vanishes from the dialog, and an
- *  unexplained disappearance reads as a bug. */
+ *  Naming the source is the whole point: the two local engines read opposite
+ *  pools, and a user who reaches for the wrong one gets a worse render with no
+ *  error to explain it. The "goes to the other engines" half also covers the
+ *  case where switching engines shrinks or empties the picker — an unexplained
+ *  disappearance reads as a bug. */
 export function editRefNote(engine, { datasetExtraCount = 0 } = {}) {
   const support = editRefSupport(engine);
   const label = ENGINE_LABELS[engine] || engine;
   const n = Math.max(0, Number(datasetExtraCount) || 0);
-  if (support === 'dataset_only') {
-    return n > 0
-      ? `${label} uses your reference plus the dataset's ${n} extra reference `
-        + `photo${n === 1 ? '' : 's'}.`
-      : `${label} uses your reference photo (and any extra angles you add to the dataset).`;
+  // Klein's second reference is PERSISTENT (it locks identity for every future
+  // generation, not just this edit), so it lives on the dataset's reference card
+  // and this dialog only points at it. With no angles yet the picker below shows
+  // nothing for Klein, which reads as "it takes none" — hence the pointer.
+  const where = 'Add angles with + on the reference card behind this dialog.';
+  if (support === 'modal_one') {
+    // Naming what the slot is FOR beats naming how big it is. The pack trained
+    // it to place a second, DIFFERENT subject ("scene first, subject second"),
+    // which is also WHY it reads this dialog and not the dataset's angles: that
+    // pool holds more views of the same face, the one photo the slot mishandles.
+    return `${label} uses your reference photo plus one image you add right here — its `
+      + 'second slot was trained to hold a different subject, so use it to compose: '
+      + 'another person, or a scene to place yours in. It does not read the dataset\'s '
+      + 'extra angles; those are for the engines that lock identity with them.';
   }
-  return `${label} edits the main reference only — extra reference photos, including the `
-    + "dataset's, are not used.";
+
+  const uses = n > 0
+    ? `${label} uses your reference plus the dataset's ${n} extra reference `
+      + `photo${n === 1 ? '' : 's'}.`
+    : `${label} uses your reference photo, and reads every extra angle the dataset `
+      + `holds. ${where}`;
+  return uses;
 }
 
 /** What this edit costs and how long it takes. Every engine here renders on the

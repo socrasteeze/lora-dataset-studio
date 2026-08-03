@@ -5,7 +5,7 @@ import {
   batchLiveNote, editPhase, editEngineOptions, editCostNote, editKeepNote,
   editRefNote, acceptsExtraEditRefs, acceptsExtraEditRefsForBatch, editRefSupport,
   editBatchBlockedReason, referenceEditCandidates,
-  retryRequestForReferenceEdit,
+  retryRequestForReferenceEdit, MAX_EDIT_REFS, maxEditRefsForBatch,
 } from './referenceEdit.js';
 import {
   STORAGE_ENGINES, STORAGE_PRIMARY, ENGINES, API_ENGINES, LOCAL_ENGINES, ENGINE_LABELS,
@@ -174,31 +174,39 @@ test('the Keep line does not claim a refund that never applied', () => {
   assert.match(note, /can’t be undone/);
 });
 
-test('an engine that takes fewer references SAYS so at pick time', () => {
+test('each local engine names WHERE its second reference comes from', () => {
   assert.equal(editRefSupport('klein'), 'dataset_only');
-  assert.equal(editRefSupport('krea'), 'primary_only');
+  assert.equal(editRefSupport('krea'), 'modal_one');
   assert.match(editRefNote('klein', { datasetExtraCount: 2 }), /2 extra reference photos/);
   assert.match(editRefNote('klein', { datasetExtraCount: 1 }), /1 extra reference photo\b/);
-  assert.match(editRefNote('krea', { datasetExtraCount: 2 }), /main reference only/);
+  assert.match(editRefNote('klein', { datasetExtraCount: 0 }), /reference card/);
+  assert.doesNotMatch(editRefNote('klein', { datasetExtraCount: 1 }), /reference card/);
+
+  const krea = editRefNote('krea');
+  assert.match(krea, /right here/);
+  assert.match(krea, /a different subject/);
+  assert.match(krea, /another person/);
+  assert.match(krea, /scene/);
+  assert.match(krea, /does not read the dataset's extra angles/);
 });
 
-/* Upstream defaults an unknown engine to 'all' — "takes the primary, the dataset
-   extras AND transient uploads". No engine here can take transient bytes (the
-   route refuses them), so inheriting that default would have the UI promise a
-   capability nothing implements. The conservative default is the honest one. */
+/* Unknown engines remain conservative: never promise a reference slot until the
+   graph's actual support has been decided. */
 test('an unknown engine defaults to the CONSERVATIVE reference support', () => {
   assert.equal(editRefSupport('something-else'), 'primary_only');
-  assert.match(editRefNote('something-else'), /main reference only/);
+  assert.equal(acceptsExtraEditRefs('something-else'), false);
 });
 
-test('the transient reference picker is hidden — no engine here can take it', () => {
-  // Hidden, not ignored: an input whose files are silently dropped returns an
-  // edit that used half of what the user handed it. Both local engines refuse,
-  // so the batch answer is false however they are combined.
+test('the picker appears only for the local graph that reads it', () => {
   assert.equal(acceptsExtraEditRefs('klein'), false);
-  assert.equal(acceptsExtraEditRefs('krea'), false);
-  assert.equal(acceptsExtraEditRefsForBatch(['klein', 'krea']), false);
+  assert.equal(acceptsExtraEditRefs('krea'), true);
+  assert.equal(acceptsExtraEditRefsForBatch(['klein', 'krea']), true);
+  assert.equal(acceptsExtraEditRefsForBatch(['klein']), false);
   assert.equal(acceptsExtraEditRefsForBatch([]), false);
+  assert.equal(maxEditRefsForBatch(['krea']), 1);
+  assert.equal(maxEditRefsForBatch(['klein']), 0);
+  assert.equal(maxEditRefsForBatch([]), 0);
+  assert.equal(MAX_EDIT_REFS, 3, 'the shared request ceiling remains explicit');
 });
 
 test('batchLiveNote informs only while a generate batch runs, never blocks', () => {

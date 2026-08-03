@@ -167,13 +167,13 @@ test('the hook submits and retries the exact selected engine list', () => {
     'Retry availability must follow the currently displayed opaque batch');
 });
 
-/* Divergence 1: upstream keeps the transient picker for a MIXED batch, because
-   its API engines consume those bytes. Every engine here is local, so there is no
-   mixed case and the picker never shows. What still matters — and is asserted —
-   is that the modal DERIVES that from the per-engine table rather than hardcoding
-   it, so adding an engine that does take uploads needs no second decision. */
-test('the picker is derived from the engine table, and no API scope note remains', () => {
+test('a local mixed selection keeps Krea’s picker but explains its scope', () => {
   assert.match(modal, /acceptsExtraEditRefsForBatch\(engines\)/);
-  assert.doesNotMatch(modal, /Images added here go only to the selected API engines/);
+  // Krea reads these bytes while Klein does not. The banner turns on what the
+  // engines consume, never on an API-vs-local distinction this fork lacks.
+  assert.match(modal, /selectedLocalEngines\.some\(\(e\) => !acceptsExtraEditRefs\(e\)\)/);
+  assert.match(modal, /Images added below go to the engines that read them/);
   assert.doesNotMatch(modal, /selectedApiEngines/);
+  assert.match(modal, /maxEditRefsForBatch\(engines\)/);
+  assert.match(modal, /editRefs\.length < maxRefs/);
 });

@@ -15,12 +15,10 @@
  * references it consumes (editRefNote) and whether this install can run it at all
  * (the `blocked` reason on each option).
  *
- * Upstream additionally offers "+ Add reference images" — transient uploads that
- * ride along with an API call. There is no such lane here: both local graphs want
- * file PATHS and the route refuses request-scoped bytes, so the picker stays
- * hidden rather than present-and-ignored. The gate is acceptsExtraEditRefsForBatch
- * reading EDIT_REF_SUPPORT, not a hardcoded false, so it cannot disagree with the
- * per-engine table the notes above are built from.
+ * Krea additionally offers "+ Add reference images" for its one compositional
+ * second-subject slot. Klein keeps reading the dataset's persistent extra angles.
+ * The gate is acceptsExtraEditRefsForBatch reading EDIT_REF_SUPPORT, so the picker
+ * cannot disagree with the per-engine notes above.
  *
  * Keep promotes the candidate (atomic on the server); Discard deletes it; the ✕
  * just closes and LEAVES the job running (rediscovered on reopen). Modal idiom
@@ -32,15 +30,10 @@ import KleinModelSetting from '../shared/KleinModelSetting';
 import {
   EDIT_ENGINES, LOCAL_ENGINES, batchLiveNote, editPhase,
   editEngineOptions, editCostNote, editKeepNote, editRefNote,
-  acceptsExtraEditRefsForBatch, editBatchBlockedReason, referenceEditCandidates,
-  ENGINE_LABELS,
+  acceptsExtraEditRefs, acceptsExtraEditRefsForBatch, editBatchBlockedReason,
+  referenceEditCandidates,
+  ENGINE_LABELS, maxEditRefsForBatch,
 } from './referenceEdit';
-
-/* Mirrors the server's MAX_EDIT_REFERENCE_UPLOADS. Every engine here is local and
-   refuses transient uploads, so acceptsExtraEditRefsForBatch keeps the picker
-   hidden and this cap is never reached — it stays so the two cannot disagree if a
-   future engine does take them. */
-const MAX_EDIT_REFS = 3;
 
 export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                                              defaultEngine = DEFAULT_ENGINE, liveActivity = null,
@@ -118,13 +111,16 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
     .map((engine) => editRefNote(engine, { datasetExtraCount }))
     .filter(Boolean);
   const canAddRefs = acceptsExtraEditRefsForBatch(engines);
-  // No engine here takes modal uploads, so anything staged by an older client
-  // is dropped rather than silently ignored.
-  useEffect(() => { if (!canAddRefs) setEditRefs([]); }, [canAddRefs]);
+  // The cap follows the selection. Krea has one slot; Klein has none. Switching
+  // away from Krea drops what the selected graph can no longer receive.
+  const maxRefs = maxEditRefsForBatch(engines);
+  useEffect(() => {
+    setEditRefs((cur) => (cur.length <= maxRefs ? cur : cur.slice(0, maxRefs)));
+  }, [maxRefs]);
 
   const addRefs = (files) => {
     const list = Array.from(files || []).filter((f) => f && f.type.startsWith('image/'));
-    setEditRefs((cur) => [...cur, ...list].slice(0, MAX_EDIT_REFS));
+    setEditRefs((cur) => [...cur, ...list].slice(0, maxRefs));
   };
 
   const runEdit = async () => {
@@ -347,9 +343,18 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
             {localRefNotes.map((note) => (
               <p key={note} className="text-[0.6875rem] text-content-muted">{note}</p>
             ))}
+            {/* Only worth saying when the selection actually splits: one engine
+                reads these bytes and another does not. */}
+            {canAddRefs && selectedLocalEngines.some((e) => !acceptsExtraEditRefs(e)) && (
+              <p className="text-[0.6875rem] text-sky-300 bg-sky-500/10 border border-sky-500/30 rounded-lg px-2.5 py-1.5">
+                Images added below go to the engines that read them. The rest use the
+                reference support described above.
+              </p>
+            )}
             {/* Optional extra reference images — transient inputs to THIS edit only,
-                never saved as the dataset's extra refs. Hidden for an all-local
-                batch; in a mixed batch they go only to selected API engines. */}
+                never saved as the dataset's extra refs. Krea reads one as a
+                different subject to compose with. Klein instead reads the
+                dataset's angles from the reference card. */}
             {canAddRefs && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-content-subtle text-xs">Add reference images (optional)</span>
@@ -362,7 +367,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                     className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl bg-black/70 text-white text-[0.625rem] leading-none disabled:opacity-40">✕</button>
                 </div>
               ))}
-              {editRefs.length < MAX_EDIT_REFS && (
+              {editRefs.length < maxRefs && (
                 <button type="button" onClick={() => inpRef.current?.click()} disabled={busy}
                   aria-label="Add a reference image for the edit"
                   className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-lg leading-none disabled:opacity-40">+</button>

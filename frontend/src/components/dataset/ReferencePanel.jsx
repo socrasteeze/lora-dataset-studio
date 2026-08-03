@@ -58,13 +58,15 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
         </div>
       </div>
 
-      {/* Références additionnelles — identité multi-angles, chaînées en
-          ReferenceLatent natifs côté Klein. Recadrables une par une (✂ sur la
-          vignette) ; le scoring reste sur la principale. */}
+      {/* Références additionnelles — identité multi-angles pour Klein, chaînées
+          en ReferenceLatent natifs. PAS Krea 2 Edit : son unique slot secondaire
+          a été entraîné pour un sujet DIFFÉRENT, donc il lit une image ajoutée
+          dans la modale ✦ Edit reference, jamais ce vivier-ci. Recadrables une
+          par une (✂ sur la vignette) ; le scoring reste sur la principale. */}
       {refFilename && (
         <div className="flex items-center gap-2 flex-wrap border-t border-border pt-2">
           <span className="text-content-subtle text-[0.6875rem]">
-            Extra refs <span className="opacity-70">(stronger identity lock)</span>
+            Extra refs <span className="opacity-70">(more angles of this face — identity lock)</span>
           </span>
           {extraRefs.map((fn) => (
             <div key={fn} className="relative w-12 h-12 rounded-lg overflow-hidden bg-black shrink-0">
@@ -88,7 +90,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
           {extraRefs.length < MAX_EXTRA_REFS && (
             <button type="button" onClick={() => inpExtra.current?.click()} disabled={importBusy}
               aria-label="Add an extra reference photo (other angles of the same face)"
-              title="Add an extra reference photo — Klein chains them together to lock the identity"
+              title="Add an extra reference photo — Klein uses these together to lock identity on every generation. Krea 2 Edit does not read them: its second image is added inside the ✦ Edit reference dialog and is meant to be a different subject."
               className="w-12 h-12 rounded-lg border border-dashed border-border-strong text-content-muted text-lg leading-none disabled:opacity-40">
               +
             </button>

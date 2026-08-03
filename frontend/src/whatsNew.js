@@ -50,11 +50,34 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-krea-edit-takes-an-extra-angle',
+    date: '2026-08-03',
+    title: 'Krea 2 Edit takes a second image — add it in the edit dialog, and use it to compose',
+    blurb:
+      'Editing your reference with Krea 2 Edit used the main photo and nothing else. You can now add a second image, with the “+” inside the ✦ Edit reference dialog. What it is for matters more than the fact it exists: that slot was trained on two-input edits where the second image is a *different* subject — another person, or a scene to place yours in. So it composes (“put her in this room”, “next to him”). Another angle of the same face is off-label there and can come back duplicated, which is why it deliberately does NOT read the dataset’s extra reference photos: those are angles of one person by definition. Extra angles keep doing what they always did: Klein chains every one of them from the reference card and locks identity across every generation. Two different jobs, two different places, and the dialog now says which is which before you press Generate.',
+  },
+  {
+    id: '2026-08-03-canvas-images-go-anywhere',
+    date: '2026-08-03',
+    title: 'Pinned images go anywhere on the canvas, not just below and right of their run',
+    blurb:
+      'A picture pinned onto the ◉ LoRA Canvas could be dragged down and right as far as you liked, but never up and never left: its own lane\'s corner was a wall, so you could not park a render above its run, in the free margin beside the board, or next to another dataset\'s lane to compare across datasets. That wall is gone — the mouse and the arrow keys both reach everywhere now, and ✦ Fit grows to include a picture wherever you put it, so it is always one click from being back on screen. Nothing about where an image came from changes: the line to the checkpoint that made it follows it, because that link is read off the image itself rather than off its position. Three things came with it. ✦ Tidy up is the way home — it brings every picture on the board back beside the run that made it, side-by-side strips included, moved in one piece and never taken apart — and it is no longer greyed out on a board where only pictures have been moved, which is exactly when you need it. The board no longer re-zooms under your finger while you drag something past its edge; it settles once, when you let go. And a strip of grouped pictures now draws ONE line back to each checkpoint it came from instead of one per picture, so a long link stays readable.',
+    to: '/canvas',
+  },
+  {
     id: '2026-08-03-canvas-group-drag-out-crash',
     date: '2026-08-03',
     title: 'Pulling a picture out of a canvas group no longer blanks the board',
     blurb:
-      'Dragging an image away from a grouped strip could show the full-screen error boundary. The drag-out hint now derives its size from the same zoom-aware helper as the group bar, and a real JSX render test exercises the exact leaving state that crashed.',
+      'Dragging one image off a strip of grouped images showed the error screen instead of the picture coming loose — the board went blank and the only way back was a reload. The hint that appears while you pull ("Drag it off the group to take it out") was reading a size that had moved to another file when the group\'s title bar was split out earlier today, so the very gesture it exists to explain was the one that crashed. It is back, at the same size as the bar\'s own label at every zoom. Nothing you had pinned was lost — the board reloads exactly as you left it.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-canvas-lightbox-upscale-improve',
+    date: '2026-08-03',
+    title: 'Upscale a picture without leaving the canvas',
+    blurb:
+      'Open a picture on the ◉ LoRA Canvas and it now carries ✨ Upscale & improve next to ⬇ Download — the same pass, and the same choice between Klein (re-renders detail and texture) and SeedVR2 (resolves detail and keeps the look) you already had in the dataset lightbox, with the same live quote of the instruction Klein is about to send. Until now the only way to improve a render you liked on the board was to go and find it somewhere else. The picture on the board is never touched: the result arrives as its own image in that checkpoint’s gallery, right next to the original, so you can compare the two and pin the better one. SeedVR2 offers to install itself if it is not there yet, an improvement cannot be improved again, and these upscales stay out of the Test Studio — they never count as a run in progress and never enter a checkpoint’s 👍/👎 ranking.',
     to: '/canvas',
   },
   {
@@ -104,6 +127,14 @@ export const WHATS_NEW = [
     blurb:
       'On a phone (and in the installed app), the dataset page drew everything at about three quarters of the screen width — the header bar, the section chips, every card — with a dead black strip down the right-hand side. Nothing was cut off and nothing looked broken up close, which is what made it hard to place: the culprit was a one-pixel, invisible label that the horizontal section rail was failing to keep inside itself, which stretched the page wider than the screen and made the browser shrink the whole thing to fit. The rail now holds its contents, so the page measures the width of your screen and uses it. The Settings and Guide chip rails got the same treatment before they could catch it.',
     to: '/datasets',
+  },
+  {
+    id: '2026-08-03-prompt-batch-no-cap',
+    date: '2026-08-03',
+    title: 'The prompt batch no longer caps at 24 — and the time estimate is now yours',
+    blurb:
+      'Ticking more than 24 saved prompts was refused. That number was a guess, not a limit: nothing breaks past it, and it governed the wrong thing — 24 prompts across eight checkpoints went through, while 25 on a single one did not, even though the second run is far shorter. Tick as many as you like. What you get instead is the real cost, before the click: the panel counts every generation the run will queue and tells you how long that takes at the pace your own machine has actually been running at, measured from your recent tests rather than assumed. Past about an hour it asks once whether you meant it, and reminds you that the queue is serial — you can stop it whenever you like and keep what is already done. Every duration in the Studio and on the canvas now comes from that same measured pace, so a slower card stops being told it will take twenty minutes when it will take two hours.',
+    to: '/studio',
   },
   {
     id: '2026-08-03-person-pass-checks-folders-first',
