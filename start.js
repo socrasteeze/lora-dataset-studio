@@ -12,14 +12,27 @@
                       interpreter is the `env/` venv Pinokio just activated, so
                       a `.venv/` left behind by an earlier start.bat run in the
                       same folder must not hijack the launch.
+   - LDS_RUNTIME=pinokio  tells the app that START AND STOP belong to Pinokio.
+                      Its Settings > Updates card then hands the update back
+                      here (Stop / Update / Start) instead of offering its own
+                      "Update & restart", which would relaunch the server in a
+                      detached process this launcher no longer tracks.
    - LDS_OPEN_BROWSER is intentionally NOT set: Pinokio opens the app itself.
    - LDS_NO_BROWSER=1  and on this fork that is not enough on its own. Here
                       `server.auto_open_browser` DEFAULTS to true, so run.py
                       would pop a system browser alongside Pinokio's own Open
                       Web UI tab. Not setting a variable only withholds a
-                      request; this one withdraws it. */
+                      request; this one withdraws it.
+
+   `requires: { bundle: "python" }` asks Pinokio to make sure its own toolkit is
+   there before running us: conda, git, uv, node. Pinokio 8 reads
+   `requires.bundle`, and when a requirement is missing it routes to
+   `/setup/python` instead of letting a command fail on a half-built machine. */
 module.exports = {
   daemon: true,
+  requires: {
+    bundle: "python"
+  },
   run: [
     {
       method: "shell.run",
@@ -29,7 +42,8 @@ module.exports = {
           PYTHONUTF8: "1",
           LDS_PORT: "5050",
           LDS_NO_REEXEC: "1",
-          LDS_NO_BROWSER: "1"
+          LDS_NO_BROWSER: "1",
+          LDS_RUNTIME: "pinokio"
         },
         message: [
           "python backend/run.py"

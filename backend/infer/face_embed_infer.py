@@ -7,18 +7,30 @@ inside its GPU-exclusive window). CUDA requested but unavailable → CPU fallbac
 Protocol (same family as face_score_infer.py):
   stdin  : {"images": [abs paths], "models_root": path|null,
             "cache": abs path to a .npz|null, "threshold": 0.45,
-            "device": "cpu"|"cuda"}
-  stdout : ONE JSON line {"ok": bool, "results": {path: {state, det, bbox_frac}},
-            "clusters": {path: int}, "used_gpu": bool, "error"?: str}
+            "device": "cpu"|"cuda", "require_yaw": bool,
+            "groups": [{"name": str, "images": [abs paths]}]  # OPTIONAL}
+  stdout : ONE JSON line {"ok": bool,
+            "results": {path: {state, det, bbox_frac, yaw|null}},
+            "clusters": {path: int}, "used_gpu": bool, "error"?: str,
+            "group_clusters": {name: {path: int}}  # only when groups was given}
   stderr : "[embed] i/N <state>" progress lines (the parent streams these to
             drive the UI progress bar).
 
 Embeddings are CACHED in the .npz (parallel arrays paths/embs/states/dets/
-bfracs/sigs; `sigs` is the file signature at embed time, so an image replaced at
-the same path is re-embedded rather than answering with a stale face) and
-written incrementally every CACHE_EVERY images — killing the pass
+bfracs/sigs/yaws; `sigs` is the file signature at embed time, so an image
+replaced at the same path is re-embedded rather than answering with a stale
+face) and written incrementally every CACHE_EVERY images — killing the pass
 mid-way loses at most that slice, and re-clustering at another threshold is
-then near-instant. Clustering = union-find over cosine ≥ threshold on the
+then near-instant.
+
+``yaws`` is the newest array and every cache written before it exists lacks it.
+Those entries load with yaw = NaN and are reported as ``yaw: null`` — "not
+measured", never 0.0, which would read as a perfectly frontal face. ``require_yaw``
+asks for those entries to be RE-DETECTED (the angle is not recoverable from the
+stored embedding); it is what the app's opt-in ⤢ backfill sets, and it is off by
+default so an ordinary resume never turns into hours of re-detection.
+
+Clustering = union-find over cosine ≥ threshold on the
 L2-normed embeddings of the SCORABLE faces (biggest face per image — a group
 photo clusters by its dominant face); cluster ids are 1-based, ordered by
 cluster size descending, singletons included (a person seen once is still a
@@ -86,6 +98,11 @@ def _cache_sig(entry):
     return entry[4] if len(entry) > 4 else ''
 
 
+def _cache_yaw(entry):
+    """Yaw of a cache tuple, tolerant of a legacy 4/5-tuple (no yaw yet)."""
+    return entry[5] if len(entry) > 5 else float('nan')
+
+
 def _is_stale(path, entry):
     """True when the file differs from what the cache recorded — a same-path
     edit. Without this an image replaced in place kept its OLD embedding
@@ -101,6 +118,10 @@ def _is_stale(path, entry):
 
 
 def _load_cache(path):
+    """{path: (state, det, bbox_frac, emb, sig, yaw)}. A cache written before
+    signatures/yaw existed loads with sig = '' (never treated as stale) and/or
+    yaw = NaN (reported as "not measured") — both additive, so no user ever has
+    to re-embed a bank just because a new value was added to the tuple."""
     import numpy as np
     out = {}
     if not path or not os.path.isfile(path):
@@ -112,9 +133,13 @@ def _load_cache(path):
             # 'sigs' is additive — a cache written before signatures shipped has
             # none, so those entries carry an empty sig (never treated as stale).
             sigs = z['sigs'] if 'sigs' in z.files else [''] * len(paths)
+            # 'yaws' is additive too — a cache written before it existed loads
+            # with yaw = NaN, reported as "not measured" rather than a false 0.0.
+            yaws = z['yaws'] if 'yaws' in z.files else None
         for i, p in enumerate(paths):
             out[str(p)] = (states[i], float(dets[i]), float(bfracs[i]), embs[i],
-                           str(sigs[i]))
+                           str(sigs[i]),
+                           float(yaws[i]) if yaws is not None else float('nan'))
     except Exception as e:  # noqa: BLE001 — a corrupt cache = recompute, never fatal
         _log(f'[embed] cache unreadable, recomputing: {e}')
         return {}
@@ -134,7 +159,8 @@ def _save_cache(path, cache):
         dets=np.array([cache[p][1] for p in paths], dtype='float32'),
         bfracs=np.array([cache[p][2] for p in paths], dtype='float32'),
         embs=np.stack([cache[p][3] for p in paths]).astype('float32'),
-        sigs=np.array([_cache_sig(cache[p]) for p in paths]))
+        sigs=np.array([_cache_sig(cache[p]) for p in paths]),
+        yaws=np.array([_cache_yaw(cache[p]) for p in paths], dtype='float32'))
     os.replace(tmp, path)
 
 
@@ -197,12 +223,24 @@ def main() -> int:
     cancel_file = req.get('cancel_file') or None
     threshold = float(req.get('threshold') or 0.45)
     device = str(req.get('device') or 'cpu').lower()   # 'cpu' | 'cuda'
+    # Opt-in only: re-detect the entries a pre-yaw build cached, because the
+    # angle cannot be recovered from a stored embedding. See the module docstring.
+    require_yaw = bool(req.get('require_yaw'))
 
     used_gpu = False   # set when the model actually loads on CUDA below
     cache = _load_cache(cache_path)
-    # A same-path edit invalidates the stale embedding, exactly as the score
-    # pass already does -- otherwise a replaced image keeps the old face forever.
-    todo = [p for p in images if p not in cache or _is_stale(p, cache[p])]
+
+    def _needs_work(p):
+        # A same-path edit invalidates the stale embedding, exactly as the score
+        # pass already does -- otherwise a replaced image keeps the old face
+        # forever. require_yaw additionally re-detects any entry a pre-yaw
+        # build cached (the angle cannot be recovered from a stored embedding).
+        if p not in cache or _is_stale(p, cache[p]):
+            return True
+        yaw = _cache_yaw(cache[p])
+        return require_yaw and not (yaw == yaw)   # NaN test
+
+    todo = [p for p in images if _needs_work(p)]
     _write_count(cache_path, len(images) - len(todo))
     _log(f'[embed] {len(images)} image(s), {len(images) - len(todo)} cached')
 
@@ -257,7 +295,7 @@ def main() -> int:
                 payload = read_validated_bank_image(p)
                 img = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_COLOR)
                 if img is None:
-                    cache[p] = ('unreadable', 0.0, 0.0, zero, _file_sig(p))
+                    cache[p] = ('unreadable', 0.0, 0.0, zero, _file_sig(p), float('nan'))
                 else:
                     h, w = img.shape[:2]
                     f = biggest(app.get(img))
@@ -269,24 +307,32 @@ def main() -> int:
                     else:
                         scale = 1.0
                     if f is None:
-                        cache[p] = ('no_face', 0.0, 0.0, zero, _file_sig(p))
+                        cache[p] = ('no_face', 0.0, 0.0, zero, _file_sig(p), float('nan'))
                     else:
                         area = (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1])
                         bbox_frac = float(area / (w * h) / scale)
                         det = float(f.det_score)
-                        yaw = float(f.pose[1]) if getattr(f, 'pose', None) is not None else 0.0
+                        # The pose estimate: kept BOTH as the 'extreme_pose'
+                        # gate (its original and only use) and, now, as a stored
+                        # measurement — it is what the app's head-angle facet is
+                        # made of. No pose at all stays NaN rather than becoming
+                        # 0.0, which would claim a perfectly frontal face.
+                        pose = getattr(f, 'pose', None)
+                        yaw = float(pose[1]) if pose is not None else float('nan')
+                        gate = 0.0 if yaw != yaw else yaw
                         state = 'scorable'
                         if det < DET_MIN:
                             state = 'low_det'
                         elif bbox_frac < BBOX_MIN:
                             state = 'too_small'
-                        elif abs(yaw) > YAW_MAX:
+                        elif abs(gate) > YAW_MAX:
                             state = 'extreme_pose'
                         cache[p] = (state, round(det, 3), round(bbox_frac, 4),
                                     f.normed_embedding.astype('float32'),
-                                    _file_sig(p))
+                                    _file_sig(p),
+                                    yaw if yaw != yaw else round(yaw, 2))
             except Exception as e:  # noqa: BLE001 — one broken file must not sink the pass
-                cache[p] = ('error', 0.0, 0.0, zero, _file_sig(p))
+                cache[p] = ('error', 0.0, 0.0, zero, _file_sig(p), float('nan'))
                 _log(f'[embed] {i}/{len(todo)} ERROR {e}')
                 continue
             finally:
@@ -311,13 +357,34 @@ def main() -> int:
     results = {}
     for p in images:
         # Positional, not a fixed-width unpack: the tuple grew a `sig` and a
-        # 4-way unpack here raised on every run the moment it did.
-        entry = cache.get(p) or ('error', 0.0, 0.0, None, '')
+        # `yaw` and a fixed-width unpack here raised on every run the moment
+        # either one did.
+        entry = cache.get(p) or ('error', 0.0, 0.0, None, '', float('nan'))
         state, det, bfrac = entry[0], entry[1], entry[2]
-        results[p] = {'state': str(state), 'det': float(det), 'bbox_frac': float(bfrac)}
+        yaw = _cache_yaw(entry)
+        results[p] = {'state': str(state), 'det': float(det), 'bbox_frac': float(bfrac),
+                      # null, never 0.0 — "not measured" is its own answer.
+                      'yaw': None if yaw != yaw else float(yaw)}
     clusters = _cluster(images, cache, threshold)
-    print(json.dumps({'ok': True, 'results': results, 'clusters': clusters,
-                      'used_gpu': used_gpu}), file=_OUT)
+    out = {'ok': True, 'results': results, 'clusters': clusters,
+           'used_gpu': used_gpu}
+    # Optional per-GROUP clustering, for the caller asking "is EACH of these
+    # folders one person?" — a question the flat clustering above cannot answer:
+    # it would happily merge two folders into a single cluster and let that read
+    # as "consistent". Same threshold, same union-find, run once per group, and
+    # riding on the SAME child call so a scan over forty folders costs one
+    # subprocess and one model load — none at all when every image is cached.
+    groups = req.get('groups') or []
+    if groups:
+        out['group_clusters'] = {
+            str(g.get('name')): _cluster(
+                [str(p) for p in (g.get('images') or [])], cache, threshold)
+            for g in groups}
+    # file=_OUT, not a bare print(): sys.stdout is redirected to stderr (see the
+    # module docstring) so a bare print() here would route the whole result
+    # payload onto the progress channel instead of the parent's result stream —
+    # upstream's own commit shipped without this and never printed a result.
+    print(json.dumps(out), file=_OUT)
     return 0
 
 

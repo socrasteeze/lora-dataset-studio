@@ -73,6 +73,18 @@ function Facts({ img }) {
         && chip('sharp', `sharpness ${Math.round(img.blur_score)}`, 'bg-white/10 text-white/70')}
       {img.face_cluster != null && chip('face', `👤 #${img.face_cluster}`, 'bg-white/10 text-sky-200')}
       {img.framing && chip('framing', `📐 ${img.framing}`, 'bg-white/10 text-teal-200')}
+      {/* 🎨 the medium, with the margin BEHIND it in the tooltip: a verdict shown
+          without its confidence is how a guess turns into a fact. 'unsure' is
+          shown too — here, where the user is looking at the picture and can
+          settle it, it is the most useful thing the classifier can say. */}
+      {img.medium && chip('medium', `🎨 ${img.medium}`,
+        img.medium === 'unsure' ? 'bg-white/10 text-white/50' : 'bg-white/10 text-lime-200',
+        img.medium_margin != null
+          ? `Zero-shot CLIP over the ✨ Score embedding — confidence gap ${img.medium_margin.toFixed(3)}.`
+          : null)}
+      {img.face_yaw != null && chip('yaw',
+        `⤢ ${Math.round(Math.abs(img.face_yaw))}°`, 'bg-white/10 text-cyan-200',
+        'How far the head is turned, measured by the 🎭 Faces pass.')}
       {/* Kept even once the group is resolved, unlike the grid tile — there is
           room here to SAY "resolved" rather than leave a bare id implying the
           image is still an undecided duplicate. */}

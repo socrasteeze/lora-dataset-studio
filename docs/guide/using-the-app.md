@@ -630,6 +630,68 @@ prerequisite (semantic de-dup wanting ✨ Score first) is the pipeline working a
 designed and is not flagged; a pass the machine refused ("GPU busy", never
 reached) is. When the queue empties, one line says how many finished and how
 many had problems.
+
+## When a folder is already one person
+
+Scraped material usually arrives sorted: one folder per person. **👤 Group by
+person** does not know that, so it pays one face embedding per image to
+rediscover what the folder name already said — thousands of inferences for an
+answer you had before you started.
+
+Scope the grid to a folder with the **Subfolder** picker and the panel under it
+offers **👤 Single person here**. One click groups every image of that folder as
+one person, instantly, with no pass at all — and the next 👤 Group by person run
+**skips those images entirely**. That skip is the saving: on a bank of 9 000
+images where 8 000 sit in asserted folders, the pass embeds 1 000.
+
+It is a rule, not a stamp. It survives re-scans, and an image you drop into the
+folder tomorrow joins the group the moment the bank sees it. It is also
+reversible at any time — **↩ Not one person after all** dissolves the group and
+puts the folder back in the way of normal clustering. Nothing is deleted either
+way.
+
+**Check a sample (15 images)** is the honest counterweight. It picks about
+fifteen images spread across the whole folder (not the first fifteen — those are
+usually one shoot), embeds *only those*, and compares them at the same
+similarity threshold the clustering uses. You get either *sample consistent
+(14/15 same person)* or *2 different faces in the sample — check this folder*.
+Two limits, stated plainly: fifteen images cannot prove a folder is clean, only
+that the sample looked one way; and whatever it finds, **your assertion stands**
+until you revoke it. It informs, it never overrules you.
+
+Images in the folder that the face machinery could not read — no face in frame,
+a face too small or too turned — are listed as *worth a look*. They stay in the
+group: "I could not see a face here" is not "this is someone else".
+
+### The app asks the question for you
+
+You should not have to guess which of your forty folders are worth declaring, so
+the same sampling runs by itself and **suggests**. A folder it sampled and found
+consistent gets a **👤?** next to its name in the Subfolder picker, and scoping
+to it says *Looks like one person (15/15 of the 15 sampled) — assert?* next to
+the button. A folder holding several people says so too, which is just as useful.
+
+**It suggests. It never asserts.** Confirming is always the same single click it
+always was. This is deliberate: a wrong assertion made silently would corrupt
+your person grouping with something you never said, and you would have no reason
+to go looking for it.
+
+It runs in two places, and the difference is cost:
+
+- **automatically at the end of 👤 Group by person** — free. That pass has just
+  cached an embedding for every image, so sampling every folder adds no
+  inference at all and no GPU time. The pass's line then ends with *N folder(s)
+  look like a single person*.
+- **on demand, with 🔎 Scan folders** — for asking *before* ever running the
+  heavy pass. This one pays about fifteen embeddings per folder, so it says how
+  many folders it will cover before you click, and covers the twenty biggest
+  first when there are more. It tells you what it did not reach rather than
+  leaving you to assume the rest are not one person.
+
+A suggestion expires when the folder changes. If images arrive or leave, the
+verdict no longer describes what is in front of you, so it is dropped and the
+folder goes back into the queue instead of advising you from stale evidence.
+
 ## Pick a balanced set
 
 Advice is only half the gesture, so **📊 Coverage advice** ends with **⚖️ Pick a
@@ -718,6 +780,75 @@ pipeline, but it is far too common to be worth a filter.
 A bank you already scanned picks all of this up on its next **🔎 Scan** — the
 pass re-visits the images that predate these measurements on its own. You do not
 need a full rescan.
+
+## Sort a bank by medium and by head angle
+
+Two more ways to slice a big dump, both built on passes you have already paid
+for.
+
+### 🎨 Medium — what the picture is *made of*
+
+**🎨 Classify medium** sorts every scored image into **📷 Photo**, **🅰 Anime**,
+**🧊 3D render**, **🖌 Illustration** — or **❔ Unsure**. It reads the CLIP
+embedding the **✨ Score** pass already computed, so it looks at no image twice,
+downloads nothing, and never touches the GPU. On a 23 000-image bank it finishes
+in seconds. An image ✨ Score has not reached has no embedding and stays
+unclassified; the row says how many.
+
+**You no longer have to ask for it.** Because it costs nothing beyond what
+✨ Score already paid, it now runs **automatically at the end of every ✨ Score
+pass**, and the pass's own line reports it (`· 🎨 Medium: 812 classified`). If
+the CLIP text encoder is missing, the line says *skipped* and names the reason
+rather than staying quiet. The **🎨 Classify medium** button is still there: it
+is how you re-run the pass on its own, and how you re-classify images that
+already carry a verdict — something the automatic run never does, so a verdict
+you are looking at is never rewritten behind your back.
+
+This is **not** the same question as **🔎 Origin** above. Origin reads the
+*file's metadata* and answers "who made this file". Medium reads *the picture*
+and answers "what does it look like". A photorealistic AI portrait is 🤖 AI and
+📷 Photo at the same time; a scanned manga page is ❔ Unknown and 🅰 Anime.
+Neither is evidence for the other.
+
+**What it is worth, measured.** On a real 23 532-image bank, against 167 images
+labelled by hand:
+
+- photograph verdicts were right **90 out of 90** times;
+- both real anime drawings in the sample were found;
+- every 3D render and illustration in the sample came back **Unsure**.
+
+That last line is the honest shape of this feature. The bar for a non-photo
+verdict is deliberately six times higher than for a photograph, because the
+model reads a picture's *subject* as much as its medium: a photo of somebody
+**cosplaying** an anime character scores as anime. At a lower bar the "anime"
+pile filled with cosplay photographs and the "3D render" pile with advertising
+banners. So the pass answers **Unsure** rather than guessing, and the row prints
+how big that pile is instead of hiding it. Sort by **🎨 Medium confidence ↑** to
+put the images it nearly could not call in front of you.
+
+### ⤢ Angle — where the head is pointing
+
+The **🎭 Person groups** pass estimates a head pose while it works. The **⤢**
+chips turn that into **😐 Frontal** (turned less than 20°), **◑ Three-quarter**
+(20–60°), **👤 Profile** (more than 60°) and **🔙 From behind**.
+
+Two limits worth knowing before you trust a count:
+
+- **Profile is under-counted.** A head turned far enough that one eye disappears
+  often defeats the face detector outright, and an image with no detected face
+  has no angle at all. The profiles you see are the ones that were still
+  detectable.
+- **From behind needs two passes.** It is the crossing of "no face found" with
+  "the **📐 Framing** pass called it a back view" — because *no face* on its own
+  is also what a landscape with nobody in it looks like. Without the framing
+  pass this bucket stays empty rather than claiming a person is there.
+
+**If your bank was scanned before this shipped**, its faces have no angle: older
+builds measured the pose, used it once and threw it away, and the number is not
+recoverable from what was stored. The ⤢ row then offers to measure them, tells
+you how many there are and roughly how long it will take on your machine, and
+does nothing until you click. It re-runs the face detector on those images only,
+writes nothing but the angle, and leaves your person groups exactly as they are.
 
 ## Find bank images by describing them
 
@@ -1320,6 +1451,44 @@ If a bank was scanned by an older version, its flagged images carry no recorded
 mark position; the panel says so and one more **🚩 Find watermarks** run makes
 them cleanable.
 
+### Who decided an image is watermarked
+
+**🚩 Find watermarks** can run two ways, and the panel says which one produced
+the verdicts you are looking at ("Judged 1 240 by the detector, 300 by the vision
+model") and which one a new run would use.
+
+- **The vision model** — the way that has always worked. It asks the local vision
+  model, in words, whether the picture carries a mark, once per image. About
+  1.7 seconds each, so about fifteen hours on a 30 000-image bank.
+- **The watermark detector** — an optional extra (Setup ▸ Quality tools). A small
+  classifier scores each image in about **0.14 second**, and a second model marks
+  where the logo sits so the two cleaning steps still have a box to work on. It
+  needs no Ollama at all.
+
+Install nothing and nothing changes. Install the extra and it takes over on its
+own; there is no switch to flip. What it costs is ~0.9 GB of weights, downloaded
+once into the same Python the **✨ Score** pass already uses.
+
+**How good is it, measured.** On 110 images pulled from a real bank and labelled
+by eye — half of them hard on purpose: faint corner logos, semi-transparent
+handles across the subject, an `OnlyFans.com/…` line barely a few pixels tall, and
+clean photos containing legitimate signage — the detector at its default setting
+flagged **none of the 55 clean images** and **54 of the 55 marked ones**. The
+vision model, on the exact same 110, flagged one clean image and missed one marked
+one. So the detector is not a downgrade in judgement; the gain you actually buy is
+the ten-fold speed-up. Neither is a verdict: both are a review flag, and both leave
+your source files untouched.
+
+The one image the detector missed was a `MET-ART.com` line in a bottom corner
+scoring 0.929, just under the 0.94 cut — and the highest-scoring clean image sat
+at 0.939. The two overlap by about a hundredth, which is why the cut is a
+**setting** (Settings ▸ Captioning & quality ▸ *Watermark detector sensitivity*)
+and not a constant.
+
+Images flagged **without** a position — the detector was sure there is a mark but
+could not place it — stay flagged and are counted separately in the pass's report.
+Draw a zone on them with **🚩 Edit mask** below, or leave them as a filter.
+
 
 ## Fix a watermark mask in a bank
 
@@ -1592,8 +1761,11 @@ thing you reconstruct.
 
 **Choosing what is on the board.** Everything is on it by default. The
 **Datasets** control above the board unticks what you do not want to see; the
-choice is remembered. On a phone it opens folded, with the current state written
-on the button ("3 of 7") so you always know what you are looking at.
+choice is remembered. It opens **folded**, at every screen width: its checkbox
+list is as tall as your library, and expanded on arrival it pushed the board —
+the thing you came to look at — below the fold on every load. Nothing is hidden
+by that, because the current state is written on the button ("3 of 7") so you
+always know what you are looking at. Unfold it and it stays unfolded next time.
 
 **Moving around.** Drag the background to pan, use the wheel (or two fingers) to
 zoom, and **Fit** puts the whole board back in view. The board only fits itself
@@ -1684,6 +1856,18 @@ choice, and it defaults to what it always did:
 A blend is one configuration, not one per pick, so the strength sweep disappears
 (each LoRA carries its own weight instead) and the image counter drops to one
 picture per seed.
+
+**Trying several weights at once.** Each picked checkpoint has a row of weight
+boxes under its slider. Tick two on one and two on another, and the launch
+renders **all four combinations** in a single run instead of making you launch,
+look, move a slider and launch again. Every image is labelled with the pair that
+produced it. Tick nothing and the slider governs, exactly as before; the slider
+is also how you use a weight that is not on the grid.
+
+The panel counts the cost before you commit — "4 weight combinations → 4 images,
+about 1 min" — and turns amber past 24 images. It does not refuse: the queue is
+serial and the machine is yours. Two checkpoints at four weights each is 16
+images, which is exactly why the panel does the multiplication for you.
 
 What blending actually does is worth saying plainly: **two identity LoRAs give
 you a hybrid person** — someone who is neither of the two. That is a real use, on

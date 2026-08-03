@@ -313,6 +313,16 @@ class BankImage(db.Model):
     face_state = db.Column(String(16), nullable=True)
     face_det = db.Column(Float, nullable=True)
     face_cluster = db.Column(Integer, nullable=True, index=True)
+    # WHERE the face_cluster id came from. NULL = the embeddings pass computed it
+    # (the default, and what every row that predates this column carries).
+    # 'asserted' = the user declared the image's SUBFOLDER to hold a single person
+    # (services/folder_person.py), so the id was written with no inference at all.
+    # The two live in the SAME id space on purpose: every reader (filters, coverage,
+    # the person chips) keeps working unchanged, and a later cross-folder merge can
+    # still join an asserted group to a computed one. The column exists so the
+    # embeddings pass can tell them apart — it SKIPS asserted rows (that skip is the
+    # compute the assertion saves) and never silently overwrites the user's word.
+    face_cluster_origin = db.Column(String(10), nullable=True)
     # Scoring pass (V2, the "bank scoring" ML extra: CLIP ViT-L/14 + a tiny
     # aesthetic head + an NSFW classifier, one subprocess like the face pass).
     # RAW scores persist, VERDICTS are recomputed at read time against the 'bank'
@@ -353,6 +363,20 @@ class BankImage(db.Model):
     # Non-NULL is what makes the readers (promote, thumbnails, the file route)
     # prefer the cleaned blob over the untouched source.
     watermark_clean_method = db.Column(String(16), nullable=True)
+    # WHICH detector produced watermark_state: NULL (a row scanned before this
+    # column existed, or never scanned) | 'vision' (the Ollama vision model, the
+    # route that has always existed and still runs when the extra is absent) |
+    # 'detector' (the dedicated SigLIP2 + Grounding DINO extra). Persisted rather
+    # than derived because a bank is scanned over weeks and can hold BOTH — and
+    # the two disagree at the margins, so "why is this flagged?" has to be
+    # answerable per image, not per bank. Additive column (see _SCHEMA_ADDITIONS).
+    watermark_source = db.Column(String(16), nullable=True)
+    # The detector's raw score in 0..1 for this image (NULL for a vision-model row:
+    # that route produces a sentence, not a number). Kept because the flag itself
+    # is a THRESHOLD applied to it — storing only the verdict would mean a rescan
+    # of the whole bank to answer "what would 0.92 have flagged?", and the
+    # threshold is the one knob this feature offers.
+    watermark_score = db.Column(Float, nullable=True)
     # Caption pass — a plain DESCRIPTIVE caption (no trigger, no identity omission:
     # a bank has no trigger word and nothing to protect). It doubles as the bank's
     # search text (the search bar matches caption + relpath) AND rides along to the
@@ -423,6 +447,39 @@ class BankImage(db.Model):
     tags = db.Column(Text, nullable=True)
     tags_text = db.Column(Text, nullable=True)
     tags_state = db.Column(String(16), nullable=True, index=True)
+    # Medium pass — WHAT THE PICTURE IS MADE OF, as opposed to `origin`, which
+    # reads the file's metadata. The two answer different questions and must
+    # never be conflated: an AI-generated photorealistic portrait is origin='ai'
+    # AND medium='photo'; a scanned manga page is origin='unknown' AND
+    # medium='anime'. Computed with zero-shot CLIP over the embedding the ✨ Score
+    # pass ALREADY cached, so it costs no new image inference.
+    #   medium         : 'photo' | 'anime' | 'render3d' | 'illustration'
+    #                    | 'unsure' | NULL (never classified — the ✨ Score pass
+    #                    has not reached this image, so there is no embedding to
+    #                    read and the honest answer is "not scored yet").
+    #                    'unsure' is a REAL, measured verdict, not a placeholder:
+    #                    see MEDIUM_MARGIN_* in image_bank_service for the numbers
+    #                    that make it the majority answer on ambiguous rows.
+    #   medium_margin  : the cosine gap between the winning prototype and the
+    #                    runner-up. Persisted because it is the only number that
+    #                    says HOW MUCH the verdict was worth, it is what the
+    #                    'unsure' cut is applied to, and it makes the pass
+    #                    re-tunable with no recompute (same read-time-verdict
+    #                    philosophy as the quality thresholds).
+    # Synergy note: this column is what a future "is this dataset anime or
+    # photographic?" check (the Anima lane) should read — it is the only
+    # per-image medium signal the app persists.
+    medium = db.Column(String(16), nullable=True, index=True)
+    medium_margin = db.Column(Float, nullable=True)
+    # Face pass — the head's YAW in degrees, signed, as InsightFace reports it
+    # (negative = turned one way, positive = the other; the app only ever reads
+    # |yaw|, because "turned left" and "turned right" are the same shot type for
+    # a training set). It was ALREADY computed by every face pass — used once to
+    # gate 'extreme_pose' and then thrown away — so persisting it costs one float
+    # and no extra inference. NULL = the pass never ran on this row, ran before
+    # this column existed, or found no face; the ⤢ Angle chips call all three
+    # "not measured", never "frontal".
+    face_yaw = db.Column(Float, nullable=True)
     # Manual turn, in degrees CLOCKWISE: NULL/0 = untouched | 90 | 180 | 270.
     # (Idea by 1Tomber, GitHub #17.) A bank is a READ-ONLY view over the user's
     # own folder, so a rotation cannot rewrite their file — it is stored here and
@@ -454,6 +511,89 @@ class BankImage(db.Model):
 
     def __repr__(self):
         return f'<BankImage {self.id} bank={self.bank_id} {self.status}>'
+
+
+class BankFolderPerson(db.Model):
+    """"This subfolder is one person" — the user's assertion about a bank folder.
+
+    Scraped sources are very often one folder per person, and making the face pass
+    re-discover by inference what the folder name already said is the single most
+    expensive way to learn nothing. One row here says it instead: every image of
+    that subfolder gets a person id immediately, at zero GPU cost, and the
+    embeddings pass then SKIPS those images entirely.
+
+    Keyed on (bank_id, subfolder) — the TOP-LEVEL subfolder, exactly the string the
+    Subfolder filter uses ('' = the bank root), so the assertion and the scoping
+    facet always talk about the same set of files. It is a rule, not a stamp: it
+    survives re-scans, and an image that lands in the folder later joins the group
+    on insert. Revoking deletes the row and clears the ids it wrote, putting those
+    images back in the way of normal clustering.
+
+    NO relationship() to ImageBank on purpose (see the delete-500 lesson): the
+    services delete these rows explicitly, children first."""
+    __tablename__ = 'bank_folder_person'
+    __table_args__ = (db.UniqueConstraint('bank_id', 'subfolder',
+                                          name='uq_bank_folder_person'),)
+    id = db.Column(Integer, primary_key=True)
+    bank_id = db.Column(
+        Integer, db.ForeignKey('image_bank.id', ondelete='CASCADE'),
+        nullable=False, index=True)
+    # Top-level subfolder name, '' for the bank root. Stored verbatim — it is a
+    # user path fragment and is never shown outside this install.
+    subfolder = db.Column(Text, nullable=False, default='')
+    # The bank-local person id this folder owns. Allocated once, above every id in
+    # use at that moment, and NEVER reallocated while the assertion stands — the
+    # embeddings pass offsets its own ids past it so the two never collide.
+    cluster_id = db.Column(Integer, nullable=False)
+    # Last sample check, JSON: {checked_at, sample, scorable, largest, faces,
+    # verdict, note}. NULL = never verified (the assertion is still in force —
+    # verification informs, it never gates).
+    sample_report = db.Column(Text, nullable=True)
+    created_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+    def __repr__(self):
+        return (f'<BankFolderPerson bank={self.bank_id} '
+                f'{self.subfolder!r} #{self.cluster_id}>')
+
+
+class BankFolderProbe(db.Model):
+    """"This subfolder LOOKS like one person" — a MEASUREMENT about a folder.
+
+    Deliberately a different table from BankFolderPerson, because it is a
+    different kind of thing with a different lifetime. A probe is something the
+    app found out by sampling ~15 images; an assertion is something the user
+    declared. Conflating them is exactly the mistake this feature exists to
+    avoid: a suggestion must never be able to become a grouping on its own.
+
+    So this table only ever feeds a SUGGESTION. It groups nothing, it writes no
+    face_cluster, and confirming it is a click the user makes.
+
+    ``content_sig`` is what makes a probe expire honestly: a cheap
+    "<image count>:<highest image id>" fingerprint of the folder at probe time.
+    Images added or removed since → the verdict describes a folder that no longer
+    exists, and the UI drops it rather than suggest from stale evidence."""
+    __tablename__ = 'bank_folder_probe'
+    __table_args__ = (db.UniqueConstraint('bank_id', 'subfolder',
+                                          name='uq_bank_folder_probe'),)
+    id = db.Column(Integer, primary_key=True)
+    bank_id = db.Column(
+        Integer, db.ForeignKey('image_bank.id', ondelete='CASCADE'),
+        nullable=False, index=True)
+    subfolder = db.Column(Text, nullable=False, default='')
+    # 'consistent' | 'mixed' | 'inconclusive' — the same three the single-folder
+    # check produces, from the same function. One vocabulary, one meaning.
+    verdict = db.Column(String(14), nullable=False)
+    sample = db.Column(Integer, nullable=True)      # images actually embedded
+    scorable = db.Column(Integer, nullable=True)    # of those, with a usable face
+    largest = db.Column(Integer, nullable=True)     # biggest same-person group
+    faces = db.Column(Integer, nullable=True)       # distinct people in the sample
+    note = db.Column(Text, nullable=True)           # the sentence shown to the user
+    content_sig = db.Column(String(40), nullable=True)
+    checked_at = db.Column(DateTime, default=db.func.current_timestamp())
+
+    def __repr__(self):
+        return (f'<BankFolderProbe bank={self.bank_id} '
+                f'{self.subfolder!r} {self.verdict}>')
 
 
 class LoraTestImage(db.Model):

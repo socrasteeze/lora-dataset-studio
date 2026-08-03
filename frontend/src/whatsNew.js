@@ -90,6 +90,149 @@ export const WHATS_NEW = [
     to: '/datasets',
   },
   {
+    id: '2026-08-03-seedvr2-tile-and-vae-settings',
+    date: '2026-08-03',
+    title: 'SeedVR2 upscaling now fits smaller cards — tile size is a setting',
+    blurb:
+      'The fidelity upscaler used to hold one 1024 px tile at a time whatever your GPU, which is where a large upscale ran out of memory on an 8 GB card. Settings ▸ Image engines now has a Tile size: lower it to 768 or 512 and the same 4K upscale fits, at the cost of a few more seams. It also sizes the model\'s own tiled encode/decode, so it lowers memory use even without the optional tiling node pack. Two more dials came with it — where automatic tiling switches over, and which VAE file to load when yours is named something the automatic search cannot recognise. Defaults are unchanged, so nothing moves unless you touch it. Thanks to SurpassHR (GitHub) for asking for these knobs alongside the engine itself.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-03-canvas-usable-on-a-phone',
+    date: '2026-08-03',
+    title: 'The LoRA Canvas is finally usable on a phone',
+    blurb:
+      'The board had never had a small-screen pass, and it showed. Opening 🎨 Generate on a tablet-width window turned it into a fixed side drawer that took more than half the screen and left a sliver of the very board you were picking checkpoints from — so that panel, the run details, the compare view and the image gallery now stay full-width sheets right up to a real desktop, and each one closes with a thumb-sized ✕ instead of a 14-pixel glyph. The zoom, Fit and Tidy up buttons are 40 px on touch, where a miss used to land on the board and pan it. The ✓ box that adds a checkpoint to a run no longer shrinks with the zoom — at the level the board opens on it had become a five-pixel square, on the one control the whole generate flow goes through. And the list of what the board can be told to do, which was simply hidden below laptop width, is now one tap away with the touch gestures spelled out.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-restart-no-longer-kills-a-live-cloud-run',
+    date: '2026-08-03',
+    title: 'Restarting the app no longer kills a cloud run that is training fine',
+    blurb:
+      'When the app restarted, it picked the run back up and asked vast.ai whether the pod still existed. If that one answer came back without the pod in it — which happens, and means nothing — the run was declared dead about ten seconds later, and the "stop" that followed reached the pod that was still training and ended it. A run at step 825 of 3000 was lost that way, with the hour already paid. Now the pod itself is asked: a pod that answers is a pod that exists, whatever the marketplace says, and silence has to last minutes before the run is given up. If it truly cannot be reached, no stop is sent to a machine we could not talk to, and the pod is kept so the result stays recoverable.',
+    to: '/cloud',
+  },
+  {
+    id: '2026-08-03-canvas-opens-again-hotfix',
+    date: '2026-08-03',
+    title: 'The LoRA Canvas opens again — v2026.08.03 broke it for a few minutes',
+    blurb:
+      'If you updated to v2026.08.03 in the short window it was live, the Canvas page crashed on load (“An unexpected error occurred”). The provenance-edges feature read a value before it existed. Fixed — nothing else in that release was affected, and no data was touched.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-canvas-blend-provenance',
+    date: '2026-08-03',
+    title: '🧬 A blended picture now shows every checkpoint it came from',
+    blurb:
+      'A picture pinned on the LoRA Canvas was linked back to one checkpoint — but a 🧬 Blend loads several, often from different datasets, so the board was showing one parent out of two or three. Violet lines now join a blended picture to every source it was made from, across lanes, next to the existing indigo training lineage. When a source is no longer on the board — its run deleted, its dataset unticked — no line is invented: the picture says “1 of 2 sources is not on the board” instead. Blends made before this update keep their images and simply have no lines to show.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-seedvr2-tiling-is-a-choice',
+    date: '2026-08-03',
+    title: 'Tiled upscaling is now the default — it keeps more detail, not just less VRAM',
+    blurb:
+      'Yesterday tiling only kicked in when a frame would not fit on your card. SurpassHR (GitHub #32) re-tested it and sent the source renders: side by side, the full-frame result does not just soften fine texture, it rewrites it — short dense stubble comes back as long smeared strands. A tile is upscaled at the size the model works well at, while a whole 4K frame spreads its capacity over four times the surface. That made the old rule backwards: the bigger your GPU, the less often you got the better picture. So with the tiling node pack installed, large upscales are now tiled by default, and Settings ▸ Image engines lets you choose — tile when it helps (recommended), always tile large frames, or never. Nothing is tiled below roughly 1536 px on the short edge, where the model already works at a good size and a grid would only add seams.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-03-bank-suggests-one-person-folders',
+    date: '2026-08-03',
+    title: '👤 The bank now spots your one-person folders — suggested automatically, you confirm',
+    blurb:
+      'Telling the bank a subfolder holds a single person saves the whole face pass on it, but you had to know which folders those were. It now samples them and asks: a folder that looks consistent gets a 👤? in the Subfolder picker and offers "Looks like one person (15/15 sampled) — assert?", and a folder holding several people says that too. Nothing is ever grouped on its own — the suggestion is an offer, confirming stays your click, because a wrong grouping made silently is one you would never think to look for. It runs free at the end of 👤 Group by person (the embeddings are already cached, so covering every folder costs no inference), or on demand with 🔎 Scan folders, which tells you what it will cost and what it did not reach. A suggestion expires by itself when the folder gains or loses images.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-medium-runs-itself-after-score',
+    date: '2026-08-03',
+    title: '🎨 Medium classifies itself at the end of ✨ Score',
+    blurb:
+      'Sorting a bank into photo / anime / 3D render / illustration reads the embeddings ✨ Score already computed — no GPU, seconds for 23 000 images. It was still a second button you had to know about, so banks sat there holding the data for the answer without the answer. Score now finishes the job and says so on its own line ("· 🎨 Medium: 812 classified"), or names the reason it could not. The 🎨 Classify medium button stays for re-running it alone, and the automatic pass never re-judges an image that already has a verdict.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-export-keeps-original-bytes',
+    date: '2026-08-03',
+    title: 'Big datasets stop bloating on their way to training',
+    blurb:
+      'Preparing a dataset for training used to re-encode every picture to a lossless PNG, even when nothing needed changing. On a 6 200-image style dataset that turned 3.6 GB of photos into 24 GB and took half an hour before training could even start — long enough to fill a disk and fail with a bare "no space left on device", and long enough that any restart in between killed the run. Pictures the trainer already reads as they are now go through untouched: same dataset, 3.6 GB, a couple of minutes. Anything that genuinely needs converting — a photo with a rotation tag to bake in, an unusual colour mode, a format the trainer does not read — still is. And if the disk really cannot hold the export, you are now told before it starts, with the size it needs and the space you have, instead of finding out halfway through.',
+  },
+  {
+    id: '2026-08-03-canvas-group-bar-reachable',
+    date: '2026-08-03',
+    title: 'Groups of pinned images can be moved and closed again',
+    blurb:
+      'A side-by-side group on the LoRA Canvas could end up impossible to move AND impossible to close, with no way to tell why. Its title bar — which holds the ⠿ grip, Export grid and ✕ — is drawn just above the strip, and any picture pinned over that space silently took the clicks meant for it. The bars are now drawn above every picture, so they always answer; and ✦ Tidy up and 📌 Pin all know that space is taken, so they stop dropping a picture there. It showed up most on a zoomed-out board, where the bar is twice as tall.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-watermark-detector-extra',
+    date: '2026-08-03',
+    title: 'Finding watermarks in a big bank now takes minutes instead of hours',
+    blurb:
+      'Until now, 🚩 Find watermarks asked the vision model, in words, "is there a watermark here?" once per image — about 1.7 seconds each, which is fifteen hours on a 30 000-image bank for a question whose answer is usually no. There is now an optional extra (Setup ▸ Quality tools ▸ Watermark detector) that answers it with a small classifier instead, in about 0.14 seconds, and a second model marks where the logo sits so ✂ Crop and 🧽 Inpaint still have something to work on. It does not need Ollama at all, so a machine with no vision model can scan too. On a hand-labelled sample of 110 images from a real bank it flagged none of the 55 clean ones and 54 of the 55 marked ones — slightly better than the vision model on the same images, which also missed one. Install nothing and nothing changes: the vision model keeps doing exactly the same job, slower. The flag score is tunable in Settings ▸ Captioning & quality.',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-03-canvas-image-controls-see-through',
+    date: '2026-08-03',
+    title: 'Pinned pictures are no longer hidden by their own buttons',
+    blurb:
+      'Hovering a picture pinned on the LoRA Canvas dropped an opaque black band across its top and a black block over its corner — the controls covered the very thing you were pointing at. 🔍, ✕ and ⬇ are now separate rounded pills over a blur, and the step label is a small tag instead of a full-width band, so the image shows through between them. The glyphs went white too: they were mid-grey, which reads on the app’s dark chrome but vanishes on a bright render.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-canvas-filter-opens-folded',
+    date: '2026-08-03',
+    title: 'The LoRA Canvas opens on the board, not on its filter',
+    blurb:
+      'The Datasets filter opened expanded every time you loaded the canvas, and on a library of any size its checkbox list pushed the board itself below the fold — so the first thing you did on the page you came to look at was scroll past a filter. It now opens folded at every width, with the same summary on the button (“3 of 7 · 12 runs shown”), so nothing is hidden. If you unfold it, it stays unfolded next time.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-blend-weight-sweep',
+    date: '2026-08-03',
+    title: '🧬 Tick several weights and blend every combination in one run',
+    blurb:
+      'Finding the right balance between two LoRAs meant launching, looking, moving a slider, launching again. Each LoRA in a 🧬 Blend now has weight boxes next to its slider: tick 0.6 and 0.8 on one, 0.4 and 1.0 on the other, and the launch renders all four combinations in a single run — each image labelled with the pair that made it, and lined up side by side in the stack view so you can just pick. The button says the cost before you commit (“4 weight combinations → 4 images, about 1 min”) and warns past 24, without ever refusing: it is your machine. Tick nothing and the slider governs, exactly as before. Works in the Test Studio and from the LoRA Canvas board.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-03-concept-sdxl-refusal-tells-the-truth',
+    date: '2026-08-03',
+    title: 'A Concept dataset on SDXL is told the truth instead of sent hunting',
+    blurb:
+      'Concept captions are only ever written as prose, and the prose/booru selector is hidden on concept datasets — so a Concept dataset trained on a booru-native SDXL checkpoint was always stopped, and then told to “re-caption in Booru tags mode”: a control that does not exist for it. You could look for it forever. The refusal now says what is actually true — no booru concept captioner exists yet — and names the two paths that work: train the concept on a prose family (Z-Image, Krea 2, FLUX.1, FLUX.2 Klein, Anima), or force the launch knowing what a booru-native base loses on prose. Character and Style datasets are untouched; both reach booru captions normally.',
+    to: '/datasets?section=training&panel=launch',
+  },
+  {
+    id: '2026-08-03-pinokio-update-hands-back',
+    date: '2026-08-03',
+    title: 'Installed from Pinokio? Updates now tell you the right three clicks',
+    blurb:
+      'Pinokio starts and stops the app itself, so pressing "Update & restart" in Settings would have relaunched the server in a window Pinokio no longer follows — it would show the app as stopped while the old one still held the port, and Start would have opened a second one on the same datasets. The Updates card and the update banner now show Stop, Update, Start instead of that button, while still telling you how many commits behind you are. Every other install shape is unchanged.',
+    to: '/settings/maintenance',
+  },
+  {
+    id: '2026-08-03-seedvr2-tiled-highres',
+    date: '2026-08-03',
+    title: 'Big SeedVR2 upscales no longer have to fit on your card in one piece',
+    blurb:
+      'Upscaling a whole frame at once needs the whole frame in VRAM, and past a certain size that simply fails — with a CUDA out-of-memory error in a log, which is a terrible way to find out. Two things change. The app now tells you, before it starts, roughly how many megapixels your GPU is good for in one pass. And if you install the Comfyui_TTP_Toolset node pack in ComfyUI, anything bigger is automatically cut into overlapping tiles, upscaled tile by tile and blended back together — so a 4K result works on a card that could not hold it whole. Without the pack nothing breaks: upscales still run, they are just capped. Tiled workflow and the measurement behind it contributed by SurpassHR (GitHub #32).',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-03-dataset-passes-survive-a-deleted-image',
+    date: '2026-08-03',
+    title: 'A long pass no longer dies if you delete an image while it is running',
+    blurb:
+      'Captioning, watermark detection and cleaning, framing, short captions — these walk your whole dataset for minutes or hours, and the grid stays clickable the whole time. Delete a bad tile, press ⏹ Stop, or start an improve while one of them is working, and the pass could die on the spot with a cryptic database error, losing the work it had already done on every other image. It now skips whatever disappeared and carries on. ⏹ Stop also reports the number of generations it really cancelled rather than the number it attempted, so the count and the grid can no longer disagree.',
+    to: '/datasets',
+  },
+  {
     id: '2026-08-03-bank-coverage-sees-more',
     date: '2026-08-03',
     title: 'The bank’s Coverage advice can now see that your images all look the same',
@@ -111,6 +254,14 @@ export const WHATS_NEW = [
     title: '▶ Review and “Select all in filter” no longer claim your filter is empty when it is not',
     blurb:
       'If you updated LDS without restarting the server, pressing ▶ Review answered “Nothing to review — no image matches the current filter” and Select all in filter reported 0 selected — directly under a counter reading 1,128 shown of 1,128. Nothing was wrong with your filter. The page had already picked up the new version (the browser reloads it from disk), while the server was still running the old one and did not understand the faster request the new page makes — so it answered a different question, and the page read that as “no images”. It now tells you what actually happened and what to do about it: restart LDS. A filter that genuinely matches nothing still says so quietly, as before.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-bank-single-person-folder',
+    date: '2026-08-03',
+    title: '👤 Tell the bank a folder is already one person — and skip the pass',
+    blurb:
+      'Scraped folders are usually one person each, and 👤 Group by person did not know it: one face embedding per image to rediscover what the folder name already said. Scope the grid to a subfolder and click "Single person here" — every image is grouped instantly, with no pass at all, and the next Group by person run skips them entirely. It survives re-scans, adopts images that land in the folder later, and one click undoes it. Not sure? "Check a sample" embeds about fifteen images spread across the folder and tells you whether they look like the same person, at the same threshold the clustering uses — fifteen inferences instead of thousands, and whatever it finds, your call stands.',
     to: '/bank',
   },
   {
@@ -152,6 +303,30 @@ export const WHATS_NEW = [
     blurb:
       'Every captioned tile now has a clickable 🏷️ badge. It opens that image’s caption as chips — woman, red, dress, balcony — and ticking them narrows the grid to the images whose captions mention them. It is the readable cousin of 🎯 Similar to selected: that one matches the overall look and cannot say why, this one matches attributes you picked and shows you exactly which. Several chips mean AND, so each tick narrows further, and chips match as whole words — “car” will not drag back “scarf”.',
     to: '/bank',
+  },
+  {
+    id: '2026-08-03-bank-medium-chips',
+    date: '2026-08-03',
+    title: '🎨 Split a mixed dump into photos, anime, 3D renders and illustrations',
+    blurb:
+      'A new chip row on the Bank sorts your images by what they are MADE of — a photograph, an anime drawing, a 3D render, a painting — and it costs nothing to run: it reads the embeddings ✨ Score already computed, so no image is looked at twice and the GPU stays free. It is not the same question as 🔎 Origin: a photorealistic AI portrait is 🤖 AI and 📷 Photo at once. Where it cannot tell, it says “Unsure” instead of guessing, and the row prints how big that pile is — measured on a real 23 500-image bank, its photograph verdicts were right 90 out of 90 times, and it refused to call every 3D render it saw rather than invent one. A photo of somebody cosplaying an anime character is the confusion that forced that caution.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-bank-angle-chips',
+    date: '2026-08-03',
+    title: '⤢ Filter a bank by head angle — frontal, three-quarter, profile, from behind',
+    blurb:
+      'The 🎭 Person groups pass has always estimated where a head is pointing, used the number once and thrown it away. It now keeps it, and a new chip row lets you pull out the frontal shots, the three-quarters, the profiles and the back views — the fastest way to see that a set is fifty selfies facing the camera. You can sort by it too. Two limits are printed rather than hidden: profiles are under-counted (a head turned that far often defeats the face detector), and “from behind” needs the 📐 Framing pass as well, because “no face” on its own is also what an empty landscape looks like. Banks scanned before this can measure their missing angles from the row itself — it tells you how many and roughly how long, and does nothing until you click.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-caption-length-preset',
+    date: '2026-08-03',
+    title: 'Ask for shorter — or longer — captions in one click',
+    blurb:
+      'Captions came out at whatever length the vision model felt like, and the only way to steer that was to hand-write it into Extra instructions on every dataset. ⚙️ Options on the Captions panel now has a Caption length dial: Concise aims for one short sentence, Detailed for several, Standard leaves the prompt exactly as it was. On 18 real photos with the shipped default vision model that came out at a median of 24 words for Concise, 88 for Standard and 126 for Detailed — a target the model follows loosely, not a word cap, and your own numbers will differ. Concise stays full prose, so a short-captioned dataset still trains on prose families without forcing past the caption-style check, and it is a different axis from the long + short dual captions — use both if you want. Saved per dataset, offered per run on the image bank\'s caption pass too, and your Extra instructions still get the last word. Suggested by djpraxis (Reddit).',
+    to: '/datasets?section=captions&panel=generate',
   },
   {
     id: '2026-08-03-review-opens-instantly',

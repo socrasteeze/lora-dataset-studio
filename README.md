@@ -70,7 +70,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | **Custom bases and continuation** | Train compatible custom weights, continue from any saved epoch, or use verified full-state resume where available |
 | **Runs hub** | Every run together with progress, logs, stop/retry/continue/download actions and paste-safe config sharing |
 | **Experiment lineage** | Inspect, annotate and diff the exact tree of runs and the checkpoint each continuation resumed from |
-| **LoRA Canvas** | Put every dataset's lineage on one pan/zoom board, rearrange cards, compare runs across datasets, generate from same-family checkpoints, pin/fuse outputs and continue training from a pill — each generation run keeps its own strip in training-step order, with the character dataset's reference face on its lane |
+| **LoRA Canvas** | Put every dataset's lineage on one pan/zoom board, rearrange cards, compare runs across datasets, generate from same-family checkpoints — including 🧬 blending several checkpoints into one image, with purple provenance edges joining a blended picture to every pill it came from (blends made before this feature show a badge instead) — pin/fuse outputs and continue training from a pill; each generation run keeps its own strip in training-step order, with the character dataset's reference face on its lane |
 | **Test Studio** | Fixed-seed checkpoint × strength grids, multi-LoRA comparisons or 🧬 combined stacks (several of your LoRAs in one image, each at its own weight, weight variants compared side by side), a ✨ Enhance button that enriches your prompt through your local Ollama, votes, Wilson ranking, face ranking and shareable exports |
 | **Studio shortcuts and recovery** | Open Studio directly from a run, draw prompts from kept dataset captions, and pause safely when ComfyUI drops instead of launching later cells against changed state |
 
@@ -94,6 +94,7 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 | **✂ Find crops & variants** | Catches the same shot re-cropped or re-compressed, reusing Score's embeddings (no extra GPU pass) |
 | **🚩 Find & 🧽 clean watermarks** | Flags overlaid logos/URLs with a box, then removes them in two manual passes — a model-free crop, or a LaMa/Klein repaint into a *separate* file |
 | **👥 Group by person** | Clusters faces into people **with no reference photo needed**, GPU-accelerated when the card is free |
+| **🎨 Medium · ⤢ Angle** | Splits a mixed dump into photographs, anime, 3D renders and illustrations, reusing ✨ Score's embeddings (no extra GPU pass), and sorts by head angle from the same face pass that already clusters people. Both answer *unsure* / *not measured* instead of guessing — non-photo verdicts are rare by design, and profiles are under-counted because a hard-turned head often defeats face detection |
 | **🔖 Tags** | A local ~400 MB tagger labels what's in each shot — hair colour, clothing, setting — so a huge pile can be sliced by that *before* you spend GPU hours captioning it. Facet dropdowns over the common questions, an **All other tags** list for the rest. Runs on CPU. Never writes captions. **Bank only** (not the dataset workspace), and **cannot run on a compute peer** |
 | **🔍 Search & filter** | Full-text search over captions **and 🔖 tags** plus Status / Quality / Score / Groups / Resolution filters with a live count. On a small screen the panel opens folded behind a summary of what's active; **✓ Keep / ✕ Reject** ride along in a bar pinned to the bottom of the screen once anything is selected |
 | **🔤 Find by text** | Rank what you're looking at by a written phrase — *"brunette outdoors, wide shot"* — reusing ✨ Score's embeddings. A ranking, not a filter |
@@ -343,7 +344,7 @@ Directions, not dates. These are discussed openly on the project's Discord, and 
 
 - **🧬 Merge Lab** *(next big one)* — bake your trained LoRAs into a standalone, shareable checkpoint and merge models with guided recipes, judged side by side in the Test Studio (same seeds, A/B grids). Full model fine-tuning on large curated datasets comes later on the same path.
 - **🎬 WAN 2.1 / 2.2 video LoRAs** — ai-toolkit already trains WAN and the scraper can already pull video, so the whole pipeline (scrape, curate, caption, train, test) extends naturally to motion. Community-driven.
-- **🧠 Smarter watermark detection** — a dedicated NSFW-trained detector, and cleaning that happens **during import** instead of as a separate errand. *(Detection and manual two-pass cleaning already ship, in datasets and in the Image Bank; what's missing is a detector that doesn't need a vision model, and automation you can trust unattended.)*
+- **🧠 Watermark cleaning during import** — cleaning that happens **during import** instead of as a separate errand, and automation you can trust unattended. *(Detection has caught up: a dedicated detector that needs no vision model now ships alongside the Ollama path, and manual two-pass cleaning already works in datasets and in the Image Bank.)*
 - **🧩 More base models** — additional Flux-family bases (Chroma, Qwen-Image…) with the same one-click flow as Krea 2.
 
 ### Table of contents
@@ -711,7 +712,7 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Feature | Requires |
 |---|---|
 | Klein image generation / single or bulk 2 MP improvement | ComfyUI reachable + Klein model installed |
-| SeedVR2 upscaling | ComfyUI reachable + the `ComfyUI-SeedVR2_VideoUpscaler` node pack (installed from ComfyUI, not by this app — it has its own Python dependencies) + two model files the Setup step downloads (~3.9 GB); [exact files](docs/guide/settings-reference.md#seedvr2-upscaling-local) |
+| SeedVR2 upscaling | ComfyUI reachable + the `ComfyUI-SeedVR2_VideoUpscaler` node pack (installed from ComfyUI, not by this app — it has its own Python dependencies) + two model files the Setup step downloads (~3.9 GB); big frames are upscaled in overlapping tiles by default when the optional `Comfyui_TTP_Toolset` pack is present (a `tiling` setting keeps `always`/`never` available); [exact files](docs/guide/settings-reference.md#seedvr2-upscaling-local) |
 | Krea 2 Edit generation | ComfyUI reachable + `comfyui-krea2edit`, a Krea 2 base, Identity Edit LoRA, Qwen3-VL encoder and Qwen Image VAE; [exact files](docs/guide/settings-reference.md#krea-2-edit-local) |
 | Captioning | Ollama **or** ai-toolkit (JoyCaption) |
 | Dual long + short captions | ai-toolkit + local vision caption derivation; local training only, and unavailable for Krea 2 / Anima |
@@ -719,7 +720,7 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Face similarity / auto-triage | `backend/requirements-ml.txt` (InsightFace + ONNX Runtime) |
 | Character person masks | `backend/requirements-ml.txt` (rembg); Concept/Style intentionally disable them |
 | Image Bank scoring, crops and semantic tools | Bank scoring extra from `backend/requirements-ml.txt`; semantic search/diversity reuse an existing Score pass, and balanced picks also need Framing |
-| Watermark detection | Ollama with a vision model |
+| Watermark detection | Ollama with a vision model, **or** the dedicated detector (torch + transformers — the bank-scoring extra's environment is reused when present — plus ~0.9 GB of model downloads at first use) |
 | Watermark inpainting | LaMa extra from `backend/requirements-ml.txt`, or ComfyUI + Klein for the refine lane; crop remains model-free |
 | Scraping | `backend/requirements-scrape.txt`; Pexels also needs `PEXELS_API_KEY` and explicit authorization |
 | Local LoRA training: Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein / Anima | ai-toolkit; no ComfyUI is needed for official Hugging Face bases |
@@ -853,7 +854,7 @@ operational limits are documented in the dedicated
 
 In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/socrasteeze/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
 
-Only the core app is installed this way — ComfyUI, Ollama, ai-toolkit and the optional ML helpers are still connected from the app's own **Setup** screen. Use Pinokio's **Update** tab rather than the in-app **Update & restart** button: the in-app restart relaunches the server outside Pinokio's control.
+Only the core app is installed this way — ComfyUI, Ollama, ai-toolkit and the optional ML helpers are still connected from the app's own **Setup** screen. Updates go through Pinokio's **Update** tab: because Pinokio starts and stops the server, the app detects this install shape and shows *Stop → Update → Start* instead of its own **Update & restart** button, which would relaunch the server outside Pinokio's control.
 
 ### External tools (install once, connect in Settings)
 

@@ -12,7 +12,7 @@ import {
 } from '../utils/canvasFamilyFilter';
 import { toOverrideMap } from '../utils/canvasPlacement';
 import { toImageNodeMap, visibleImageNodes } from '../utils/canvasImageNodes';
-import { layoutImageNodes } from '../utils/canvasImageGroups';
+import { layoutImageNodes, occupiedBox } from '../utils/canvasImageGroups';
 import { placeImageBatch } from '../utils/canvasPinBatch';
 import CanvasDatasetFilter from '../components/canvas/CanvasDatasetFilter';
 import LineageCanvas from '../components/canvas/LineageCanvas';
@@ -237,10 +237,13 @@ export default function CanvasPage() {
         if (!nodes.length) continue;
         const res = placeImageBatch({
           graph,
-          // …and nothing may land ON one of those strips either.
+          // …and nothing may land ON one of those strips either — nor on the
+          // BAR above one, which is the group's only grip and carries its ✕.
+          // `occupiedBox` is the shared answer to "how much board does this
+          // really take", so Tidy up and 📌 Pin all cannot disagree about it.
           existing: layoutImageNodes(visibleImageNodes(map))
             .filter((r) => r.kind === 'group')
-            .map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })),
+            .map(occupiedBox),
           images: nodes.map((n) => ({ id: n.imageId, dataset_id: id,
             record_id: n.image?.record_id, step: n.image?.step })),
           max: nodes.length,
@@ -366,13 +369,19 @@ export default function CanvasPage() {
 
   return (
     <div>
-      <header className="mb-3">
+      {/* 📱 The blurb is the first thing a phone can afford to lose. It explains
+          the page once; after that it is 72 px of the 800 this screen has, spent
+          above the board, on every single load — and it was those 72 px that
+          pushed the frame's bottom edge past the fold at 400 px. It stays in full
+          from `sm` up, and the ? badge next to the title carries the same
+          explanation at every width, so nothing is actually hidden. */}
+      <header className="mb-2 sm:mb-3">
         <h1 className="flex items-center gap-2 text-lg font-semibold text-content">
           <span aria-hidden>◉</span> LoRA Canvas
           <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.625rem] font-semibold uppercase tracking-wide">Beta</span>
           <HelpBadge topic="page-canvas" />
         </h1>
-        <p className="mt-1 text-content-muted text-[0.75rem]">
+        <p className="mt-1 hidden text-content-muted text-[0.75rem] sm:block">
           Every training run you have made, on one board: each dataset gets a lane, each run a card,
           and a continuation is joined to the exact checkpoint it resumed from.
         </p>

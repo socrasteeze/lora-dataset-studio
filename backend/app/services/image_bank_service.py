@@ -417,6 +417,11 @@ def _insert_bank_images(bank_id, folder, rels) -> int:
         except OSError:
             size = None
         rows.append({'bank_id': bank_id, 'relpath': rel, 'file_size': size})
+    # A "this subfolder is one person" assertion is a RULE, not a stamp: a file
+    # that lands in an asserted folder joins its person group here, on insert,
+    # with no pass and no click (see services/folder_person.py).
+    from . import folder_person
+    folder_person.stamp_new_rows(bank_id, rows)
     for i0 in range(0, len(rows), _INSERT_CHUNK):
         db.session.execute(BankImage.__table__.insert(),
                            rows[i0:i0 + _INSERT_CHUNK])
@@ -887,6 +892,9 @@ def delete_bank(user_id, bank_id) -> bool:
     if bank_jobs.running(bank_id):
         bank_jobs.cancel(bank_id)
     imported_source = bank.source_path if _is_imported_source(bank.source_path) else None
+    from . import folder_person
+    folder_person.drop_for_bank(bank_id)   # children first — no relationship()
+    folder_person.drop_probes_for_bank(bank_id)
     BankImage.query.filter_by(bank_id=bank_id).delete(synchronize_session=False)
     db.session.delete(bank)
     db.session.commit()
@@ -1005,6 +1013,13 @@ def _image_dict(row: BankImage, th: dict, promoted_by, live) -> dict:
         'aesthetic_score': row.aesthetic_score, 'nsfw_score': row.nsfw_score,
         'style_cluster': row.style_cluster, 'watermark_state': row.watermark_state,
         'watermark_clean_method': row.watermark_clean_method,
+        # Who ruled on THIS image, and with what score. Per image rather than per
+        # bank because a bank scanned over weeks holds both routes' verdicts, and
+        # "why is this one flagged?" is asked about one tile, not about a bank.
+        # NULL source = scanned before the app recorded it; NULL score = the
+        # vision route, which writes a sentence and not a number.
+        'watermark_source': row.watermark_source,
+        'watermark_score': row.watermark_score,
         'detail_ratio': row.detail_ratio, 'bars_ratio': row.bars_ratio,
         'jpeg_quality': row.jpeg_quality,
         'origin': row.origin, 'origin_evidence': row.origin_evidence,
@@ -1021,7 +1036,20 @@ def _image_dict(row: BankImage, th: dict, promoted_by, live) -> dict:
         'semantic_dup_unresolved':
             row.semantic_dup_group in live['semantic_dup_group'],
         'face_state': row.face_state, 'face_cluster': row.face_cluster,
+        # 'asserted' = the person id came from the user's "this subfolder is one
+        # person", not from an embedding. The grid says so rather than passing a
+        # declaration off as a measurement.
+        'face_cluster_origin': row.face_cluster_origin,
         'framing': row.framing,
+        # 🎨 what the picture is made of, and how sure the classifier was. The
+        # margin travels with the verdict on purpose: a tile badge that cannot
+        # show its own confidence is how a guess becomes a fact.
+        'medium': row.medium, 'medium_margin': row.medium_margin,
+        # ⤢ the raw head yaw in degrees, signed as the detector reports it. The
+        # BUCKET is not stored here — it is derived from this number by the same
+        # two cuts the SQL uses, so a re-tune can never leave the badge and the
+        # chip disagreeing.
+        'face_yaw': row.face_yaw,
         'status': row.status, 'reject_reason': row.reject_reason,
         'promoted_dataset_id': promoted,
         # The OTHER destination. Kept as its own key rather than overloading the
@@ -1097,6 +1125,175 @@ _RES_BOUNDS = {bid: (lo, hi) for bid, lo, hi in _RES_BUCKETS}
 _FRAMINGS = ('face', 'bust', 'body', 'back')
 _FRAMING_KEYS = _FRAMINGS + ('unknown',)
 _FRAMING_TARGET = {'face': 12, 'bust': 6, 'body': 6, 'back': 1}
+
+
+# --- 🎨 Medium: what the picture is MADE OF ---------------------------------
+# A DIFFERENT question from `origin`, which reads the file's metadata. origin
+# answers "who made this file" (a generator, a camera, or — usually — nobody can
+# tell); medium answers "what does this picture look like it is". An AI-generated
+# photorealistic portrait is origin='ai' AND medium='photo'; a scanned manga page
+# is origin='unknown' AND medium='anime'. Neither implies the other and the UI
+# must never present one as evidence for the other.
+#
+# Ids are user-facing filter keys AND stored column values — never rename one
+# without an alias.
+MEDIUMS = ('photo', 'anime', 'render3d', 'illustration')
+MEDIUM_KEYS = MEDIUMS + ('unsure',)
+
+# Zero-shot CLIP prototypes. Each bucket is the MEAN of its phrases, re-normed
+# (standard prompt ensembling) — one vector per bucket, encoded ONCE per install
+# and then cached on disk forever by clip_text_encoder.
+#
+# The two keys starting with '_' are DISTRACTORS and are deliberately NOT
+# buckets: a forced four-way choice has no way to say "none of these", so every
+# banner, website screenshot and thumbnail collage in a scrape dump had to land
+# in one of the four — measured, that was the single biggest source of wrong
+# verdicts (a '3D render' pile that was mostly text banners). Giving the junk
+# somewhere honest to go and mapping it to 'unsure' removed 769 wrong verdicts
+# out of 23 532 images on the reference bank without costing a single right one.
+MEDIUM_PROTOTYPES = {
+    'photo': ('a photograph', 'a photo of a real person',
+              'a photograph taken with a camera', 'a real-life photo',
+              'a candid snapshot of real people'),
+    'anime': ('an anime drawing', 'an anime style illustration', 'a manga panel',
+              'a cartoon character drawn in anime style', 'anime artwork'),
+    'render3d': ('a 3D render', 'a 3D computer graphics render', 'a CGI render',
+                 'a rendered 3D character', 'a videogame screenshot'),
+    'illustration': ('an illustration', 'a digital painting', 'a pencil drawing',
+                     'a painted artwork', 'a comic book drawing'),
+    '_text': ('a text banner', 'a poster with large text', 'a logo',
+              'an advertisement banner with writing', 'a page of text'),
+    '_screen': ('a screenshot of a website', 'a screenshot of an app interface',
+                'a computer desktop screenshot', 'a collage of thumbnails',
+                'a photo grid montage'),
+}
+
+# The two cuts that turn a ranking into a VERDICT, and the reason they are not
+# one number. Both are a cosine MARGIN — the winning prototype's similarity minus
+# the runner-up's — never an absolute similarity, because this project has
+# already measured (see search_by_text) that no absolute CLIP cut separates
+# "relevant" from "unrelated" on a real corpus.
+#
+# MEASURED, on the reference machine's 23 532-image bank, against 167 images
+# labelled BY EYE from contact sheets (100 uniformly random + the 25 strongest
+# candidates of each non-photo bucket):
+#   * at no cut at all, the four-way argmax is 99/100 right on the random sample
+#     but only 2/25 right on its own top 'anime' picks and 4/25 on 'render3d' —
+#     because CLIP reads a picture's SUBJECT as much as its medium, so a
+#     photograph of somebody cosplaying an anime character scores as 'anime'.
+#     That confusion is the whole reason the non-photo bar is where it is.
+#   * photo verdicts survive a low bar: 0.005 keeps 90 of the 159 photographs
+#     and got none of them wrong.
+#   * non-photo verdicts need a bar six times higher: at 0.030 the pass named the
+#     2 real anime drawings and nothing else, with zero false positives; at 0.020
+#     it also named 3 cosplay photographs and a text banner.
+# The result is a classifier that is almost never wrong and often silent — which
+# is the trade this app takes everywhere else too. On that bank it answers
+# photo for 21 138 images, anime for 2, and 'unsure' for 2 392. The 'unsure'
+# pile is a REAL answer, and the UI says how big it is rather than hiding it.
+MEDIUM_MARGIN_PHOTO = 0.005
+MEDIUM_MARGIN_OTHER = 0.030
+
+
+def medium_verdict(sims: dict) -> tuple:
+    """(medium, margin) from {bucket: cosine} — the ONE place the cuts are
+    applied, so the pass, the tests and any future re-tune read the same rule.
+
+    A distractor winning, or a margin under this bucket's cut, is 'unsure'. The
+    margin is returned either way: it is what makes the verdict re-tunable
+    without recomputing a single embedding."""
+    ranked = sorted(sims.items(), key=lambda kv: -kv[1])
+    if len(ranked) < 2:
+        return 'unsure', None
+    name, best = ranked[0]
+    margin = float(best - ranked[1][1])
+    if name.startswith('_'):
+        return 'unsure', margin
+    cut = MEDIUM_MARGIN_PHOTO if name == 'photo' else MEDIUM_MARGIN_OTHER
+    return (name if margin >= cut else 'unsure'), margin
+
+
+def _medium_counts(bank_id) -> dict:
+    """Per-bucket image counts for the 🎨 Medium chips in ONE GROUP BY. Rows with
+    a NULL medium (never classified — no ✨ Score embedding to read) are excluded:
+    "not classified yet" is a different statement from "unsure", and merging them
+    would let an unrun pass look like an undecided one."""
+    q = (db.session.query(BankImage.medium, func.count(BankImage.id))
+         .filter(BankImage.bank_id == bank_id, BankImage.medium.isnot(None)))
+    got = {k: n for k, n in q.group_by(BankImage.medium).all()}
+    return {k: int(got.get(k, 0)) for k in MEDIUM_KEYS}
+
+
+# --- ⤢ Angle: where the head is pointing ------------------------------------
+# Measured IN THE PIXELS by the 🎭 Faces pass (InsightFace/antelopev2 estimates a
+# head pose from its five landmarks), never guessed from a caption. Only the
+# ABSOLUTE yaw is ever read: "turned left" and "turned right" are the same shot
+# type for a training set, and treating them as two would halve every count for
+# no gain.
+#
+# Ids are user-facing filter keys — never rename without an alias.
+ANGLES = ('frontal', 'three_quarter', 'profile', 'behind')
+
+# MEASURED on 144 randomly sampled face-scanned images of the reference bank,
+# laid out in |yaw| order and read off contact sheets:
+#   * 0-15°  nothing reads as turned at all;
+#   * 16-25° the turn becomes visible around 20°, which is where the eye puts the
+#     boundary — so 20 is kept (it was also the starting hypothesis, and here the
+#     measurement agrees with it instead of the usual other way round);
+#   * 26-50° unmistakably three-quarter, both eyes still visible at 47°;
+#   * the sample contains NO face between 57.0° and 73.7°, and the four faces
+#     above 73° are true profiles. Any cut inside that empty band is equally
+#     supported by this data; 60 sits in the middle of it.
+# Distribution obtained with these two numbers: 60% frontal, 38% three-quarter,
+# 3% profile (n=144, |yaw| median 16.1°, p95 40.8°, max 78.8°).
+#
+# KNOWN LIMIT, and it is not small: a head turned far enough that one eye is
+# hidden often defeats the DETECTOR, so the hardest profiles never reach this
+# column at all — they come back as 'no_face' and count as "not measured". The
+# 'profile' bucket therefore under-counts, and the UI says so instead of
+# presenting 3% as the truth about a bank.
+ANGLE_FRONTAL_MAX = 20.0
+ANGLE_PROFILE_MIN = 60.0
+
+# What one image costs the ⤢ backfill, in seconds — antelopev2 on the CPU path,
+# measured at ~2 s/image over 144 images on the reference machine. Used ONLY to
+# price the offer before the click; a slow machine takes longer and the wording
+# says "about".
+ANGLE_BACKFILL_S_PER_IMAGE = 2.0
+
+
+def _angle_case():
+    """A single SQL CASE mapping each row to its angle bucket id, or NULL for
+    "not measured". Used to COUNT (one GROUP BY) and to FILTER, so the chips and
+    the grid can never disagree about what a bucket contains.
+
+    'behind' is the one bucket that is not a yaw: a back view has no face to
+    measure, so it is the crossing of two facts the app ALREADY holds — the 🎭
+    Faces pass found no face AND the 📐 Framing pass called the shot a back view.
+    Requiring both is what keeps a landscape with nobody in it out of a bucket
+    that claims a person is present; the cost is that 'behind' stays empty until
+    BOTH passes have run, which the UI states rather than hides."""
+    yaw = func.abs(BankImage.face_yaw)
+    return case(
+        (BankImage.face_yaw.isnot(None), case(
+            (yaw < ANGLE_FRONTAL_MAX, 'frontal'),
+            (yaw < ANGLE_PROFILE_MIN, 'three_quarter'),
+            else_='profile')),
+        ((BankImage.face_state == 'no_face') & (BankImage.framing == 'back'),
+         'behind'),
+        else_=None)
+
+
+def _angle_counts(bank_id) -> dict:
+    """Per-bucket image counts for the ⤢ Angle chips in ONE GROUP BY. Rows the
+    CASE maps to NULL (no yaw, and not a proven back view) are "not measured" and
+    are counted separately by bank_payload, never folded into 'frontal'."""
+    bucket = _angle_case()
+    rows = (db.session.query(bucket, func.count(BankImage.id))
+            .filter(BankImage.bank_id == bank_id)
+            .group_by(bucket).all())
+    got = {k: n for k, n in rows if k is not None}
+    return {k: int(got.get(k, 0)) for k in ANGLES}
 
 
 def _framing_counts(bank_id, extra_crit=None) -> dict:
@@ -1311,11 +1508,20 @@ _SORT_KEYS = {
     'nsfw': lambda: BankImage.nsfw_score,
     'face': lambda: BankImage.face_det,
     'size': lambda: BankImage.file_size,
+    #   yaw          the 🎭 Faces pass's head yaw, read as an ABSOLUTE angle so
+    #                the two directions mean "most turned away" / "most
+    #                face-on" rather than "turned left" / "turned right", which
+    #                is not a distinction a training set cares about.
+    'yaw': lambda: func.abs(BankImage.face_yaw),
+    #   medium_conf  the 🎨 Medium pass's confidence gap. ↑ is the useful one: it
+    #                opens on the images the classifier nearly could not call,
+    #                which is exactly the pile a human should check by hand.
+    'medium_conf': lambda: BankImage.medium_margin,
 }
 # Menu order (the UI renders it in this order); ids are stored query values, so a
 # key may be added here but never renamed without an alias.
 _SORT_ORDER = ('res', 'size', 'aesthetic', 'nsfw', 'sharp', 'noise', 'flat',
-               'detail', 'bars', 'jpeg', 'face')
+               'detail', 'bars', 'jpeg', 'face', 'yaw', 'medium_conf')
 GRID_SORTS = tuple(f'{k}_{d}' for k in _SORT_ORDER for d in ('desc', 'asc'))
 
 
@@ -1366,6 +1572,18 @@ def bank_payload(user_id, bank_id) -> dict | None:
                                   BankImage.nsfw_score.isnot(None))).count(),
         'watermark_scanned': base.filter(BankImage.watermark_state.isnot(None)).count(),
         'framing_classified': base.filter(BankImage.framing.isnot(None)).count(),
+        # 🎨 Medium — how many rows the pass has a verdict for ('unsure'
+        # included: it IS a verdict). Drives the chip row's appearance and the
+        # Sort menu's "run 🎨 Medium first" state.
+        'medium_classified': base.filter(BankImage.medium.isnot(None)).count(),
+        # ⤢ Angle — how many rows carry a measured yaw…
+        'angle_measured': base.filter(BankImage.face_yaw.isnot(None)).count(),
+        # …and how many were face-scanned by a build that computed the yaw and
+        # threw it away. This is the ONLY number that can offer the backfill
+        # honestly: it is the exact size of the re-measure job, so the UI can
+        # price the click before the user makes it instead of after.
+        'angle_backfillable': base.filter(BankImage.face_state.isnot(None),
+                                          BankImage.face_yaw.is_(None)).count(),
     }
     framing = _framing_counts(bank_id)
     flags = {}
@@ -1430,7 +1648,15 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'id': bank.id, 'name': bank.name, 'source_path': bank.source_path,
         'created_at': bank.created_at.isoformat() if bank.created_at else None,
         'counts': counts, 'flags': flags, 'res_buckets': res_buckets,
-        'framing': framing, 'origins': origins, 'dup': dup,
+        'framing': framing, 'origins': origins,
+        'mediums': _medium_counts(bank_id), 'angles': _angle_counts(bank_id),
+        # What the ⤢ backfill would cost, in the app's own words. ~2 s/image is
+        # the MEASURED cost of antelopev2 on this project's CPU path (144 images,
+        # ~2 s each); it is a ballpark shown before the click, never a promise.
+        'angle_backfill_minutes': max(1, round(
+            counts['angle_backfillable'] * ANGLE_BACKFILL_S_PER_IMAGE / 60)
+        ) if counts['angle_backfillable'] else None,
+        'dup': dup,
         'semantic_dup': semantic_dup,
         'clusters': clusters, 'faces_scanned': faces_scanned,
         'style_clusters': style_clusters,
@@ -1835,7 +2061,8 @@ def _apply_text_filters(q, search=None, exclude=None, tags=None):
 def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
                 group=None, style=None, subfolder=None, search=None,
                 semantic_group=None, sort=None, res_bucket=None, framing=None,
-                origin=None, ids=None, exclude=None, tags=None, wd14_tags=None,
+                origin=None, medium=None, angle=None, ids=None, exclude=None,
+                tags=None, wd14_tags=None,
                 ids_only=False, offset=0, limit=200) -> dict | None:
     """One PAGE of the bank grid (a 9 000-image bank must never ship whole).
     Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ tags ∩ search.
@@ -1868,6 +2095,11 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
     ``res_bucket`` (a _RES_BUCKETS id) narrows to one resolution tier — a
     half-open [lo, hi) megapixel band — and composes with every filter AND the
     sort (the tier + Resolution↑/↓ combo is the mixed-dump cleanup flow).
+    ``medium`` (a MEDIUM_KEYS id) narrows to one medium — what the picture is
+    MADE of, from the 🎨 Medium pass — including 'unsure', which is a real
+    verdict and has to be reachable. ``angle`` (an ANGLES id) narrows to one head
+    angle, recomputed from the stored yaw at read time. Both compose with
+    everything, like every other facet.
     ``ids`` is the "show selected" VIEW: an explicit ordered list of image ids
     that OVERRIDES every facet/sort (the selection IS the scope) and renders the
     page in the SAME order the caller passed — so a similarity ranking from
@@ -1979,6 +2211,16 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         # what a stripped file honestly is, and the user must be able to see that
         # pile rather than have it silently merged into "not AI".
         q = q.filter(BankImage.origin == origin)
+    if medium in MEDIUM_KEYS:
+        # One medium bucket. 'unsure' is selectable on purpose — it is the pile
+        # the classifier honestly could not call, and the only way to work
+        # through it is to be able to look at it.
+        q = q.filter(BankImage.medium == medium)
+    if angle in ANGLES:
+        # One head-angle bucket, recomputed from the stored yaw at read time (so
+        # re-tuning the two cuts re-slices the bank with no rescan) — see
+        # _angle_case for what 'behind' costs and requires.
+        q = q.filter(_angle_case() == angle)
     if subfolder is not None:
         # '' scopes to root-level files; any other value to that top-level folder
         # and everything nested under it. startswith() escapes LIKE metachars.
@@ -3018,7 +3260,8 @@ _CURATION_MAX_N = 2000       # a curated LoRA set is 20–200 images; this is ge
 
 
 def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
-                style=None, subfolder=None, search=None, exclude=None, tags=None):
+                style=None, subfolder=None, search=None, exclude=None, tags=None,
+                medium=None, angle=None):
     """The candidate-pool query for the curation selectors — the SAME filter
     composition as list_images (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩
     search ∩ NOT exclude), minus the ordering/pagination, so "give me 60 diverse
@@ -3070,6 +3313,14 @@ def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
         q = q.filter(BankImage.face_cluster == int(cluster))
     if style is not None:
         q = q.filter(BankImage.style_cluster == int(style))
+    # The two newest facets narrow a curation pick exactly as they narrow the
+    # grid — "60 diverse images, among the photographs, three-quarter only" has
+    # to mean the same thing in both places or the selection stops matching what
+    # the user is looking at.
+    if medium in MEDIUM_KEYS:
+        q = q.filter(BankImage.medium == medium)
+    if angle in ANGLES:
+        q = q.filter(_angle_case() == angle)
     if subfolder is not None:
         if subfolder == '':
             q = q.filter(~BankImage.relpath.contains(os.sep))
@@ -4399,11 +4650,23 @@ def _resolve_face_device():
     return ('cuda' if use_gpu else 'cpu'), use_gpu
 
 
-def start_faces(app, user_id, bank_id, device_id=None):
+def start_faces(app, user_id, bank_id, device_id=None, angles_only=False):
     """Launch the face embedding + person clustering pass over the bank's
     non-rejected images. Needs the face-scoring extra (Setup ▸ Quality tools) —
     on THIS machine for a local run, on the peer for a remote one (its own
-    stack answers when the job arrives; no local gate applies)."""
+    stack answers when the job arrives; no local gate applies).
+
+    ``angles_only`` is the ⤢ BACKFILL, and it is a different job on purpose. The
+    face pass has always computed a head yaw and thrown it away (it used it once
+    to decide 'extreme_pose'), so every bank scanned before this release has
+    faces with no angle and its cache cannot answer for them — the number is not
+    in the .npz to be read back. Re-measuring them means re-running the detector,
+    which on a big bank is hours: far too much to slip into a pass somebody
+    started for something else. So it is its OWN action, offered on the ⤢ row
+    with its own count and its own estimate, never automatic and never at boot.
+    It touches ONLY `face_yaw`: person clusters are computed over the whole bank
+    at once, and re-deriving them from a partial re-run would renumber a
+    clustering the user has already worked with."""
     from .face_similarity import is_available
     bank = get_bank(user_id, bank_id)
     if not bank:
@@ -4414,36 +4677,70 @@ def start_faces(app, user_id, bank_id, device_id=None):
     # something the peer already said it cannot do.
     if remote:
         refuse_steps_for_device(device_id, ['faces'])
+    q = BankImage.query.filter_by(bank_id=bank_id)
+    if angles_only:
+        q = q.filter(BankImage.face_state.isnot(None), BankImage.face_yaw.is_(None))
+        # BEFORE the install probe, and the order is the point: sending someone
+        # to install a 300 MB extra so they can do work that does not exist is a
+        # true sentence that answers the wrong question. (Same reasoning as the
+        # framing pass, which checks occupancy before it probes Ollama.)
+        if not q.count():
+            raise ValueError('every face-scanned image already has an angle')
+    else:
+        q = q.filter(BankImage.status != 'reject')
     if not remote and not is_available():
         raise RuntimeError(
             'face scoring is not installed (Quality tools step in Setup)')
-    total = (BankImage.query.filter_by(bank_id=bank_id)
-             .filter(BankImage.status != 'reject').count())
-    return bank_jobs.start(app, bank_id, 'faces',
-                           _faces_job(bank_id, device_id if remote else None),
+    # Images the user has DECLARED to be one person (their subfolder is asserted)
+    # are not embedded at all — that skip is the whole point of the assertion, and
+    # counting them in the total would promise work this pass will not do. The ⤢
+    # angle lane is NOT affected: measuring where a head points is not identifying
+    # who it is, and its pool is already restricted to rows a face pass measured.
+    total = q.count() if angles_only \
+        else max(q.count() - _asserted_image_count(bank_id), 0)
+    return bank_jobs.start(app, bank_id, 'angles' if angles_only else 'faces',
+                           _faces_job(bank_id, device_id if remote else None, angles_only),
                            total=total,
                            device_label=_device_label(device_id if remote else None))
 
 
-def _faces_job(bank_id, device_id=None):
+def _asserted_image_count(bank_id) -> int:
+    return (BankImage.query.filter_by(bank_id=bank_id)
+            .filter(BankImage.status != 'reject',
+                    BankImage.face_cluster_origin == 'asserted').count())
+
+
+def _faces_job(bank_id, device_id=None, angles_only=False):
     def run(job):
         import json as _json
         import sys
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        rows = (BankImage.query.filter_by(bank_id=bank_id)
-                .filter(BankImage.status != 'reject')
-                .order_by(BankImage.id.asc()).all())
+        q = BankImage.query.filter_by(bank_id=bank_id)
+        if angles_only:
+            q = q.filter(BankImage.face_state.isnot(None),
+                         BankImage.face_yaw.is_(None))
+        else:
+            # Asserted rows are EXCLUDED from the identity lane, not merely
+            # preserved: the user already told us who is in them, so paying an
+            # embedding to re-derive it is exactly the cost "Single person here"
+            # exists to avoid (services/folder_person.py).
+            q = q.filter(BankImage.status != 'reject',
+                         or_(BankImage.face_cluster_origin.is_(None),
+                             BankImage.face_cluster_origin != 'asserted'))
+        rows = q.order_by(BankImage.id.asc()).all()
         by_path = {}
         for r in rows:
             p = abs_image_path(bank, r)
             if _is_safe_bank_source(p, label='bank face pass'):
                 by_path[p] = r.id
         paths = list(by_path)
-        bank_jobs.progress(job, done=0, total=len(paths),
-                           detail='face pass (on the peer)' if device_id
-                                  else 'face pass')
+        skipped_asserted = 0 if angles_only else _asserted_image_count(bank_id)
+        detail = 'measuring angles' if angles_only else 'face pass'
+        if device_id:
+            detail += ' (on the peer)'
+        bank_jobs.progress(job, done=0, total=len(paths), detail=detail)
         if not paths:
             return
         _bank_dir(bank_id).mkdir(parents=True, exist_ok=True)
@@ -4458,7 +4755,8 @@ def _faces_job(bank_id, device_id=None):
                 data = bank_remote.run_remote_pass(
                     job, device_id, script=_EMBED_SCRIPT, by_path=by_path,
                     extra_payload={'threshold': th['face_threshold'],
-                                   'device': 'auto'},
+                                   'device': 'auto',
+                                   'require_yaw': bool(angles_only)},
                     cache_path=cache_path, progress_re=_PROGRESS_RE,
                     detail_label='face pass', required_cap='face_scoring',
                     bank_id=bank_id)
@@ -4487,6 +4785,11 @@ def _faces_job(bank_id, device_id=None):
                 'cancel_file': str(cache_path) + '.cancel',
                 'threshold': th['face_threshold'],
                 'device': device,
+                # Only the ⤢ backfill overrides the cache. A normal pass must stay
+                # exactly as cheap as it was: it writes the yaw for every image it
+                # actually looks at, and leaves the already-cached ones alone rather
+                # than silently turning a resume into hours of re-detection.
+                'require_yaw': bool(angles_only),
             })
             python = cfg.get('face_scoring.python') or sys.executable
             window = gpu_exclusive_vision_window(flag_ttl=1800) if use_gpu else nullcontext()
@@ -4511,6 +4814,13 @@ def _faces_job(bank_id, device_id=None):
                                   if returncode is not None else ''))
         results = data.get('results') or {}
         clusters = data.get('clusters') or {}
+        # The child numbers its clusters 1..n, unaware of the asserted groups that
+        # already own ids in this bank. Push them above the highest asserted id so
+        # a computed cluster can never land ON a folder the user declared — the two
+        # kinds share one id space (that is what lets them be merged later), and
+        # sharing it means allocating in it.
+        from . import folder_person
+        offset = folder_person.asserted_offset(bank_id)
         done = vanished = 0
         for p, image_id in by_path.items():
             row = _live_image(image_id)
@@ -4518,9 +4828,19 @@ def _faces_job(bank_id, device_id=None):
                 vanished += 1
                 continue
             res = results.get(p) or {}
-            row.face_state = res.get('state')
-            row.face_det = res.get('det')
-            row.face_cluster = clusters.get(p)
+            # A yaw is written whenever the child measured one. It is never
+            # written back as NULL over a value we already have: the ⤢ backfill
+            # re-runs on rows that HAVE no angle, and a face that fails detection
+            # this time must leave the row "not measured", not blank a number
+            # that was right.
+            yaw = res.get('yaw')
+            if yaw is not None:
+                row.face_yaw = float(yaw)
+            if not angles_only:
+                row.face_state = res.get('state')
+                row.face_det = res.get('det')
+                cid = clusters.get(p)
+                row.face_cluster = None if cid is None else int(cid) + offset
             done += 1
             if done % 200 == 0:
                 db.session.commit()
@@ -4531,7 +4851,19 @@ def _faces_job(bank_id, device_id=None):
         for cid in clusters.values():
             sizes[cid] = sizes.get(cid, 0) + 1
         multi = sum(1 for n in sizes.values() if n >= 2)
-        detail = f'done — {multi} person cluster(s) of 2+ images'
+        detail = (f'done — {sum(1 for r in results.values() if r.get("yaw") is not None)}'
+                  ' angle(s) measured' if angles_only
+                  else f'done — {multi} person cluster(s) of 2+ images')
+        if skipped_asserted:
+            # Never mute: an image the pass did not look at must be reported as
+            # such, or "0 clusters" would read as "no one in this bank".
+            detail += (f', {skipped_asserted} image(s) skipped '
+                       f'(subfolder asserted as one person)')
+        # The embeddings are cached NOW, so asking "which folders look like one
+        # person?" costs nothing here and would cost a pass of its own later.
+        # It only ever produces a suggestion the user confirms (folder_person).
+        if not angles_only and not bank_jobs.cancelled(job):
+            detail += folder_person.probe_after_faces(job, bank_id)
         if vanished:
             detail += f', {vanished} skipped (deleted while the pass ran)'
         bank_jobs.progress(job, detail=detail)
@@ -4835,8 +5167,47 @@ def _score_job(bank_id, device_id=None):
             detail += f', {vanished} skipped (deleted while the pass ran)'
         if missing:
             detail += f' ({" + ".join(missing)} head unavailable)'
+        if not bank_jobs.cancelled(job):
+            detail += _chain_medium_after_score(job, bank_id)
         bank_jobs.progress(job, detail=detail)
     return run
+
+
+def _chain_medium_after_score(job, bank_id) -> str:
+    """Run 🎨 Medium immediately after ✨ Score, inside the SAME job.
+
+    Why automatically: Medium computes NO image inference of its own — it reads
+    the embeddings Score just cached and multiplies them by a handful of text
+    vectors (0.16 s for 23 000 images, no GPU). Leaving it behind a second button
+    meant the bank sat there with the data for the answer and not the answer,
+    and most users never learned the pass existed. Chaining it here is the only
+    moment it is genuinely free: the embeddings are on disk and warm.
+
+    The manual 🎨 Medium button stays exactly as it was — it is how you re-run
+    the pass alone, and how ``rescan`` re-classifies rows that already have a
+    verdict, which this chain deliberately never does.
+
+    NEVER raises: Score has already succeeded by the time this runs, and a
+    classification that could not run must not turn a finished pass red. It
+    returns a suffix for the pass's detail line, so what happened is visible
+    either way — including "skipped", with the reason."""
+    reason = medium_prereq(bank_id)
+    if reason:
+        # The common one is "the text encoder is not installed" — a Setup step,
+        # not a failure of this bank. Said once, in passing, never as an alarm.
+        return f' · 🎨 Medium skipped ({reason})'
+    before = (BankImage.query.filter_by(bank_id=bank_id)
+              .filter(BankImage.medium.isnot(None)).count())
+    try:
+        _medium_job(bank_id, False)(job)
+    except Exception as e:  # noqa: BLE001 — see the docstring
+        logger.warning('bank %s: chained medium pass failed', bank_id,
+                       exc_info=True)
+        return (f' · 🎨 Medium could not run ({type(e).__name__}) — '
+                'the 🎨 Medium button re-runs it')
+    after = (BankImage.query.filter_by(bank_id=bank_id)
+             .filter(BankImage.medium.isnot(None)).count())
+    return f' · 🎨 Medium: {after - before} classified'
 
 
 # --- watermark pass (reuses the dataset Qwen3-VL overlaid-mark detector) -----
@@ -4861,10 +5232,26 @@ def _watermark_scan_query(bank_id, rescan):
 
 
 def start_watermark(app, user_id, bank_id, rescan=False, device_id=None):
-    """Launch the overlaid-watermark scan over the bank's non-rejected images,
-    reusing the SAME Qwen3-VL detector the datasets use. Needs the vision model
-    pulled; serialized against training/vision (503 when the GPU is held)."""
+    """Launch the overlaid-watermark scan over the bank's non-rejected images.
+
+    TWO routes, and which one runs is decided here, once:
+
+      * the dedicated DETECTOR extra when it is installed — a SigLIP2 classifier
+        that answers the binary question in ~0.14 s per image against the vision
+        model's ~1.7 s, plus a second model that locates the mark. It does not
+        need Ollama at all, so a machine with no vision model can still scan.
+        LOCAL ONLY: it runs its own child process on THIS machine and has no
+        peer-dispatch counterpart, so a pass aimed at a peer always takes the
+        vision-model route below instead.
+      * otherwise the vision model, exactly as before — on THIS machine for a
+        local run, on the peer for a remote one (its own Ollama answers when
+        the job arrives; no local gate applies). That is also the fail-open
+        contract for the detector: the extra can only ever ADD a faster LOCAL
+        route, never remove the one that has always worked.
+
+    Serialized against training/vision (503 when the GPU is held)."""
     from ..capabilities import probe_ollama_model
+    from . import watermark_detector
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -4885,8 +5272,11 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None):
     # something the peer already said it cannot do.
     if remote:
         refuse_steps_for_device(device_id, ['watermark'])
+    # The detector extra is a LOCAL child process with no peer-dispatch path,
+    # so a remote pass always uses the vision-model route below.
+    use_detector = not remote and watermark_detector.available()
     if not remote:
-        if not probe_ollama_model().get('ok'):
+        if not use_detector and not probe_ollama_model().get('ok'):
             raise RuntimeError('the vision model is not available '
                                '(Settings ▸ Captioning & quality)')
         reason = _gpu_busy_reason()
@@ -4894,12 +5284,17 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None):
             raise RuntimeError(reason)
     device_id = device_id if remote else None
     return bank_jobs.start(app, bank_id, 'watermark',
-                           _watermark_job(bank_id, rescan, device_id),
+                           _watermark_job(bank_id, rescan, device_id,
+                                         use_detector=use_detector),
                            total=_watermark_scan_query(bank_id, rescan).count(),
                            device_label=_device_label(device_id))
 
 
-def _watermark_job(bank_id, rescan, device_id=None):
+def _watermark_job(bank_id, rescan, device_id=None, use_detector=False):
+    if use_detector:
+        return _watermark_detector_job(bank_id, rescan)
+
+
     def run(job):
         import contextlib
         import json as _json
@@ -5014,6 +5409,17 @@ def _watermark_job(bank_id, rescan, device_id=None):
                         unanswered += 1
                     else:
                         bbox = _parse_watermark_bbox(raw)
+                        # Stamp WHICH detector ruled, on every row this pass
+                        # touches. A bank scanned over weeks can hold verdicts
+                        # from both routes, and they disagree at the margins —
+                        # so "why is this one flagged?" has to stay answerable
+                        # per image rather than per bank. Staged like every
+                        # other field this loop writes — never a live ORM row
+                        # (see _flush_row_updates: that is what keeps a lock
+                        # error from losing an answer already paid for in
+                        # Ollama time).
+                        pending.setdefault(row_id, {}).update(
+                            watermark_source='vision', watermark_score=None)
                         if bbox:
                             pending.setdefault(row_id, {}).update(
                                 watermark_state='detected',
@@ -5069,6 +5475,184 @@ def _watermark_job(bank_id, rescan, device_id=None):
         if unanswered:
             detail += (f', {unanswered} not analysed (the vision model returned '
                        'nothing — check Ollama in Settings, then run it again)')
+        if errors:
+            detail += f', {errors} unreadable'
+        bank_jobs.progress(job, detail=detail)
+    return run
+
+
+def _watermark_detector_job(bank_id, rescan):
+    """The same pass, run by the dedicated detector extra instead of the vision
+    model. Deliberately the same SHAPE as the vision job above, because the two
+    have to be interchangeable: same resume semantics, same per-image commit,
+    same survives-a-deletion discipline, same honest final sentence.
+
+    The one structural difference is where the work happens. The vision route
+    overlaps network calls through a thread pool; here a single child process
+    holds both models (loading them costs ~10 s, so it must be paid once) and
+    streams one verdict per image back. Cancellation therefore travels as a
+    sentinel FILE the child polls between images — killing a process that holds
+    two loaded models mid-forward is how a stop turns into a corrupted half-write.
+    """
+    def run(job):
+        import contextlib
+        import json as _json
+        import tempfile
+        from . import watermark_detector
+        from ..gpu_window import gpu_exclusive_vision_window
+        bank = _detach_bank(db.session.get(ImageBank, bank_id))
+        if not bank:
+            return
+        rows = _watermark_scan_query(bank_id, rescan).order_by(BankImage.id.asc()).all()
+        bank_jobs.progress(job, done=0, total=len(rows), detail='watermark scan')
+        if not rows:
+            return
+        detected = clean = errors = vanished = 0
+        threshold = watermark_detector.threshold()
+
+        # Paths are resolved HERE, on the owning thread, exactly like the vision
+        # route: everything that reads the database or has a side effect (the
+        # destructive discard below included) stays off the worker.
+        planned = []
+        for row_id in [r.id for r in rows]:
+            row = _live_image(row_id)
+            if row is None:      # deleted since the pass started — see _live_image
+                logger.info('bank watermark scan: image %s was deleted mid-pass, '
+                            'skipping it', row_id)
+                vanished += 1
+                bank_jobs.bump(job)
+                continue
+            # Always detect on the SOURCE pixels: a re-scan of an already cleaned
+            # image drops its cleaned version first, or we would be asking "is
+            # there a watermark?" about our own edit.
+            if row.watermark_clean_method:
+                _discard_clean_blob(bank_id, row)
+            path = abs_image_path(bank, row)
+            if not path:
+                # No resolvable file. Counted and bumped rather than quietly
+                # dropped: a pass that says "done — 12 with a watermark" over a
+                # bank of 20 while 8 were never looked at is the kind of silent
+                # arithmetic this pass has already been fixed for once.
+                vanished += 1
+                bank_jobs.bump(job)
+                continue
+            planned.append((row_id, path))
+        db.session.commit()
+        if not planned:
+            bank_jobs.progress(
+                job, detail='done — nothing left to scan'
+                + (f' ({vanished} skipped: gone while the pass ran)' if vanished else ''))
+            return
+        by_path = {}
+        for row_id, path in planned:
+            by_path.setdefault(path, []).append(row_id)
+
+        cancel_dir = tempfile.mkdtemp(prefix='lds-wmdet-')
+        cancel_file = os.path.join(cancel_dir, 'cancel')
+
+        def should_cancel():
+            if not bank_jobs.cancelled(job):
+                return False
+            try:                            # the child polls for this file
+                open(cancel_file, 'wb').close()
+            except OSError:
+                pass
+            return True
+
+        # The GPU window is taken only when this extra would actually USE the
+        # card. The stock install is CPU-only torch, and a pass that never
+        # touches the GPU must never unload ComfyUI or block a training start —
+        # the exact rule the scoring pass already follows.
+        from ..capabilities import watermark_detect_gpu_available
+        on_gpu = watermark_detect_gpu_available()
+        window = (gpu_exclusive_vision_window(flag_ttl=1800) if on_gpu
+                  else contextlib.nullcontext())
+        located = 0
+        try:
+            with window:
+                for path, state, score, regions, error in watermark_detector.scan(
+                        [p for _rid, p in planned],
+                        should_cancel=should_cancel, cancel_file=cancel_file):
+                    # Match on the path the child echoed, popping it so a bank
+                    # that holds the same file twice gets one verdict each
+                    # rather than both landing on the first row.
+                    waiting = by_path.get(path) or []
+                    row_id = waiting.pop(0) if waiting else None
+                    row = _live_image(row_id) if row_id is not None else None
+                    if row is None:
+                        logger.info('bank watermark scan: image %s was deleted while '
+                                    'it was being analysed, skipping it', row_id)
+                        vanished += 1
+                        bank_jobs.bump(job)
+                        continue
+                    row.watermark_source = 'detector'
+                    row.watermark_score = (round(float(score), 4)
+                                           if score is not None else None)
+                    if state == 'error':
+                        # One bad file never sinks the pass, same as the vision route.
+                        row.watermark_state = 'error'
+                        errors += 1
+                    elif state == 'detected':
+                        row.watermark_state = 'detected'
+                        # Only ONE box is persisted: the child's FIRST, which it
+                        # orders most-peripheral-first precisely because this
+                        # line only takes one (see _merge_boxes — "biggest" put
+                        # a crop on the subject). watermark_bbox holds
+                        # one rectangle (it is what both cleaning levels route
+                        # on), and the multi-zone column next to it means
+                        # something else entirely — it is the HAND-DRAWN
+                        # override, and writing machine output there would make
+                        # every flagged image look hand-corrected and silently
+                        # exclude it from ✂ Auto-crop. Losing the smaller boxes
+                        # is the honest cost; the mask editor still lets the user
+                        # add them back.
+                        if regions:
+                            row.watermark_bbox = _json.dumps(
+                                [round(float(v), 4) for v in regions[0][:4]])
+                            located += 1
+                        else:
+                            # Flagged with no box: known to be marked, position
+                            # unknown. Exactly the state the pre-box builds
+                            # produced, and _watermark_scan_query already adopts
+                            # those rows on a plain re-run.
+                            row.watermark_bbox = None
+                        detected += 1
+                    else:
+                        row.watermark_state = 'none'
+                        row.watermark_bbox = None
+                        clean += 1
+                    bank_jobs.bump(job)
+                    # Per image, for the same reason the vision route commits per
+                    # image: never hold the single SQLite write lock across an
+                    # unbounded number of inferences.
+                    db.session.commit()
+        except watermark_detector.DetectorUnavailable as e:
+            # The extra probed OK but could not actually run (weights half
+            # downloaded, a torch that no longer imports in that env). Say so and
+            # leave every unscanned row untouched — a retry, or an uninstall back
+            # to the vision model, both finish the job.
+            db.session.commit()
+            logger.warning('bank watermark scan: detector unavailable (%s)', e)
+            bank_jobs.progress(
+                job, detail=f'stopped — the watermark detector could not run ({e}). '
+                            'Nothing was mis-flagged; the images it had not reached '
+                            'are still unscanned.')
+            return
+        finally:
+            db.session.commit()
+            shutil.rmtree(cancel_dir, ignore_errors=True)
+        if bank_jobs.cancelled(job):
+            bank_jobs.progress(job, detail=f'cancelled — {detected} with a watermark '
+                                           f'so far')
+            return
+        detail = (f'done — {detected} with a watermark, {clean} clean '
+                  f'(detector, score ≥ {threshold:g})')
+        if detected and located < detected:
+            detail += (f', {detected - located} flagged without a position '
+                       '(they cannot be cropped or repainted until you draw a zone '
+                       'in ▶ Review)')
+        if vanished:
+            detail += f', {vanished} skipped (deleted while the pass ran)'
         if errors:
             detail += f', {errors} unreadable'
         bank_jobs.progress(job, detail=detail)
@@ -5736,6 +6320,35 @@ def dismiss_watermarks(user_id, bank_id, image_ids) -> int:
     return len(rows)
 
 
+def _watermark_source_counts(bank_id) -> dict:
+    """How many SCANNED rows each detection route produced. A row with a state but
+    no source predates the column — counted as 'unknown', never attributed."""
+    scanned = BankImage.query.filter_by(bank_id=bank_id).filter(
+        BankImage.watermark_state.isnot(None))
+    detector = scanned.filter(BankImage.watermark_source == 'detector').count()
+    vision = scanned.filter(BankImage.watermark_source == 'vision').count()
+    return {'detector': detector, 'vision': vision,
+            'unknown': scanned.count() - detector - vision}
+
+
+def _detector_ready() -> bool:
+    """Never raises: a probe that explodes must not 500 the whole panel — it just
+    means the next run is the vision model, which is the shipped behaviour."""
+    try:
+        from . import watermark_detector
+        return watermark_detector.available()
+    except Exception:      # noqa: BLE001
+        return False
+
+
+def _detector_threshold() -> float:
+    try:
+        from . import watermark_detector
+        return watermark_detector.threshold()
+    except Exception:      # noqa: BLE001
+        return 0.94
+
+
 def watermark_levels(user_id, bank_id) -> dict | None:
     """Where each cleaning level stands — the numbers the UI shows per level.
     None when the bank is gone."""
@@ -5786,6 +6399,18 @@ def watermark_levels(user_id, bank_id) -> dict | None:
             BankImage.watermark_clean_method.in_(('lama', 'klein'))).count(),
         'dismissed': base.filter_by(watermark_state='dismissed').count(),
         'needs_rescan': _needs_rescan_count(bank_id),
+        # WHO ruled on the images already scanned. Surfaced because the two
+        # routes are not the same instrument and a bank scanned over weeks can
+        # hold both: 'detector' rows carry a score and a threshold you can
+        # change, 'vision' rows carry a sentence a model wrote. 'unknown' is
+        # every row scanned before this was recorded — named rather than
+        # attributed, because guessing which one produced them would be a lie.
+        'sources': _watermark_source_counts(bank_id),
+        # Which route the NEXT run would take, and (when it is the detector) the
+        # score it will flag at. The panel quotes these instead of keeping its own
+        # copy of the default.
+        'next_source': ('detector' if _detector_ready() else 'vision'),
+        'threshold': _detector_threshold(),
         # A few already-cleaned ids so the panel can offer a before/after strip
         # (each image is served cleaned, or original with ?original=1) without a
         # second endpoint just to list them.
@@ -6159,9 +6784,131 @@ def _tags_job(bank_id, rescan, threshold=None):
     return run
 
 
+# --- 🎨 medium pass (zero-shot CLIP over the ✨ Score embeddings) ------------
+def medium_prereq(bank_id=None) -> str | None:
+    """Why 🎨 Medium cannot run here, or None. Two distinct refusals, and telling
+    them apart is the point: a bank with no ✨ Score embeddings needs a pass run,
+    while a machine that cannot encode text needs a Setup step. Answering either
+    with the other sends the user to fix the wrong thing."""
+    from . import clip_text_encoder
+    if bank_id is not None:
+        scored = (BankImage.query.filter_by(bank_id=bank_id)
+                  .filter(or_(BankImage.aesthetic_score.isnot(None),
+                              BankImage.nsfw_score.isnot(None))).count())
+        if not scored:
+            return ('run ✨ Score first — 🎨 Medium reads the embeddings it '
+                    'computes, and computes none of its own')
+    return clip_text_encoder.unavailable_reason()
+
+
+def start_medium(app, user_id, bank_id, rescan=False):
+    """Classify every SCORED image by MEDIUM (photograph / anime / 3D render /
+    illustration, or an honest 'unsure') from the CLIP embedding the ✨ Score pass
+    already cached.
+
+    NO NEW IMAGE INFERENCE, by construction: the only model call this pass makes
+    is encoding ~30 short phrases through CLIP's text tower, once per install
+    (clip_text_encoder caches every phrase on disk, forever, across restarts), on
+    the CPU. Everything after that is a (n × 768) @ (768 × 6) matrix product in
+    the Flask process. An image the ✨ Score pass never reached has no embedding
+    and stays NULL — "not scored yet", which is neither a medium nor an 'unsure'.
+
+    ``rescan`` re-classifies rows that already carry a verdict; without it the
+    pass finishes the job (rows with medium IS NULL), so it can be re-run after a
+    ✨ Score that added images without redoing the whole bank.
+
+    Never takes the GPU window and is not refused when the GPU is busy: it does
+    not touch the card, and blocking it behind a training run would be a refusal
+    with no cause."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    if bank_jobs.running(bank_id):
+        raise bank_jobs.BankJobBusy((bank_jobs.get(bank_id) or {}).get('kind') or 'background')
+    reason = medium_prereq(bank_id)
+    if reason:
+        raise RuntimeError(reason)
+    q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+    if not rescan:
+        q = q.filter(BankImage.medium.is_(None))
+    return bank_jobs.start(app, bank_id, 'medium', _medium_job(bank_id, rescan),
+                           total=q.count())
+
+
+def _medium_prototype_matrix():
+    """(bucket_names, P) — one L2-normed row per bucket, each the MEAN of its
+    phrases' text vectors (prompt ensembling). Raises clip_text_encoder's
+    TextEncodeError, which the route turns into an announced 503."""
+    import numpy as np
+    from . import clip_text_encoder
+    names, rows = [], []
+    for name, phrases in MEDIUM_PROTOTYPES.items():
+        vecs = [clip_text_encoder.encode_query(p)[0] for p in phrases]
+        m = np.mean(np.stack(vecs).astype('float32'), axis=0)
+        rows.append(m / (float(np.linalg.norm(m)) + 1e-8))
+        names.append(name)
+    return names, np.stack(rows).astype('float32')
+
+
+def _medium_job(bank_id, rescan):
+    def run(job):
+        import numpy as np
+        bank = db.session.get(ImageBank, bank_id)
+        if not bank:
+            return
+        bank_jobs.progress(job, done=0, detail='medium pass — encoding prototypes')
+        names, P = _medium_prototype_matrix()
+        emb_by_path = _load_score_embeddings(bank)
+        q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+        if not rescan:
+            q = q.filter(BankImage.medium.is_(None))
+        rows = q.order_by(BankImage.id.asc()).all()
+        bank_jobs.progress(job, done=0, total=len(rows), detail='medium pass')
+        base = os.path.realpath(bank.source_path)
+        prefix = os.path.normcase(base + os.sep)
+        done = classified = unscored = 0
+        for r in rows:
+            if bank_jobs.cancelled(job):
+                break
+            # Same two-step path resolution as _pool_embeddings: a lexical
+            # normpath that HITS the cache is provably what realpath would have
+            # returned, and realpath is a syscall this loop cannot afford once
+            # per row on a 20 000-image bank.
+            p = os.path.normpath(os.path.join(base, r.relpath))
+            emb = emb_by_path.get(p) if os.path.normcase(p).startswith(prefix) else None
+            if emb is None:
+                p2 = _abs_under(base, r.relpath)
+                emb = emb_by_path.get(p2) if p2 else None
+            if emb is None:
+                unscored += 1          # no embedding → stays NULL, honestly
+            else:
+                e = np.asarray(emb, dtype='float32')
+                e = e / (float(np.linalg.norm(e)) + 1e-8)
+                sims = P @ e
+                verdict, margin = medium_verdict(dict(zip(names, sims)))
+                r.medium = verdict
+                r.medium_margin = round(float(margin), 5) if margin is not None else None
+                classified += 1
+            done += 1
+            bank_jobs.bump(job)
+            if done % 500 == 0:
+                db.session.commit()
+        db.session.commit()
+        detail = f'done — {classified} classified'
+        if unscored:
+            # Never silent: an image with no ✨ Score embedding CANNOT get a
+            # medium, and "0 results" without that sentence reads as a bug.
+            detail += f', {unscored} skipped (not scored yet)'
+        if bank_jobs.cancelled(job):
+            detail = (f'stopped — {classified} classified, '
+                      f'{len(rows) - done} left (re-run to finish)')
+        bank_jobs.progress(job, detail=detail)
+    return run
+
+
 # --- caption pass (reuses the dataset caption engines) ----------------------
 def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
-                  device_id=None):
+                  length=None, device_id=None):
     """Launch the caption pass over a selection (``ids``) or, when empty, every
     non-rejected readable image. Reuses the dataset caption engines (JoyCaption /
     Ollama per Settings) through a dataset-free descriptive brick; the captions
@@ -6174,14 +6921,21 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
     dataset caption uses, appended as an instruction. Explicit only spells sexual
     content out when the backend runs an abliterated Ollama model; the choice rides
     per-call (the UI passes it), so a call WITHOUT it is byte-identical to before
-    (no instruction appended). Richer captions also mean richer 🔍 search text."""
+    (no instruction appended). Richer captions also mean richer 🔍 search text.
+
+    ``length`` picks the SIZE preset (one of CAPTION_LENGTHS: 'concise' | 'detailed';
+    None/'' = standard, nothing appended) — an axis orthogonal to the register, again
+    the same lane and the same text as the dataset caption."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    from .face_dataset_service import CAPTION_VOCABULARIES
+    from .face_dataset_service import CAPTION_LENGTHS, CAPTION_VOCABULARIES
     vocab = (vocabulary or '').strip().lower() or None
     if vocab and vocab not in CAPTION_VOCABULARIES:
         raise ValueError(f'invalid caption vocabulary: {vocab}')
+    size = (length or '').strip().lower() or None
+    if size and size not in CAPTION_LENGTHS:
+        raise ValueError(f'invalid caption length: {size}')
     # Both gates describe THIS machine: its configured engine and its card. A
     # pass aimed at a peer uses the peer's captioner and the peer's GPU.
     remote = _remote_pass_device(device_id)
@@ -6207,7 +6961,7 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
         q = q.filter(or_(BankImage.caption.is_(None), BankImage.caption == ''))
     total = q.count()
     return bank_jobs.start(app, bank_id, 'caption',
-                           _caption_job(bank_id, ids, force, vocab, device_id),
+                           _caption_job(bank_id, ids, force, vocab, size, device_id),
                            total=total, device_label=_device_label(device_id))
 
 
@@ -6285,9 +7039,9 @@ def _peer_caption_kind(device_id) -> str | None:
     return None
 
 
-def _caption_job(bank_id, ids, force, vocabulary=None, device_id=None):
+def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=None):
     def run(job):
-        from .face_dataset_service import caption_paths, vocabulary_instruction
+        from .face_dataset_service import caption_paths, caption_preset_instructions
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -6354,9 +7108,10 @@ def _caption_job(bank_id, ids, force, vocabulary=None, device_id=None):
 
         # GPU-exclusive for the whole pass, exactly like the score/watermark passes:
         # frees ComfyUI VRAM and blocks a training start for the duration.
-        # The vocabulary register rides in as the SAME appended instruction the
-        # dataset pass uses (None when unset → byte-identical to the plain pass).
-        extra = vocabulary_instruction(vocabulary)
+        # The vocabulary register and the length preset ride in as the SAME appended
+        # instructions the dataset pass uses, in the same order (None when neither is
+        # set → byte-identical to the plain pass).
+        extra = caption_preset_instructions(vocabulary, length)
         # A peer captions with ITS OWN engine and its own model. The hub only
         # asks the peer's last heartbeat what it has (see _peer_caption_kind) —
         # it never re-decides "which captioner", because that rule lives in

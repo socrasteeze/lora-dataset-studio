@@ -332,6 +332,28 @@ DEFAULTS = {
     # engine). A persisted user preference (Settings ▸ Watermark inpainting AND the
     # batch Clean bar both edit it); the review lightbox can still override it per image.
     'watermark': {'python': '', 'device': 'auto', 'allow_crop': True},  # auto|cuda|cpu
+    # 🚩 Dedicated watermark DETECTOR (optional extra: a SigLIP2 classifier that
+    # ranks + a Grounding DINO pass that locates). When installed, the Find pass
+    # uses it instead of asking the vision model image by image; when not, nothing
+    # changes and the vision model still does the work.
+    # python: its interpreter. Empty = reuse the bank-scoring environment (which
+    #   already has torch + transformers) and then the app's own — so a normal
+    #   install simply probes ✗ and keeps the vision-model path.
+    # models_root: where the ~0.9 GB of weights live. Empty = data/models/watermark_detect.
+    # threshold: the classifier score at or above which an image is FLAGGED.
+    #   0.94 is MEASURED, not a guess, and it is nowhere near the 0.5 a
+    #   probability normally implies: this model's scores are compressed hard
+    #   against 1, so on a 110-image hand-labelled sample of a real 29 759-image
+    #   bank, 0.5 flagged 52 of the 55 CLEAN images while 0.94 flagged none of
+    #   them and still caught 54 of the 55 marked ones. Raise it toward 0.96 to
+    #   miss more rather than crop anything by mistake; lower it toward 0.92 to
+    #   catch the faintest marks and hand-check a few clean images.
+    # device: auto|cuda|cpu, same meaning as the inpainting device.
+    # locate: run the second (localisation) model on flagged images. Off = images
+    #   are flagged with NO box, which the crop/inpaint levels cannot route on —
+    #   only worth it to save time on a bank you intend to filter, not clean.
+    'watermark_detect': {'python': '', 'models_root': '', 'threshold': 0.94,
+                         'device': 'auto', 'locate': True},
     # consistency_strength: the dx8152 LoRA anchors STRUCTURE (composition/
     # background), not the face — its own guide says start at 0.5 and that
     # 0.8-1.0 "can prevent edits from applying". 0.9 made every variation a
@@ -477,6 +499,11 @@ DEFAULTS = {
         # first build in the SEEDVR2 folder. Set it to a filename to pin one (a
         # 7B build you dropped in yourself resolves exactly the same way).
         'model': '',
+        # Same contract for the VAE: blank = the canonical ema_vae_fp16, else the
+        # first file in the folder whose name says VAE. Set it to a filename when
+        # yours is named something the heuristic cannot recognise — a pin is
+        # honoured against the whole folder, which is the only reason it exists.
+        'vae': '',
         # Target for the SHORT edge in pixels; the long edge follows the source
         # aspect. 1080 is the node's own default and a sane dataset target — LoRA
         # training buckets rarely exceed it, so going higher mostly costs VRAM.
@@ -489,6 +516,25 @@ DEFAULTS = {
         # tone better on heavily degraded sources. Colour fidelity is the whole
         # reason this engine exists, so this is deliberately exposed.
         'color_correction': 'lab',
+        # How the high-resolution (tiled) lane is chosen, when the TTP node pack
+        # is installed. 'auto' (default) tiles when tiling helps — past the size
+        # the model is comfortable at, or when the frame would not fit. Tiling
+        # preserves high-frequency detail, not just VRAM (SurpassHR's
+        # side-by-side, GitHub #32); the old VRAM-only rule meant the bigger
+        # your card the less often you got the better picture, and it is gone.
+        # 'always' tiles whenever there is more than one tile to make; 'never'
+        # stays full-frame. Without the pack this has no effect.
+        'tiling': 'auto',
+        # Side of one tile, in pixels — THE VRAM lever of this engine. 1024 is
+        # the contributed value and a good one on a big card; on 8 GB, 768 or
+        # 512 is the difference between a 4K upscale and an out-of-memory, at
+        # the cost of more seams. It also sizes the VAE's tiled encode/decode,
+        # so it helps on the full-frame lane too, tiling pack or not.
+        'tile_px': 1024,
+        # Output short edge past which 'auto' tiles. 0 (default) = derive it from
+        # the tile size (1.5x = the shipped 1536 at a 1024 tile) so the crossover
+        # follows the tile. A positive value places it by hand.
+        'tile_threshold': 0,
         # Transformer blocks offloaded to system RAM during inference. 0 = none
         # (fastest). Raise it to fit a bigger build on a smaller card; it trades
         # speed for VRAM headroom, it does not change the result.

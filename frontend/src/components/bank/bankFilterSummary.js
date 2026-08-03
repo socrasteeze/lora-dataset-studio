@@ -46,19 +46,22 @@ const STATUS_LABEL = { pending: 'Undecided', keep: '✓ Kept', reject: '✕ Reje
 /**
  * Every facet currently narrowing the bank grid, as display strings, in the
  * open panel's own reading order (Status → Quality/Score/Groups → Resolution
- * → Origin → Framing → 🔖 tag facets → 🏷️ caption tags → search/exclude).
+ * → Origin → 🎨 Medium → ⤢ Angle → Framing → 🔖 tag facets → 🏷️ caption tags
+ * → search/exclude).
  * Deliberately excludes `sort` — a ranking is not a filter, it changes which
  * image is first, never which images match, so counting it would make
  * "N shown of M" lie about why the total differs.
  *
  * @param {object} filter same shape as BankWorkspace's `filter` state
  * @param {object} [ctx]
- * @param {object} [ctx.labels] { FLAG_LABEL, RES_BUCKETS, FRAMING_BUCKETS, ORIGIN_BUCKETS }
+ * @param {object} [ctx.labels] { FLAG_LABEL, RES_BUCKETS, FRAMING_BUCKETS,
+ *   ORIGIN_BUCKETS, MEDIUM_BUCKETS, ANGLE_BUCKETS }
  * @returns {string[]}
  */
 export function bankFilterParts(filter, { labels = {} } = {}) {
   const f = filter || {}
-  const { FLAG_LABEL = {}, RES_BUCKETS = [], FRAMING_BUCKETS = [], ORIGIN_BUCKETS = [] } = labels
+  const { FLAG_LABEL = {}, RES_BUCKETS = [], FRAMING_BUCKETS = [], ORIGIN_BUCKETS = [],
+    MEDIUM_BUCKETS = [], ANGLE_BUCKETS = [] } = labels
   const out = []
   if (f.status) out.push(STATUS_LABEL[f.status] || f.status)
   if (f.flag) out.push(FLAG_LABEL[f.flag] || GROUP_FLAG_LABEL[f.flag] || f.flag)
@@ -66,6 +69,8 @@ export function bankFilterParts(filter, { labels = {} } = {}) {
   if (f.style != null) out.push(`🎨 Style #${f.style}`)
   if (f.resBucket) out.push(bucketLabel(RES_BUCKETS, f.resBucket))
   if (f.origin) out.push(`Origin: ${bucketLabel(ORIGIN_BUCKETS, f.origin)}`)
+  if (f.medium) out.push(bucketLabel(MEDIUM_BUCKETS, f.medium))
+  if (f.angle) out.push(bucketLabel(ANGLE_BUCKETS, f.angle))
   if (f.framing) out.push(bucketLabel(FRAMING_BUCKETS, f.framing))
   // Subfolder: '' is a MEANINGFUL value (the bank root itself), so this must
   // stay a `!= null` test — a truthiness check would silently stop naming it.

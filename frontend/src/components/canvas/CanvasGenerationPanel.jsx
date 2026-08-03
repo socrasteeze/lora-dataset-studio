@@ -4,7 +4,8 @@ import CanvasBlendPanel from './CanvasBlendPanel';
 import { useCanvasStudio } from '../../hooks/useCanvasStudio';
 import { useStudioForm } from '../../hooks/useStudioForm';
 import {
-  canvasBlendBlocker, canvasFamily, canvasSelectionSummary, describeCanvasLaunch,
+  canvasBlendBlocker, canvasBlendConfigCount, canvasFamily, canvasSelectionSummary,
+  describeCanvasLaunch,
 } from '../../utils/canvasGeneration';
 import { famLabel } from '../../utils/familyLabels';
 import { DEPLOY_BAR_CLASS } from '../../utils/checkpointDeployState';
@@ -22,10 +23,14 @@ import { HelpBadge } from '../../help/HelpMode';
    Because it is the same code, a setting added to the Test Studio appears here
    without anyone touching this file, and the two screens cannot drift.
 
-   Layout: a bottom sheet under `sm`, a side drawer above it. A full settings
+   Layout: a bottom sheet under `lg`, a side drawer above it. A full settings
    panel on a 400-px canvas is the hard case of this screen — a side drawer
    there would leave a sliver of board, and the board is what you are picking
-   from. */
+   from. The switch used to be at `sm` (640 px) and that reasoning stopped one
+   breakpoint too early: this drawer is a FIXED 26 rem, so at 768 px it took 54 %
+   of the window and left a 352-px sliver — the very thing the paragraph above
+   rules out, on the width a phone in landscape actually reports. A side drawer
+   only earns its keep once the board keeps ~600 px, which is `lg`. */
 
 /** The picks, as the panel shows them back: one removable chip per checkpoint,
  *  grouped so a cross-dataset run reads as one. Replaces the CheckpointPicker. */
@@ -104,12 +109,19 @@ function CanvasCheckpointRecap({ selection, onToggle, onClear }) {
    stored under an existing name changes meaning. */
 const MODE_KEY = 'canvasStack_mode';
 const WEIGHTS_KEY = 'canvasStack_weights';
+// Les poids COCHÉS (balayage 🧬). Clé neuve : une install qui n'en a pas lit {},
+// c'est-à-dire aucune case cochée, c'est-à-dire les curseurs — comme avant.
+const SETS_KEY = 'canvasStack_weightSets';
 const readMode = () => {
   try { return localStorage.getItem(MODE_KEY) === 'blend' ? 'blend' : 'compare'; }
   catch { return 'compare'; }
 };
 const readWeights = () => {
   try { return JSON.parse(localStorage.getItem(WEIGHTS_KEY) || '{}') || {}; }
+  catch { return {}; }
+};
+const readSets = () => {
+  try { return JSON.parse(localStorage.getItem(SETS_KEY) || '{}') || {}; }
   catch { return {}; }
 };
 
@@ -120,12 +132,18 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
   // Keyed on the PILL (see canvasGeneration), so a weight survives un-ticking
   // another pick, deploying, and reloading the page.
   const [weights, setWeights] = useState(readWeights);
+  const [sets, setSets] = useState(readSets);
   useEffect(() => {
     try {
       localStorage.setItem(MODE_KEY, mode);
       localStorage.setItem(WEIGHTS_KEY, JSON.stringify(weights));
+      localStorage.setItem(SETS_KEY, JSON.stringify(sets));
     } catch { /* private mode — persistence is best effort */ }
-  }, [mode, weights]);
+  }, [mode, weights, sets]);
+  const toggleChip = (k, w) => setSets((cur) => {
+    const list = Array.isArray(cur[k]) ? cur[k] : [];
+    return { ...cur, [k]: list.includes(w) ? list.filter((v) => v !== w) : [...list, w] };
+  });
 
   // Mixed families kill the whole launch, blend or not, and `verdict` already
   // says so in the better words. Only when the launch is otherwise possible does
@@ -143,7 +161,9 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
     ? { ...verdict, blocked: true, reason: blendBlocker }
     : verdict;
 
-  const studio = useCanvasStudio(selection, family, { onDeploy, tracker, blend, weights });
+  const configCount = blend ? canvasBlendConfigCount(selection, { weights, sets }) : 1;
+  const studio = useCanvasStudio(selection, family, {
+    onDeploy, tracker, blend, weights, sets });
   const pinned = useMemo(
     () => (studio.data?.checkpoints || []).map((c) => c.filename), [studio.data]);
   // Namespaced per FAMILY, never per dataset: a canvas run is cross-dataset by
@@ -157,6 +177,7 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
         <CanvasBlendPanel selection={selection} mode={mode} onMode={setMode}
           weights={weights}
           onWeight={(k, v) => setWeights((cur) => ({ ...cur, [k]: v }))}
+          sets={sets} onToggleChip={toggleChip} count={form?.genCount ?? 1}
           blocker={blendBlocker} familyReason={familyReason} />
       )}
     </>
@@ -167,14 +188,18 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
       data-testid="canvas-generation-panel"
       aria-label="Generate from the canvas"
       className="fixed inset-x-0 bottom-0 z-50 flex max-h-[78vh] flex-col overflow-hidden border-t border-border bg-surface-overlay shadow-xl
-                 sm:inset-x-auto sm:right-0 sm:top-0 sm:h-full sm:max-h-none sm:w-[26rem] sm:border-l sm:border-t-0">
+                 lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:max-h-none lg:w-[26rem] lg:border-l lg:border-t-0">
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-content">
           Generate from the board
           {family && <span className="font-normal text-content-muted"> · {famLabel(family)}</span>}
         </h3>
+        {/* The way back to the board, and the control most often reached for on a
+            phone: 44 px of thumb below `lg`. Closing keeps every pick — the board's
+            🎨 button carries the count — so this is a cheap, reversible gesture and
+            it must not be a 14-px glyph. */}
         <button type="button" onClick={onClose} aria-label="Close"
-          className="shrink-0 text-content-subtle hover:text-content">✕</button>
+          className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-base text-content-subtle hover:text-content lg:h-8 lg:w-8">✕</button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -205,7 +230,10 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
               // count must stop multiplying by it — or the panel would announce
               // six images and queue one.
               showStrengths={!blend}
-              cellTotal={blend ? form.axisTotal : null}
+              // 🧬 Un balayage rend `configCount` configurations, pas une :
+              // le compteur du bouton doit les multiplier, ou il annonce une
+              // image là où la file en recevra neuf.
+              cellTotal={blend ? form.axisTotal * configCount : null}
               genStoragePrefix={`studioGen_canvas_${family || 'default'}`}
               // The Studio's fixed bottom bar would sit ON this sheet at 400 px.
               actionBar={false}
