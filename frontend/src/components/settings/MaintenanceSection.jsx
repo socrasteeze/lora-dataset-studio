@@ -5,7 +5,7 @@ import GlobalStopPanel from './GlobalStopPanel'
 import DockerUpdateInstructions from '../common/DockerUpdateInstructions'
 import { Card, TextField } from './primitives'
 import ResetToDefault from './ResetToDefault'
-import { installMode, zipUpdateHeadline, progressLabel, progressPercent } from './updateStatus'
+import { installMode, zipUpdateHeadline, progressLabel, progressPercent, upstreamAheadLabel } from './updateStatus'
 import { versionLabel } from '../../utils/versionLabel'
 
 /* In-app updater: "Check for updates" hits the git-aware check (commits-behind for a
@@ -19,6 +19,7 @@ function UpdatesCard() {
   const [applying, setApplying] = useState(false)
   const [phase, setPhase] = useState('')     // '' | 'pulling' | 'restarting'
   const [progress, setProgress] = useState(null)   // ZIP mode: {phase, downloaded, total}
+  const [upstream, setUpstream] = useState(null)
 
   // Passive check on mount (cached server-side, no git fetch): the card shows
   // the current build immediately instead of waiting for a manual check.
@@ -27,6 +28,17 @@ function UpdatesCard() {
     apiFetch('/api/update/check')
       .then((d) => { if (alive) setStatus((prev) => prev || d) })
       .catch(() => { /* best-effort — the manual button stays available */ })
+    return () => { alive = false }
+  }, [])
+
+  // A DIFFERENT question from the above: "has upstream moved", not "does my
+  // own fork have a release". Passive, best-effort, purely informational —
+  // never blocks or competes with the fork's own update status.
+  useEffect(() => {
+    let alive = true
+    apiFetch('/api/update/upstream-check')
+      .then((d) => { if (alive) setUpstream(d) })
+      .catch(() => { /* best-effort — the card works fine without this line */ })
     return () => { alive = false }
   }, [])
 
@@ -205,6 +217,29 @@ function UpdatesCard() {
             <p className="text-content-muted"><span aria-hidden>⚠</span> {s.reason || 'Could not check for updates.'}</p>
           )}
         </div>
+      )}
+
+      {/* A DIFFERENT question from everything above: not "does my own fork
+          have a release" but "has upstream moved". Deliberately a sibling,
+          not nested in the block above — nesting it inside one of those
+          branches would visually imply a relationship between the two that
+          doesn't exist. No button, no restart offer: quieter styling than
+          every other status line here on purpose, and it renders nothing at
+          all on a non-git install, offline, or when upstream isn't ahead. */}
+      {!applying && upstreamAheadLabel(upstream) && (
+        <p className="mt-2 text-xs text-content-subtle">
+          <span aria-hidden>ℹ</span>{' '}
+          {upstreamAheadLabel(upstream)}
+          {upstream.compare_url && (
+            <>
+              {' · '}
+              <a href={upstream.compare_url} target="_blank" rel="noreferrer"
+                className="underline hover:text-content">
+                compare »
+              </a>
+            </>
+          )}
+        </p>
       )}
     </Card>
   )
