@@ -1001,6 +1001,9 @@ export default function SetupPage() {
         { action: 'wd14', cap: 'wd14', icon: '🔖', title: 'Image tagging (WD14)',
           detailKey: 'wd14_detail',
           body: "Powers the 🗃️ Bank's 🔖 Tags pass: labels what is IN each picture as booru tags — hair colour, clothing, setting — so a huge unsorted dump can be filtered by those before you spend GPU hours captioning it. It never writes captions; the tags live in their own column. Runs fine on CPU. Includes a ~400 MB model download." },
+        { action: 'watermark_detect', cap: 'watermark_detect', icon: '🚩',
+          title: 'Watermark detector (faster 🚩 Find)',
+          body: "Makes the Bank's 🚩 Find watermarks pass roughly ten times faster and lets it run without Ollama: a small classifier scores each image (~0.14 s instead of ~1.7 s asking the vision model in words), and a second model marks where the logo sits so ✂ Crop and 🧽 Inpaint have something to work on. Adds ~0.9 GB of weights into the scoring Python it shares with ✨ Score. Without it nothing breaks — the vision model keeps doing the same job, slower." },
       ]
       return (
         <div className="space-y-3">

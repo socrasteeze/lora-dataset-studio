@@ -88,13 +88,16 @@ def test_an_installed_faces_cache_is_readable_by_the_faces_script(
 
     assert set(got) == set(hub_images), \
         'the faces script could not read the cache the peer just sent'
-    state, det, bfrac, emb, sig = got[hub_images[0]]
+    state, det, bfrac, emb, sig, yaw = got[hub_images[0]]
     assert str(state) == 'scorable'
     assert (det, bfrac) == (pytest.approx(0.9), pytest.approx(0.3))
     assert sig == '', 'a legacy entry carries no signature and is never stale'
+    assert yaw != yaw, 'a legacy entry carries no yaw and reads as "not measured"'  # NaN
     with np.load(str(dest), allow_pickle=False) as z:
         assert 'sigs' not in z.files, \
             'a cache that arrived without sigs must not have one invented for it'
+        assert 'yaws' not in z.files, \
+            'a cache that arrived without yaws must not have one invented for it'
 
 
 def test_an_installed_score_cache_keeps_its_scores_and_gains_hub_sigs(

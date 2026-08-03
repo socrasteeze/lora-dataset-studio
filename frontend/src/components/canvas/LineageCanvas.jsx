@@ -53,6 +53,8 @@ import CanvasGenerationPanel from './CanvasGenerationPanel';
 import CanvasRunTracker from './CanvasRunTracker';
 import CanvasImageNode from './CanvasImageNode';
 import CanvasImageGroup from './CanvasImageGroup';
+import CanvasGroupBar from './CanvasGroupBar';
+import { blendEdgesFor, blendSourcesNote } from '../../utils/canvasBlendEdges';
 import ExportGridModal from '../dataset/studio/ExportGridModal';
 import CheckpointGalleryPanel from '../shared/CheckpointGalleryPanel';
 import { useToast } from '../common/Toast';
@@ -98,6 +100,24 @@ const LONG_PRESS_MS = 420;
 // is still a click, so inspecting a run never depends on holding perfectly
 // still — and a 2-px twitch must not write a position to the database.
 const DRAG_SLOP = 4;
+
+/* What the board can be told to do, written ONCE.
+   The toolbar shows it inline from `lg` up and behind a one-tap ☝ Gestures
+   disclosure below that. Two copies of this sentence would have drifted the
+   first time a gesture was added, and it is the only documentation the board
+   has. The touch half is named explicitly (pinch, long-press) because the
+   device that most needs this list is the one with no wheel and no hover. */
+const BOARD_GESTURES = (
+  <>
+    Drag a run to move it (on touch, hold it first) · drag the background to pan ·
+    wheel or pinch to zoom · click a run for all its images, notes and settings ·
+    click a checkpoint for its actions · tick a checkpoint’s <span aria-hidden>✓</span> to
+    generate from it · <span className="font-semibold">⇧ Shift-click</span> two runs to
+    compare - pin an image from its gallery to put it ON the board ·{' '}
+    <span className="font-semibold">drop one pinned image onto another</span> to fuse them
+    side by side, drag one off the group to take it back out
+  </>
+);
 
 /** One dataset's title strip above its tree. Inside the zoomed world, so it
  *  scales with the board it labels — a lane whose name floated at a constant
@@ -157,7 +177,7 @@ function LaneHeader({ lane, onZoomRef }) {
 
 /** One dataset's tree, drawn exactly as the in-card graph draws it. */
 function LaneGraph({ lane, isLit, onHover, onNodeClick, diffRole, noteOf, liftedId,
-  isPicked, onTogglePick, onOpenGallery, onOpenActions, onZoomPreview }) {
+  isPicked, onTogglePick, onOpenGallery, onOpenActions, onZoomPreview, boardScale }) {
   const g = lane.graph;
   if (!g || !g.nodes.length) return null;
   return (
@@ -206,6 +226,9 @@ function LaneGraph({ lane, isLit, onHover, onNodeClick, diffRole, noteOf, lifted
                   // A checkpoint still on disk is pickable even when it is not in
                   // ComfyUI yet: the launch button then offers to deploy it first.
                   selectable={p.present !== false}
+                  // ✓ Counter-scales the pick box so it stops shrinking with the
+                  // board — at Fit zoom on a phone it was a 5-px square.
+                  boardScale={boardScale}
                   onToggleSelect={() => onTogglePick(lane, n.node, p)}
                   onOpenGallery={() => onOpenGallery(n.node.record_id, p.step)} />
               ))}
@@ -227,7 +250,7 @@ function LaneGraph({ lane, isLit, onHover, onNodeClick, diffRole, noteOf, lifted
  *  Its own <svg>, sized 1x1 and overflow-visible, because a pinned image may sit
  *  well outside the tree's box and the tree's <svg> is sized to the tree. */
 function LaneImages({ lane, layout, onGeometry, onClose, onOpen, onCloseGroup, onExportGrid,
-  boardScale, hint }) {
+  boardScale, hint, blendNotes }) {
   if (!layout.length) return null;
   // Edges are drawn from where each picture actually IS — a member's slot in
   // its strip, not the box it remembers while it waits to leave one.
@@ -239,14 +262,26 @@ function LaneImages({ lane, layout, onGeometry, onClose, onOpen, onCloseGroup, o
       </svg>
       {layout.map((r) => (r.kind === 'group' ? (
         <CanvasImageGroup key={r.key} group={r} datasetId={lane.datasetId}
-          laneName={lane.name} onClose={onClose} onOpen={onOpen}
-          onCloseGroup={onCloseGroup} onExportGrid={onExportGrid} boardScale={boardScale}
+          laneName={lane.name} onClose={onClose} onOpen={onOpen} boardScale={boardScale}
+          blendNotes={blendNotes}
           dropHint={hint?.leaving && hint.groupId === r.groupId ? 'leaving' : null} />
       ) : (
         <CanvasImageNode key={r.key} node={r.node} datasetId={lane.datasetId}
           laneName={lane.name} onGeometry={onGeometry} onClose={onClose}
-          onOpen={onOpen} boardScale={boardScale} />
+          onOpen={onOpen} boardScale={boardScale}
+          blendNote={blendNotes?.get(r.node.imageId) || null} />
       )))}
+      {/* 🖼🖼 The groups' title bars, drawn AFTER every picture and every strip.
+          A bar sits on board space above its own strip, so as an ordinary
+          sibling it was painted over by whatever the board placed there — and
+          with it went the group's only grip, its ✕ and its Export grid at once.
+          Chrome belongs above content; the pictures keep their order among
+          themselves. Same idiom as the merge hint just below. */}
+      {layout.map((r) => (r.kind === 'group' ? (
+        <CanvasGroupBar key={`bar:${r.key}`} group={r} datasetId={lane.datasetId}
+          boardScale={boardScale}
+          onCloseGroup={onCloseGroup} onExportGrid={onExportGrid} />
+      ) : null))}
       {/* ⊕ "Let go here and these become one node." Without it the very first
           merge can only be discovered by accident, which is worse than not
           having the feature: two pictures would fuse and the board would look
@@ -376,6 +411,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
   }, [placed, imagesByLane, imgDrag]);
   const layoutRef = useRef(layoutByLane);
   useEffect(() => { layoutRef.current = layoutByLane; }, [layoutByLane]);
+
   // ⊕ / ⤢ What the gesture in flight would DO on release: a merge target, or
   // "this one is on its way out of its group". Feedback only — the decision is
   // taken again from the same functions at pointerup.
@@ -393,6 +429,33 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
       height: Math.max(e.graph?.height || 0, ext.height),
     };
   })), [placed, layoutByLane]);
+
+  /* 🧬 GENERATION PROVENANCE — a blended picture descends from SEVERAL pills at
+     once, and they are routinely in different lanes (blending across datasets is
+     the point of doing it from the board). A cross-lane edge cannot live in a
+     lane's own <svg>, so these are computed in WORLD units here and drawn once,
+     under everything (see the layer below). The head LoRA keeps the ordinary
+     image → pill edge its lane already draws; only the other parents are added,
+     or one pair would carry two connectors. Declared after `world` — the
+     dependency array reads it at render time, not lazily inside the memo. */
+  const provenance = useMemo(() => {
+    const nodes = [];
+    for (const lane of world.lanes) {
+      for (const n of drawnNodes(layoutByLane[lane.datasetId] || [])) {
+        nodes.push({ ...n, datasetId: lane.datasetId });
+      }
+    }
+    return blendEdgesFor(nodes, world.lanes);
+  }, [world.lanes, layoutByLane]);
+  // What each blended picture must OWN UP TO: the sources it could not place.
+  const blendNotes = useMemo(() => {
+    const out = new Map();
+    for (const [imageId, entry] of provenance.unresolved) {
+      const note = blendSourcesNote(entry);
+      if (note) out.set(imageId, note);
+    }
+    return out;
+  }, [provenance]);
 
   // The latest placement, for the pointer handlers (which must not re-bind on
   // every board change just to read a card's current position).
@@ -1367,21 +1430,28 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           <svg> references them by id (see lineageEdges.jsx). */}
       <svg width="0" height="0" aria-hidden className="absolute"><LineageEdgeDefs /></svg>
 
+      {/* 📱 The board's controls, on a phone.
+          Every target here is 40 px up to `lg` and the familiar 36 px above it.
+          Not cosmetics: this row is the ONLY way to zoom without a wheel, and a
+          36-px button is under the ~40 px a finger actually lands on — a miss on
+          − or + lands on the board and pans it, which reads as "the zoom buttons
+          are unreliable". The row already wrapped; it now wraps into rows a thumb
+          can use. Desktop keeps the exact sizes it has always had. */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => zoomByButton(1 / ZOOM_STEP)}
             disabled={view.scale <= MIN_SCALE + 1e-9}
             title="Zoom out" aria-label="Zoom out"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-app/60 text-content-muted hover:text-content disabled:opacity-40">−</button>
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-app/60 text-content-muted hover:text-content disabled:opacity-40 lg:h-9 lg:w-9">−</button>
           <span className="min-w-[3.25rem] text-center text-content-muted text-[0.6875rem] tabular-nums">{pct}%</span>
           <button type="button" onClick={() => zoomByButton(ZOOM_STEP)}
             disabled={view.scale >= MAX_SCALE - 1e-9}
             title="Zoom in" aria-label="Zoom in"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-app/60 text-content-muted hover:text-content disabled:opacity-40">+</button>
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-app/60 text-content-muted hover:text-content disabled:opacity-40 lg:h-9 lg:w-9">+</button>
         </div>
         <button type="button" onClick={fitNow}
           title="Fit the whole board in view"
-          className="flex h-9 items-center rounded-md border border-border bg-app/60 px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content">
+          className="flex h-10 items-center rounded-md border border-border bg-app/60 px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content lg:h-9">
           Fit
         </button>
         {/* The way out of an arrangement that got away from you. Twenty runs
@@ -1392,7 +1462,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           title={arranged
             ? 'Forget every moved card and rebuild the automatic tree'
             : 'Nothing has been moved yet'}
-          className="flex h-9 items-center gap-1 rounded-md border border-border bg-app/60 px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content disabled:opacity-40">
+          className="flex h-10 items-center gap-1 rounded-md border border-border bg-app/60 px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content disabled:opacity-40 lg:h-9">
           <span aria-hidden>✦</span> Tidy up
         </button>
         <HelpBadge topic="canvas-arrange" />
@@ -1404,7 +1474,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           title={picks.length
             ? `${picks.length} checkpoint(s) picked — open the run settings`
             : 'Tick checkpoints on the board, then set the run up here'}
-          className={'flex h-9 items-center gap-1 rounded-md border px-3 text-[0.6875rem] font-semibold '
+          className={'flex h-10 items-center gap-1 rounded-md border px-3 text-[0.6875rem] font-semibold lg:h-9 '
             + (picks.length
               ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100 '
               : 'border-border bg-app/60 text-content-muted hover:text-content ')}>
@@ -1434,10 +1504,28 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
         {/* The ONLY place the board's gestures are discoverable. A gesture that
             is not listed here does not exist as far as anyone is concerned, so
             every new one earns its clause — including 🖼🖼 drop-to-fuse, which
-            nobody would ever guess. */}
+            nobody would ever guess.
+
+            📱 …and below `lg` it used to be `hidden`, full stop. So on the one
+            device where the gestures are LEAST guessable — no wheel, no hover
+            title, no shift key — the board's instructions did not exist at all.
+            The line is too long to sit in a phone toolbar, so it folds into a
+            one-tap disclosure there instead of disappearing. Same words, written
+            once (BOARD_GESTURES), so the two can never drift. */}
         <span className="ml-auto hidden text-content-subtle text-[0.625rem] lg:inline">
-          Drag a run to move it · drag the background to pan · wheel to zoom · click a run for all its images, notes and settings · click a checkpoint for its actions · tick a checkpoint’s <span aria-hidden>✓</span> to generate from it · <span className="font-semibold">⇧ Shift-click</span> two runs to compare - pin an image from its gallery to put it ON the board · <span className="font-semibold">drop one pinned image onto another</span> to fuse them side by side, drag one off the group to take it back out
+          {BOARD_GESTURES}
         </span>
+        {/* Closed it costs one more chip in a row that already wraps, not a row
+            of its own: every pixel spent above the frame is a pixel of board
+            pushed under the fold, which is the other half of this same pass. */}
+        <details className="lg:hidden">
+          <summary className="flex h-10 cursor-pointer list-none items-center rounded-md border border-border bg-app/60 px-3 text-content-muted text-[0.6875rem] font-semibold hover:text-content">
+            <span aria-hidden className="mr-1">☝</span> Gestures
+          </summary>
+          <p className="mt-1.5 rounded-md border border-border bg-app/40 px-2.5 py-2 text-content-subtle text-[0.6875rem] leading-relaxed">
+            {BOARD_GESTURES}
+          </p>
+        </details>
         {selectedForDiff.length > 0 && (
           <button type="button" onClick={() => setSelectedForDiff([])}
             className="rounded-md border border-amber-400/50 bg-amber-500/10 px-2 py-1 text-amber-100 text-[0.625rem]">
@@ -1469,7 +1557,14 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
         // select-none: shift-click is the compare gesture, and shift-click is ALSO
         // the browser's extend-selection — without this, comparing two runs paints
         // half the board blue.
-        className="lds-canvas-frame relative h-[65vh] min-h-[320px] w-full select-none touch-none overflow-hidden rounded-xl border border-border bg-app/40"
+        /* 📱 60vh on a phone, the usual 65 from `sm` up. Measured at 400×800:
+           the chrome above this frame — nav, title, the folded filter, the
+           toolbar — costs ~290 px, and 290 + 65vh is 812 on an 800-px screen, so
+           the board's bottom edge fell under the fold on every load however
+           little was on it. 60vh brings the WHOLE frame on screen, which is what
+           makes Fit mean anything: a board you have to scroll the page to see
+           the bottom of is a board whose pan gesture fights the page's. */
+        className="lds-canvas-frame relative h-[60vh] min-h-[320px] w-full select-none touch-none overflow-hidden rounded-xl border border-border bg-app/40 sm:h-[65vh]"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endPointer}
@@ -1482,10 +1577,24 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
           <div style={{ position: 'absolute', left: 0, top: 0,
             width: Math.max(world.width, 1), height: Math.max(world.height, 1),
             transform: viewTransform(view), transformOrigin: '0 0' }}>
+            {/* 🧬 The provenance layer. FIRST child and `pointer-events: none`,
+                both deliberate: an edge is CONTEXT, not content. It must never
+                cover a card or a picture, and it must never take a click —
+                chrome and content fighting over the pointer is exactly how a
+                group of pinned images became impossible to move AND to close.
+                Under the lanes means a long edge passes behind the cards and
+                reappears between them, which is already how this board reads
+                descent. */}
+            <svg width="1" height="1" aria-hidden
+              data-testid="canvas-provenance-layer"
+              className="pointer-events-none absolute left-0 top-0 block overflow-visible">
+              <LineageEdges edges={provenance.edges} isLit={() => false} />
+            </svg>
             {world.lanes.map((lane) => (
               <div key={lane.datasetId}>
                 <LaneHeader lane={lane} onZoomRef={setRefZoom} />
                 <LaneImages lane={lane} layout={layoutByLane[lane.datasetId] || []}
+                  blendNotes={blendNotes}
                   onGeometry={handleImageGeometry} onClose={handleCloseImage}
                   onCloseGroup={handleCloseGroup}
                   onExportGrid={(group) => setExportGroup({
@@ -1496,6 +1605,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
                   hint={dropHint?.datasetId === lane.datasetId ? dropHint : null}
                   boardScale={clampScale(view.scale)} />
                 <LaneGraph lane={lane} isLit={isLit} onHover={onHover}
+                  boardScale={clampScale(view.scale)}
                   onNodeClick={onNodeClick} diffRole={diffRole} noteOf={noteOf}
                   liftedId={drag && drag.datasetId === lane.datasetId ? drag.recordId : null}
                   isPicked={isPicked} onTogglePick={onTogglePick}

@@ -871,12 +871,44 @@ _VOCABULARY_INSTRUCTION = {
         'refer to any nudity only in general, non-graphic language.'),
 }
 
+# Length preset (idea by djpraxis on Reddit): how LONG the caption should be, on an axis
+# ORTHOGONAL to the vocabulary register. '' = standard — nothing appended, byte-identical
+# to the pre-preset prompt, which is why the default stays the empty string forever.
+#
+# Two things these texts must never stop doing:
+#  1. STAY PROSE. 'concise' explicitly forbids a comma-separated tag list, because
+#     face_variations.caption_style() votes 'booru' on >=3 short comma segments with no
+#     sentence punctuation — a "short caption" phrased as key phrases would trip the
+#     MISMATCH_CAPTION guard at training launch on every prose family. Asking for one
+#     full sentence keeps a Concise dataset trainable without a force.
+#  2. STAY A LENGTH, NOT A CONTENT RULE. The kind omission rules (identity / concept /
+#     style) are built into the base prompt and post-filtered by the cleaners; a preset
+#     that told the model WHAT to leave out would fight them. These only say how much.
+#
+# 'concise' is NOT the short half of dual long+short captioning: that one is DERIVED from
+# the stored long caption by a separate text pass (_SHORTEN_BASE) and lives in its own
+# column. Concise changes the long caption itself. The two axes compose.
+_CAPTION_LENGTHS = ('concise', 'detailed')
+_LENGTH_INSTRUCTION = {
+    'concise': (
+        'Keep the caption SHORT: ONE single sentence of roughly 20 to 30 words, naming '
+        'only the subject, the pose or action, the clothing and the setting. Write it as '
+        'a complete sentence in plain prose — never a comma-separated list of tags or key '
+        'phrases. Do not add a second sentence, a list, or any commentary.'),
+    'detailed': (
+        'Write a DETAILED caption: several complete sentences in plain prose, covering the '
+        'subject and pose, the expression, the clothing and accessories, the setting and '
+        'background, the lighting, and the camera framing and angle. Describe only what is '
+        'clearly visible — do not speculate, and do not add commentary about the image.'),
+}
+
 
 def caption_options(ds) -> dict:
     """Normalized per-dataset caption overrides: {backend, ollama_model, instructions}.
     Empty strings = "use the global default". Never raises ({} defaults on a missing or
     corrupt blob) so every caption path can read it unconditionally."""
-    out = {'backend': '', 'ollama_model': '', 'instructions': '', 'vocabulary': ''}
+    out = {'backend': '', 'ollama_model': '', 'instructions': '', 'vocabulary': '',
+           'length': ''}
     raw = getattr(ds, 'caption_options', None) if ds else None
     if not raw:
         return out
@@ -900,6 +932,9 @@ def caption_options(ds) -> dict:
     vocab = str(data.get('vocabulary') or '').strip().lower()
     if vocab in _CAPTION_VOCABULARIES:
         out['vocabulary'] = vocab
+    length = str(data.get('length') or '').strip().lower()
+    if length in _CAPTION_LENGTHS:
+        out['length'] = length
     return out
 
 
@@ -927,6 +962,11 @@ def set_caption_options(user_id, dataset_id, patch) -> dict:
         if v and v not in _CAPTION_VOCABULARIES:
             raise ValueError(f'invalid caption vocabulary: {v}')
         cur['vocabulary'] = v
+    if 'length' in patch:
+        ln = str(patch.get('length') or '').strip().lower()
+        if ln and ln not in _CAPTION_LENGTHS:
+            raise ValueError(f'invalid caption length: {ln}')
+        cur['length'] = ln
     stored = {k: v for k, v in cur.items() if v}
     ds.caption_options = json.dumps(stored) if stored else None
     db.session.commit()
@@ -990,15 +1030,28 @@ def _with_caption_instructions(prompt: str, instructions: str) -> str:
     return f'{prompt}\n\nAdditional instructions from the user:\n{extra}'
 
 
-def _combined_caption_instructions(opts) -> str:
-    """The text appended to a caption prompt for a run: the vocabulary preset (if any),
-    then the user's free-text instructions. Empty when neither is set — so a dataset that
-    never touched the popover produces byte-identical prompts. Both ride at the END of the
-    prompt, after the kind omission rules, and the output cleaners still post-filter."""
+def _caption_preset_parts(vocabulary=None, length=None) -> list:
+    """The preset instructions for a run, in their fixed order: vocabulary register first
+    (how to name things), then length (how much to write). One list so the dataset pass,
+    the Caption Lab preview and the image bank never drift on that order."""
     parts = []
-    preset = _VOCABULARY_INSTRUCTION.get(opts.get('vocabulary'))
-    if preset:
-        parts.append(preset)
+    register = _VOCABULARY_INSTRUCTION.get((vocabulary or '').strip().lower())
+    if register:
+        parts.append(register)
+    size = _LENGTH_INSTRUCTION.get((length or '').strip().lower())
+    if size:
+        parts.append(size)
+    return parts
+
+
+def _combined_caption_instructions(opts) -> str:
+    """The text appended to a caption prompt for a run: the presets (vocabulary register,
+    then length), then the user's free-text instructions LAST — closest to the model, so a
+    hand-written steer overrides a preset it contradicts. Empty when none is set, so a
+    dataset that never touched the popover produces byte-identical prompts. All of it rides
+    at the END of the prompt, after the kind omission rules, and the output cleaners still
+    post-filter."""
+    parts = _caption_preset_parts(opts.get('vocabulary'), opts.get('length'))
     extra = (opts.get('instructions') or '').strip()
     if extra:
         parts.append(extra)
@@ -1878,6 +1931,38 @@ def _owned_image(user_id, image_id):
     return img if ds and str(ds.user_id) == str(user_id) else None
 
 
+# --- rows that can vanish under a long pass ---------------------------------
+# A pass loads its rows, then walks them for minutes to hours with one model
+# call per image, committing as it goes. `expire_on_commit` is on, so every row
+# it has not reached yet is a lazy re-SELECT — and the grid stays fully
+# interactive while the pass runs, so deleting a bad tile mid-caption is
+# ordinary use rather than a race anyone has to engineer.
+#
+# SQLAlchemy's default answer is fatal: an attribute read on an expired row
+# whose database row is gone raises ObjectDeletedError (measured — including for
+# the PRIMARY KEY, which is why ids captured BEFORE any commit are the immune
+# shape), and a commit carrying a write staged on such a row raises too, leaving
+# the session poisoned for the `finally`. Either killed the WHOLE pass and threw
+# away the work already done on every other image.
+#
+# `analyze_faces` is the reference shape in this file and needs none of this: it
+# carries plain tuples and writes through `update(...).where(...)` + rowcount.
+# The passes below keep their ORM writes and get the same immunity by holding
+# ids and re-reading through the helper immediately before each touch.
+def _live_image_row(image_id):
+    """The dataset row as the database has it RIGHT NOW, or None when it is gone.
+
+    Always re-reads (``populate_existing``): a row the session still holds
+    unexpired would otherwise come back from the identity map, and the whole
+    question here is whether the image still exists. Measured on a 36 000-row
+    bank: on an already-expired row this is ~31 us/image CHEAPER than the lazy
+    attribute refresh it replaces, because that refresh emitted a SELECT anyway.
+    """
+    if image_id is None:
+        return None
+    return db.session.get(FaceDatasetImage, image_id, populate_existing=True)
+
+
 def resolve_small_image_rescue(user_id, dataset_id, candidate_id, choice):
     """Resolve an original/Klein rescue pair in one DB commit.
 
@@ -2586,7 +2671,7 @@ def cancel_pending(user_id, dataset_id):
     rows = (FaceDatasetImage.query
             .filter_by(dataset_id=dataset_id, status='pending')
             .filter(FaceDatasetImage.filename.is_(None)).all())
-    n = 0
+    targeted_ids = [img.id for img in rows]
     retry_pending = 0
     restart_required = 0
     recovery_error = 0
@@ -2612,8 +2697,20 @@ def cancel_pending(user_id, dataset_id):
             # cancelled / terminal / missing are all safe: cancel_job_outcome
             # proved that this exact job owns no durable recovery barrier.
         _finish_cancelled_generation_row(img)
-        n += 1
     db.session.commit()
+    # Counted from the DATABASE, never from the loop. `cancel_job_outcome` can
+    # roll back internally, and a rollback discards the `db.session.delete(img)`
+    # staged by EARLIER iterations — while a counter incremented in the loop has
+    # already counted them. Stop then reported cancellations that never happened
+    # and the tiles were still there on refresh. Asking which rows actually went
+    # cannot drift from what the user sees.
+    still_there = set()
+    for i0 in range(0, len(targeted_ids), 500):
+        chunk = targeted_ids[i0:i0 + 500]
+        still_there.update(
+            row_id for (row_id,) in db.session.query(FaceDatasetImage.id)
+            .filter(FaceDatasetImage.id.in_(chunk)).all())
+    n = len(targeted_ids) - len(still_there)
     # Stop deleted the in-flight rows: clear the Klein 'generate' indicator now
     # (its completion callbacks won't fire for cancelled jobs). An API batch's own
     # begin/end entry is untouched — its worker unwinds and end()s on its own.
@@ -2645,14 +2742,24 @@ def confirm_unknown_generation_restart(user_id, dataset_id, *,
             .filter_by(dataset_id=dataset_id, status='pending')
             .filter(FaceDatasetImage.filename.is_(None))
             .filter(FaceDatasetImage.job_id.isnot(None)).all())
-    n = 0
+    targeted_ids = [img.id for img in rows]
     for img in rows:
         if not queue_manager.confirm_unknown_comfyui_restart(
                 img.job_id, str(user_id), restart_confirmed=True):
             continue
         _finish_cancelled_generation_row(img)
-        n += 1
     db.session.commit()
+    # Counted from the database, not from the loop — same reason as
+    # cancel_pending: confirm_unknown_comfyui_restart can roll back internally,
+    # which discards deletes staged by earlier iterations that a loop counter has
+    # already counted.
+    still_there = set()
+    for i0 in range(0, len(targeted_ids), 500):
+        chunk = targeted_ids[i0:i0 + 500]
+        still_there.update(
+            row_id for (row_id,) in db.session.query(FaceDatasetImage.id)
+            .filter(FaceDatasetImage.id.in_(chunk)).all())
+    n = len(targeted_ids) - len(still_there)
     _sync_generate_activity(dataset_id)
     return n
 
@@ -5402,13 +5509,22 @@ def classify_images(user_id, dataset_id):
         return 0
     rows = FaceDatasetImage.query.filter_by(
         dataset_id=dataset_id, source='import', framing=None).all()
+    # Ids, not ORM objects: see _live_image_row. The commit at the bottom of this
+    # loop expires every row it has not reached, and a tile deleted from the grid
+    # meanwhile used to kill the whole classification.
+    row_ids = [img.id for img in rows]
     n = 0
+    vanished = 0
     # Persistent progress indicator (survives a page reload): try/finally guarantees
     # end() runs even if the batch raises → no phantom "Classifying…" spinner.
-    token = dataset_activity.begin(dataset_id, 'classify', total=len(rows))
+    token = dataset_activity.begin(dataset_id, 'classify', total=len(row_ids))
     try:
-        for i, img in enumerate(rows):
+        for i, image_id in enumerate(row_ids):
             dataset_activity.progress(token, done=i + 1)
+            img = _live_image_row(image_id)
+            if img is None:      # deleted while the pass ran
+                vanished += 1
+                continue
             path = _img_path(img) if img.filename else ''
             if not os.path.exists(path):
                 continue
@@ -5428,6 +5544,9 @@ def classify_images(user_id, dataset_id):
     finally:
         unload_vision_model()  # libère la VRAM pour ComfyUI en fin de batch
         dataset_activity.end(token)
+    if vanished:
+        logger.info('classify: %s image(s) were deleted while the pass ran, skipped',
+                    vanished)
     return n
 
 
@@ -5687,16 +5806,19 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
         q = q.filter(FaceDatasetImage.id.in_(image_ids))
     if not force:
         q = q.filter((FaceDatasetImage.caption.is_(None)) | (FaceDatasetImage.caption == ''))
-    todo = [(img, _img_path(img)) for img in q.all() if img.filename]
-    todo = [(img, p) for img, p in todo if p and os.path.exists(p)]
+    # (image_id, path), not (row, path): the loops below commit per image and
+    # this pass runs for a long time over a live grid. See _live_image_row.
+    todo = [(img.id, _img_path(img)) for img in q.all() if img.filename]
+    todo = [(image_id, p) for image_id, p in todo if p and os.path.exists(p)]
     if not todo:
         return 0
     # Total for the persistent progress indicator (token owned by the caller).
     dataset_activity.progress(token, total=len(todo),
                               detail=f'Preparing {len(todo)} concept caption(s)…')
     n = 0
+    vanished = 0
     remaining = list(todo)
-    refine_targets = []  # (img, p, joycap) -> Joy draft refined by Qwen
+    refine_targets = []  # (image_id, p, joycap) -> Joy draft refined by Qwen
     # 1) JoyCaption batch (draft) when the backend allows it.
     if backend in ('auto', 'joycaption'):
         jc = {}
@@ -5715,21 +5837,25 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
         except Exception as e:
             logger.warning('caption concept: JoyCaption indisponible (%s)', e)
         still = []
-        for img, p in remaining:
+        for image_id, p in remaining:
             cap = (jc.get(p) or '').strip().strip('"').strip()
             if cap:
-                refine_targets.append((img, p, cap))
+                refine_targets.append((image_id, p, cap))
             else:
-                still.append((img, p))
+                still.append((image_id, p))
         remaining = still
     # 2a) Backend 'joycaption' forced: no Qwen. Store Joy drafts scrubbed mechanically
     #     (leak_re from the desc words only) - respects "no Ollama fallback".
     if backend == 'joycaption':
         leak_re = _concept_terms_re(_fallback_concept_terms(concept_desc))
-        for img, p, joycap in refine_targets:
+        for image_id, p, joycap in refine_targets:
             if dataset_activity.cancel_requested(ds.id):
                 break   # graceful stop at an image boundary (see caption_images)
             dataset_activity.bump(token)
+            img = _live_image_row(image_id)
+            if img is None:      # deleted while the pass ran
+                vanished += 1
+                continue
             try:
                 with open(p, 'rb') as fh:
                     data = fh.read()
@@ -5760,7 +5886,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
         leak_re = _concept_terms_re(_get_concept_terms(ds, image_path=sample,
                                                        describe=describe))
         try:
-            for img, p, joycap in refine_targets:
+            for image_id, p, joycap in refine_targets:
                 if dataset_activity.cancel_requested(ds.id):
                     break   # graceful stop at an image boundary (see caption_images)
                 dataset_activity.bump(token)
@@ -5792,7 +5918,8 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                 else:
                     # Unusable refine (reasoning trace / loop) -> direct Qwen caption
                     # (natively omits the concept), else keep the Joy draft.
-                    logger.info('caption concept: refine rejected -> direct Qwen (image %s)', img.id)
+                    logger.info('caption concept: refine rejected -> direct Qwen (image %s)',
+                                image_id)
                     alt = ''
                     try:
                         alt = describe(data, cap_prompt, num_predict=2000,
@@ -5804,6 +5931,12 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                     final = alt or joycap
                 final = _enforce_concept_omission(final, leak_re, data, concept_desc,
                                                   describe=describe) or final
+                # Re-read only now: everything above is model work measured in
+                # seconds per image, and the tile can be deleted during it.
+                img = _live_image_row(image_id)
+                if img is None:
+                    vanished += 1
+                    continue
                 if not _usable_caption(final):
                     # Refine AND direct both unusable → fall back to the Joy draft (clean
                     # prose), scrubbed of any leak; leave blank if even that fails.
@@ -5815,12 +5948,13 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                         if force and (img.caption or ''):
                             img.caption = ''
                             db.session.commit()
-                        logger.info('caption concept: no usable caption for image %s -> left blank', img.id)
+                        logger.info('caption concept: no usable caption for image %s '
+                                    '-> left blank', image_id)
                         continue
                 img.caption = _cap_caption(final)
                 db.session.commit()
                 n += 1
-            for img, p in remaining:
+            for image_id, p in remaining:
                 if dataset_activity.cancel_requested(ds.id):
                     break   # graceful stop at an image boundary (see caption_images)
                 dataset_activity.bump(token)
@@ -5834,6 +5968,11 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                 if cap:
                     cap = _enforce_concept_omission(cap, leak_re, data, concept_desc,
                                                     describe=describe) or cap
+                # Re-read after the call, for the same reason as the refine loop.
+                img = _live_image_row(image_id)
+                if img is None:
+                    vanished += 1
+                    continue
                 if _usable_caption(cap):
                     img.caption = _cap_caption(cap)
                     db.session.commit()
@@ -5842,12 +5981,16 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                     if force and (img.caption or ''):
                         img.caption = ''
                         db.session.commit()
-                    logger.info('caption concept: no usable direct caption for image %s -> left blank', img.id)
+                    logger.info('caption concept: no usable direct caption for image '
+                                '%s -> left blank', image_id)
         finally:
             if ollama_model:
                 unload_vision_model(model=ollama_model)
             else:
                 unload_vision_model()  # libère la VRAM pour ComfyUI en fin de batch
+    if vanished:
+        logger.info('caption concept: %s image(s) were deleted while the pass ran, '
+                    'skipped', vanished)
     return n
 
 
@@ -5950,8 +6093,11 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
     if not force:
         q = q.filter((FaceDatasetImage.caption.is_(None)) | (FaceDatasetImage.caption == ''))
     rows = q.all()
-    todo = [(img, _img_path(img)) for img in rows if img.filename]
-    todo = [(img, p) for img, p in todo if p and os.path.exists(p)]
+    # (image_id, path), not (row, path): both loops below commit per image, which
+    # expires every row still to come, and this pass runs for minutes-to-hours
+    # over a grid the user keeps working in. See _live_image_row.
+    todo = [(img.id, _img_path(img)) for img in rows if img.filename]
+    todo = [(image_id, p) for image_id, p in todo if p and os.path.exists(p)]
     if not todo:
         return 0
     # Persistent progress indicator (survives a page reload): 'recaption' when force
@@ -5965,6 +6111,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
                 dataset_id, backend, mode, force, len(todo))
     try:
         n = 0
+        vanished = 0
         remaining = todo
         # In 'auto', why JoyCaption didn't contribute (deps missing / crash). Kept so a
         # LATER Ollama failure reports BOTH reasons instead of only the Ollama one —
@@ -6000,22 +6147,28 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
                 joycaption_note = str(e)
                 logger.warning('caption_images: JoyCaption indisponible (%s)', e)
             still = []
-            for img, p in remaining:
+            for image_id, p in remaining:
                 cap = (jc.get(p) or '').strip().strip('"').strip()
                 if cap:
+                    img = _live_image_row(image_id)
+                    if img is None:      # deleted while the batch ran
+                        vanished += 1
+                        dataset_activity.bump(token)
+                        continue
                     cleaned = cleaner(cap) or cap
                     img.caption = _cap_caption(cleaned)
                     db.session.commit()
                     n += 1
                     dataset_activity.bump(token)   # this image is captioned (done)
                 else:
-                    still.append((img, p))
+                    still.append((image_id, p))
             remaining = still
             dataset_activity.progress(
                 token, detail=f'JoyCaption finished; {len(remaining)} image(s) remaining…')
             if backend == 'joycaption':  # backend forcé JoyCaption -> pas de repli Ollama
-                logger.info('captioning finished: dataset=%s backend=%s captioned=%s elapsed=%.1fs',
-                            dataset_id, backend, n, time.monotonic() - started)
+                logger.info('captioning finished: dataset=%s backend=%s captioned=%s '
+                            'deleted_mid_pass=%s elapsed=%.1fs',
+                            dataset_id, backend, n, vanished, time.monotonic() - started)
                 return n
         # 2) Ollama (Qwen3-VL) pour les images non couvertes par JoyCaption ('auto'),
         # ou pour TOUT le lot si le backend force 'ollama'.
@@ -6025,7 +6178,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
             except ImportError:
                 raise RuntimeError('vision (Ollama) service not configured/available yet')
             try:
-                for index, (img, p) in enumerate(remaining, 1):
+                for index, (image_id, p) in enumerate(remaining, 1):
                     # Graceful stop: the user asked to stop and we're at an image
                     # boundary (nothing decoding) — leave the rest uncaptioned and let
                     # the finally below free the model, exactly like a normal finish.
@@ -6041,6 +6194,14 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
                             auto_start_local=(index == 1), timeout=(10, 300))
                     cap = (cap or '').strip().strip('"').strip()
                     if cap:
+                        # Re-read AFTER the call: the answer we are about to store
+                        # took a full VLM inference to arrive, and the tile can
+                        # have been deleted from the grid in that time.
+                        img = _live_image_row(image_id)
+                        if img is None:
+                            vanished += 1
+                            dataset_activity.bump(token)
+                            continue
                         cleaned = cleaner(cap) or cap
                         img.caption = _cap_caption(cleaned)
                         db.session.commit()
@@ -6056,8 +6217,9 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
                 raise
             finally:
                 unload_vision_model()  # libère la VRAM pour ComfyUI en fin de batch
-        logger.info('captioning finished: dataset=%s backend=%s captioned=%s elapsed=%.1fs',
-                    dataset_id, backend, n, time.monotonic() - started)
+        logger.info('captioning finished: dataset=%s backend=%s captioned=%s '
+                    'deleted_mid_pass=%s elapsed=%.1fs',
+                    dataset_id, backend, n, vanished, time.monotonic() - started)
         return n
     except Exception:
         logger.exception('captioning failed: dataset=%s backend=%s elapsed=%.1fs',
@@ -6243,14 +6405,13 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
 # compare raw model output side by side and pick the config, not to produce the final
 # stored caption (that still goes through the normal caption pass with its kind rules).
 
-def _compose_preview_instructions(vocabulary, instructions) -> str | None:
-    """Combine a vocabulary preset (the SAME appended register the dataset pass uses,
-    from _VOCABULARY_INSTRUCTION) with the user's free extra instructions into the single
-    ``extra_instructions`` string caption_paths appends to the prompt. None when neither
-    is set (byte-identical to a plain descriptive pass)."""
-    parts = []
-    if vocabulary:
-        parts.append(_VOCABULARY_INSTRUCTION[vocabulary])
+def _compose_preview_instructions(vocabulary, instructions, length=None) -> str | None:
+    """Combine the presets (the SAME appended register and length text the dataset pass
+    uses) with the user's free extra instructions into the single ``extra_instructions``
+    string caption_paths appends to the prompt. Same order as the dataset pass — presets
+    first, free text last. None when nothing is set (byte-identical to a plain descriptive
+    pass)."""
+    parts = _caption_preset_parts(vocabulary, length)
     extra = (instructions or '').strip()[:_CAPTION_INSTRUCTIONS_MAX]
     if extra:
         parts.append(extra)
@@ -6258,8 +6419,10 @@ def _compose_preview_instructions(vocabulary, instructions) -> str | None:
 
 
 # Public so the image bank's caption lane validates against — and appends — the SAME
-# vocabulary registers as the dataset pass, rather than duplicating the tuple or the text.
+# vocabulary registers and length presets as the dataset pass, rather than duplicating the
+# tuples or the texts.
 CAPTION_VOCABULARIES = _CAPTION_VOCABULARIES
+CAPTION_LENGTHS = _CAPTION_LENGTHS
 
 
 def vocabulary_instruction(vocabulary) -> str | None:
@@ -6271,8 +6434,17 @@ def vocabulary_instruction(vocabulary) -> str | None:
     return _VOCABULARY_INSTRUCTION.get((vocabulary or '').strip().lower())
 
 
+def caption_preset_instructions(vocabulary=None, length=None) -> str | None:
+    """The combined preset block (vocabulary register, then length) for a run that has no
+    per-dataset options to read — the image bank's per-run lane. None when neither is set,
+    so a call without presets appends nothing at all."""
+    parts = _caption_preset_parts(vocabulary, length)
+    return '\n\n'.join(parts) if parts else None
+
+
 def preview_caption(user_id, dataset_id, image_id, *, backend=None, ollama_model='',
-                    vocabulary=None, instructions=None, should_cancel=None) -> dict:
+                    vocabulary=None, length=None, instructions=None,
+                    should_cancel=None) -> dict:
     """Caption ONE dataset image with a candidate config and return the text WITHOUT
     persisting it — the Caption Lab's ephemeral A/B probe. Reuses caption_paths(), so the
     engine/model/GPU serialization contract is identical to the batch pass.
@@ -6281,7 +6453,9 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None, ollama_model
                    rejected here — a preview with captioning disabled makes no sense).
     vocabulary   : '' / None → the model's own wording; else an _CAPTION_VOCABULARIES
                    preset, appended as an instruction exactly like the dataset options.
-    instructions : free extra instructions, appended after the vocabulary preset.
+    length       : '' / None → standard (nothing appended); else a _CAPTION_LENGTHS
+                   preset ('concise' | 'detailed'), on an axis orthogonal to vocabulary.
+    instructions : free extra instructions, appended after both presets.
     should_cancel: polled by caption_paths at the image boundary (Ollama phase) so the
                    existing Stop path can abort a preview cleanly.
 
@@ -6305,7 +6479,10 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None, ollama_model
     vocab = (vocabulary or '').strip().lower() or None
     if vocab and vocab not in _CAPTION_VOCABULARIES:
         raise ValueError(f'invalid caption vocabulary: {vocab}')
-    extra = _compose_preview_instructions(vocab, instructions)
+    size = (length or '').strip().lower() or None
+    if size and size not in _CAPTION_LENGTHS:
+        raise ValueError(f'invalid caption length: {size}')
+    extra = _compose_preview_instructions(vocab, instructions, size)
     ollama_model = normalize_ollama_model_ref(
         ollama_model, allow_empty=True) or None
     started = time.perf_counter()
@@ -6422,13 +6599,27 @@ def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode
                                            detail=f'Deriving {len(rows)} short caption(s)…')
         token = own_token
     n = 0
+    vanished = 0
+    # Ids, not ORM objects: see _live_image_row. The commit below expires every
+    # row still to come, and this loop pays a text generation per image — long
+    # enough for the user to delete a tile from the grid meanwhile, which used to
+    # kill the pass on the next `img.caption` read.
+    row_ids = [img.id for img in rows]
     try:
-        for img in rows:
+        for image_id in row_ids:
             if dataset_activity.cancel_requested(dataset_id):
                 break   # graceful stop at an image boundary (see caption_images)
             dataset_activity.bump(token)
+            img = _live_image_row(image_id)
+            if img is None:      # deleted while the pass ran
+                vanished += 1
+                continue
             short = _scrub_short_like_long(ds, gen(_shorten_prompt(ds, img.caption)), mode)
             if not short:
+                continue
+            img = _live_image_row(image_id)
+            if img is None:      # deleted DURING its own generation
+                vanished += 1
                 continue
             img.caption_short = _cap_caption(short) or None
             db.session.commit()
@@ -6437,6 +6628,9 @@ def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode
         _unload()
         if own_token is not None:
             dataset_activity.end(own_token)
+    if vanished:
+        logger.info('short captions: %s image(s) were deleted while the pass ran, '
+                    'skipped', vanished)
     return n
 
 
@@ -7020,13 +7214,26 @@ def detect_watermarks(user_id, dataset_id, *, include_dismissed=False):
         return {'detected': 0, 'none': 0, 'checked': 0}
     rows = (FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep')
             .filter(FaceDatasetImage.filename.isnot(None)).all())
+    # Ids, not ORM objects: see _live_image_row. This loop commits per image, so
+    # every row it has not reached is expired, and deleting a tile from the grid
+    # mid-scan used to kill the scan.
+    row_ids = [img.id for img in rows]
     counts = {'detected': 0, 'none': 0, 'checked': 0}
+    # Deliberately NOT a key in `counts`: that dict is this route's response
+    # shape and four tests pin it exactly. A counter that is zero on every
+    # ordinary run does not justify changing an API contract — and surfacing it
+    # usefully would mean a UI decision, not a silent extra field. Logged below.
+    vanished = 0
     # Persistent progress indicator (survives a page reload); try/finally clears it
     # even if the vision pass raises → no phantom "Scanning…" spinner.
-    token = dataset_activity.begin(dataset_id, 'watermark_detect', total=len(rows))
+    token = dataset_activity.begin(dataset_id, 'watermark_detect', total=len(row_ids))
     try:
-        for i, img in enumerate(rows):
+        for i, image_id in enumerate(row_ids):
             dataset_activity.progress(token, done=i + 1)
+            img = _live_image_row(image_id)
+            if img is None:      # deleted while the pass ran
+                vanished += 1
+                continue
             # Dismissed = a confirmed false positive; don't waste a vision call re-asking
             # (and never silently re-flag it) unless the caller opts back in.
             if not include_dismissed and img.watermark_state == 'dismissed':
@@ -7058,6 +7265,9 @@ def detect_watermarks(user_id, dataset_id, *, include_dismissed=False):
     finally:
         unload_vision_model()  # rend la VRAM a ComfyUI en fin de batch
         dataset_activity.end(token)
+    if vanished:
+        logger.info('watermark detect: %s image(s) were deleted while the pass ran, '
+                    'skipped', vanished)
     return counts
 
 
@@ -7145,8 +7355,13 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
                if isinstance(i, (int, float, str)) and str(i).lstrip('-').isdigit()]
         q = q.filter(FaceDatasetImage.id.in_(ids or [-1]))   # empty subset -> match nothing
     rows = q.all()
+    row_ids = [img.id for img in rows]
     out = {'cropped': 0, 'inpainted': 0, 'inpainted_klein': 0, 'needs_review': 0,
            'failed': 0, 'skipped': 0}
+    # NOT a key in `out`: that dict is the route's response shape and existing
+    # tests pin it. 'skipped' already means "engine unavailable" and must not be
+    # overloaded with "the image no longer exists". Logged at the end instead.
+    vanished = 0
     error = None
     lama_ok = watermark_lama.is_available()
     klein_ok = method == 'klein' and watermark_klein.is_available()
@@ -7162,9 +7377,11 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
         from . import klein_edit_helper as keh
         if not keh.klein_model_on_disk(klein_model):
             raise keh.KleinModelGone(klein_model)
-    # (img, live_path, staged_path, bboxes, manual_regions). The VLM/browser
-    # boxes apply to the staged upright file; the master is replaced only after
-    # a successful engine result has passed verification.
+    # (image_id, live_path, staged_path, bboxes, manual_regions). An ID, not an
+    # ORM row: this list is carried across the whole per-image loop AND across
+    # the LaMa batch, which runs for minutes -- by the time the tail loop writes,
+    # those rows have been expired by a dozen commits and any one of them may
+    # have been deleted from the grid. See _live_image_row.
     lama_pending = []
 
     def _backup_failed(img, staged_path=None):
@@ -7227,8 +7444,12 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
         dataset_id, 'watermark_clean', total=len(rows),
         detail=f'Cleaning watermarks on {device_label}…')
     try:
-        for i, img in enumerate(rows):
+        for i, image_id in enumerate(row_ids):
             dataset_activity.progress(token, done=i + 1)
+            img = _live_image_row(image_id)
+            if img is None:      # deleted while the pass ran
+                vanished += 1
+                continue
             path = _img_path(img)
             if img.watermark_regions is not None:
                 try:
@@ -7268,7 +7489,7 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
                     _backup_failed(img, staged)
                     db.session.commit()
                     continue
-                lama_pending.append((img, path, staged, regions, True))
+                lama_pending.append((img.id, path, staged, regions, True))
                 continue
             bbox = _safe_json(img.watermark_bbox)
             if not os.path.exists(path) or not (isinstance(bbox, list) and len(bbox) == 4):
@@ -7316,7 +7537,7 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
                         staged = _stage_oriented_watermark_edit(path)
                         if staged:
                             if _preserve_original(path):
-                                lama_pending.append((img, path, staged, [bbox], False))
+                                lama_pending.append((img.id, path, staged, [bbox], False))
                             else:
                                 _backup_failed(img, staged)
                         else:
@@ -7330,7 +7551,7 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
         if lama_pending:
             try:
                 if len(lama_pending) == 1:
-                    img, live_path, staged_path, boxes, manual = lama_pending[0]
+                    _pid, live_path, staged_path, boxes, manual = lama_pending[0]
                     if manual:
                         ok, err = watermark_lama.inpaint_watermarks(
                             staged_path, boxes,
@@ -7343,10 +7564,18 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
                 else:
                     results = watermark_lama.inpaint_batch(
                         [{'image_path': staged_path, 'bboxes': boxes}
-                         for _img, _live_path, staged_path, boxes, _manual in lama_pending],
+                         for _pid, _live_path, staged_path, boxes, _manual in lama_pending],
                         device=device,
                     )
-                for img, live_path, staged_path, _boxes, manual in lama_pending:
+                for pending_id, live_path, staged_path, _boxes, manual in lama_pending:
+                    img = _live_image_row(pending_id)
+                    if img is None:
+                        # Deleted while the batch ran: there is no row left to
+                        # point at the repainted file, so drop the staged edit
+                        # rather than promote it over a master nobody owns.
+                        _discard_staged_watermark_edit(staged_path)
+                        vanished += 1
+                        continue
                     ok, err = results.get(
                         staged_path,
                         (False, {'kind': 'failed', 'detail': 'missing inpaint result'}),
@@ -7376,7 +7605,11 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
             except Exception as exc:  # engine/process faults must not leak a staged edit
                 logger.exception('watermark: LaMa execution failed for dataset %s', dataset_id)
                 error = {'kind': 'failed', 'detail': f'watermark inpaint failed: {exc}'}
-                for img, _live_path, _staged_path, _boxes, manual in lama_pending:
+                for pending_id, _live_path, _staged_path, _boxes, manual in lama_pending:
+                    img = _live_image_row(pending_id)
+                    if img is None:
+                        vanished += 1
+                        continue
                     if not manual:
                         img.watermark_state = 'failed'
                     out['failed'] += 1
@@ -7385,8 +7618,11 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
                 # The engine can crash before returning a result; in that case its
                 # disposable EXIF-oriented copy still has to disappear, while the
                 # master remains exactly where it was.
-                for _img, _live_path, staged_path, _boxes, _manual in lama_pending:
+                for _pid, _live_path, staged_path, _boxes, _manual in lama_pending:
                     _discard_staged_watermark_edit(staged_path)
+        if vanished:
+            logger.info('watermark clean: %s image(s) were deleted while the pass '
+                        'ran, skipped', vanished)
         return out, error
     finally:
         dataset_activity.end(token)
@@ -7535,6 +7771,10 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                                        variation_prompt=v['prompt'], klein_model=klein_model)
                 db.session.add(img)
                 db.session.commit()
+                # Captured NOW, while the row certainly exists: ⏹ Stop deletes
+                # exactly this shape (status='pending' AND filename IS NULL), and
+                # it can land while the enqueue below is in flight.
+                image_id = img.id
                 # NSFW (flag explicite OU label du catalogue NSFW) : wrapper sans le
                 # clamp SFW — chemin Klein local uniquement.
                 nsfw = bool(v.get('nsfw')) or is_nsfw_label(v.get('label'))
@@ -7560,12 +7800,17 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                                         'variation_label': v.get('label')},
                         device_id=device_id)
                 except Exception:
-                    img.status = 'failed'
-                    db.session.commit()
+                    row = _live_image_row(image_id)
+                    if row is not None:
+                        row.status = 'failed'
+                        db.session.commit()
                     raise
-                img.job_id = job_id
+                row = _live_image_row(image_id)
+                if row is None:
+                    continue     # Stop removed it mid-enqueue; nothing to report
+                row.job_id = job_id
                 db.session.commit()
-                ids.append(img.id)
+                ids.append(image_id)
     finally:
         _sync_generate_activity(dataset_id)
     return ids
@@ -7630,6 +7875,9 @@ def generate_variations_krea(user_id, dataset_id, variations, multiplier,
                                        klein_model=KREA_ENGINE)
                 db.session.add(img)
                 db.session.commit()
+                # Same reason as the Klein path: ⏹ Stop deletes exactly this
+                # pending/filename-less shape, and the enqueue below is the window.
+                image_id = img.id
                 nsfw = bool(v.get('nsfw')) or is_nsfw_label(v.get('label'))
                 try:
                     job_id = keh.enqueue_krea_edit(
@@ -7652,12 +7900,17 @@ def generate_variations_krea(user_id, dataset_id, variations, multiplier,
                                         'variation_label': v.get('label')},
                         device_id=device_id)
                 except Exception:
-                    img.status = 'failed'
-                    db.session.commit()
+                    row = _live_image_row(image_id)
+                    if row is not None:
+                        row.status = 'failed'
+                        db.session.commit()
                     raise
-                img.job_id = job_id
+                row = _live_image_row(image_id)
+                if row is None:
+                    continue     # Stop removed it mid-enqueue; nothing to report
+                row.job_id = job_id
                 db.session.commit()
-                ids.append(img.id)
+                ids.append(image_id)
     finally:
         _sync_generate_activity(dataset_id)
     return ids
@@ -7899,23 +8152,38 @@ def _improve_existing_image_locked(user_id, image_id, engine=None):
     )
     db.session.add(candidate)
     db.session.commit()
+    # Captured while both rows certainly exist: the commit above expires them,
+    # and ⏹ Stop deletes exactly this candidate's shape (pending, no filename)
+    # — the enqueue below is the window, same as the variation paths.
+    candidate_id = candidate.id
+    dataset_id_of_source = img.dataset_id
 
     try:
         job_id = _enqueue_improve(
             engine, user_id=user_id, source=img, source_path=source_path,
             prompt=prompt, label=label,
-            dataset=get_dataset(user_id, img.dataset_id))
+            dataset=get_dataset(user_id, dataset_id_of_source))
     except Exception:
         # No broken tile: the original is still untouched and the user can retry
-        # as soon as the queue/ComfyUI issue is fixed.
-        db.session.delete(candidate)
-        db.session.commit()
+        # as soon as the queue/ComfyUI issue is fixed. Nothing to remove if Stop
+        # already removed it — and trying would raise from inside this `except`,
+        # replacing the real enqueue error with a database one.
+        row = _live_image_row(candidate_id)
+        if row is not None:
+            db.session.delete(row)
+            db.session.commit()
         raise
 
-    candidate.job_id = job_id
+    row = _live_image_row(candidate_id)
+    if row is None:
+        # Stop removed the candidate mid-enqueue. Reporting its id would have the
+        # tile poll for a generation that can never arrive.
+        _sync_generate_activity(dataset_id_of_source)
+        return None
+    row.job_id = job_id
     db.session.commit()
-    _sync_generate_activity(img.dataset_id)
-    return {'candidate_id': candidate.id, 'job_id': job_id}
+    _sync_generate_activity(dataset_id_of_source)
+    return {'candidate_id': candidate_id, 'job_id': job_id}
 
 
 # The three ways a re-run can be impossible, worded as the user reads them. The

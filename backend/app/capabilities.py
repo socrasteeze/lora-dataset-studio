@@ -686,6 +686,12 @@ CAPABILITY_IMPORTS = {
     'bank_scoring': 'import torch, open_clip, transformers',
     'watermark_inpaint': 'import simple_lama_inpainting',
     'wd14': 'import onnxruntime',
+    # The detector extra runs backend/infer/watermark_detect_infer.py, which needs
+    # torch (both models) and transformers (BOTH heads are transformers-native —
+    # that is precisely why Grounding DINO was chosen over Florence-2, whose
+    # trust_remote_code file no longer loads). Nothing else: no einops, no
+    # flash-attn, no vendored modelling code.
+    'watermark_detect': 'import torch, transformers',
 }
 
 
@@ -807,6 +813,91 @@ def probe_watermark_inpaint() -> dict:
     python = cfg.get('watermark.python') or cfg.get('masks.python') or sys.executable
     ok = _cached_import('watermark', python, CAPABILITY_IMPORTS['watermark_inpaint'])
     return {'ok': ok, 'detail': 'simple-lama-inpainting import OK' if ok else 'import failed'}
+
+
+def probe_watermark_detect() -> dict:
+    """The dedicated watermark DETECTOR extra (SigLIP2 ranker + Grounding DINO
+    locator). Dedicated interpreter key, else the bank-scoring one — which is not
+    a fallback but the intended shared home: it already holds torch and
+    transformers, and a second copy would cost the user another ~2.5 GB.
+
+    Importing is necessary but NOT sufficient: the weights (~0.9 GB) must also be
+    on disk, and an environment that imports torch while the models were never
+    downloaded would light this capability green and then fail a whole pass with a
+    network error. So the presence of the model cache is part of the verdict, and
+    the two failures are reported apart — 'the packages are missing' and 'the
+    weights are missing' send the user to different buttons.
+
+    False here is never a refusal: the Find pass keeps using the vision model,
+    exactly as it does today (fail-open).
+
+    ORDER IS DELIBERATE — the filesystem check runs FIRST. The import check is a
+    subprocess that runs `import torch`, and on the overwhelmingly common machine
+    (this extra not installed) that subprocess can never change the answer, since
+    no weights means not-ready whatever imports. Probing the other way round made
+    every capability poll — and every test that drops the probe cache — pay a
+    torch import for a capability nobody has. That cost is paid by every agent and
+    every CI run, forever, which is precisely how a suite drifts from minutes to
+    an hour."""
+    if not watermark_detect_weights_present():
+        return {'ok': False,
+                'detail': 'the detector weights are not downloaded yet '
+                          '(Setup ▸ Quality tools ▸ Watermark detector)'}
+    python = cfg.get('watermark_detect.python') or cfg.get('bank_scoring.python') or sys.executable
+    ok = _cached_import('watermark_detect', python,
+                        CAPABILITY_IMPORTS['watermark_detect'])
+    if not ok:
+        return {'ok': False,
+                'detail': 'the weights are there but torch + transformers do not '
+                          'import in the detector environment'}
+    return {'ok': True, 'detail': 'torch + transformers OK, weights on disk'}
+
+
+def watermark_detect_gpu_available() -> bool:
+    """True only when the detector's interpreter can actually run torch on CUDA.
+
+    Same reasoning as bank_scoring_gpu_available, and the same UNKNOWN handling:
+    the parent uses this to decide whether to take the GPU-exclusive window (which
+    unloads ComfyUI and blocks a training start for the whole pass), so an
+    unanswered probe on a machine that HAS a card resolves to "assume the card is
+    in play" — leaving the GPU unprotected is the expensive mistake, not holding a
+    window one extra time."""
+    python = (cfg.get('watermark_detect.python') or cfg.get('bank_scoring.python')
+              or sys.executable)
+    if (cfg.get('watermark_detect.device') or 'auto').lower() == 'cpu':
+        return False
+    state = _cached_import_state(
+        'watermark_detect_gpu', python,
+        'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)')
+    if state is None:
+        return gpu_vram_gb() is not None
+    return state
+
+
+def _watermark_detect_threshold() -> float:
+    from .services import watermark_detector
+    return watermark_detector.threshold()
+
+
+def watermark_detect_weights_present() -> bool:
+    """True when BOTH model repos are cached under the detector's models_root.
+    A cheap directory check — huggingface_hub names its cache folders
+    ``models--<owner>--<name>``, and a snapshot folder that exists but is empty is
+    a half-finished download, which counts as absent."""
+    from .services import watermark_detector
+    root = watermark_detector.models_root()
+    if not root:
+        return False
+    for repo in watermark_detector.MODEL_REPOS:
+        folder = os.path.join(root, 'models--' + repo.replace('/', '--'), 'snapshots')
+        try:
+            snaps = [d for d in os.listdir(folder)
+                     if os.listdir(os.path.join(folder, d))]
+        except OSError:
+            return False
+        if not snaps:
+            return False
+    return True
 
 
 # Prebuilt wheels for the ML extras (insightface 0.7.3, numpy<2, onnxruntime,
@@ -1518,21 +1609,24 @@ def probe(force=False) -> dict:
     ollama = probe_ollama()
     ollama_installed = probe_ollama_installed()
     aitoolkit = probe_aitoolkit()
-    # These six each shell out a cached-but-possibly-cold subprocess import
+    # These seven each shell out a cached-but-possibly-cold subprocess import
     # (insightface/rembg/torch+open_clip+transformers/simple_lama_inpainting/
-    # onnxruntime/the ai-toolkit venv's captioning deps — see _cached_import).
-    # Run them concurrently so a cold boot pays the SLOWEST one, not the sum.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+    # torch+transformers/onnxruntime/the ai-toolkit venv's captioning deps — see
+    # _cached_import). Run them concurrently so a cold boot pays the SLOWEST
+    # one, not the sum.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as pool:
         f_face = pool.submit(probe_face_scoring)
         f_masks = pool.submit(probe_masks)
         f_bank = pool.submit(probe_bank_scoring)
         f_watermark = pool.submit(probe_watermark_inpaint)
+        f_watermark_detect = pool.submit(probe_watermark_detect)
         f_wd14 = pool.submit(probe_wd14)
         f_joycaption = pool.submit(probe_joycaption, aitoolkit)
         face_scoring = f_face.result()
         masks = f_masks.result()
         bank_scoring = f_bank.result()
         watermark_inpaint = f_watermark.result()
+        watermark_detect = f_watermark_detect.result()
         wd14 = f_wd14.result()
         joycaption = f_joycaption.result()
     models = _scan_models()
@@ -1622,6 +1716,14 @@ def probe(force=False) -> dict:
     seedvr2_ready = _svr.engine_ready(comfy['ok'], missing=seedvr2_missing,
                                       invalid=seedvr2_invalid,
                                       nodes_missing=seedvr2_nodes_missing)
+    # The OPTIONAL high-resolution lane (tiling), contributed by SurpassHR
+    # (GitHub #32). Its absence is not a fault: without it the default lane
+    # still upscales, it is only capped by what this card can hold in one pass.
+    # The ceiling is published so the UI can say that BEFORE a run dies — the
+    # report behind this feature is someone meeting the limit as a CUDA OOM.
+    seedvr2_tiling_nodes_missing = _svr.ttp_missing_nodes() if comfy['ok'] else []
+    seedvr2_tiling_ready = _svr.tiling_available(comfy['ok'])
+    seedvr2_ceiling_mp = _svr.full_frame_ceiling_mp()
     base_dir = cfg.get('comfyui.base_dir') or ''
     from .services import comfyui_control
     comfy_launcher = comfyui_control.launcher_status()
@@ -1699,6 +1801,12 @@ def probe(force=False) -> dict:
             # Setup step, the improve engine picker) so none of them re-derives
             # readiness from a different subset of the four gaps above.
             'seedvr2_ready': seedvr2_ready,
+            # Optional tiled lane: ready / which TTP classes are absent / the
+            # full-frame megapixel ceiling this GPU is good for (None = unknown
+            # card, and then the UI says nothing rather than inventing a number).
+            'seedvr2_tiling_ready': seedvr2_tiling_ready,
+            'seedvr2_tiling_nodes_missing': seedvr2_tiling_nodes_missing,
+            'seedvr2_ceiling_mp': seedvr2_ceiling_mp,
             # Klein assets PRESENT on disk but not real, loadable weights:
             # [{asset, filename, verdict, blocking, reason}]. Distinct from
             # klein_missing (the file exists, it just can't load) — drives the Setup
@@ -1759,6 +1867,15 @@ def probe(force=False) -> dict:
         # Lets the front adapt the watermark Clean tooltip: when False, Clean is
         # crop-only (LaMa-routed watermarks are skipped with an install hint).
         'watermark_inpaint': watermark_inpaint['ok'],
+        # The dedicated detector extra. True → 🚩 Find runs the classifier instead
+        # of the vision model (roughly ten times faster, and it does not need
+        # Ollama at all). False changes NOTHING: the vision model still does the
+        # work, so this only ever unlocks a faster route, never blocks the old one.
+        'watermark_detect': watermark_detect['ok'],
+        'watermark_detect_detail': watermark_detect['detail'],
+        # The measured flag threshold, published so the panel and the Settings
+        # field quote the SAME number the pass will actually use.
+        'watermark_detect_threshold': _watermark_detect_threshold(),
         # Klein-inpaint (V2, quality) readiness = same as the Klein engine (ComfyUI
         # reachable + Klein models on disk). The custom-node preflight is a clean-time
         # 409. Greys the batch's "Klein (quality)" option when False.
