@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-review-no-longer-claims-an-empty-filter',
+    date: '2026-08-03',
+    title: '▶ Review and “Select all in filter” no longer claim your filter is empty when it is not',
+    blurb:
+      'If you updated LDS without restarting the server, pressing ▶ Review answered “Nothing to review — no image matches the current filter” and Select all in filter reported 0 selected — directly under a counter reading 1,128 shown of 1,128. Nothing was wrong with your filter. The page had already picked up the new version (the browser reloads it from disk), while the server was still running the old one and did not understand the faster request the new page makes — so it answered a different question, and the page read that as “no images”. It now tells you what actually happened and what to do about it: restart LDS. A filter that genuinely matches nothing still says so quietly, as before.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-03-caption-mismatch-names-your-family',
     date: '2026-08-03',
     title: 'The caption-mismatch warning names YOUR model family, not Z-Image',

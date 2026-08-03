@@ -23,6 +23,7 @@ import { folderSyncToast, forgetMissingConfirm } from './bankSync.js'
 import { UNDO_HINT, undoBannerText, undoOffer, undoResultMessage } from './bankUndo.js'
 // ≈/✂ marks, shown only while a group is still open (pure/testable).
 import { dupBadges, dupStateSuffix } from './bankDupBadge.js'
+import { idsFromResponse } from './bankIds.js'
 // Four progress states, not two — including the honest "I don't know" (pure/testable).
 import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } from './progressPresence.js'
 // An occupied bank refuses in OUR words, never in the server's (pure/testable).
@@ -118,7 +119,11 @@ async function fetchAllIds(bankId, params) {
   // table, which is what put seconds in front of ▶ Review.
   const qs = new URLSearchParams({ ...params, ids_only: '1' })
   const d = await apiFetch(`/api/bank/${bankId}/images?${qs}`)
-  return d.ids || []
+  // A MISSING `ids` key and an EMPTY one are different answers — see bankIds.js
+  // for why conflating them made the app report "no image matches the current
+  // filter" over a grid showing 1 128 of them. Both callers below surface a
+  // thrown message in an error toast, so the real cause reaches the user.
+  return idsFromResponse(d)
 }
 
 const STEP_SHORT = {
