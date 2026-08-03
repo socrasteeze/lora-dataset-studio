@@ -428,6 +428,13 @@ const TOPICS = [
      'review faster', 'grid', 'unscored', 'unscanned', 'not scored', 'greyed out',
      'disabled sort', 'bank', 'triage'],
     '/bank', 'using-the-app', 'sort-a-grid-to-review-faster'),
+  action('bank-tag-chips', 'Filter a bank by the tags of one image',
+    ['tag', 'tags', 'chips', 'tag chips', 'clickable tags', 'attributes',
+     'same tags', 'more like this', 'like this one', 'similar', 'find similar',
+     'by attribute', 'caption words', 'keywords', 'red dress', 'and',
+     'both tags', 'narrow', 'whole word', 'booru', 'prose', 'badge',
+     'label icon', 'bank', 'triage', 'caption'],
+    '/bank', 'using-the-app', 'find-more-images-like-this-one-by-attribute-not-by-look'),
   action('bank-exclude-words', 'Hide bank images that already carry a word',
     ['exclude', 'exclude words', 'hide', 'hide images', 'without', 'not',
      'inverse search', 'opposite of search', 'negative search', 'minus',
@@ -1143,7 +1150,11 @@ const TOPICS = [
      'flip', 'bank', 'crop'],
     '/datasets', 'using-the-app', 'rotate-a-sideways-image'),
   action('action-caption-generate', 'Generate captions',
-    ['caption', 'generate', 'joycaption', 'ollama', 'text'],
+    ['caption', 'generate', 'joycaption', 'ollama', 'text',
+     // Caption STYLE lives on this control: the prose/booru selector next to the
+     // button. Anima accepts both forms, so a user searching "booru" or "anima"
+     // must land here rather than conclude the app only does one of them.
+     'prose', 'booru', 'tags', 'style', 'anima', 'hybrid'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
   action('action-caption-options', 'Caption method options',
     ['caption', 'options', 'engine', 'model', 'ollama', 'pull', 'instructions', 'prompt',
