@@ -12,6 +12,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { bankFilterCount } from './bankFilterSummary.js';
 
 const workspace = fs.readFileSync(
   new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');
@@ -41,9 +42,13 @@ test('the tag filter is part of filterParams, so it reaches Select-all and Revie
 });
 
 test('an active tag filter counts as "filtered" in the N-shown readout', () => {
-  const m = workspace.match(/const isFiltered = !!\([\s\S]{0,300}?\)\n/);
-  assert.ok(m, 'found the isFiltered expression');
-  assert.match(m[0], /filter\.wd14Tags\?\.length/);
+  // isFiltered is now derived from bankFilterSummary.js (one source shared
+  // with the folded panel's header), rather than a hand-written boolean —
+  // assert the wiring AND the behaviour, so a facet can't quietly drop out
+  // of the count the way filter.wd14Tags never did the way filter.exclude and
+  // filter.origin once did.
+  assert.match(workspace, /const isFiltered = bankFilterCount\(filter, \{ labels: filterLabels \}\) > 0/);
+  assert.equal(bankFilterCount({ wd14Tags: ['blonde_hair'] }), 1);
 });
 
 test('picking a facet value replaces that facet, not appends to it', () => {

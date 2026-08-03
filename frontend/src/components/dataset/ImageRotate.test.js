@@ -18,6 +18,10 @@ const lightbox = read('./DatasetLightbox.jsx');
 const gridItem = read('./DatasetGridItem.jsx');
 const bankWorkspace = read('../bank/BankWorkspace.jsx');
 const bankReview = read('../bank/BankReviewLightbox.jsx');
+// The bank's selection rotate BUTTONS live in BankDecisionBar.jsx (the pinned
+// bottom bar) — rotateSelection() itself, and the endpoint it calls, stay in
+// BankWorkspace.jsx, which passes it down as a prop.
+const bankDecisionBar = read('../bank/BankDecisionBar.jsx');
 
 test('the dataset hook rotates once per image and cache-busts only on success', () => {
   assert.ok(hook.includes('`/api/dataset/image/${imageId}/rotate`'));
@@ -65,11 +69,13 @@ test('the dataset grid tile is deliberately NOT given rotate buttons', () => {
 test('the bank rotates a selection without ever writing to the user folder', () => {
   assert.ok(bankWorkspace.includes('`/api/bank/${bankId}/rotate`'));
   assert.match(bankWorkspace, /const rotateSelection = async \(degrees\)/);
-  assert.match(bankWorkspace, /rotateSelection\(-90\)/);
-  assert.match(bankWorkspace, /rotateSelection\(90\)/);
-  assert.match(bankWorkspace, /aria-label=\{`Rotate the \$\{selected\.size\} selected image\(s\) 90 degrees left`\}/);
+  // The buttons that call it live in the pinned selection bar, not inline.
+  assert.match(bankDecisionBar, /onClick=\{onRotateLeft\}/);
+  assert.match(bankWorkspace, /onRotateLeft=\{\(\) => rotateSelection\(-90\)\}/);
+  assert.match(bankWorkspace, /onRotateRight=\{\(\) => rotateSelection\(90\)\}/);
+  assert.match(bankDecisionBar, /aria-label=\{`Rotate the \$\{count\} selected image\(s\) 90 degrees left`\}/);
   // The promise made in the tooltip is the one the backend keeps.
-  assert.match(bankWorkspace, /Your own files are never modified/);
+  assert.match(bankDecisionBar, /Your own files are never modified/);
   // A cached thumbnail (max-age=3600) would otherwise keep the old orientation.
   assert.ok(bankWorkspace.includes('${img.rotation ? `?r=${img.rotation}` : \'\'}'));
 });

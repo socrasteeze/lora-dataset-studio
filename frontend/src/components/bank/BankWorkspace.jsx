@@ -25,7 +25,10 @@ import { spreadReadout, spreadCoverageNote } from './coverageVisual.js'
 import { axisRows, axisSummary } from '../dataset/datasetCoverage.js'
 // Source-folder re-walk messages (pure/testable).
 import { folderSyncToast, forgetMissingConfirm } from './bankSync.js'
-import { UNDO_HINT, undoBannerText, undoOffer, undoResultMessage } from './bankUndo.js'
+import { undoOffer, undoResultMessage } from './bankUndo.js'
+import BankDecisionBar from './BankDecisionBar.jsx'
+import { bankFilterSummary, bankFilterCount } from './bankFilterSummary.js'
+import { initialFiltersOpen, loadFiltersOpen, saveFiltersOpen } from './bankFilterPanelOpen.js'
 // ≈/✂ marks, shown only while a group is still open (pure/testable).
 import { dupBadges, dupStateSuffix } from './bankDupBadge.js'
 import { idsFromResponse } from './bankIds.js'
@@ -162,43 +165,12 @@ function ProgressUnknown({ stale }) {
   )
 }
 
-/** ↩ The net under the bank's biggest gesture.
- *
- * Deliberately NOT a toast: a bar that vanishes after four seconds is unusable
- * for anyone who reads slowly, and this is the one control you reach for after
- * realising you just marked 400 images wrong. It stays until it is used,
- * dismissed, or replaced by a newer action — and it is fed by the bank payload,
- * so it is still there after a reload, unlike an undo that only ever lived in
- * this tab.
- *
- * `role="status"` + `aria-live="polite"` so a screen reader is told the net
- * exists at the moment the bulk action lands, without stealing focus from the
- * grid. Both controls are real buttons, in tab order.
- */
-function UndoBar({ offer, busy, onUndo, onDismiss }) {
-  if (!offer) return null
-  return (
-    <div role="status" aria-live="polite"
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-sm text-content">
-      <p className="m-0 min-w-0 grow basis-full sm:basis-auto">
-        <span aria-hidden>↩</span>{' '}
-        <span className="font-semibold">{undoBannerText(offer)}</span>
-        <span className="block text-xs text-content-muted sm:inline sm:before:content-['_—_']">
-          {UNDO_HINT}
-        </span>
-      </p>
-      <button type="button" onClick={onUndo} disabled={busy}
-        className="rounded border border-sky-400/60 px-2 py-1 text-xs font-semibold hover:bg-white/10 disabled:opacity-50">
-        {busy ? 'Undoing…' : '↩ Undo'}
-      </button>
-      <button type="button" onClick={onDismiss} disabled={busy}
-        title="Keep the change and hide this"
-        className="rounded border border-border px-2 py-1 text-xs text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50">
-        Dismiss
-      </button>
-    </div>
-  )
-}
+// ↩ The undo offer used to render here as its own bar. It now lives inside
+// BankDecisionBar, sticky at the bottom of the page: a bulk decision is made
+// from wherever the selection bar is (the bottom, on any page long enough to
+// scroll), so the offer to take it back has to appear in the same place —
+// an undo banner pinned at the TOP of the page is invisible exactly when it
+// is needed. See BankDecisionBar.jsx.
 
 function ProgressBar({ activity, onCancel, offline = false }) {
   const presence = progressPresence(activity, offline)
@@ -652,6 +624,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [showSelected, setShowSelected] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [tileSize, setTileSize] = useState('M')
+  // 🔎 The filter panel folds behind a one-line summary on a narrow screen.
+  // Decided ONCE at mount (see bankFilterPanelOpen.js for why) — a stored
+  // chevron choice always wins, and with none yet it opens wide, folds narrow.
+  const [filtersOpen, setFiltersOpen] = useState(() => initialFiltersOpen({
+    stored: loadFiltersOpen(),
+    viewportWidth: typeof window === 'undefined' ? undefined : window.innerWidth,
+  }))
+  const toggleFilters = () => setFiltersOpen((v) => { const next = !v; saveFiltersOpen(next); return next })
   // Caption register for the 🏷️ Caption pass ('' = model's own wording). Explicit is
   // the NSFW lane — same registers as the dataset caption, passed per-run.
   const [captionVocab, setCaptionVocab] = useState('')
@@ -859,6 +839,21 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     const f = { ...filter, ...patch }
     setFilter(f); setOffset(0); setSelected(new Set()); exitSelectionView()
     refreshImages(f, 0, { on: false })
+  }
+
+  // Every facet off at once — the antidote to a folded panel making the grid
+  // look like it lost images. `sort` is NOT reset: a ranking is not a filter
+  // (it changes which image is first, never which images match) and it is a
+  // remembered per-bank preference, same as the "Clear all" tooltip says.
+  // Clears the two text boxes and the 🏷️ tag-picker state too — setF alone
+  // only resets `filter`, and would leave the boxes showing words that no
+  // longer explain anything on screen.
+  const clearAllFilters = () => {
+    setSearchText(''); setExcludeText('')
+    setTagSource(null); setTagPicked(new Set())
+    setF({ status: null, flag: null, cluster: null, style: null, subfolder: null,
+      search: null, exclude: null, tags: null, resBucket: null, origin: null,
+      wd14Tags: [], framing: null })
   }
 
   // Sort only reorders — the same rows match, so the selection (a set of ids)
@@ -1280,10 +1275,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const availableScoreFlags = SCORE_REJECT_FLAGS.filter(
     (f) => (f === 'watermark' ? watermarkScanned : scored) > 0)
   const canPromote = (counts?.keep || 0) > 0 || selected.size > 0
-  // Is any facet narrowing the grid? Drives the "N shown of TOTAL" readout.
-  const isFiltered = !!(filter.status || filter.flag || filter.cluster != null
-    || filter.style != null || filter.subfolder != null || filter.search
-    || filter.resBucket || filter.framing || filter.tags?.length || filter.wd14Tags?.length)
+  // Is any facet narrowing the grid, and what would you call it? ONE source
+  // for both — bankFilterSummary.js — so the "N shown of M" readout and the
+  // folded panel's header can never disagree. This replaces a hand-written
+  // boolean that had quietly stopped counting `filter.exclude` and
+  // `filter.origin`: set only an exclude term or an origin chip and the old
+  // readout said "412 shown" with no "of 9,004" behind it.
+  const filterLabels = { FLAG_LABEL, RES_BUCKETS, FRAMING_BUCKETS, ORIGIN_BUCKETS }
+  const filterSummary = bankFilterSummary(filter, { labels: filterLabels })
+  const isFiltered = bankFilterCount(filter, { labels: filterLabels }) > 0
 
   // 🔖 Tag pass + facets. The grouping is pure and lives in bankTagFacets.js;
   // this only decides whether to show it and what is currently picked.
@@ -1387,9 +1387,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       </header>
 
       <ProgressBar activity={payload?.activity} onCancel={cancelJob} offline={!connection.online} />
-
-      <UndoBar offer={undoBar} busy={undoBusy} onUndo={undoLast}
-        onDismiss={() => setUndoDismissedAt(undoBar?.at || 0)} />
 
       {!live && payload?.pipeline_report
         && payload.pipeline_report.finished_at !== dismissedReportAt && (
@@ -1597,8 +1594,41 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         </div>
       )}
 
-      {/* Search, subfolder scoping, and the grouped flag filters. */}
+      {/* Search, subfolder scoping, and the grouped flag filters — folded
+          behind a summary header. ~29 chips across seven groups plus two text
+          boxes, a subfolder select, the 🔖 facet dropdowns, the 🎚 thresholds
+          disclosure and the View row wrap to roughly fifteen rows on a 390 px
+          phone — about a thousand pixels between the top of ② Triage and the
+          first thumbnail. The header never hides WHAT is filtering: this app
+          already treats a filter you can't see as data loss (the 🚫 Exclude
+          box is deliberately never persisted for the same reason), and a
+          folded panel would recreate that risk inside one session if its
+          summary line went silent. bankFilterSummary.js is the one place that
+          turns the filter state into words, shared with the isFiltered count
+          above so the two can never disagree. */}
       <div className="space-y-2.5 rounded-lg border border-border bg-surface px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={toggleFilters}
+            aria-expanded={filtersOpen} aria-controls="bank-filter-panel"
+            title={filterSummary.count ? filterSummary.title : undefined}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left">
+            <span aria-hidden className="shrink-0">🔎</span>
+            <GroupLabel>Filters</GroupLabel>
+            <span className={`min-w-0 truncate text-xs ${filterSummary.count ? 'text-content' : 'text-content-subtle'}`}>
+              {filterSummary.text}
+            </span>
+            <span aria-hidden className="ml-auto shrink-0 text-content-subtle">{filtersOpen ? '▲' : '▼'}</span>
+          </button>
+          {filterSummary.count > 0 && (
+            <button type="button" onClick={clearAllFilters}
+              title="Clear every filter and show the whole bank again. The grid ORDER is a separate, remembered preference and is left alone."
+              className="shrink-0 rounded border border-border px-2 py-0.5 text-[11px] text-content-muted hover:bg-surface-raised hover:text-content">
+              ✕ Clear all
+            </button>
+          )}
+        </div>
+        {filtersOpen && (
+        <div id="bank-filter-panel" className="space-y-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[12rem] max-w-md flex-1">
 
@@ -1946,6 +1976,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {tileSize === 'M' ? 'Small tiles' : 'Medium tiles'}
           </button>
         </div>
+        </div>
+        )}
       </div>
 
       {/* Results readout + selection actions */}
@@ -2030,33 +2062,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {showSelected ? '↩ Show all' : `Show selected (${selected.size})`}
           </button>
         )}
-        {selected.size > 0 && (
-          <>
-            <button type="button" onClick={() => { setSelected(new Set()); if (showSelected) { exitSelectionView(); setOffset(0); refreshImages(filter, 0, { on: false }) } }}
-              className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">Clear</button>
-            <button type="button" onClick={() => batchStatus([...selected], 'keep')}
-              className="rounded-md border border-emerald-400/50 bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20">✓ Keep</button>
-            <button type="button" onClick={() => batchStatus([...selected], 'reject')}
-              className="rounded-md border border-rose-400/50 bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/20">✕ Reject</button>
-            <button type="button" onClick={() => batchStatus([...selected], 'pending')}
-              className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">↺ Undecided</button>
-            {/* 🔄 Rotate the selection. Your own files are never rewritten: the
-                angle is stored on the row and applied to what the app shows and
-                to what it promotes — so four turns cost the original nothing. */}
-            <button type="button" onClick={() => rotateSelection(-90)}
-              aria-label={`Rotate the ${selected.size} selected image(s) 90 degrees left`}
-              title="Rotate 90° left (counter-clockwise). Your own files are never modified — the turn is stored and applied to what you see and to what gets promoted."
-              className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
-              <span aria-hidden="true">↺</span> Rotate left
-            </button>
-            <button type="button" onClick={() => rotateSelection(90)}
-              aria-label={`Rotate the ${selected.size} selected image(s) 90 degrees right`}
-              title="Rotate 90° right (clockwise). Your own files are never modified — the turn is stored and applied to what you see and to what gets promoted."
-              className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
-              <span aria-hidden="true">↻</span> Rotate right
-            </button>
-          </>
-        )}
+        {/* Clear / ✓ Keep / ✕ Reject / ↺ Undecided / rotate used to live here,
+            inline — which meant scrolling past the whole filter panel above
+            to reach them after selecting thumbnails at the bottom of the
+            page. They now live in BankDecisionBar, pinned to the bottom of
+            the viewport wherever the selection actually is. See that file. */}
       </div>
       </ZoneSection>
 
@@ -2459,6 +2469,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </>
       )}
+
+      <BankDecisionBar selected={selected}
+        onKeep={() => batchStatus([...selected], 'keep')}
+        onReject={() => batchStatus([...selected], 'reject')}
+        onUndecided={() => batchStatus([...selected], 'pending')}
+        onRotateLeft={() => rotateSelection(-90)}
+        onRotateRight={() => rotateSelection(90)}
+        onClear={() => { setSelected(new Set()); if (showSelected) { exitSelectionView(); setOffset(0); refreshImages(filter, 0, { on: false }) } }}
+        undoOffer={undoBar} undoBusy={undoBusy} onUndo={undoLast}
+        onUndoDismiss={() => setUndoDismissedAt(undoBar?.at || 0)} />
 
       {promoteOpen && (
         <PromoteDialog bankId={bankId}
