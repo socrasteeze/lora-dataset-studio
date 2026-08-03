@@ -15,6 +15,10 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-08-03 | *(fix)* + dist | **The phone layout drew at 73% of the screen, and the cause was a one-pixel invisible box.** Reported from mobile/PWA: on the dataset page the header bar, the section chips and every card rendered at about three quarters of the screen width with dead space down the right. **Diagnosed live rather than by eye** — the served app at a 440 px viewport reported `innerWidth` 598 and `documentElement.scrollWidth` 598 while `body.scrollWidth` stayed 440, which is the signature of an element escaping the body and widening the document, and 440/598 = 73.6% is exactly the ratio measured off the screenshot's pixels. The escapee: `overflow-x-auto` clips a descendant only when the scroller is ALSO its containing block, and a `position: static` box never is — so the `.sr-only` label inside a NavBadge count (Tailwind implements `.sr-only` as `position: absolute` with no offsets) resolved against the document and kept its static position out at the far end of a rail 1123 px wide. Proven both ways in the live page before touching code: setting `position: relative` on the rail took the document 598 → 440, reverting took it back to 598. Fixed with `relative` on the dataset sections rail, its destinations sibling, and the Settings and Guide rails — the last two are latent, not broken (Settings' rail is already 1217 px wide and would reproduce this the day a badge is added there). Screen-reader labels and rail scrolling both verified intact afterwards. Pinned by `tests/mobile-rail-containing-block.test.mjs`, verified red against the unfixed markup. Frontend 2337 → 2342 passed / 0 failed. |
+| 2026-08-03 | *(merge)* + dist | **Upstream sync, third merge of the day — 2 commits, both adopted whole.** `b053ea1c` (🧬 Blend: load every ticked checkpoint into ONE generation from the Canvas board, each on its own weight slider) and `c28be7a8` (Coverage gains the two axes labels cannot see — visual spread from the CLIP embeddings ✨ Score already cached, and caption variety from the 🏷️ lexicon). **Checked, not assumed, on the two things that could have gone wrong quietly:** (1) `b053ea1c` renames Combine→Blend and the commit says labels-only — verified against the code, not the message: `studioComp_mode`, `'combine'`, `combine: true`, `studio-combine-loras` and `combineBlocker` all still present, so nothing in localStorage or on the wire moved (CLAUDE.md rule 7); (2) its `cloud_training.py` and `LineageCanvas.jsx` hits are NOT Divergence 4 — the first adds `trigger_word` to `canvas_dataset_index` (that file hosts the Canvas index despite its name) and the second passes `triggerWord` into a pick, deriving no lane from `configured`, so diagnostic 16 does not fire. **The one real catch:** upstream's import block in `BankWorkspace.jsx` drops `forgetMissingConfirm` from the `bankSync.js` import — fork-only (their `bankSync.js` never exported it) and called at line 708, so taking their side wholesale would have shipped a `ReferenceError` on the "forget missing" gesture. Kept, alongside their two new imports. Also aligned the ⚖️ Pick a balanced set glyph with upstream's (the fork carried a bare U+2696 where upstream has U+2696 U+FE0F — leftover drift from the retired Divergence 3), so the Guide and the button now agree. Prepend-vs-prepend on `whatsNew.js` resolved keep-both, upstream on top: 392 entries, no fused blocks, no duplicate ids. Merge-added rejected-feature lines: 0. Tests: frontend 2313 → 2337 passed / 0 failed; backend 5049 → 5065 passed / 16 skipped / 0 failed. |
+| 2026-08-03 | *(merge)* + dist | **Upstream sync — 13 commits over two merges, and six of them are this fork's own bug reports coming home.** The whole GitHub #20 batch landed upstream overnight (`b1a3d7bd` ref-edit Keep logger, `9c3ddad0` Ollama pull read timeout, `bb2df2e6` dead `ComfyUIService.queue_prompt`, `dd1e355d` Klein bare-name guard on Linux, `f99567df` Ollama fence `down` state, `f089ebb5` Docker launcher assertion), each credited "Reported by socrasteeze". **Four of the six were already fixed here, so the real work was comparing two independent fixes for the same bug and keeping theirs** — which retires four carried patches. **Divergence 7 is now one bullet: `_CLAIM_MAX_AGE_S`**, which upstream's fence fix re-adds and which cannot ever fire (`now > deadline + 30` sits in the same `or` and is true first) — dropped again, with the reasoning kept in the file so the next sync does not re-adopt it silently. Adopted whole: `602c7720` (Browse… opens the modern Windows folder dialog via COM interop under PowerShell 5.1), `316b2ec9` (🏷️ tag chips — click an image's tags to find the images that share them; its own `tags` payload key, AND matching, whole-word), `db0c380e` (the scoring pass counts rows it WROTE, not paths it asked about), `acafb43f`, `4fa37172` (Anima is hybrid-prompting: booru AND prose), `a66591ae` (the caption-mismatch refusal names YOUR family). Rejected: `ad809fa6`, upstream's `build(frontend):` dist — restored to this fork's bundle and rebuilt separately, as always. **The near-miss worth reading is new diagnostic 23**: `git checkout --theirs` on a ONE-hunk conflict in `face_dataset_service.py` silently restored upstream's ENTIRE file — the whole API fan-out lane, `chatgpt_image`, `_run_nanobanana_batch`, `API_ENGINES = ('nanobanana', 'chatgpt', 'openrouter')` — with zero conflict markers left and a clean `--diff-filter=U`. Caught only by sweeping merge-ADDED lines (64 hits in one file), then redone per hunk: 0 hits, both merges. `BankWorkspace.jsx` was the one real keep-both: the fork's `dupBadges()` (still-open groups only) kept, upstream's superseded raw `dup_group` badges dropped, its new 🏷️ BUTTON adopted. Both Divergence-5 carriers upstream edited this window (`test_anima_family.py`, `test_bank_pass_survives_deleted_image.py`) were checked line-by-line and survived. Also ported upstream's new Keep-failure test into `test_ref_edit_local_engines.py` (their copy lives in the API-lane suite this fork re-deletes), verified red without the module logger. Tests: frontend 2292 → 2305 passed / 0 failed; backend (from the repo ROOT, as CI runs it) 5031 → 5049 passed / 16 skipped / 0 failed. |
+| 2026-08-02 | *(merge)* + dist | **Upstream sync — 19 commits, and the headline is that a fork divergence ENDED: upstream ported the Klein model-file pins back from this fork's branch (GitHub #20) and Divergence 2 is retired.** `644ab5dd` / `54032d62` take `resolve_model_ref`, `_configured_model`, `klein_override_status`, `_stage_external_model` and `_unet_weight_dtype` under their original names, and `76b25466` then fixes a defect in the port — the pinned-file badge told the consistency LoRA row "Not found — auto-detection is used", naming a mechanism that slot does not have (there is no detection behind it; a miss means the LoRA is skipped). Upstream's version was taken on **all 34 conflicting hunks** across the eight D2 files, so the fork now runs the same code as upstream on a feature it used to carry alone. **The retirement sprang two traps, both of which take a feature backwards without failing anything, and they are new diagnostic 21**: upstream RELOCATED `KLEIN_OVERRIDE_KEYS` and `_PINNED_SUBDIR` inside `klein_edit_helper.py`, leaving the fork's copies outside every conflict (duplicate definitions, same value, silent); and `EnginesSection.jsx` put upstream's improved `overrideBadge` / `KleinModelFilesCard` INSIDE the conflict while the fork's older pair sat 700 lines below it, outside — a JS `function` redeclaration is legal and the **last one wins**, so the merge would have shipped upstream's fixed card as dead code and kept the superseded one live, undoing `76b25466` while the diff said it was adopted. Neither the bundler nor `no-undef` sees a redeclaration. Also adopted: **▶ Review opens in one `ids_only=1` request** instead of paging the whole grid (3 771 ms → 44 ms on upstream's 22 940-image bank); **sort by anything a pass measured** plus a 🚫 Exclude box; **text search can push down what you do not want** (CLIP cannot hear "without" — measured 60 % bikinis against a 10.1 % base rate on "a woman without a bikini", an inversion, not an imprecision); a **🔍 Coverage panel**; **both upscalers in the lightbox** with engine-true labels and a waiting-result badge; the **Pinokio launcher**; a dark `color-scheme` so the Sort menu's `<optgroup>` headers stop rendering as white bands; and the Docker test-mode timeout. **The substantive merge interaction was `image_bank_service.py`, and taking either side whole was wrong.** Upstream's `b87830f6` makes every bank pass survive an image deleted mid-pass, by re-reading each row through `_live_image` (`Session.get(..., populate_existing=True)`, which answers None instead of raising `ObjectDeletedError`). Three passes (faces, score, inpaint) auto-merged and took that fix verbatim. The other five are the ones **this fork rewrote in the db-lock wave** to hold no ORM rows at all — and there upstream's side would have reverted the write-lock fix (the ORM row is dirtied again by `_discard_clean_blob`) *and* deleted the fork's remote-peer support outright, because their loop hardcodes `map_vision(prepared(), ask, ...)` where the fork branches on `source` being the peer stream or the local pool. Resolved by keeping the fork's staged-write shape and adopting upstream's liveness half as an **existence test only** — which is safe here for the reason the original bug report identified: the hazard was a SELECT autoflushing DIRTY ORM rows, and with every write staged as plain data there is nothing dirty for a read to flush. That buys both properties at once: the pass no longer pays a ~1.7 s Ollama call for a row that is gone, and the write transaction still never spans an inference call. **The counter that came with it is new diagnostic 22**: upstream's `vanished` tally is defined at the TOP of each pass and reported at the BOTTOM, and in all five fork-owned passes the bottom half auto-merged clean while the top half was inside the conflict — five `NameError`s waiting at the very end of a job that runs for minutes to hours, which is exactly where a suite is least likely to reach. **One correctness fix went in on top rather than being merged**: the caption pass fails the job when it produced no captions ("the caption engine answered nothing"), which becomes a lie when the images were deleted instead — it now only blames the engine when nothing vanished. **Two What's-new entries were deliberately DROPPED**, and this is the editorial call of the sync: upstream's `2026-08-02-klein-model-paths` and `2026-08-02-klein-model-file-pins` announce the Klein pins as new, and on this fork they shipped on **2026-07-19** with their own entries. Prepending them would have lit the unseen badge to tell these users about a feature they have had for two weeks. **Rejected**: `engines.chatgpt_auth` and the `nanobanana`/`chatgpt`/`openrouter` keywords upstream re-added to the enabled-engines help topic (D1, keeping their genuine keyword enrichment on the `klein.unet` row), and upstream's `test_service_fanout_refuses_nsfw_on_api_engines`, which calls a `generate_variations_nanobanana` this fork does not have — its sibling route test is kept, renamed to `test_generate_route_refuses_removed_api_engines`, which is what it actually asserts here. **Zero rejected-feature lines were ADDED by this merge** (diagnostic-2 sweep over merge-added lines only). **The sync also arrived carrying a fresh copy of the bug fixed yesterday**: upstream's new Pinokio instructions tell the user to install from `perfectgf/lora-dataset-studio`, i.e. a one-click installer for a different codebase — repointed in `README.md`, `docs/guide/getting-started.md` and `pinokio.js`, along with two pre-existing README pointers (the release download and the `git clone`) that had the same effect and were missed when `updates.repo` was fixed. Sponsorship and issue links stay upstream's on purpose. **The keep-both splice in `whatsNew.js` failed again, in a quieter shape than last time**: the boundary between upstream's last entry and the fork's first lost its `},\n  {`, so the two objects FUSED — and because duplicate keys are legal, the result was valid JavaScript that parsed, linted and built cleanly while `2026-08-02-bank-sort-every-measure` simply ceased to exist in `WHATS_NEW`. The 2026-07-29 version of this mistake broke the parse and ESLint caught it in seconds; this one was caught only by `release-notes-contract.test.mjs`'s *"no entry is swallowed by a merge"* (383 `id:` lines against 382 parsed entries), which is a test whose entire purpose is this failure and which earned its keep on the first sync after it was written. A silently dropped entry is also a silently dropped RELEASE note, since the notes are the diff of this file. `backend/run.py` was a genuine keep-BOTH: upstream added `_announce_when_ready` to print `[LDS] Ready on <url>` (Werkzeug's own banner goes to `data/app.log`, so a launcher reading the terminal waits forever) while the fork carries browser-opening at the REAL bound address with the LAN token and a Settings switch. Merged into one readiness thread — one `/api/health` probe, both jobs — since they want the same moment; the announcement is now unconditional, because a launcher needs the address even when the browser is off. `start.js` additionally sets `LDS_NO_BROWSER=1`: upstream's comment says LDS_OPEN_BROWSER is "intentionally not set", which is not enough here, where `server.auto_open_browser` DEFAULTS to true and would pop a second browser beside Pinokio's own tab. **One more duplicate, in prose this time**: `docs/guide/settings-reference.md` auto-merged with ZERO conflict markers into TWO `### Klein model files (optional)` sections — the fork's older one and upstream's fuller port, 95 lines apart, with the duplicate heading also splitting the anchor the help registry points at. Upstream's is a strict superset (it keeps the per-dataset-picker precedence and the wrong-kind-of-file caveat and adds the "present but unreadable" explanation), so the fork's 18 lines were deleted. Carried under Divergence 5: upstream's new `test_bank_pass_survives_deleted_image.py` mocks `_drive_infer_subprocess` with their positional signature and this fork passes `stall_label=`/`busy_detail=`, so 2 of its 8 cases failed — and failed through the suite's own helper as *"one image deleted mid-pass killed the whole pass"*, blaming the feature under test for a mock that never matched. Widened to `**_kwargs`; the other 6 passed unaided, which is the useful signal, since those six cover the passes whose loops were re-engineered here rather than taken. Gates: lint clean (ESLint's own output, diagnostic 11); build clean; local-only contract **8/8** against the rebuilt bundle; `create_app()` OK; frontend **2236 → 2292/2292**; backend, run from the repo ROOT as CI does, **4961 → 5031 passed (+70), 16 → 16 skipped, 0 → 0 failed**. |
 | 2026-08-02 | *(merge)* + dist | **Upstream sync — 54 commits, a React 19 / react-router 8 migration, and a global request guard that broke the one route it had never met.** Adopted: **SeedVR2 as a second local upscaler** (a `ComfyUI-SeedVR2_VideoUpscaler` node pack + two downloaded models, offered beside Klein improve, added to the feature matrix); **Krea generation-LoRA presets** (a Settings card + per-run picker mirroring Klein's, both engines resolving their OWN preset list so one name can mean two different chains); **the whole Docker launcher restructure** — `start-docker.bat` now adopts an EXISTING host ComfyUI (folder picker, port auto-allocation 5050-5149/8188-8287, an explicit Ollama choice inside Setup instead of silent download) while `start-docker-gpu.bat` keeps the isolated fresh-ComfyUI path; the watermark pass now commits **once per image traversed**, not once per 25 parsed answers, closing a hold-window upstream's own instrumentation found beyond what this fork's existing periodic flush already bounded; and `_release_db_before_inference()`, a bare commit inserted before every hour-long face/score child process to close whatever the ORM's autobegin opened on the read side. **The React 19 / react-router 8 bump needed a real `npm install`, not `npm ci`**: taking upstream's `package-lock.json` wholesale left `node_modules` on router 6.30 + React 18, and `npm ci` itself refused (`Missing ... from lock file` on several transitive deps) — the lockfile was resolved against a different npm run than this checkout's. Diagnostic 6 caught the aftermath: `EnginesSection.jsx`'s new SeedVR2 model-list fetch called `useEffect` with only `useState` imported, invisible until lint ran on the freshly-built dist. **Rejected** (Divergence 4, fifth consecutive sync): the whole rented-GPU launch dialog (three hunks against an empty HEAD side, again), the `VastKeyGuide` card and its ten cloud settings, and every `cloud.*` help-registry topic — upstream's three new `trainingMode.test.js` assertions collapsed into one inverted test, per the established pattern. **The catch, and it is the fifth diagnostic-6 hit this fork has logged**: `TrainingPanel.jsx` still imported `cloudUnsupportedFamilyReason` from `trainingFamilyScope.js` after its only caller (the rejected dialog) was deleted — an orphaned import with zero runtime effect, caught only by `trainingFamilyScope.test.js` asserting the panel spells it out; re-pointed to assert the import's ABSENCE instead, since the helper itself stays defined and unit-tested for the day this fork's D4 stance changes. **A genuine bug this sync's own new guard introduced, found by a pre-existing test rather than anything this fork wrote**: `9cb3ddc9`'s app-wide `reject_unparsable_json_body` before_request hook calls `request.get_data(cache=True)` on every strict-method `/api/` write to catch a body that silently degrades to `{}` — and that call buffers the WHOLE WSGI input stream, which `cluster.peer_upload_artifact` (a fork-only route with no upstream equivalent) then reads a second time via `request.stream` in 1 MiB chunks to avoid holding a LoRA checkpoint in memory. The guard's own multipart skip didn't cover it — the peer upload is `application/octet-stream`, not multipart — so a real peer training upload would silently write a 0-byte file while answering 200. Fixed by skipping `application/octet-stream` before the buffering call, alongside multipart, with a regression test added to the guard's own suite (`test_json_body_strict.py`) verified to fail without the skip. Two of the three CI-run failures traced to test infrastructure rather than product bugs: `test_bank_infer_no_db_lock.py`'s two new tests mocked `_drive_infer_subprocess` with a 7-positional-argument signature, missing this fork's own `stall_label`/`busy_detail` kwargs (the CUDA-interpreter stall watchdog upstream doesn't have); widened to `**_kwargs`. `test_dataset_job_dispatch.py` carried a HARDCODED engine-list test that upstream's own commit message says doesn't work (`test_dataset_job_harvest.py`'s AST-based discovery supersedes it) — taken, not kept alongside. Gates: lint clean; build clean (after `npm install`); local-only contract 8/8 against the rebuilt bundle; `create_app()` OK; frontend 2138 → 2230/2230; backend 4642 → 4945 passed / 16 skipped / 0 failed, run from the repo root as CI does. **One editorial call, not obviously mechanical, recorded rather than silently made**: upstream's own README has quietly been ~250 lines shorter than this fork's for a long time (a "quick visual tour" table + a pointer to `docs/guide/workflow.md`, no numbered walkthrough, no Recent-improvements changelog) — today's real upstream diff to it was only 52 insertions / 19 deletions, folded into the fork's existing long-form structure rather than adopted wholesale; the fork's structure is kept on the grounds that CLAUDE.md's own README rule ("not a changelog") is already satisfied by it, and switching would need a dedicated pass to re-point every internal anchor this file and its ToC depend on. |
 | 2026-08-01 | *(merge)* + dist | **Upstream sync — 9 commits, and the D1 arrival was a file that did not exist an hour earlier.** Adopted: **the bank ceiling, counted against the FOLDER** (50 000 → 200 000, and a folder that once hit the cap could previously never accept another image because `refresh_bank` is deliberately additive and every deleted file kept consuming budget for ever); **🗑 Delete rejected as an ordinary bank job** (progress, Stop, chunked row drops) ; **Test Studio LoRA stacking** (`combine=True`, per-selection weights through the same `extra_loras` channel all three families already use, every trigger word injected) and a **✨ Enhance prompt** button that runs on the local Ollama client — in scope by the Divergence-1b principle, since it is `vision_ollama.generate_text_ollama`, not a provider; **Klein edits stop carrying a detail LoRA at 0.8** on four lanes that never asked for one (`klein.edit_base_lora_strength`, default 0.0); **canvas per-run strips in epoch order** plus each character lane's reference face; and **a verified install is no longer re-offered the Setup wizard** (`backend/app/setup_state.py` + a background re-probe). **The catch, and it merged with zero conflict markers because the file is BRAND NEW**: `setup_state.py`'s `TRACKED` tuple opens with `engines.nanobanana` / `engines.chatgpt` / `engines.openrouter` and `_RECOMMENDED_ENGINES` names all three — a fresh D1 surface that no re-delete list could have predicted and no conflict would have flagged. Stripped, and **deliberately NOT replaced with `engines.klein`/`engines.krea`**: upstream's three are durable (an API key stays valid while nothing is running), whereas Klein/Krea readiness follows ComfyUI being REACHABLE, so tracking them would report "ComfyUI is not running" as a REGRESSION — the exact nag the feature exists to remove, and upstream's own `test_comfyui_or_ollama_merely_stopped_is_not_a_regression` is what proved it (it fails against the klein-tracking version). `comfyui.dir_valid` is the durable half of that question and stays. **Rejected**: `a539370b`'s first half — the 80 GB GPU picker's `HF_CLOUD_TOKEN` banner, `CustomBasePushSection` and the whole `CloudLaunchDialog` arrived as ONE conflict hunk against an empty HEAD side (D4, fourth consecutive sync), together with its two What's-new entries; its second half (`_set_soft` on the cloud monitor's progress heartbeat) is dormant backend and was taken. Upstream's three new `trainingMode.test.js` cases pin that dialog and were **INVERTED to assert its absence** rather than deleted, per the documented pattern. **One real merge interaction, resolved as keep-BOTH rather than either/or**: upstream replaced `image_bank_service`'s row-by-row insert with a chunked CORE insert (`_insert_bank_images`, 141 → 35 µs/file) while this fork carries `_register_bank` (the split's `root_only` bank) and the db-lock fix that commits instead of flushing. Taking upstream's `create_bank` verbatim would have reintroduced that lock bug in a worse form — its `db.session.flush()` opens the write transaction and the new code then runs up to 200 000 `os.path.getsize` syscalls inside it. The fork's structure keeps the commit, and `_insert_bank_images` builds its whole row list BEFORE the first insert statement, so the size walk holds no lock at all; `refresh_bank` took upstream's side whole, where the same ordering already holds. `routes/__init__.py` was a one-line keep-both (`setup_state` + the fork's `cluster`). **Two fork tests went red, both fairly**, and the first is the more interesting: `test_creating_a_bank_saves_as_it_walks` asserted mid-walk DURABILITY (≥500 rows committed 560 files in) as a proxy for "the write lock is not held across the walk". Upstream's chunked insert commits NOTHING mid-walk and holds the lock for none of it, so the proxy went false while the property it stood for got STRONGER. Rewritten to measure the property itself — a second connection takes `BEGIN IMMEDIATE` at the probe point — which is also what "database is locked" means to the rest of the app; verified to fail with the real `database is locked` when `_register_bank`'s commit is put back to a flush. `test_a_singleton_left_by_delete_rejected_is_not_badged` wanted a 200 from a route that is now 202 (the delete is a bank job; `bank_jobs` runs it inline under TESTING, so the body is still complete). Gates: lint clean; build clean; local-only contract **8/8**; `create_app()` OK; frontend **2092 → 2138/2138**; backend **4587 → 4642 passed, 14 skipped, 0 failed**, run from the repo ROOT as CI does. |
 | 2026-08-01 | *(merge)* + dist | **Upstream sync — 53 commits, and the biggest single reversal of a first-pass judgement this fork has made.** Adopted: the whole **GPU Docker stack** (~25 commits — `Dockerfile.gpu`, `docker-compose.gpu.yml`, `start-docker-gpu.bat`, `packaging/docker/{studio_launch.sh,healthcheck.py,seed_comfy_config.py}`, `backend/port_utils.py`), which ships ComfyUI INSIDE the container and so makes local generation work with nothing on the host — it still cannot train, and the README now says so rather than letting the capability table's "Available in Docker GPU mode" line argue with an Option 3 that called Docker curation-only; **Canvas** checkpoint-timeline playback, grid export, advanced filters and pin-batch concatenation; the **exact full-state training resume** (`aitoolkit_state_bridge`, `training_state_bundle`, `training_state_identity`, `backend/app/training_bridge/**`); a bank **promotion dHash cache**; and a CI torch-test job. **The reversal**: `f55ae7ab` "compare reference edits across engines" reads as a pure D1 rejection — the engines it compares are chatgpt/openrouter/klein/krea, and it rewrites four files D1c says this fork MAINTAINS (~1 300 added lines). Counting the lines that are actually provider-lane said otherwise: **5 of 421** in `reference_edit_jobs.py` (`claim_api_dispatch` + its `_api_dispatch_claimed` flag), **4 of 489** in `face_dataset_service.py`, **1 of 174** in `ReferenceEditModal.jsx`, and **zero** in `routes/datasets.py`, `referenceEdit.js` and `useDataset.js`. The batch/compare restructure is engine-agnostic; the cloud fan-out is a skin. Adopted whole and the lane excised — `reference_edit_jobs.py` now contains the string `api` **zero** times — so the fork keeps klein-vs-krea compare instead of diverging forever on a file upstream is actively rewriting. **Rejected**: `afd5656b` (a help link onto a rental price cap) and the **HF_CLOUD_TOKEN trio** (`1c4f99f8`/`2ff63352`/`f895e756`) — that token was the one thing the plan expected to SPLIT into a local write-token half and a cloud half, and it does not split: `1c4f99f8` touches `cloud_training.py` and `test_cloud_full_transformer.py`, and the token's stated job is reading `krea/Krea-2-Raw` for a rented run. **Five catches, and greps found none of them.** (1) `_all_ref_bytes` arrived CALLED and defined NOWHERE — upstream's new code invoking a helper this fork deleted, a `NameError` on every reference edit. Defined locally rather than importing upstream's, because upstream's is an EGRESS sanitiser that downscales to 2048 px for a base64 request; taking it verbatim would have silently degraded the reference of every local Klein edit, which is the opposite of the divergence's point. (2) `<FullArtifactStatus>` rendered at two sites with its definition inside a rejected hunk (diagnostic 18, from the other direction) — surface removed, not panel restored. (3) `cloudActiveHere` and then a whole `HF_CLOUD_TOKEN` notice, both auto-merged OUTSIDE every conflict region; the second was found only because a contract test was INVERTED to assert absence, which is the argument for inverting them rather than deleting them. (4) `test_cloud_full_transformer.py` merged with zero conflict markers and was caught by `test_no_personal_data` on a bearer token — the rejected-feature TEST FILE as carrier, third sync running. (5) An em-dash reached `requirements-dev.txt` from taking upstream's comment (CLAUDE.md rule 8). **One judgement call**: upstream added a LoRA / Full-model radio whose own tooltip says "cloud-only", against a `/train` that answers `full_transformer` with a 400 here — a control that could only ever fail. Radio removed, backend plumbing left dormant (which D4 permits), and the refusal reworded off "choose Cloud training" to name the real reason. Seven upstream tests were re-pointed rather than deleted, so a sync that reintroduces any of these surfaces fails here. Gates: lint clean; build clean; local-only contract **8/8 + 3/3**; `create_app()` OK; privacy/ASCII 7 passed; frontend **1973 → 2067/2067**. |
@@ -169,11 +173,22 @@ engines or local features) the local half is in scope, so it is here.
 - Divergence 3: the `✦` upstream puts on the button and heading is stripped —
   the button reads `Edit`, which is real text, not an empty control.
 
-**Upstream bug NOT copied:** upstream's `/ref/edit/keep` route calls
-`logger.exception(...)` in a module that never defines `logger` (it uses
-`logging.getLogger(__name__)` inline elsewhere), so its error path raises
-`NameError` inside the very `except` that exists to turn a failed Keep into an
-honest 500. This fork uses the inline form.
+**Upstream bug NOT copied — FIXED UPSTREAM 2026-08-03, divergence gone.**
+Upstream's `/ref/edit/keep` route called `logger.exception(...)` in a module that
+never defined `logger`, so its error path raised `NameError` inside the very
+`except` that exists to turn a failed Keep into an honest 500. This fork had
+side-stepped it with an inline `logging.getLogger(__name__)`. Upstream's
+`b1a3d7bd` defines the module logger, which is the better fix, so the route here
+is now byte-identical to theirs and the inline form is gone — **and the fork's
+comment explaining why it used the inline form went with it, because the merge
+made that comment false.**
+
+The test upstream added to pin it lives in `backend/tests/test_ref_edit.py`,
+which this fork does not carry (it is the API-lane suite — re-deleted on every
+sync). It was PORTED into `test_ref_edit_local_engines.py` as
+`test_keep_reports_a_failed_commit_instead_of_erroring_twice`, and verified red
+without the module logger. Without that port, re-deleting upstream's suite would
+have thrown away the only guard on a line this fork now depends on.
 
 **`frontend/src/utils/localEngineReason.js`** was adopted 2026-07-28 in the sync
 itself, ahead of the feature it arrived with, because it is not ref-edit plumbing:
@@ -345,17 +360,34 @@ Compatibility notes:
 - Stale `engines.*` keys and GEMINI/OPENAI entries in an existing
   `config.json`/`.env` are ignored — nothing needs manual cleanup.
 
-## Divergence 2: Klein model-file pins (+ paths from anywhere)
+## Divergence 2: Klein model-file pins — RETIRED 2026-08-02 (upstream took it)
 
-Optional `klein.unet` / `klein.text_encoder` / `klein.vae` config keys pin the
-exact loader files, ahead of the auto-detection. Absolute paths outside every
-ComfyUI root are hardlinked/symlinked into `<models>/<type>/lds-pinned/` so
-stock loaders can open them (`_stage_external_model` in klein_edit_helper).
-Native / bf16 UNETs (filename without `fp8`) enqueue with `weight_dtype:
-default`. Touched: `backend/app/config.py`, `klein_edit_helper.py`,
-`watermark_klein.py`, `capabilities.py`, `EnginesSection.jsx`,
-`helpRegistry.js`, `docs/guide/settings-reference.md`,
-`backend/tests/test_klein_models.py`.
+**This divergence is over, and it ended the way the fork wanted it to.** Upstream
+ported the whole feature back from this fork's branch (GitHub #20) in
+`644ab5dd` / `54032d62`, keeping the entry-point names (`resolve_model_ref`,
+`_configured_model`, `klein_override_status`, `_stage_external_model`,
+`_unet_weight_dtype`), then fixed a defect in their own port (`76b25466`).
+All eight files this section used to list are now UPSTREAM's, and the sync took
+their version on all 34 conflicting hunks.
+
+What the fork still carries in those files is **Divergence 1**, not this one:
+`EnginesSection.jsx` drops the cloud cards, `helpRegistry.js` drops the
+`engines.chatgpt_auth` topic and the cloud keywords, `capabilities.py` and
+`config.py` drop the cloud probes and keys. Resolve those per hunk as always.
+
+**Two traps this retirement sprang, both of which take a feature BACKWARDS
+without failing anything** — the general lesson is diagnostic 21:
+
+- Upstream MOVED `KLEIN_OVERRIDE_KEYS` and `_PINNED_SUBDIR` to the top of
+  `klein_edit_helper.py`. The fork's copies sat outside every conflict, so
+  taking upstream's side left the module with two definitions of each. Same
+  value, so nothing failed.
+- `EnginesSection.jsx` was worse: upstream's improved `overrideBadge` /
+  `KleinModelFilesCard` landed inside the conflict while the fork's OLDER pair
+  sat 700 lines below it, outside. A `function` redeclaration is legal and the
+  LAST one wins — so the merge would have shipped upstream's card definition
+  dead and the fork's superseded one live, silently undoing `76b25466`'s fix.
+  Neither the bundler nor `no-undef` says a word about a redeclaration.
 
 ## Divergence 3: emoji-free UI — RETIRED 2026-07-29
 
@@ -538,6 +570,21 @@ filtered on hunks adding a `venv/.../bin/python` line.
   this sentence.** Upstream asked for this as a PR on 2026-08-02, so the
   retirement may come soon.
 
+**A second, unrelated entry, added 2026-08-02** — same section because it is the
+same shape (a bug in an upstream test, not a policy divergence), but a different
+bug and a different file:
+
+- `backend/tests/test_bank_pass_survives_deleted_image.py` — upstream's new
+  suite for the deleted-mid-pass fix mocks `_drive_infer_subprocess` with their
+  exact positional signature. This fork's score and face passes call it with
+  `stall_label=` and `busy_detail=` (the CUDA-interpreter stall watchdog upstream
+  does not have), so the mock raises `TypeError` — and the failure surfaces
+  through the suite's own `_assert_survived` helper as **"one image deleted
+  mid-pass killed the whole pass"**, which blames the feature under test for a
+  mock that never matched this fork's caller. Widened to `**_kwargs`, the same
+  one-line fix `test_bank_infer_no_db_lock.py` needed on 2026-08-02's earlier
+  sync; expect it on every new upstream suite that mocks that function.
+
 The section previously held the worked example of how these are meant to end:
 
 - ~~`backend/tests/test_face_mask_preview_progress.py` — an autouse
@@ -681,7 +728,7 @@ that means *this machine*", not "every one we have seen fail".
 verified to FAIL without the scoping (the barrier installs and the local
 `add_job` raises `ComfyUIRecoveryRequired`).
 
-## Divergence 7: fixes carried AHEAD of upstream, pending their own
+## Divergence 7: fixes carried AHEAD of upstream — one dropped line, one new fix
 
 Not a policy divergence and not a permanent one: bugs found here, reported
 upstream, and fixed here because waiting would leave this fork exposed. Upstream
@@ -689,36 +736,52 @@ has said it is taking each of these, so **expect a conflict on the next sync and
 prefer THEIR version when it arrives** — unless the reasoning below says
 otherwise. Delete an entry the moment its upstream fix lands.
 
-**One entry, added 2026-08-02:**
+**The 2026-08-02 entry is gone: upstream took it, and five others with it.** The
+whole six-fix batch reported from here as GitHub #20 landed upstream overnight
+(`b1a3d7bd`, `9c3ddad0`, `bb2df2e6`, `dd1e355d`, `f99567df`, `f089ebb5`) and was
+merged back on 2026-08-03. Every one of them is now UPSTREAM's code, so there is
+nothing left to carry and nothing left to re-apply. Four of the six had already
+been fixed here, so the sync's real work was comparing two independent fixes for
+the same bug and keeping theirs — see the changelog row.
 
-- `backend/app/services/ollama_gpu_fence.py` — `_probe` returning `'down'` for a
-  refused connection, instead of `'empty'`. Upstream's `61f80c5c` (merged here
-  in `cec9d4fe`) added claim persistence on top of a pre-existing refused →
-  `'empty'` mapping, which turned a harmless quirk into a lease persisted for a
-  model that never loaded — and, downstream of that, LDS unloading a model the
-  USER had loaded under the same name. Fixed here in `1701c4e7`.
+The fence entry (`ollama_gpu_fence.py`) was checked against the three things this
+section said to check, and upstream's version satisfies all three: the release
+paths still accept a stopped daemon (their `_RUNNER_HOLDS_NOTHING` tuple is
+exactly this fork's retired `_runner_is_idle` helper), `mark_before_generate`
+returns `'local'` and writes no claim, and `fence_status` reports
+`reachable: False`. Their file was taken whole.
 
-  **What to check when upstream's version arrives**, because these are the parts
-  that are easy to get subtly different:
-  - a stopped daemon must still satisfy the RELEASE paths (`_release_endpoint`,
-    `unload_foreign_models`, and the post-unload proof). Nothing resident means
-    nothing to release, and a daemon that is not running is the strongest form
-    of that proof. If their fix makes a refused probe fail those, ComfyUI stops
-    being handed the card whenever Ollama is off — a regression this fork's
-    `test_a_stopped_ollama_still_counts_as_a_free_runner_for_release` exists to
-    catch, and which passes either way against the OLD code, so it will not
-    announce itself.
-  - `mark_before_generate` must return something that lets the call proceed and
-    fail on its own connection error. Returning `'blocked'` is the tempting
-    shape and it lies: the user is told a model is in use outside LDS by a
-    daemon that is not running.
-  - `fence_status` must report `reachable: False`. The surfaces refused by the
-    fence poll it to notice the moment the fence lifts.
+**One line of it is deliberately NOT taken, and this is the only thing left of
+Divergence 7:**
 
-  Also removed here, and worth keeping removed: `_CLAIM_MAX_AGE_S`, which sat in
-  an `or` beside a 30-second slack test that always fired first. It could not
-  execute, while documenting a guarantee ("a claim never speaks for a runner an
-  hour later") that nothing provided.
+- `_CLAIM_MAX_AGE_S = 3600.0` — upstream's fix re-adds this constant and tests it
+  in `_adopt_persisted` as `now > horizon or now > deadline + _CLAIM_MAX_AGE_S`,
+  where `horizon` is `deadline + _CLAIM_SLACK_S` (30 s). Any `now` that satisfies
+  the second disjunct satisfied the first long before, so the clause **cannot
+  ever be the one that fires** — it is unreachable by construction, while
+  documenting a guarantee ("a claim never speaks for a runner an hour later")
+  that no code path provides. Dropped here, with the reasoning kept as a comment
+  above `_CLAIM_SLACK_S` so the next sync does not silently re-adopt it.
+  Behaviour is identical either way; that is precisely why nothing will fail if
+  it comes back, and why the note has to live in the file as well as here.
+
+  **If upstream ever makes it reachable** (by shortening the slack, or by testing
+  it against something other than the same deadline), this note is void — take
+  their version and delete this bullet.
+
+**Carried ahead as of 2026-08-03 — not yet reported upstream:**
+
+- `relative` on the three mobile chip rails (`DatasetWorkspace.jsx` ×2,
+  `SettingsPage.jsx`, `GuidePage.jsx`). Upstream has the same markup and
+  therefore the same bug: an `overflow-x-auto` rail that is `position: static`
+  is not the containing block for its absolutely positioned descendants, so the
+  `.sr-only` label inside a NavBadge escapes the scroller, keeps its static
+  position out at the far end of a 1123 px rail, and widens the DOCUMENT to
+  ~598 px against a 440 px viewport. Mobile Safari then shrinks the whole page
+  to fit and every bar draws at ~73% of the screen. Measured live at 440 px
+  before and after; pinned by `tests/mobile-rail-containing-block.test.mjs`.
+  **On the next sync, prefer whichever side has `relative`** — this is additive
+  and conflicts only if upstream rewrites the same className.
 
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
@@ -996,6 +1059,60 @@ a decision, and don't miss the parts that merge with zero conflict markers.
     a check against this fork's OWN routes, not just upstream's — `grep -rn
     "request.stream\b" backend/app/routes/*.py` before trusting a guard that
     reads the body itself.
+21. **When upstream PORTS a fork feature back, the fork's older copy of a moved
+    helper survives OUTSIDE the conflict — and in JavaScript it wins.** 2026-08-02,
+    the Klein pins (Divergence 2). Upstream relocated `KLEIN_OVERRIDE_KEYS` and
+    `_PINNED_SUBDIR` within `klein_edit_helper.py`, and rewrote `overrideBadge` /
+    `KleinModelFilesCard` in `EnginesSection.jsx`. Every relocation puts the NEW
+    definition inside the conflict and leaves the OLD one, hundreds of lines
+    away, untouched. In Python a re-binding is merely dead weight; in a JS module
+    a `function` redeclaration is legal and the LAST definition wins, so the
+    merge would have shipped upstream's fixed card as dead code and kept the
+    fork's superseded one live — reverting a fix while the diff says it was
+    adopted. `npm run build` and ESLint `no-undef` are both blind to it.
+    **After taking upstream's side on a ported feature, grep the file for every
+    top-level name in the hunk you took** and confirm each is defined exactly
+    once. `grep -c '^function <name>\|^const <name> ='` is the whole check.
+22. **An auto-merged TAIL can reference a variable the resolution never
+    defines** — diagnostic 6's class, arriving from the far end of the function.
+    2026-08-02: upstream's deleted-image fix added a `vanished` counter to eight
+    bank passes. In five of them the fork's own rewrite owned the loop, so the
+    resolution kept the fork's side — while the end-of-pass `if vanished:` line,
+    forty lines below the conflict, merged in clean. Five `NameError`s, each
+    raised only at the very END of a pass that runs for minutes to hours, i.e.
+    exactly where a test suite is least likely to reach and a user is most
+    likely to have already left. The tell is cheap: after resolving a file,
+    grep it for every identifier upstream's side introduced and check each has
+    a definition on the path that survived.
+23. **`git checkout --theirs <file>` is a WHOLE-FILE revert, not a hunk
+    resolution — it is diagnostic 4's blanket-revert wearing a safe-looking
+    name.** 2026-08-03, and it is the closest this fork has come to shipping
+    Divergence 1 back in. `face_dataset_service.py` had exactly ONE conflict
+    hunk (a five-line guard), so `--theirs` read as "take upstream's side of
+    that hunk". It does not: it checks out stage 3, i.e. upstream's entire file,
+    discarding the merge — which for this file means the whole API fan-out lane
+    returning at once, `from .chatgpt_image import ...`, `_run_nanobanana_batch`,
+    `API_ENGINES = ('nanobanana', 'chatgpt', 'openrouter')` and all. **Nothing
+    complained.** There were no conflict markers left, `git diff --diff-filter=U`
+    was empty, and the file imports modules this fork deletes, so even the build
+    equivalent would only have caught it at `create_app()` — after the commit.
+    What caught it was Phase 4 scoped to merge-ADDED lines: 64 hits in one file.
+
+    So: never use `--theirs`/`--ours` on a file that has any fork divergence —
+    which here is most of them. Resolve the hunk textually (take the region
+    between `=======` and `>>>>>>>` and leave the rest of the merged file
+    alone), and assert the hunk count while doing it (diagnostic 17). If you
+    have already run `--theirs`, `git checkout -m -- <file>` recreates the
+    conflict so you can redo it properly — note it re-labels the markers
+    `ours`/`theirs` instead of `HEAD`/`upstream/main`, which will break a
+    resolver script that pattern-matches the original labels.
+
+    The general rule this is an instance of: **a resolution that produces no
+    markers is not evidence of a correct resolution.** The only check that
+    speaks to correctness is diffing the result against the fork's pre-merge
+    HEAD and reading what the merge ADDED — `git diff <pre-merge-HEAD> --
+    . ':(exclude)frontend/dist'`, filtered on the rejected-feature patterns.
+    Run it every sync, not only when something feels wrong.
 
 ## Merge routine (every upstream sync)
 

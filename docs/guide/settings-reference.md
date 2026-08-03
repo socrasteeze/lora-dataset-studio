@@ -53,24 +53,6 @@ This fork generates exclusively on **local** engines, both running through Comfy
 - **Enabled engines** → `engines.enabled`. Which engines appear as cards in the generate panel. Default **`['klein', 'krea']`**. Both are free local GPU passes, so this is about what you actually have installed — Krea 2 Edit needs its own custom-node pack and four model files, and its card names whatever is still missing.
 - `engines.known` is **not a setting**: it is the ledger of which engines the app was offering the last time you saved this list, and it is what tells "this engine did not exist yet" apart from "I unticked it on purpose". Written automatically; `[]` or absent means the app assumes Klein was the only engine on offer — which is what makes Krea 2 Edit reach installs that had already saved their Settings. Delete it to be re-offered every engine.
 
-### Klein model files (optional)
-
-Pin the exact files the Klein graph loads instead of relying on auto-detection. Every field accepts **a full absolute path or a ComfyUI-relative loader name**; empty fields keep the default behaviour (canonical download filename first, then a narrow token scan of the ComfyUI model folders).
-
-- **Diffusion model (UNET)** → `klein.unet`. E.g. a full path from anywhere, or `klein/flux-2-klein-9b.safetensors` (bf16) / `klein/flux-2-klein-9b-kv-fp8.safetensors` under `models/unet`. This also lets you use a UNET that does **not** live in a `klein`-named subfolder (which the automatic scan would never find). The workspace's per-run Klein model picker still wins over this pin when you explicitly choose a model there. Default **empty** (auto-detect).
-- **Text encoder** → `klein.text_encoder`. Full path from anywhere, or relative to `models/text_encoders` — e.g. `qwen_3_8b.safetensors` (full) or `qwen_3_8b_fp8mixed.safetensors`. Default **empty**.
-- **VAE** → `klein.vae`. Full path from anywhere, or relative to `models/vae` — e.g. `flux2-vae.safetensors`. Default **empty**.
-- **Consistency LoRA** → `klein.consistency_lora`. Full path from anywhere, or relative to `models/loras`. The structure-anchoring LoRA chained onto the Klein edit graph; clearing the field disables it. Default `klein/Flux2-Klein-9B-consistency-V2.safetensors` (the Setup download location).
-
-How references resolve:
-
-- A **full path under any of ComfyUI's model folders** — including folders registered in `extra_model_paths.yaml` (the app parses it exactly like ComfyUI does) — is converted automatically to the relative loader name ComfyUI's nodes need, and the field shows **✓ found**.
-- A **full path anywhere else** (Downloads, an HF cache, another drive) is **hardlinked or symlinked** into `<ComfyUI models>/<type>/lds-pinned/` so stock loader nodes can still open it — same **✓ found** badge. The config keeps your original absolute path; the link is created on resolve.
-- A reference that **can't be resolved** (missing file, or linking failed) falls back to auto-detection instead of blocking generation, with a badge so the miss is never silent.
-- Native / bf16 UNETs (filename without `fp8`) run with `weight_dtype: default`; FP8 builds keep `fp8_e4m3fn`.
-- Generation-LoRA **preset rows** accept full paths the same way.
-- Pinning the wrong *kind* of file (e.g. another family's text encoder) is not validated — the generate will fail at sampling time with a shape error. The narrow auto-detection exists precisely to avoid that; only pin files you know are Klein-compatible.
-
 ### Krea 2 Edit (local)
 
 The second local engine. Where Klein *restages* your reference with a general instruction-edit model, **Krea 2 Identity Edit** is trained specifically to keep an identity: from a **single** reference photo it holds the face, the body and the permanent markings while changing the angle, framing, light, background and clothes — **with no character LoRA**. That is what makes it useful *before* a LoRA exists, which is the whole point of building a dataset.
@@ -147,6 +129,30 @@ Settings:
 - **Blocks offloaded to system RAM** → `seedvr2.blocks_to_swap`. Range `0`–`36`, default **`0`** (none, and fastest). Raise it to fit a bigger build on a smaller card: it trades speed for VRAM headroom and does not change the result.
 
 **There is no batch-size setting, on purpose.** SeedVR2's `batch_size` is a *video* window whose frames share temporal attention to stay coherent — feeding it unrelated dataset photos would let them bleed into each other. Images are upscaled one per job; throughput comes from the normal generation queue and its fan-out cap.
+
+### Klein model files (optional)
+
+*Contributed by socrasteeze (GitHub).* Pin the exact files the Klein graph loads instead of relying on auto-detection. Every field accepts **a full absolute path or a ComfyUI-relative loader name**; empty fields keep the default behaviour (the canonical download filename first, then a narrow token scan of the ComfyUI model folders).
+
+- **Diffusion model (UNET)** → `klein.unet`. A full path, or a name relative to a diffusion-model folder — e.g. `klein/flux-2-klein-9b-fp8.safetensors` under `models/unet`, or a bare filename for a file sitting at a folder root. This is also what lets you use a UNET that does **not** live in a `klein`-named subfolder, which the automatic scan would never find. Default **empty** (auto-detect).
+- **Text encoder** → `klein.text_encoder`. Full path, or relative to `models/text_encoders` — e.g. `qwen_3_8b_fp8mixed.safetensors`. Default **empty**.
+- **VAE** → `klein.vae`. Full path, or relative to `models/vae` — e.g. `flux2-vae.safetensors`. Default **empty**.
+- **Consistency LoRA** → `klein.consistency_lora`. Full path, or relative to `models/loras`. The structure-anchoring LoRA chained onto the Klein edit graph — this is the same key that was previously config-only. Unlike the three above it has a shipped default, so **clearing it disables the LoRA** rather than turning on auto-detection. Default `klein/Flux2-Klein-9B-consistency-V2.safetensors` (the Setup download location).
+
+How references resolve:
+
+- A **full path under any of ComfyUI's model folders** — including folders registered in `extra_model_paths.yaml` (the app parses it exactly like ComfyUI does) — is converted automatically to the relative loader name ComfyUI's nodes need, and the field shows **Found**. Nothing is copied or moved.
+- A **full path anywhere else** — Downloads, a Hugging Face cache, another drive — is **hardlinked (or symlinked) into `<ComfyUI models>/<type>/lds-pinned/`** so stock loader nodes can open it, and shows the same **Found**. Your config keeps the original absolute path; the link is created when the reference resolves, costs no extra disk, and is reused on later runs. Staged files are deliberately *not* put in a `klein`-named folder, so they never show up as a second copy in the Klein model picker.
+- A reference that **cannot be resolved** — no such file, or the link could not be created (a read-only models folder, or another volume on an account without symlink rights) — falls back to auto-detection instead of blocking generation, with a badge so the miss is never silent.
+- Native / **bf16 UNETs** (a filename without `fp8`) now load with `weight_dtype: default`; FP8 builds keep `fp8_e4m3fn`. Both shipped Klein graphs hardcoded `fp8_e4m3fn`, which quantized a full-precision pin on load without saying so. The canonical download carries `fp8` in its name, so a stock install renders exactly as before.
+- Generation-LoRA **preset rows** accept full paths the same way.
+- **Not cleaned up automatically.** Changing or clearing a pin leaves its link behind in `lds-pinned/`; the folder is safe to delete by hand when nothing points there any more.
+
+Traps and good-to-knows:
+
+- The dataset's own **Klein model (per dataset)** choice still wins over `klein.unet` for that dataset's runs — the pin is what auto-detection falls back to, not an override of an explicit per-run pick.
+- **This is the fix for a model the app insists is "missing" while you are looking at it.** Auto-detection is deliberately narrow (a wrong model fails at sampling time with a cryptic shape error, which is worse than a missing one), so it *declines* any file it cannot confidently name — and a declined file is reported as missing. Pinning it by name removes that discretion: the file resolves, and the integrity check then tells you the truth about it, including **"present but unreadable"** for a corrupt or half-downloaded weight, with the delete-and-re-download action attached.
+- Pinning the wrong *kind* of file (e.g. another family's text encoder) is **not** validated — that generate will fail at sampling time with a shape error. The narrow auto-detection exists precisely to avoid that; only pin files you know are Klein-compatible.
 
 ### Klein generation LoRA presets (optional)
 
@@ -470,7 +476,7 @@ Defaults for new local training runs.
 
 ### Defaults
 
-- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download); it is **local-only** for now (needs an up-to-date ai-toolkit + diffusers — cloud training arrives once the GPU pod image is verified).
+- **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download); it is **local-only** for now (needs an up-to-date ai-toolkit + diffusers — cloud training arrives once the GPU pod image is verified). **Anima is the one family with hybrid prompting:** booru tags *and* natural language are both first-class on it, so the caption-style guard says nothing there — prose is merely the preselected default, and a booru-captioned Anima dataset trains without being flagged or forced. Every other family keeps its single expected form (SDXL = booru tags, the rest = prose).
 
 This fork's Settings → Training keeps only **Defaults** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
 ### Training base & variant are per FAMILY

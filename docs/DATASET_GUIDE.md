@@ -39,6 +39,15 @@ Both bases are *gated* on Hugging Face: accept the license of
 testing (Test Studio) is coming — until then, test your Klein LoRA in your own
 ComfyUI.
 
+**Anima note (the one family that takes BOTH caption styles):** Anima is an anime
+model with **hybrid prompting** — its model card documents *booru tags* and *natural
+language* as equally supported, which its LLM text encoder is what makes possible. So
+this is the family where the "match the style" rule below does **not** apply: caption
+in prose, caption in booru tags, or keep an existing dataset as it is — the app will
+not flag either as a mismatch, and you never have to force the launch. Prose is only
+the preselected default. It trains on the open `Anima-Base-v1.0-Diffusers` (no gated
+download) and is **local-only** for now.
+
 ---
 
 ## 2. How many images, and which ones
@@ -97,7 +106,9 @@ Concretely:
    captions under ~8 words are too weak to isolate the identity.
 5. **Match the style to the family.** Prose for Z-Image and Krea; booru tags for
    SDXL booru-native checkpoints. The app blocks a mismatch for a reason —
-   a prose-captioned SDXL LoRA produces disjointed images.
+   a prose-captioned SDXL LoRA produces disjointed images. **Anima is the
+   exception:** it reads both forms natively, so neither is ever blocked there
+   (see the Anima note above).
 
 **Concept datasets** (training a *thing/style/act*, not a person) invert the rule:
 describe everything **except the concept** — the concept is what must bind to the
@@ -188,7 +199,7 @@ The app runs these checks when you hit Train — here's the list to self-check e
 - [ ] Framing balanced — not 100% face shots (some bust/body/back)
 - [ ] Every kept image captioned *(strongly recommended — a blank caption won't block the launch, it just asks you to confirm "train anyway")*
 - [ ] **Zero identity leaks** (no hair/face/skin words — the leak badge shows 0)
-- [ ] Captions varied, ≥ 8 words, style matches the family (prose vs booru)
+- [ ] Captions varied, ≥ 8 words, style matches the family (prose vs booru — Anima takes either)
 - [ ] Near-duplicate pairs resolved (keep one of each)
 - [ ] Body fidelity: if ON, actual full-body shots exist
 
@@ -224,25 +235,34 @@ best one**. Later checkpoints know the identity better but obey prompts worse.
    expression/angle regardless of prompt, outfits from the dataset bleeding in.
 4. Save the winning settings (★) — they're reused as the dataset's defaults.
 
-### Compare LoRAs — or combine them
+### Compare LoRAs — or blend them
 
 Check two or more LoRAs and Studio asks what you want to do with them:
 
 - **⚖ Compare** (the default) tests each LoRA **on its own**, one column per LoRA,
   swept across the strengths you picked. This is what you want to answer "which of
   these is better".
-- **🧬 Combine** loads them **together in the same image**, each at its own weight,
+- **🧬 Blend** loads them **together in the same image**, each at its own weight,
   and injects **every trigger word** into the prompt for you. This is what you want
-  to answer "do these two work together" — a character plus a style, or two of your
-  own characters in one shot.
+  to answer "do these two work together" — a character plus a style, or a character
+  plus a concept.
 
-In Combine mode the strength sweep disappears: each LoRA already carries its own
+> This mode was called **🧬 Combine** until August 2026. Only the name changed;
+> the ◉ LoRA Canvas offers the very same thing from the board, and calling it two
+> different things was a needless thing to learn twice.
+
+**What blending two characters actually gives you** is a *hybrid* — one person who
+is neither of the two, not both of them side by side in one shot. That is a real
+and deliberate use, but if you expected "my two characters together", this is not
+it. The reliable pairings are **character + style** and **character + concept**.
+
+In Blend mode the strength sweep disappears: each LoRA already carries its own
 weight, so the run is one configuration instead of a grid. Start both around
 0.7-0.9 — two LoRAs at 1.0 usually fight each other, and the one you care about
 most should be the heavier of the two. Result tiles from a stack carry a **🧬 +N**
 badge naming what was loaded alongside.
 
-**One family per run, always.** A Krea LoRA and an SDXL LoRA cannot be combined:
+**One family per run, always.** A Krea LoRA and an SDXL LoRA cannot be blended:
 they need different base models and different workflows. The picker greys out the
 other families as soon as you check one, and a run that somehow mixes them is
 refused with both family names in the message.
@@ -376,5 +396,54 @@ purpose — see the settings reference.
 
 ---
 
+## 9. Coverage — what your set never showed
+
+Section 2 says "vary everything except the person". The Composition bar cannot
+check that: it counts face / bust / body / back against a target, so a set of
+twenty-five front-on studio portraits in one outfit reaches a **fully green
+target** while having no profile, no daylight and no second outfit. The LoRA that
+comes out reproduces that one look and nothing else.
+
+**🔍 Coverage**, the collapsible panel right under the Composition bar, is that
+second check. Open it and it reports, per axis, what your captions describe and
+what they never mention:
+
+| Axis | What a gap means |
+|---|---|
+| Camera view | frontal / three-quarter / profile — a character with no profile has a side nobody ever saw |
+| Camera height | eye level / low / high / overhead — eye-level-only is the default trap |
+| Lighting | daylight, indoor, golden hour, studio, night, backlit, overcast |
+| Setting | indoor, outdoor, urban, plain backdrop, water, vehicle |
+| Outfit | counts how many **distinct** outfit types appear — one outfit gets learned as part of the person |
+| Expression | counts how many distinct expressions appear |
+
+Which axes apply depends on the dataset kind. A **style** dataset is judged on
+lighting, setting and view only — "one outfit" is not a defect when the outfit is
+not what you are teaching. A **concept** dataset drops the expression axis.
+
+### What it can and cannot see
+
+This is deliberately a cheap check, not a second model. It reads **the words in
+the captions you already generated** — nothing new runs, there is no GPU cost,
+and the numbers appear instantly. That comes with real limits, and the panel
+repeats them on screen rather than hiding them:
+
+- **No captions, no reading.** With an uncaptioned dataset the panel says so
+  instead of drawing empty bars. Run the caption pass first.
+- **It sees descriptions, not pixels.** A profile shot the captioner described
+  without the word "profile" is invisible here. An absence is strong evidence,
+  not proof.
+- **Negation is not parsed.** "not smiling" counts as a smile.
+- **Under five captions it refuses to judge** — at that size everything looks
+  missing for the wrong reason.
+- **It never selects, keeps, rejects or changes anything.** It is advice.
+
+The panel reads the same pool the Composition bar counts: everything that is not
+rejected and not failed. It also tells you how many images have **no shot type
+yet**, which is the one thing the bar above silently drops.
+
+---
+
 *Everything above is enforced or surfaced by the app itself (pre-flight checks,
-leak badge, composition bar, advanced options). This page just explains why.*
+leak badge, composition bar, coverage panel, advanced options). This page just
+explains why.*

@@ -172,19 +172,77 @@ function KleinLorasCard({ config, setField }) {
   )
 }
 
-/* The overridable Klein model slots. `key` is the DOM id the help
-   registry focuses (the contract test scans these literals); `cfg` is the
-   klein.* config key; `slot` matches caps.comfyui.klein_overrides. */
+/* The pinnable Klein model slots. `key` is the DOM id the help registry focuses
+   (the contract test scans these literals); `cfg` is the klein.* config key;
+   `slot` matches caps.comfyui.klein_overrides.
+   Ported from socrasteeze's branch (GitHub #20). */
 const KLEIN_MODEL_SLOTS = [
   { key: 'klein-model-unet', cfg: 'unet', slot: 'unet', label: 'Diffusion model (UNET)',
-    hint: "Full path from anywhere, or relative to a diffusion-model folder — e.g. flux-2-klein-9b.safetensors (bf16) or klein/flux-2-klein-9b-kv-fp8.safetensors under models/unet." },
+    hint: 'Full path from anywhere, or relative to a diffusion-model folder — e.g. klein/flux-2-klein-9b-fp8.safetensors under models/unet (a bare filename for a file sitting at a folder root). A filename without "fp8" loads at full precision instead of being quantized.' },
   { key: 'klein-model-text_encoder', cfg: 'text_encoder', slot: 'text_encoder', label: 'Text encoder',
-    hint: 'Full path from anywhere, or relative to models/text_encoders — e.g. qwen_3_8b.safetensors (full) or qwen_3_8b_fp8mixed.safetensors.' },
+    hint: 'Full path, or relative to models/text_encoders — e.g. qwen_3_8b_fp8mixed.safetensors.' },
   { key: 'klein-model-vae', cfg: 'vae', slot: 'vae', label: 'VAE',
-    hint: 'Full path from anywhere, or relative to models/vae — e.g. flux2-vae.safetensors.' },
-  { key: 'klein-model-consistency_lora', cfg: 'consistency_lora', slot: 'consistency_lora', label: 'Consistency LoRA',
-    hint: 'Full path from anywhere, or relative to models/loras — the structure-anchoring LoRA chained onto the Klein edit graph. Clearing this disables it entirely.' },
+    hint: 'Full path, or relative to models/vae — e.g. flux2-vae.safetensors.' },
+  { key: 'klein-model-consistency_lora', cfg: 'consistency_lora', slot: 'consistency_lora',
+    label: 'Consistency LoRA',
+    placeholder: 'Empty = no consistency LoRA',
+    missText: 'Not found — the LoRA is skipped (Setup can download it)',
+    hint: 'Full path, or relative to models/loras — the structure-anchoring LoRA chained onto the Klein edit graph. Unlike the three above, this one has a shipped default and clearing it disables the LoRA rather than turning on auto-detection.' },
 ]
+
+/* One badge per resolve status from caps.comfyui.klein_overrides. Two wordings
+   are deliberate rather than cosmetic:
+   - 'outside_roots' is NOT "not found" — the file IS there, ComfyUI simply
+     cannot reach it, and a different action fixes that;
+   - what happens after a miss is not the same for every slot, so the badge does
+     not claim it: the three model slots fall back to auto-detection, while the
+     consistency LoRA has no detection to fall back to (it is just skipped, and
+     reported as a missing asset Setup can download). Saying "auto-detection is
+     used" on that row would name a mechanism that does not exist for it. */
+function overrideBadge(st, missText) {
+  if (!st) return null
+  if (st.found) return { cls: 'text-emerald-400', text: 'Found' }
+  if (st.status === 'outside_roots') {
+    return { cls: 'text-amber-400',
+             text: "Could not be linked into ComfyUI's model folders — check permissions, or move the file" }
+  }
+  return { cls: 'text-amber-400', text: missText || 'Not found — auto-detection is used' }
+}
+
+function KleinModelFilesCard({ config, setField, caps }) {
+  const overrides = caps?.comfyui?.klein_overrides || {}
+  return (
+    <Card
+      id="klein-model-files"
+      title="Klein model files (optional)"
+      help="Pin the exact files the Klein graph loads instead of relying on auto-detection (the canonical download names, then a narrow token scan). Each field takes a full absolute path OR a ComfyUI-relative loader name. A path under one of ComfyUI's model folders (extra_model_paths.yaml roots included) is converted automatically to what the loader needs; a path from anywhere else is hardlinked into an lds-pinned/ folder so ComfyUI can load it without you moving a multi-GB file. Leave a field empty to keep auto-detection for that slot. A pinned file that cannot be resolved falls back to auto-detection and shows a badge here rather than blocking generation. Contributed by socrasteeze (GitHub)."
+    >
+      {KLEIN_MODEL_SLOTS.map(({ key, cfg, slot, label, hint, placeholder, missText }) => {
+        const badge = overrideBadge(overrides[slot], missText)
+        return (
+          <div key={key}>
+            <div className="flex flex-wrap items-center justify-between gap-x-2">
+              <label htmlFor={key} className="block text-sm font-medium text-content">{label}</label>
+              {badge && (
+                <span className={`text-xs sm:text-right ${badge.cls}`}>{badge.text}</span>
+              )}
+            </div>
+            <input
+              id={key}
+              type="text"
+              value={config.klein?.[cfg] || ''}
+              onChange={(e) => setField('klein', cfg, e.target.value)}
+              placeholder={placeholder || 'Empty = auto-detect'}
+              className={INPUT_CLASS}
+            />
+            <p className="mt-1 text-[0.6875rem] text-content-subtle">{hint}</p>
+          </div>
+        )
+      })}
+    </Card>
+  )
+}
+
 /* Klein GENERATION sampling. The shipped workflow hardcodes 5 steps at its
    sampler node and nothing on the generation paths ever passed a value, so the
    engine's own `sampler_steps` parameter was unreachable — "is the number of
@@ -430,6 +488,18 @@ function SeedVr2Card({ config, setField, configDefaults, caps }) {
         {ready
           ? 'Ready — SeedVR2 appears in the workspace bulk actions.'
           : 'Not ready yet. Setup ▸ ComfyUI lists what is missing and can download the weights; the node pack itself is installed from ComfyUI (search “SeedVR2” in ComfyUI-Manager), then restart ComfyUI.'}
+      </p>
+
+      <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <a href="https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler" target="_blank"
+          rel="noreferrer" className="text-sky-300 underline hover:text-sky-200">Node pack →</a>
+        {' · '}
+        <a href="https://huggingface.co/numz/SeedVR2_comfyUI" target="_blank"
+          rel="noreferrer" className="text-sky-300 underline hover:text-sky-200">Model weights →</a>
+        {' · '}
+        <a href="https://github.com/ByteDance-Seed/SeedVR" target="_blank"
+          rel="noreferrer" className="text-sky-300 underline hover:text-sky-200">SeedVR2 by ByteDance-Seed →</a>
+        {' — all Apache-2.0.'}
       </p>
 
       <div className="mt-3 sm:max-w-md">
@@ -911,51 +981,6 @@ function IdentityPromptsCard({ config, setField, promptDefaults, promptDefaultsB
           ))}
         </div>
       </div>
-    </Card>
-  )
-}
-
-/* Badge per resolve status from caps.comfyui.klein_overrides. */
-function overrideBadge(st) {
-  if (!st) return null
-  if (st.found) return { cls: 'text-emerald-400', text: '✓ found' }
-  if (st.status === 'outside_roots') {
-    return { cls: 'text-amber-400',
-             text: "⚠ could not link into ComfyUI's model folders — check permissions or move the file" }
-  }
-  return { cls: 'text-amber-400', text: '⚠ not found — auto-detection is used' }
-}
-
-function KleinModelFilesCard({ config, setField, caps }) {
-  const overrides = caps?.comfyui?.klein_overrides || {}
-  return (
-    <Card
-      id="klein-model-files"
-      title="Klein model files (optional)"
-      help="Pin the exact files the Klein graph loads instead of relying on auto-detection (canonical download names, then a narrow token scan). Each field takes a full absolute path OR a ComfyUI-relative loader name. Paths under ComfyUI's model folders (including extra_model_paths.yaml) convert automatically; paths from anywhere else are hardlinked/symlinked into an lds-pinned/ folder so ComfyUI can still load them. Leave a field empty to keep auto-detection for that slot. A pinned file that can't be resolved falls back to auto-detection and shows a badge here."
-    >
-      {KLEIN_MODEL_SLOTS.map(({ key, cfg, slot, label, hint }) => {
-        const badge = overrideBadge(overrides[slot])
-        return (
-          <div key={key}>
-            <div className="flex items-center justify-between gap-2">
-              <label htmlFor={key} className="block text-sm font-medium text-content">{label}</label>
-              {badge && (
-                <span className={`text-xs text-right ${badge.cls}`}>{badge.text}</span>
-              )}
-            </div>
-            <input
-              id={key}
-              type="text"
-              value={config.klein?.[cfg] || ''}
-              onChange={(e) => setField('klein', cfg, e.target.value)}
-              placeholder="Empty = auto-detect"
-              className={INPUT_CLASS}
-            />
-            <p className="mt-1 text-xs text-content-muted">{hint}</p>
-          </div>
-        )
-      })}
     </Card>
   )
 }

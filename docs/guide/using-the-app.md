@@ -477,7 +477,29 @@ pure maths on data the passes already computed, so it costs no GPU. The
 framing-balance line needs the 📐 Framing pass to have run; without it the panel
 still covers person mix, style spread and resolution and hints to run framing.
 
-The advice becomes a gesture with **⚖ Pick a balanced set…** at the bottom of
+Those are all **labels**, and labels have a blind spot: they cannot tell two
+hundred near-identical shots from two hundred different ones, and they say
+nothing about outfits, lighting or camera angle. Two things you may already have
+on disk can, so the panel also reads them when they exist:
+
+- **Visual spread**, from the CLIP embeddings the ✨ Score pass caches. It reports
+  the average similarity across the pool — *"91% average similarity — a set this
+  repetitive teaches one look"*. The bands were calibrated by measuring real
+  banks: an ordinary one sits near 65%, an image plus its nearest neighbours
+  lands around 79-90%. Without ✨ Score it says **Not measured** — never
+  "varied", because nothing looked.
+- **Caption variety**, from the captions the 🏷️ pass wrote, read by the same
+  lexicon the dataset Coverage panel uses. It reports which camera views,
+  lightings, settings, outfits and expressions your captions mention and which
+  they never do.
+
+Both limits are on the panel, not just here. The caption read looks at **words,
+not pixels**: a profile shot the captioner never called a profile is invisible,
+and *"not smiling"* still counts as a smile. A bank has no character/concept/style
+kind the way a dataset does, so it is judged as a **character source** — the same
+assumption the framing target and the person-mix advice already make.
+
+The advice becomes a gesture with **⚖️ Pick a balanced set…** at the bottom of
 the panel — see [Pick a balanced set](#pick-a-balanced-set).
 
 **🗑 Delete rejected from disk** (next to Promote) is the one exception to the
@@ -768,11 +790,54 @@ setting, materials and colour**, and unreliable for three things in particular:
 The negation case is the one to remember, because it fails *silently and
 backwards*: CLIP does not penalise "without", it simply ignores the word. Someone
 searching `woman without glasses` gets women **wearing** glasses and has no way
-to tell the search misfired.
+to tell the search misfired. The same measurement on a 7,316-image bank: `a
+photo of a woman without a bikini` returned **60% bikinis**, against a 10%
+base rate — the query did not miss, it inverted. See **Push down** below.
 
-These are properties of the model, not bugs to report. The workaround is to
-describe what *is* in the frame rather than what is absent — "bare face" works,
-"without glasses" does not — and to check counting and left/right by eye.
+These are properties of the model, not bugs to report. Describe what *is* in the
+frame rather than what is absent, check counting and left/right by eye — and for
+the negation case, use the **Push down** field described next, because typing
+"without" will never work.
+
+### Push down what you do not want
+
+The panel has a second field, **Push down**, for the trait you are trying to get
+away from: `hat`, `sunglasses`, `blonde hair`. You can also write it inline in
+the query with a leading dash — `a woman in a car -hat` means the same thing.
+Typing a query that starts negating something ("a woman without a hat") offers
+you the field instead, rather than letting the search fail quietly.
+
+It does **not** filter. The excluded phrase is encoded exactly like the positive
+one and *subtracted* from each image's score, so images carrying that trait sink
+in the ranking. They are still in the pool and one can still surface if it is
+otherwise the best answer. If you need a guaranteed absence, that is a tag
+filter's job, not this one.
+
+**How hard** offers Gentle / Normal / Strong. The default, Normal, was measured
+over 7,316 real bank images that carry both a CLIP embedding and a written
+description, across 19 query/exclusion pairs, counting the top 60:
+
+| How hard | Top 60 still carrying the unwanted trait | Top 60 still on-topic |
+|---|---|---|
+| off | 23.0% | 89.7% |
+| Gentle | 11.9% | 89.5% |
+| **Normal** | **7.6%** | **87.7%** |
+| Strong | 3.8% | 79.8% |
+
+Pushing harder always removes more of the trait — what you pay for it is
+relevance, and that stays essentially flat up to Normal (2 points) then drops
+off a cliff (10 points at Strong, 25 past it). That is why Normal is the default
+and why Strong is described as a trade rather than as "better".
+
+**Some pairs cannot be separated at all,** and the app says so instead of
+pretending. Excluding `a bikini` from `a woman at the beach` barely moved: at
+every usable strength two thirds of the results still had a bikini, because in
+this model's eyes a beach photo largely *is* a bikini photo — and by the strength
+that finally bit, the beach was gone too. After each search the summary reports
+what actually happened on *your* bank: how many results the push-down brought in
+that would not have been there, and how strongly the returned set still matches
+the unwanted phrase compared with a typical image of the bank. When it changed
+nothing, it says that too.
 
 One last caveat, seen in the same measurement: a result can be right on the broad
 trait and wrong on the detail. A generic indoor query returned a genuinely indoor
@@ -913,6 +978,66 @@ half-working one would be worse than none:
 
 The 🔄 rotate button needs no undo entry: turn the other way and the image is
 byte-for-byte the original again.
+## Find more images like this one — by attribute, not by look
+
+Every captioned tile in a bank carries a 🏷️ badge. **Click it** and that image's
+caption opens as a row of chips in the filter bar: `woman`, `red`, `dress`,
+`balcony`. Tick the ones you care about and the grid narrows to the images whose
+captions mention them.
+
+This is the readable cousin of **🎯 Similar to selected**, and the difference is
+worth knowing because they fail differently:
+
+| | 🎯 Similar to selected | 🏷️ Tags of this image |
+|---|---|---|
+| Matches on | the whole look (CLIP embeddings) | words *you* ticked |
+| Works without captions | yes | no |
+| Tells you *why* it matched | no | yes — the chips you ticked |
+
+Details that decide what you get:
+
+- **Several chips mean AND.** Ticking `red` and `dress` shows images mentioning
+  both, so every extra chip narrows further. The line under the chips says so
+  while the filter is active.
+- **Chips are matched as whole words**, in captions *and* file names. `car` will
+  not bring back `scarf`. (The 🚫 exclude box below is looser — it matches
+  anywhere — because a word you type by hand is often a fragment on purpose.)
+- **Booru captions keep their tags whole** (`red dress` stays one chip); prose
+  captions are cut into words, so `golden hour` becomes two chips and ticking
+  both means "captions with both words", not "captions about golden hour".
+- **It only sees what a captioner wrote.** An attribute nobody put in words is
+  invisible here, however plain it is in the picture. Caption more of the bank
+  (🏷️ Caption all) and the chips get better.
+- It composes with every other filter, and it travels with them — **Select all
+  in filter**, **▶ Review** and the curation picks all work on what you can see.
+
+## Hide images you have already handled
+
+The bank's 🔍 search box narrows the grid *to* a word. Next to it, the 🚫
+**Exclude words** box does the opposite: it hides every image whose **caption or
+file name** contains what you type. That turns a captioned bank into a checklist
+— *what have I not tagged yet?* — instead of a list you have to keep re-reading.
+
+- **Several words at once**, comma-separated: `logo, watermark, screenshot` hides
+  anything mentioning any of them.
+- **It composes with everything else** — the search box included. Searching
+  `dress` while excluding `red` gives you the dresses that are not red, and the
+  filter chips, subfolder, resolution tier and framing all still apply.
+- **It travels with the filter**: **Select all in filter**, **▶ Review one by
+  one** and the curation picks (🎨 diverse, ⚖️ balanced, similar) all work on the
+  visible set, so an image you hid is never handed back to you by a pick.
+
+Two limits worth knowing:
+
+- **It matches anywhere in the text**, like the search box — so `car` also hides
+  `scarf`. Type the longer word when that matters.
+- **Images with no caption are never hidden.** They have nothing to match, and
+  hiding them would remove exactly the images a checklist is looking for.
+
+Unlike the sort, the exclude box is **not remembered** between visits: an order
+you can see in a menu is a habit, but images missing from a grid for a reason you
+set last week reads as data loss.
+
 ## Sort a grid to review faster
 
 Filters answer *which images*; sorting answers *which one first*. Both grids
@@ -920,13 +1045,31 @@ have a **Sort** control, and it changes nothing but the order — the same image
 match, the counts stay put, and every bulk action keeps operating on exactly
 what the filters left.
 
-In a **bank** (View ▸ Sort, next to the tile size):
+In a **bank** (View ▸ Sort, next to the tile size) you can order by *anything the
+passes measured*, either way. The menu is grouped by the pass that produces the
+figure, so a greyed-out section also tells you which pass to run:
 
-- **Resolution ↓ / ↑** — megapixels, so a 900×900 outranks a wider 1200×300.
-- **Aesthetic ↓ / ↑** — the 1–10 rating from **✨ Score**. ↓ puts your keepers on
-  the first page; ↑ puts the duds there, which is usually the faster way to prune.
-- **Sharpness ↓ / ↑** — the Laplacian variance from **🔎 Scan quality**. ↑ brings
-  the blurry misses to you instead of making you hunt for them.
+- **📁 File** — **Resolution ↓ / ↑** (megapixels, so a 900×900 outranks a wider
+  1200×300) and **File size ↓ / ↑** (bytes on disk — the one figure no filter
+  chip exposes).
+- **✨ Score** — **Aesthetic ↓ / ↑** (the 1–10 rating; ↓ puts your keepers on the
+  first page, ↑ puts the duds there, which is usually the faster way to prune)
+  and **NSFW likelihood ↓ / ↑**.
+- **🔎 Scan quality** — **Sharpness** (↑ brings the blurry misses to you),
+  **Noise**, **Contrast** (↑ = the flattest, near-empty frames first), **Detail**
+  (↑ = the enlargements pretending to be big images), **Letterbox bars** and
+  **JPEG quality**.
+- **🎭 Faces** — **Face confidence ↓ / ↑**, the detection score: ↑ surfaces the
+  tiny, turned or half-hidden faces.
+
+A chip and a sort answer different questions. A chip only ranks the images that
+*cross* its threshold, so "the noisiest of the ones I am keeping" — all of them
+below the threshold — is a question only the sort can answer, and no chip ranks
+the other way round at all.
+
+**The bank remembers the order you chose, per bank.** Reopen it tomorrow and it
+opens the way you were reviewing it; other banks keep their own. Pick **Default**
+to forget the preference.
 
 In a **dataset** (above the grid, next to the decision chips): **Face similarity
 ↓ / ↑**, the ArcFace cosine against your reference photo computed by **🎭 Analyze
@@ -1495,6 +1638,34 @@ Two things it will tell you rather than fail at:
   and it says which two. This is not a restriction we chose: those families do
   not share a base model or a workflow, so there is no single run that can render
   both. Unpick one family and the button comes back.
+
+**⚖ Compare or 🧬 Blend.** From the second pick onwards the panel offers a
+choice, and it defaults to what it always did:
+
+- **⚖ Compare** — one pass per checkpoint, swept across the strengths. This is
+  how you find out which LoRA, or which step, is better.
+- **🧬 Blend** — *one* generation loads them **all**, each at its own weight, and
+  every dataset's trigger word is added to the front of your prompt. The panel
+  lists those words before you launch; nothing is injected silently. It is the
+  Test Studio's Blend mode, driven from the board — the same toggle, the same
+  engine. (The Test Studio called it **🧬 Combine** until August 2026; only the
+  name changed.)
+
+A blend is one configuration, not one per pick, so the strength sweep disappears
+(each LoRA carries its own weight instead) and the image counter drops to one
+picture per seed.
+
+What blending actually does is worth saying plainly: **two identity LoRAs give
+you a hybrid person** — someone who is neither of the two. That is a real use, on
+purpose, but it is not "both people in one shot". The combination that usually
+pays off is **identity + style**, or **identity + concept**. Weights are the dial:
+below 1 the LoRA contributes less, above 1 it dominates (0 to 2, 1 by default),
+and a weight you set survives un-ticking another pick or reloading the page.
+
+Blend needs **at least two checkpoints of one family**; with a mixed selection
+the toggle is greyed out with the reason, because the run underneath it could not
+exist either. Picks that are not deployed yet are deployed first, all of them,
+before anything is generated — a blend never loads a subset of what it announced.
 
 **▶ Continue training from a checkpoint.** Clicking a pill's body opens its
 actions — Download, Deploy, Details, Delete — and **▶ Continue from here**. It

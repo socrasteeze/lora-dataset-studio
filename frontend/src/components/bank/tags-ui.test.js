@@ -35,21 +35,22 @@ test('the facet vocabulary is fetched on the tagged count, not on the payload po
 test('the tag filter is part of filterParams, so it reaches Select-all and Review', () => {
   // filterParams feeds BOTH the grid page and fetchAllIds. A filter that only
   // reached the grid would make "Select all in filter" hand back rows the user
-  // cannot see — the bug the dups chip shipped once.
-  assert.match(workspace, /if \(f\.tags\?\.length\) params\.tags = f\.tags\.join\(','\)/);
+  // cannot see — the bug the dups chip shipped once. Its own key (wd14_tags),
+  // separate from the 🏷️ caption-chip `tags` param upstream added in the same wave.
+  assert.match(workspace, /if \(f\.wd14Tags\?\.length\) params\.wd14_tags = f\.wd14Tags\.join\(','\)/);
 });
 
 test('an active tag filter counts as "filtered" in the N-shown readout', () => {
-  const m = workspace.match(/const isFiltered = !!\([\s\S]{0,260}?\)\n/);
+  const m = workspace.match(/const isFiltered = !!\([\s\S]{0,300}?\)\n/);
   assert.ok(m, 'found the isFiltered expression');
-  assert.match(m[0], /filter\.tags\?\.length/);
+  assert.match(m[0], /filter\.wd14Tags\?\.length/);
 });
 
 test('picking a facet value replaces that facet, not appends to it', () => {
   // Appending would turn "blonde, no wait, brown" into a filter for images that
   // are both — which match nothing and look like a broken grid.
   assert.match(workspace,
-    /setFacetTag[\s\S]{0,300}?filter\.tags\.filter\(\(t\) => !facet\.options\.some/);
+    /setFacetTag[\s\S]{0,300}?filter\.wd14Tags\.filter\(\(t\) => !facet\.options\.some/);
 });
 
 test('the Setup tile explains WHICH half of the install is missing', () => {

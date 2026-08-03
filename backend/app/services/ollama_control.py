@@ -229,9 +229,10 @@ def pull_status() -> dict:
 def _run_pull(model: str):
     url = _url()
     try:
-        # Read timeout matters here: with (10, None) a stalled stream hangs this
-        # pull thread forever with no way to cancel it. Ollama emits progress
-        # lines continuously; 5 minutes of silence means the pull is dead.
+        # (connect, read). The read budget is per CHUNK, not per download: a pull
+        # streams progress lines continuously, so 300s of total silence means the
+        # daemon died mid-transfer — with no read timeout at all that thread, and
+        # the pull state it owns, hung until the app was restarted.
         resp = requests.post(f'{url}/api/pull', json={'name': model, 'stream': True},
                              stream=True, timeout=(10, 300))
         if resp.status_code >= 400:
