@@ -611,6 +611,16 @@ silently and nothing would have looked wrong until the suite went red again.
   accident, and it is a PR waiting to be sent — same class as the ai-toolkit
   venv-layout fixture (a test that only passes in the maintainer's environment).
 
+  **Only HALF of this carrier is going upstream, and the halves retire
+  separately.** Branch `fix/gpu-window-assert-outside-patch` proposes the assert
+  move alone (+5/−1) — measured on upstream's own tree, that is sufficient there:
+  `6 passed` without touching `fake_drive`. The `**_kw` widening is fork-only,
+  because it exists for a caller upstream does not have (`stall_label=` /
+  `busy_detail=`, the CUDA-interpreter stall watchdog), exactly like the
+  `test_bank_pass_survives_deleted_image.py` entry above. **So when the assert
+  move lands upstream, drop that hunk and KEEP the `**_kw` one** — this entry
+  shrinks rather than retiring.
+
   **How it was found is the transferable part.** It surfaced only because a
   contribution branch was checked with the FULL backend suite rather than the
   file it touched — the branch changed zero backend files and still came back
