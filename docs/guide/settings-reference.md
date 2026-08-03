@@ -611,6 +611,29 @@ to compare in Test Studio, not as proof that a specific step will be best.
 
 - **Dual captions (long + short)** — off by default. When on, the run uses ai-toolkit's native `short_and_long_captions`: every image trains with **both** its full caption and a short one (text-side augmentation, so the LoRA leans less on any single wording). The short variant is **derived from the long caption** the next time you (re-)caption — text-only, via the local vision model, honouring the same kind rules (no trigger; the identity/concept/aesthetic stays omitted) — and you can edit it per image in the **⛶** caption editor. **Local training only for now:** the cloud pod's dataset upload doesn't carry the JSON caption file the short is read from, so cloud runs train on the long caption alone. **Not available on Krea 2 or Anima:** those families pre-cache their text embeddings and unload the text encoder, so no second caption can be encoded — the toggle is reported as ignored on the training panel and in the pre-launch check, and the run trains on the long caption alone (issue #22, reported by 1Tomber).
 
+## Storage
+
+One local disk page answers where the app writes files and how much space they use.
+Opening it is cheap: large folders are measured only when you press **📏 Measure
+everything**, and each row shows its effective path, what it holds, and free space
+on that drive.
+
+- **Dataset images root** → `paths.dataset_images_root`. Leave it blank for
+  `<data dir>/datasets`. To change it, enter an absolute folder and press **Check
+  folder**; the app proves it can write there with a temporary file. You then choose
+  explicitly between moving the current files (copy first, remove the old copy only
+  after the last byte lands) or adopting the new folder empty and leaving the old
+  files untouched. The setting is saved only after a move finishes.
+- **Trash** — **Open folder** and **Empty trash**. Everything the app deletes goes
+  here first; emptying it is the one destructive action, and it asks for confirmation.
+- **Run image archive** — shows its size and ceiling, with **Clear archive**. The
+  archive keeps content-addressed copies used by run comparisons; clearing it keeps
+  run records, settings and captions, but removed dataset images can no longer be
+  shown in old comparisons.
+
+Rental-run staging, its checkpoint store, and private Hugging Face delivery remain
+backend-only on this fork and are not offered as Storage controls.
+
 ## Server & access
 
 How the app binds and who can reach it. **These are the settings that need a restart** — the card shows a **Running vs Saved** banner and a **Save & restart to apply** button that does it in one click.
@@ -665,13 +688,10 @@ There are **two ways** to use another machine's GPU, and they can coexist in the
 
 ## Maintenance
 
-Housekeeping and diagnostics. Only one true setting lives here; the rest are actions.
+Keeping the **app itself** healthy: updating it, and getting a bug report out of it. No setting lives here, only actions. Everything about the **disk** — the trash, the run image archive, the dataset root and the folders that fill a drive — moved to *Storage* above, where those questions are answered together.
 
 - **Updates** — **Check for updates** and **Update & restart**, plus a *see what's in this update* compare link. **The button adapts to how you installed.** A **git checkout** fast-forwards to the latest commits. A **packaged (ZIP) install** announces the release and its size (*Update to vX — download ~XX MB*) and shows a **live progress bar** while it downloads and installs (a release ZIP is far larger than a git pull), then backs up the current files and swaps in the new ones — keeping `data/`, `config.json`, `.env` and your `.venv` untouched — and restarts. A mid-way failure rolls back automatically, so a broken download never leaves you with a half-updated install. If the app can't identify a downloadable release (no ZIP asset, or offline), the button steps aside and links to the releases page instead of promising an update it can't perform. Separately, and unrelated to `updates.repo` below: on a git checkout, a quiet **Upstream is N commits ahead · compare »** line can appear here when [perfectgf/lora-dataset-studio](https://github.com/perfectgf/lora-dataset-studio) — the project this fork tracks — has commits your current build doesn't. It's informational only, with no download or restart action attached; it stays silent on a packaged install (there's no local commit to compare from), when GitHub can't be reached, and whenever upstream isn't actually ahead.
-- **Trash** — **Open folder** and **Empty trash**. Everything the app deletes goes here first; emptying is the one destructive action, and it asks for confirmation.
-- **Run image archive** — its size, its ceiling, and **Clear archive**. When a training run is launched, a **deduplicated** copy of the images it trains on is kept so that comparing two runs can still *show* an image you have since deleted from its dataset. Copies are **content-addressed**: relaunching an unchanged dataset stores nothing the second time, and only images that were added or re-edited cost anything. Clearing it keeps your runs, their settings and their caption text — you only lose the ability to look at images that are no longer in their dataset. The ceiling is `provenance.archive_max_gb` (see *Config-file-only settings*); past it, nothing more is stored and the compare panel says the picture is unavailable instead of showing a wrong one.
 - **Back up everything** — not on this page but on the **Datasets library**: one button archives every dataset, its **training history** and your settings into a single file (⬇ download or 📂 open folder), and the library's **Import backup** restores it — datasets come back under **Trained**, not "Not trained yet". Tick **Include trained LoRAs** to bundle the (large) trained `.safetensors` too. **API keys and tokens are never included** — re-enter them on the new install. See *Using the app → Back up everything*.
-- **Dataset images root** → `paths.dataset_images_root`. Where dataset images are stored. Default **empty → `<data dir>/datasets`**. Point it at a bigger or faster drive if your default data directory is tight on space. This folder (and every dataset folder under it) is refused as an **image bank** source: a bank points at a live folder and can delete from it, so the two must never share files — see *Using the app → A bank and a dataset never share files*. Moving this root onto a folder an existing bank already uses is not blocked here, but that bank will say so the next time you open it, and its 🗑 Delete rejected will be refused.
 - **Diagnostic report** — a one-click, **paste-safe** report for bug reports: it carries the version, capability status and a log tail, with **no secrets** and file paths reduced to booleans (present/absent). Safe to drop into Discord or a GitHub issue. If your browser refuses the clipboard — which it does on any address that is not HTTPS or `localhost`, so on the LAN address you use from another machine — the report is shown in a selected box to copy by hand instead of being lost. See *Getting help → Or let the app write it for you*.
 - **Stop everything** — one action for when something did not fire correctly and the app is stuck. It cancels queued and running bank passes, dataset batches and in-flight generations, asks ComfyUI to unload its models, stops training, and then clears the two flags the "GPU busy" refusal reads. It **confirms first** — it is destructive to in-flight work by design — and it reports **per target**: an unreachable ComfyUI is *not confirmed*, not "stopped", and a training process that cannot be confirmed dead is a failure whose flag is deliberately left set. Above it, a warning appears **only when the server has checked and found nothing behind a "GPU busy" flag**, offering to clear it alone — that stops nothing and is the fix in the common case. The same warning shows on the bank workspace and the banks page, where the refusal is actually met. See *Troubleshooting → "GPU busy" when nothing is running*.
 - **Server log** — a live tail of the server log, with **Copy all**, for when you need to see what just happened.
@@ -778,7 +798,7 @@ Set one of these **only** to override that search — for instance if your Comfy
 
 | Key | Default | Role |
 |---|---|---|
-| `provenance.archive_max_gb` | `5` | Ceiling of the **run image archive** (Settings → Maintenance): the deduplicated copies that let a two-run comparison still show an image you deleted afterwards. Copies are content-addressed, so a whole training history usually costs well under a gigabyte — on a real 20-dataset, 1471-image library, every distinct version of every image ever trained came to about **0.5 GB**. Past the ceiling nothing more is stored and the compare panel says so. Set it to `0` to turn archiving off entirely; the run records, settings and caption text are kept either way. |
+| `provenance.archive_max_gb` | `5` | Ceiling of the **run image archive** (Settings → Storage): the deduplicated copies that let a two-run comparison still show an image you deleted afterwards. Copies are content-addressed, so a whole training history usually costs well under a gigabyte — on a real 20-dataset, 1471-image library, every distinct version of every image ever trained came to about **0.5 GB**. Past the ceiling nothing more is stored and the compare panel says so. Set it to `0` to turn archiving off entirely; the run records, settings and caption text are kept either way. |
 
 **Cloud training (vast.ai) — dormant in this fork.** These keys are upstream's and are documented for completeness only. There is **no rented-GPU lane here**: no rental card in Settings → Training, no ☁ launch button, and the **Runs** hub filters cloud rows out entirely, so a cloud run cannot be started, continued, retried or even listed. Setting `VAST_API_KEY` does **not** switch any of it back on — the capability is forced off in the UI. The backend module is kept only so the fork does not diverge from upstream on a file it never runs.
 
@@ -807,6 +827,8 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `console.heartbeat_seconds` | Interval for heartbeat lines when `console.level` is `heartbeat` or `all` (default `30`, clamped 5–600). |
 | `diagnostics.db_trace_seconds` | Seconds a database write may be held before the log reports which thread is holding it and what opened it. `0` (default) = off. The database allows one writer at a time, so a background pass that holds it too long makes everything else — a ✓ on an image, a second machine's check-in — fail with "the database is busy". This is how you find out which pass. Turn it on only while investigating; it costs nothing when off but adds a log line per slow write when on. Overridable by `LDS_DB_TRACE`. Config.json only — no Settings UI. |
 | `paths.dataset_images_root` | Where dataset images are stored. Empty string defaults to `<data dir>/datasets`. |
+| `paths.cloud_runs_dir` | Working area of cloud training runs (dataset copy, samples, logs). Empty string defaults to `<data dir>/cloud_runs`. |
+| `paths.checkpoints_dir` | Durable store for the checkpoints cloud runs produce. Empty string defaults to `<data dir>/checkpoints`. No cleanup ever removes a file from it. |
 | `dataset_import.max_side` | Longest side for opt-in WebP normalization (default `1024`; `0` = original size). It is ignored by the default `preserve` mode; ratio is always preserved, never enlarged, and normalized paths clamp at 8192 px. Every source must still be at most 16 Mi-pixels and 8192 px per side; a larger one is rejected and must be converted or resized before import. Not retroactive. Editable in Settings → Captioning & quality. |
 | `dataset_import.encoding` | How an un-cropped imported image is written: `preserve` (default; original JPG/JPEG, PNG, WebP or BMP bytes with the matching extension), or the opt-in WebP modes `standard` (q92), `high` (q100), and `lossless`. Auto head-crop is always a derived WebP. The 16 Mi-pixel / 8192 px-per-side input limit applies to every mode. Editable in Settings → Captioning & quality. |
 | `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |
@@ -835,15 +857,15 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `krea.identity_lora` | Krea 2 Edit identity LoRA, relative to `models/loras`. |
 | `captioning.backend` | Caption backend: `auto` (prefer JoyCaption, fall back to Ollama), `joycaption`, `ollama`, or `none`. |
 | `training.default_family` | Default model family preselected for new training runs (`zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, or `anima`). |
-| `cloud.max_concurrent_runs` | Simultaneous cloud pods allowed (default `1`, 1–10). Also in Settings → Training. |
+| `cloud.max_concurrent_runs` | Simultaneous cloud pods allowed (default `1`, 1–10). Also in Settings → Storage. |
 | `cloud.max_price_per_hour` | Safety cap on the hourly offer price in $ (default `0.80`); pricier hosts are skipped before launch. |
 | `cloud.monthly_budget_usd` | Hard monthly spend ceiling in $ (default `0` = unlimited); launches are blocked past it. |
 | `cloud.stall_timeout_minutes` | Kill + rescue a cloud run after this many minutes without step progress (default `30`, 5–240). |
-| `cloud.first_step_timeout_minutes` | Kill a run that reaches no training step **and** reports no new downloaded bytes for this long (default `45`, 5–240). Also in Settings → Training. |
-| `cloud.first_step_download_budget_minutes` | Absolute ceiling on the pre-training base-model download, even while it is progressing (default `180`; `0` = no ceiling). Also in Settings → Training. |
-| `cloud.max_runtime_minutes` | Hard stop on the whole run (default `480`, 30–1440); the newest checkpoint is rescued first. Enforced by the out-of-run supervisor too. Also in Settings → Training. |
+| `cloud.first_step_timeout_minutes` | Kill a run that reaches no training step **and** reports no new downloaded bytes for this long (default `45`, 5–240). Also in Settings → Storage. |
+| `cloud.first_step_download_budget_minutes` | Absolute ceiling on the pre-training base-model download, even while it is progressing (default `180`; `0` = no ceiling). Also in Settings → Storage. |
+| `cloud.max_runtime_minutes` | Hard stop on the whole run (default `480`, 30–1440); the newest checkpoint is rescued first. Enforced by the out-of-run supervisor too. Also in Settings → Storage. |
 | `cloud.freeze_watchdog_minutes` | Terminate a training run whose **pod** shows no progress for this long (step, download bytes or a new checkpoint), from outside the run's own supervision; the clock is durable and survives an app restart (default `45`; `0` = warn on the card only). |
-| `cloud.upload_stall_minutes` | Give up a run whose dataset upload has had **no byte at all** reach the pod for this long, and release the machine (default `25`; `0` = never cut). Not a ceiling on the transfer's duration — a slow upload that keeps moving is never cut. Also in Settings → Training. |
+| `cloud.upload_stall_minutes` | Give up a run whose dataset upload has had **no byte at all** reach the pod for this long, and release the machine (default `25`; `0` = never cut). Not a ceiling on the transfer's duration — a slow upload that keeps moving is never cut. Also in Settings → Storage. |
 | `cloud.min_reliability` | vast.ai host-reliability floor (default `0.98`, 0.9–0.999); lower surfaces cheaper, riskier hosts. |
 | `cloud.verified_only` | Restrict to vast.ai verified hosts (default `true`). |
 | `cloud.secure_cloud_only` | Restrict to vast.ai's Secure Cloud (datacenter) tier (default `false`; narrows the market, raises price). |

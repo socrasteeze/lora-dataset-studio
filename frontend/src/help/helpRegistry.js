@@ -27,6 +27,7 @@ const SETTINGS_ANCHOR = {
   'local-tools': 'local-tools',
   captioning: 'captioning-quality',
   training: 'training',
+  storage: 'storage',
   server: 'server-access',
   devices: 'devices',
   maintenance: 'maintenance',
@@ -98,8 +99,14 @@ const TOPICS = [
       'remote', 'laptop', 'hub', 'join', 'hardware'],
     guide: { chapter: 'settings-reference', anchor: 'devices' },
     app: { route: '/settings/devices' } },
+  { id: 'settings-storage', kind: 'section', title: 'Settings · Storage',
+    keywords: ['storage', 'disk', 'space', 'disk full', 'drive', 'move folder',
+      'relocate', 'path', 'location', 'where are my files', 'trash', 'archive',
+      'free space', 'dataset root'],
+    guide: { chapter: 'settings-reference', anchor: 'storage' },
+    app: { route: '/settings/storage' } },
   { id: 'settings-maintenance', kind: 'section', title: 'Settings · Maintenance',
-    keywords: ['maintenance', 'update', 'restart', 'log', 'trash', 'data', 'storage', 'diagnostic', 'version',
+    keywords: ['maintenance', 'update', 'restart', 'log', 'diagnostic', 'version',
       'upstream', 'ahead', 'compare', 'fork'],
     guide: { chapter: 'settings-reference', anchor: 'maintenance' },
     app: { route: '/settings/maintenance' } },
@@ -851,6 +858,14 @@ const TOPICS = [
     // carry (Divergence 4 — no rented-GPU sections). Routed to the same anchor
     // its sibling /cloud topics use instead.
     '/cloud', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  action('storage-measure', 'See what each local folder weighs',
+    ['what lives where', 'disk usage', 'measure', 'how big', 'size', 'space',
+     'where are my files', 'which folder', 'free space', 'drive'],
+    '/settings/storage', 'settings-reference', 'storage'),
+  action('storage-move-location', 'Move dataset images to another drive',
+    ['move', 'relocate', 'another drive', 'change folder', 'disk full', 'out of space',
+     'external drive', 'adopt', 'start empty', 'move my datasets'],
+    '/settings/storage', 'settings-reference', 'storage'),
 
   // ---- Settings: per-field topics (kind 'setting') -----------------------
   // engines
@@ -1166,8 +1181,8 @@ const TOPICS = [
   setting('server.auto_open_browser', 'server', 'server-auto-open-browser',
     'Open a browser tab on launch',
     ['browser', 'tab', 'launch', 'startup', 'open', 'auto', 'pin', 'new tab']),
-  // maintenance
-  setting('paths.dataset_images_root', 'maintenance', 'dataset-images-root', 'Dataset images root',
+  // storage
+  setting('paths.dataset_images_root', 'storage', 'dataset-images-root', 'Dataset images root',
     ['data', 'storage', 'path', 'dataset', 'images', 'root', 'location', 'disk']),
 
   // ---- Action topics (kind 'action') -------------------------------------

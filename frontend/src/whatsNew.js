@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-canvas-group-drag-out-crash',
+    date: '2026-08-03',
+    title: 'Pulling a picture out of a canvas group no longer blanks the board',
+    blurb:
+      'Dragging an image away from a grouped strip could show the full-screen error boundary. The drag-out hint now derives its size from the same zoom-aware helper as the group bar, and a real JSX render test exercises the exact leaving state that crashed.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-settings-storage-tab',
+    date: '2026-08-03',
+    title: 'Local storage is visible in one place — and datasets can move safely',
+    blurb:
+      'Settings › Storage lists the app’s local folders, paths, free space and on-demand sizes without walking a large library while the page opens. The dataset root can move to another drive with an explicit copy-or-adopt choice and progress, while Trash and the run image archive now live beside the rest of the disk controls.',
+    to: '/settings/storage',
+  },
+  {
     id: '2026-08-03-upstream-ahead-indicator',
     date: '2026-08-03',
     title: 'Settings quietly tells you when upstream has moved past your build',

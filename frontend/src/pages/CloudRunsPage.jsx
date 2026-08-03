@@ -34,6 +34,7 @@ import {
   isFullTransformerRun,
 } from '../utils/trainingMode.js';
 import {
+  CHECKPOINTS_KEPT,
   TRASH_REMINDER,
   purgeAllResultMessage,
   purgeRunResultMessage,
@@ -767,7 +768,7 @@ export default function CloudRunsPage() {
                 and no 🧹 either). */}
             {cleanup.size && (
               <span className="tabular-nums text-content-subtle"
-                title="Disk this run's staging folder still holds (dataset copy, samples, checkpoints)">
+                title="Disk this run's staging folder still holds (dataset copy, samples, logs)">
                 🗄 {cleanup.size} on disk
               </span>
             )}
@@ -1093,8 +1094,7 @@ export default function CloudRunsPage() {
             {!recentCollapsed && (
               <button type="button"
                 onClick={async () => {
-                  // Wording stays local-only (Divergence 4): no rented "pods".
-                  if (!window.confirm(`Move the staging folders of all FINISHED runs to the trash?\n\nDataset copies, samples and checkpoint duplicates already imported. Active runs are spared.\n${TRASH_REMINDER}`)) return;
+                  if (!window.confirm(`Clean the staging folders of all FINISHED runs?\n\nThis moves their dataset copies, sample images and logs to the trash. Active runs and recoverable remote runs are spared.\n${CHECKPOINTS_KEPT}\n${TRASH_REMINDER}`)) return;
                   // No catch here meant a refused purge threw past the refresh
                   // below AND said nothing (GitHub #23's defect class again).
                   try {

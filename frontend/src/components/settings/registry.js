@@ -29,6 +29,10 @@ export const SETTINGS_SECTIONS = [
   { id: 'training', title: 'Training', icon: '🏋️', eyebrow: 'training',
     description: 'Default model family for new local training runs.',
     keywords: ['family', 'zimage', 'sdxl', 'krea', 'flux', 'flux2klein', 'training', 'default'] },
+  { id: 'storage', title: 'Storage', icon: '💾', eyebrow: 'disk',
+    description: 'Where local data lives on disk, how much space it takes, and how to move it.',
+    keywords: ['storage', 'disk', 'space', 'full', 'drive', 'path', 'folder', 'location',
+      'move', 'relocate', 'data', 'dataset root', 'trash', 'archive', 'free space', 'gb'] },
   { id: 'server', title: 'Server & access', icon: '🌐', eyebrow: 'network',
     description: 'Port, LAN access and the access token.',
     keywords: ['port', 'host', 'lan', 'network', 'token', 'remote', 'phone', 'bind'] },
@@ -37,8 +41,8 @@ export const SETTINGS_SECTIONS = [
     keywords: ['device', 'devices', 'peer', 'primary', 'worker', 'cluster', 'gpu', 'tailscale',
       'remote', 'laptop', 'hub', 'join', 'hardware'] },
   { id: 'maintenance', title: 'Maintenance', icon: '🔧', eyebrow: 'housekeeping',
-    description: 'Updates, server log and data location.',
-    keywords: ['update', 'restart', 'log', 'diagnostic', 'data', 'storage', 'version', 'bug'] },
+    description: 'Updates, server log and bug reports.',
+    keywords: ['update', 'restart', 'log', 'diagnostic', 'version', 'bug'] },
 ]
 
 /* Sidebar LED per section — derived from live capabilities so the rail doubles
