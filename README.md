@@ -95,7 +95,7 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 | **🚩 Find & 🧽 clean watermarks** | Flags overlaid logos/URLs with a box, then removes them in two manual passes — a model-free crop, or a LaMa/Klein repaint into a *separate* file |
 | **👥 Group by person** | Clusters faces into people **with no reference photo needed**, GPU-accelerated when the card is free |
 | **🔖 Tags** | A local ~400 MB tagger labels what's in each shot — hair colour, clothing, setting — so a huge pile can be sliced by that *before* you spend GPU hours captioning it. Facet dropdowns over the common questions, an **All other tags** list for the rest. Runs on CPU. Never writes captions. **Bank only** (not the dataset workspace), and **cannot run on a compute peer** |
-| **🔍 Search & filter** | Full-text search over captions **and 🔖 tags** plus Status / Quality / Score / Groups / Resolution filters with a live count |
+| **🔍 Search & filter** | Full-text search over captions **and 🔖 tags** plus Status / Quality / Score / Groups / Resolution filters with a live count. On a small screen the panel opens folded behind a summary of what's active; **✓ Keep / ✕ Reject** ride along in a bar pinned to the bottom of the screen once anything is selected |
 | **🔤 Find by text** | Rank what you're looking at by a written phrase — *"brunette outdoors, wide shot"* — reusing ✨ Score's embeddings. A ranking, not a filter |
 | **🎨 Pick diverse · ⚖️ Balanced pick** | Cover the visual space, or spread the pick evenly over face / bust / body / back instead of taking the top of one ranking |
 | **🎚 Thresholds · ↩ Undo** | Retune the twelve numbers behind the flags without leaving the bank, and take the last bulk decision back |

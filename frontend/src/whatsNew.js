@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-bank-selection-bar',
+    date: '2026-08-03',
+    title: 'Keep and reject a bank without scrolling back up',
+    blurb:
+      'Picking images out of a bank used to mean tapping thumbnails at the bottom of the page, then scrolling all the way back up past the filter panel to reach ✓ Keep / ✕ Reject. Those buttons — plus ↺ Undecided, rotate and Clear — now travel with you: the moment you select anything, a bar appears pinned to the bottom of the screen. It is a real part of the page, not a floating overlay, so scrolling to the very end still shows the last row of thumbnails and the page buttons with nothing hidden behind it. The ↩ Undo offer after a bulk decision moved down here too, next to the buttons that made it.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-bank-filters-fold',
+    date: '2026-08-03',
+    title: 'The bank filter panel folds away — and always says what it is still doing',
+    blurb:
+      'On a small screen the bank\'s filter panel was roughly fifteen wrapped rows of chips, boxes and dropdowns before the first thumbnail. It now opens folded on a phone (expanded on a desktop, and it remembers whichever way you leave it), behind one line that names every filter currently narrowing the grid — "✓ Kept · 🌫 Blurry · 1–2 MP +2 more" — with a ✕ Clear all next to it. A folded panel never hides what it is doing to your images. The "N shown of M" count was also quietly ignoring two filters — the 🚫 Exclude words box and the 🔎 Origin chips didn\'t count as filtering, so the total you were being compared against went missing — and now counts everything.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-03-phone-layout-full-width',
     date: '2026-08-03',
     title: 'The dataset page uses the whole screen again on a phone',
