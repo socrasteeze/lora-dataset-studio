@@ -61,3 +61,16 @@ def test_a_release_of_this_fork_sorts_above_the_upstream_tag_it_forked_from():
     assert '2026.08.02.2F' > '2026.08.02'
     assert '2026.08.02.2F' > '2026.08.02.1'
     assert '2026.08.03F' > '2026.08.02.2F'
+
+
+def test_the_upstream_check_points_at_upstream_and_not_the_fork():
+    """Mirror image of test_the_update_feed_is_this_fork_and_not_upstream. That one
+    guards `updates.repo` staying pointed at THIS fork; this one guards the
+    upstream-ahead indicator's constant staying pointed at the OTHER one. Pointed
+    at the fork itself, ahead_by would always compare a SHA against its own
+    history and read 0 forever — the badge would be silently useless, never wrong
+    out loud."""
+    from app.services import updater
+    assert updater.UPSTREAM_REPO.startswith('perfectgf/'), (
+        f'the upstream-ahead check points at {updater.UPSTREAM_REPO!r}: it should '
+        'name the project this fork tracks, not this fork itself')

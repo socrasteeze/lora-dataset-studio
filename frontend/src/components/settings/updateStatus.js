@@ -74,3 +74,13 @@ export function progressLabel(p) {
   if (phase === 'restarting') return '↻ Restarting the app…'
   return null
 }
+
+/* "Upstream is N commits ahead" for the quiet Maintenance-card line, or null
+   when there's nothing worth saying: no data yet, a degraded/offline check,
+   a non-git install, or upstream not actually ahead — a literal "0 commits
+   ahead" would read as a status to parse rather than nothing to look at. */
+export function upstreamAheadLabel(u) {
+  const n = u && u.ok ? u.ahead_by : null
+  if (!n || n <= 0) return null
+  return `Upstream is ${n} commit${n === 1 ? '' : 's'} ahead`
+}

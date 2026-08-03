@@ -426,6 +426,29 @@ _update_cache = {'ts': 0.0, 'data': None}
 # Auto-detection (nav badge): the git fetch is allowed but CACHED — the SPA
 # asks on every load, the network is hit at most once per TTL.
 _git_check_cache = {'ts': 0.0, 'data': None}
+# Separate cache, separate question: "is upstream ahead of me" vs. "does my own
+# fork have a release". Never shares state/TTL with the two above.
+_UPSTREAM_CHECK_TTL = 3600
+_upstream_check_cache = {'ts': 0.0, 'data': None}
+
+
+@bp.get('/update/upstream-check')
+def upstream_check():
+    """How many commits upstream's main has that this checkout doesn't —
+    informational only (Settings -> Maintenance), never a download/restart
+    offer. Cached ~1h: an uncached mount-time fetch on every SPA load would
+    spend the GitHub API's unauthenticated rate limit on a line most sessions
+    never look at."""
+    import time
+    from ..services import updater
+    now = time.time()
+    if (_upstream_check_cache['data'] is not None
+            and (now - _upstream_check_cache['ts']) < _UPSTREAM_CHECK_TTL):
+        return jsonify(_upstream_check_cache['data'])
+    status = updater.upstream_ahead_status()
+    out = status if status is not None else {'ok': True, 'ahead_by': None, 'compare_url': None}
+    _upstream_check_cache.update(ts=now, data=out)
+    return jsonify(out)
 
 
 @bp.get('/update/check')
@@ -455,7 +478,7 @@ def update_check():
     if (_update_cache['data'] is not None and (now - _update_cache['ts']) < _UPDATE_TTL
             and not force):
         return jsonify(_update_cache['data'])
-    repo = cfg.get('updates.repo') or 'perfectgf/lora-dataset-studio'
+    repo = cfg.get('updates.repo') or 'socrasteeze/lora-dataset-studio'
     out = {'ok': True, 'current': APP_VERSION, 'latest': None,
            'update_available': False, 'url': f'https://github.com/{repo}/releases'}
     if docker_runtime:

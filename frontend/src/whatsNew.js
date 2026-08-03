@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-upstream-ahead-indicator',
+    date: '2026-08-03',
+    title: 'Settings quietly tells you when upstream has moved past your build',
+    blurb:
+      'Settings → Maintenance → Updates now shows a small, informational-only line — "Upstream is N commits ahead · compare »" — when the original project this fork tracks has commits your current checkout doesn\'t. It never offers to download or apply anything (that stays the separate "Update & restart" button above it, which only ever follows this fork\'s own releases); it just links to GitHub\'s compare view so you can see what changed. It stays invisible on a packaged (non-git) install, when GitHub can\'t be reached, and whenever upstream isn\'t actually ahead.',
+    to: '/settings/maintenance',
+  },
+  {
     id: '2026-08-03-bank-mobile-contrast-and-scroll-fix',
     date: '2026-08-03',
     title: 'Bank chips are easier to see, and the page stops scrolling sideways',
