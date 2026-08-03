@@ -340,7 +340,7 @@ import { installAllPlan, INSTALL_ALL_ORDER } from './useSetupSteps.js';
 // A fully-installed snapshot; each test flips just the pieces it needs MISSING.
 const fullCaps = () => ({
   python: { ml_supported: true },
-  face_scoring: true, masks: true, watermark_inpaint: true,
+  face_scoring: true, masks: true, watermark_inpaint: true, wd14: true,
   ollama: { reachable: true, vision_model_ready: true, vision_model: 'qwen3-vl:8b' },
   // reachable matters for the Krea node pack: an unreachable ComfyUI's node probe
   // fails open, so "nothing missing" from a stopped ComfyUI must not read as
@@ -353,14 +353,14 @@ test('installAllPlan is empty when everything installable is present', () => {
 });
 
 test('installAllPlan folds null/empty caps to the always-runnable ML extras', () => {
-  const mlOnly = ['face_scoring', 'masks', 'watermark_inpaint'];
+  const mlOnly = ['face_scoring', 'masks', 'watermark_inpaint', 'wd14'];
   assert.deepEqual(installAllPlan(null), mlOnly);
   assert.deepEqual(installAllPlan({}), mlOnly);
 });
 
 test('installAllPlan skips face/masks on an unsupported Python but keeps watermark', () => {
   const caps = { ...fullCaps(), python: { ml_supported: false },
-    face_scoring: false, masks: false, watermark_inpaint: false };
+    face_scoring: false, masks: false, watermark_inpaint: false, wd14: false };
   assert.deepEqual(installAllPlan(caps), ['watermark_inpaint']);
 });
 
@@ -386,7 +386,7 @@ test('installAllPlan takes Klein weights only into a validated ComfyUI, in order
 test('installAllPlan full order groups ML -> vision model -> Klein', () => {
   const caps = {
     python: { ml_supported: true },
-    face_scoring: false, masks: false, watermark_inpaint: false,
+    face_scoring: false, masks: false, watermark_inpaint: false, wd14: false,
     ollama: { reachable: true, vision_model_ready: false, vision_model: 'm' },
     comfyui: { dir_valid: true,
       klein_missing: ['klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora'] },
@@ -406,7 +406,7 @@ test('installCatalog lists every app-installable component, present + available'
   // card, this menu is the per-piece repair path each of them also deserves.
   assert.deepEqual(
     installCatalog(fullCaps()).map((c) => c.action),
-    ['face_scoring', 'masks', 'watermark_inpaint', 'ollama_model',
+    ['face_scoring', 'masks', 'watermark_inpaint', 'wd14', 'ollama_model',
       'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
       'krea_nodes', 'krea_model', 'krea_text_encoder', 'krea_vae',
       'krea_identity_lora'],
@@ -421,7 +421,7 @@ test('installCatalog lists every app-installable component, present + available'
 test('installCatalog stays fully available for reinstall when all is green', () => {
   // The menu must never collapse once installed — each item can always be repaired.
   const cat = installCatalog(fullCaps());
-  assert.ok(cat.length === 13 && cat.every((c) => c.available));
+  assert.ok(cat.length === 14 && cat.every((c) => c.available));
 });
 
 test('installCatalog marks missing ML extras not-present but still available', () => {

@@ -291,6 +291,12 @@ def bank_images(bank_id):
         res_bucket=args.get('res_bucket') or None,
         framing=args.get('framing') or None,
         origin=args.get('origin') or None,
+        # Comma-separated WHOLE WD14 tag names, ANDed. Sanitised service-side
+        # (_clean_tag_filter) so there is one definition of a canonical tag.
+        # A SEPARATE key from `tags` above for the reason that comment gives:
+        # the 🏷️ chips read a caption's words, the 🔖 facets read the tagger's
+        # vocabulary, and one key answering both questions is a filter that lies.
+        wd14_tags=args.get('wd14_tags') or None,
         ids=ids,
         # ids_only=1 answers {'ids': [...]} for the WHOLE filter in one request —
         # what ▶ Review and "Select all in filter" actually need. Same filters,
@@ -465,6 +471,32 @@ def bank_framing(bank_id):
     return _start(banks.start_framing, _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
                   device_id=data.get('device_id'))
+
+
+@bp.post('/bank/<int:bank_id>/tags')
+def bank_tags(bank_id):
+    """🏷️ Tag every non-rejected image with the local WD14 classifier, so the bank
+    can be filtered by what is in the pictures without a captioning pass first.
+    Captions are never written. {rescan:true} re-tags already-tagged rows;
+    {threshold} overrides the configured confidence cut for this run only.
+    No device_id: this pass is local-only (see banks.LOCAL_ONLY_STEPS).
+    202/409/503."""
+    data = request.get_json(silent=True) or {}
+    return _start(banks.start_tags, _app(), LOCAL_USER, bank_id,
+                  rescan=bool(data.get('rescan')),
+                  threshold=data.get('threshold'))
+
+
+@bp.get('/bank/<int:bank_id>/tags/facets')
+def bank_tag_facets(bank_id):
+    """Every tag present in the bank with its non-rejected image count, most
+    common first — what the facet dropdowns are built from. Separate from the
+    bank payload on purpose: that one is polled every couple of seconds and this
+    answer only moves when the tag pass does. 404 when the bank is gone."""
+    payload = banks.tag_facets_payload(LOCAL_USER, bank_id)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
 
 
 @bp.get('/bank/<int:bank_id>/coverage')

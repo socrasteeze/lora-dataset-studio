@@ -302,6 +302,18 @@ DEFAULTS = {
              #   reference bank (screenshots of videos, padded stills).
              'bars_max': 0.04},
     'masks': {'python': ''},
+    # 🏷️ WD14 tagger (image-bank Tags pass). A ~400 MB ONNX classifier that names
+    # what is IN a picture as booru tags — hair colour, clothing, setting — so a
+    # huge dump can be sliced by those facets WITHOUT paying for a full caption
+    # run. It is not a captioner and never writes a caption: its output lives in
+    # its own column (BankImage.tags). Empty python = the same ML interpreter the
+    # other onnxruntime capabilities use (masks.python) then sys.executable;
+    # models_root overrides where the two model files are cached.
+    # threshold: confidence at or above which a tag is kept when the pass runs.
+    #   The FULL model output is stored regardless, so moving this re-filters an
+    #   already-tagged bank instantly (same read-time-thresholds contract as the
+    #   'bank' scores above) — 0.35 is the tagger's own published default.
+    'wd14': {'python': '', 'models_root': '', 'threshold': 0.35},
     # Bank ✨ Score pass interpreter (CLIP aesthetic/NSFW stack). Auto-provisioned
     # by the bank_scoring installer into its own venv — declared here so a
     # full-config Save round-trips it instead of failing "unknown config section".

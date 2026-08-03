@@ -549,7 +549,8 @@ def test_a_broken_weight_is_re_queued_by_the_one_click_installs():
     dark. A file no loader can open is not installed."""
     from app import setup_installer
     caps = {
-        'face_scoring': True, 'masks': True, 'watermark_inpaint': True, 'scrape_deps': True,
+        'face_scoring': True, 'masks': True, 'watermark_inpaint': True, 'wd14': True,
+        'scrape_deps': True,
         'ollama': {'reachable': False},
         'comfyui': {
             'dir_valid': True, 'reachable': True, 'klein_missing': [],
@@ -1363,7 +1364,7 @@ def _caps(**over):
     caps = {
         'python': {'ml_supported': True},
         'scrape_deps': True,
-        'face_scoring': True, 'masks': True, 'watermark_inpaint': True,
+        'face_scoring': True, 'masks': True, 'watermark_inpaint': True, 'wd14': True,
         'ollama': {'reachable': True, 'vision_model_ready': True, 'vision_model': 'qwen3-vl:8b'},
         'comfyui': {'dir_valid': True, 'klein_missing': []},
     }
@@ -1383,7 +1384,7 @@ def test_install_all_plan_none_and_empty_caps_are_safe():
     tiles read missing (default present=falsey) and Ollama/ComfyUI are absent so their
     gated actions are skipped; only the always-runnable extras remain."""
     from app import setup_installer
-    ungated = ['scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint']
+    ungated = ['scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint', 'wd14']
     assert setup_installer.install_all_plan(None) == ungated
     assert setup_installer.install_all_plan({}) == ungated
 

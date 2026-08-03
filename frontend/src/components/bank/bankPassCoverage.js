@@ -26,6 +26,7 @@ export const COVERAGE_PASSES = [
   { key: 'watermark', mark: '🚩', label: 'Watermarks' },
   { key: 'faces', mark: '👥', label: 'Group by person' },
   { key: 'framing', mark: '📐', label: 'Framing' },
+  { key: 'tags', mark: '🔖', label: 'Tags' },
   { key: 'caption', mark: '🏷️', label: 'Caption' },
 ]
 
