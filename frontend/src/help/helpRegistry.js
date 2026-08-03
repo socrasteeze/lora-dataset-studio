@@ -1126,6 +1126,15 @@ const TOPICS = [
     // the panel already shows a targeted notice to the only browsers it affects
     // (the ones that had turned masking off). A third surface would be nagging.
     app: { route: '/datasets?section=training' } },
+  { id: 'training.fp8_quantize_local', kind: 'action',
+    title: 'Quantize an existing model to fp8',
+    keywords: ['quantize', 'quantise', 'fp8', 'convert', 'shrink', 'comfyui',
+      'local', 'safetensors', 'checkpoint', 'full model', 'cpu',
+      'already quantized', 'bf16', 'fp16'],
+    guide: { chapter: 'dataset-guide', anchor: '10-local-fp8-model-conversion' },
+    app: { route: '/datasets?section=training' },
+    tip: { trigger: 'fp8-quantize-local',
+      text: 'New: turn a full-precision model on this machine into the smaller fp8 file ComfyUI loads. The original is never changed.' } },
   // WHICH Klein model runs — a per-DATASET setting since 28/07. Improve took no
   // model at all (the server resolved one silently) and generation's picker was a
   // per-BROWSER localStorage value that improve never read, so "which model made

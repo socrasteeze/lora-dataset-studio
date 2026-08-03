@@ -622,6 +622,15 @@ def _is_custom_weights(value) -> bool:
     return bool(value) and os.path.isabs(str(value))
 
 
+def assert_trainable_base_file(path) -> dict:
+    """Refuse an inference-only quantized export as a training base."""
+    from . import model_integrity
+    report = model_integrity.quantization_report(path)
+    if report.get('quantized'):
+        raise ValueError(model_integrity.QUANT_REFUSAL)
+    return report
+
+
 _SAFETENSORS_MAX_HEADER = 64 * 1024 * 1024   # 64 MB — a real header is < ~10 MB
 
 
@@ -872,6 +881,7 @@ def preflight_custom_paths(family, weights=None, vae_path=None, te_path=None,
     if _is_custom_weights(weights):
         if not os.path.isfile(weights):
             raise ValueError(f'custom weights file not found: {weights}')
+        assert_trainable_base_file(weights)
         keys = _safetensors_tensor_keys(weights)   # raises on unreadable header
         detected = _detect_safetensors_arch(keys)
         expected = _FAMILY_EXPECTED_ARCH.get(family)
@@ -2601,6 +2611,8 @@ def _training_selection_candidate(ds, patch: dict, requested_mode) -> dict:
         if raw_base is not None and not isinstance(raw_base, str):
             raise ValueError('base_model must be a string or empty')
         base_model = (raw_base or '').strip()
+        if _is_custom_weights(base_model):
+            assert_trainable_base_file(base_model)
     if 'variant' in patch:
         raw_variant = patch.get('variant')
         if not isinstance(raw_variant, str) or not raw_variant.strip():

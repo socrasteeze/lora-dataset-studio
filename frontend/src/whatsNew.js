@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-local-fp8-model-conversion',
+    date: '2026-08-03',
+    title: 'Make a ComfyUI-ready fp8 model locally, without touching the original',
+    blurb:
+      'The Training panel can now turn a full-precision safetensors checkpoint already on this machine into a smaller scaled-fp8 copy. It runs on the CPU, writes beside the source, checks the finished file before reporting success, and refuses LoRAs or models that are already quantized. Training also catches fp8/int8 custom bases at selection time and asks for the trainable bf16/fp16 original instead.',
+    to: '/datasets?section=training',
+  },
+  {
     id: '2026-08-03-krea-edit-takes-an-extra-angle',
     date: '2026-08-03',
     title: 'Krea 2 Edit takes a second image — add it in the edit dialog, and use it to compose',
