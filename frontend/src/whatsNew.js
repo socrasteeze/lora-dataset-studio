@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-bank-mobile-contrast-and-scroll-fix',
+    date: '2026-08-03',
+    title: 'Bank chips are easier to see, and the page stops scrolling sideways',
+    blurb:
+      'Two phone fixes for the bank. The active filter chip — the one telling you which Status/Quality/Origin/etc. is currently narrowing the grid — was a faint tint that was hard to tell apart from the inactive ones; it now renders as a solid, bold pill. Separately, the whole page could sometimes end up scrollable left-right on a phone, usually right after the keyboard auto-zoomed on a text box: two of the four ③ Curate popovers (🎨 Pick diverse…, 🎯 Similar to selected…) had never gotten the same mobile-safe placement their two siblings already had, so on a narrow screen they could hang off the edge and widen the whole page. Fixed to match, plus a couple of defensive tweaks so the same class of bug can\'t sneak back in.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-03-bank-selection-bar',
     date: '2026-08-03',
     title: 'Keep and reject a bank without scrolling back up',

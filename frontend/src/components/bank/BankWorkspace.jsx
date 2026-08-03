@@ -230,8 +230,12 @@ function ProgressBar({ activity, onCancel, offline = false }) {
 function Chip({ active, onClick, children, title }) {
   return (
     <button type="button" onClick={onClick} title={title}
+      // Active is a SOLID fill + white text, not a tint: a translucent
+      // indigo-500/20 over the near-black surface read as barely different
+      // from the inactive chips around it on a phone. font-semibold is a
+      // second, non-color cue, so the state doesn't rely on the tint alone.
       className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${active
-        ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
+        ? 'border-indigo-400 bg-indigo-500/35 text-white font-semibold'
         : 'border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised'}`}>
       {children}
     </button>
@@ -1546,7 +1550,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <GroupLabel>
             People ({clusters.length} cluster{clusters.length > 1 ? 's' : ''} — biggest first)
           </GroupLabel>
-          <ul className="flex gap-2 overflow-x-auto pb-1">
+          {/* `relative` makes this scroller the containing block for any
+              absolutely-positioned descendant — without it, overflow-x-auto
+              only clips a descendant when the scroller IS its containing
+              block. Each cover badge below already sits inside its own
+              `relative` button, so nothing escapes today, but that's an
+              incidental property of the current markup, not a guarantee —
+              see tests/mobile-rail-containing-block.test.mjs for the exact
+              bug this defends against. */}
+          <ul className="relative flex gap-2 overflow-x-auto pb-1">
             {clusters.map((c) => (
               <li key={c.id} className="shrink-0">
                 <button type="button" onClick={() => setF({ cluster: filter.cluster === c.id ? null : c.id, flag: null })}
@@ -1573,7 +1585,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <GroupLabel>
             Styles ({styleClusters.length} group{styleClusters.length > 1 ? 's' : ''} — biggest first)
           </GroupLabel>
-          <ul className="flex gap-2 overflow-x-auto pb-1">
+          {/* `relative` makes this scroller the containing block for any
+              absolutely-positioned descendant — without it, overflow-x-auto
+              only clips a descendant when the scroller IS its containing
+              block. Each cover badge below already sits inside its own
+              `relative` button, so nothing escapes today, but that's an
+              incidental property of the current markup, not a guarantee —
+              see tests/mobile-rail-containing-block.test.mjs for the exact
+              bug this defends against. */}
+          <ul className="relative flex gap-2 overflow-x-auto pb-1">
             {styleClusters.map((c) => (
               <li key={c.id} className="shrink-0">
                 <button type="button" onClick={() => setF({ style: filter.style === c.id ? null : c.id, flag: null, cluster: null })}
@@ -2057,7 +2077,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               ? 'Back to the full grid with its filters'
               : 'Show only the selected images (as their own view), so a scattered curation/similarity result is visible in one place'}
             className={`rounded-md border px-2 py-0.5 text-xs font-medium ${showSelected
-              ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
+              ? 'border-indigo-400 bg-indigo-500/35 text-white font-semibold'
               : 'border-border text-content-muted hover:text-content hover:bg-surface-raised'}`}>
             {showSelected ? '↩ Show all' : `Show selected (${selected.size})`}
           </button>
@@ -2092,7 +2112,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {curateOpen === 'diverse' && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setCurateOpen(null)} aria-hidden />
-              <div className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2">
+              {/* Bottom sheet below sm (measured at 400 px, an anchored w-72 panel
+                  hanging off a button that sits mid-row pushes the whole page
+                  sideways — the same overflow already fixed on ⚖ Balanced pick and
+                  🔤 Find by text; this popover and 🎯 Similar to selected had been
+                  left on the old absolute-with-no-offset markup). From sm up it
+                  behaves exactly like its siblings. */}
+              <div className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72 sm:max-h-none sm:overflow-visible">
                 <p className="text-xs text-content-muted">
                   Selects the most <strong>varied</strong> images of the current filter — the best
                   coverage of the visual space, not N look-alikes. Reviews as a normal selection
@@ -2203,7 +2229,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {curateOpen === 'similar' && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setCurateOpen(null)} aria-hidden />
-              <div className="absolute z-50 mt-1 w-72 rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2">
+              {/* Bottom sheet below sm — same overflow fix as 🎨 Pick diverse above;
+                  see its comment for the measured cause. */}
+              <div className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72 sm:max-h-none sm:overflow-visible">
                 <p className="text-xs text-content-muted">
                   Ranks the current filter by CLIP similarity to your one selected image and selects
                   the closest — a fast way to extract one person or look. The reference is kept in

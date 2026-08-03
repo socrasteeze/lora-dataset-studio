@@ -240,7 +240,11 @@ export default function BankWatermarkPanel({ bankId, live, onChanged }) {
               onChange={(e) => setShowOriginal(e.target.checked)} />
             Show my original files instead of the cleaned versions
           </label>
-          <ul className="flex gap-2 overflow-x-auto pb-1">
+          {/* `relative` makes this scroller the containing block for any
+              absolutely-positioned descendant — see
+              tests/mobile-rail-containing-block.test.mjs for the bug an
+              un-contained overflow-x-auto rail can cause on a phone. */}
+          <ul className="relative flex gap-2 overflow-x-auto pb-1">
             {sample.map((id) => (
               <li key={id} className="shrink-0">
                 <img alt={showOriginal ? `Original of image ${id}` : `Cleaned image ${id}`}
