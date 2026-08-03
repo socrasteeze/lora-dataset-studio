@@ -51,6 +51,10 @@ _foreign_local_endpoints: set[str] = set()
 # claimed to add was always really the line below; the constant is gone rather
 # than left standing as a guarantee no code path provided.
 _CLAIM_SLACK_S = 30.0        # request round-trip between our call and expires_at
+
+# Probe states that prove no model is on this GPU: a daemon that answered with
+# an empty runner, and a port nothing is listening on.
+_RUNNER_HOLDS_NOTHING = ('empty', 'down')
 _claims_loaded = False
 
 
@@ -288,12 +292,13 @@ def mark_before_generate(url, model, keep_alive=None) -> str:
 
     state, loaded, expiry = _probe(endpoint)
     if state == 'down':
-        # Ollama is not running. There is nothing to fence — and nothing to own
-        # either, so this path deliberately records NO ownership and writes NO
-        # keep-warm claim: you cannot hold a residency on a process that does
-        # not exist. Admit the call and let it fail on its own connection error,
-        # which names the real problem. Returning 'blocked' here would tell the
-        # user a model is "already in use outside LDS" by a daemon that is down.
+        # Nothing is listening, so there is no residency to fence — and none to
+        # own either. The request goes through (it will either fail on its own
+        # connection error or start the daemon and be admitted for real on the
+        # retry), but NO claim is written: a keep-warm lease is a statement about
+        # a model that is loaded. Writing one here for a model that never loaded
+        # made LDS adopt — and unload — a same-named model the user started by
+        # hand minutes later.
         return 'local'
     with _lock:
         # Re-read process ownership after the probe: concurrent LDS requests may
@@ -323,24 +328,17 @@ def mark_before_generate(url, model, keep_alive=None) -> str:
 
 
 def _probe(endpoint):
-    """Return (``empty`` | ``models`` | ``down`` | ``unknown``, names, expires_at).
+    """Return (``empty`` | ``down`` | ``models`` | ``unknown``, names, expires_at map).
+
+    ``down`` is "nothing is listening on this port" (the connection was refused),
+    as opposed to ``empty`` — "a daemon answered and holds no model". Both mean
+    the GPU is free, so every release path treats them alike; they part ways on
+    the admission path, where ``empty`` describes a runner that can hold what LDS
+    is about to load and ``down`` describes one that cannot hold anything at all.
 
     ``expires_at`` is epoch seconds when Ollama reported a parseable one. It is
     only ever used to REFUSE an ownership claim, so a missing value is not a
     failure — it simply leaves the claim to be judged on its own freshness.
-
-    ``down`` and ``empty`` both mean NOTHING IS RESIDENT, and every caller that
-    asks "is the runner free?" treats them alike (see ``_runner_is_idle``) — a
-    refused connection is in fact the strongest such proof there is, since a
-    daemon that is not running cannot be holding VRAM.
-
-    They are separated because ONE question does not have the same answer for
-    both: may LDS take ownership? A refused connection used to be reported as
-    ``empty``, which is the permissive state, so with Ollama stopped the
-    admission path claimed the model and persisted a keep-warm lease for a
-    runner that never loaded it. That left LDS believing it owned a residency it
-    had never created — enough to later unload a model the USER had loaded under
-    that name, which is the one thing this module exists to prevent.
     """
     try:
         response = requests.get(f'{endpoint}/api/ps', timeout=(3, 5), allow_redirects=False)
@@ -372,18 +370,6 @@ def _probe(endpoint):
         return 'unknown', set(), {}
 
 
-def _runner_is_idle(state) -> bool:
-    """Is the local runner holding nothing? Both ways of being sure count.
-
-    ``empty`` is Ollama answering with an empty model list; ``down`` is Ollama
-    not answering at all because it is not running. Either way there is no
-    resident model to preserve, unload or wait for — so release, unload and the
-    post-unload proof all accept both. Only ownership (``mark_before_generate``)
-    and reachability (``fence_status``) need to tell them apart.
-    """
-    return state in ('empty', 'down')
-
-
 def _post_unload(endpoint, model) -> bool:
     try:
         response = requests.post(f'{endpoint}/api/generate',
@@ -401,7 +387,9 @@ def _release_endpoint(endpoint, expected_models) -> bool:
     state, loaded, expiry = _probe(endpoint)
     if state == 'unknown':
         return False
-    if _runner_is_idle(state):
+    if state in _RUNNER_HOLDS_NOTHING:
+        # Empty, or not running at all: either way this GPU is free, and any
+        # claim left over from a previous life stops speaking for it.
         with _lock:
             _owned_models.pop(endpoint, None)
             _foreign_local_endpoints.discard(endpoint)
@@ -431,7 +419,7 @@ def _release_endpoint(endpoint, expected_models) -> bool:
         if not _post_unload(endpoint, model):
             return False
     state, remaining, _ = _probe(endpoint)
-    if not _runner_is_idle(state) or remaining:
+    if state not in _RUNNER_HOLDS_NOTHING or remaining:
         return False
     with _lock:
         _owned_models.pop(endpoint, None)
@@ -537,10 +525,7 @@ def fence_status() -> dict:
     if state in ('unknown', 'down'):
         # Not reachable / not answering usefully: that is not this fence's
         # story to tell, and reporting "blocked" here would offer an unload
-        # button for a daemon nobody can talk to. 'down' belongs here and not
-        # with 'empty': a refused connection did report `reachable: True`, so
-        # the surfaces that poll this to notice the fence lifting were told a
-        # stopped Ollama was up and idle.
+        # button for a daemon nobody can talk to.
         return {'applies': True, 'blocked': False, 'scope': 'local',
                 'reachable': False, 'models': []}
     with _lock:
@@ -571,9 +556,7 @@ def unload_foreign_models() -> dict:
     state, loaded, _ = _probe(endpoint)
     if state == 'unknown':
         return {'ok': False, 'reason': 'unreachable', 'unloaded': [], 'still_loaded': []}
-    if _runner_is_idle(state):
-        # Includes a stopped daemon: there is nothing resident to take, and the
-        # stale claims should go with it.
+    if state in _RUNNER_HOLDS_NOTHING:
         with _lock:
             _owned_models.pop(endpoint, None)
             _foreign_local_endpoints.discard(endpoint)
@@ -582,7 +565,7 @@ def unload_foreign_models() -> dict:
 
     unloaded = [model for model in sorted(loaded) if _post_unload(endpoint, model)]
     state, remaining, _ = _probe(endpoint)
-    if not _runner_is_idle(state) or remaining:
+    if state not in _RUNNER_HOLDS_NOTHING or remaining:
         # Ollama acknowledged but the runner is not empty (a request still in
         # flight holds it). Say so rather than let the caller retry into the
         # same wall.

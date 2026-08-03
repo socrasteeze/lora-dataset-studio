@@ -32,6 +32,8 @@ from ..utils.comfyui import KREA_ALLOWED_SAMPLERS, KREA_ALLOWED_SCHEDULERS, get_
 from ._common import (_map_error, _require_comfyui, _require_no_stalled_comfyui,
                       _studio_arch_mismatch_response, _studio_missing_response)
 
+logger = logging.getLogger(__name__)
+
 bp = Blueprint('datasets', __name__, url_prefix='/api')
 
 _PRESET_NAMES = ('balanced_25', 'zimage_12', 'balanced_multiformat',
@@ -489,11 +491,7 @@ def dataset_ref_edit_keep(dataset_id):
         fn = svc.keep_reference_edit(LOCAL_USER, dataset_id, engine=engine,
                                      batch_id=batch_id)
     except Exception:
-        # NOT `logger.exception` — this module has no module-level `logger`, and
-        # upstream's copy of this line would raise NameError inside the very
-        # except block that exists to turn a failed Keep into an honest 500.
-        logging.getLogger(__name__).exception(
-            'reference edit keep failed (dataset %s)', dataset_id)
+        logger.exception('reference edit keep failed (dataset %s)', dataset_id)
         return jsonify({'error': "Couldn't save the edited reference — the previous "
                                  'reference is unchanged.'}), 500
     if fn is None:

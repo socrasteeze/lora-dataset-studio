@@ -960,18 +960,12 @@ def set_dataset_klein_model(user_id, dataset_id, name):
     if not ds:
         raise ValueError('dataset not found')
     value = (name or '').strip()
-    # Checked on ALL THREE flavours, and on the separators literally. A single
-    # `os.path.basename` is only as strict as the platform running it: off
-    # Windows a backslash is an ordinary character, so `sub\model.safetensors`
-    # passed this guard on Linux and failed it on Windows — and the test that
-    # pins the rejection only ever ran on the platform where it was already
-    # true (CI's backend job is windows-latest). Same shape as
-    # _validated_comfy_output_name below, for the same reason.
-    if value and (value in ('.', '..')
-                  or '/' in value or '\\' in value
-                  or os.path.basename(value) != value
-                  or ntpath.basename(value) != value
-                  or posixpath.basename(value) != value):
+    # BOTH separators, on every OS: os.path.basename alone reads a backslash as
+    # an ordinary character on Linux, so `sub\model.safetensors` walked straight
+    # through this guard there and only Windows was actually protected.
+    if value and (ntpath.basename(value) != value
+                  or posixpath.basename(value) != value
+                  or value in ('.', '..')):
         raise ValueError('a Klein model is named by its file name, without a folder')
     ds.klein_model = value or None
     db.session.commit()
