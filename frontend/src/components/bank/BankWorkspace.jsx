@@ -18,11 +18,17 @@ import BankReviewLightbox from './BankReviewLightbox'
 import BankWatermarkPanel from './BankWatermarkPanel'
 // 🎚 The twelve triage thresholds, edited here instead of in Settings.
 import BankThresholdsPanel from './BankThresholdsPanel.jsx'
+import { spreadReadout, spreadCoverageNote } from './coverageVisual.js'
+// Shared with the dataset coverage panel on purpose: both render the SAME
+// caption-lexicon payload, so the row/summary logic lives in one place rather
+// than being copied and left to drift.
+import { axisRows, axisSummary } from '../dataset/datasetCoverage.js'
 // Source-folder re-walk messages (pure/testable).
 import { folderSyncToast, forgetMissingConfirm } from './bankSync.js'
 import { UNDO_HINT, undoBannerText, undoOffer, undoResultMessage } from './bankUndo.js'
 // ≈/✂ marks, shown only while a group is still open (pure/testable).
 import { dupBadges, dupStateSuffix } from './bankDupBadge.js'
+import { idsFromResponse } from './bankIds.js'
 // Four progress states, not two — including the honest "I don't know" (pure/testable).
 import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } from './progressPresence.js'
 // An occupied bank refuses in OUR words, never in the server's (pure/testable).
@@ -37,15 +43,21 @@ import { BANK_ZONES, nextBankStep } from './bankGuide.js'
 // Provenance wording (effective resolution, origin, black bars) — pure/testable.
 import { ORIGIN_CHIPS, PROVENANCE_FLAG_LABEL, detailSummary } from './bankProvenance.js'
 // Grid ordering menu (which sorts exist, and which ones have data) — pure/testable.
-import { bankSortOptions } from '../../utils/gridSort.js'
-// 🏷️ WD14 tags: thousands of booru labels folded into a handful of dropdowns,
+import { bankSortGroups, loadBankSort, saveBankSort } from '../../utils/gridSort.js'
+// 🏷️ One image's caption → the chips you can filter by (pure/testable).
+import { captionChips, tagsParam, tagFilterSummary } from './bankTags.js'
+// 🔖 WD14 tags: thousands of booru labels folded into a handful of dropdowns,
 // and the gate that decides whether the pass can run at all (pure/testable).
+// A DIFFERENT feature from the 🏷️ chips above — those read one caption's words,
+// these read the tagger's own vocabulary — hence the separate module and key.
 import { groupTags, label as tagLabel } from './bankTagFacets.js'
 import { showTagFilters, tagsButtonLabel, tagsButtonState } from './wd14Gate.js'
 // 🔤 Text search wording — "closest", never "matching" — plus the cold-start and
 // CLIP-limitation copy. Pure/testable (node --test cannot parse this JSX).
 import {
-  limitsSentence, pendingLabel, readinessHint, summarize,
+  PUSH_DOWN_DEFAULT_STRENGTH, PUSH_DOWN_STRENGTHS, pushDownCaveat, pushDownNote,
+  limitsSentence, pendingLabel, readinessHint, suggestPushDown, summarize,
+  withoutNegation,
 } from './bankTextSearch.js'
 // ⚖ Balanced pick — the distribution obtained, in words and numbers. Pure logic
 // on purpose: the repartition is what has to be provable (node --test, no JSX).
@@ -110,16 +122,19 @@ const STATUS_RING = {
 /** Fetch EVERY image id matching a filter, page by page (used by the
  * cluster/flag "select all" actions — a cluster can exceed one grid page). */
 async function fetchAllIds(bankId, params) {
-  const ids = []
-  let offset = 0
-  for (;;) {
-    const qs = new URLSearchParams({ ...params, offset: String(offset), limit: '500' })
-    const d = await apiFetch(`/api/bank/${bankId}/images?${qs}`)
-    ids.push(...d.images.map((i) => i.id))
-    offset += d.images.length
-    if (offset >= d.total || d.images.length === 0) break
-  }
-  return ids
+  // ONE request for the ids of the whole filter (`ids_only=1`), in the order the
+  // grid is showing. This used to walk the grid 500 rows at a time and keep only
+  // `i.id` — 46 sequential round trips and 16 MB of image payloads to end up with
+  // 23 000 integers, measured on a 22 940-image bank; with a measure sort active
+  // each of those pages also re-ran the COUNT and the ORDER BY over the whole
+  // table, which is what put seconds in front of ▶ Review.
+  const qs = new URLSearchParams({ ...params, ids_only: '1' })
+  const d = await apiFetch(`/api/bank/${bankId}/images?${qs}`)
+  // A MISSING `ids` key and an EMPTY one are different answers — see bankIds.js
+  // for why conflating them made the app report "no image matches the current
+  // filter" over a grid showing 1 128 of them. Both callers below surface a
+  // thrown message in an error toast, so the real cause reaches the user.
+  return idsFromResponse(d)
 }
 
 const STEP_SHORT = {
@@ -346,6 +361,64 @@ function FramingBar({ framing }) {
   )
 }
 
+// 👁 What the labels cannot see: how alike the pool actually LOOKS, measured on
+// the CLIP embeddings ✨ Score already cached. An unscored bank shows "Not
+// measured" rather than a reassuring colour — the whole point is that silence
+// must never read as variety.
+function VisualSpread({ visual, total }) {
+  const r = spreadReadout(visual)
+  if (!r) return null
+  const tone = r.tone === 'warn' ? 'border-amber-400/50 bg-amber-400/10 text-amber-200'
+    : r.tone === 'ok' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+      : 'border-border bg-surface-raised text-content-subtle'
+  const note = spreadCoverageNote(visual, total)
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-content-muted">Visual spread</span>
+        <span className={`rounded-full border px-2 py-0.5 text-[11px] ${tone}`}>{r.label}</span>
+      </div>
+      <p className="m-0 text-[11px] text-content-subtle">{r.detail}</p>
+      {note && <p className="m-0 text-[11px] text-content-subtle">{note}</p>}
+    </div>
+  )
+}
+
+// The caption-derived axes, rendered from the SAME pure helpers the dataset panel
+// uses (imported, not copied) so the two surfaces cannot drift apart.
+function VarietyAxes({ variety }) {
+  if (!variety || !variety.captioned || !(variety.axes || []).length) return null
+  const chip = { ok: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+    thin: 'border-amber-400/50 bg-amber-400/10 text-amber-300',
+    gap: 'border-rose-400/50 bg-rose-400/10 text-rose-300',
+    none: 'border-border bg-surface-raised text-content-subtle' }
+  return (
+    <div className="flex flex-col gap-2 border-t border-border pt-2">
+      {variety.axes.map((axis) => (
+        <div key={axis.id} className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-[11px] uppercase tracking-wide text-content-muted">{axis.label}</span>
+            {axis.hint && <span className="text-[11px] text-content-subtle">{axis.hint}</span>}
+          </div>
+          {/* The chips decorate a sentence a screen reader can read out; the
+              sentence is the carrier, never the colour. */}
+          <span className="sr-only">{axisSummary(axis)}</span>
+          <div aria-hidden className="flex flex-wrap gap-1">
+            {axisRows(axis).map((r) => (
+              <span key={r.id}
+                title={r.count ? `${r.count} caption${r.count === 1 ? '' : 's'} mention this`
+                  : (r.state === 'gap' ? 'No caption mentions this' : 'Not mentioned (optional)')}
+                className={`rounded-full border px-2 py-0.5 text-[11px] ${chip[r.state]}`}>
+                {r.label}<span className="opacity-60"> {r.count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function CoveragePanel({ coverage, onClose, onBalance = null, balanceReason = '' }) {
   if (!coverage) {
     return <p className="text-sm text-content-subtle">Reading coverage…</p>
@@ -364,6 +437,7 @@ function CoveragePanel({ coverage, onClose, onBalance = null, balanceReason = ''
           className="rounded-md border border-border px-1.5 py-0.5 text-xs text-content-subtle hover:text-content">✕</button>
       </div>
       {coverage.framing_available && <FramingBar framing={coverage.framing} />}
+      <VisualSpread visual={coverage.visual} total={coverage.total} />
       <ul className="space-y-1 text-sm">
         {coverage.advice.map((a, i) => (
           <li key={i} className="flex items-start gap-2">
@@ -380,20 +454,24 @@ function CoveragePanel({ coverage, onClose, onBalance = null, balanceReason = ''
             ? 'Select a set spread evenly over the framings, instead of the top of one ranking'
             : balanceReason}
           className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-emerald-500/20">
-          ⚖ Pick a balanced set…
+          ⚖️ Pick a balanced set…
         </button>
         {!onBalance && balanceReason && (
           <span className="text-[11px] text-content-subtle">{balanceReason}</span>
         )}
       </div>
+      <VarietyAxes variety={coverage.variety} />
       <p className="text-[11px] text-content-subtle">
-        Advice only — nothing is kept or rejected. Based on what the passes already computed.
+        Advice only — nothing is kept or rejected. Based on what the passes already computed:
+        the labels, your captions (words, not pixels — a shot the captioner never described is
+        invisible here, and “not smiling” still counts as a smile) and the ✨ Score embeddings.
+        Judged as a character source, like the framing target above.
       </p>
     </div>
   )
 }
 
-function Tile({ img, bankId, selected, onToggle, onReview, size }) {
+function Tile({ img, bankId, selected, onToggle, onReview, onTags, size }) {
   // `key` matters only for the flags list below (the one mapped array) — it was
   // missing and logged a React warning on every bank grid render.
   const badge = (txt, cls, key) => (
@@ -455,7 +533,18 @@ function Tile({ img, bankId, selected, onToggle, onReview, size }) {
             {b.text}
           </span>
         ))}
-        {img.caption && badge('🏷️', 'bg-black/60 text-emerald-200')}
+        {/* 🏷️ is the only badge that DOES something: it lifts this image's own
+            caption words into the filter bar as tickable chips. A button, not a
+            span, so it is reachable by keyboard and announces what it opens. */}
+        {img.caption && (
+          <button type="button"
+            onClick={(e) => { e.stopPropagation(); onTags?.() }}
+            title={`Filter the bank by this image's tags — ${img.caption}`}
+            aria-label={`Use the tags of ${img.name} as a filter`}
+            className="rounded bg-black/60 px-1 text-[10px] text-emerald-200 hover:bg-black/80">
+            🏷️
+          </button>
+        )}
       </span>
       {/* ▶ starts the fast-triage lightbox AT this image. It's a separate hit
           target on purpose: the tile's own click still (de)selects for the bulk
@@ -475,17 +564,34 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const toast = useToast()
   const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities()
   const [payload, setPayload] = useState(null)
-  const [filter, setFilter] = useState({ status: null, flag: null, cluster: null,
-    style: null, subfolder: null, search: null, sort: 'default', resBucket: null,
+  // `sort` opens on whatever order this bank was last reviewed in (per bank, not
+  // global — see gridSort.bankSortStorageKey). Every other facet starts empty on
+  // purpose: an order is a habit, a filter is a question you asked once.
+  const [filter, setFilter] = useState(() => ({ status: null, flag: null, cluster: null,
+    style: null, subfolder: null, search: null, exclude: null, tags: null,
+    sort: loadBankSort(bankId), resBucket: null,
     origin: null,
-    // 🔖 WD14 tag filter: an ARRAY of whole tag names, ANDed server-side. An
+    // 🔖 WD14 facet filter: an ARRAY of whole tag names, ANDed server-side. An
     // array and not one value, because each facet dropdown is an independent
-    // question ("blonde hair" AND "wearing a shirt").
-    tags: [],
-    framing: null })
+    // question ("blonde hair" AND "wearing a shirt"). Its own key beside the
+    // 🏷️ `tags` chips above — same reasoning as the route's two parameters.
+    wd14Tags: [],
+    framing: null }))
   const [searchText, setSearchText] = useState('')
-  // The bank's tag vocabulary with counts, fetched on demand (never folded into
-  // the 2 s payload poll — it only moves when the tag pass does).
+  // 🚫 The inverse of the search box: hide what already carries a word. Session
+  // state, deliberately NOT remembered like the sort — an order you can see in a
+  // menu is a habit, images missing from a grid for a reason you set last week
+  // reads as data loss.
+  const [excludeText, setExcludeText] = useState('')
+  // 🏷️ Tag chips lifted off ONE image's caption. `tagSource` is the image the
+  // chips were read from (kept so the row can say WHOSE tags these are — chips
+  // with no provenance are just mystery words), `tagPicked` the ticked subset.
+  // Both are session state: this is a question you ask about one image now, not
+  // a standing preference like the sort order.
+  const [tagSource, setTagSource] = useState(null)
+  const [tagPicked, setTagPicked] = useState(() => new Set())
+  // The bank's WD14 tag vocabulary with counts, fetched on demand (never folded
+  // into the 2 s payload poll — it only moves when the tag pass does).
   const [tagFacets, setTagFacets] = useState(null)
   const [subfolders, setSubfolders] = useState([])
   const [offset, setOffset] = useState(0)
@@ -532,6 +638,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // keeps the ranking legible once the grid has switched to it.
   const [textQuery, setTextQuery] = useState('')
   const [textN, setTextN] = useState(60)
+  // 🔤 what to push DOWN the ranking. Not a filter — see bankTextSearch.js.
+  const [textExclude, setTextExclude] = useState('')
+  const [textExcludeW, setTextExcludeW] = useState(PUSH_DOWN_DEFAULT_STRENGTH)
   const [textStatus, setTextStatus] = useState(null)
   const [textPending, setTextPending] = useState(false)
   const [textResult, setTextResult] = useState(null)
@@ -631,7 +740,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // whenever it isn't null, empty string included.
     if (f.subfolder != null) params.subfolder = f.subfolder
     if (f.search) params.search = f.search
-    // Grid sort (resolution / aesthetic / sharpness, each way) — sent to the grid
+    // The exclude terms travel with the search on every surface that reads a
+    // filter — the grid, "Select all in filter", ▶ Review and the curation picks.
+    if (f.exclude) params.exclude = f.exclude
+    // 🏷️ ticked chips — its own key, matched as WORDS and ANDed server-side.
+    if (f.tags) params.tags = f.tags
+    // Grid sort (any measured quantity, each way) — sent to the grid
     // AND to fetchAllIds so "Select all in filter" and > Review walk the SAME
     // order the user is looking at. 'default' keeps the server's flag order.
     if (f.sort && f.sort !== 'default') params.sort = f.sort
@@ -642,10 +756,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     if (f.framing) params.framing = f.framing
     // Origin state (ai/camera/unknown) — a facet like the flags.
     if (f.origin) params.origin = f.origin
-    // 🔖 Tag filter — comma-separated whole tag names, ANDed server-side. Also
-    // flows to fetchAllIds, so "Select all in filter" and ▶ Review stay scoped
-    // to the tags the user is actually looking at.
-    if (f.tags?.length) params.tags = f.tags.join(',')
+    // 🔖 WD14 facet filter — comma-separated whole tag names, ANDed server-side.
+    // Its OWN key (`wd14_tags`), separate from the 🏷️ chip `tags` above — same
+    // reasoning: two features, one payload key, is how a filter silently eats
+    // its sibling's field. Also flows to fetchAllIds, so "Select all in filter"
+    // and ▶ Review stay scoped to the tags the user is actually looking at.
+    if (f.wd14Tags?.length) params.wd14_tags = f.wd14Tags.join(',')
     return params
   }, [])
 
@@ -666,7 +782,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   useEffect(() => { refreshImagesRef.current = refreshImages }, [refreshImages])
 
   useEffect(() => {
-    refreshPayload({ force: true }); refreshImages()
+    // Opening ANOTHER bank without unmounting (the workspace is not keyed by id)
+    // has to pick up THAT bank's remembered order, not keep the previous one —
+    // and the first fetch must already use it, hence the explicit filter here
+    // instead of a setFilter that the fetch below would race.
+    const f = { ...filter, sort: loadBankSort(bankId) }
+    if (f.sort !== filter.sort) setFilter(f)
+    refreshPayload({ force: true }); refreshImages(f)
     apiFetch(`/api/bank/${bankId}/subfolders`)
       .then((d) => setSubfolders(d.subfolders || []))
       .catch(() => setSubfolders([]))
@@ -712,7 +834,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   useEffect(() => {
     if (coverageOpen) loadCoverage()
   }, [coverageOpen, loadCoverage, payload?.counts?.keep,
-      payload?.counts?.framing_classified])
+      payload?.counts?.framing_classified,
+      // The panel now also reads captions and embeddings, so it must refresh
+      // when those passes land — otherwise it keeps showing "no captions yet"
+      // after the 🏷️ pass finished.
+      payload?.counts?.captioned, payload?.counts?.scored])
 
   // Leaving the selection view: back to the facet grid.
   const exitSelectionView = () => { setShowSelected(false); setSelectedOrder(null) }
@@ -740,8 +866,33 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // sort has no meaning inside the selection view, so it drops back to the grid.
   const setSort = (sort) => {
     const f = { ...filter, sort }
+    saveBankSort(bankId, sort)
     setFilter(f); setOffset(0); exitSelectionView()
     refreshImages(f, 0, { on: false })
+  }
+
+  // 🏷️ Open the chip row on an image, with nothing ticked yet: reading the tags
+  // is not the same act as filtering by them, and auto-applying all of them would
+  // usually return that one image alone.
+  const openTagPicker = (img) => {
+    setTagSource(img)
+    setTagPicked(new Set())
+    if (filter.tags) setF({ tags: null })
+  }
+
+  // Tick / untick one chip and re-filter immediately — the grid IS the feedback,
+  // so an Apply button would only add a click between the question and its answer.
+  const toggleTag = (tag) => {
+    const next = new Set(tagPicked)
+    if (next.has(tag)) next.delete(tag); else next.add(tag)
+    setTagPicked(next)
+    setF({ tags: tagsParam(next) })
+  }
+
+  const clearTags = () => {
+    setTagSource(null)
+    setTagPicked(new Set())
+    if (filter.tags) setF({ tags: null })
   }
 
   // Debounce the search box, then apply it as a filter (page 1, selection cleared).
@@ -752,6 +903,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText])
+
+  // Same debounce for the exclude box. It is a FILTER like any other, so it goes
+  // through setF: page 1, selection cleared, and it rides to the curation
+  // endpoints too (filterParams) — hiding an image in the grid must also keep it
+  // out of "pick 60 diverse".
+  useEffect(() => {
+    const term = excludeText.trim()
+    if ((filter.exclude || '') === term) return undefined
+    const t = setTimeout(() => setF({ exclude: term || null }), 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [excludeText])
   const goto = (off) => { setOffset(off); refreshImages(filter, off) }
 
   /* `onRefusal` is for a caller that OWNS a surface for the refusal — today the
@@ -1035,7 +1198,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setTextPending(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/search-text`,
-        { query: q, n: textN, ...filterParams(filter) })
+        { query: q, n: textN, push_down: textExclude.trim() || null,
+          push_down_weight: textExcludeW, ...filterParams(filter) })
       setTextResult(d)
       setCurateOpen(null)
       if (!d.image_ids?.length) {
@@ -1056,6 +1220,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }
 
   const counts = payload?.counts
+  // The Sort menu greys an entry out when its pass has measured NOTHING. Face
+  // confidence is the one whose progress the payload reports outside `counts`
+  // (faces_scanned, a sibling key), so it is folded in here rather than by
+  // changing the payload shape every other reader depends on.
+  const sortGroups = bankSortGroups(
+    counts ? { ...counts, faces: payload?.faces_scanned } : counts)
   // ↩ the live offer, minus the one the user already waved away.
   const offer = undoOffer(payload)
   const undoBar = offer && offer.at !== undoDismissedAt ? offer : null
@@ -1113,7 +1283,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // Is any facet narrowing the grid? Drives the "N shown of TOTAL" readout.
   const isFiltered = !!(filter.status || filter.flag || filter.cluster != null
     || filter.style != null || filter.subfolder != null || filter.search
-    || filter.resBucket || filter.framing || filter.tags?.length)
+    || filter.resBucket || filter.framing || filter.tags?.length || filter.wd14Tags?.length)
 
   // 🔖 Tag pass + facets. The grouping is pure and lives in bankTagFacets.js;
   // this only decides whether to show it and what is currently picked.
@@ -1123,22 +1293,22 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     scanned: counts?.scanned || 0,
   })
   const grouped = useMemo(() => groupTags(tagFacets?.tags), [tagFacets])
-  const tagFiltersShown = showTagFilters({ tagged: taggedCount, activeTags: filter.tags })
+  const tagFiltersShown = showTagFilters({ tagged: taggedCount, activeTags: filter.wd14Tags })
   // Which tag (if any) each facet is currently narrowing on, so a <select> can
   // show it. A tag can only be in one facet, so this is unambiguous.
   const facetValue = (facet) =>
-    facet.options.find((o) => filter.tags.includes(o.name))?.name || ''
+    facet.options.find((o) => filter.wd14Tags.includes(o.name))?.name || ''
   // Picking a value REPLACES this facet's previous pick and leaves the others
   // alone — the alternative (append) turns "blonde, no wait, brown" into a
   // filter for images that are both, which match nothing and look broken.
   const setFacetTag = (facet, name) => {
-    const others = filter.tags.filter((t) => !facet.options.some((o) => o.name === t))
-    setF({ tags: name ? [...others, name] : others })
+    const others = filter.wd14Tags.filter((t) => !facet.options.some((o) => o.name === t))
+    setF({ wd14Tags: name ? [...others, name] : others })
   }
-  const toggleTag = (name) => setF({
-    tags: filter.tags.includes(name)
-      ? filter.tags.filter((t) => t !== name)
-      : [...filter.tags, name],
+  const toggleWd14Tag = (name) => setF({
+    wd14Tags: filter.wd14Tags.includes(name)
+      ? filter.wd14Tags.filter((t) => t !== name)
+      : [...filter.wd14Tags, name],
   })
 
   // The ONE recommended next step, from the counters the header strip already
@@ -1441,6 +1611,26 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
             )}
           </div>
+          {/* 🚫 Exclude — the search bar read backwards. Captioning a big bank
+              turns it into a checklist ("which ones have I not tagged with X
+              yet?"), and that question has no answer while the only text tool
+              can just narrow TO a word. Same fields as the search (caption +
+              file name), same debounce, composes with every other facet.
+              Comma-separated: hiding 'logo, watermark' in one pass is the
+              normal case. Its own min-width so the pair wraps to two rows —
+              not two half-unusable boxes — inside a 400 px toolbar. */}
+          <div className="relative min-w-[12rem] max-w-md flex-1">
+            <span aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-content-subtle">🚫</span>
+            <input type="search" value={excludeText} onChange={(e) => setExcludeText(e.target.value)}
+              placeholder="Exclude words… (e.g. logo, watermark)"
+              aria-label="Hide images whose caption or file name contains these words"
+              title="Hides every image whose caption or file name contains one of these words (comma-separated). Matches anywhere in the text, so 'car' also hides 'scarf'. Images with no caption are never hidden."
+              className="w-full rounded-md border border-border bg-surface py-1.5 pl-8 pr-8 text-sm text-content placeholder:text-content-subtle" />
+            {excludeText && (
+              <button type="button" onClick={() => setExcludeText('')} aria-label="Clear the exclude filter"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content">✕</button>
+            )}
+          </div>
           {/* Subfolder scoping (a Telegram export nests one folder per chat/date) */}
           {subfolders.length > 1 && (
             <div className="flex items-center gap-1.5">
@@ -1458,6 +1648,51 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             </div>
           )}
         </div>
+
+        {/* 🏷️ Tags of ONE image, as chips you tick. Opened from a tile's 🏷️
+            badge, and rendered HERE — with the other filters — rather than in a
+            popover on the tile or inside ▶ Review: filtering is a grid gesture,
+            it has to stay visible while it is active, and the review lightbox
+            walks a FROZEN snapshot that a filter change could not honestly
+            alter. Ticking re-filters immediately; the sentence spells out that
+            several chips mean AND, because a set that shrinks with every click
+            is only obvious once you already know the rule. */}
+        {tagSource && (
+          <div className="space-y-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/5 px-2.5 py-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <GroupLabel>🏷️ Tags of {tagSource.name}</GroupLabel>
+              <span className="text-[11px] text-content-subtle">
+                attributes you pick — unlike 🎯 Similar, which matches the look
+              </span>
+              <button type="button" onClick={clearTags}
+                className="ml-auto rounded border border-border px-2 py-0.5 text-[11px] text-content-muted hover:text-content">
+                ✕ Close
+              </button>
+            </div>
+            {captionChips(tagSource.caption).length === 0 ? (
+              <p className="m-0 text-xs text-content-muted">
+                This caption has no word worth filtering on.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {captionChips(tagSource.caption).map((tag) => (
+                  <Chip key={tag} active={tagPicked.has(tag)} onClick={() => toggleTag(tag)}
+                    title={tagPicked.has(tag)
+                      ? `Stop requiring “${tag}”`
+                      : `Show only images whose caption mentions “${tag}”`}>
+                    {tag}
+                  </Chip>
+                ))}
+              </div>
+            )}
+            {tagPicked.size > 0 && (
+              <p className="m-0 text-[11px] text-content-muted">
+                {tagFilterSummary(tagPicked)} Matched as whole words, in captions
+                and file names.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Filters — grouped by facet so the chips read as a system, not a wall */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -1586,10 +1821,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   </select>
                 </label>
               ))}
-              {filter.tags.length > 0 && (
-                <button type="button" onClick={() => setF({ tags: [] })}
+              {filter.wd14Tags.length > 0 && (
+                <button type="button" onClick={() => setF({ wd14Tags: [] })}
                   className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
-                  Clear tags ({filter.tags.length})
+                  Clear tags ({filter.wd14Tags.length})
                 </button>
               )}
             </div>
@@ -1604,8 +1839,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 </summary>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {grouped.other.slice(0, 120).map((o) => (
-                    <Chip key={o.name} active={filter.tags.includes(o.name)}
-                      onClick={() => toggleTag(o.name)}
+                    <Chip key={o.name} active={filter.wd14Tags.includes(o.name)}
+                      onClick={() => toggleWd14Tag(o.name)}
                       title={`Filter the grid to images tagged "${o.name}"`}>
                       {o.label} {o.count}
                     </Chip>
@@ -1622,11 +1857,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {/* An active tag filter that names tags this bank no longer has (a
                 re-tag at a higher threshold, say) would otherwise be invisible
                 and unexplainable — the grid would just be empty. */}
-            {filter.tags.filter((t) => !grouped.facets.some(
+            {filter.wd14Tags.filter((t) => !grouped.facets.some(
               (f) => f.options.some((o) => o.name === t))
               && !grouped.other.some((o) => o.name === t)).length > 0 && (
               <p className="mt-1 text-xs text-amber-300">
-                Filtering on {filter.tags.map(tagLabel).join(', ')} — some of those tags
+                Filtering on {filter.wd14Tags.map(tagLabel).join(', ')} — some of those tags
                 are no longer present in this bank.
               </p>
             )}
@@ -1673,23 +1908,36 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <GroupLabel>View</GroupLabel>
           <label className="flex items-center gap-1 text-xs text-content-muted">
             Sort
-            {/* Order the grid on what the passes MEASURED — resolution, aesthetic
-                rating, sharpness — so a review opens on what it is looking for.
+            {/* Order the grid on ANY quantity the passes measured — resolution,
+                file size, aesthetic rating, NSFW likelihood, sharpness, noise,
+                contrast, detail, bars, JPEG quality, face confidence — each way,
+                so a review opens on what it is looking for. Grouped by the pass
+                that produces them: eleven measures is a long flat list, and the
+                grouping doubles as "run THIS pass to unlock these".
                 Images the matching pass never reached sink to the end (never the
                 top), and an entry whose pass has produced nothing yet is greyed
                 out saying which pass to run. The value rides to the server, which
                 sorts in SQL: it applies to the WHOLE filter, not this page, so
-                "Select all in filter" and ▶ Review walk the same order.
-                max-w keeps the control inside a 400 px toolbar. */}
+                "Select all in filter" and ▶ Review walk the same order — and it
+                is remembered per bank, so a dump you review by sharpness opens
+                that way tomorrow. max-w keeps the control inside a 400 px toolbar. */}
             <select value={filter.sort} onChange={(e) => setSort(e.target.value)}
-              title="Order the grid by resolution, aesthetic rating or sharpness. Images a pass never reached sink to the end."
+              title="Order the grid by anything the passes measured — resolution, size, aesthetic, NSFW, sharpness, noise, contrast, detail, bars, JPEG quality, face confidence. Images a pass never reached sink to the end. Remembered for this bank."
               aria-label="Sort the grid"
               className="max-w-[11rem] rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-content">
-              {bankSortOptions(counts).map((o) => (
+              {sortGroups.map((g) => (g.group ? (
+                <optgroup key={g.group} label={g.group}>
+                  {g.options.map((o) => (
+                    <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
+                      {o.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : g.options.map((o) => (
                 <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
                   {o.label}
                 </option>
-              ))}
+              ))))}
             </select>
           </label>
           <span className="ml-auto" />
@@ -2001,6 +2249,48 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   onChange={(e) => setTextQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !textPending) runTextSearch() }}
                   className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-content" />
+                {/* The pedagogy that matters most, because the failure it
+                    prevents is INVISIBLE: "without a hat" comes back full of
+                    hats, confidently, with no signal. Offered, never applied on
+                    its own — a wrong guess acted on silently would be the same
+                    class of bug. */}
+                {suggestPushDown(textQuery) && !textExclude.trim() && (
+                  <p className="text-xs text-amber-300/90">
+                    “without” is ignored by the search.{' '}
+                    <button type="button"
+                      onClick={() => {
+                        setTextExclude(suggestPushDown(textQuery))
+                        setTextQuery(withoutNegation(textQuery))
+                      }}
+                      className="underline underline-offset-2 hover:text-amber-200">
+                      Push “{suggestPushDown(textQuery)}” down instead?
+                    </button>
+                  </p>
+                )}
+                <label htmlFor="bank-text-exclude" className="block text-sm text-content">
+                  Push down (optional)
+                </label>
+                <input id="bank-text-exclude" type="search" value={textExclude}
+                  placeholder="hat, sunglasses"
+                  onChange={(e) => setTextExclude(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !textPending) runTextSearch() }}
+                  className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-content" />
+                <p className="text-xs text-content-subtle">{pushDownCaveat()}</p>
+                {textExclude.trim() && (
+                  <label className="flex flex-wrap items-center gap-2 text-sm text-content">
+                    How hard
+                    <select value={textExcludeW}
+                      onChange={(e) => setTextExcludeW(Number(e.target.value))}
+                      className="rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content">
+                      {PUSH_DOWN_STRENGTHS.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                    <span className="w-full text-xs text-content-subtle">
+                      {PUSH_DOWN_STRENGTHS.find((s) => s.value === textExcludeW)?.hint}
+                    </span>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-sm text-content">
                   How many
                   <input type="number" min={1} max={2000} value={textN}
@@ -2047,6 +2337,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 Clear search
               </button>
             </div>
+            {/* What the push-down did HERE, measured on this bank for this
+                pair of phrases — including "it changed nothing", which is the
+                outcome the user would otherwise never detect. */}
+            {pushDownNote(textResult) && (
+              <p className="text-content-muted">{pushDownNote(textResult)}</p>
+            )}
             {textResult.cached === false && (
               <p className="text-content-subtle">
                 This phrase is now cached — searching it again is instant, even after a restart.
@@ -2138,6 +2434,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               <Tile key={img.id} img={img} bankId={bankId} size={tileSize}
                 selected={selected.has(img.id)}
                 onReview={() => openReview(img.id)}
+                onTags={() => openTagPicker(img)}
                 onToggle={() => setSelected((prev) => {
                   const next = new Set(prev)
                   if (next.has(img.id)) next.delete(img.id); else next.add(img.id)

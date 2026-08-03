@@ -50,11 +50,167 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-03-phone-layout-full-width',
+    date: '2026-08-03',
+    title: 'The dataset page uses the whole screen again on a phone',
+    blurb:
+      'On a phone (and in the installed app), the dataset page drew everything at about three quarters of the screen width — the header bar, the section chips, every card — with a dead black strip down the right-hand side. Nothing was cut off and nothing looked broken up close, which is what made it hard to place: the culprit was a one-pixel, invisible label that the horizontal section rail was failing to keep inside itself, which stretched the page wider than the screen and made the browser shrink the whole thing to fit. The rail now holds its contents, so the page measures the width of your screen and uses it. The Settings and Guide chip rails got the same treatment before they could catch it.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-03-bank-coverage-sees-more',
+    date: '2026-08-03',
+    title: 'The bank’s Coverage advice can now see that your images all look the same',
+    blurb:
+      'Coverage advice used to read only labels — framing, person and style clusters, resolution — and labels have a blind spot: they cannot tell two hundred near-identical shots from two hundred different ones, and they say nothing about outfits, lighting or camera angle. It now also reads two things you may already have on disk. Visual spread uses the embeddings ✨ Score cached to report how alike the pool actually looks ("91% average similarity — a set this repetitive teaches one look"); the bands come from measuring real banks, where an ordinary one sits near 65% and an image plus its nearest neighbours lands at 79-90%. Caption variety uses the captions 🏷️ wrote to say which camera views, lightings, settings, outfits and expressions your set never mentions — the same reading the dataset Coverage panel does. Both are honest about their limits on the panel itself: without ✨ Score the spread says "Not measured" rather than "varied", and the caption read looks at words rather than pixels, so a profile nobody described is invisible and "not smiling" still counts as a smile. Still advice only — nothing is kept or rejected.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-canvas-blend',
+    date: '2026-08-03',
+    title: '🧬 Blend two LoRAs into one image, straight from the board',
+    blurb:
+      'Ticking several checkpoints on the LoRA Canvas used to mean one pass each. A new ⚖ Compare / 🧬 Blend toggle lets you load them all into the SAME generation instead, each on its own weight slider, with every dataset\'s trigger word listed before you launch rather than injected behind your back. Identity + style and identity + concept are where it pays off — two identities blend into a hybrid person, which the panel now tells you up front. The mode is called Blend everywhere now: the Test Studio\'s 🧬 Combine toggle is the same thing and now says Blend too. Nothing you saved changes — only the word.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-03-review-no-longer-claims-an-empty-filter',
+    date: '2026-08-03',
+    title: '▶ Review and “Select all in filter” no longer claim your filter is empty when it is not',
+    blurb:
+      'If you updated LDS without restarting the server, pressing ▶ Review answered “Nothing to review — no image matches the current filter” and Select all in filter reported 0 selected — directly under a counter reading 1,128 shown of 1,128. Nothing was wrong with your filter. The page had already picked up the new version (the browser reloads it from disk), while the server was still running the old one and did not understand the faster request the new page makes — so it answered a different question, and the page read that as “no images”. It now tells you what actually happened and what to do about it: restart LDS. A filter that genuinely matches nothing still says so quietly, as before.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-caption-mismatch-names-your-family',
+    date: '2026-08-03',
+    title: 'The caption-mismatch warning names YOUR model family, not Z-Image',
+    blurb:
+      'If your captions did not match the family you picked, the app refused the launch with a message that always said “this Z-Image dataset… but Z-Image expects prose” — even when you were training Krea 2, FLUX.1 or FLUX.2 Klein. The sentence was frozen into the code while the truth depends on the family. It now names the one you actually chose, so the advice matches what you are looking at.',
+    to: '/datasets?section=training&panel=launch',
+  },
+  {
+    id: '2026-08-03-anima-hybrid-captions',
+    date: '2026-08-03',
+    title: 'Anima takes booru tags too — the app stops calling them a mistake',
+    blurb:
+      'Anima is a hybrid-prompting model: booru tags and natural language are both first-class on it. The app only knew half of that and treated a booru-captioned Anima dataset as a caption mismatch, so a perfectly valid dataset had to be force-launched past a red warning. Both forms now train without a warning and without forcing, the caption-style selector says so on Anima, and prose stays the preselected default. Every other family keeps its guard exactly as it was — SDXL still refuses prose. Prompted by a correction from Witty_Mycologist_995 (Reddit).',
+    to: '/datasets?section=captions&panel=generate',
+  },
+  {
+    id: '2026-08-03-improve-note-cites-the-setting',
+    date: '2026-08-03',
+    title: 'The amber “drawn dataset” note now names the setting it came from',
+    blurb:
+      'Next to Improve, a caution used to announce “This dataset is drawn.” — a verdict the app never actually reached, because it only ever read the subject type you picked. On a photoreal dataset left marked Anime the sentence was simply wrong, with nothing to tell you where it came from. It now says the subject type is set to anime, so when the setting and your images disagree you can see which one to change. The advice itself is unchanged.',
+    to: '/datasets?section=images&panel=review',
+  },
+  {
+    id: '2026-08-03-folder-picker-paste-a-path',
+    date: '2026-08-03',
+    title: 'You can finally paste a path when choosing a folder',
+    blurb:
+      'Browse… opened the Windows folder tree from the XP era: no address bar, no Quick Access, and no way to paste — so a path someone sent you, or one you had just copied out of Explorer, had to be clicked down to one folder at a time. It now opens the modern Windows folder picker, with an address bar you can paste into and your usual shortcuts down the side. The in-app browser — the one you get over the LAN, on a tablet, or on Linux, where no Windows dialog exists — gained the same thing: a path box at the top, Enter to jump. If the modern dialog cannot be used on your machine, the old one still opens rather than nothing at all.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-03-bank-tag-chips',
+    date: '2026-08-03',
+    title: 'Click an image’s 🏷️ tags to find the other images that share them',
+    blurb:
+      'Every captioned tile now has a clickable 🏷️ badge. It opens that image’s caption as chips — woman, red, dress, balcony — and ticking them narrows the grid to the images whose captions mention them. It is the readable cousin of 🎯 Similar to selected: that one matches the overall look and cannot say why, this one matches attributes you picked and shows you exactly which. Several chips mean AND, so each tick narrows further, and chips match as whole words — “car” will not drag back “scarf”.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-03-review-opens-instantly',
+    date: '2026-08-03',
+    title: '▶ Review opens instantly, even on a 20 000-image bank',
+    blurb:
+      'Pressing ▶ on a tile used to sit there for seconds on a big bank — longer still with a sort active. It was building its list of images the slow way: asking the server for the whole grid, 500 rows at a time, and keeping only the identifiers. On a 22 940-image bank that was 46 requests and 16 MB to end up with 23 000 numbers. It now asks once, for the numbers alone: 3.8 s down to 44 ms, on the same bank. "Select all in filter" took the same shortcut and got the same gain.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-02-bank-passes-survive-a-deleted-image',
+    date: '2026-08-02',
+    title: 'Deleting a bank image while a long pass is running no longer throws the whole pass away',
+    blurb:
+      'Score, watermark, framing, faces, captions and the quality scan all walk thousands of images for minutes or hours. If an image disappeared underneath one of them — most often because you deleted the bank, or its rejected images, while it was still working — the pass died on the spot with a cryptic error, and every image it had already analysed was lost with it. Now the vanished image is simply skipped and the pass finishes; the line at the end tells you how many were skipped, so a pass never quietly claims it analysed more than it did.',
+  },
+  {
+    id: '2026-08-02-dataset-coverage-panel',
+    date: '2026-08-02',
+    title: 'Your dataset can hit a green composition target and still be twenty-five copies of the same shot — a new panel says so',
+    blurb:
+      'The Composition bar counts face / bust / body / back against a target, so it goes green on a set that is entirely front-on, in one outfit, under one light. Those are not things it counts, and that set trains a LoRA that can only reproduce that one look. The new 🔍 Coverage panel, folded under that bar, is the second question: it reads the captions you already generated and reports what your set never shows — no profile views, only one outfit, eye level only, never outdoors — with a plain "generate or import more: profile, three-quarter" line under it. It is honest about being a keyword read of your captions rather than a look at the pixels: with no captions it says so instead of drawing empty bars, under five captions it refuses to judge, and it never keeps, rejects or changes anything. Style and concept datasets are judged on their own axes — "one outfit" is not a defect when the outfit is not what you are teaching.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-08-02-pinokio-one-click-install',
+    date: '2026-08-02',
+    title: 'Install LDS in one click from Pinokio',
+    blurb:
+      'LDS now ships a Pinokio launcher. In Pinokio, paste the repository URL under "Download from URL", click Install, then Start — the Python environment, the requirements and the browser tab are handled for you, with no terminal, no Python install and nothing added to your PATH. Only the core app is set up that way: ComfyUI, Ollama, ai-toolkit and the ML helpers are still connected from Setup, so nothing heavy is downloaded behind your back. Update from Pinokio\'s own Update tab — it fast-forwards the same checkout the in-app updater uses.',
+  },
+  {
+    id: '2026-08-02-terminal-prints-the-address',
+    date: '2026-08-02',
+    title: 'The terminal finally tells you where the app is',
+    blurb:
+      'Starting the server by hand (python backend/run.py) printed no address at all — the usual "Running on http://..." line was being swallowed into data/app.log — so you had to guess the port, which is exactly the case where it may have moved because 5050 was taken. The console now prints "[LDS] Ready on http://…" once the app really answers, whichever way you launched it.',
+  },
+  {
+    id: '2026-08-02-ref-edit-keep-error',
+    date: '2026-08-02',
+    title: 'Fixing a failed reference edit no longer errors twice',
+    blurb:
+      'When keeping an edited reference failed, the app hit a second error while reporting the first, so you got a blank failure instead of the reassurance that your previous reference was left untouched. It now says exactly that — thanks to socrasteeze (GitHub) for spotting it.',
+  },
+  {
+    id: '2026-08-02-bank-text-search-push-down',
+    date: '2026-08-02',
+    title: 'Text search can finally get rid of what you do not want',
+    blurb:
+      'Typing "a woman without a hat" in 🔤 Find by text never worked — the search engine ignores the word "without", so you got hats, with nothing to tell you it had misfired (measured on a real bank: "without a bikini" returned 60% bikinis against a 10% base rate). There is now a Push down field for the trait you are trying to avoid, plus a -hat shorthand in the query itself, and typing "without" offers to move it there for you. It re-ranks rather than filters: matching images sink instead of disappearing, and after each search the panel tells you what it actually achieved on your bank — including "this changed nothing", which is the one outcome you could never have spotted.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-02-upscale-candidate-visible',
+    date: '2026-08-02',
+    title: 'You can finally see that an upscale is waiting for you',
+    blurb:
+      'An upscale never touches your original: it arrives as a separate tile you keep or reject. Which also meant that from the image you had just sent, nothing appeared to happen — so the pass got re-run on images that already had a result waiting, paying GPU time for a duplicate. The source tile now says it, both while the result is rendering and once it is ready to review. And the candidate names the engine that actually made it, instead of always crediting Klein.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-02-seedvr2-in-the-lightbox',
+    date: '2026-08-02',
+    title: 'Pick your upscaler while you are looking at the image',
+    blurb:
+      'The full-screen inspector only ever offered the Klein pass. That is the one place where the choice matters most: on a drawn dataset the panel already warns you that Klein’s instruction pulls anime skin towards realism, and the pass that does not do that was two screens away in the selection toolbar. Both engines are now side by side in the inspector, each saying what it does to the original — and that warning stays under Klein alone, because SeedVR2 sends no instruction at all.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-02-bank-exclude-words',
+    date: '2026-08-02',
+    title: 'Hide the bank images you have already handled, and work the rest as a checklist',
+    blurb:
+      'The bank search box narrows the grid TO a word. Next to it there is now a 🚫 Exclude box that does the opposite: it hides every image whose caption or file name carries one of the words you type (comma-separated, so "logo, watermark" is one gesture). It composes with the search and every chip — "dresses that are not red" is one line — and it travels with the filter, so Select all, ▶ Review and the curation picks never hand back an image you just hid. Images with no caption are never hidden: they are exactly what the checklist is looking for.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-02-tag-a-bank-before-you-caption-it',
     date: '2026-08-02',
     title: 'Sort a huge bank by hair colour or clothing — before you caption anything',
     blurb:
       'Until now the only way to slice a 9,000-image dump by what was actually in the pictures was to caption it first, which is hours of GPU time spent before you even know which images you want to keep. The bank now has a 🔖 Tags pass: a small local model labels every image with booru tags — blonde hair, red dress, outdoors — and the grid gains tidy dropdowns for hair, clothing, setting, pose and more, plus an "all other tags" list so nothing the model found is hidden. Your search box finds those tags too, so "red dress" works with no captioning pass at all. It never touches your captions: the tags live in their own place, and the captioner still runs later, on the keepers only. It runs on CPU, so it works on a machine that cannot host a captioning model. Install it in Setup ▸ Quality tools (~400 MB, one time).',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-02-bank-sort-every-measure',
+    date: '2026-08-02',
+    title: 'Sort a bank by anything its passes measured — and it remembers the order you chose',
+    blurb:
+      'The Sort menu covered resolution, aesthetics and sharpness. It now covers every figure the passes persist, both ways: file size, NSFW likelihood, noise, contrast, detail, letterbox bars, JPEG quality and face confidence — grouped by the pass that produces them, so a greyed-out section tells you which pass to run. A chip only ranks what crosses its threshold, so "the noisiest of the ones I am keeping" was a question nothing could answer. Each bank also remembers its own order now, so the dump you review by sharpness opens that way tomorrow.',
     to: '/bank',
   },
   {

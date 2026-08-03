@@ -960,18 +960,12 @@ def set_dataset_klein_model(user_id, dataset_id, name):
     if not ds:
         raise ValueError('dataset not found')
     value = (name or '').strip()
-    # Checked on ALL THREE flavours, and on the separators literally. A single
-    # `os.path.basename` is only as strict as the platform running it: off
-    # Windows a backslash is an ordinary character, so `sub\model.safetensors`
-    # passed this guard on Linux and failed it on Windows — and the test that
-    # pins the rejection only ever ran on the platform where it was already
-    # true (CI's backend job is windows-latest). Same shape as
-    # _validated_comfy_output_name below, for the same reason.
-    if value and (value in ('.', '..')
-                  or '/' in value or '\\' in value
-                  or os.path.basename(value) != value
-                  or ntpath.basename(value) != value
-                  or posixpath.basename(value) != value):
+    # BOTH separators, on every OS: os.path.basename alone reads a backslash as
+    # an ordinary character on Linux, so `sub\model.safetensors` walked straight
+    # through this guard there and only Windows was actually protected.
+    if value and (ntpath.basename(value) != value
+                  or posixpath.basename(value) != value
+                  or value in ('.', '..')):
         raise ValueError('a Klein model is named by its file name, without a folder')
     ds.klein_model = value or None
     db.session.commit()
@@ -5923,7 +5917,11 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
         finally:
             dataset_activity.end(token)
     # Style de caption : prose (Z-Image) vs tags booru (SDXL booru-native type bigLove).
-    # Défaut AUTO selon le type entraîné ; un mode explicite (UI) l'emporte.
+    # Défaut AUTO selon le type entraîné ; un mode explicite (UI) l'emporte — c'est ce
+    # qui rend le captioning « model-matched » réglable sans 2e mécanisme.
+    # Anima est HYBRIDE (booru ET langage naturel sont natifs) : son défaut reste la
+    # prose, mais mode='booru' est un choix légitime, pas un contournement — le garde
+    # MISMATCH_CAPTION du lancement ne dit rien sur anima (lora_training.assert_trainable).
     ttype = (getattr(ds, 'train_type', None) or 'zimage').lower()
     mode = (mode or ('booru' if ttype == 'sdxl' else 'prose')).lower()
     style = is_style(ds)
@@ -7681,9 +7679,31 @@ def _improve_prompt() -> str:
     return ''
 
 
-def _improve_candidate_label(source) -> str:
-    """Label of the candidate produced from ``source`` (its parent image)."""
-    base_label = 'Klein upscale & improve'
+# The tile label of an improve candidate, per engine. STORED in
+# FaceDatasetImage.variation_label, so the rule about stored strings applies —
+# and it is the reason Klein's wording is byte-identical to what it always was:
+# renaming it would strand every candidate already in every user's database
+# behind a label nothing produces any more, and would need an alias table to
+# read them back. SeedVR2 gets its OWN new string instead, so nothing is
+# renamed and no alias path is needed.
+#
+# Checked before writing this (2026-08-02): the literal 'Klein upscale &
+# improve' is matched by NO runtime code, front or back — it is a display label
+# only (grep hits are this builder, test fixtures, and prose in Settings/help).
+# Had anything keyed off it, adding a second value would have needed the alias
+# table, not just a new branch.
+_IMPROVE_LABELS = {
+    'klein': 'Klein upscale & improve',   # NEVER change: stored in user databases
+    'seedvr2': 'SeedVR2 upscale',
+}
+
+
+def _improve_candidate_label(source, engine='klein') -> str:
+    """Label of the candidate produced from ``source`` (its parent image).
+
+    Names the engine that ACTUALLY ran: a SeedVR2 result labelled "Klein upscale
+    & improve" tells the user the one thing they chose this pass to avoid."""
+    base_label = _IMPROVE_LABELS.get(engine, _IMPROVE_LABELS['klein'])
     source_label = (source.variation_label or '').strip()
     return (f'{base_label} · {source_label}' if source_label else base_label)[:120]
 
@@ -7867,7 +7887,7 @@ def _improve_existing_image_locked(user_id, image_id, engine=None):
     # image. The honest value is the pass that ran.
     stored_prompt = (prompt[:500] if engine == 'klein'
                      else 'SeedVR2 upscale (no prompt — restoration pass)')
-    label = _improve_candidate_label(img)
+    label = _improve_candidate_label(img, engine)
     candidate = FaceDatasetImage(
         dataset_id=img.dataset_id, source='generated', status='pending',
         parent_image_id=img.id, derivation_kind=KLEIN_IMAGE_IMPROVE,
@@ -7979,7 +7999,7 @@ def _reimprove_image_locked(user_id, image_id):
             f'too many generations in flight ({in_flight}), wait or cancel')
 
     prompt = _improve_prompt()
-    label = _improve_candidate_label(parent)
+    label = _improve_candidate_label(parent, engine)
 
     # Enqueue BEFORE touching the row (regenerate_image's ordering): a ComfyUI
     # refusal must leave the current result on screen, not a broken tile.

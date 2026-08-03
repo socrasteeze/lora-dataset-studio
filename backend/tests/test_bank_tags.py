@@ -150,6 +150,86 @@ def test_rejected_images_are_not_tagged(app, client, tmp_path, monkeypatch):
         assert rows['i1.png'].tags_state is None
 
 
+def test_a_stop_mid_run_keeps_the_chunks_already_tagged(app, client, tmp_path, monkeypatch):
+    """A Stop lands while a later chunk is still being classified — the tagger
+    is a subprocess call per _TAG_CHUNK images, not per image, so the pass can
+    only notice a cancel BETWEEN chunks. Each chunk's rows are committed the
+    moment the subprocess answers, before the next chunk's cancel check runs —
+    so a stop must leave every already-tagged row exactly as tagged, and must
+    NOT wipe them back to untagged. The next (non-rescan) run then only owes
+    the rows the stop actually caught in flight.
+
+    Which two of the four files land in the first chunk depends on scan/id
+    order, not filename — so this asserts on COUNTS and self-consistency
+    (state 'ok' iff scores actually landed) rather than on specific names."""
+    from app.models import BankImage
+    from app.services import image_bank_service as banks
+    from app.services import bank_jobs
+
+    bank_id, _src = _mkbank(client, tmp_path, n=4)
+    monkeypatch.setattr(banks, '_TAG_CHUNK', 2)   # force 2 chunks of 2
+
+    per_image = {'i0.png': {'shirt': 0.9}, 'i1.png': {'hat': 0.9},
+                 'i2.png': {'blonde_hair': 0.9}, 'i3.png': {'red_dress': 0.9}}
+    from app.services import wd14_tagger as w
+    calls = []
+
+    def fake_tag_images(paths, threshold_value=None, on_progress=None, **kw):
+        calls.append(sorted(os.path.basename(p) for p in paths))
+        if len(calls) == 1:
+            # Simulate the Stop button landing on the server WHILE this first
+            # chunk's subprocess is still running — the flag is set before the
+            # chunk's own results are written, exactly like a real click would
+            # race the in-flight call.
+            bank_jobs.cancel(bank_id)
+        results = {p: per_image[os.path.basename(p)] for p in paths}
+        return {'ok': True, 'results': results, 'model': 'wd-test', 'errors': {}}
+
+    monkeypatch.setattr(w, 'tag_images', fake_tag_images)
+    import app.capabilities as caps
+    monkeypatch.setattr(caps, 'probe_wd14', lambda: {'ok': True, 'detail': 'stub'})
+    monkeypatch.setattr(w, 'uses_gpu', lambda: False)
+
+    with app.app_context():
+        _run_tags(app, bank_id)
+        rows = {r.relpath: r for r in BankImage.query.filter_by(bank_id=bank_id)}
+
+    # Only the first chunk ever ran the subprocess: the cancel was caught before
+    # the second chunk started.
+    assert len(calls) == 1
+    tagged_now = calls[0]
+    untouched = [n for n in per_image if n not in tagged_now]
+    assert len(tagged_now) == 2 and len(untouched) == 2
+
+    # The chunk that finished is tagged AND its scores actually landed, not just
+    # the state flag — a stop must not leave a half-written row either.
+    for name in tagged_now:
+        assert rows[name].tags_state == 'ok'
+        assert rows[name].tags_text
+        for tag in per_image[name]:
+            assert tag in rows[name].tags_text
+    # The chunk the stop actually interrupted is untouched — NULL, not 'error'
+    # and not silently marked done — so a plain re-run (no rescan) still owes it.
+    for name in untouched:
+        assert rows[name].tags_state is None
+        assert not rows[name].tags_text
+
+    # A follow-up run (rescan=False, the default) must pick up exactly the rows
+    # the stop left behind, and must not re-touch what already succeeded.
+    with app.app_context():
+        _run_tags(app, bank_id)
+        rows = {r.relpath: r for r in BankImage.query.filter_by(bank_id=bank_id)}
+    assert len(calls) == 2
+    assert sorted(calls[1]) == sorted(untouched)
+    for name in untouched:
+        assert rows[name].tags_state == 'ok'
+        for tag in per_image[name]:
+            assert tag in rows[name].tags_text
+    # The rows the stop already finished were not re-sent to the tagger.
+    for name in tagged_now:
+        assert name not in calls[1]
+
+
 # --- refusals -------------------------------------------------------------------
 
 def test_a_busy_bank_says_busy_not_not_installed(app, client, tmp_path, monkeypatch):
@@ -225,7 +305,7 @@ def test_the_tag_filter_matches_whole_tags_only(app, client, tmp_path, monkeypat
         'i0.png': {'blonde_hair': 0.9},
         'i1.png': {'blonde_hair_ribbon': 0.9},
     })
-    r = client.get(f'/api/bank/{bank_id}/images?tags=blonde_hair')
+    r = client.get(f'/api/bank/{bank_id}/images?wd14_tags=blonde_hair')
     assert r.status_code == 200
     got = [i['relpath'] for i in r.get_json()['images']]
     assert got == ['i0.png']
@@ -238,14 +318,14 @@ def test_two_tag_filters_narrow_rather_than_widen(app, client, tmp_path, monkeyp
         'i1.png': {'blonde_hair': 0.9},
         'i2.png': {'shirt': 0.8},
     })
-    r = client.get(f'/api/bank/{bank_id}/images?tags=blonde_hair,shirt')
+    r = client.get(f'/api/bank/{bank_id}/images?wd14_tags=blonde_hair,shirt')
     got = [i['relpath'] for i in r.get_json()['images']]
     assert got == ['i0.png']
 
 
 def test_an_untagged_image_matches_no_tag_filter(app, client, tmp_path, monkeypatch):
     bank_id = _tagged_bank(app, client, tmp_path, monkeypatch, {'i0.png': {'shirt': 0.8}})
-    r = client.get(f'/api/bank/{bank_id}/images?tags=shirt')
+    r = client.get(f'/api/bank/{bank_id}/images?wd14_tags=shirt')
     assert [i['relpath'] for i in r.get_json()['images']] == ['i0.png']
 
 

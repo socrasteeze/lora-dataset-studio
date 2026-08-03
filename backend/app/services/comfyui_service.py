@@ -11,6 +11,12 @@ Dataset Studio: SRC's module-level COMFYUI_API_ADDRESS constant becomes a live
 restart). SRC's COMFYUI_BASE_DIR/COMFYUI_BATCH_FILE imports are dropped — this
 app never launches or stops ComfyUI itself, so start_comfyui_process /
 stop_comfyui_process were already no-ops and stay that way.
+
+SRC's `queue_prompt` is gone too: nothing in this app ever called it, and it
+submitted with no timeout at all. The one live submission path is
+`app.utils.comfyui.queue_prompt_to_comfyui`, which is bounded and carries the
+error contract job_queue relies on — a second, unbounded door into /prompt was
+only ever a trap for the next caller.
 """
 
 import os
@@ -101,15 +107,6 @@ class ComfyUIService:
         """Démarrage désactivé."""
         logger.warning("⚠ start_comfyui_process ignoré.")
         return self.check_connection()
-
-    # ---------------- Prompt ----------------
-    # `queue_prompt` lived here and was deleted 2026-08-02: it had no callers
-    # anywhere, and utils/comfyui.queue_prompt_to_comfyui — which every real
-    # submission goes through — is a strict superset of it. The only behaviour
-    # unique to this copy was behaviour missing from it: no exception handling
-    # (breaking the "never raises" contract job_queue depends on) and no
-    # WORKFLOW_INVALIDE tagging of ComfyUI's 400 body. It had been hardened
-    # once, in the 2026-07-22 no-timeout audit, without ever being called.
 
 
 comfyui_service = ComfyUIService()

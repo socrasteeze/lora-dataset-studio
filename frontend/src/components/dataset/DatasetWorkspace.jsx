@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import CompositionBar from './CompositionBar';
+import CoveragePanel from './CoveragePanel';
 import ClassifyFramingButton from './ClassifyFramingButton';
 import ReferencePanel from './ReferencePanel';
 import VariationCatalog from './VariationCatalog';
@@ -567,7 +568,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const leakingImages = images.filter((i) => i.leak);
   // Overlaid watermarks still awaiting removal → drives the "🧽 Clean (N)" button.
   const watermarkDetected = images.filter((i) => i.watermark_state === 'detected').length;
-  // Style de caption : défaut AUTO (SDXL booru-native → booru tags ; sinon prose), surchargé par le sélecteur.
+  // Style de caption : défaut AUTO (SDXL booru-native → booru tags ; sinon prose),
+  // surchargé par le sélecteur. Anima est HYBRIDE (les deux formes sont natives) :
+  // le défaut prose n'est qu'un point de départ, basculer sur booru est légitime et
+  // ne déclenche aucun garde-fou au lancement.
   const effCaptionMode = captionMode || (d.train_type === 'sdxl' ? 'booru' : 'prose');
   // ── Grid tag-filter (session-only) ──────────────────────────────────────────
   // A tag is toggled in its list and mutually excluded from the other (a tag can't
@@ -965,15 +969,28 @@ export default function DatasetWorkspace({ ds, onBack }) {
           horizontal chip rail — same responsive pattern as the Settings page. */}
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-4 lg:items-start">
         <aside>
-          {/* Mobile: horizontal chip rail */}
-          <nav aria-label="Dataset sections" className="-mx-4 overflow-x-auto px-4 pb-2 lg:hidden">
+          {/* Mobile: horizontal chip rail.
+
+              `relative` is NOT decoration — without it the whole page renders
+              at ~73% on a phone. `overflow-x-auto` clips a descendant only when
+              the scroller is also its containing block, and a static box never
+              is. The NavBadge counts carry an `.sr-only` label, which Tailwind
+              implements as `position: absolute` with no offsets: it therefore
+              resolves against the document, keeps its static position out at
+              the far end of a rail 1123 px wide, and escapes the clip. The
+              document then measures ~598 px against a 440 px viewport, mobile
+              Safari shrinks the page to fit, and every bar on screen — header
+              included — draws at 73% of the screen with dead space beside it.
+              Nothing overflows visibly, because the escapee is a 1 px box no
+              one can see. */}
+          <nav aria-label="Dataset sections" className="relative -mx-4 overflow-x-auto px-4 pb-2 lg:hidden">
             <ul className="m-0 flex list-none gap-2 p-0">
               {WORKSPACE_SECTIONS.map((s) => <li key={s.id}>{navItem(s, true)}</li>)}
             </ul>
           </nav>
           {activePanels.length > 0 && (
             <nav aria-label={`${sectionMeta[section].title} destinations`}
-              className="-mx-4 -mt-1 overflow-x-auto px-4 pb-3 lg:hidden">
+              className="relative -mx-4 -mt-1 overflow-x-auto px-4 pb-3 lg:hidden">
               <ul id={`dataset-mobile-panels-${section}`} className="m-0 flex list-none gap-2 p-0">
                 {activePanels.map((destination) => (
                   <li key={destination.id}>{panelNavItem(section, destination, true)}</li>
@@ -1110,8 +1127,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onReimprove={ds.reimproveImage} onView={setViewImg}
                   onBatch={ds.batchImages} busy={ds.busy}
                   onImproveBatch={ds.improveBatch} activity={act}
-                  kleinAvailable={Boolean(caps.engines?.klein)}
-                  subjectType={d.subject_type || 'human'}
+                          subjectType={d.subject_type || 'human'}
                   eligibilityImages={images}
                   nonces={ds.nonces} faceThresholds={d.face_thresholds} datasetKind={d.kind || 'character'}
                   faceScoringBlocked={d.face_scoring_blocked}
@@ -1153,6 +1169,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
 
                 <div id="gf-generate" className="scroll-mt-20 flex flex-col gap-2">
                   <CompositionBar composition={d.composition} upscaled={d.composition_upscaled} bodyFidelity={bodyFid} />
+                  {/* The bar above counts shot types against a target and can go
+                      fully green on a set that is the same pose, one outfit, one
+                      light — none of which it counts. This is that second
+                      question, read from the captions already written. */}
+                  <CoveragePanel datasetId={d.id} refreshKey={images.length} />
                   {/* Images imported WITHOUT head-crop have no shot type, so they count
                       for nothing in the bar above (the default on body-fidelity datasets:
                       a whole drag-and-drop import can leave it at 0). The vision pass that
@@ -1405,7 +1426,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2 scroll-mt-20">
                 {!isConceptual && (
                   <select value={effCaptionMode} onChange={(e) => setCaptionMode(e.target.value)} disabled={ds.busy}
-                    title="Caption style — Prose (Z-Image) or Booru tags (SDXL booru-native, e.g. bigLove). Defaults to auto based on the dataset's type."
+                    title={d.train_type === 'anima'
+                      ? "Caption style — Anima reads BOTH: booru tags and natural language are first-class on this model. Prose is only the default; switching to Booru tags trains fine and is never flagged as a mismatch."
+                      : "Caption style — Prose (Z-Image) or Booru tags (SDXL booru-native, e.g. bigLove). Defaults to auto based on the dataset's type."}
                     className="px-2 py-1.5 rounded-lg bg-surface border border-border text-content text-[0.8125rem] disabled:opacity-40">
                     <option value="prose">📝 Prose</option>
                     <option value="booru">🏷️ Booru tags</option>
@@ -1894,7 +1917,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
           onMirror={viewImgLive._rescueReviewPreview ? undefined : ds.mirrorImage}
           onRotate={viewImgLive._rescueReviewPreview ? undefined : ds.rotateImage}
           mirrorBusy={Boolean(ds.mirroringIds?.has(viewImgLive.id))}
-          onImprove={canImproveViewImg ? ds.improveImage : undefined}
+          // The lightbox hands back WHICH engine was pressed; a single-✨
+          // surface passes none and the improve.engine setting decides.
+          onImprove={canImproveViewImg
+            ? ((imageId, engine) => ds.improveImage(imageId, { engine }))
+            : undefined}
           improvePending={viewImgImproving}
           improveReady={viewImgImprovementReady}
           busy={ds.busy}

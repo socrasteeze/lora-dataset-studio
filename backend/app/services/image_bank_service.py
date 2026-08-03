@@ -1282,17 +1282,41 @@ def _res_bucket_counts(bank_id) -> dict:
 #   res       megapixels (width×height) — the original sort, kept as-is.
 #   aesthetic the ✨ Score pass's 1–10 rating: ↓ surfaces the keepers, ↑ the duds.
 #   sharp     the 🔎 Scan pass's Laplacian variance: ↑ surfaces the blurry misses.
-# Deliberately NOT here: noise / uniformity / bars / detail_ratio / NSFW. Each
-# already has a chip that filters AND orders worst-first, so a sort entry would
-# duplicate an existing gesture — and a fifteen-line menu slows the review down
-# more than the missing order costs.
+# The first version stopped there, reasoning that noise / uniformity / bars /
+# detail_ratio / NSFW each already have a CHIP that filters and orders worst-first.
+# That reasoning does not survive contact with a real dump (asked again on
+# Discord): a chip only ranks the rows that CROSS its threshold, so "the noisiest
+# images I am keeping" — every one of them under the threshold — was unreachable,
+# and no chip ranks the other way at all ("the cleanest first", "the safest
+# first"). Sorting is not filtering, so the two do not duplicate each other; the
+# precedent was already in this table, since 'sharp' coexists with the blur chip
+# and 'res' with the small chip. So: EVERY quantity a pass persists on bank_image
+# is sortable, both ways. The menu is grouped by pass in the UI to stay readable.
+#   noise/flat/detail/bars/jpeg  the 🔎 Scan + provenance passes' raw figures.
+#   nsfw                         the ✨ Score pass's 0–1 probability.
+#   face                         the 🎭 Face pass's detection confidence.
+#   size                         bytes on disk — the one figure NO chip exposes.
+# Deliberately still NOT here: anything that is a LABEL rather than a measure
+# (framing, origin, cluster and group ids, watermark/quality state). Those are
+# facets — ordering by an id number means nothing to a reviewer.
 _SORT_KEYS = {
     'aesthetic': lambda: BankImage.aesthetic_score,
     'sharp': lambda: BankImage.blur_score,
     'res': lambda: BankImage.width * BankImage.height,
+    'noise': lambda: BankImage.noise_score,
+    'flat': lambda: BankImage.uniformity_score,
+    'detail': lambda: BankImage.detail_ratio,
+    'bars': lambda: BankImage.bars_ratio,
+    'jpeg': lambda: BankImage.jpeg_quality,
+    'nsfw': lambda: BankImage.nsfw_score,
+    'face': lambda: BankImage.face_det,
+    'size': lambda: BankImage.file_size,
 }
-GRID_SORTS = tuple(f'{k}_{d}' for k in ('res', 'aesthetic', 'sharp')
-                   for d in ('desc', 'asc'))
+# Menu order (the UI renders it in this order); ids are stored query values, so a
+# key may be added here but never renamed without an alias.
+_SORT_ORDER = ('res', 'size', 'aesthetic', 'nsfw', 'sharp', 'noise', 'flat',
+               'detail', 'bars', 'jpeg', 'face')
+GRID_SORTS = tuple(f'{k}_{d}' for k in _SORT_ORDER for d in ('desc', 'asc'))
 
 
 def _sort_order(sort):
@@ -1709,28 +1733,136 @@ def _preview_ids(bank_id, limit=PREVIEW_COUNT) -> list:
     return [r[0] for r in rows]
 
 
+# --- free-text matching (the search bar, and its inverse) --------------------
+# ONE definition of "this image's text mentions <term>", used by the search
+# filter, by the exclude filter and by the curation pool, so the three can never
+# drift into disagreeing about what a term matches.
+_MAX_TEXT_TERMS = 12          # a checklist has a handful of tags, not a corpus
+
+
+def _text_match(term):
+    """Rows whose CAPTION, RELPATH or WD14 TAGS contain `term`, case-insensitively.
+    LIKE metacharacters in the term are escaped so a literal '%'/'_' matches itself.
+    The caption and the tags are COALESCED to '' because this criterion is also
+    used NEGATED: in SQL, NULL LIKE x is NULL, and NOT NULL is still NULL — so an
+    uncaptioned row would be dropped by an exclude filter instead of kept, which
+    is the exact opposite of "show me what does NOT have this tag yet".
+
+    Tags are in here rather than in a search of their own because that is the
+    whole point of the 🔖 pass: a big dump becomes searchable WITHOUT paying for
+    a captioning run. A two-word term is also tried with an underscore, since
+    booru tags are written `red_dress` and nobody types them that way."""
+    def _esc(s):
+        return s.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+    like = f'%{_esc(term)}%'
+    tags = func.coalesce(BankImage.tags_text, '')
+    crits = [func.coalesce(BankImage.caption, '').ilike(like, escape='\\'),
+             BankImage.relpath.ilike(like, escape='\\'),
+             tags.ilike(like, escape='\\')]
+    if ' ' in term:
+        crits.append(tags.ilike(f'%{_esc(term.replace(" ", "_"))}%', escape='\\'))
+    return or_(*crits)
+
+
+# Separators a caption puts around a word. The word-boundary match below turns
+# each of them into a space, then looks for ' <tag> ' in the padded result — the
+# closest a plain LIKE gets to \b without a REGEXP function, and it needs no
+# extension, no engine hook and no index.
+_WORD_SEPARATORS = (',', '.', ';', ':', '!', '?', '(', ')', '[', ']', '"', "'",
+                    '/', '\\', '-', '_', '\n', '\r', '\t')
+
+
+def _spaced_text():
+    """`' ' || lower(caption) || ' ' || lower(relpath) || ' '` with every
+    separator replaced by a space — the haystack a whole-word match looks in."""
+    haystack = func.lower(
+        func.coalesce(BankImage.caption, '') + ' ' + BankImage.relpath)
+    for sep in _WORD_SEPARATORS:
+        haystack = func.replace(haystack, sep, ' ')
+    return ' ' + haystack + ' '
+
+
+def _tag_match(tag):
+    """Rows whose caption or path mentions `tag` AS A WORD.
+
+    Deliberately stricter than the 🚫 exclude field's substring match, and the
+    difference is not an inconsistency: an exclude term is typed by hand, where
+    a partial match is often what someone means, while a tag chip comes FROM a
+    caption's own tokens — matching 'car' inside 'scarf' would make the feature
+    lie about what it found. The substring/word-boundary split between the two
+    is the known parity debt; this is the side that pays it first."""
+    esc = tag.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    return _spaced_text().ilike(f'% {esc} %', escape='\\')
+
+
+def _text_terms(value) -> list:
+    """Split an exclude field into terms on commas, trimmed, de-duplicated
+    case-insensitively and capped. One field, several tags ('nsfw, logo') — a
+    checklist pass usually hides more than one thing at a time."""
+    out, seen = [], set()
+    for tok in str(value or '').split(','):
+        tok = tok.strip()
+        if tok and tok.lower() not in seen:
+            seen.add(tok.lower())
+            out.append(tok)
+    return out[:_MAX_TEXT_TERMS]
+
+
+def _apply_text_filters(q, search=None, exclude=None, tags=None):
+    """search ∩ ALL(tags) ∩ NOT(exclude₁) ∩ NOT(exclude₂)… — the positive term
+    narrows to what mentions it, each exclude term hides what mentions it. They
+    compose: searching 'dress' while excluding 'red' is a legitimate (and useful)
+    question. An exclude term that is ALSO the search term simply yields nothing,
+    honestly.
+
+    ``tags`` is the 🏷️ chip filter, and it is an AND on purpose: the gesture is
+    "images that have THIS and THIS", i.e. narrowing from one image's attributes.
+    An OR would grow the result set with every chip ticked, which reads as the
+    filter going backwards. Each tag matches as a WORD (see _tag_match) — a
+    dedicated parameter with its own criterion, never folded into `search` or
+    `exclude`, so two features can never fight over one key."""
+    term = (search or '').strip()
+    if term:
+        q = q.filter(_text_match(term))
+    for tag in _text_terms(tags):
+        q = q.filter(_tag_match(tag))
+    for bad in _text_terms(exclude):
+        q = q.filter(~_text_match(bad))
+    return q
+
+
 def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
                 group=None, style=None, subfolder=None, search=None,
                 semantic_group=None, sort=None, res_bucket=None, framing=None,
-                origin=None, tags=None, ids=None, offset=0, limit=200) -> dict | None:
+                origin=None, ids=None, exclude=None, tags=None, wd14_tags=None,
+                ids_only=False, offset=0, limit=200) -> dict | None:
     """One PAGE of the bank grid (a 9 000-image bank must never ship whole).
     Filters compose: status ∩ flag ∩ cluster ∩ dup-group ∩ style ∩ subfolder ∩ tags ∩ search.
     ``search`` is a plain full-text term matched (case-insensitive LIKE) against the
-    caption, the relpath AND the 🏷️ WD14 tags — so a big dump is searchable
+    caption, the relpath AND the 🔖 WD14 tags — so a big dump is searchable
     ("red dress") whether it was captioned, tagged, or both; a two-word term is
     also tried with an underscore, because booru tags are written `red_dress` and
     nobody types them that way. Combinable with every other filter.
-    ``tags`` is a list of WHOLE tag names, ANDed: each facet dropdown is an
-    independent question, so picking a second one narrows rather than widens.
-    Matching is whole-tag only — `blonde_hair` never matches `blonde_hair_ribbon`
-    — the same promise utils/tagFilter.js makes for booru captions.
+    ``exclude`` is the INVERSE of that search and the reason both live here: a
+    comma-separated list of terms, each HIDING the images whose caption, path or
+    tags mention it. Searching answers "where is X"; excluding answers "what have
+    I not done yet", which is how a captioned bank gets worked through as a
+    checklist. Uncaptioned rows are never hidden by it (see _text_match).
+    ``tags`` is the 🏷️ chip filter, matching a WORD of the caption or path.
+    ``wd14_tags`` is the separate 🔖 facet filter: a list of WHOLE WD14 tag names,
+    ANDed, matched against `tags_text` only. Two filters, two parameters, on
+    purpose — the chips come from a caption's own words and the facets come from
+    the tagger's vocabulary, so folding them into one key would make each one
+    silently answer the other's question. Facet matching is whole-tag only —
+    `blonde_hair` never matches `blonde_hair_ribbon`.
     Flag filters sort by the relevant score (worst first) so the review reads
-    top-down.
-    ``sort`` (a GRID_SORTS id — resolution / aesthetic / sharpness, each way)
-    overrides that order: resolution ranks on megapixels (width×height, so
-    900×900 outranks 1200×300), aesthetic on the ✨ Score rating, sharpness on
-    the 🔎 Scan Laplacian variance. Rows the matching pass never reached (NULL)
-    always sink to the end, in BOTH directions. It composes with every filter,
+    top-down. ``sort`` (a GRID_SORTS id) overrides that order and covers EVERY
+    quantity the passes persist — resolution (megapixels, so 900×900 outranks
+    1200×300), file size, aesthetic rating, NSFW probability, sharpness, noise,
+    flatness, detail ratio, letterbox bars, JPEG quality, face confidence — each
+    way. Rows the matching pass never reached (NULL) always sink to the end, in
+    BOTH directions (see _sort_order). It composes with every filter,
     and — since "Select all in filter" / ▶ Review page this SAME endpoint — the
     selection walks the order the user is looking at.
     ``res_bucket`` (a _RES_BUCKETS id) narrows to one resolution tier — a
@@ -1760,6 +1892,10 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
                               BankImage.id.in_(chunk)).all()):
                 by_id[r.id] = r
         ordered_rows = [by_id[i] for i in ordered if i in by_id]
+        if ids_only:
+            # Same scope, same order, ids only — the caller passed a selection and
+            # wants it back minus the ids that no longer exist.
+            return {'ids': [r.id for r in ordered_rows]}
         total = len(ordered_rows)
         off = max(0, int(offset))
         page = ordered_rows[off:off + max(1, min(500, int(limit)))]
@@ -1850,7 +1986,7 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
             q = q.filter(~BankImage.relpath.contains(os.sep))
         else:
             q = q.filter(BankImage.relpath.startswith(subfolder + os.sep))
-    for tag in _clean_tag_filter(tags):
+    for tag in _clean_tag_filter(wd14_tags):
         # One WHOLE tag per facet, ANDed: the facet dropdowns are independent
         # questions ("blonde hair" AND "wearing a shirt"), so narrowing on a
         # second one must narrow, not widen. The sentinel commas around both
@@ -1858,24 +1994,9 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         # — see models.BankImage.tags_text and services/wd14_tagger.tags_text.
         esc = tag.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
         q = q.filter(BankImage.tags_text.ilike(f'%,{esc},%', escape='\\'))
-    term = (search or '').strip()
-    if term:
-        # Full-text over caption + relpath + TAGS. Escape LIKE metacharacters so a
-        # literal '%'/'_' in the query matches itself, then wrap in wildcards.
-        esc = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-        like = f'%{esc}%'
-        crits = [BankImage.caption.ilike(like, escape='\\'),
-                 BankImage.relpath.ilike(like, escape='\\'),
-                 BankImage.tags_text.ilike(like, escape='\\')]
-        # Booru tags are written with underscores (`red_dress`), and nobody types
-        # them that way. Without this line the tag pass would leave the search bar
-        # exactly as useless as before it ran, which is the opposite of the point:
-        # tags exist so a big dump becomes searchable WITHOUT a captioning run.
-        if ' ' in term:
-            u = term.replace(' ', '_')
-            u_esc = u.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-            crits.append(BankImage.tags_text.ilike(f'%{u_esc}%', escape='\\'))
-        q = q.filter(or_(*crits))
+    # Full-text over caption + relpath + WD14 tags, positive (search) and
+    # negative (exclude).
+    q = _apply_text_filters(q, search, exclude, tags)
     if res_bucket in _RES_BOUNDS:
         # One resolution tier: [lo, hi) on megapixels (width×height). The NOT-NULL
         # guards drop unscanned rows (a NULL product would satisfy neither bound
@@ -1892,8 +2013,22 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         # An explicit sort (resolution / aesthetic / sharpness) wins over the flag
         # worst-first order; see _sort_order for the NULL-sinks-last contract.
         order = explicit
-    total = q.count()
     order_by = order if isinstance(order, tuple) else (order,)
+    if ids_only:
+        # The LEAN answer: the ids of the WHOLE filter, in the order above, in one
+        # query and one response. ▶ Review and "Select all in filter" want a
+        # snapshot of ids and nothing else; walking the paginated grid for it made
+        # the browser ask 46 times for 16 MB of image payloads — thumbnails, flags,
+        # captions, promotion state — and throw all but the integer away. Measured
+        # on a 22 940-image bank: 3.8 s with an active measure sort, because every
+        # one of those 46 pages re-ran the COUNT and re-applied the ORDER BY over
+        # the full table with a growing OFFSET.
+        # No pagination here on purpose: 23 000 ids are ~180 kB of JSON, where the
+        # same 23 000 rows are 16 MB. The cap that matters is the bank's size, and
+        # a bank that cannot fit its own ids in a response cannot fit its grid either.
+        return {'ids': [r[0] for r in
+                        q.with_entities(BankImage.id).order_by(*order_by).all()]}
+    total = q.count()
     rows = q.order_by(*order_by).offset(max(0, int(offset))) \
             .limit(max(1, min(500, int(limit)))).all()
     return {'images': _page_images(rows, th, bank_id), 'total': total,
@@ -2062,6 +2197,7 @@ def _scan_job(bank_id, rescan):
         workers = min(8, os.cpu_count() or 4)
         done = 0
         missing = 0
+        vanished = 0
         pending = {}
         unreadable_ids = []
         with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -2092,11 +2228,26 @@ def _scan_job(bank_id, rescan):
                     if not bank_jobs.cancelled(job):
                         submit_next()
                     continue
+                # The row can be deleted while the pass runs (see _live_image).
+                # An EXISTENCE test only: this shape never crashed on it — a
+                # staged UPDATE for a gone id simply matches no rows — but it
+                # would have counted the image as scanned and paid to decode it.
+                if _live_image(res['id']) is None:
+                    logger.info('bank quality scan: image %s was deleted mid-pass, '
+                                'skipping it', res['id'])
+                    vanished += 1
+                    done += 1
+                    bank_jobs.bump(job)
+                    if not bank_jobs.cancelled(job):
+                        submit_next()
+                    continue
                 # Staged as plain data, NOT via db.session.get(). That get() was
                 # a real SELECT, and autoflush turned it into a flush of the
                 # previous rows — opening the write transaction, which then
                 # survived the next futures.popleft().result() on the decode
-                # pool. Same shape as the vision passes; see _flush_row_updates.
+                # pool. The existence test above is safe in the same loop
+                # precisely BECAUSE the writes are staged: with nothing dirty in
+                # the session there is nothing for a read to flush.
                 values = {
                     'quality_state': res['quality_state'],
                     'width': res['width'],
@@ -2137,6 +2288,8 @@ def _scan_job(bank_id, rescan):
             groups = rebuild_dup_groups(bank_id)
             tail = (f' — {missing} file(s) were not on disk and were left '
                     'untouched') if missing else ''
+            if vanished:
+                tail += f', {vanished} skipped (deleted while the pass ran)'
             bank_jobs.progress(
                 job, detail=f'done — {groups} duplicate group(s){tail}')
     return run
@@ -2865,10 +3018,11 @@ _CURATION_MAX_N = 2000       # a curated LoRA set is 20–200 images; this is ge
 
 
 def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
-                style=None, subfolder=None, search=None):
+                style=None, subfolder=None, search=None, exclude=None, tags=None):
     """The candidate-pool query for the curation selectors — the SAME filter
     composition as list_images (status ∩ flag ∩ cluster ∩ style ∩ subfolder ∩
-    search), minus the ordering/pagination, so "give me 60 diverse images" is
+    search ∩ NOT exclude), minus the ordering/pagination, so "give me 60 diverse
+    images" is
     composable with whatever the grid is currently showing.
 
     Kept as its own function (a small, deliberate mirror of the list_images WHERE
@@ -2921,13 +3075,7 @@ def _pool_query(bank_id, th, *, status=None, flag=None, cluster=None,
             q = q.filter(~BankImage.relpath.contains(os.sep))
         else:
             q = q.filter(BankImage.relpath.startswith(subfolder + os.sep))
-    term = (search or '').strip()
-    if term:
-        esc = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-        like = f'%{esc}%'
-        q = q.filter(or_(BankImage.caption.ilike(like, escape='\\'),
-                         BankImage.relpath.ilike(like, escape='\\')))
-    return q
+    return _apply_text_filters(q, search, exclude, tags)
 
 
 def _pool_embeddings(bank, emb_by_path, filters):
@@ -3430,7 +3578,55 @@ def select_similar(user_id, bank_id, ref_id, n=60, min_score=None, *, filters=No
             'pool': len(ids), 'ref_id': int(ref_id)}
 
 
-def search_by_text(user_id, bank_id, query, n=60, *, filters=None):
+# ── 🔤 pushing an attribute DOWN a text ranking ──────────────────────────────
+# CLIP has no negation: "a woman without a bikini" ranks bikinis HIGHER, because
+# the word is ignored rather than applied (measured: 60% of the top 60 carried
+# a bikini against a 10.1% base rate — an inversion, not a miss). What the
+# embedding space DOES support is arithmetic, so the exclusion is subtracted
+# instead of spoken: score = sim(positive) − weight · sim(excluded).
+#
+# The weight below was calibrated on 2026-08-01 over 7,316 real bank images that
+# carry BOTH a cached CLIP embedding and a vision caption — the caption supplies
+# the ground truth (a different model from CLIP, so the labels are not circular).
+# 19 positive/excluded pairs, top-60 measured against the app's own default n:
+#
+#   weight   top-60 carrying the excluded trait   top-60 still on-topic
+#     0.00              23.0% (mean)                    89.7% (mean)
+#     0.30              11.9%                           89.5%
+#     0.50               8.9%                           88.5%
+#     0.60               7.6%                           87.7%   ← the knee
+#     0.75               6.3%                           85.8%
+#     1.00               3.8%                           79.8%
+#     1.50               1.4%                           64.4%
+#
+# Exclusion improves all the way up; RELEVANCE is what buys it, and it holds
+# essentially flat to 0.6 (−2.0 points) then falls off a cliff (−9.9 at 1.0,
+# −25.3 at 1.5). 0.6 is where two thirds of the unwanted trait is gone for a
+# cost the ranking does not feel. The extremes are offered as Gentle/Strong
+# because one measured case — excluding "a bikini" from "a woman at the beach"
+# — is INSEPARABLE (the trait is most of what the positive query means), and no
+# weight fixes that: at 0.6 it still returned 66.7% bikinis, and by the time the
+# weight bites the beach is gone too. That case is why the UI promises a
+# push-down and never an absence.
+PUSH_DOWN_WEIGHT_DEFAULT = 0.6
+PUSH_DOWN_WEIGHT_MAX = 2.0
+
+
+def _push_down_weight(value):
+    """The requested push-down strength, clamped. Anything unreadable falls back
+    to the calibrated default rather than to 0 — a silently ignored exclusion
+    would look exactly like an exclusion that found nothing."""
+    try:
+        w = float(value)
+    except (TypeError, ValueError):
+        return PUSH_DOWN_WEIGHT_DEFAULT
+    if w != w:                                   # NaN
+        return PUSH_DOWN_WEIGHT_DEFAULT
+    return max(0.0, min(w, PUSH_DOWN_WEIGHT_MAX))
+
+
+def search_by_text(user_id, bank_id, query, n=60, *, push_down=None,
+                   push_down_weight=None, filters=None):
     """Rank the (filtered) pool by CLIP similarity to a written QUERY — "brunette
     outdoors, wide shot" instead of a reference picture.
 
@@ -3454,8 +3650,16 @@ def search_by_text(user_id, bank_id, query, n=60, *, filters=None):
     true ones. A threshold control would therefore offer the illusion of a
     boundary that does not exist, so the ranking is the whole product.
 
+    ``push_down`` (or ``-term`` inside the query) names what to push DOWN. It is
+    NOT a filter and the UI must never call it one: the excluded phrase is
+    encoded like the positive one and SUBTRACTED, weighted, from the score, so
+    an image that matches it falls in the ranking instead of disappearing. See
+    PUSH_DOWN_WEIGHT_DEFAULT above for the calibration and for the measured case
+    where it cannot work at all.
+
     Returns {'results': [{id, score}], 'image_ids', 'pool', 'filtered', 'unscored',
-    'query', 'cached', 'score_range', 'pool_median'}.
+    'query', 'cached', 'score_range', 'pool_median', 'push_down', 'push_down_weight',
+    'push_down_moved', 'push_down_median'}.
       * ``unscored`` — an image with no ✨ Score embedding CANNOT be found by text;
         saying "0 results" without saying that would let the user conclude the
         image is gone.
@@ -3466,6 +3670,17 @@ def search_by_text(user_id, bank_id, query, n=60, *, filters=None):
         single-subject bank (image-to-image cosine 0.60–0.89) the discriminating
         gap compresses by 30–70%, and that is the app's MAIN use case, not an
         edge case — so the baseline has to be measured, never assumed.
+      * ``push_down_median`` — {pool, results}: how strongly a TYPICAL image of
+        this bank matches the excluded phrase, against how strongly the returned
+        set does. Same reasoning as ``pool_median``, applied to the push-down:
+        results well below pool means it worked here, results level with pool
+        means it did not, and neither claim needs a universal constant. This is
+        the only honest way to report an exclusion whose strength depends
+        entirely on how entangled the two phrases are in this corpus.
+      * ``push_down_moved`` — how many places in the returned ranking hold a
+        different image than they would have without the exclusion. 0 is the
+        signal that the push-down changed nothing at all, which the UI has to
+        say out loud.
 
     Raises ValueError (→400) for an empty query or an unscored bank, and
     clip_text_encoder.TextEncodeError (→503) when no interpreter can run CLIP."""
@@ -3474,9 +3689,20 @@ def search_by_text(user_id, bank_id, query, n=60, *, filters=None):
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    text = clip_text_encoder.normalize_query(query)
+    # `-term` inside the query means the same thing as the panel's second field,
+    # so both are folded into one excluded phrase before anything is encoded.
+    positive, from_query = clip_text_encoder.split_query(query)
+    text = clip_text_encoder.normalize_query(positive)
+    excl = ', '.join(t for t in (clip_text_encoder.normalize_query(push_down),
+                                 clip_text_encoder.normalize_query(from_query)) if t)
     if not text:
-        raise ValueError('a search query is required')
+        # A bare "-hat" is not a search. Ranking by "least like a hat" would
+        # return whatever is least like ANYTHING, which is noise wearing the
+        # costume of an answer — so it is refused rather than served.
+        raise ValueError('a search query is required — an excluded term alone '
+                         'cannot rank anything')
+    weight = _push_down_weight(push_down_weight if push_down_weight is not None
+                               else PUSH_DOWN_WEIGHT_DEFAULT)
     emb_by_path = _load_score_embeddings(bank)
     if not emb_by_path:
         raise ValueError('run ✨ Score first — text search ranks the embeddings '
@@ -3489,28 +3715,86 @@ def search_by_text(user_id, bank_id, query, n=60, *, filters=None):
     # Encode AFTER the cheap refusals: never make someone wait on a CLIP load to
     # then be told their bank was never scored.
     qv, cached = clip_text_encoder.encode_query(text)
+    nv = None
+    if excl:
+        # A second encode, and a second phrase in the same persistent cache — so
+        # a repeated exclusion is as free as a repeated query. `cached` stays
+        # true only when BOTH halves were already known, because it is shown to
+        # promise instant, and half a cache hit is not instant.
+        nv, ncached = clip_text_encoder.encode_query(excl)
+        cached = bool(cached) and bool(ncached)
     base = {'query': text, 'cached': bool(cached), 'filtered': int(filtered),
-            'pool': len(ids), 'unscored': max(0, int(filtered) - len(ids))}
+            'pool': len(ids), 'unscored': max(0, int(filtered) - len(ids)),
+            'push_down': excl or None,
+            'push_down_weight': round(weight, 3) if excl else None}
     if not ids:
         return {**base, 'results': [], 'image_ids': [], 'score_range': None,
-                'pool_median': None}
+                'pool_median': None, 'push_down_moved': None,
+                'push_down_median': None}
     qv = np.asarray(qv, dtype='float32')
     qv /= (float(np.linalg.norm(qv)) + 1e-8)
     sims = E @ qv                                # cosine similarity, (m,)
-    order = np.argsort(-sims, kind='stable')     # desc; stable ⇒ id tie-break
     n = max(1, min(int(n), _CURATION_MAX_N))
+    excl_sims = None
+    scores = sims
+    if nv is not None:
+        nv = np.asarray(nv, dtype='float32')
+        nv /= (float(np.linalg.norm(nv)) + 1e-8)
+        excl_sims = E @ nv
+        scores = sims - weight * excl_sims
+    order = np.argsort(-scores, kind='stable')   # desc; stable ⇒ id tie-break
     keep = [int(k) for k in order[:n]]
-    results = [{'id': ids[k], 'score': round(float(sims[k]), 4)} for k in keep]
+    # The RANKING score is what ordered the list, so it is what the list reports:
+    # showing the raw positive cosine here would make the order look arbitrary
+    # (a lower-cosine image legitimately outranks a higher one once its excluded
+    # match is paid for). Both halves are kept alongside so nothing is hidden.
+    results = [{'id': ids[k], 'score': round(float(scores[k]), 4)} for k in keep]
+    if excl_sims is not None:
+        for r, k in zip(results, keep):
+            r['match'] = round(float(sims[k]), 4)
+            r['excluded_match'] = round(float(excl_sims[k]), 4)
     # The span of what came back, plus the pool's own median — together they let
     # the UI say whether this ranking discriminates, using only numbers measured
     # on THIS bank for THIS query. An absolute band would be wrong everywhere:
     # the same model's "good" ceiling barely moves between corpora while its
     # floor climbs sharply on real photographs of people.
-    score_range = ({'top': results[0]['score'], 'bottom': results[-1]['score']}
-                   if results else None)
+    # The range is always in POSITIVE-match units, never in composite ones: it is
+    # read against ``pool_median`` to decide whether the ranking discriminates,
+    # and a composite score (which can even go negative) is not on that scale.
+    # Without an exclusion this is exactly the old first/last pair; with one it
+    # is the best and worst MATCH among what came back, which is the thing the
+    # sentence above the grid actually claims.
+    match_of = [float(sims[k]) for k in keep]
+    score_range = ({'top': round(max(match_of), 4),
+                    'bottom': round(min(match_of), 4)} if results else None)
+    moved = excl_median = None
+    if excl_sims is not None:
+        # What the SAME query would have returned unexcluded — the only way to
+        # tell the user whether the push-down did anything, rather than leaving
+        # them to compare two screens from memory.
+        #
+        # POSITIONS changed, not membership. Membership alone is silently wrong
+        # whenever n reaches the whole pool: asking for 60 out of 22 images
+        # returns the same 22 however hard the push, so a membership count reads
+        # 0 and the UI announces "changed nothing" over a grid the user can SEE
+        # was reordered. Comparing the two orderings slot by slot is right in
+        # both regimes — it counts newcomers when the list is a cut of a larger
+        # pool, and re-ranking when it is not.
+        plain = [int(k) for k in np.argsort(-sims, kind='stable')[:n]]
+        moved = int(sum(1 for a, b in zip(keep, plain) if a != b))
+        if len(keep) < len(ids):
+            excl_median = {'pool': round(float(np.median(excl_sims)), 4),
+                           'results': round(float(np.median(excl_sims[keep])), 4)}
+        # else: the returned set IS the pool, so its median and the pool's are
+        # the same number BY CONSTRUCTION. Reporting them would let the UI read
+        # "level with a typical image — too tangled to separate" off an identity,
+        # which is how it once declared a visibly-reordered grid a failure. When
+        # a comparison cannot carry information, the honest output is none: the
+        # places-changed count already says what happened.
     return {**base, 'results': results,
             'image_ids': [ids[k] for k in keep], 'score_range': score_range,
-            'pool_median': round(float(np.median(sims)), 4)}
+            'pool_median': round(float(np.median(sims)), 4),
+            'push_down_moved': moved, 'push_down_median': excl_median}
 
 
 def _trash_or_remove(path: str) -> str:
@@ -3891,6 +4175,46 @@ def _remote_stopped_detail(noun, stop, cache_path, total):
         return _stopped_detail(noun, stop.kept, cache_path, total)
     return ('Stopped — the peer was told to abort and did not hand anything '
             'back in time; relaunch to run it again')
+# --- rows that can vanish under a long pass ---------------------------------
+# A pass reads its rows, then spends minutes to hours walking them, committing as
+# it goes. `expire_on_commit` is on, so every row it has not reached yet becomes
+# a lazy re-SELECT — and that re-SELECT can come back empty, because a bank's
+# rows CAN disappear mid-pass: `delete_bank` cancels the live job cooperatively
+# and then drops every row and the bank itself immediately, so the still-running
+# thread keeps iterating over rows that are already gone (`delete_rejected` can
+# do the same if the job registry has aged the pass out as stale).
+#
+# What SQLAlchemy does then is the trap: plain attribute access on an expired
+# row whose database row is gone raises ObjectDeletedError, and so does a commit
+# carrying a write staged on one. Either killed the WHOLE pass — one deleted
+# image and thousands of analysed ones never got written. `Session.get(...,
+# populate_existing=True)` is the one access that answers None instead of
+# raising, so every long pass re-reads through the helper below immediately
+# before it touches a row, and skips (and counts) what is no longer there.
+def _live_image(image_id):
+    """The bank row as the database has it RIGHT NOW, or None when it is gone.
+
+    Always re-reads (``populate_existing``): a row the session still holds
+    unexpired would otherwise be returned from the identity map, and the whole
+    point here is to ask the database whether the image still exists."""
+    if image_id is None:
+        return None
+    return db.session.get(BankImage, image_id, populate_existing=True)
+
+
+def _detach_bank(bank):
+    """Take the ImageBank row OUT of the session so a pass can keep reading it.
+
+    Passes read the bank (its source folder) once per image, for hours. Left in
+    the session, it is expired by each commit exactly like the images are — and
+    it is deleted by the very same `delete_bank` that removes them, so it turns
+    into an ObjectDeletedError of its own. Detaching a fully loaded instance
+    keeps every column readable and immune to expiry; the passes doing this only
+    ever READ the bank, so nothing is lost by leaving the session's copy behind.
+    """
+    if bank is not None:
+        db.session.expunge(bank)
+    return bank
 
 
 def _release_db_before_inference():
@@ -4187,10 +4511,11 @@ def _faces_job(bank_id, device_id=None):
                                   if returncode is not None else ''))
         results = data.get('results') or {}
         clusters = data.get('clusters') or {}
-        done = 0
+        done = vanished = 0
         for p, image_id in by_path.items():
-            row = db.session.get(BankImage, image_id)
-            if row is None:
+            row = _live_image(image_id)
+            if row is None:      # deleted while the pass ran — see _live_image
+                vanished += 1
                 continue
             res = results.get(p) or {}
             row.face_state = res.get('state')
@@ -4200,12 +4525,16 @@ def _faces_job(bank_id, device_id=None):
             if done % 200 == 0:
                 db.session.commit()
         db.session.commit()
+        if vanished:
+            logger.info('bank face pass: %s image(s) were deleted while it ran', vanished)
         sizes = {}
         for cid in clusters.values():
             sizes[cid] = sizes.get(cid, 0) + 1
         multi = sum(1 for n in sizes.values() if n >= 2)
-        bank_jobs.progress(job, detail=f'done — {multi} person cluster(s) '
-                                       f'of 2+ images')
+        detail = f'done — {multi} person cluster(s) of 2+ images'
+        if vanished:
+            detail += f', {vanished} skipped (deleted while the pass ran)'
+        bank_jobs.progress(job, detail=detail)
     return run
 
 
@@ -4461,23 +4790,37 @@ def _score_job(bank_id, device_id=None):
                                   if returncode is not None else ''))
         results = data.get('results') or {}
         clusters = data.get('clusters') or {}
-        done = 0
+        done = vanished = scored = 0
         for p, image_id in by_path.items():
-            row = db.session.get(BankImage, image_id)
-            if row is None:
+            row = _live_image(image_id)
+            if row is None:      # deleted while the pass ran — see _live_image
+                vanished += 1
                 continue
             res = results.get(p) or {}
             row.aesthetic_score = res.get('aesthetic')
             row.nsfw_score = res.get('nsfw')
             row.style_cluster = clusters.get(p)
+            # Counted HERE, on the row we actually wrote — not from the child's
+            # report. The child scores a PATH; this loop is the only place that
+            # knows whether the image behind it still exists. Counting the report
+            # made the pass announce "scored 3 image(s), 1 skipped" over a bank of
+            # three, which is two claims that cannot both be true.
+            if res.get('state') == 'ok':
+                scored += 1
             done += 1
             if done % 200 == 0:
                 db.session.commit()
         db.session.commit()
+        if vanished:
+            logger.info('bank scoring pass: %s image(s) were deleted while it ran',
+                        vanished)
         sizes = {}
         for cid in clusters.values():
             sizes[cid] = sizes.get(cid, 0) + 1
         multi = sum(1 for n in sizes.values() if n >= 2)
+        # The child's own report — used ONLY to name a head that produced nothing
+        # (below). It counts PATHS it was handed, so it is the wrong thing to
+        # report as "scored": see the counter in the write-back loop.
         ok = [r for r in results.values() if r.get('state') == 'ok']
         # Name any head that produced nothing, so a degraded pass says so out loud
         # (graceful degradation must be visible, never a silent gap).
@@ -4486,8 +4829,10 @@ def _score_job(bank_id, device_id=None):
             missing.append('aesthetic')
         if ok and not any('nsfw' in r for r in ok):
             missing.append('NSFW')
-        detail = (f'done — scored {len(ok)} image(s), '
+        detail = (f'done — scored {scored} image(s), '
                   f'{multi} style group(s) of 2+')
+        if vanished:
+            detail += f', {vanished} skipped (deleted while the pass ran)'
         if missing:
             detail += f' ({" + ".join(missing)} head unavailable)'
         bank_jobs.progress(job, detail=detail)
@@ -4563,7 +4908,7 @@ def _watermark_job(bank_id, rescan, device_id=None):
         from . import bank_remote
         from .vision_pool import map_vision
         from ..gpu_window import gpu_exclusive_vision_window
-        bank = db.session.get(ImageBank, bank_id)
+        bank = _detach_bank(db.session.get(ImageBank, bank_id))
         if not bank:
             return
         # Read once, before anything commits, and carry plain tuples — see the
@@ -4577,7 +4922,7 @@ def _watermark_job(bank_id, rescan, device_id=None):
         bank_jobs.progress(job, done=0, total=len(items), detail='watermark scan')
         if not items:
             return
-        detected = clean = errors = checked = unanswered = seen = 0
+        detected = clean = errors = checked = unanswered = seen = vanished = 0
         pending = {}
 
         def prepared():
@@ -4586,7 +4931,20 @@ def _watermark_job(bank_id, rescan, device_id=None):
             workers, keeps its original order, and is only paid for by images
             the pass actually reaches (which matters: the discard below is
             destructive)."""
+            nonlocal vanished
             for row_id, relpath, clean_method in items:
+                # Deleted mid-pass (see _live_image). Checked as an EXISTENCE
+                # test only — the values this loop needs were read into plain
+                # tuples before anything committed, and pulling the row back into
+                # the session is what the staged-write shape exists to avoid.
+                # Worth the lookup here: it saves a ~1.7 s Ollama call, and it
+                # stops a destructive discard running for a row that is gone.
+                if _live_image(row_id) is None:
+                    logger.info('bank watermark scan: image %s was deleted mid-pass, '
+                                'skipping it', row_id)
+                    vanished += 1
+                    bank_jobs.bump(job)
+                    continue
                 # Always detect on the SOURCE pixels: a re-scan of an already
                 # cleaned image drops its cleaned version first (otherwise we
                 # would be asking "is there a watermark?" about our own edit).
@@ -4594,7 +4952,7 @@ def _watermark_job(bank_id, rescan, device_id=None):
                 # because a write_with_retry rollback must not be able to lose
                 # the record of a file that is already gone.
                 if clean_method:
-                    _discard_clean_blob_files(bank_id, row_id)
+                    _drop_clean_blob_by_id(bank_id, row_id)
                     pending.setdefault(row_id, {})['watermark_clean_method'] = None
                 yield row_id, _abs_under(root, relpath)
 
@@ -4629,6 +4987,16 @@ def _watermark_job(bank_id, rescan, device_id=None):
             try:
                 # Every database write below still runs here, on this one thread.
                 for (row_id, _path), raw, error in source:
+                    # Re-read: the answer we are about to store took ~1.7 s to
+                    # arrive (longer on a peer), and the image can have been
+                    # deleted in that window.
+                    if _live_image(row_id) is None:
+                        logger.info('bank watermark scan: image %s was deleted while '
+                                    'it was being analysed, skipping it', row_id)
+                        pending.pop(row_id, None)
+                        vanished += 1
+                        bank_jobs.bump(job)
+                        continue
                     if error is not None:  # one bad file never sinks the pass
                         pending.setdefault(row_id, {})['watermark_state'] = 'error'
                         errors += 1
@@ -4696,6 +5064,8 @@ def _watermark_job(bank_id, rescan, device_id=None):
                                            f'so far')
             return
         detail = f'done — {detected} with a watermark, {clean} clean'
+        if vanished:
+            detail += f', {vanished} skipped (deleted while the pass ran)'
         if unanswered:
             detail += (f', {unanswered} not analysed (the vision model returned '
                        'nothing — check Ollama in Settings, then run it again)')
@@ -4747,14 +5117,18 @@ def _needs_rescan_count(bank_id) -> int:
             .filter(BankImage.watermark_regions.is_(None)).count())
 
 
-def _discard_clean_blob_files(bank_id, image_id) -> None:
-    """The FILE half of forgetting a cleaned version: delete the blob and drop
-    the stale thumbnail. Split out so a pass that stages its row updates as
-    plain data (see _flush_row_updates) can do the destructive part where it
-    belongs — lazily, per image reached — without also dirtying the session
+def _drop_clean_blob_by_id(bank_id, image_id) -> None:
+    """The FILE half of forgetting a cleaned version, by id: delete the blob and
+    drop the stale thumbnail. Two callers want exactly this and no row update.
+
+    An image whose ROW is gone (deleted mid-pass) has no
+    `watermark_clean_method` left to clear; without this the staged copy would
+    outlive the row with nothing pointing at it. And a pass that stages its row
+    updates as plain data (see _flush_row_updates) does the destructive part
+    where it belongs — lazily, per image reached — without dirtying the session
     there.
 
-    Safe to run before the row update lands: resolved_image_path checks
+    Safe to run before a row update lands: resolved_image_path checks
     `watermark_clean_method` and THEN `cleaned.is_file()`, so a row still
     claiming a blob whose file is gone serves the source, which is exactly the
     post-discard behaviour. A crash in between leaves the row rescannable."""
@@ -4769,7 +5143,7 @@ def _discard_clean_blob(bank_id, row) -> None:
     """Forget a cleaned version: delete the blob, drop the stale thumbnail and
     clear the method so the readers fall back to the source. No commit (the
     caller owns the transaction)."""
-    _discard_clean_blob_files(bank_id, row.id)
+    _drop_clean_blob_by_id(bank_id, row.id)
     row.watermark_clean_method = None
 
 
@@ -4955,16 +5329,24 @@ def start_watermark_crop(app, user_id, bank_id):
 def _watermark_crop_job(bank_id):
     def run(job):
         from .face_dataset_service import _apply_watermark_crop, _route_watermark
-        bank = db.session.get(ImageBank, bank_id)
+        bank = _detach_bank(db.session.get(ImageBank, bank_id))
         if not bank:
             return
         rows = _clean_pool_query(bank_id).order_by(BankImage.id.asc()).all()
         bank_jobs.progress(job, done=0, total=len(rows), detail='auto-crop')
-        cropped = left = failed = seen = 0
+        row_ids = [r.id for r in rows]
+        cropped = left = failed = seen = vanished = 0
         try:
-            for row in rows:
+            for rid in row_ids:
                 if bank_jobs.cancelled(job):
                     break
+                row = _live_image(rid)
+                if row is None:      # deleted since the pass started — see _live_image
+                    logger.info('bank auto-crop: image %s was deleted mid-pass, '
+                                'skipping it', rid)
+                    vanished += 1
+                    bank_jobs.bump(job)
+                    continue
                 boxes, manual, _problem = _clean_regions(row)
                 if manual:
                     # A hand mask is level 2's material, mask emptied or not. It
@@ -5020,6 +5402,8 @@ def _watermark_crop_job(bank_id):
             bank_jobs.progress(job, detail=f'cancelled — {cropped} cropped so far')
             return
         detail = f'done — {cropped} cropped, {left} left for inpainting'
+        if vanished:
+            detail += f', {vanished} skipped (deleted while the pass ran)'
         if failed:
             detail += f', {failed} unreadable'
         bank_jobs.progress(job, detail=detail)
@@ -5096,13 +5480,14 @@ def _watermark_inpaint_job(bank_id, method, device_id=None):
         from . import watermark_klein, watermark_lama
         from .face_dataset_service import _clean_inpaint_engine, _route_watermark
         from ..gpu_window import gpu_exclusive_vision_window
-        bank = db.session.get(ImageBank, bank_id)
+        bank = _detach_bank(db.session.get(ImageBank, bank_id))
         if not bank:
             return
         rows = _clean_pool_query(bank_id).order_by(BankImage.id.asc()).all()
         bank_jobs.progress(job, done=0, total=len(rows), detail='inpainting')
+        row_ids = [r.id for r in rows]
         counts = {'inpainted': 0, 'klein': 0, 'review': 0, 'failed': 0,
-                  'skipped': 0, 'empty': 0}
+                  'skipped': 0, 'empty': 0, 'vanished': 0}
         error = None
         from . import cluster as cluster_svc
         remote = (cluster_svc.normalize_device_id(device_id)
@@ -5116,14 +5501,24 @@ def _watermark_inpaint_job(bank_id, method, device_id=None):
         # holding it would deadlock its worker (same split as the dataset route);
         # a remote render likewise never holds the LOCAL GPU.
         device = 'cpu' if method == 'klein' else watermark_lama.resolve_device()
-        pending = []            # (row, dst_path, [bbox]) for the single LaMa batch
+        # (image_id, dst_path, [bbox]) for the single LaMa batch — ids, not ORM
+        # rows: this list is held across a batch that can run for minutes, and a
+        # row deleted in that window must be skippable rather than fatal.
+        pending = []
         window = (gpu_exclusive_vision_window(flag_ttl=1800)
                   if device == 'cuda' else nullcontext())
         try:
             with window:
-                for row in rows:
+                for rid in row_ids:
                     if bank_jobs.cancelled(job):
                         break
+                    row = _live_image(rid)
+                    if row is None:  # deleted since the pass started — _live_image
+                        logger.info('bank inpaint: image %s was deleted mid-pass, '
+                                    'skipping it', rid)
+                        counts['vanished'] += 1
+                        bank_jobs.bump(job)
+                        continue
                     boxes, manual, problem = _clean_regions(row)
                     src, width, height = _source_size(bank, row)
                     if problem or not src:
@@ -5197,20 +5592,29 @@ def _watermark_inpaint_job(bank_id, method, device_id=None):
                         db.session.commit()
                         bank_jobs.bump(job)
                         continue
-                    pending.append((row, dst, [list(b) for b in boxes]))
+                    pending.append((rid, dst, [list(b) for b in boxes]))
                     bank_jobs.bump(job)
                 if pending and bank_jobs.cancelled(job):
                     # Stop means stop: the staged copies of rows we never got to
                     # repaint are thrown away rather than running a long batch
                     # after the user asked out (they stay 'detected', retryable).
-                    for row, _dst, _boxes in pending:
-                        _discard_clean_blob(bank_id, row)
+                    for pid, _dst, _boxes in pending:
+                        _drop_clean_blob_by_id(bank_id, pid)
                     pending = []
                 if pending:
                     results = watermark_lama.inpaint_batch(
                         [{'image_path': str(dst), 'bboxes': boxes}
-                         for _row, dst, boxes in pending], device=device)
-                    for row, dst, _boxes in pending:
+                         for _rid, dst, boxes in pending], device=device)
+                    for pid, dst, _boxes in pending:
+                        row = _live_image(pid)
+                        if row is None:
+                            # Deleted while the batch ran: no row is left to point
+                            # at the repainted copy, so throw the copy away too.
+                            logger.info('bank inpaint: image %s was deleted while the '
+                                        'batch ran, skipping it', pid)
+                            _drop_clean_blob_by_id(bank_id, pid)
+                            counts['vanished'] += 1
+                            continue
                         ok, err = results.get(str(dst), (
                             False, {'kind': 'failed', 'detail': 'missing inpaint result'}))
                         if ok:
@@ -5238,6 +5642,9 @@ def _watermark_inpaint_job(bank_id, method, device_id=None):
             # Klein for images where the honest answer is "your mask is empty".
             detail += (f", {counts['empty']} with an empty mask (draw a zone in "
                        '▶ Review, or dismiss them)')
+        if counts['vanished']:
+            detail += (f", {counts['vanished']} skipped "
+                       '(deleted while the pass ran)')
         if counts['skipped']:
             detail += f", {counts['skipped']} skipped (engine unavailable)"
         if counts['failed']:
@@ -5442,7 +5849,7 @@ def _framing_job(bank_id, rescan, device_id=None):
         from .vision_pool import map_vision
         from . import bank_remote
         from ..gpu_window import gpu_exclusive_vision_window
-        bank = db.session.get(ImageBank, bank_id)
+        bank = _detach_bank(db.session.get(ImageBank, bank_id))
         if not bank:
             return
         # Read ONCE, before anything commits. Every commit expires the row, so a
@@ -5465,14 +5872,25 @@ def _framing_job(bank_id, rescan, device_id=None):
         bank_jobs.progress(job, done=0, total=len(items), detail='framing')
         if not items:
             return
-        classified = errors = missing = seen = 0
+        classified = errors = missing = seen = vanished = 0
         pending = {}
 
         def prepared():
             """Path resolution stays lazy and on the job's own thread — one
             image per free slot — but reads plain strings now, not rows. The
             bank folder is resolved ONCE (see _abs_under)."""
+            nonlocal vanished
             for row_id, relpath in items:
+                # Deleted mid-pass (see _live_image) — an EXISTENCE test only,
+                # so the staged-write shape above is untouched. Worth a lookup
+                # to skip: the alternative is a ~1.7 s Ollama call for a row
+                # that will match nothing when the batch is flushed.
+                if _live_image(row_id) is None:
+                    logger.info('bank framing: image %s was deleted mid-pass, '
+                                'skipping it', row_id)
+                    vanished += 1
+                    bank_jobs.bump(job)
+                    continue
                 yield row_id, _abs_under(root, relpath)
 
         def ask(item):
@@ -5503,6 +5921,16 @@ def _framing_job(bank_id, rescan, device_id=None):
         with window:
             try:
                 for (row_id, _path), raw, error in source:
+                    # Re-read: the classification we are about to store took a
+                    # second or more to arrive, and the image can have been
+                    # deleted in that window.
+                    if _live_image(row_id) is None:
+                        logger.info('bank framing: image %s was deleted while it was '
+                                    'being classified, skipping it', row_id)
+                        pending.pop(row_id, None)
+                        vanished += 1
+                        bank_jobs.bump(job)
+                        continue
                     if error is not None:  # one bad file never sinks the pass
                         errors += 1
                     elif raw is None:      # file gone: leave the row as it was
@@ -5539,6 +5967,8 @@ def _framing_job(bank_id, rescan, device_id=None):
             bank_jobs.progress(job, detail=f'cancelled — {classified} classified so far')
             return
         detail = f'done — {classified} classified'
+        if vanished:
+            detail += f', {vanished} skipped (deleted while the pass ran)'
         if errors:
             detail += f', {errors} unreadable'
         # Files that were not THERE are their own outcome. Unreported, a bank
@@ -5905,15 +6335,22 @@ def _caption_job(bank_id, ids, force, vocabulary=None, device_id=None):
         bank_jobs.progress(job, done=0, total=len(paths),
                            detail='captioning — loading the caption model '
                                   '(the first image can take a minute)')
-        captioned = 0
+        captioned = vanished = 0
 
         def _on_caption(path, caption):
-            nonlocal captioned
-            row = db.session.get(BankImage, by_path.get(path))
-            if row is not None:
-                row.caption = caption
-                db.session.commit()
-                captioned += 1
+            nonlocal captioned, vanished
+            image_id = by_path.get(path)
+            if image_id is None:
+                return           # a path this pass never asked about — not ours
+            row = _live_image(image_id)
+            if row is None:      # deleted while it was being captioned — _live_image
+                logger.info('bank caption pass: image %s was deleted mid-pass, '
+                            'skipping its caption', image_id)
+                vanished += 1
+                return
+            row.caption = caption
+            db.session.commit()
+            captioned += 1
 
         # GPU-exclusive for the whole pass, exactly like the score/watermark passes:
         # frees ComfyUI VRAM and blocks a training start for the duration.
@@ -5989,12 +6426,19 @@ def _caption_job(bank_id, ids, force, vocabulary=None, device_id=None):
         # mid-run: describe_image_ollama is best-effort and returns '' per image
         # (vision_ollama.py), so the pass counts every image as handled and
         # writes nothing. A pass that produced nothing did not succeed.
-        if not captioned:
+        # ...unless the images themselves went away. A pass whose whole selection
+        # was deleted under it produced nothing for a reason that has nothing to
+        # do with the engine, and blaming Ollama there sends the user to fix a
+        # setting that was never wrong.
+        if not captioned and not vanished:
             bank_jobs.fail(job, 'no captions were produced — the caption engine '
                                 'answered nothing for every image. Check Ollama / '
                                 'JoyCaption in Settings ▸ Captioning, then retry.')
             return
-        bank_jobs.progress(job, detail=f'done — {captioned} captioned')
+        detail = f'done — {captioned} captioned'
+        if vanished:
+            detail += f', {vanished} skipped (deleted while the pass ran)'
+        bank_jobs.progress(job, detail=detail)
     return run
 
 
@@ -6457,15 +6901,122 @@ def _pct(n, total) -> int:
     return int(round(100 * n / total)) if total else 0
 
 
+# --- visual spread, from the embeddings the ✨ Score pass already cached -------
+# The framing/cluster numbers above are labels; they cannot see that two hundred
+# images labelled "body" are the same body in the same pose. The CLIP embeddings
+# can, and they are already on disk — so this costs one pass over vectors that
+# were computed for other reasons, and nothing new runs.
+#
+# The statistic is the MEAN PAIRWISE COSINE SIMILARITY of the pool. For L2-normed
+# vectors it has a closed form that avoids ever building the n×n matrix:
+#
+#     sum_{i,j} e_i . e_j  ==  || sum_i e_i ||^2
+#
+# so the mean over off-diagonal pairs is (||s||^2 - n) / (n^2 - n) — one pass,
+# O(n·d), exact, and it does not care how big the bank is. That matters: the
+# panel is read-only and opened casually, so it must not become the reason a
+# 47k-image bank stalls.
+#
+# THRESHOLDS ARE MEASURED, NOT GUESSED. Taken on the two real banks available
+# (117 and 46 775 usable embeddings — deliberately different in size and
+# content):
+#     whole pool                    0.645   and  0.650
+#     random subsets n=20…1000      0.643 … 0.692   (i.e. NOT a function of n)
+#     an image + its nearest nbrs   0.788   and  0.900   <- redundant extreme
+#     a farthest-point sample       0.538   and  0.220   <- varied extreme
+# So ~0.65 is what an ordinary bank looks like, a genuinely repetitive selection
+# lands around 0.79-0.90, and the statistic is stable across pool size — which is
+# why no n-correction is applied. The bands below sit clear of the ordinary
+# reading so a normal bank is never nagged.
+_SPREAD_REDUNDANT = 0.80     # at/above: measured territory of nearest-neighbour sets
+_SPREAD_LEANING = 0.72       # at/above: tighter than either real bank's whole pool
+_SPREAD_MIN_POOL = 10        # under this the mean is noise, so we decline to judge
+
+
+def _coverage_embeddings(bank, crit):
+    """The (m×d) L2-normed embedding matrix for the coverage pool.
+
+    A sibling of ``_pool_embeddings`` rather than a call into it: that one takes
+    the curation FILTER dict and goes through ``_pool_query``, which has no way to
+    express the coverage pool's "everything not rejected" fallback. Same path
+    resolution, same fast-path reasoning — see ``_pool_embeddings``.
+    """
+    import numpy as np
+    emb_by_path = _load_score_embeddings(bank)
+    if not emb_by_path:
+        return None
+    rows = (BankImage.query.filter(BankImage.bank_id == bank.id, crit)
+            .order_by(BankImage.id.asc()).all())
+    base = os.path.realpath(bank.source_path)
+    prefix = os.path.normcase(base + os.sep)
+    vecs = []
+    for r in rows:
+        p = os.path.normpath(os.path.join(base, r.relpath))
+        emb = emb_by_path.get(p) if os.path.normcase(p).startswith(prefix) else None
+        if emb is None:
+            p = _abs_under(base, r.relpath)
+            emb = emb_by_path.get(p) if p else None
+        if emb is not None:
+            vecs.append(emb)
+    if not vecs:
+        return None
+    E = np.stack(vecs).astype('float32')
+    E /= (np.linalg.norm(E, axis=1, keepdims=True) + 1e-8)
+    return E
+
+
+def _visual_spread(bank, crit) -> dict:
+    """How alike the pool LOOKS, from the cached CLIP embeddings.
+
+    Returns ``{'scored': m, 'similarity': float|None, 'band': str}`` where band is
+    'redundant' | 'leaning' | 'varied' | 'unknown'. 'unknown' with scored 0 means
+    the ✨ Score pass has not run (or its cache went stale) — the panel says so
+    rather than drawing a bar it did not measure.
+    """
+    out = {'scored': 0, 'similarity': None, 'band': 'unknown'}
+    try:
+        E = _coverage_embeddings(bank, crit)
+    except Exception:
+        # A read-only advisory must never be the thing that breaks the panel:
+        # a corrupt or half-written cache degrades to "not measured".
+        return out
+    if E is None or len(E) < 2:
+        out['scored'] = 0 if E is None else len(E)
+        return out
+    n = len(E)
+    out['scored'] = n
+    if n < _SPREAD_MIN_POOL:
+        return out
+    s = E.sum(axis=0, dtype='float64')
+    sim = (float(s @ s) - n) / (n * n - n)
+    sim = max(-1.0, min(1.0, sim))
+    out['similarity'] = round(sim, 4)
+    out['band'] = ('redundant' if sim >= _SPREAD_REDUNDANT
+                   else 'leaning' if sim >= _SPREAD_LEANING else 'varied')
+    return out
+
+
+def _coverage_pool_crit(bank_id):
+    """The pool the panel describes: the KEPT images, or — before anything is
+    kept — every non-rejected one (so the panel is useful from the first look).
+
+    Extracted so the caption and embedding reads share ONE definition with the
+    label counts instead of each re-deriving it and drifting. It is returned by a
+    function rather than smuggled out inside the stats dict: that dict gets
+    jsonify()'d, and an SQLAlchemy criterion in it is a 500 waiting for whoever
+    forgets to strip it.
+    """
+    kept_n = BankImage.query.filter_by(bank_id=bank_id, status='keep').count()
+    return ((BankImage.status == 'keep') if kept_n > 0
+            else (BankImage.status != 'reject'))
+
+
 def _coverage_stats(bank_id) -> dict:
-    """Everything the coverage panel needs, from the pool the user would train on:
-    the KEPT images, or — before anything is kept — every non-rejected image (so
-    the panel is useful from the first look). Pure aggregate SQL, no GPU."""
+    """Everything the coverage panel needs, from the pool the user would train on.
+    Pure aggregate SQL, no GPU. Every value here is JSON-serialisable."""
     base = BankImage.query.filter_by(bank_id=bank_id)
-    kept_n = base.filter_by(status='keep').count()
-    pool_is_kept = kept_n > 0
-    crit = (BankImage.status == 'keep') if pool_is_kept \
-        else (BankImage.status != 'reject')
+    crit = _coverage_pool_crit(bank_id)
+    pool_is_kept = base.filter_by(status='keep').count() > 0
     pool = base.filter(crit)
     total = pool.count()
 
@@ -6586,15 +7137,86 @@ def _coverage_advice(stats: dict) -> list:
     return out
 
 
+def _spread_advice(spread, total) -> list:
+    """The visual-spread sentence, or nothing. Pure function of the measurement.
+
+    Deliberately quiet: a bank in the ordinary band says NOTHING, because a panel
+    that comments on every axis every time trains people to skim it.
+    """
+    if total < _SPREAD_MIN_POOL:
+        return []
+    if not spread['scored']:
+        return [{'tone': 'info',
+                 'text': 'Run ✨ Score to also see how varied the set LOOKS — the '
+                         'labels above cannot tell two hundred near-identical shots '
+                         'from two hundred different ones.'}]
+    if spread['similarity'] is None:
+        return []
+    pct = int(round(100 * spread['similarity']))
+    if spread['band'] == 'redundant':
+        return [{'tone': 'warn',
+                 'text': f'The images look very alike ({pct}% average similarity) — '
+                         f'a set this repetitive teaches one look. Use ⚖️ or the '
+                         f'diverse pick to spread it out.'}]
+    if spread['band'] == 'leaning':
+        return [{'tone': 'info',
+                 'text': f'The images lean alike ({pct}% average similarity) — '
+                         f'workable, but more variety would generalise better.'}]
+    return []
+
+
+# The bank has no `kind` (character/concept/style) — that lives on datasets only.
+# It is judged as a CHARACTER source rather than offered as a choice, because the
+# rest of this panel already is: the framing target it phrases against is the
+# character 12/6/6/1 mix, the person-cluster advice says "a character LoRA wants
+# one consistent subject", and the style-cluster advice treats a style mix as
+# dilution. Adding a selector here would make one axis kind-aware inside a panel
+# whose every other axis assumes a character, and would introduce a stored
+# preference (with the alias obligations that carry) to fix an inconsistency this
+# panel does not otherwise have. The UI says which lens it is using instead of
+# leaving the user to infer it.
+_COVERAGE_KIND = 'character'
+
+
 def coverage(user_id, bank_id) -> dict | None:
     """The read-only coverage advice for the bank (idea by @antonp). Returns the
     distributions the panel renders plus the generated advice, or None if the bank
-    is gone. Never mutates; pure DB, zero GPU."""
+    is gone. Never mutates.
+
+    Three sources, all already computed by earlier passes: the labels (framing,
+    person/style clusters, resolution), the CAPTIONS from the 🏷️ pass — scanned by
+    the shared `caption_coverage` lexicon, the same one the dataset panel uses, so
+    the two never drift — and the CLIP embeddings from ✨ Score, for whether the
+    pool actually LOOKS varied. No model runs.
+    """
+    from . import caption_coverage
+
     bank = get_bank(user_id, bank_id)
     if not bank:
         return None
     stats = _coverage_stats(bank_id)
-    stats['advice'] = _coverage_advice(stats)
+    crit = _coverage_pool_crit(bank_id)
+
+    captions = [c for (c,) in db.session.query(BankImage.caption)
+                .filter(BankImage.bank_id == bank_id, crit).all()]
+    variety = caption_coverage.analyse(captions, kind=_COVERAGE_KIND)
+    spread = _visual_spread(bank, crit)
+    # Nested, because `analyse` returns its own `total`/`axes` and the bank payload
+    # already owns `total` — flattening would silently overwrite the pool size.
+    stats['variety'] = variety
+    stats['visual'] = spread
+
+    advice = _coverage_advice(stats)
+    if stats['total']:
+        # On an empty pool _coverage_advice already says the one true thing
+        # ("nothing to advise on yet"); the other two sources would each add their
+        # own phrasing of the same emptiness.
+        advice += _spread_advice(spread, stats['total'])
+        advice += caption_coverage.advice(variety)
+    # One list, warnings first — the panel reads worst-to-mildest across all three
+    # sources rather than as three separate verdicts the user has to merge.
+    advice.sort(key=lambda a: 0 if a['tone'] == 'warn' else 1)
+    stats['advice'] = advice
     return stats
 
 

@@ -338,18 +338,30 @@ DEFAULTS = {
     # near-copy of the reference. 0 disables the LoRA entirely.
     'klein': {'consistency_lora': 'klein/Flux2-Klein-9B-consistency-V2.safetensors',
               # Optional user-pinned model files for the three required Klein
-              # slots. Accepts a ComfyUI-relative loader name (e.g.
+              # slots. Each accepts a ComfyUI-relative loader name (e.g.
               # 'klein/flux-2-klein-9b-fp8.safetensors' under models/unet or
-              # models/diffusion_models; bare names for files at a root) OR an
-              # ABSOLUTE path — a path under any registered model root
-              # (including extra_model_paths.yaml roots) is auto-converted to
-              # the relative name a loader node needs. Empty = auto-detect
-              # (canonical download name, then narrow token scan). A configured
-              # file that can't be resolved falls back to auto-detection with a
-              # visible badge in Settings — it never blocks generation. A file
-              # genuinely outside every ComfyUI root can't be loaded by ComfyUI
-              # at all: register its folder in extra_model_paths.yaml (the app
-              # parses it identically; the badge says so).
+              # models/diffusion_models; a bare name for a file at a root) OR an
+              # ABSOLUTE path — a path under any registered model root (including
+              # extra_model_paths.yaml roots) is converted to the relative name a
+              # loader node needs. klein.consistency_lora and the
+              # generation_lora_presets rows take a path the same way.
+              # Empty = auto-detect (canonical download name, then the narrow
+              # token scan) — the historical behaviour, byte for byte.
+              #
+              # The scan is deliberately narrow (wrong model >> missing model),
+              # which means it DECLINES anything it cannot name: a UNET outside a
+              # 'klein'-named folder, an encoder whose filename carries no known
+              # token. Those files are on disk and get reported as MISSING, and
+              # no amount of re-downloading fixes that. A pin removes the
+              # resolver's discretion — the named file resolves, so the integrity
+              # verdict (klein_invalid_assets) finally gets to say "present but
+              # unreadable" when that is the truth.
+              #
+              # A pinned file that cannot be resolved falls back to auto-detection
+              # with a visible badge in Settings — it never blocks generation. A
+              # file genuinely outside every ComfyUI root cannot be loaded by
+              # ComfyUI at all: register its folder in extra_model_paths.yaml (the
+              # app parses it identically) — the badge says exactly that.
               'unet': '', 'text_encoder': '', 'vae': '',
               'consistency_strength': 0.5,
               # Optional generation-LoRA PRESETS (Idea by @waltm — Discord
