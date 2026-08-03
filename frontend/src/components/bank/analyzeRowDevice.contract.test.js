@@ -40,3 +40,9 @@ test('the buttons grey out per machine through the SAME gate as Launch all', () 
   // …and says which stack is missing rather than a generic "needs setup".
   assert.match(ws, /passGate\.score\.reason \|\|/);
 });
+
+test('the local-only folder probe never steals a pass assigned to another machine', () => {
+  assert.match(ws,
+    /const gate = async \(run, onRefusal\) => \{[\s\S]{0,500}if \(passDevice && passDevice !== 'local'\) return false[\s\S]{0,500}person-preflight/,
+    'a remote person pass would still run the new local folder probe first');
+});

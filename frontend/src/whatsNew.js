@@ -90,6 +90,14 @@ export const WHATS_NEW = [
     to: '/datasets',
   },
   {
+    id: '2026-08-03-person-pass-checks-folders-first',
+    date: '2026-08-03',
+    title: 'The person pass now checks your folders first — and asks once',
+    blurb:
+      'Scraped material arrives one folder per person, and 👥 Group by person used to pay a face embedding per image to rediscover that. The bank could already sample folders and offer the obvious ones, but only from a button in the Subfolder panel — and the first thing anyone does with a new bank is press 🚀 Launch all, so nobody ever saw it. Now the sampling runs by itself the moment you launch the person pass, standalone or inside Launch all: about fifteen images per folder, then one dialog saying “12 folders look like a single person — treat each as one person and skip their full analysis”, with those folders already ticked. One click accepts them all; untick what you disagree with; “👥 Analyze everything anyway” is right there and says what it costs. Folders where the sample showed several faces say so and go to the full analysis, and a ceiling that was not reached is named rather than assumed away. Nothing is ever grouped without your click — and whatever you accept is a normal folder assertion you can undo any time.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-03-seedvr2-tile-and-vae-settings',
     date: '2026-08-03',
     title: 'SeedVR2 upscaling now fits smaller cards — tile size is a setting',
@@ -104,6 +112,22 @@ export const WHATS_NEW = [
     blurb:
       'The board had never had a small-screen pass, and it showed. Opening 🎨 Generate on a tablet-width window turned it into a fixed side drawer that took more than half the screen and left a sliver of the very board you were picking checkpoints from — so that panel, the run details, the compare view and the image gallery now stay full-width sheets right up to a real desktop, and each one closes with a thumb-sized ✕ instead of a 14-pixel glyph. The zoom, Fit and Tidy up buttons are 40 px on touch, where a miss used to land on the board and pan it. The ✓ box that adds a checkpoint to a run no longer shrinks with the zoom — at the level the board opens on it had become a five-pixel square, on the one control the whole generate flow goes through. And the list of what the board can be told to do, which was simply hidden below laptop width, is now one tap away with the touch gestures spelled out.',
     to: '/canvas',
+  },
+  {
+    id: '2026-08-03-multilora-steps-and-cfg',
+    date: '2026-08-03',
+    title: 'Set the steps and CFG with several LoRAs selected — compare or blend',
+    blurb:
+      'With two or more LoRAs checked, the Test Studio gave you no way to choose the number of steps or the CFG: the setting was not greyed out, it simply was not there, and every image ran on the family default no matter what you wanted. It is there now, in the same panel as the strengths, with the same ladders the single-LoRA studio and the canvas already used — including the SDXL second pass. It stays available in 🧬 Blend, where the strength sweep disappears but the render settings do not, and the cell counter includes them so you can see what a sweep will cost before you launch it.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-03-studio-prompt-batch',
+    date: '2026-08-03',
+    title: 'Run several saved prompts in one go, on both generation screens',
+    blurb:
+      'The list of saved prompts could only be replayed one at a time: pick a prompt, launch, wait, pick the next one. Every card now has a tick box. Tick three and the launch renders all three with the same checkpoints, the same settings and the same seed — which is what makes them comparable — in a single run the GPU works through by itself. The counter and the button say how many images that is before you click, and ticking nothing leaves the screen exactly as it was. It works the same way in the dataset Test Studio and in "Generate from the board" on the canvas, because both screens show the same list.',
+    to: '/studio',
   },
   {
     id: '2026-08-03-restart-no-longer-kills-a-live-cloud-run',

@@ -19,6 +19,8 @@ import BankWatermarkPanel from './BankWatermarkPanel'
 // 👤 "Single person here" — a folder the user declares to hold one person.
 import SubfolderPersonPanel from './SubfolderPersonPanel'
 import { assertionFor, folderMarker, scanOffer, suggestionFor } from './folderPerson.js'
+import PersonPreflightDialog from './PersonPreflightDialog'
+import { preflightNeeded, preflightWillSample } from './personPreflight.js'
 // 🎚 The twelve triage thresholds, edited here instead of in Settings.
 import BankThresholdsPanel from './BankThresholdsPanel.jsx'
 import { spreadReadout, spreadCoverageNote } from './coverageVisual.js'
@@ -600,6 +602,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // probed by itself, and what a scan would cost.
   const [folderPersonInfo, setFolderPersonInfo] = useState(null)
   const [folderPersonBusy, setFolderPersonBusy] = useState(false)
+  // 👤 The preflight of the person pass: { plan, probing, run } — `run` is the
+  // pass (or the whole 🚀 Launch all) the user actually asked for, held until
+  // they have answered the folder question.
+  const [preflight, setPreflight] = useState(null)
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState({ images: [], total: 0 })
   const [selected, setSelected] = useState(() => new Set())
@@ -1038,7 +1044,75 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // the same five passes behaved differently depending on which button you
   // pressed and nothing said so. `local` is folded to nothing server-side.
   const on = () => (passDevice && passDevice !== 'local' ? { device_id: passDevice } : {})
-  const startFaces = () => act(() => postJson(`/api/bank/${bankId}/faces`, on()), null)
+  const runFacesPass = () => act(() => postJson(`/api/bank/${bankId}/faces`, on()), null)
+
+  /* 👤 THE PREFLIGHT GATE.
+     The person pass is the bank's most expensive one, and on scraped material
+     most of it is spent rediscovering what the folder names already said. The
+     app knew how to sample folders and offer the obvious ones — but only from a
+     panel the user who presses 🚀 Launch all never opens. So the sampling now
+     runs HERE, in front of the pass, whichever button started it.
+
+     `gate` returns:
+       false      — nothing worth asking (no subfolder, or all declared already);
+                    the caller runs its pass immediately, exactly as before.
+       'refused'  — the bank is busy. The refusal is raised at THIS point on
+                    purpose: it is the same 409 the pass itself would produce, so
+                    the Launch all dialog still gets it while its checkboxes are
+                    alive, instead of losing them to a preflight that dies later.
+       true       — the dialog is up and owns the decision. */
+  const gate = async (run, onRefusal) => {
+    // The folder probe is a local face-embedding child process and has no peer
+    // dispatch path. A pass explicitly assigned to another machine must stay
+    // there; sampling locally first would silently take this machine's GPU.
+    if (passDevice && passDevice !== 'local') return false
+    let plan = null
+    try { plan = await apiFetch(`/api/bank/${bankId}/person-preflight`) } catch { plan = null }
+    if (!preflightNeeded(plan)) return false
+    if (preflightWillSample(plan)) {
+      try {
+        await postJson(`/api/bank/${bankId}/person-preflight`, {})
+      } catch (e) {
+        const kind = e?.body?.busy_kind
+        const message = e?.status === 409 && kind
+          ? busyRefusal({ kind, activity: payload?.activity })
+          : (e?.message || 'Could not check the folders.')
+        if (onRefusal) onRefusal(message); else toast.error(message)
+        return 'refused'
+      }
+      // The 2 s poll only ticks while a job is live, and the payload we hold
+      // predates the one we just started — refresh so the dialog can watch it.
+      refreshPayload({ force: true })
+    }
+    setPreflight({ plan, probing: preflightWillSample(plan), run })
+    return true
+  }
+
+  const startFaces = async () => {
+    const gated = await gate(runFacesPass)
+    if (gated === true || gated === 'refused') return null
+    return runFacesPass()
+  }
+
+  /* The answer. Accepted folders become ORDINARY assertions (same endpoint
+     family, same revoke) and only then does the pass the user asked for run. */
+  const proceedPreflight = async ({ accept }) => {
+    const run = preflight?.run
+    setPreflight(null)
+    if (accept && accept.length) {
+      const d = await act(
+        () => postJson(`/api/bank/${bankId}/folder-persons/accept`, { subfolders: accept }),
+        null)
+      if (d) {
+        const missed = (d.failed || []).length
+        toast.success(`${d.accepted.length} folder(s) · ${d.images} image(s) grouped `
+          + 'as one person each — the pass will skip them'
+          + (missed ? ` · ${missed} could not be grouped` : ''))
+      }
+      loadFolderPersons()
+    }
+    if (run) await run()
+  }
   const startScore = () => act(() => postJson(`/api/bank/${bankId}/score`, on()), null)
   const startSemanticDedup = () => act(
     () => postJson(`/api/bank/${bankId}/semantic-dedup`, {}), null)
@@ -1063,8 +1137,27 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   /* Posts with the dialog still OPEN and answers {ok,error}: a refused launch —
      "a scan job is already running on this bank" is the usual one — used to close
      the dialog first and reset all seven pass checkboxes and the reject flags to
-     their defaults. The dialog decides what to do with the answer. */
+     their defaults. The dialog decides what to do with the answer.
+
+     🚀 Launch all is also the FIRST thing a new user presses, so it is the path
+     the folder check has to be on — otherwise that saving only ever reaches the
+     people who went looking for it. The question is asked BEFORE the run starts,
+     which is the only honest place for it: the point of Launch all is walking
+     away, and a dialog that woke the user three passes in would defeat that.
+     The gate posts too, so a busy bank is refused HERE, while the checkboxes
+     are still alive — the rule this whole contract is about. */
   const startPipeline = async (config) => {
+    if ((config?.steps || []).includes('faces')) {
+      let error = null
+      const gated = await gate(() => runPipeline(config), (m) => { error = m })
+      if (gated === 'refused') return { ok: false, error }
+      // The preflight dialog owns the launch now; the Launch all card can close.
+      if (gated === true) { setLaunchOpen(false); return { ok: true } }
+    }
+    return runPipeline(config)
+  }
+
+  const runPipeline = async (config) => {
     let error = null
     const d = await act(() => postJson(`/api/bank/${bankId}/pipeline`, config),
       '🚀 Launch all started — you can walk away; Stop any time.',
@@ -1508,7 +1601,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       <GpuBusyNotice className="mb-2" onCleared={() => refreshPayload()} />
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
-          title="Run the whole triage in one go — scan, auto-reject, score, watermarks, group by person and (optionally) caption. Start it and walk away."
+          title="Run the whole triage in one go — scan, auto-reject, score, watermarks, group by person and (optionally) caption. Start it and walk away. If the person pass is in, it checks your folders first and asks once, before the run."
           className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
           🚀 Launch all…
         </button>
@@ -1533,7 +1626,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
           <PassButton onClick={startFaces} disabled={live || !passGate.faces.ok}
             title={passGate.faces.reason || (passGate.faces.ok
-              ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images.'
+              ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images. It samples your subfolders first and offers the ones that look like a single person, so you can skip them.'
               : 'Install the Quality tools (Setup) to sort by person')}>
             👥 Group by person
           </PassButton>
@@ -2719,6 +2812,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {launchOpen && (
         <LaunchAllDialog caps={caps} visionReady={visionReady}
           onClose={() => setLaunchOpen(false)} onLaunch={startPipeline} />
+      )}
+
+      {preflight && (
+        <PersonPreflightDialog plan={preflight.plan} probing={preflight.probing}
+          activity={payload?.activity}
+          reload={() => apiFetch(`/api/bank/${bankId}/person-preflight`)}
+          onProceed={proceedPreflight}
+          onStopProbe={() => postJson(`/api/bank/${bankId}/cancel`, {})}
+          onCancel={() => setPreflight(null)} />
       )}
 
       {scoringPythonOpen && (
