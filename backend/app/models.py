@@ -396,6 +396,33 @@ class BankImage(db.Model):
     jpeg_quality = db.Column(Float, nullable=True)
     origin = db.Column(String(8), nullable=True, index=True)
     origin_evidence = db.Column(String(24), nullable=True)
+    # 🏷️ WD14 tag pass — a booru TAG VOCABULARY for triage, deliberately kept
+    # apart from `caption` above. Two different jobs: a caption is prose written
+    # for a trainer to read, these are machine-predicted labels with confidences
+    # written for a HUMAN to filter a 9 000-image dump by ("show me the blonde
+    # ones, drop the ones in a hat") before the expensive captioner ever runs.
+    # Storing them in `caption` would have made one destroy the other.
+    #   tags       : JSON {"model","threshold","tags":{name: confidence}}. The
+    #                FULL output above the pass threshold is kept, so moving the
+    #                threshold re-filters an already-tagged bank with no new
+    #                inference — the same read-time contract the quality scores
+    #                above follow. NULL = never tagged.
+    #   tags_text  : the same tag NAMES, comma-joined and comma-WRAPPED
+    #                (',blonde_hair,shirt,'). The denormalised read path: the tag
+    #                filter is a LIKE '%,tag,%' and those sentinel commas are what
+    #                keep 'blonde_hair' from matching 'blonde_hair_ribbon' — the
+    #                exact whole-tag semantics utils/tagFilter.js already promises
+    #                for booru captions. '' (never ',') on an untagged row, so an
+    #                untagged image matches no filter. It also joins `caption` in
+    #                the bank's search LIKE, which is what lets a search find
+    #                "red dress" with no captioning pass at all.
+    #   tags_state : NULL = not tagged | 'ok' | 'error' — same convention as
+    #                watermark_state, so a re-run picks up only what is missing.
+    # All three are additive and nullable (see _SCHEMA_ADDITIONS): a bank tagged
+    # by a build that has them still opens on one that does not.
+    tags = db.Column(Text, nullable=True)
+    tags_text = db.Column(Text, nullable=True)
+    tags_state = db.Column(String(16), nullable=True, index=True)
     # Manual turn, in degrees CLOCKWISE: NULL/0 = untouched | 90 | 180 | 270.
     # (Idea by 1Tomber, GitHub #17.) A bank is a READ-ONLY view over the user's
     # own folder, so a rotation cannot rewrite their file — it is stored here and

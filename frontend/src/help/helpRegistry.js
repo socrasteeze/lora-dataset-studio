@@ -296,6 +296,21 @@ const TOPICS = [
       'queue all', 'all banks', 'every bank', 'skipped passes', 'wasted night',
       'pipeline report', 'did it run'],
     '/bank', 'using-the-app', 'the-image-bank-triage-a-big-folder'),
+  action('bank-tags', 'Tag a bank and filter it by what is in the pictures',
+    ['tag', 'tags', 'tagging', 'wd14', 'tagger', 'booru', 'danbooru', 'auto-tag',
+      'autotag', 'label', 'labels', 'keywords',
+      // What someone actually types when they want this and do not know its name.
+      'hair colour', 'hair color', 'blonde', 'brunette', 'shirt', 'dress',
+      'clothing', 'outfit', 'what are they wearing', 'sort by hair',
+      'filter by clothes', 'find blonde', 'indoors', 'outdoors', 'setting',
+      'facet', 'facets', 'dropdown', 'narrow down', 'slice the bank',
+      'sort without captioning', 'skip joycaption', 'faster than captioning',
+      'quick tagger', 'simple tags', 'threshold', 'confidence',
+      'all other tags', 'tag not listed'],
+    // No one-time tip: those are a deliberately scarce, curated set (the help
+    // contract pins the count), and this pass already announces itself through
+    // the button, the Setup tile and What's new.
+    '/bank', 'using-the-app', 'the-image-bank-triage-a-big-folder'),
   action('bank-pass-coverage', 'Per-pass badges — what each bank has had done',
     ['coverage', 'pass coverage', 'badges', 'which passes', 'already done',
       'has it been scored', 'never captioned', 'what is missing', 'pending',
@@ -487,7 +502,8 @@ const TOPICS = [
   setupStep('setup-quality', 'quality', 'Install the optional ML helpers',
     ['face scoring', 'face similarity', 'insightface', 'person masks', 'masks', 'rembg',
      'watermark inpainting', 'lama', 'inpaint', 'bank scoring', 'ml extras', 'install',
-     'reinstall', 'repair', 'optional helpers']),
+     'reinstall', 'repair', 'optional helpers',
+     'wd14', 'tagger', 'image tagging', 'booru', 'danbooru', 'onnx', 'tag model']),
   setupStep('setup-training', 'training', 'Set up ai-toolkit (LoRA training)',
     ['ai-toolkit', 'aitoolkit', 'training', 'lora training', 'run.py', 'python',
      'interpreter', 'install training', 'train']),

@@ -995,6 +995,12 @@ export default function SetupPage() {
           body: 'Repaints small off-center watermarks (LaMa) during 🧽 Clean instead of only cropping border marks. It can use CUDA or CPU from Settings. Without it, off-center marks are skipped.' },
         { action: 'bank_scoring', cap: 'bank_scoring', icon: '✨', title: 'Bank scoring (aesthetic · NSFW · style)',
           body: "Powers the 🗃️ Bank's ✨ Score pass: rates images for aesthetics (1–10), flags NSFW and groups them by visual style with one CLIP pass — and makes 'keep best' prefer the nicest-looking duplicate. Installs into its own Python (CLIP + a small NSFW model). Without it, the Score button is disabled with this hint." },
+        // The only tile here whose install has TWO halves (pip + a ~400 MB model
+        // download), which is why its ✓/✗ can disagree with "pip succeeded" and
+        // why the reason under it is the server's own, not a fixed string.
+        { action: 'wd14', cap: 'wd14', icon: '🔖', title: 'Image tagging (WD14)',
+          detailKey: 'wd14_detail',
+          body: "Powers the 🗃️ Bank's 🔖 Tags pass: labels what is IN each picture as booru tags — hair colour, clothing, setting — so a huge unsorted dump can be filtered by those before you spend GPU hours captioning it. It never writes captions; the tags live in their own column. Runs fine on CPU. Includes a ~400 MB model download." },
       ]
       return (
         <div className="space-y-3">
@@ -1031,6 +1037,13 @@ export default function SetupPage() {
                     </span>
                   </div>
                   <p className="text-xs text-content-muted">{c.body}</p>
+                  {/* Why it is ✗, when the server can say. This one capability
+                      fails for two different reasons (no onnxruntime vs no model
+                      download) that are fixed in different places — a bare
+                      "✗ Not installed" would send half the users to the wrong one. */}
+                  {!present && c.detailKey && caps[c.detailKey] && (
+                    <p className="text-xs text-content-subtle">{caps[c.detailKey]}</p>
+                  )}
                   {/* Reuse the Setup InstallRunner verbatim — polling, live pip log, and the
                       scoped manual-command fallback come from the backend per action. onDone
                       re-probes caps so ✗ flips to ✓ (or the reinstall confirms) without a restart. */}

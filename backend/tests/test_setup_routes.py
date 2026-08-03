@@ -66,8 +66,9 @@ def test_install_all_starts_plan(client, monkeypatch):
     r = client.post('/api/setup/install-all')
     body = r.get_json()
     assert r.status_code == 200
-    # the {} snapshot -> the always-runnable extras (scrape stack + the three ML ones)
-    assert body['plan'] == ['scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint']
+    # the {} snapshot -> the always-runnable extras (scrape stack + the four ML ones)
+    assert body['plan'] == ['scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint',
+                            'wd14']
     assert set(body['statuses']) == set(body['plan'])
     assert started == body['plan']
 

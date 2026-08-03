@@ -46,6 +46,12 @@ import { ORIGIN_CHIPS, PROVENANCE_FLAG_LABEL, detailSummary } from './bankProven
 import { bankSortGroups, loadBankSort, saveBankSort } from '../../utils/gridSort.js'
 // 🏷️ One image's caption → the chips you can filter by (pure/testable).
 import { captionChips, tagsParam, tagFilterSummary } from './bankTags.js'
+// 🔖 WD14 tags: thousands of booru labels folded into a handful of dropdowns,
+// and the gate that decides whether the pass can run at all (pure/testable).
+// A DIFFERENT feature from the 🏷️ chips above — those read one caption's words,
+// these read the tagger's own vocabulary — hence the separate module and key.
+import { groupTags, label as tagLabel } from './bankTagFacets.js'
+import { showTagFilters, tagsButtonLabel, tagsButtonState } from './wd14Gate.js'
 // 🔤 Text search wording — "closest", never "matching" — plus the cold-start and
 // CLIP-limitation copy. Pure/testable (node --test cannot parse this JSX).
 import {
@@ -134,7 +140,11 @@ async function fetchAllIds(bankId, params) {
 const STEP_SHORT = {
   scan: '🔎 Scan', auto_reject: '🧹 Auto-reject', score: '✨ Score',
   semantic_dedup: '✂ Crops', watermark: '🚩 Watermarks', faces: '👥 Person',
-  framing: '📐 Framing', caption: '🏷️ Caption',
+  // 🔖 and not 🏷️ for the tag pass: 🏷️ Caption already carries that glyph
+  // everywhere (README, the panel, What's new) and this app uses emoji AS
+  // controls, so two passes wearing the same one is a real collision. Renaming
+  // the older, documented label to free it up would be the more expensive fix.
+  framing: '📐 Framing', tags: '🔖 Tags', caption: '🏷️ Caption',
 }
 
 /* No contact with the server, so no fresh job snapshot. Saying NOTHING here is
@@ -561,6 +571,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     style: null, subfolder: null, search: null, exclude: null, tags: null,
     sort: loadBankSort(bankId), resBucket: null,
     origin: null,
+    // 🔖 WD14 facet filter: an ARRAY of whole tag names, ANDed server-side. An
+    // array and not one value, because each facet dropdown is an independent
+    // question ("blonde hair" AND "wearing a shirt"). Its own key beside the
+    // 🏷️ `tags` chips above — same reasoning as the route's two parameters.
+    wd14Tags: [],
     framing: null }))
   const [searchText, setSearchText] = useState('')
   // 🚫 The inverse of the search box: hide what already carries a word. Session
@@ -575,6 +590,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // a standing preference like the sort order.
   const [tagSource, setTagSource] = useState(null)
   const [tagPicked, setTagPicked] = useState(() => new Set())
+  // The bank's WD14 tag vocabulary with counts, fetched on demand (never folded
+  // into the 2 s payload poll — it only moves when the tag pass does).
+  const [tagFacets, setTagFacets] = useState(null)
   const [subfolders, setSubfolders] = useState([])
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState({ images: [], total: 0 })
@@ -738,6 +756,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     if (f.framing) params.framing = f.framing
     // Origin state (ai/camera/unknown) — a facet like the flags.
     if (f.origin) params.origin = f.origin
+    // 🔖 WD14 facet filter — comma-separated whole tag names, ANDed server-side.
+    // Its OWN key (`wd14_tags`), separate from the 🏷️ chip `tags` above — same
+    // reasoning: two features, one payload key, is how a filter silently eats
+    // its sibling's field. Also flows to fetchAllIds, so "Select all in filter"
+    // and ▶ Review stay scoped to the tags the user is actually looking at.
+    if (f.wd14Tags?.length) params.wd14_tags = f.wd14Tags.join(',')
     return params
   }, [])
 
@@ -792,6 +816,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     return () => clearInterval(t)
   }, [live, refreshPayload, refreshImages, toast, payload?.activity?.error,
       payload?.activity?.cancelled, payload?.activity?.detail])
+
+  // The tag vocabulary: fetched once the pass has tagged anything, and re-fetched
+  // when that count MOVES. Deliberately keyed on the count and not on the 2 s
+  // payload poll — tallying tags across 9 000 rows every two seconds would be
+  // paid over and over for an answer that only changes when the pass advances.
+  const taggedCount = payload?.counts?.tagged || 0
+  useEffect(() => {
+    if (!taggedCount) { setTagFacets(null); return }
+    apiFetch(`/api/bank/${bankId}/tags/facets`)
+      .then(setTagFacets)
+      .catch(() => { /* transient — the next tagged-count change retries */ })
+  }, [bankId, taggedCount])
 
   // Keep the coverage panel current: refetch when it opens, and whenever the kept
   // set or the framing classification changes (a keep/reject or the framing pass).
@@ -923,6 +959,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const startSemanticDedup = () => act(
     () => postJson(`/api/bank/${bankId}/semantic-dedup`, {}), null)
   const startFraming = () => act(() => postJson(`/api/bank/${bankId}/framing`, on()), null)
+  // No on(): the tag pass is local-only (the server refuses it for a peer), so
+  // sending a device would be asking for a 400 rather than offering a choice.
+  const startTags = () => act(() => postJson(`/api/bank/${bankId}/tags`, {}), null)
   const startCaption = () => act(
     () => postJson(`/api/bank/${bankId}/caption`, {
       ...on(),
@@ -1244,7 +1283,33 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // Is any facet narrowing the grid? Drives the "N shown of TOTAL" readout.
   const isFiltered = !!(filter.status || filter.flag || filter.cluster != null
     || filter.style != null || filter.subfolder != null || filter.search
-    || filter.resBucket || filter.framing)
+    || filter.resBucket || filter.framing || filter.tags?.length || filter.wd14Tags?.length)
+
+  // 🔖 Tag pass + facets. The grouping is pure and lives in bankTagFacets.js;
+  // this only decides whether to show it and what is currently picked.
+  const tagsState = tagsButtonState({
+    capable: caps.wd14, detail: caps.wd14_detail, capsLoading,
+    busyKind: live ? payload?.activity?.kind : null,
+    scanned: counts?.scanned || 0,
+  })
+  const grouped = useMemo(() => groupTags(tagFacets?.tags), [tagFacets])
+  const tagFiltersShown = showTagFilters({ tagged: taggedCount, activeTags: filter.wd14Tags })
+  // Which tag (if any) each facet is currently narrowing on, so a <select> can
+  // show it. A tag can only be in one facet, so this is unambiguous.
+  const facetValue = (facet) =>
+    facet.options.find((o) => filter.wd14Tags.includes(o.name))?.name || ''
+  // Picking a value REPLACES this facet's previous pick and leaves the others
+  // alone — the alternative (append) turns "blonde, no wait, brown" into a
+  // filter for images that are both, which match nothing and look broken.
+  const setFacetTag = (facet, name) => {
+    const others = filter.wd14Tags.filter((t) => !facet.options.some((o) => o.name === t))
+    setF({ wd14Tags: name ? [...others, name] : others })
+  }
+  const toggleWd14Tag = (name) => setF({
+    wd14Tags: filter.wd14Tags.includes(name)
+      ? filter.wd14Tags.filter((t) => t !== name)
+      : [...filter.wd14Tags, name],
+  })
 
   // The ONE recommended next step, from the counters the header strip already
   // reads. Advisory only — draws an amber "Next step" accent on that zone.
@@ -1383,6 +1448,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               : 'Pull the vision model (Settings ▸ Captioning & quality) to classify framing')}>
             📐 Classify framing{!passGate.framing.ok && ' (needs setup)'}
           </PassButton>
+          {/* 🔖 Tags — the cheap pass that makes the expensive one optional for
+              triage. No device picker: it is local-only (see startTags). */}
+          <PassButton onClick={startTags} disabled={live || tagsState.disabled}
+            title={tagsState.title}>
+            {tagsButtonLabel(counts)}{tagsState.blocked && ' (needs setup)'}
+          </PassButton>
+          {tagsState.blocked && tagsState.setupRoute && (
+            <a href={tagsState.setupRoute}
+              className="self-center text-xs text-accent underline hover:no-underline">
+              Install it
+            </a>
+          )}
           <PassButton onClick={startSemanticDedup} disabled={live || scored === 0}
             title={scored > 0
               ? 'Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses — reuses the Score embeddings, so it costs no extra GPU time. Review them under the ✂ Same shot chip.'
@@ -1720,6 +1797,76 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             </FilterGroup>
           )}
         </div>
+
+        {/* 🔖 Tag facets — the whole reason the tag pass exists: slice a huge
+            dump by what is IN the pictures without captioning it first. One
+            dropdown per facet, ANDed; the long tail stays reachable below,
+            because these lists are curated shortcuts and never a filter on what
+            the model actually found. */}
+        {tagFiltersShown && (
+          <div className="border-t border-border pt-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-content-muted">🔖 Tags</span>
+              {grouped.facets.map((facet) => (
+                <label key={facet.id} className="flex items-center gap-1 text-xs text-content-muted">
+                  <span className="sr-only">{facet.label}</span>
+                  <select value={facetValue(facet)}
+                    onChange={(e) => setFacetTag(facet, e.target.value)}
+                    aria-label={facet.label}
+                    className="rounded-md border border-border bg-surface px-1.5 py-0.5 text-xs text-content">
+                    <option value="">{facet.label}</option>
+                    {facet.options.map((o) => (
+                      <option key={o.name} value={o.name}>{o.label} ({o.count})</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              {filter.wd14Tags.length > 0 && (
+                <button type="button" onClick={() => setF({ wd14Tags: [] })}
+                  className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
+                  Clear tags ({filter.wd14Tags.length})
+                </button>
+              )}
+            </div>
+            {/* Every tag the facets above do NOT claim. Not a footnote: the
+                curated groups are partial by design, and this is where a user
+                sees that nothing was dropped. */}
+            {grouped.other.length > 0 && (
+              <details className="mt-1.5">
+                <summary className="cursor-pointer text-xs text-content-subtle hover:text-content">
+                  All other tags ({grouped.other.length}
+                  {tagFacets?.truncated ? '+, long tail trimmed' : ''})
+                </summary>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {grouped.other.slice(0, 120).map((o) => (
+                    <Chip key={o.name} active={filter.wd14Tags.includes(o.name)}
+                      onClick={() => toggleWd14Tag(o.name)}
+                      title={`Filter the grid to images tagged "${o.name}"`}>
+                      {o.label} {o.count}
+                    </Chip>
+                  ))}
+                </div>
+                {grouped.other.length > 120 && (
+                  <p className="mt-1 text-xs text-content-subtle">
+                    Showing the 120 most common of {grouped.other.length}. Use the
+                    search box for any tag not listed — it matches tags too.
+                  </p>
+                )}
+              </details>
+            )}
+            {/* An active tag filter that names tags this bank no longer has (a
+                re-tag at a higher threshold, say) would otherwise be invisible
+                and unexplainable — the grid would just be empty. */}
+            {filter.wd14Tags.filter((t) => !grouped.facets.some(
+              (f) => f.options.some((o) => o.name === t))
+              && !grouped.other.some((o) => o.name === t)).length > 0 && (
+              <p className="mt-1 text-xs text-amber-300">
+                Filtering on {filter.wd14Tags.map(tagLabel).join(', ')} — some of those tags
+                are no longer present in this bank.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* 🎚 The numbers BEHIND those chips. Folded by default — the chips are
             the everyday gesture and the thresholds are the occasional one — but
