@@ -10,6 +10,7 @@ import { customBasePushView } from './customBasePush.js';
 import { dualCaptionsSupport } from './dualCaptions.js';
 import { maskedCarryOverAction, clearLegacyMasked } from './maskedMigration.js';
 import ConceptFaceMaskField from './ConceptFaceMaskField';
+import Fp8QuantizeTool from './Fp8QuantizeTool';
 import {
   checkpointSelectionMatchesTraining,
   checkpointVariantLabel,
@@ -3436,6 +3437,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </div>
       </details>
       </CheckpointPortal>
+
+      <Fp8QuantizeTool />
 
       {/* Portalled, like the ▶ Continue dialog above and for the same reason:
           this panel lives in a section the workspace hides with display:none,

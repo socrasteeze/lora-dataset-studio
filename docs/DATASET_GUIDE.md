@@ -529,6 +529,23 @@ The panel reads the same pool the Composition bar counts: everything that is not
 rejected and not failed. It also tells you how many images have **no shot type
 yet**, which is the one thing the bar above silently drops.
 
+## 10. Local fp8 model conversion
+
+The Training panel includes **Quantize an existing model to fp8** for full-precision
+`.safetensors` checkpoints already on this machine. It runs on the CPU and writes
+`<name>_fp8.safetensors` beside the source; the source is never modified and an
+existing output is never silently overwritten.
+
+The tool checks free disk space before conversion, refuses LoRAs and files that
+are already quantized, and reopens the result to verify its fp8 marker, tensor
+scales, and payload dtype. The resulting file loads in ComfyUI with the standard
+Load Diffusion Model node. This is different from ai-toolkit's memory-saving
+`quantize` option: that option changes how a model is held while training but
+does not produce a smaller checkpoint file.
+
+Quantized fp8/int8 exports are inference-only, so the training base picker also
+refuses them and asks for the original bf16/fp16 checkpoint instead.
+
 ---
 
 *Everything above is enforced or surfaced by the app itself (pre-flight checks,

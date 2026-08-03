@@ -2186,6 +2186,37 @@ def train_activity():
     return jsonify(ct.training_activity())
 
 
+# --- Local fp8 quantization ---------------------------------------------------
+# A CPU-only file conversion for a full-precision model already on this machine.
+# It is deliberately independent of the rejected rental-GPU training lane.
+
+@bp.post('/tools/fp8-quantize/plan')
+def tools_fp8_quantize_plan():
+    """Describe the output, or return the refusal used to disable the button."""
+    from ..services import fp8_quantize
+    data = request.get_json(silent=True) or {}
+    return jsonify(fp8_quantize.describe(data.get('path')))
+
+
+@bp.post('/tools/fp8-quantize')
+def tools_fp8_quantize_start():
+    from ..services import fp8_quantize
+    data = request.get_json(silent=True) or {}
+    try:
+        info = fp8_quantize.start_async(
+            current_app._get_current_object(), data.get('path'),
+            overwrite=bool(data.get('overwrite')))
+    except Exception as exc:
+        return _map_error(exc)
+    return jsonify({'ok': True, **info, 'status': fp8_quantize.status()})
+
+
+@bp.get('/tools/fp8-quantize/status')
+def tools_fp8_quantize_status():
+    from ..services import fp8_quantize
+    return jsonify({'ok': True, **(fp8_quantize.status() or {})})
+
+
 @bp.get('/train/canvas/datasets')
 def train_canvas_datasets():
     """◉ LoRA Canvas index: which datasets have runs worth drawing, how many, and
