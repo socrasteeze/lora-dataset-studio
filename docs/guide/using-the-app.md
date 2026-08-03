@@ -458,7 +458,29 @@ pure maths on data the passes already computed, so it costs no GPU. The
 framing-balance line needs the 📐 Framing pass to have run; without it the panel
 still covers person mix, style spread and resolution and hints to run framing.
 
-The advice becomes a gesture with **⚖ Pick a balanced set…** at the bottom of
+Those are all **labels**, and labels have a blind spot: they cannot tell two
+hundred near-identical shots from two hundred different ones, and they say
+nothing about outfits, lighting or camera angle. Two things you may already have
+on disk can, so the panel also reads them when they exist:
+
+- **Visual spread**, from the CLIP embeddings the ✨ Score pass caches. It reports
+  the average similarity across the pool — *"91% average similarity — a set this
+  repetitive teaches one look"*. The bands were calibrated by measuring real
+  banks: an ordinary one sits near 65%, an image plus its nearest neighbours
+  lands around 79-90%. Without ✨ Score it says **Not measured** — never
+  "varied", because nothing looked.
+- **Caption variety**, from the captions the 🏷️ pass wrote, read by the same
+  lexicon the dataset Coverage panel uses. It reports which camera views,
+  lightings, settings, outfits and expressions your captions mention and which
+  they never do.
+
+Both limits are on the panel, not just here. The caption read looks at **words,
+not pixels**: a profile shot the captioner never called a profile is invisible,
+and *"not smiling"* still counts as a smile. A bank has no character/concept/style
+kind the way a dataset does, so it is judged as a **character source** — the same
+assumption the framing target and the person-mix advice already make.
+
+The advice becomes a gesture with **⚖️ Pick a balanced set…** at the bottom of
 the panel — see [Pick a balanced set](#pick-a-balanced-set).
 
 **🗑 Delete rejected from disk** (next to Promote) is the one exception to the
@@ -1597,6 +1619,34 @@ Two things it will tell you rather than fail at:
   and it says which two. This is not a restriction we chose: those families do
   not share a base model or a workflow, so there is no single run that can render
   both. Unpick one family and the button comes back.
+
+**⚖ Compare or 🧬 Blend.** From the second pick onwards the panel offers a
+choice, and it defaults to what it always did:
+
+- **⚖ Compare** — one pass per checkpoint, swept across the strengths. This is
+  how you find out which LoRA, or which step, is better.
+- **🧬 Blend** — *one* generation loads them **all**, each at its own weight, and
+  every dataset's trigger word is added to the front of your prompt. The panel
+  lists those words before you launch; nothing is injected silently. It is the
+  Test Studio's Blend mode, driven from the board — the same toggle, the same
+  engine. (The Test Studio called it **🧬 Combine** until August 2026; only the
+  name changed.)
+
+A blend is one configuration, not one per pick, so the strength sweep disappears
+(each LoRA carries its own weight instead) and the image counter drops to one
+picture per seed.
+
+What blending actually does is worth saying plainly: **two identity LoRAs give
+you a hybrid person** — someone who is neither of the two. That is a real use, on
+purpose, but it is not "both people in one shot". The combination that usually
+pays off is **identity + style**, or **identity + concept**. Weights are the dial:
+below 1 the LoRA contributes less, above 1 it dominates (0 to 2, 1 by default),
+and a weight you set survives un-ticking another pick or reloading the page.
+
+Blend needs **at least two checkpoints of one family**; with a mixed selection
+the toggle is greyed out with the reason, because the run underneath it could not
+exist either. Picks that are not deployed yet are deployed first, all of them,
+before anything is generated — a blend never loads a subset of what it announced.
 
 **▶ Continue training from a checkpoint.** Clicking a pill's body opens its
 actions — Download, Deploy, Details, Delete — and **▶ Continue from here**. It
