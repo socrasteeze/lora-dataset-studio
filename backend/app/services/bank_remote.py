@@ -117,6 +117,7 @@ PASS_PEER_CAPS = {
 }
 
 PASS_LABELS = {
+    'tags': '🔖 Tags',
     'score': '✨ Score',
     'faces': '👥 Group by person',
     'watermark': '🚩 Find watermarks',
@@ -155,6 +156,90 @@ def peer_refusal(device_id, step) -> str | None:
     if not all(caps.get(cap) is False for cap in needed):
         return None
     return ' or '.join(_REQUIRED_CAP_HINT.get(cap, cap) for cap in needed)
+
+
+# Passes that cannot travel, whatever a peer reports. Mirrors
+# image_bank_service.LOCAL_ONLY_STEPS; imported lazily below to avoid a cycle.
+#
+# The polarity is the OPPOSITE of PASS_PEER_CAPS on purpose. There, silence
+# from a peer means "probably fine" — being unable to describe yourself is not
+# being unable to work. Here there is nothing to be silent about: no peer
+# advertises the tagger at all, so a permissive rule would wave every one of
+# them through and the pass would die on the other side.
+
+
+def device_pass_gate(device_id, step) -> dict:
+    """Can ``device_id`` run ``step``? The ONE answer, for every caller.
+
+    This is the DM-shaped port of a rule that lived in three places at once: a
+    hardcoded copy in `passDeviceGate.js`, `refuse_steps_for_device` at enqueue,
+    and `_check_peer_capability` at run time. The sibling project states the
+    reason for having one function better than a comment here can:
+
+        "a picker that offers a machine the submit route would refuse is worse
+        than no picker, because it turns a clear 'you cannot' into a job that
+        fails a minute later on someone else's screen."
+
+    LDS has shipped that bug in BOTH directions — a peer reporting no scoring
+    stack got ✨ Score ticked for the user, and hours earlier the vision passes
+    were gated on the HUB's Ollama long after they learned to travel. Two
+    opposite bugs in one day is what a rule with three homes buys you.
+
+    Returns ``{'ok', 'blocked', 'reason', 'warn'}`` with a fixed precedence, so
+    the same machine never reports two different reasons on two screens:
+
+      1. cannot travel  -- the step never leaves this machine
+      2. explicit false -- the peer says it lacks the stack
+      3. never reported -- a warning, never a wall
+      4. otherwise      -- allowed
+
+    ``device_id`` of None/'local' is always allowed: this function answers the
+    REMOTE question only. What is installed on this machine is a different
+    question, and the dialog still answers it locally.
+    """
+    from . import cluster as cluster_svc
+    from .image_bank_service import LOCAL_ONLY_STEPS
+
+    label_for = PASS_LABELS.get(step, step)
+    ok = {'ok': True, 'blocked': False, 'reason': None, 'warn': None,
+          'label': label_for}
+    if not device_id or device_id == cluster_svc.LOCAL_DEVICE_ID:
+        return ok
+
+    label = cluster_svc.device_label(device_id) or 'that machine'
+
+    if step in LOCAL_ONLY_STEPS:
+        return {'ok': False, 'blocked': True, 'warn': None, 'label': label_for,
+                'reason': f'{label} can\u2019t run this \u2014 it only runs on this machine'}
+
+    needed = PASS_PEER_CAPS.get(step)
+    if not needed:
+        return ok
+
+    caps = peer_capabilities(device_id)
+    if caps is None:                      # no such device; the id check owns that
+        return ok
+
+    hint = ' or '.join(_REQUIRED_CAP_HINT.get(cap, cap) for cap in needed)
+    if all(caps.get(cap) is False for cap in needed):
+        return {'ok': False, 'blocked': True, 'warn': None, 'label': label_for,
+                'reason': f'{label} reports no {hint}'}
+    if all(not isinstance(caps.get(cap), bool) for cap in needed):
+        return {'ok': True, 'blocked': False, 'reason': None, 'label': label_for,
+                'warn': f'{label} hasn\u2019t reported what it can run yet'}
+    return ok
+
+
+def device_pass_verdicts(device_id) -> dict:
+    """Every gated step's verdict for one device, for the Run-on picker.
+
+    Served on /api/cluster/devices so the browser reads the verdict instead of
+    recomputing it from a second copy of the capability map.
+    """
+    from .image_bank_service import LOCAL_ONLY_STEPS
+
+    steps = set(PASS_PEER_CAPS) | set(LOCAL_ONLY_STEPS)
+    return {step: device_pass_gate(device_id, step) for step in sorted(steps)}
 
 
 def _check_peer_capability(device_id, required_cap) -> None:
