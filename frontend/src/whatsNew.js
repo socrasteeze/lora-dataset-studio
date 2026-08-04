@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-gallery-lightbox-upscale-improve',
+    date: '2026-08-04',
+    title: 'Upscale & improve is now in the checkpoint gallery',
+    blurb:
+      'Open a picture from a checkpoint pill or run gallery and the same Upscale & improve action from the Canvas is now beside Download. It uses one shared handler, never touches the original, and puts the result back in that checkpoint gallery for comparison. Because an open gallery does not refresh during the several-minute pass, close and reopen it to see the new image.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-04-canvas-drop-keeps-your-view',
+    date: '2026-08-04',
+    title: 'Arranging the canvas no longer throws your framing away',
+    blurb:
+      'Moving a pinned picture or run card now tells the Canvas that you have taken over the view, so it keeps the zoom and position you chose instead of fitting itself again when you let go. A board you have not arranged still opens fitted, and Fit remains the one-click way to frame the whole board whenever you want it.',
+    to: '/canvas',
+  },
+  {
     id: '2026-08-03-local-fp8-model-conversion',
     date: '2026-08-03',
     title: 'Make a ComfyUI-ready fp8 model locally, without touching the original',
