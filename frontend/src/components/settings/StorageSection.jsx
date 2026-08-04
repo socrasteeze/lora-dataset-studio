@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { Card, INPUT_CLASS } from './primitives'
 import ResetToDefault from './ResetToDefault'
+import Fp8QuantizeTool from '../dataset/Fp8QuantizeTool'
 import {
   formatSize, locationRows, moveLabel, movePercent, relocationChoices,
 } from './storageLocations.js'
@@ -360,6 +361,19 @@ export default function StorageSection({
 
       <TrashCard reloadKey={reloadKey} />
       <RunArchiveCard />
+
+      {/* The SAME component the ordinary Training panel renders — imported, not
+          copied, so the refusals (already quantized, LoRA, overwriting the
+          source) and the read-back verification can never differ between the two
+          doors. It is here because its first door sits at the bottom of a
+          dataset's Training panel, which somebody who downloaded a 26 GB model
+          from Hugging Face and has no dataset at all never opens — and "this
+          file is too big" is a disk question, asked on this tab. `framed={false}`
+          drops its own accent box and title: the Card below already says both. */}
+      <Card id="storage-fp8-quantize" title="Quantize an existing model to fp8"
+        help="A full-precision model — downloaded from Hugging Face, or a large finetune someone shared — is about 2.5× the size ComfyUI needs to generate with it. Point this at one and it writes the ~10 GB fp8 version next to the original, on this machine, without ever modifying the source.">
+        <Fp8QuantizeTool framed={false} />
+      </Card>
     </div>
   )
 }

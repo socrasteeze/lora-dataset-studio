@@ -632,8 +632,80 @@ on that drive.
   run records, settings and captions, but removed dataset images can no longer be
   shown in old comparisons.
 
-Rental-run staging, its checkpoint store, and private Hugging Face delivery remain
-backend-only on this fork and are not offered as Storage controls.
+- **What lives where** — one row per category: dataset images, image banks, bank
+  source images, the trash, the run image archive, backups, the ai-toolkit
+  install, the Hugging Face cache and the app's own build. Each row shows the
+  **effective path**, what it holds, the free space on that drive, and a
+  **movable** tag when it can be relocated from here. Rental-run staging and its
+  checkpoint store exist in the backend's own map of these folders but stay off
+  this tab — they are not offered as Storage controls on this fork.
+
+### Moving a folder to another drive
+
+**Dataset images root** (`paths.dataset_images_root`) can be pointed anywhere.
+It defaults to **empty → a folder inside the app's data directory**; the
+field's *Reset to default* gives that implicit state back rather than writing
+today's path in.
+
+Type a path, press **Check folder**, and the app proves it can write there — by
+actually writing a probe file, because permission bits lie on Windows. A relative
+path, an uncreatable folder, or a target *inside* the folder it would replace is
+refused with the reason. Then **you choose**, and nothing happens until you do:
+
+- **Move what is already there** — every file is copied to the new folder first,
+  and the old one is only removed once the last byte has landed. A progress bar
+  shows files and percentage. If the destination drive has less free space than
+  the folder needs, the button is disabled and says both numbers.
+- **Start using it empty** — the new folder is used from now on. **Nothing is
+  copied and nothing is deleted**: the old folder keeps its files and the app
+  simply stops looking at them. On a full C: this is often the only choice that
+  fits.
+
+The setting is saved **after** the files have moved, so an interrupted move never
+leaves the app pointing at a half-filled folder. This folder (and every dataset
+folder under it) is refused as an **image bank** source: a bank points at a live
+folder and can delete from it, so the two must never share files — see *Using
+the app → A bank and a dataset never share files*. Moving this root onto a
+folder an existing bank already uses is not blocked here, but that bank will say
+so the next time you open it, and its 🗑 Delete rejected will be refused.
+
+### Trash and archives
+
+- **Trash** — **Open folder** and **Empty trash**. Everything the app deletes goes here first; emptying is the one destructive action, and it asks for confirmation. It lives on the same disk as your data, so a cleanup gives space back only once you empty it.
+- **Run image archive** — its size, its ceiling, and **Clear archive**. When a training run is launched, a **deduplicated** copy of the images it trains on is kept so that comparing two runs can still *show* an image you have since deleted from its dataset. Copies are **content-addressed**: relaunching an unchanged dataset stores nothing the second time, and only images that were added or re-edited cost anything. Clearing it keeps your runs, their settings and their caption text — you only lose the ability to look at images that are no longer in their dataset. The ceiling is `provenance.archive_max_gb` (see *Config-file-only settings*); past it, nothing more is stored and the compare panel says the picture is unavailable instead of showing a wrong one.
+- **Back up everything** — not on this page but on the **Datasets library**: one button archives every dataset, its **training history** and your settings into a single file (⬇ download or 📂 open folder), and the library's **Import backup** restores it — datasets come back under **Trained**, not "Not trained yet". Tick **Include trained LoRAs** to bundle the (large) trained `.safetensors` too. **API keys and tokens are never included** — re-enter them on the new install. See *Using the app → Back up everything*.
+
+### Quantize an existing model to fp8
+
+A full-precision `.safetensors` is roughly **2.5× the size ComfyUI needs** to
+generate with it. **Quantize an existing model to fp8** takes any full-precision
+model already on this machine — a ~26 GB one downloaded from Hugging Face, a
+checkpoint an earlier full-model run delivered, a large finetune someone shared —
+and writes `<name>_fp8.safetensors` next to it, loadable with the standard *Load
+Diffusion Model* node.
+
+This is the **same tool** as the one at the bottom of a dataset's ordinary
+Training panel, reachable here **without a dataset**: it was only there at
+first, which nobody who simply downloaded a model ever opens.
+
+- **The source is never modified**, and an existing output is never silently
+  overwritten. The result is re-opened and its scaled tensors counted before it
+  reports success — a file that cannot be read back is reported as a failure, not
+  as a smaller model.
+- **It refuses before you click, not after.** Type a path and the plan appears
+  under the field: the source size, the name it will write, the expected size and
+  how many matrices are quantized. A file that is **already quantized** and a
+  **LoRA/adapter** are refused there, with the reason, and the button stays
+  disabled. Reading the plan costs a few kilobytes of file header.
+- **It runs on the CPU**, one conversion at a time app-wide, so it never competes
+  with ComfyUI or a training run for VRAM. It is disk-bound (measured ~1.2 GB/s).
+- **fp8 is a one-way, inference-only export.** A quantized file is refused as a
+  training base, so keep the full-precision one if you may ever want to continue,
+  merge or re-quantize that model. And this is **not** the `quantize` training
+  option, which only shrinks a model in memory while it trains and writes no file.
+
+Move or copy the result into your ComfyUI `models/diffusion_models` folder to use
+it.
 
 ## Server & access
 
