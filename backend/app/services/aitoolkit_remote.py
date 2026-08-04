@@ -149,6 +149,29 @@ class RemoteAiToolkit:
             raise RemoteError(f'create_job -> HTTP {r.status_code}: {r.text[:200]}')
         return str(r.json().get('id'))
 
+    def upsert_job(self, name: str, job_config: dict, gpu_ids: str = '0') -> str:
+        """Create the job, or UPDATE the one already carrying this name.
+
+        `Job.name` is unique over there (`POST /api/jobs` answers
+        `409 {"error":"Job name already exists"}`), and the job name for a run
+        is derived from the run itself — so re-running the same dataset submits
+        the same name and a plain `create_job` fails on the second attempt. The
+        route's own update branch is keyed on an `id` in the body, which is what
+        ai-toolkit's own remote watcher sends after looking the name up; this is
+        the same two-step.
+
+        `id` is OMITTED rather than sent as None on a first run: the route tests
+        the key's truthiness, and a row that does not exist cannot be updated.
+        """
+        body = {'name': name, 'gpu_ids': gpu_ids, 'job_config': job_config}
+        existing = self.find_job_by_name(name)
+        if existing and existing.get('id'):
+            body['id'] = existing['id']
+        r = self._request('POST', '/api/jobs', json=body)
+        if r.status_code != 200:
+            raise RemoteError(f'upsert_job -> HTTP {r.status_code}: {r.text[:200]}')
+        return str(r.json().get('id'))
+
     def find_job_by_name(self, name: str):
         """The job row whose `name` matches exactly, or None.
 

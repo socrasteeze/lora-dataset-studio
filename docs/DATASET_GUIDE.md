@@ -254,6 +254,21 @@ just crash the trainer — **zero kept images**, or a **slider with no prompt pa
 — are never offered the option, and the box un-ticks itself the moment the
 blockers change.
 
+**Train on.** With an ai-toolkit web address set (Settings → Training), a **Train
+on** picker sits beside the Train button. **This machine** is the default and
+behaves exactly as it always has. Pick another machine and the dataset is staged
+over to it; its log, preview samples and checkpoints all arrive back here while
+it runs — into the same folders a local run writes — so the panel, the checkpoint
+browser and the Runs page read normally and the run gets its own **⏹ Stop**. Base
+models are not copied — the machine that trains downloads its own. The readiness
+checks above run either way. A remote run **always starts fresh** (previous
+checkpoints are not sent over), so there is no Resume/Fresh question for one, and
+only **one run per dataset** can be out at a time. The picker never offers this machine's own
+GPUs: a run in that lane does not hold the local GPU-busy flag, so image
+generation would start on top of it. Full details, including why an offline
+machine is greyed out rather than hidden:
+[Settings → Training](guide/settings-reference.md#train-on-another-machine).
+
 **Stopping a training run.** The red **⏹ Stop training** button next to Train
 ends the run in progress — it is not a housekeeping button. It kills the training
 process, clears the pending local training queue, and hands the GPU back to

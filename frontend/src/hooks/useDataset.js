@@ -1190,10 +1190,23 @@ export function useDataset() {
         ...(opts.steps ? { steps: opts.steps } : {}),
         // fresh : écarte le run existant (archivé) → repart de zéro au lieu de
         // reprendre le dernier checkpoint (choix Resume/Fresh du TrainingPanel).
-        ...(opts.fresh ? { fresh: true } : {}) });
+        ...(opts.fresh ? { fresh: true } : {}),
+        // Another machine's GPU, as ai-toolkit names it ("<peer>:<index>"). Sent
+        // only when one was actually picked: absent (or 'local') is the local
+        // path, byte-identical to what it has always done. The server routes on
+        // this key into its own lane — that lane must never take the
+        // machine-wide GPU-busy flag, since the GPU it uses is not this one.
+        ...(opts.deviceId && opts.deviceId !== 'local'
+          ? { device_id: opts.deviceId } : {}) });
     // L'entraînement tourne en CLI headless (pas l'UI ai-toolkit) → on N'OUVRE PAS
     // localhost:8675 (lien mort). La progression se suit ici (checkpoints + statut).
-    if (d.ok) toast.success(`Training started (${d.steps || '?'} steps) — ComfyUI paused, follow the checkpoints here`);
+    // A peer run gets its own sentence: ComfyUI is NOT paused for one (the GPU
+    // being used is not this machine's), and saying it was would be a lie the
+    // user acts on — they would wait for a generation queue that never stalled.
+    if (d.ok && d.mode === 'peer') {
+      toast.success(`Training started on ${d.run?.machine_label || 'the other machine'}`
+        + ' — its log and checkpoints are mirrored back here');
+    } else if (d.ok) toast.success(`Training started (${d.steps || '?'} steps) — ComfyUI paused, follow the checkpoints here`);
     // Les refus confirmables (mismatch caption↔type, images sans caption) sont
     // gérés par un confirm dans TrainingPanel — pas un toast d'erreur.
     else if (!String(d.error || '').includes('MISMATCH_CAPTION')

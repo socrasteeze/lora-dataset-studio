@@ -1,5 +1,5 @@
 // react-frontend/src/components/dataset/TrainingPanel.jsx
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { getCsrfToken } from '../../api/fetchClient';
@@ -51,6 +51,9 @@ import ContinueDialog from './ContinueDialog';
 import { graphContinueRefusal } from './lineageContinue.js';
 import RunLineageGraph from './RunLineageGraph';
 import TrainingProgress from './TrainingProgress';
+import TrainingMachinePicker from './TrainingMachinePicker';
+import PeerTrainingCard from './PeerTrainingCard';
+import { LOCAL_MACHINE, loadSavedMachine, saveMachine } from './trainingMachines.js';
 import PreflightModal from './PreflightModal';
 import { laneOfPayload, preflightUrl } from './preflightLane.js';
 // Divergence 4: cloudUnsupportedFamilyReason has no caller here — the whole
@@ -336,6 +339,31 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const [presetBusy, setPresetBusy] = useState(false);
   const [trainTypeBusy, setTrainTypeBusy] = useState(false);
   const presetFileRef = useRef(null);
+  // Which machine the next run goes to. 'local' = the path this app has always
+  // taken; anything else is a GPU on one of the configured ai-toolkit's
+  // machines, and runs in its own lane. Remembered per browser, and reconciled
+  // against what is actually offerable by the picker itself.
+  const [machineId, setMachineId] = useState(() => loadSavedMachine());
+  const onMachineChange = useCallback((id) => {
+    setMachineId(id);
+    saveMachine(id);
+  }, []);
+  const remoteTarget = machineId && machineId !== LOCAL_MACHINE;
+  // A peer run for THIS dataset. The local status endpoint cannot report it —
+  // it describes the single run the machine-wide GPU-busy flag stands for, and
+  // this lane deliberately never sets that flag.
+  const [peerActive, setPeerActive] = useState(false);
+  // Whether an ai-toolkit web address is set at all. Learned from the picker's
+  // own fetch so the run card does not have to ask a second time — and it is
+  // what stops that card polling every five seconds on an install that never
+  // configured any of this.
+  const [peerConfigured, setPeerConfigured] = useState(false);
+  // `any_active`, not `runs.length` — the list also carries recent FAILURES so
+  // the panel can show why one died, and a failure being displayed must not
+  // keep the Train button disabled. Showing it exists so the user relaunches.
+  const onPeerRuns = useCallback((d) => {
+    setPeerActive(!!d?.any_active);
+  }, []);
 
   const refreshStatus = async () => {
     try {
@@ -1808,11 +1836,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             this fork — so the control could only ever fail. The mode plumbing
             below stays upstream-shaped (dormant backend is allowed; a dead
             BUTTON is not), which keeps the next merge's surface small. */}
-        {!fullMode && <button type="button" disabled={!status.installed || belowFloor || status.in_progress || baseBlocksTrain || sdxlNeedsBase || customWeightsEmpty || sliderPromptsMissing}
+        {!fullMode && <TrainingMachinePicker value={machineId} onChange={onMachineChange}
+          onConfigured={setPeerConfigured} disabled={peerActive} />}
+        {!fullMode && <button type="button" disabled={!status.installed || belowFloor || status.in_progress || peerActive || baseBlocksTrain || sdxlNeedsBase || customWeightsEmpty || sliderPromptsMissing}
           title={baseBlocksTrain ? 'Convert the custom base first'
             : customWeightsEmpty ? 'Enter the path to your custom weights .safetensors'
             : sdxlNeedsBase ? 'Choose a base SDXL checkpoint'
             : sliderPromptsMissing ? 'Slider mode needs both a positive and a negative prompt'
+            : peerActive ? 'This dataset is already training on another machine'
             : belowFloor
               ? (sliderOn
                 ? `${keptCount} kept image(s) — slider training still needs ${trainMinFloor}+ images as a denoising substrate`
@@ -1820,6 +1851,38 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               : undefined}
           onClick={async () => {
             if (!(await preflightOk())) return;
+            // ds.train takes camelCase opts — map the confirmable force flags.
+            const OPT_FOR_FLAG = { allow_caption_mismatch: 'allowCaptionMismatch',
+                                   allow_uncaptioned: 'allowUncaptioned',
+                                   allow_caption_quality: 'allowCaptionQuality',
+                                   allow_unverified_weights: 'allowUnverifiedWeights' };
+            /* The launch, plus the confirm-and-retry loop over the refusals the
+               server states and the user may override. Shared by both lanes on
+               purpose: the peer lane runs the SAME `assert_trainable` guards, so
+               it raises the same markers, and a second copy of this loop would
+               be the place they quietly diverged. */
+            const trainWithConfirms = async (initial) => {
+              let opts = initial;
+              let d = await ds.train(opts);
+              for (let flag; d && d.ok === false && (flag = confirmableRetryFlag(d.error, 'Train anyway (force)')); ) {
+                if (flag === 'declined') break;      // the confirm WAS the answer
+                opts = { ...opts, [OPT_FOR_FLAG[flag]]: true };
+                d = await ds.train(opts);
+              }
+              return d;
+            };
+            const common = { baseModel: base, variant, trainType, trainingMode,
+                             masked: maskedOpt, steps: stepsN,
+                             vaePath, tePath, allowNotReady };
+            // Another machine: no Resume/Fresh question, because there is only
+            // one answer. This app does not send previous checkpoints over, so
+            // the run starts from the base weights there whatever is on disk
+            // here — asking would offer a choice the lane cannot honour.
+            if (remoteTarget) {
+              const d = await trainWithConfirms({ ...common, deviceId: machineId });
+              if (d?.ok) setPeerActive(true);
+              return;
+            }
             // Run existant → Resume (continue le LoRA) ou Fresh (archive le run,
             // repart de zéro). Le mismatch-retry re-passe fresh : le 1er appel a
             // échoué AVANT l'archivage (assert_trainable), rien n'a été écarté.
@@ -1834,21 +1897,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               setContinueOpen(true);
               return;
             }
-            const fresh = mode === 'fresh';
-            // ds.train takes camelCase opts — map the confirmable force flags.
-            const OPT_FOR_FLAG = { allow_caption_mismatch: 'allowCaptionMismatch',
-                                   allow_uncaptioned: 'allowUncaptioned',
-                                   allow_caption_quality: 'allowCaptionQuality',
-                                   allow_unverified_weights: 'allowUnverifiedWeights' };
-            let opts = { baseModel: base, variant, trainType, trainingMode, masked: maskedOpt,
-                         steps: stepsN, fresh,
-                         vaePath, tePath, allowNotReady };
-            let d = await ds.train(opts);
-            for (let flag; d && d.ok === false && (flag = confirmableRetryFlag(d.error, 'Train anyway (force)')); ) {
-              if (flag === 'declined') break;        // the confirm WAS the answer
-              opts = { ...opts, [OPT_FOR_FLAG[flag]]: true };
-              d = await ds.train(opts);
-            }
+            await trainWithConfirms({ ...common, fresh: mode === 'fresh' });
             refreshStatus();
           }}
           className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
@@ -1894,6 +1943,11 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </span>
       </div>
 
+      {/* A run on ANOTHER machine, with its own Stop. It cannot appear in the
+          local status above: that describes the single run the machine-wide
+          GPU-busy flag stands for, and this lane never sets it. */}
+      <PeerTrainingCard datasetId={ds.currentId} postJson={postJson} onChange={onPeerRuns}
+        enabled={peerConfigured} />
 
       {/* A custom base picked on ANOTHER family was still attached to this
           dataset (one shared column). The run ignores it — say so, once, rather
