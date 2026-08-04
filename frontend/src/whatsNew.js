@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-launch-all-queue-survives-a-restart',
+    date: '2026-08-04',
+    title: 'The Launch-all queue survives a restart',
+    blurb:
+      'Queue eleven banks, go to bed, and let the machine reboot for an update — the queue is still there in the morning and carries on. It used to live only in memory, so a restart emptied it with no row, no log line and nothing anywhere saying work had been dropped; you would find out by noticing nine hours of GPU time had not happened. A bank that was mid-run when the power went comes back as pending and runs again, which is cheap because scores already committed stay put. Where each bank was sent survives too — a restart no longer quietly pulls an overnight queue back onto this machine.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-04-train-on-another-machine',
     date: '2026-08-04',
     title: 'Train a LoRA on your other machine’s GPU',
