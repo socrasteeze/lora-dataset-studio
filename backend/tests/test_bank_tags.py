@@ -283,7 +283,7 @@ def test_a_peer_queue_refuses_the_tag_step_at_launch(app, client, tmp_path, monk
     bank_id, _src = _mkbank(client, tmp_path, n=1)
     monkeypatch.setattr(banks, '_remote_pass_device', lambda _d: True)
     with app.app_context():
-        with pytest.raises(ValueError, match='only run on this machine'):
+        with pytest.raises(ValueError, match='only runs on this machine'):
             banks.start_pipeline(app, LOCAL_USER, bank_id,
                                  steps=['tags'], device_id='peer:1')
 

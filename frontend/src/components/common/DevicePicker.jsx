@@ -1,6 +1,7 @@
 /** Run-on device picker for GPU jobs (Primary local + registered peers). */
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
+import { devicePartialLabel } from './devicePartialLabel.js'
 import { fetchDeviceList } from './deviceListCache.js'
 import { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
 
@@ -99,9 +100,12 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
           // passes it. Saying more than that from one <option> would be a
           // second, worse copy of the per-pass gate the Launch dialog now runs;
           // it names the passes it cannot do, so this only has to be honest.
+          // Which passes this machine cannot run, from the verdicts the server
+          // already computed — not from a hand-listed capability set here,
+          // which was a third copy of the rule and would not have noticed a
+          // newly gated pass.
           const partial = kind === 'bank-pass' && !d.local && capOk
-            && !(d.capabilities?.bank_scoring && d.capabilities?.face_scoring
-                 && d.capabilities?.ollama)
+            ? devicePartialLabel(d) : ''
           // Two machines can share a name (a peer and a ComfyUI backend added
           // from the same box routinely do). Say which is which, or the picker
           // offers two identical-looking rows that behave differently.
@@ -112,7 +116,7 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
           // Additive, not part of the chain above: "busy" is transient and
           // "some passes" is structural, and swallowing either behind the other
           // loses the one the user needed to see.
-          if (partial) label += ' (some passes)'
+          if (partial) label += partial
           return (
             <option key={d.id} value={d.id} disabled={offline}>
               {label}

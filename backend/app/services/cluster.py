@@ -520,6 +520,18 @@ def list_devices(*, include_local: bool = True) -> list[dict]:
                     .all()):
             d = row.to_dict(online_ttl_seconds=ONLINE_TTL_SECONDS)
             d['local'] = False
+            # The per-pass verdict, computed HERE. The browser used to hold a
+            # second copy of the capability map and recompute this itself, kept
+            # in step by a test that string-parses this repo's Python source —
+            # which a reformat or an inline comment would quietly break. One
+            # function answers the question now, and the submit routes call the
+            # same one (bank_remote.device_pass_gate).
+            try:
+                from .bank_remote import device_pass_verdicts
+                d['passes'] = device_pass_verdicts(d.get('id'))
+            except Exception:      # noqa: BLE001 — a picker without verdicts
+                logger.exception('cluster: could not compute pass verdicts')
+                d['passes'] = {}
             devices.append(d)
     # API backends list in EVERY role — that is the standalone/SwarmUI case.
     # 'comfyui': True is definitional (a backend IS a ComfyUI), and busy is

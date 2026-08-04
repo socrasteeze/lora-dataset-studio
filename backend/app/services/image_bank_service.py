@@ -4983,9 +4983,10 @@ def refuse_steps_for_device(device_id, steps) -> None:
     from . import bank_remote
     blocked = []
     for step in steps:
-        hint = bank_remote.peer_refusal(device_id, step)
-        if hint:
-            blocked.append(f'{bank_remote.PASS_LABELS.get(step, step)} needs {hint}')
+        verdict = bank_remote.device_pass_gate(device_id, step)
+        if verdict['blocked']:
+            label = bank_remote.PASS_LABELS.get(step, step)
+            blocked.append(f'{label}: {verdict["reason"]}')
     if not blocked:
         return
     from . import cluster as cluster_svc
@@ -7320,11 +7321,11 @@ def start_pipeline(app, user_id, bank_id, steps=None, reject_flags=None,
     # not a skipped step discovered an hour into the queue.
     remote = _remote_pass_device(device_id)
     if remote:
-        local_only = [s for s in steps if s in LOCAL_ONLY_STEPS]
-        if local_only:
-            raise ValueError(
-                f"{', '.join(local_only)} can only run on this machine — "
-                'untick it, or run the whole queue here')
+        # LOCAL_ONLY_STEPS used to be checked HERE and only here, so the queue
+        # path (bank_queue.enqueue, which calls refuse_steps_for_device without
+        # this block) accepted 🔖 Tags on a peer and only found out on the other
+        # machine, an hour into an overnight run. Both paths now go through the
+        # one gate, which is the whole point of having one.
         refuse_steps_for_device(device_id, steps)
     return bank_jobs.start(
         app, bank_id, 'pipeline',

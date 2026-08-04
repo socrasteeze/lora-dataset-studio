@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-run-on-says-which-passes-a-machine-cant-do',
+    date: '2026-08-04',
+    title: 'The Run-on picker names the passes a machine can’t do',
+    blurb:
+      'Picking another machine for a bank used to end in a vague “(some passes)” — true, but not something you could act on without opening the Launch dialog to find out which. It now names them: “G18 · peer (no ✨ Score, 👥 Group by person)”, and counts them once there are more than two. Underneath, the app stopped answering “can that machine run this pass?” in three different places — the dialog, the Queue button and the pass itself each had their own copy of the rule, and this app has shipped that going wrong in both directions on the same day. One answer now, computed once. That turned up a real hole while it was being done: queueing 🔖 Tags to another machine was accepted even though Tags can only ever run here, and you would only have found out on the other machine, an hour into an overnight run. Both buttons refuse it up front now.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-08-04-peer-passes-start-sooner-and-stop-when-told',
     date: '2026-08-04',
     title: 'A pass sent to another machine starts sooner, and Stop reaches it',

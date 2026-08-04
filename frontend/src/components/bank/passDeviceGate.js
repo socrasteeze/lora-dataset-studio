@@ -16,35 +16,22 @@
  * pretend otherwise. Unknown is a warning, not a wall.
  */
 
-/* MUST mirror PASS_PEER_CAPS in backend/app/services/bank_remote.py — pinned by
- * passDeviceGate.test.js. A list is an ANY-of: captions run on either engine, so
- * only a peer reporting BOTH missing is refused.
+/* The per-pass verdict for a PEER is computed on the server and arrives with
+ * the device (`/api/cluster/devices` -> `device.passes`). This file used to
+ * hold a second copy of the capability map, the local-only list and the hint
+ * strings, kept in step with `bank_remote.py` by a test that string-parsed that
+ * Python source — which a reformat, an inline comment or a `# noqa` would have
+ * broken silently.
  *
- * scan / auto_reject / semantic_dedup are absent on purpose: they read this
- * machine's database and embeddings cache, never travel, and so can never be
- * blocked by the device you pick. */
-export const PASS_PEER_CAPS = {
-  score: ['bank_scoring'],
-  faces: ['face_scoring'],
-  watermark: ['ollama'],
-  framing: ['ollama'],
-  caption: ['joycaption', 'ollama'],
-}
-
-/* Passes that CANNOT travel, whatever the peer reports. Mirrors
- * image_bank_service.LOCAL_ONLY_STEPS, and the polarity is the opposite of
- * PASS_PEER_CAPS above on purpose: there, silence from a peer means "probably
- * fine". Here there is nothing to be silent about — no peer advertises the
- * tagger at all, so the permissive rule would wave every one of them through
- * and the pass would die on the other side, an hour into an overnight queue. */
-export const LOCAL_ONLY_PASSES = ['tags']
-
-const CAP_HINT = {
-  bank_scoring: 'the bank-scoring extra',
-  face_scoring: 'the face-scoring extra',
-  joycaption: 'JoyCaption',
-  ollama: 'Ollama with a vision model',
-}
+ * The sibling dataset-manager project states the rule this now follows:
+ * one function answers "can this machine run this?", and the picker and the
+ * submit route both call it. Here that function is
+ * `bank_remote.device_pass_gate`, and `refuse_steps_for_device` calls the same
+ * one, so the dialog can no longer offer a pass the launch route refuses.
+ *
+ * What stays client-side is the LOCAL question — is this pass's tool installed
+ * on THIS machine — because that is about the caps blob the page already holds
+ * and has never had a second copy on the server. */
 
 /** The peer we are gating against, or null for "this machine". */
 function peerOf(device) {
@@ -92,25 +79,21 @@ export function stepGate(key, ctx = {}) {
   const peer = peerOf(device)
   if (!peer) return { ok: localReady(key, caps, visionReady), blocked: false }
 
-  // A pass that cannot travel is blocked by ANY peer, not by what that peer
-  // reports — the server refuses the whole queue at launch otherwise.
-  if (LOCAL_ONLY_PASSES.includes(key)) {
-    return { ok: false, blocked: true,
-             reason: `${peer.name || 'that machine'} can’t run this — it only runs here` }
+  // The server already decided, with the same function the launch route uses.
+  const verdict = (peer.passes || {})[key]
+  if (verdict) {
+    return {
+      ok: !!verdict.ok,
+      blocked: !!verdict.blocked,
+      ...(verdict.reason ? { reason: verdict.reason } : {}),
+      ...(verdict.warn ? { warn: verdict.warn } : {}),
+    }
   }
 
-  const needed = PASS_PEER_CAPS[key]
-  if (!needed) return { ok: true, blocked: false }
-
-  const name = peer.name || 'that machine'
-  const blob = peer.capabilities || {}
-  const hint = needed.map((c) => CAP_HINT[c] || c).join(' or ')
-
-  if (needed.every((c) => blob[c] === false)) {
-    return { ok: false, blocked: true, reason: `${name} reports no ${hint}` }
-  }
-  if (needed.every((c) => typeof blob[c] !== 'boolean')) {
-    return { ok: true, blocked: false, warn: `${name} hasn’t reported what it can run yet` }
-  }
+  // No verdict for this step means the server does not gate it (scan,
+  // auto_reject) — or, on a device list fetched before the verdicts existed,
+  // that we simply do not know. Both are "allowed": the launch route is the
+  // authority and refuses anything this misses, which is the safe direction
+  // for a picker that must never be MORE restrictive than the submit path.
   return { ok: true, blocked: false }
 }

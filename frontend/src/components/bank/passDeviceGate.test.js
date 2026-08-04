@@ -1,70 +1,95 @@
 /* Can the SELECTED machine run this pass?
  *
- * The bug: the Launch dialog answered with `|| remote` — a truthy device id and
- * nothing else — so a peer that had already reported `bank_scoring: false` got
- * ✨ Score ticked FOR the user, staged the whole bank over the network, and died
- * on the first image as a mid-pipeline step error.
+ * The original bug: the Launch dialog answered with `|| remote` — a truthy
+ * device id and nothing else — so a peer that had already reported
+ * `bank_scoring: false` got ✨ Score ticked FOR the user, staged the whole bank
+ * over the network, and died on the first image as a mid-pipeline step error.
+ *
+ * What changed on 2026-08-04: the peer verdict is no longer recomputed here
+ * from a second copy of the capability map. The server computes it with the
+ * SAME function the launch route uses (`bank_remote.device_pass_gate`) and
+ * ships it on the device as `device.passes`. So the two source-parsing tests
+ * that used to live here — one scraping `PASS_PEER_CAPS` out of
+ * `bank_remote.py`, one scraping `LOCAL_ONLY_STEPS` out of
+ * `image_bank_service.py` — are gone, because there is no longer a second copy
+ * to pin. Those greps were also brittle in a way worth remembering: a
+ * reformat, an inline comment or a `# noqa` inside either literal would have
+ * broken them without any behaviour changing.
+ *
+ * The precedence itself is now pinned on the Python side, in
+ * `backend/tests/test_pass_device_gate.py`.
  */
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import test from 'node:test';
 
-import { LOCAL_ONLY_PASSES, PASS_PEER_CAPS, stepGate } from './passDeviceGate.js';
+import { stepGate } from './passDeviceGate.js';
 
-const peer = (capabilities) => ({ id: 'p1', name: 'G18', local: false, capabilities });
+/** A peer as `/api/cluster/devices` serialises it: verdicts already decided. */
+const peer = (passes) => ({ id: 'p1', name: 'G18', local: false, passes });
 
-test('a peer that reports the stack missing BLOCKS the pass', () => {
-  const g = stepGate('score', { device: peer({ bank_scoring: false }) });
+const BLOCKED = (reason) => ({ ok: false, blocked: true, reason, warn: null });
+const ALLOWED = { ok: true, blocked: false, reason: null, warn: null };
+const UNKNOWN = (warn) => ({ ok: true, blocked: false, reason: null, warn });
+
+test('a blocked verdict blocks the checkbox and carries its reason through', () => {
+  const g = stepGate('score', {
+    device: peer({ score: BLOCKED('G18 reports no bank-scoring') }),
+  });
   assert.equal(g.blocked, true);
   assert.equal(g.ok, false);
   assert.match(g.reason, /G18/);
   assert.match(g.reason, /bank-scoring/);
 });
 
-test('a peer that reports the stack present allows it', () => {
-  assert.deepEqual(stepGate('faces', { device: peer({ face_scoring: true }) }),
+test('an allowed verdict allows it', () => {
+  assert.deepEqual(stepGate('faces', { device: peer({ faces: ALLOWED }) }),
     { ok: true, blocked: false });
 });
 
 test('a peer that has not reported warns but does not block', () => {
-  // Polarity has to match the backend (bank_remote.peer_refusal): only an
-  // EXPLICIT false refuses. Blocking on an empty blob would make a freshly
-  // joined peer unusable from the UI while the hub ran its jobs happily.
-  const g = stepGate('framing', { device: peer({}) });
+  // The polarity lives on the server now, but the dialog must still RENDER it:
+  // an unknown peer is a note, never a wall. Blocking on silence would make a
+  // freshly joined peer unusable from the UI while the hub ran its jobs happily.
+  const g = stepGate('framing', {
+    device: peer({ framing: UNKNOWN('G18 hasn’t reported what it can run yet') }),
+  });
   assert.equal(g.blocked, false);
   assert.equal(g.ok, true);
   assert.match(g.warn, /hasn’t reported/);
 });
 
-test('captions need only ONE engine — either one keeps it live', () => {
-  for (const blob of [{ joycaption: true, ollama: false },
-    { joycaption: false, ollama: true }]) {
-    assert.equal(stepGate('caption', { device: peer(blob) }).blocked, false);
-  }
-  assert.equal(
-    stepGate('caption', { device: peer({ joycaption: false, ollama: false }) }).blocked,
-    true, 'both engines refused must block — the peer cannot caption at all');
-});
-
-test('the hub-only passes are never blocked by the device you pick', () => {
-  // scan / auto_reject / semantic_dedup read this machine's database and
-  // embeddings cache. A device cannot block work it never receives.
-  const device = peer({ bank_scoring: false, face_scoring: false, ollama: false });
-  for (const key of ['scan', 'auto_reject', 'semantic_dedup']) {
+test('a step the server does not gate is allowed, never invented as blocked', () => {
+  // scan / auto_reject read this machine's database. The server sends no
+  // verdict for them at all, and a picker that guessed "blocked" from a missing
+  // key would disable work the launch route runs happily.
+  const device = peer({ score: BLOCKED('G18 reports no bank-scoring') });
+  for (const key of ['scan', 'auto_reject']) {
     assert.equal(stepGate(key, { device }).blocked, false, `${key} was blocked`);
   }
 });
 
+test('a device list with no verdicts at all falls back to allowed', () => {
+  // The safe direction for a picker is to be no MORE restrictive than the
+  // submit path, which re-checks every step and refuses with the real reason.
+  const device = { id: 'p1', name: 'G18', local: false };
+  assert.deepEqual(stepGate('score', { device }), { ok: true, blocked: false });
+});
+
 test('same shot follows Score rather than the device', () => {
-  // It reuses Score's embeddings and runs HERE either way, so it tracks Score's
-  // verdict — and when there are none it declines itself, which the bank card
-  // renders as a stated prerequisite, not as a fault.
-  const device = peer({ bank_scoring: false });
-  assert.equal(stepGate('semantic_dedup', { device }).ok, false);
-  assert.equal(stepGate('semantic_dedup', { device: peer({ bank_scoring: true }) }).ok, true);
+  // Stage 2 reuses Score's embeddings but always runs HERE, so it follows
+  // Score's verdict — and when there are none it declines itself, which the
+  // bank card renders as a stated prerequisite, not as a fault.
+  const blocked = peer({ score: BLOCKED('G18 reports no bank-scoring') });
+  assert.equal(stepGate('semantic_dedup', { device: blocked }).ok, false);
+  assert.equal(stepGate('semantic_dedup', { device: blocked }).blocked, false,
+    'never blocked by the device — it runs on this machine either way');
+  assert.equal(stepGate('semantic_dedup', { device: peer({ score: ALLOWED }) }).ok, true);
 });
 
 test('this machine keeps the old local verdict and is never blocked', () => {
+  // The LOCAL question — is this pass's tool installed HERE — is still answered
+  // client-side, from the caps blob the page already holds. It never had a
+  // second copy on the server, so it was never part of the duplication.
   const ctx = { caps: { bank_scoring: true, face_scoring: false }, visionReady: false };
   assert.deepEqual(stepGate('score', ctx), { ok: true, blocked: false });
   assert.deepEqual(stepGate('faces', ctx), { ok: false, blocked: false });
@@ -74,43 +99,13 @@ test('this machine keeps the old local verdict and is never blocked', () => {
     false);
 });
 
-test('the pass→capability map matches the backend', () => {
-  // Two copies of this map is exactly the client/server drift _peer_caption_kind
-  // warns about in its own docstring. Pin them together.
-  const py = fs.readFileSync(
-    new URL('../../../../backend/app/services/bank_remote.py', import.meta.url), 'utf8');
-  const block = py.slice(py.indexOf('PASS_PEER_CAPS = {'));
-  const backend = {};
-  for (const [, key, caps] of block.slice(0, block.indexOf('}')).matchAll(
-    /^\s{4}'(\w+)': \(([^)]*)\)/gm)) {
-    backend[key] = [...caps.matchAll(/'(\w+)'/g)].map((m) => m[1]);
-  }
-  assert.deepEqual(backend, PASS_PEER_CAPS);
-});
-
-test('the local-only pass list matches the backend', () => {
-  // Same drift risk as the map above, with a nastier failure: a pass this list
-  // forgets is offered for a peer, ticked by default, and refused only when the
-  // whole queue is launched.
-  const py = fs.readFileSync(
-    new URL('../../../../backend/app/services/image_bank_service.py', import.meta.url), 'utf8');
-  const line = py.slice(py.indexOf('LOCAL_ONLY_STEPS = ('));
-  const backend = [...line.slice(0, line.indexOf(')')).matchAll(/'(\w+)'/g)].map((m) => m[1]);
-  assert.deepEqual(backend, LOCAL_ONLY_PASSES);
-});
-
-test('a local-only pass is blocked by ANY peer, whatever it reports', () => {
-  // The opposite polarity to the map above, on purpose: no peer advertises the
-  // tagger at all, so the permissive "silence means probably fine" rule would
-  // wave every one of them through.
-  for (const capabilities of [{}, { wd14: true }, { ollama: true }]) {
-    const g = stepGate('tags', { device: peer(capabilities) });
-    assert.equal(g.blocked, true);
-    assert.match(g.reason, /only runs here/);
-  }
-});
-
-test('locally, the tag pass follows the wd14 capability', () => {
-  assert.deepEqual(stepGate('tags', { caps: { wd14: true } }), { ok: true, blocked: false });
-  assert.deepEqual(stepGate('tags', { caps: {} }), { ok: false, blocked: false });
+test('a local-only pass is blocked by the server for any peer', () => {
+  // 🔖 Tags cannot travel. The verdict now arrives from the server, which is
+  // what makes the QUEUE path refuse it too — that path never checked
+  // LOCAL_ONLY_STEPS at all before this moved into one function.
+  const g = stepGate('tags', {
+    device: peer({ tags: BLOCKED('G18 can’t run this — it only runs on this machine') }),
+  });
+  assert.equal(g.blocked, true);
+  assert.match(g.reason, /only runs on this machine/);
 });
