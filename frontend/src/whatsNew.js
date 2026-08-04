@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-quantize-to-fp8-from-settings-storage',
+    date: '2026-08-04',
+    title: 'Shrink a model to fp8 from Settings ▸ Storage — no dataset, no training run',
+    blurb:
+      'The fp8 quantizer that shipped yesterday had exactly one door: the bottom of a dataset’s Training panel, which only exists once you have a dataset. So the person it was written for — someone who downloaded a 26 GB full-precision model from Hugging Face and cannot load it — had no dataset, and never found it. It is now also in Settings ▸ Storage, beside the folder sizes and the trash, because “this file is too big” is a disk question. It is the same tool, not a second copy: point it at any full-precision .safetensors on this machine and it writes the ~10 GB version ComfyUI loads directly, next to the original. Same refusals before you click (a file that is already quantized, a LoRA/adapter), same promise that your source file is never modified and never overwritten, same read-back of the result before it reports success. It runs on the CPU, one at a time, so it never takes VRAM from ComfyUI or a training run.',
+    to: '/settings/storage',
+  },
+  {
     id: '2026-08-04-gallery-lightbox-upscale-improve',
     date: '2026-08-04',
     title: 'Upscale & improve is now in the checkpoint gallery',

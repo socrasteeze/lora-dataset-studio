@@ -543,8 +543,24 @@ Load Diffusion Model node. This is different from ai-toolkit's memory-saving
 `quantize` option: that option changes how a model is held while training but
 does not produce a smaller checkpoint file.
 
-Quantized fp8/int8 exports are inference-only, so the training base picker also
-refuses them and asks for the original bf16/fp16 checkpoint instead.
+### Testing a full model: it is a RAW checkpoint
+
+The artifact is **undistilled**. Krea 2 Turbo-style settings — CFG 1 and a
+handful of steps — produce a blurry sketch on it, which reads as "the training
+failed" when nothing failed at all. Use the same settings the run previewed
+with: **CFG ~4 (3.5-5) and 20-30 steps**. The Test Studio now pre-fills those
+automatically when the selected base looks like a Raw / full / fp8 checkpoint.
+
+### Why a quantized checkpoint is refused as a training base
+
+Picking a community fp8/int8 export as **Custom weights** is refused with
+*"This is an inference-only quantized export — training needs the bf16/fp16
+version of this model."* Those files (about 10 GB instead of 26 GB) are repacks
+made for generation: the weights no longer carry the precision a gradient step
+needs. The check reads a few kilobytes of file header — the quantization
+markers and the tensor dtypes — so it costs nothing and fires the moment you
+pick the file, not an hour into a paid run. A file whose header cannot be read
+is let through: the app refuses what it can prove, never what it merely suspects.
 
 ---
 

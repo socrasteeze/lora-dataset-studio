@@ -1086,7 +1086,29 @@ const TOPICS = [
     ['training', 'family', 'default', 'zimage', 'sdxl', 'krea', 'flux']),
   // Divergence 4: no rental-GPU card in this fork's Settings → Training, so
   // none of upstream's VAST_API_KEY / cloud.* topics apply — there is nothing
-  // in the UI for them to anchor to.
+  // in the UI for them to anchor to. The Hugging Face storage forecast and its
+  // cloud-quantize third door are rejected the same way: no HfStorageCard, no
+  // /cloud fp8 lane.
+  // The fp8 tool's SECOND door, and the findable one. Its first
+  // (training.fp8_quantize_local, further below) sits at the bottom of a
+  // dataset's ordinary Training panel — which the person this helps most,
+  // someone who downloaded a 26 GB full model from Hugging Face and has no
+  // dataset, never opens. Same component, same refusals; only the address
+  // differs, so it gets its own topic rather than stealing the other one's.
+  { id: 'storage.fp8_quantize', kind: 'action',
+    title: 'Quantize a model to fp8 (no dataset or training run needed)',
+    keywords: ['quantize', 'quantise', 'fp8', 'shrink', 'smaller', 'convert', 'comfyui',
+      'comfy', 'safetensors', 'hugging face', 'downloaded', 'disk', 'space', 'storage',
+      '26 gb', '10 gb', 'checkpoint', 'full model', 'load diffusion model', 'cpu'],
+    guide: { chapter: 'settings-reference', anchor: 'storage' },
+    app: { route: '/settings/storage', focus: 'storage-fp8-quantize' } },
+  { id: 'training.quantized_base_refused', kind: 'setting',
+    title: 'Why a quantized checkpoint is refused as a training base',
+    keywords: ['quantized', 'quantised', 'fp8', 'int8', 'gguf', 'custom weights',
+      'base', 'refused', 'inference only', 'training', 'bf16', 'fp16', 'error'],
+    guide: { chapter: 'dataset-guide',
+      anchor: 'why-a-quantized-checkpoint-is-refused-as-a-training-base' },
+    app: { route: '/datasets?section=training' } },
   // Dual captions is a per-run Advanced training option (not a global Setting),
   // so it points at the dataset guide's dedicated section rather than
   // settings-reference, and its route is the training workspace section. Its tip
