@@ -597,6 +597,18 @@ def create_app(config_object=None):
         except Exception:
             app.logger.exception('checkpoint store retrofit skipped')
 
+        # Re-attach to peer training runs a restart interrupted. Their rows are
+        # durable precisely so this is possible: without it a job would still be
+        # running on another machine with nothing watching it, and a Stop nobody
+        # could honour.
+        try:
+            from .services.peer_training import resume_supervisors
+            resumed = resume_supervisors(app)
+            if resumed:
+                app.logger.info('peer training: resumed %s run(s)', resumed)
+        except Exception:
+            app.logger.exception('peer training resume skipped')
+
     from .routes import register_blueprints
     register_blueprints(app, csrf)
 

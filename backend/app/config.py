@@ -131,7 +131,14 @@ DEFAULTS = {
     'aitoolkit': {'dir': '', 'datasets_dir': '', 'output_dir': '', 'hf_home': '',
                   # Explicit interpreter for installs without venv/.venv
                   # (conda, uv, system python). Empty = auto-detect.
-                  'python': ''},
+                  'python': '',
+                  # WEB address of an ai-toolkit, distinct from `dir` above.
+                  # `dir` is the checkout this machine shells run.py in; this is
+                  # the running UI a job can be SUBMITTED to, so it can pick the
+                  # GPU — its own, or one of the machines it has configured.
+                  # Empty = the training-machine picker is not offered and every
+                  # run goes the way it always has.
+                  'url': '', 'token': ''},
     # Local-only fork (Divergence 1): the ComfyUI engines are the only ones.
     # The API engines (Nano Banana / ChatGPT / OpenRouter) were removed; stale
     # engines.* keys in an existing config.json are simply ignored.

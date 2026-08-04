@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-train-on-another-machine',
+    date: '2026-08-04',
+    title: 'Train a LoRA on your other machine’s GPU',
+    blurb:
+      'If you have a second box with a GPU, a run can now go there instead of tying this one up for hours. Set your ai-toolkit’s web address in Settings → Training and a “Train on” picker appears next to Train the LoRA, listing the machines that ai-toolkit knows about. Pick one and the dataset is sent over, the run starts there, and its log, its preview samples and its checkpoints all arrive back here as it goes — into the same folders a local run writes, so the Training panel, the checkpoint browser and the Runs page work on it exactly as they would on a local run. Stop reaches it, and the checkpoints it already saved come home before it closes. Base models are not copied: the machine that trains downloads its own weights, so only your dataset and the job config cross the network. The readiness guards are the same either way — a dataset does not become well-formed by training somewhere else. And the limits, said out loud: the picker only ever offers OTHER machines (a run in this lane doesn’t take this machine’s GPU-busy flag, so generation would start on top of it), a run sent elsewhere always starts fresh because previous checkpoints aren’t sent over, one run per dataset at a time, and a machine that is switched off is listed and greyed out rather than hidden.',
+    to: '/settings/training',
+  },
+  {
     id: '2026-08-04-run-on-says-which-passes-a-machine-cant-do',
     date: '2026-08-04',
     title: 'The Run-on picker names the passes a machine can’t do',
