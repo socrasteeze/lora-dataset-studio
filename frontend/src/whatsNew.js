@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-continue-lanes-stop-promising-cloud',
+    date: '2026-08-04',
+    title: 'The Continue dialog stopped offering a lane that does not exist',
+    blurb:
+      'When a training could not continue on this machine, the reason said “continue in the cloud” and the closed cloud lane said it “needs a rental key set up in Settings”. Neither was true: this build has no rented-GPU lane at all, so setting a key would have changed nothing and there was no second lane to fall back to. Every one of those messages now says what is actually the case — that this build trains on your own machine — so a blocked run sends you to the real fix instead of to a Settings page that cannot help. Nothing about what you can run changed; only the app’s account of itself did.',
+    to: '/cloud',
+  },
+  {
     id: '2026-08-04-quantize-to-fp8-from-settings-storage',
     date: '2026-08-04',
     title: 'Shrink a model to fp8 from Settings ▸ Storage — no dataset, no training run',

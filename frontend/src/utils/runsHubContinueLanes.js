@@ -29,13 +29,13 @@ export function runsHubContinueLanes(run, opts = {}) {
 
   const localReason =
     aitoolkitValid === false
-      ? 'Local training needs ai-toolkit — set it up in Settings, or continue in the cloud.'
+      ? 'Local training needs ai-toolkit — set it up in Settings.'
     // A legacy row with no dataset can't address a local run dir — say so
     // instead of firing a request that would 404.
     : run.dataset_id == null
-      ? 'This run’s dataset is unknown, so it can only be continued in the cloud.'
+      ? 'This run’s dataset is unknown, so it cannot be continued on this machine.'
     : localActive
-      ? 'A training is already running on this machine — continue in the cloud, or wait for it to finish.'
+      ? 'A training is already running on this machine — wait for it to finish.'
     : null;
 
   // A run without train_type (older payload) matches any family, exactly like
@@ -44,7 +44,7 @@ export function runsHubContinueLanes(run, opts = {}) {
     && (!a.train_type || a.train_type === run.train_type));
   const cloudReason =
     !configured
-      ? 'Cloud training needs a rental key set up in Settings.'
+      ? 'This build trains on your own machine only — rented-GPU training was removed.'
     : cloudActiveThere
       ? `A ${familyLabel(run.train_type)} cloud run is already active on this dataset`
     : actives.length >= limit

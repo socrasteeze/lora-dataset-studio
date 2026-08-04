@@ -1605,17 +1605,17 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           reason: 'Full-model training is cloud-only. Switch back to LoRA to continue this local checkpoint.' }
       : caps.aitoolkit?.valid === false
       ? { available: false,
-          reason: 'Local training needs ai-toolkit — set it up in Settings, or continue in the cloud.' }
+          reason: 'Local training needs ai-toolkit — set it up in Settings.' }
       : status.in_progress
         ? { available: false,
-            reason: 'A training is already running on this machine — continue in the cloud, or wait for it to finish.' }
+            reason: 'A training is already running on this machine — wait for it to finish.' }
         : { available: true },
     cloud: fullMode
       ? { available: false,
           reason: 'Continuing a full model is not available in this MVP. Switch back to LoRA to continue a LoRA.' }
       : !caps.cloud_training
       ? { available: false,
-          reason: 'Cloud training needs a rental key set up in Settings.' }
+          reason: 'This build trains on your own machine only — rented-GPU training was removed.' }
       : { available: true },
   };
   // The lane the dialog OPENS on = the lane the source checkpoint was trained in

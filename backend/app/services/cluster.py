@@ -37,7 +37,9 @@ ARTIFACT_MAX_AGE_SECONDS = 48 * 3600
 LOCAL_DEVICE_ID = 'local'
 
 _VALID_ROLES = frozenset({'standalone', 'primary', 'peer'})
-_VALID_KINDS = frozenset({'comfy', 'infer', 'vision', 'training'})
+# 'training' was removed on 2026-08-04 with the peer-training lane: it had no
+# UI caller, produced no run record, and its peer half discarded the cancel flag.
+_VALID_KINDS = frozenset({'comfy', 'infer', 'vision'})
 
 # In-memory join-token plaintext cache so Settings can show the token once
 # after mint (hash-only in DB). Cleared on redeem / expiry / restart.
@@ -243,7 +245,10 @@ def local_capabilities() -> dict:
             'masks': bool(caps.get('masks')),
             'bank_scoring': bool(caps.get('bank_scoring')),
             'watermark_inpaint': bool(caps.get('watermark_inpaint')),
-            'training': bool(caps.get('training_visible')),
+            # No `training` key: the peer-training kind was removed on
+            # 2026-08-04 and nothing reads this. A capability advertised for a
+            # job kind that cannot be sent is the "wiring implies a workload"
+            # trap — an older peer may still send one; it is ignored.
             # probe() carries no VRAM figure at all (it must stay network-free,
             # and the ComfyUI numbers live in comfyui_runtime_info). Reading a
             # `vram_gb` key off it therefore always yielded None and the picker

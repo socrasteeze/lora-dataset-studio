@@ -56,8 +56,12 @@ def test_local_capabilities_on_a_fully_installed_machine(app, monkeypatch):
         caps = cluster_svc.local_capabilities()
 
     for key in ('comfyui', 'ollama', 'aitoolkit', 'joycaption', 'face_scoring',
-                'masks', 'bank_scoring', 'watermark_inpaint', 'training'):
+                'masks', 'bank_scoring', 'watermark_inpaint'):
         assert caps[key] is True, f'{key} must be advertised on a full install'
+    # No 'training' key since 2026-08-04: the peer-training kind was removed, and
+    # a capability advertised for a job kind that cannot be sent is exactly the
+    # "wiring implies a workload" trap this cluster is meant to avoid.
+    assert 'training' not in caps
     # VRAM used to read caps['python']['vram_gb'] / caps['comfyui']['vram_gb'],
     # keys probe() has never had — so the Run-on picker showed no card, ever.
     assert caps['vram_gb'] == 24.0
@@ -277,8 +281,11 @@ def test_peer_artifact_upload_streams_past_the_browser_size_cap(app, client):
         cfg.save_config({'cluster': {'role': 'primary'}})
         minted = cluster_svc.mint_join_token()
         redeemed = cluster_svc.redeem_join_token(minted['token'], name='peer')
+        # Any valid kind will do — this test is about the upload size cap, not
+        # about what the job does. It used 'training' until that kind was
+        # removed on 2026-08-04.
         cluster_svc.create_cluster_job(
-            device_id=redeemed['device_id'], kind='training',
+            device_id=redeemed['device_id'], kind='infer',
             payload={}, job_id='train-1')
 
     blob = b'x' * (64 * 1024)
