@@ -87,7 +87,16 @@ peer faces pass, `data/banks/<id>/face_cache.npz` must carry `dets` and
 
 ## Still open
 
-There is **no version handshake between a Primary and its peers**. A peer on
-older code is survivable — the result parser is tolerant, and the vision reader
-falls back to the older key — but nothing detects or reports a mixed-version
-cluster.
+~~There is **no version handshake between a Primary and its peers**.~~
+**Closed 2026-08-04.** `local_capabilities()` now carries `app_version`, so the
+blob a peer heartbeats states what it runs, and Settings → Devices shows a note
+on any peer whose build differs from this machine's.
+
+The note is deliberately soft, and the polarity is the same one
+`passDeviceGate` uses: only an explicit disagreement says anything. A peer that
+has never checked in reports nothing, and a peer on code older than the
+handshake has no `app_version` key at all — neither is evidence of a mismatch,
+and treating them as one would put a warning on every fresh join. Nothing is
+blocked either way, because a mixed cluster genuinely does work: the result
+parser is tolerant and the vision reader still falls back to the older key.
+`peerVersionNote.js` holds the rule and its tests.

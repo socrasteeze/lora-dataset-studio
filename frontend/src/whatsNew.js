@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-peer-passes-start-sooner-and-stop-when-told',
+    date: '2026-08-04',
+    title: 'A pass sent to another machine starts sooner, and Stop reaches it',
+    blurb:
+      'Sending a bank to a second machine spent its first stretch transferring images one at a time — on a 5,000-image bank that is around fifteen minutes of nothing visibly happening before the pass even starts. Several files now travel at once, so that wait shrinks to a fraction of it; a transfer that goes wrong still fails the whole pass rather than quietly running against a partial bank. Two other things that were wrong on a peer: pressing ⏹ Stop during a remote *generation* did nothing — the other machine kept rendering, holding its GPU, for up to fifteen minutes — and it now stops within a second. And a machine running Ollama with no vision model pulled used to be offered for 🚩 Watermarks and 📐 Framing, accept the whole bank across the network, then fail on the first image; it is greyed out up front instead. Settings ▸ Devices also now says when a peer is on a different build from this machine — that still works, you just get told.',
+    to: '/settings/devices',
+  },
+  {
     id: '2026-08-04-continue-lanes-stop-promising-cloud',
     date: '2026-08-04',
     title: 'The Continue dialog stopped offering a lane that does not exist',
