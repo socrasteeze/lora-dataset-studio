@@ -315,8 +315,6 @@ class PeerWorker:
                 self._run_vision(job)
             elif kind == 'infer':
                 self._run_infer(job)
-            elif kind == 'training':
-                self._run_training(job)
             else:
                 self._complete(job_id, error=f'unsupported kind: {kind}')
             self._log(f'finished the {kind or "job"} for the Primary', 'ok')
@@ -637,74 +635,6 @@ class PeerWorker:
             self._complete(job_id,
                            result={'result': result_obj, 'extra_artifacts': uploaded_extras},
                            output_artifact=uploaded)
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
-
-    def _run_training(self, job: dict):
-        """Download dataset archive, launch local ai-toolkit, upload checkpoints."""
-        from ..services import lora_training
-
-        job_id = job['job_id']
-        payload = job.get('payload') or {}
-        artifact_names = list(job.get('artifacts') or payload.get('artifacts') or [])
-        work = Path(tempfile.mkdtemp(prefix='lds-peer-train-'))
-        try:
-            downloaded = self._download_artifacts(job_id, artifact_names, work)
-            archive_name = payload.get('dataset_archive') or (
-                artifact_names[0] if artifact_names else None)
-            if not archive_name:
-                self._complete(job_id, error='missing dataset archive')
-                return
-            archive = downloaded.get(os.path.basename(archive_name))
-            if archive is None:
-                self._complete(job_id, error='dataset archive not downloaded')
-                return
-
-            self._progress(job_id, {'phase': 'extract'})
-            dataset_dir = work / 'dataset'
-            dataset_dir.mkdir()
-            if str(archive).endswith('.zip'):
-                import zipfile
-                with zipfile.ZipFile(archive, 'r') as zf:
-                    zf.extractall(dataset_dir)
-            else:
-                shutil.copy2(archive, dataset_dir / archive.name)
-
-            train_kwargs = dict(payload.get('train') or {})
-            self._progress(job_id, {'phase': 'training'})
-
-            # Peer-local training entry: services expose a helper that runs
-            # ai-toolkit against an arbitrary folder and returns checkpoint paths.
-            run_fn = getattr(lora_training, 'run_peer_training', None)
-            if run_fn is None:
-                self._complete(
-                    job_id,
-                    error='peer training helper not available on this build — '
-                          'update both installs')
-                return
-
-            def _on_progress(info):
-                self._progress(job_id, {'phase': 'training', **(info or {})})
-
-            result = run_fn(dataset_dir=str(dataset_dir),
-                            work_dir=str(work / 'run'),
-                            progress_cb=_on_progress,
-                            **train_kwargs)
-            ckpts = list((result or {}).get('checkpoints') or [])
-            uploaded = []
-            for ckpt in ckpts:
-                p = Path(ckpt)
-                if p.is_file():
-                    uploaded.append(self._upload_artifact(job_id, p))
-            meta_path = work / 'training_result.json'
-            meta_path.write_text(json.dumps({
-                'checkpoints': uploaded,
-                'detail': (result or {}).get('detail'),
-            }), encoding='utf-8')
-            meta_name = self._upload_artifact(job_id, meta_path, 'training_result.json')
-            self._complete(job_id,
-                           result={'checkpoints': uploaded, 'raw': result},
-                           output_artifact=meta_name)
         finally:
             shutil.rmtree(work, ignore_errors=True)
 

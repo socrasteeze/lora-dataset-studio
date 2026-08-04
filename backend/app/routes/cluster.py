@@ -441,25 +441,8 @@ def enqueue_infer_job():
         return jsonify({'error': str(e)}), 400
 
 
-@bp.post('/jobs/training')
-def enqueue_training_job():
-    """Hub: send a dataset zip + ai-toolkit config to a peer."""
-    from ..services import cluster_remote
-    data = request.get_json(silent=True) or {}
-    archive = data.get('archive_path')
-    if not archive:
-        return jsonify({'error': 'archive_path required'}), 400
-    try:
-        job_id = cluster_remote.enqueue_training_on_device(
-            data.get('device_id'),
-            dataset_archive_path=archive,
-            train_params={
-                'config_text': data.get('config_text') or data.get('config'),
-                'config_name': data.get('config_name'),
-                'extra_args': data.get('extra_args'),
-                'timeout': data.get('timeout'),
-            },
-        )
-        return jsonify({'ok': True, 'job_id': job_id})
-    except (ValueError, RuntimeError) as e:
-        return jsonify({'error': str(e)}), 400
+# `POST /jobs/training` was removed on 2026-08-04 along with the rest of the
+# peer-training lane. It had no caller anywhere in `frontend/src`, produced no
+# TrainingRunRecord and no Training-page progress, and the peer half discarded
+# the cancel flag so a Stop never reached it. Training on another machine is
+# ai-toolkit's own feature now.

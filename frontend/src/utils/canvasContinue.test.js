@@ -95,7 +95,7 @@ test('a closed lane keeps its slot and states the reason — never a hidden opti
   // board additionally forces this lane shut on caps.cloud_training in
   // LineageCanvas. Assert the SHAPE the UI relies on — closed, with a reason —
   // not upstream's wording.
-  assert.match(noKey.cloud.reason, /rental key/);
+  assert.match(noKey.cloud.reason, /rented-GPU training was removed/);
 
   const busy = canvasContinueLanes(LOCAL, null, { ...OPEN, localActive: { current: {} } });
   assert.equal(busy.local.available, false);

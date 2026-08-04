@@ -120,25 +120,13 @@ def dataset_train(dataset_id):
                       'run can offer — switch to LoRA'),
             'training_mode': mode,
         }), 400
-    # Remote peer training: zip the export folder and enqueue a ClusterJob.
-    from ..services import cluster as cluster_svc
-    device_id = cluster_svc.normalize_device_id(d.get('device_id'))
-    if device_id != cluster_svc.LOCAL_DEVICE_ID:
-        try:
-            from ..services import cluster_remote
-            archive, config_text = lt.prepare_peer_training_bundle(
-                LOCAL_USER, dataset_id, steps=d.get('steps'),
-                base_model=d.get('base_model'), variant=d.get('variant', 'turbo'),
-                train_type=d.get('train_type'), masked=d.get('masked'))
-            job_id = cluster_remote.enqueue_training_on_device(
-                device_id,
-                dataset_archive_path=archive,
-                train_params={'config_text': config_text},
-            )
-            return jsonify({'ok': True, 'mode': 'peer', 'job_id': job_id,
-                            'device_id': device_id})
-        except Exception as e:
-            return _map_error(e)
+    # Training always runs on this machine's ai-toolkit. A `device_id` in the
+    # body is accepted and ignored: the peer-training lane that used to read it
+    # was removed on 2026-08-04 because nothing in the UI ever sent one, it
+    # created no TrainingRunRecord and showed no progress, and its peer half
+    # read the cancel flag and threw it away — a Stop could not reach it.
+    # Sending a training job to another box is ai-toolkit's own job now; it
+    # owns the machine picker and the transfer.
     try:
         # steps optionnel : None → adaptatif. base_model='' → officiel ; sinon merge
         # (doit être converti d'abord). variant règle l'adapter de de-distillation.

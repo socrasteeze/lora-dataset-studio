@@ -1215,7 +1215,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
       // name different causes for the same gap.
       if (lanes && !caps.cloud_training) {
         lanes.cloud = { available: false,
-          reason: 'Cloud training needs a rental key set up in Settings.' };
+          reason: 'This build trains on your own machine only — rented-GPU training was removed.' };
       }
       return lanes;
     },
