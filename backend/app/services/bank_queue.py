@@ -26,15 +26,32 @@ this queue's own reporting.
 so the lanes must never work two of them at once, or that card would show two
 conflicting states. See _unit_of.
 
+**The queue SURVIVES a restart.** It used to be in-memory only, and this
+docstring used to defend that: committed scores stay, so a re-run only pays for
+what is missing. That describes the cost of a re-run somebody knows to start. It
+does not cover the actual failure, which was silence — eleven banks queued
+overnight, a reboot for an update, and by morning an empty panel with no row, no
+log line and no report saying anything had been dropped.
+
+So every mutation is now mirrored into ``BankQueueEntry`` and the FIFO is
+rebuilt from it at boot (see ``restore``). The list stays the working copy and
+the table is the record: the lane, unit and atomic-claim logic below is
+intricate and well covered, and moving the queue itself into SQL would have
+rewritten all of it to fix a durability bug. Same shape the sibling
+dataset-manager project uses for its own cancel flag, for the same reason —
+state that must outlive the process cannot live in the process.
+
 Same contract as ``bank_jobs``:
-* **In-memory ONLY** — the queue dies with the process; a restart starts empty
-  (raw scores already committed stay, so a re-run only pays for what's missing).
 * **Thread-safe** — one module lock guards the FIFO; a second lock guards the
   single-worker invariant.
 * Finished entries are dropped from the FIFO (the running bank's live progress
   is shown by its own bank_jobs snapshot); the queue only ever lists what is
   still pending or currently running.
+* A durable write that fails is logged and swallowed — the record is worth
+  having, it is not worth failing a launch for. Same call this module already
+  makes for its activity-log mirror.
 """
+import json
 import logging
 import threading
 import time
@@ -61,6 +78,125 @@ _LOCAL_LANE = 'local'
 # How often the worker re-checks whether the next bank can start (GPU free /
 # bank idle). Module-level so tests can drop it to 0 for a synchronous drain.
 _POLL_SECONDS = 2.0
+
+
+# ── the durable half ─────────────────────────────────────────────────────────
+#
+# Three calls, all best-effort. A failure here loses the restart-resume for one
+# entry; it must never lose the entry itself, which is why each one swallows and
+# logs rather than raising into a launch the user is waiting on.
+
+#: The app to write with. `cancel`, `clear` and `_remove` take no `app` argument
+#: — they are called from routes, from the worker thread and from tests — so the
+#: reference is kept from whoever last enqueued or restored. A module global
+#: rather than a parameter because adding one to those three would change three
+#: public signatures to fix a bookkeeping detail.
+_app_ref = None
+
+
+def _app_context():
+    """An app context to write in, reusing the caller's when there is one."""
+    import contextlib
+
+    from flask import has_app_context
+    if has_app_context():
+        return contextlib.nullcontext()
+    if _app_ref is None:
+        raise RuntimeError('bank_queue has no app to write with')
+    return _app_ref.app_context()
+
+
+def _persist_add(entry) -> None:
+    """Write a new entry's row and stash its id on the in-memory entry."""
+    from ..extensions import db
+    from ..models import BankQueueEntry
+    from ..utils.dbbusy import write_with_retry
+    row = BankQueueEntry(
+        bank_id=entry['bank_id'], user_id=str(entry['user_id']),
+        steps=json.dumps(list(entry['steps'])),
+        reject_flags=json.dumps(list(entry['reject_flags'])),
+        resolve_dups=bool(entry['resolve_dups']),
+        device_id=entry.get('device_id'), group_key=entry.get('group_key'),
+        enqueued_at=float(entry['enqueued_at']))
+    write_with_retry(lambda: db.session.add(row))
+    entry['row_id'] = row.id
+
+
+def _persist_remove(bank_ids) -> None:
+    """Drop the rows for these banks. Keyed on bank_id rather than on the
+    stashed row id, so an entry whose insert failed still cleans up, and so a
+    row left by a crash mid-`_remove` cannot resurrect the bank at the next
+    boot."""
+    if not bank_ids:
+        return
+    from ..extensions import db
+    from ..models import BankQueueEntry
+    from ..utils.dbbusy import write_with_retry
+    write_with_retry(lambda: BankQueueEntry.query
+                     .filter(BankQueueEntry.bank_id.in_(list(bank_ids)))
+                     .delete(synchronize_session=False))
+
+
+def _safely(what, fn, *args) -> None:
+    try:
+        with _app_context():
+            fn(*args)
+    except Exception:      # noqa: BLE001
+        logger.warning('bank_queue: could not %s durably — the queue still '
+                       'works, but it will not survive a restart', what,
+                       exc_info=True)
+
+
+def restore(app) -> int:
+    """Rebuild the FIFO from the table at boot. Returns how many came back.
+
+    An entry that was RUNNING comes back pending: the pipeline running it died
+    with the process, so nothing is running any more. Leaving it 'running' would
+    park its lane behind a job that can never finish — the same shape as a peer
+    job a dead peer left claimed forever, which this project has already paid
+    for once. Re-running a partly-done bank is cheap by design: committed scores
+    stay, so it only pays for what is missing.
+    """
+    from ..models import BankQueueEntry
+    global _app_ref
+    _app_ref = app
+    with app.app_context():
+        try:
+            rows = BankQueueEntry.query.order_by(BankQueueEntry.id.asc()).all()
+        except Exception:      # noqa: BLE001 — a missing table must not stop boot
+            logger.warning('bank_queue: could not read the stored queue', exc_info=True)
+            return 0
+        restored, seen = [], set()
+        for row in rows:
+            if row.bank_id in seen:
+                # Only reachable if a delete failed. Two entries for one bank
+                # would run it twice; keep the earliest and drop the rest.
+                continue
+            seen.add(row.bank_id)
+            restored.append({
+                'bank_id': row.bank_id, 'user_id': row.user_id,
+                'steps': json.loads(row.steps or '[]'),
+                'reject_flags': json.loads(row.reject_flags or '[]'),
+                'resolve_dups': bool(row.resolve_dups),
+                'device_id': row.device_id, 'group_key': row.group_key,
+                'enqueued_at': row.enqueued_at or time.time(),
+                'state': 'pending', 'row_id': row.id})
+    if not restored:
+        return 0
+    with _lock:
+        # `restore` is idempotent: a second call must not double the queue, or
+        # every bank in it would run twice.
+        here = {e['bank_id'] for e in _queue}
+        added = [e for e in restored if e['bank_id'] not in here]
+        _queue.extend(added)
+    if added:
+        logger.info('bank_queue: restored %s queued bank(s) after a restart',
+                    len(added))
+        _log(None, 'queue restored after a restart', 'info',
+             detail=f'{len(added)} bank(s)')
+        if not app.config.get('TESTING'):
+            _ensure_worker(app)
+    return len(added)
 
 
 def _log(bank_id, message, level='info', detail=None):
@@ -155,6 +291,8 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
     # unit, which is the safe direction (it can only ever run alone).
     group_key = _group_key_of(user_id, bank_id)
     device_id = _normalized_device(device_id)
+    global _app_ref
+    _app_ref = app
     if device_id:
         banks._remote_pass_device(device_id)      # raises ValueError on a backend id
         # …and the picked PASSES against that machine, not just the id. A peer
@@ -175,6 +313,20 @@ def enqueue(app, user_id, bank_id, steps=None, reject_flags=None,
                  'enqueued_at': time.time(), 'state': 'pending'}
         _queue.append(entry)
         position = len(_queue)
+    # Outside _lock: this touches the database, and _claim_next runs under that
+    # same lock — a query there is what the group-key comment above already
+    # warns about.
+    _safely('record the queued bank', _persist_add, entry)
+    # …which opens a window. A worker left alive by an EARLIER enqueue can claim,
+    # run and remove this entry while the row is being written: `_remove`'s
+    # delete then finds no row yet, the insert lands after it, and the next boot
+    # re-runs a bank that already finished. Microseconds wide and never
+    # observed — closed rather than documented because the failure is invisible,
+    # the bank simply runs again one morning.
+    with _lock:
+        still_queued = _find(bank_id) is entry
+    if not still_queued:
+        _safely('forget the already-finished bank', _persist_remove, [bank_id])
     _log(bank_id, 'bank queued', 'info', detail=f'position {position}')
     # Under TESTING every bank_jobs job runs INLINE, so drain the whole queue
     # synchronously here (no worker thread) — same inline-vs-thread split as
@@ -417,11 +569,15 @@ def _process_next(app) -> bool:
 
 def _remove(bank_id) -> bool:
     with _lock:
+        found = False
         for i, e in enumerate(_queue):
             if e['bank_id'] == bank_id:
                 _queue.pop(i)
-                return True
-    return False
+                found = True
+                break
+    if found:
+        _safely('forget the finished bank', _persist_remove, [bank_id])
+    return found
 
 
 def cancel(bank_id) -> bool:
@@ -434,6 +590,7 @@ def cancel(bank_id) -> bool:
             return False
         was_running = entry['state'] == 'running'
         _queue.remove(entry)
+    _safely('forget the cancelled bank', _persist_remove, [bank_id])
     if was_running:
         bank_jobs.cancel(bank_id)
         _log(bank_id, 'removed from queue (was running)', 'warn')
@@ -448,8 +605,10 @@ def clear() -> int:
     from . import bank_jobs
     with _lock:
         running_ids = [e['bank_id'] for e in _queue if e['state'] == 'running']
+        all_ids = [e['bank_id'] for e in _queue]
         n = len(_queue)
         _queue.clear()
+    _safely('forget the cleared queue', _persist_remove, all_ids)
     for bid in running_ids:
         bank_jobs.cancel(bid)
     if n:
@@ -492,9 +651,17 @@ def state_for(bank_id):
     return None
 
 
-def reset():
-    """Test helper: forget the whole queue (does not touch running threads)."""
+def reset(durable=True):
+    """Test helper: forget the whole queue (does not touch running threads).
+
+    ``durable=False`` forgets only the in-memory half, which is exactly what a
+    process restart does — the table is what a restart leaves behind. That is
+    the seam `restore` is tested through.
+    """
     with _lock:
+        ids = [e['bank_id'] for e in _queue]
         _queue.clear()
     with _worker_lock:
         _workers.clear()
+    if durable and ids:
+        _safely('forget the reset queue', _persist_remove, ids)

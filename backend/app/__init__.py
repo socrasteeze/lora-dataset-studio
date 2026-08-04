@@ -597,6 +597,17 @@ def create_app(config_object=None):
         except Exception:
             app.logger.exception('checkpoint store retrofit skipped')
 
+        # Put the Launch-all queue back. Losing it to a restart used to be
+        # silent: banks queued overnight, a reboot for an update, and an empty
+        # panel by morning with nothing saying anything had been dropped.
+        try:
+            from .services.bank_queue import restore as restore_bank_queue
+            restored = restore_bank_queue(app)
+            if restored:
+                app.logger.info('bank queue: restored %s bank(s)', restored)
+        except Exception:
+            app.logger.exception('bank queue restore skipped')
+
         # Re-attach to peer training runs a restart interrupted. Their rows are
         # durable precisely so this is possible: without it a job would still be
         # running on another machine with nothing watching it, and a Stop nobody

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
+import { FALLBACK_ORDER, buildSteps, defaultChecked } from './pipelineSteps.js';
+
 const dialog = fs.readFileSync(new URL('./LaunchAllDialog.jsx', import.meta.url), 'utf8');
 const report = fs.readFileSync(new URL('./PipelineReport.jsx', import.meta.url), 'utf8');
 const ws = fs.readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');
@@ -26,12 +28,18 @@ test('the overnight dialog offers no non-verdict flag; the attended button print
 });
 
 test('captioning is OFF by default; auto-reject defaults to blur+uniform and keep-best dedup', () => {
-  // Default checked set never includes caption.
-  const m = dialog.match(/useState\(\(\)\s*=>\s*new Set\(\s*\[([^\]]*)\]/);
-  assert.ok(m, 'found the default step set');
-  assert.doesNotMatch(m[1], /caption/);
-  assert.match(m[1], /'scan'/);
-  assert.match(m[1], /'auto_reject'/);
+  // The default-checked RULE moved into pipelineSteps.defaultChecked when the
+  // step list moved onto the server, so it is asserted through the module now
+  // rather than by grepping this file for a literal Set — the same migration
+  // passDeviceGate.test.js made, and for the same reason: a reformat or an
+  // inline comment used to break these greps with no behaviour change.
+  const steps = buildSteps(FALLBACK_ORDER);
+  const allReady = Object.fromEntries(steps.map((s) => [s.key, true]));
+  const checked = defaultChecked(steps, allReady);
+  assert.equal(checked.has('caption'), false);
+  assert.equal(checked.has('scan'), true);
+  assert.equal(checked.has('auto_reject'), true);
+  // These two literals still live in the dialog, so they are still greppable.
   assert.match(dialog, /new Set\(\['blur',\s*'uniform'\]\)/);
   assert.match(dialog, /useState\(true\)/);            // resolveDups defaults on
 });
@@ -44,7 +52,10 @@ test('a heavy pass whose tool is not ready is auto-unchecked and flagged "will s
   assert.match(gate, /return !!caps\?\.bank_scoring/);
   assert.match(gate, /return !!caps\?\.face_scoring/);
   assert.match(gate, /return !!visionReady/);
-  assert.match(dialog, /\.filter\(\(k\)\s*=>\s*ready\[k\]\)/);   // default set intersects readiness
+  // The default set intersects readiness — asserted on the function that does
+  // it, not on the call site's shape.
+  const steps = buildSteps(['scan', 'score']);
+  assert.deepEqual([...defaultChecked(steps, { scan: true, score: false })], ['scan']);
   assert.match(dialog, /will skip/);
 });
 

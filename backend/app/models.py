@@ -837,6 +837,43 @@ class SystemState(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class BankQueueEntry(db.Model):
+    """One bank waiting its turn in the cross-bank "Launch all" queue.
+
+    The queue itself is still the module-level FIFO in `bank_queue` — its lane,
+    unit and atomic-claim logic is intricate and well covered, and moving it
+    into SQL would have rewritten all of it. This table sits BESIDE it: the list
+    is the working copy, this is the record, and on boot the list is rebuilt
+    from here.
+
+    It exists because losing the queue to a restart was silent. Committed scores
+    survive, so a re-run only pays for what is missing — but that describes the
+    cost of a re-run somebody knows to start. Eleven banks queued overnight, a
+    reboot for an update, and by morning the panel is empty with no row, no log
+    line and no report saying anything was dropped.
+
+    Rows are deleted when an entry leaves the queue, so this table only ever
+    holds what is still pending or running. `id` carries the queue order.
+    """
+    __tablename__ = 'bank_queue_entry'
+    id = db.Column(db.Integer, primary_key=True)
+    bank_id = db.Column(db.Integer, nullable=False, index=True)
+    user_id = db.Column(db.String(64), nullable=False, default='local')
+    steps = db.Column(db.Text, default='[]')              # JSON list
+    reject_flags = db.Column(db.Text, default='[]')       # JSON list
+    resolve_dups = db.Column(db.Boolean, default=False)
+    # Which machine this bank was sent to. Without it a restart would silently
+    # repatriate a whole overnight queue onto this one — the exact outcome
+    # renting the second machine exists to avoid, and it would read as the queue
+    # merely being slow.
+    device_id = db.Column(db.String(64))
+    # The merged group this bank belongs to, so two lanes cannot split one card
+    # across two machines after a restore either.
+    group_key = db.Column(db.String(128))
+    enqueued_at = db.Column(db.Float)                     # time.time(), as the FIFO stores it
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class PeerTrainingRun(db.Model):
     """One training run sent to another machine's ai-toolkit.
 
