@@ -47,8 +47,10 @@ export default function Fp8QuantizeTool({
   }, [path]);
 
   const poll = () => {
+    // apiFetch RESOLVES THE PARSED BODY, not a Response. Calling `.json()` on it
+    // threw a TypeError straight into the `.catch` below, so this panel never
+    // once reported a completion or a failure however well the conversion went.
     apiFetch('/api/tools/fp8-quantize/status')
-      .then((r) => r.json())
       .then((state) => {
         setStatus(state);
         if (state?.status !== 'running') {

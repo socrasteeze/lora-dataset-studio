@@ -50,6 +50,54 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-comfyui-unreachable-is-said-out-loud',
+    date: '2026-08-04',
+    title: 'When LDS cannot reach ComfyUI, the banner now says exactly that — instead of blaming a paused job',
+    blurb:
+      'On a brand-new install, the very first Generate could answer “A paused ComfyUI job is blocking new generations” — on a machine that had never generated anything, while ComfyUI logged no incoming connection at all. The pause was real, but it was the consequence, not the cause: LDS was knocking at an address nobody was behind, and nothing on screen said so. The banner now checks whether the two programs are in touch and leads with the answer: “LDS cannot reach ComfyUI at <your URL>”, followed by the three things that are actually wrong when that happens — the address of the ComfyUI window you really use, a ComfyUI started without --listen (it only answers on its own machine), and LDS in Docker needing host.docker.internal instead of 127.0.0.1. The paused job is still held, and still clears the same way; it just stops being the accusation. Reported by jerkyjunky (Discord).',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-08-04-prompt-batch-grid-shows-every-prompt',
+    date: '2026-08-04',
+    title: 'A batch of prompts now shows all of its images — one labelled grid per prompt, instead of a grid with a single picture',
+    blurb:
+      'Ticking several saved prompts generated every one of them, but the results view only ever showed one: it identified a run by its seed AND its prompt, so a single launch of five prompts arrived as five separate “runs” in the run picker, and you were looking at one of them. Nothing was lost — the images were all there, behind a dropdown that should never have had them. A run is now identified by the launch itself, so the batch stays whole, and each prompt gets its own grid under the prompt that produced it (shortened to fit, in full when you hover). Runs from before this change are grouped exactly as they were.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-04-person-preflight-redraws-unreadable-samples',
+    date: '2026-08-04',
+    title: 'The folder check before 👤 Group by person no longer gives up when its sample lands on faceless images — it draws new ones',
+    blurb:
+      'On a real bank, four folders out of six came back with no verdict at all: “only 0 of 15 sampled images had a usable face — analyzed in full”. Scraped folders are full of crops, backs and blur, so a sample of fifteen can land entirely on images no face detector can read — and the biggest folder then spent fifteen embeddings for nothing before analysing all 3 546 of its images anyway, which is exactly the cost the check exists to avoid. A draw that cannot be read is now replaced: the check keeps drawing new images (never one it already tried, still spread across the whole folder) until it has about fifteen usable faces or hits a budget — at most 60 images per folder, or a quarter of it, whichever is smaller, and the dialog prints that ceiling next to the typical cost before you start. Three honest endings replace the old silence: a normal verdict; “looks like one person, on thin evidence — only 6 usable faces in 60 images tried”, still offered because a weak verdict that says how weak beats none; and, when almost nothing is readable, a fact about the folder rather than a promise the full pass would do better — it would not, it uses the same detector on the same images and re-reads the answers the check already cached.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-04-fp8-quantize-runs-where-torch-lives',
+    date: '2026-08-04',
+    title: 'Quantizing to fp8 now actually runs — it uses an environment that has torch, and says so before you click if none does',
+    blurb:
+      'On a real install the conversion could not run at all: it ended on “No module named ‘safetensors’”, because it tried to do the work inside the app’s own Python — which ships without torch on purpose, since torch is gigabytes and nothing else here needs it. It now runs the conversion in a separate interpreter that has the dependencies, exactly like ✨ Score and the masking passes already do: the one ✨ Score uses, ai-toolkit’s, or whichever you set as `quantize.python`. And because “can this machine do it at all” is something you should learn before committing, it is checked while the plan is drawn: an environment without torch disables the button and tells you which environments would work and what to install, instead of failing thirty seconds in — or, worse, after a 26 GB download.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-08-04-fp8-disk-guard-says-yes-when-it-fits',
+    date: '2026-08-04',
+    title: 'The fp8 quantizer no longer refuses a conversion that fits — and a refusal now shows its arithmetic',
+    blurb:
+      'Two things were wrong with the disk check, and both showed up on a real 25.6 GB model. The panel said the conversion was fine, and the click that followed refused it: the threshold was only applied when starting, never when planning, so the button stayed enabled right up to the moment it was too late. And that threshold was a flat 30 GB, while the file being written was 12.8 GB and the drive had 17.6 GB free — an operation that fit twice over, refused by a number of our own. The budget is now derived from the job itself (what is left to download, the fp8 file’s own ceiling, and 2 GB of working headroom), every term is named in the refusal so you can check it, and whatever the plan accepts the start no longer rejects. Free space is also measured on the volume that really holds the folder, which matters because a ComfyUI models folder is very often a junction onto another drive. And when a drive genuinely is too full, the refusal offers to write the file to another folder instead of ending there.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-08-04-image-grid-pages-big-datasets',
+    date: '2026-08-04',
+    title: 'A dataset of thousands of images no longer bogs the Images screen down',
+    blurb:
+      'The Images grid used to draw every photo of the dataset at once. On a 6 211-image dataset that is about 148 000 elements on one page — 6 211 thumbnails, 6 211 caption boxes, 60 000 buttons — and it showed: scrolling ran at roughly 20 frames a second on a desktop and 12 on a phone, and a single keystroke in a caption took a tenth of a second to appear. The grid now shows 500 images at a time with a ← Prev / Next → pager above and below it, the same way the Bank has always handled 24 000-image folders. Measured on that same 6 211-image dataset: scrolling back at full speed, typing in a caption instant again, switching a filter about seven times faster. Nothing about curation changed — “select all” still takes every image the current filters show across all pages (its tooltip now says so), a selection you started on one page is still there on the next, the counters, sort, filters and auto-triage all still read the whole dataset, and captions are still edited right on the tile. The pager only appears when there is more than one page.',
+    to: '/datasets?section=images',
+  },
+  {
     id: '2026-08-04-quantize-to-fp8-from-settings-storage',
     date: '2026-08-04',
     title: 'Shrink a model to fp8 from Settings ▸ Storage — no dataset, no training run',

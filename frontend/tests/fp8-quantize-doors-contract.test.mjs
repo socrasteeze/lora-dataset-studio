@@ -56,12 +56,22 @@ const SRC_FILES = walk(new URL('../src/', import.meta.url))
 
 // ---- one implementation ----------------------------------------------------
 
-test('exactly one component talks to /api/tools/fp8-quantize', () => {
+test('exactly one component talks to the quantize endpoints', () => {
+  // `/api/tools/fp8-quantize` is THE lane in this fork. Upstream moved its
+  // screens onto an `/api/tools/fp8-deliver` endpoint that can also FETCH a
+  // master from a private Hugging Face repo and write into ComfyUI's folder;
+  // that whole lane rides on the dense cloud delivery this fork rejects
+  // (Divergence 4), so it is deliberately absent here — see FORK_NOTES.
   const callers = SRC_FILES
     .filter(([, src]) => src.includes('/api/tools/fp8-quantize'))
     .map(([path]) => path.replace(/\\/g, '/').split('/src/')[1])
   assert.deepEqual(callers, ['components/dataset/Fp8QuantizeTool.jsx'],
     'a second file calling the quantize endpoints means the tool was copied, not reused')
+  const rejected = SRC_FILES
+    .filter(([, src]) => src.includes('/api/tools/fp8-deliver'))
+    .map(([path]) => path.replace(/\\/g, '/').split('/src/')[1])
+  assert.deepEqual(rejected, [],
+    'the fp8-deliver lane is rejected here — it fetches from the dense cloud delivery')
 })
 
 test('both hosts render the shared component instead of their own controls', () => {
@@ -83,7 +93,13 @@ const CONTROLS = [
 test('the Training-panel door keeps its accent frame and its own title', () => {
   const html = renderToStaticMarkup(createElement(Fp8QuantizeTool, {}))
   assert.match(html, /bg-sky-400\/10/)
+  // "an EXISTING model", "on this machine": both are load-bearing here and are
+  // NOT upstream's wording. Upstream dropped them when the block learned to
+  // reach a master that only exists in a private Hugging Face repo — the dense
+  // cloud delivery this fork rejects (Divergence 4). Here the tool is exactly
+  // what the title says: a file already on this machine.
   assert.match(html, /Quantize an existing model to fp8/)
+  assert.match(html, /on this machine into/)
   for (const re of CONTROLS) assert.match(html, re)
 })
 
