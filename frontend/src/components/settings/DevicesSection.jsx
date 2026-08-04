@@ -3,6 +3,7 @@ import { apiFetch, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
 import { INPUT_CLASS, Card } from './primitives'
 import ResetToDefault from './ResetToDefault'
+import { peerVersionNote } from './peerVersionNote.js'
 
 const ROLES = [
   { id: 'standalone', label: 'Standalone',
@@ -336,6 +337,14 @@ export default function DevicesSection({ config, setField, handleSave, configDef
                   {p.online ? (p.busy ? 'busy' : 'online') : 'offline'}
                   {p.capabilities?.vram_gb != null ? ` · ~${p.capabilities.vram_gb} GB` : ''}
                 </span>
+                {/* Only ever shown for an explicit disagreement — see
+                    peerVersionNote.js for why silence is the default. */}
+                {peerVersionNote(p.capabilities, status?.local_capabilities) && (
+                  <span className="text-xs text-amber-400"
+                    title="A peer on a different build still works; the two just disagree.">
+                    {peerVersionNote(p.capabilities, status?.local_capabilities)}
+                  </span>
+                )}
                 <button type="button" onClick={() => revoke(p.id)}
                   className="text-xs text-rose-400 hover:underline">Revoke</button>
               </li>

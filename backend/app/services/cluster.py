@@ -228,17 +228,37 @@ def local_capabilities() -> dict:
     # Identity first, so the degraded return below cannot re-run whatever just
     # failed. A device that answers with no gates is still addressable; one that
     # answers with nothing is a 500.
+    try:
+        from ..version import APP_VERSION
+    except Exception:      # noqa: BLE001 — identity must survive a bad import
+        APP_VERSION = ''
     base = {
         'device_name': device_display_name(),
         'node_id': ensure_node_id(),
         'kinds': sorted(_VALID_KINDS),
+        # A mixed-version cluster used to be survivable but undetectable: a peer
+        # on older code answers an unparseable stdout with a different shape and
+        # writes its vision results under a different key, and both are handled
+        # defensively here — but nothing ever SAID the two machines disagreed.
+        # `kinds` above is the same idea for capability rather than version: it
+        # lets the hub see that a peer does not know a kind it is about to be
+        # sent, instead of finding out from a failed job.
+        'app_version': APP_VERSION,
     }
     # Keep the wire payload small — peers/hub only need routing gates.
     try:
         return {
             **base,
             'comfyui': bool((caps.get('comfyui') or {}).get('reachable')),
-            'ollama': bool((caps.get('ollama') or {}).get('reachable')),
+            # `reachable` alone means the Ollama SERVER answered, not that the
+            # vision model is pulled. A peer with Ollama running and no model
+            # therefore passed the 🚩 Watermark / 📐 Framing gate, the hub staged
+            # the whole bank across the network, and the pass died on the first
+            # image. probe() computes `vision_model_ready` separately and it was
+            # simply never forwarded. Both are required now, so the gate answers
+            # the question it is actually asked.
+            'ollama': bool((caps.get('ollama') or {}).get('reachable')
+                           and (caps.get('ollama') or {}).get('vision_model_ready')),
             'aitoolkit': bool((caps.get('aitoolkit') or {}).get('valid')),
             'joycaption': bool((caps.get('captioners') or {}).get('joycaption')),
             'face_scoring': bool(caps.get('face_scoring')),

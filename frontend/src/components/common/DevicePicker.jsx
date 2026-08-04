@@ -1,6 +1,7 @@
 /** Run-on device picker for GPU jobs (Primary local + registered peers). */
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
+import { fetchDeviceList } from './deviceListCache.js'
 import { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
 
 /* The remembered choice lives in deviceMemory.js — pure, and therefore
@@ -17,12 +18,12 @@ export default function DevicePicker({ value, onChange, onDevice, kind = 'comfy'
 
   useEffect(() => {
     let cancelled = false
-    apiFetch(`/api/cluster/devices?kind=${encodeURIComponent(kind)}`)
-      .then((d) => {
-        if (!cancelled) setDevices(d.devices || [])
-      })
-      .catch(() => {
-        if (!cancelled) setDevices([])
+    // Shared, short-TTL fetch: two pickers are commonly mounted at once (the
+    // bank workspace holds one, opening Launch-all mounts another), and each
+    // request makes the hub re-probe every configured backend.
+    fetchDeviceList(kind, apiFetch)
+      .then((list) => {
+        if (!cancelled) setDevices(list)
       })
     return () => { cancelled = true }
   }, [kind])

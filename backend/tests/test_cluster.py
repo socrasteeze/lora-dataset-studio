@@ -34,7 +34,11 @@ def test_devices_list_includes_local(client):
 def _probe_all_installed():
     return {
         'comfyui': {'reachable': True, 'models': {}},
-        'ollama': {'reachable': True},
+        # A FULLY installed machine has the vision model pulled, not just a
+        # server that answers. `reachable` alone used to be enough to advertise
+        # the 'ollama' gate, which is how a peer with no model passed the
+        # Watermark/Framing check and died on the first image.
+        'ollama': {'reachable': True, 'vision_model_ready': True},
         'aitoolkit': {'valid': True},
         'captioners': {'joycaption': True, 'ollama': True},
         'face_scoring': True,
@@ -44,6 +48,51 @@ def _probe_all_installed():
         'training_visible': True,
         'python': {'version': '3.12.0', 'ml_supported': True},
     }
+
+
+def test_a_reachable_ollama_with_no_model_pulled_does_not_advertise_ollama(app, monkeypatch):
+    """The gate answers "can this machine caption/scan", not "is a server up".
+
+    Wrong version this pins: `local_capabilities` forwarded
+    `ollama.reachable` alone. `probe()` computes `vision_model_ready`
+    separately and it was simply never read, so a peer running Ollama with no
+    vision model pulled reported the gate as available. The hub then staged the
+    whole bank across the network for a Watermark or Framing pass, and the pass
+    failed on the first image — after the transfer, which is the expensive part.
+    """
+    from app import capabilities
+    from app.services import cluster as cluster_svc
+
+    def _server_up_no_model():
+        caps = _probe_all_installed()
+        caps['ollama'] = {'reachable': True, 'vision_model_ready': False}
+        return caps
+
+    monkeypatch.setattr(capabilities, 'probe', _server_up_no_model)
+    monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: 24.0)
+    with app.app_context():
+        caps = cluster_svc.local_capabilities()
+
+    assert caps['ollama'] is False
+    # Everything else is unaffected — this is one gate, not a blanket refusal.
+    assert caps['bank_scoring'] is True
+    assert caps['joycaption'] is True
+
+
+def test_the_capability_blob_carries_this_build_s_version(app, monkeypatch):
+    """There was no version handshake at all, so a mixed-version cluster was
+    survivable but undetectable. The blob now states what it runs; the picker
+    only comments when the two sides explicitly disagree."""
+    from app import capabilities
+    from app.services import cluster as cluster_svc
+
+    monkeypatch.setattr(capabilities, 'probe', _probe_all_installed)
+    monkeypatch.setattr(capabilities, 'gpu_vram_gb', lambda: 24.0)
+    with app.app_context():
+        caps = cluster_svc.local_capabilities()
+
+    assert 'app_version' in caps
+    assert isinstance(caps['app_version'], str)
 
 
 def test_local_capabilities_on_a_fully_installed_machine(app, monkeypatch):
