@@ -1106,8 +1106,7 @@ const TOPICS = [
     title: 'Why a quantized checkpoint is refused as a training base',
     keywords: ['quantized', 'quantised', 'fp8', 'int8', 'gguf', 'custom weights',
       'base', 'refused', 'inference only', 'training', 'bf16', 'fp16', 'error'],
-    guide: { chapter: 'dataset-guide',
-      anchor: 'why-a-quantized-checkpoint-is-refused-as-a-training-base' },
+    guide: { chapter: 'dataset-guide', anchor: '10-local-fp8-model-conversion' },
     app: { route: '/datasets?section=training' } },
   // Dual captions is a per-run Advanced training option (not a global Setting),
   // so it points at the dataset guide's dedicated section rather than
