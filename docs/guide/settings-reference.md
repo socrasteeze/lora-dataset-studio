@@ -694,11 +694,23 @@ first, which nobody who simply downloaded a model ever opens.
   as a smaller model.
 - **It refuses before you click, not after.** Type a path and the plan appears
   under the field: the source size, the name it will write, the expected size and
-  how many matrices are quantized. A file that is **already quantized** and a
-  **LoRA/adapter** are refused there, with the reason, and the button stays
-  disabled. Reading the plan costs a few kilobytes of file header.
+  how many matrices are quantized. A file that is **already quantized**, a
+  **LoRA/adapter**, an output that already exists and a drive without room are
+  refused *there*, with the reason, and the button stays disabled. Reading the
+  plan costs a few kilobytes of file header. Every condition that would stop the
+  conversion is evaluated here: a refusal that only existed at start time left
+  the button enabled and landed after the user had committed.
+- **The disk budget is derived, not a flat number.** The fp8 file's own ceiling
+  plus 2 GB of working headroom, against the free space of the volume that
+  really holds the destination (`realpath` first — model folders are often
+  junctions onto another drive). A flat 30 GB floor used to refuse a 12.8 GB
+  conversion on a drive with 17.6 GB free.
 - **It runs on the CPU**, one conversion at a time app-wide, so it never competes
   with ComfyUI or a training run for VRAM. It is disk-bound (measured ~1.2 GB/s).
+- **It runs in a separate Python**, the one that has `torch` and `safetensors` —
+  this app installs without them on purpose. See `quantize.python` in
+  *Config-file-only settings*. An environment that cannot do the work is a
+  refusal in the plan, naming what to install.
 - **fp8 is a one-way, inference-only export.** A quantized file is refused as a
   training base, so keep the full-precision one if you may ever want to continue,
   merge or re-quantize that model. And this is **not** the `quantize` training
@@ -950,6 +962,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `wd14.python` | Python interpreter that runs the 🔖 WD14 tagger (empty = reuse `masks.python`, then the current interpreter). |
 | `wd14.models_root` | Directory where the WD14 model files are stored/downloaded (empty = `data/models/wd14`). |
 | `wd14.threshold` | Confidence cut for the 🔖 Tags pass, 0.05–0.95 (default `0.35`). |
+| `quantize.python` | Python interpreter that runs the **fp8 conversion** (empty = the one ✨ Score uses, then ai-toolkit's, then the app's own). The conversion needs `torch` and `safetensors`, which this app deliberately does **not** install — torch is gigabytes and nothing else here needs it — so it runs in a subprocess, like the scoring and masking passes. The chosen interpreter is probed while the *plan* is drawn: one that lacks the packages disables the button with the reason and the `pip install` line, instead of failing after the click (or after a 26 GB download). |
 | `bank_scoring.python` | Python interpreter that runs the ✨ Score pass (empty = the app's own). Auto-filled by Setup with a CPU-only environment; repointable at any CUDA interpreter already on the machine via the bank's **⚡ Use a GPU Python I already have** picker, which verifies every dependency first and never installs into an environment it did not create. |
 | `watermark.python` | Python interpreter used to run the LaMa watermark-inpainting subprocess (empty = reuse `masks.python`, then the current interpreter). |
 | `watermark.device` | LaMa processing device: `auto` (CUDA when available, otherwise CPU), `cuda`, or `cpu`. |
