@@ -633,10 +633,21 @@ def _mirror_log(client, run: PeerTrainingRun, offset: int) -> int:
                  f'(what follows is a fresh tail, not a continuation) ---\n') + chunk
     if chunk:
         try:
+            # The re-attach path does not create this folder — only `launch`
+            # does — so a supervisor that comes back after the run folder was
+            # moved or cleaned would otherwise fail every append.
+            os.makedirs(os.path.dirname(run.log_path), exist_ok=True)
             with open(run.log_path, 'a', encoding='utf-8') as fh:
                 fh.write(chunk)
         except OSError:
+            # Do NOT advance the cursor past bytes that were never written.
+            # While it lived in a local variable this only lost the chunk until
+            # the next restart; persisted, it would skip that stretch of the log
+            # for good. Returning the old offset re-requests the same bytes on
+            # the next poll, which costs one repeated read and self-heals the
+            # moment the path is writable again.
             logger.warning('peer_training: could not append to %s', run.log_path)
+            return offset
     nxt = (res or {}).get('offset')
     return int(nxt) if isinstance(nxt, int) else offset
 
