@@ -351,6 +351,12 @@ _SCHEMA_ADDITIONS = (
     # no groups on it, and every pinned picture keeps the geometry it had.
     ('canvas_image_node', 'group_id', 'VARCHAR(40)'),
     ('canvas_image_node', 'group_pos', 'INTEGER'),
+    # How much of a peer run's REMOTE log has already been mirrored. Without it
+    # the watcher's cursor restarted at 0 after an app restart and appended the
+    # whole run's log to the mirror a second time. NOT NULL DEFAULT 0 so a row
+    # written before this column reads as "nothing mirrored yet" rather than
+    # NULL, which the offset arithmetic would have to special-case.
+    ('peer_training_run', 'log_offset', 'INTEGER NOT NULL DEFAULT 0'),
 )
 
 # Indexes that only a FRESH database ever got. `index=True` on a model column is
