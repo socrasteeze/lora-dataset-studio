@@ -98,6 +98,13 @@ Run through this before calling a wave done:
 
 ## Fork sync (upstream)
 
+**The procedure lives in [`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md)** —
+ordered steps, the derivation commands (never read a file list or a count out of
+prose; every hand-maintained one here has drifted), the gate commands as CI
+invokes them, and the expected-failure baseline for a Windows dev box. Start
+there, then read the divergence sections of `FORK_NOTES.md` for the window you
+are merging.
+
 This repo is a fork. Before/after `git merge upstream/main`, follow
 `FORK_NOTES.md` — especially **Divergence 1 (local-only generation)** and the
 **Merge diagnostics** section (read it *before* touching a single conflict —

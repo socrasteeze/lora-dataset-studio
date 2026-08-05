@@ -35,6 +35,8 @@ This is the documentation index for LoRA Dataset Studio. The root [README](../RE
 | [Roadmap](../README.md#roadmap) | Directions currently planned, without date promises |
 | [Changelog](../CHANGELOG.md) | Shipped improvements rolled out of the README |
 | [Contributing](../CONTRIBUTING.md) | Development setup, tests and pull-request conventions |
+| [Upstream sync](UPSTREAM_SYNC.md) | **Fork maintainers only** — how to merge `upstream/main` into this fork: ordered procedure, derivation commands, verification gates and the expected-failure baseline |
+| [Fork notes](../FORK_NOTES.md) | **Fork maintainers only** — what diverges from upstream and why, the merge diagnostics, and the wave-by-wave record |
 | [Design specs](specs/) | Dated records of why a change was built the way it was — read before reworking one of these areas |
 | [Code of Conduct](../CODE_OF_CONDUCT.md) | Community expectations |
 | [License](../LICENSE) | PolyForm Noncommercial License 1.0.0 |
