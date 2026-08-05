@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-05-a-remote-run-is-not-lost-when-the-link-drops',
+    date: '2026-08-05',
+    title: 'A run on your other machine is no longer written off the moment this one cannot see it',
+    blurb:
+      'Four more repairs to “Train on another machine”, all of them about telling the truth when something goes wrong at this end. If the link went quiet for a minute — the other machine restarting, the network blinking, this app booting before it — the run was declared failed, and that was final: nothing ever looked at it again, while the GPU over there carried on training for hours. Silence now says so and stays open, and the run is picked back up when this app restarts; ⏹ Stop ends it for good if you would rather give up, and Stop now works on such a run at all, which it did not before — the dataset could otherwise stay locked to a run nothing was watching. A training that finished but whose files could not be copied back is reported as finished with a note about the copy, instead of being relabelled a failure that lost the run. And a run keeps talking to the machine it was actually sent to, so changing your ai-toolkit address mid-run no longer points it at a different computer, where it would read someone else’s job or none at all.',
+    to: '/settings/training',
+  },
+  {
+    id: '2026-08-05-restarting-mid-remote-run-picks-up-where-it-left-off',
+    date: '2026-08-05',
+    title: 'Restarting the app during a run on your other machine no longer garbles its log or loses the run',
+    blurb:
+      'Two more faults in the “Train on another machine” lane, both of which only showed up when this app stopped and started while a run was in flight — closing an update, a reboot, a crash. The log came back doubled: the app forgot how much of it it had already copied, asked the other machine for the whole thing again, and appended a second copy underneath the first, so the run appeared to happen twice, step counter and all. It now remembers its place, and picks up exactly where it left off. Separately, if the app stopped in the very small window between creating the job on the other machine and starting it, the job was left sitting there having never run — and on the next start this app read that as a run that had finished, marked it stopped, and went looking for weights that were never written. It now says the job reached that machine but was never started, and invites you to train again, which picks the same job back up.',
+    to: '/settings/training',
+  },
+  {
     id: '2026-08-05-remote-training-brings-whole-checkpoints-home',
     date: '2026-08-05',
     title: 'A LoRA trained on your other machine can no longer come home half-copied',    blurb:

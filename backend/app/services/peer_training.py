@@ -110,6 +110,31 @@ def _client():
     return RemoteAiToolkit(url, token)
 
 
+def _client_for(run: PeerTrainingRun):
+    """The client for a run ALREADY under way, addressed at the machine it was
+    sent to rather than at whatever the settings say now.
+
+    `base_url` was recorded at launch and then never read: every poll rebuilt
+    the client from live config. Change the ai-toolkit address while a run is in
+    flight — or re-attach after a restart that followed such a change — and the
+    supervisor would go on polling job ids against a DIFFERENT machine. Ids are
+    per-database, so the likely answers are a 404 that reads as "the job is
+    gone" or, worse, a job that happens to share the id and reports someone
+    else's progress into this run.
+
+    The token still comes from config: it is not stored per run, and a machine
+    that has been repointed usually needs the new one anyway. If the recorded
+    address is dead this now fails honestly as lost contact, which is the right
+    answer — it is a truthful "I cannot reach the machine that has your run"
+    rather than a confident report about the wrong one.
+    """
+    url = (run.base_url or '').strip().rstrip('/')
+    if not url:
+        return _client()
+    from .aitoolkit_remote import RemoteAiToolkit
+    return RemoteAiToolkit(url, _endpoint()[1])
+
+
 def machines() -> list[dict]:
     """Every GPU this app can send a training run to.
 
@@ -243,11 +268,27 @@ def request_stop(run_id: int) -> bool:
     if run is None or run.status in PeerTrainingRun.TERMINAL:
         return False
     _set(run, stop_requested_at=datetime.utcnow(), phase_detail='Stopping…')
+    reached = True
     try:
         if run.remote_job_id:
-            _client().stop_job(run.remote_job_id)
+            _client_for(run).stop_job(run.remote_job_id)
     except Exception as e:      # noqa: BLE001 — the flag is the durable part
+        reached = False
         logger.warning('peer_training: stop request did not reach the job: %s', e)
+
+    # A run with no supervisor has to be finalised HERE, because the flag above
+    # is only ever acted on by a watcher, and this lane deliberately leaves a
+    # run non-terminal when contact is lost. Without this, Stop on such a run
+    # set a flag nobody would ever read: the row stayed non-terminal for ever
+    # and went on holding the dataset's single-run lock, so the one action
+    # offered for getting out of that state did nothing at all.
+    with _threads_lock:
+        watched = run.id in _threads
+    if not watched:
+        _set(run, status='stopped', finished_at=datetime.utcnow(),
+             phase_detail=('Stopped.' if reached else
+                           f'Stopped here. {run.machine_label} could not be '
+                           'reached, so the job may still be running there.'))
     return True
 
 
@@ -465,8 +506,22 @@ def _supervise(app, run_id: int, job_config: dict | None = None) -> None:
             _watch(run)
         except Exception as e:      # noqa: BLE001 — a supervisor must not die silently
             logger.exception('peer_training: run %s failed', run_id)
-            _set(run, status='failed', error=str(e)[:2000],
-                 phase_detail='', finished_at=datetime.utcnow())
+            # Only if `_watch` had not already reached a verdict. It sets the
+            # terminal status BEFORE fetching the weights, so anything that
+            # raises during the fetch — a save_root that cannot be created, a
+            # disk that filled — used to come through here and rewrite a run
+            # that genuinely COMPLETED as 'failed'. The training really did
+            # finish and its checkpoints really are on the other machine; a
+            # copy-back problem is a phase_detail, not a different outcome.
+            try:
+                db.session.refresh(run)
+            except Exception:      # noqa: BLE001 — a detached row keeps its value
+                pass
+            if run.status in PeerTrainingRun.TERMINAL:
+                _set(run, phase_detail=f'Finished, but: {str(e)[:500]}')
+            else:
+                _set(run, status='failed', error=str(e)[:2000],
+                     phase_detail='', finished_at=datetime.utcnow())
         finally:
             with _threads_lock:
                 _threads.pop(run_id, None)
@@ -503,12 +558,23 @@ def _submit(run: PeerTrainingRun, job_config: dict | None) -> None:
     # "never sent" — which would abandon a job actually training over there.
     _set(run, remote_job_id=job_id)
     client.start_job(job_id, gpu_ids=run.gpu_ids)
+    # Only once the start has RETURNED. Everything between the line above and
+    # this one is the window where the job exists and has never run, and this
+    # stamp is what lets the next boot tell that state apart from a job that
+    # ran and stopped — both of which read as 'stopped' on the far side.
+    _set(run, started_at=datetime.utcnow())
 
 
 def _watch(run: PeerTrainingRun) -> None:
-    client = _client()
+    client = _client_for(run)
     failures = 0
-    log_offset = 0
+    # Resume the mirror where the last supervisor left it. A fresh launch has 0
+    # here; a re-attach after a restart has the real cursor, which is the whole
+    # point — starting from 0 asks the peer for the entire log again, and since
+    # a valid offset is not a truncation the answer carries `reset: false`, so
+    # `_mirror_log` appends the run's whole history to the mirror a second time
+    # and the restart marker cannot fire to explain it.
+    log_offset = run.log_offset or 0
     have_samples: set[str] = set()
 
     while True:
@@ -527,8 +593,26 @@ def _watch(run: PeerTrainingRun) -> None:
         except Exception as e:      # noqa: BLE001
             failures += 1
             if failures >= MAX_POLL_FAILURES:
-                _set(run, status='failed', finished_at=datetime.utcnow(),
-                     error=f'lost contact with {run.machine_label}: {e}')
+                # NOT terminal. Losing contact says nothing about the RUN — the
+                # job is very likely still training over there; what died is the
+                # conversation. Marking it 'failed' put it in TERMINAL, which
+                # drops it out of `active_runs()`, and `resume_supervisors` only
+                # ever re-attaches to those — so the one status that meant "we
+                # cannot see it any more" also guaranteed we would never look
+                # again, while the GPU carried on for hours. Boot is when this
+                # is most likely to fire, too: a minute of silence is exactly
+                # what an ai-toolkit still starting up looks like.
+                #
+                # Left non-terminal, the next boot re-attaches and picks the run
+                # back up. If the machine is really gone, Stop ends it — and
+                # `request_stop` finalises a run nothing is watching rather than
+                # waiting for a supervisor that will never answer.
+                _set(run, phase_detail=(
+                    f'Lost contact with {run.machine_label} ({e}). The run may '
+                    'still be going there — this will re-attach when the app '
+                    'restarts. Press ⏹ Stop to give up on it.'))
+                logger.warning('peer_training: lost contact with run %s; left '
+                               'non-terminal for a later re-attach', run.id)
                 return
             _set(run, phase_detail=f'{run.machine_label} is not answering…')
             continue
@@ -554,20 +638,54 @@ def _watch(run: PeerTrainingRun) -> None:
         _mirror_samples(client, run, have_samples)
 
         remote_status = str(remote.get('status') or '')
+
+        # 'stopped' is ai-toolkit's Prisma DEFAULT, so it is also what a job
+        # that has NEVER RUN reads as — `POST /api/jobs` creates the row in that
+        # state and only `GET /api/jobs/<id>/start` moves it to 'queued'. The
+        # gap between those two calls is not theoretical: `_submit` records the
+        # job id BEFORE starting it, deliberately, so that a start which times
+        # out is not mistaken for a job that was never sent. Crash in that gap
+        # and the re-attach path skips `_submit` entirely (`_supervise` only
+        # submits when there is no job id yet), so the first poll of the next
+        # boot sees a job sitting at its creation default — and read as a
+        # terminal 'stopped' that meant the run was quietly marked finished and
+        # asked to hand over weights that were never written.
+        #
+        # `run.status` is what separates the two, and it survives the restart
+        # that causes this: `_submit` sets 'queued' and only a poll that has
+        # actually seen the job live moves it on. So 'queued' here means no poll
+        # has ever succeeded, which a genuinely finished run cannot be.
+        # `started_at is None` is the precise half of this test and the reason
+        # the column exists; the other two conditions keep a row that PREDATES
+        # the column (NULL because it was never written, not because no start
+        # happened) from being misread — such a run has been seen live, so its
+        # status has moved past 'queued'.
+        if (remote_status == 'stopped' and run.started_at is None
+                and run.status == 'queued'
+                and not int(remote.get('step') or 0)):
+            _set(run, status='failed', finished_at=datetime.utcnow(),
+                 phase_detail='',
+                 error=f'the job reached {run.machine_label} but was never '
+                       'started — this app stopped between creating it and '
+                       'launching it. Train again to pick it back up.')
+            return
+
         _set(run,
              step=int(remote.get('step') or 0),
              total_steps=remote.get('total_steps') or run.total_steps,
              status='running' if remote_status in ('running', 'queued') else run.status,
+             log_offset=log_offset,
              phase_detail=(remote.get('info') or '')[:2000])
 
         if remote_status in REMOTE_TERMINAL_STATUS:
             # One last pass at both: the final log lines and the last sample are
             # written after the poll that saw the run still running.
-            _mirror_log(client, run, log_offset)
+            log_offset = _mirror_log(client, run, log_offset)
             _mirror_samples(client, run, have_samples)
             failed = remote_status == 'error'
             _set(run,
                  status=REMOTE_TERMINAL_STATUS[remote_status],
+                 log_offset=log_offset,
                  finished_at=datetime.utcnow(),
                  phase_detail='' if failed else 'Finished',
                  error=(remote.get('info') or 'the run failed on that machine') if failed else None)
@@ -599,10 +717,21 @@ def _mirror_log(client, run: PeerTrainingRun, offset: int) -> int:
                  f'(what follows is a fresh tail, not a continuation) ---\n') + chunk
     if chunk:
         try:
+            # The re-attach path does not create this folder — only `launch`
+            # does — so a supervisor that comes back after the run folder was
+            # moved or cleaned would otherwise fail every append.
+            os.makedirs(os.path.dirname(run.log_path), exist_ok=True)
             with open(run.log_path, 'a', encoding='utf-8') as fh:
                 fh.write(chunk)
         except OSError:
+            # Do NOT advance the cursor past bytes that were never written.
+            # While it lived in a local variable this only lost the chunk until
+            # the next restart; persisted, it would skip that stretch of the log
+            # for good. Returning the old offset re-requests the same bytes on
+            # the next poll, which costs one repeated read and self-heals the
+            # moment the path is writable again.
             logger.warning('peer_training: could not append to %s', run.log_path)
+            return offset
     nxt = (res or {}).get('offset')
     return int(nxt) if isinstance(nxt, int) else offset
 
@@ -677,7 +806,18 @@ def _fetch_checkpoints(client, run: PeerTrainingRun) -> None:
         _set(run, phase_detail=f'Trained on {run.machine_label}, but the file '
                                f'list could not be read: {e}')
         return
-    os.makedirs(dest_dir, exist_ok=True)
+    # Guarded: this is the one statement in the whole terminal path that could
+    # raise AFTER the run has been declared finished, and `_supervise`'s
+    # catch-all would then have rewritten a completed run as a failed one.
+    # A destination that cannot be made is a copy-back problem — reported, with
+    # the weights still safe on the machine that trained them.
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except OSError as e:
+        _set(run, phase_detail=f'Trained on {run.machine_label}, but the local '
+                               f'folder could not be created ({e}) — the '
+                               'weights are still on that machine.')
+        return
     weights = [f for f in files
                if isinstance(f, dict) and str(f.get('path', '')).endswith('.safetensors')]
     for i, entry in enumerate(weights, 1):
