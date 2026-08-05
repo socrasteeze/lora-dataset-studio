@@ -508,7 +508,13 @@ def _submit(run: PeerTrainingRun, job_config: dict | None) -> None:
 def _watch(run: PeerTrainingRun) -> None:
     client = _client()
     failures = 0
-    log_offset = 0
+    # Resume the mirror where the last supervisor left it. A fresh launch has 0
+    # here; a re-attach after a restart has the real cursor, which is the whole
+    # point — starting from 0 asks the peer for the entire log again, and since
+    # a valid offset is not a truncation the answer carries `reset: false`, so
+    # `_mirror_log` appends the run's whole history to the mirror a second time
+    # and the restart marker cannot fire to explain it.
+    log_offset = run.log_offset or 0
     have_samples: set[str] = set()
 
     while True:
@@ -554,20 +560,48 @@ def _watch(run: PeerTrainingRun) -> None:
         _mirror_samples(client, run, have_samples)
 
         remote_status = str(remote.get('status') or '')
+
+        # 'stopped' is ai-toolkit's Prisma DEFAULT, so it is also what a job
+        # that has NEVER RUN reads as — `POST /api/jobs` creates the row in that
+        # state and only `GET /api/jobs/<id>/start` moves it to 'queued'. The
+        # gap between those two calls is not theoretical: `_submit` records the
+        # job id BEFORE starting it, deliberately, so that a start which times
+        # out is not mistaken for a job that was never sent. Crash in that gap
+        # and the re-attach path skips `_submit` entirely (`_supervise` only
+        # submits when there is no job id yet), so the first poll of the next
+        # boot sees a job sitting at its creation default — and read as a
+        # terminal 'stopped' that meant the run was quietly marked finished and
+        # asked to hand over weights that were never written.
+        #
+        # `run.status` is what separates the two, and it survives the restart
+        # that causes this: `_submit` sets 'queued' and only a poll that has
+        # actually seen the job live moves it on. So 'queued' here means no poll
+        # has ever succeeded, which a genuinely finished run cannot be.
+        if (remote_status == 'stopped' and run.status == 'queued'
+                and not int(remote.get('step') or 0)):
+            _set(run, status='failed', finished_at=datetime.utcnow(),
+                 phase_detail='',
+                 error=f'the job reached {run.machine_label} but was never '
+                       'started — this app stopped between creating it and '
+                       'launching it. Train again to pick it back up.')
+            return
+
         _set(run,
              step=int(remote.get('step') or 0),
              total_steps=remote.get('total_steps') or run.total_steps,
              status='running' if remote_status in ('running', 'queued') else run.status,
+             log_offset=log_offset,
              phase_detail=(remote.get('info') or '')[:2000])
 
         if remote_status in REMOTE_TERMINAL_STATUS:
             # One last pass at both: the final log lines and the last sample are
             # written after the poll that saw the run still running.
-            _mirror_log(client, run, log_offset)
+            log_offset = _mirror_log(client, run, log_offset)
             _mirror_samples(client, run, have_samples)
             failed = remote_status == 'error'
             _set(run,
                  status=REMOTE_TERMINAL_STATUS[remote_status],
+                 log_offset=log_offset,
                  finished_at=datetime.utcnow(),
                  phase_detail='' if failed else 'Finished',
                  error=(remote.get('info') or 'the run failed on that machine') if failed else None)

@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-05-restarting-mid-remote-run-picks-up-where-it-left-off',
+    date: '2026-08-05',
+    title: 'Restarting the app during a run on your other machine no longer garbles its log or loses the run',
+    blurb:
+      'Two more faults in the “Train on another machine” lane, both of which only showed up when this app stopped and started while a run was in flight — closing an update, a reboot, a crash. The log came back doubled: the app forgot how much of it it had already copied, asked the other machine for the whole thing again, and appended a second copy underneath the first, so the run appeared to happen twice, step counter and all. It now remembers its place, and picks up exactly where it left off. Separately, if the app stopped in the very small window between creating the job on the other machine and starting it, the job was left sitting there having never run — and on the next start this app read that as a run that had finished, marked it stopped, and went looking for weights that were never written. It now says the job reached that machine but was never started, and invites you to train again, which picks the same job back up.',
+    to: '/settings/training',
+  },
+  {
     id: '2026-08-05-remote-training-brings-whole-checkpoints-home',
     date: '2026-08-05',
     title: 'A LoRA trained on your other machine can no longer come home half-copied',

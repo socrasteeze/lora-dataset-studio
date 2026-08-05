@@ -910,6 +910,18 @@ class PeerTrainingRun(db.Model):
     # log into the SAME path a local run would have written means every one of
     # them works against a peer run without knowing it is one.
     log_path = db.Column(db.Text)
+    # How many bytes of the REMOTE log have already been mirrored into
+    # `log_path`. Durable for the same reason the row is: the watcher holds
+    # this cursor in a local variable, and a restart re-enters `_watch` with a
+    # fresh one. At zero the peer answers with the whole log from byte 0 and
+    # `reset: false` (a valid offset is not a truncation), so the entire run so
+    # far was appended to the mirror a SECOND time, with no marker to say so —
+    # the restart marker cannot fire on a non-reset answer.
+    #
+    # Not derivable from the local file's size: `_mirror_log` can write bytes
+    # that never came from the remote log (the restart marker), after which
+    # file size and remote offset diverge for good.
+    log_offset = db.Column(db.Integer, default=0)
     step = db.Column(db.Integer, default=0)
     total_steps = db.Column(db.Integer)
     train_params = db.Column(db.Text)             # JSON: steps/variant/train_type/masked

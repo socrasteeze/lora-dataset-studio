@@ -1182,3 +1182,100 @@ def test_a_cleanly_ended_short_stream_is_not_promoted_as_a_checkpoint(configured
         with open(landed, 'rb') as fh:
             assert fh.read() == weights, (
                 'a truncated checkpoint must never be promoted to the final name')
+
+
+# ── 12. the re-attach path ───────────────────────────────────────────────────
+
+def test_a_restart_does_not_mirror_the_whole_log_twice(configured, peer, monkeypatch):
+    """The cursor into the remote log has to outlive the supervisor holding it.
+
+    WAS BROKEN AS: `_watch` opened with `log_offset = 0`, which is right for a
+    fresh launch and wrong for every re-attach. `resume_supervisors` re-enters
+    `_watch` with no memory, so it asked the peer for the log from byte 0; a
+    valid offset is not a truncation, so the answer carried `reset: false`, and
+    `_mirror_log` appended the run's entire history to the mirror a second time.
+    The restart marker could not fire to explain it — that needs `reset` true —
+    so the local log simply showed the run happening twice, step counter and
+    all, which is exactly what a reader uses the log to rule out.
+    """
+    from app.extensions import db
+
+    monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
+    first = 'step 1/1200\nstep 2/1200\n'
+    second = 'step 3/1200\nstep 4/1200\n'
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='restartlog', trigger='restartlogtrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+        job_id, log_path = run.remote_job_id, run.log_path
+
+        # One supervisor mirrors the first stretch and ends. (`_watch` only
+        # returns on a terminal status, so the leg is ended with one; what is
+        # under test is where the NEXT one starts reading, not how this one
+        # stopped.)
+        peer.write_log(job_id, first)
+        peer.on_poll[job_id] = [{'status': 'running', 'step': 2, 'total_steps': 1200},
+                                {'status': 'completed', 'step': 2, 'total_steps': 1200}]
+        peer_training._watch(run)
+
+        db.session.refresh(run)
+        assert run.log_offset == len(first), (
+            'the cursor must be recorded on the run, not only in the watcher — '
+            'a supervisor that dies takes a local variable with it')
+
+        # A second supervisor picks the same run up, which is all
+        # `resume_supervisors` does after a restart: `_watch` on an existing row.
+        peer_training._set(run, status='running', finished_at=None)
+        peer.write_log(job_id, second)
+        peer.on_poll[job_id] = [{'status': 'completed', 'step': 4, 'total_steps': 1200}]
+        peer_training._watch(run)
+
+    with open(log_path, encoding='utf-8') as fh:
+        mirrored = fh.read()
+    assert mirrored == first + second, (
+        'the re-attached watcher re-mirrored the log it already had; the local '
+        f'copy is {len(mirrored)} bytes for a {len(first + second)}-byte run')
+    assert mirrored.count('step 1/1200') == 1, 'the first step appears twice'
+
+
+def test_a_job_that_was_created_but_never_started_is_not_called_finished(
+        configured, peer, monkeypatch):
+    """`stopped` is ai-toolkit's creation DEFAULT as well as a real end state.
+
+    WAS BROKEN AS: `REMOTE_TERMINAL_STATUS` maps 'stopped' straight to a
+    finished run whose weights are worth collecting. But `POST /api/jobs`
+    creates the row already 'stopped' — only `GET /api/jobs/<id>/start` moves it
+    to 'queued' — and `_submit` deliberately records the job id BEFORE calling
+    start, so that a start which times out is not mistaken for a job never sent.
+    Crash in that gap and the next boot skips `_submit` (there is a job id now),
+    polls, sees the creation default, and quietly marked the run finished, then
+    asked for weights nothing had written. The run read as "stopped" for no
+    reason a user could see, and the job it left behind never ran at all.
+    """
+    from app.extensions import db
+
+    monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='neverstarted', trigger='neverstartedtrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+        job_id = run.remote_job_id
+
+        # Exactly the state a crash between create and start leaves behind: the
+        # job exists, carries its creation default, and has never stepped.
+        peer.jobs[job_id]['status'] = 'stopped'
+        peer.jobs[job_id]['step'] = 0
+        peer_training._set(run, status='queued')
+
+        peer_training._watch(run)
+        db.session.refresh(run)
+        status, error, detail = run.status, run.error or '', run.phase_detail or ''
+
+    assert status == 'failed', (
+        f'a job that never started was reported as {status!r}; only a run that '
+        'really ran may end in a state that claims its weights are home')
+    assert 'never started' in error, f'the reason must say what happened: {error!r}'
+    assert 'Weights copied' not in detail, (
+        'nothing may claim weights came home from a run that never began')
