@@ -721,7 +721,13 @@ def _mirror_log(client, run: PeerTrainingRun, offset: int) -> int:
             # does — so a supervisor that comes back after the run folder was
             # moved or cleaned would otherwise fail every append.
             os.makedirs(os.path.dirname(run.log_path), exist_ok=True)
-            with open(run.log_path, 'a', encoding='utf-8') as fh:
+            # newline='' — this is a byte-faithful MIRROR of the peer's log, and
+            # the offset arithmetic below only holds if it stays one. Python's
+            # text mode translates '\n' to os.linesep on write, so on Windows
+            # every mirrored line grew by one byte: the local copy drifted from
+            # the remote it is supposed to reproduce, and the cursor this
+            # function returns stopped agreeing with the file it wrote.
+            with open(run.log_path, 'a', encoding='utf-8', newline='') as fh:
                 fh.write(chunk)
         except OSError:
             # Do NOT advance the cursor past bytes that were never written.

@@ -64,19 +64,40 @@ files is not a baseline. Record the failure **list**, not just the total.
 
 ### Expected failures on a Windows dev box
 
-These are green on CI (Linux) and red here. They are environment, not damage.
-Verified 2026-08-05:
+**Know which OS each CI job runs on before you call anything "environment".**
+`.github/workflows/ci.yml`: **backend tests run on `windows-latest`**; the
+frontend job and the gate run on `ubuntu-latest`. So a Windows-specific backend
+failure is *not* a local quirk — CI reproduces it exactly.
 
-| Test | Why it fails here |
+| Test | Status |
 |---|---|
-| `test_watermarks.py::test_prefill_falls_back_to_telea_when_lama_absent` | no OpenCV in this environment; CI installs it |
-| `test_peer_training_over_http.py::test_log_mirroring_is_incremental_and_sends_its_offset` | text-mode `\n`→`\r\n`: one byte per line (`39 == 36`) |
-| `test_peer_training_over_http.py::test_a_truncated_remote_log_gets_one_restart_marker` | same (`16 == 15`) |
-| `test_peer_training_over_http.py::test_a_restart_does_not_mirror_the_whole_log_twice` | same (`26 == 24`) |
-| `test_peer_training_over_http.py::test_samples_are_fetched_once_into_the_folder_the_panel_reads` | asserts `%2F`; Windows encodes `\` as `%5C` |
+| `test_watermarks.py::test_prefill_falls_back_to_telea_when_lama_absent` | **Genuinely environment.** OpenCV is absent here; CI installs `opencv-python-headless` from `requirements-dev.txt`, so it is green there. |
+
+That is the whole list as of 2026-08-05. Everything else must be green.
 
 **This table is a snapshot, not a licence.** Confirm each against your own
 baseline run. A failure not in this table is damage, whoever wrote the test.
+
+> **How this table earned its warning.** On 2026-08-05 four
+> `test_peer_training_over_http.py` failures were recorded here as
+> "Windows-only, green on CI's Linux" and carried through a whole sync as
+> accepted baseline. The backend job runs on **Windows**, so CI had been red on
+> them since the file landed — three pushes in a row. The reasoning failed at
+> the cheapest possible check: reading `runs-on` for the job that was failing.
+> They are fixed now (`newline=''` on both the mirror and its test double; a
+> platform-aware separator assertion). **Before writing a failure off as
+> environment, name the CI job, read its `runs-on`, and say why that OS differs
+> from yours.** "It's a Windows thing" is not a reason when CI is Windows.
+
+Confirm CI's verdict directly rather than inferring it:
+
+```bash
+gh run list -R socrasteeze/lora-dataset-studio --limit 5
+gh run view <id> -R socrasteeze/lora-dataset-studio --log-failed
+```
+
+`gh` defaults to the **upstream parent** for a fork, so a bare `gh run list`
+shows perfectgf's CI, not yours. Always pass `-R`.
 
 ## 2 · Recon the window
 
