@@ -44,7 +44,7 @@ def test_scaled_fp8_export_is_refused(tmp_path):
         'blocks.0.attn.wq.scale_weight': ('F32', [], 4),
         'scaled_fp8': ('F8_E4M3', [2], 2),
     })
-    with pytest.raises(ValueError, match='inference-only quantized export'):
+    with pytest.raises(ValueError, match='packed inference export'):
         lt.assert_trainable_base_file(path)
 
 

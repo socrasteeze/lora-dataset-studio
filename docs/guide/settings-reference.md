@@ -145,9 +145,9 @@ Without the pack nothing breaks: upscales still run, they are just capped by the
   - `auto` — tile once the target short edge is past ~1536 px, or when the frame would not fit anyway. This is the recommended setting and the reason the pack is worth installing.
   - `always` — tile any frame bigger than a single tile, including below that crossover.
   - `never` — always full-frame. Pick this if you ever see a seam; the VRAM warning still applies.
-  On `auto` nothing is tiled below the crossover: the model is already at a comfortable size and a grid would only add seams. The pre-#32 rule (tile *only* when the frame would not fit) is deliberately not offered — it is the default the side-by-side refuted.
+  On `auto` nothing is tiled **at or below** the crossover: the model is already at a comfortable size and a grid would only add seams. The crossover has to be *passed*, not just reached — a 1536 px target at the default 1024 px tile runs full-frame, and so does a 768 px one if you dropped the tile to 512. The panel says which lane your configured target will take, so that decision is never silent. The pre-#32 rule (tile *only* when the frame would not fit) is deliberately not offered — it is the default the side-by-side refuted.
 - **Tile size** → `seedvr2.tile_px`. Range `512`–`2048` (snapped to a multiple of 64), default **`1024`** — the contributed value. **This is the memory dial of the engine**: a pass holds one tile at a time, so lowering it to 768 or 512 is what makes a large upscale finish on an 8 GB card, at the cost of more seams and more passes; raising it on a 24 GB card gives fewer seams and more context per tile. It also sizes the model's own **tiled VAE encode/decode**, which runs on the full-frame lane as well — so it lowers VRAM use even with no tiling pack installed. Try this before concluding a big upscale is impossible on your card.
-- **Start tiling above** → `seedvr2.tile_threshold`. Short edge past which `auto` tiles, in pixels. **`0`** (default) = derive it from the tile size (1.5×, i.e. the shipped 1536 px at a 1024 px tile) so the crossover follows the tile you chose. A positive value places it by hand: lower to tile sooner (safer on a small card), higher to keep more targets in a single fast pass. No effect on `always` or `never`.
+- **Start tiling above** → `seedvr2.tile_threshold`. Short edge past which `auto` tiles, in pixels — strictly *above*, so a target equal to this value still runs full-frame. **`0`** (default) = derive it from the tile size (1.5×, i.e. the shipped 1536 px at a 1024 px tile) so the crossover follows the tile you chose. A positive value places it by hand: lower to tile sooner (safer on a small card), higher to keep more targets in a single fast pass. No effect on `always` or `never`.
 
  LDS ports only the tiling itself — the original workflow also chained two further node packs to do arithmetic (counting tiles, normalising a pixel count), one of them GPL-3.0, and that arithmetic is done in Python here instead.
 
@@ -421,6 +421,15 @@ fixed sizes on purpose.
 | `ollama` | Ollama vision model only. |
 | `none` | No auto-captioning — you write them yourself. |
 
+`auto` is a **chain**, not a coin toss: JoyCaption captions the images it can in one
+batch, the Ollama vision model covers whatever is left, and on a **Concept** dataset
+Ollama rewrites JoyCaption's drafts. The two engines write in different styles, so one
+batch can come back in two voices. Every caption pass now reports which engine wrote
+what — in the toast, and on a line under the caption buttons (Captions ▸ Generate
+captions), e.g. *“8 by JoyCaption · 4 by Ollama”*. That line describes the last pass
+of the current session only; nothing is stored per image. Pick a single value above
+(or per dataset, in Captions ▸ ⚙️ Options) if you want one voice across a set.
+
 ### Watermark inpainting
 
 - **Processing device** → `watermark.device`. Where LaMa inpainting runs. Default **`auto`**. Options: `auto` (GPU when available, otherwise CPU), `cuda` (force GPU — pauses ComfyUI while cleaning), `cpu` (keep the GPU free). This only affects the **LaMa** engine.
@@ -527,6 +536,39 @@ dialog both went on advertising it.
 
 A base that provably belongs to another family (found on datasets created before
 this change) is reported as such in the panel and is not used.
+
+### Krea 2: the checkpoints on your disk are listed as bases
+
+The **Base** dropdown under *LoRA type = Krea 2* offers the official base **and**
+every Krea 2 checkpoint found in your ComfyUI `unet` / `diffusion_models` folders,
+including the roots declared in `extra_model_paths.yaml` — the same scan the Test
+Studio uses. That is how a full model one of your own runs delivered, or a
+community Krea 2 build, becomes something you can keep training on.
+
+The value stored is the **absolute path** of the file, not the ComfyUI folder name
+the Studio uses, because the trainer identifies a custom base by its being an
+absolute path and a cloud pod has to receive the actual file. A checkpoint the app
+can list but cannot resolve to a file on disk is left out of the dropdown rather
+than offered as a name a run would ignore.
+
+Each entry says what its format costs before you pick it:
+
+- **no tag** — full precision, nothing to report;
+- **`· fp8 cast`** — the weights are stored in fp8 under the tensor names a
+  full-precision file already had, with nothing extra. The trainer up-casts it as
+  it loads, and selecting it shows how many of the file's tensors are quantized
+  and how many significand bits that leaves. The lost precision does not come
+  back. The tag reads the *packing*, not the architecture: a file can be tagged
+  this way and still be refused at load for carrying a tensor the model family
+  does not declare;
+- **`· packed export`** — a ComfyUI scaled-fp8 / `comfy_quant` / int8 repack. It
+  carries decompression tables as extra tensors that a trainer's strict load
+  rejects, so the load fails outright. Selecting it is refused, and training is
+  blocked until another base is picked. Use the bf16/fp16 master instead — a
+  full-model run keeps it next to its fp8 twin and the Checkpoints panel lists it.
+
+With no ComfyUI folder configured the list falls back to the official base alone,
+and says so.
 
 ### Concept face masking
 
@@ -707,10 +749,15 @@ first, which nobody who simply downloaded a model ever opens.
   conversion on a drive with 17.6 GB free.
 - **It runs on the CPU**, one conversion at a time app-wide, so it never competes
   with ComfyUI or a training run for VRAM. It is disk-bound (measured ~1.2 GB/s).
-- **It runs in a separate Python**, the one that has `torch` and `safetensors` —
-  this app installs without them on purpose. See `quantize.python` in
-  *Config-file-only settings*. An environment that cannot do the work is a
-  refusal in the plan, naming what to install.
+- **It runs in a separate Python**, the one that has `torch` — this app installs
+  without it on purpose. See `quantize.python` in *Config-file-only settings*. An
+  environment that cannot do the work is a refusal in the plan, naming what to
+  install.
+- **Nothing is memory-mapped.** The checkpoint is read one tensor at a time, so
+  the size of the file has no bearing on whether it can be opened. Mapping a
+  26 GB file used to reserve 26 GB before reading a single number, which failed
+  outright — with a "paging file is too small" error — on any machine whose
+  pagefile was not unusually large.
 - **fp8 is a one-way, inference-only export.** A quantized file is refused as a
   training base, so keep the full-precision one if you may ever want to continue,
   merge or re-quantize that model. And this is **not** the `quantize` training
@@ -962,7 +1009,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `wd14.python` | Python interpreter that runs the 🔖 WD14 tagger (empty = reuse `masks.python`, then the current interpreter). |
 | `wd14.models_root` | Directory where the WD14 model files are stored/downloaded (empty = `data/models/wd14`). |
 | `wd14.threshold` | Confidence cut for the 🔖 Tags pass, 0.05–0.95 (default `0.35`). |
-| `quantize.python` | Python interpreter that runs the **fp8 conversion** (empty = the one ✨ Score uses, then ai-toolkit's, then the app's own). The conversion needs `torch` and `safetensors`, which this app deliberately does **not** install — torch is gigabytes and nothing else here needs it — so it runs in a subprocess, like the scoring and masking passes. The chosen interpreter is probed while the *plan* is drawn: one that lacks the packages disables the button with the reason and the `pip install` line, instead of failing after the click (or after a 26 GB download). |
+| `quantize.python` | Python interpreter that runs the **fp8 conversion** and the **LoRA→base merge** (empty = the one ✨ Score uses, then ai-toolkit's, then the app's own). Both need `torch`, which this app deliberately does **not** install — it is gigabytes and nothing else here needs it — so they run in a subprocess, like the scoring and masking passes. One setting governs both on purpose: "the Python on this machine that has torch" is one fact, and saying it twice is how the two drift apart. The chosen interpreter is probed while the *plan* is drawn: one that lacks the packages disables the button with the reason and the `pip install` line, instead of failing after the click (or after a 26 GB download). `torch` is the only module either of them needs: both read and write the safetensors format themselves rather than memory-mapping it, so an environment with torch alone is enough. |
 | `bank_scoring.python` | Python interpreter that runs the ✨ Score pass (empty = the app's own). Auto-filled by Setup with a CPU-only environment; repointable at any CUDA interpreter already on the machine via the bank's **⚡ Use a GPU Python I already have** picker, which verifies every dependency first and never installs into an environment it did not create. |
 | `watermark.python` | Python interpreter used to run the LaMa watermark-inpainting subprocess (empty = reuse `masks.python`, then the current interpreter). |
 | `watermark.device` | LaMa processing device: `auto` (CUDA when available, otherwise CPU), `cuda`, or `cpu`. |
