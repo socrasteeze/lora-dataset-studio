@@ -277,6 +277,19 @@ generation would start on top of it. Full details, including why an offline
 machine is greyed out rather than hidden:
 [Settings → Training](guide/settings-reference.md#train-on-another-machine).
 
+**When the link to that machine breaks.** Losing contact is not the same as
+losing the run, and the panel says which happened. If this app cannot reach the
+other machine for about a minute, the run is **not** written off — the job is
+most likely still training over there. The card says contact was lost, the run
+stays open, and it is picked back up when this app restarts. Press **⏹ Stop** if
+you would rather give up on it; that ends it here and says plainly that the job
+may still be running on the other machine. A run whose training **finished** but
+whose files could not be copied back is reported as finished, with the reason —
+the checkpoints exist, they are just still over there, and training again brings
+them home. A run that reached the other machine but was never actually started
+(this app closing at exactly the wrong moment) says that too, rather than
+appearing to have stopped for no reason; training again picks the same job up.
+
 **Stopping a training run.** The red **⏹ Stop training** button next to Train
 ends the run in progress — it is not a housekeeping button. It kills the training
 process, clears the pending local training queue, and hands the GPU back to
