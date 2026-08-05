@@ -1055,17 +1055,26 @@ def test_a_peer_that_goes_away_fails_the_run_and_names_the_machine(configured, p
         'nothing may be reported as brought home')
 
 
-# ── recorded defects ─────────────────────────────────────────────────────────
+# ── defects these tests were written to catch, now fixed ─────────────────────
+#
+# All three shipped, and all three were found by this file rather than by a
+# real run. They are kept as ordinary tests, with the broken behaviour recorded
+# in each docstring: the fix is one or two lines in every case, and a later
+# refactor could undo any of them without looking wrong.
 
-@pytest.mark.xfail(strict=True, reason=(
-    'DEFECT: _watch treats a JSON `null` job (the peer no longer has the row) '
-    'as a SUCCESSFUL poll. `remote = client.get_job(...) or {}` resets the '
-    'failure counter, zeroes run.step, and never matches a terminal status, so '
-    'the supervisor spins for ever on a run that is gone. peer_training.py:525'))
+
 def test_a_job_the_peer_no_longer_has_ends_the_run(configured, peer, monkeypatch):
     """A job deleted on the far side (ai-toolkit has a delete route) answers
     JSON `null` with HTTP 200. That is a definite answer — "there is no such
-    run" — and it should end the run, not read as "still going, step 0"."""
+    run" — and it should end the run, not read as "still going, step 0".
+
+    WAS BROKEN AS: `remote = client.get_job(...) or {}` in `_watch`. A `null`
+    body is HTTP 200, so it counted as a poll that went fine: the failure
+    counter reset, every field read back empty, and the empty status matched
+    neither the running set nor a terminal one. The supervisor polled a run
+    that no longer existed for ever, holding the dataset's single-run lock, so
+    that dataset could not be trained again until the app was restarted.
+    """
     from app.extensions import db
 
     monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
@@ -1092,19 +1101,20 @@ def test_a_job_the_peer_no_longer_has_ends_the_run(configured, peer, monkeypatch
         'kept going for ever; a null job is an answer, not a missed poll')
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    'DEFECT: a stream cut INSIDE one 256 KiB iter_content chunk makes the '
-    'resume loop give up after a single attempt. urllib3 2.x raises '
-    'IncompleteRead from the short read and DISCARDS the bytes it already had, '
-    'so `written` never advances; aitoolkit_remote.py:310 then sees '
-    '`got == before` and breaks. A host that cuts below 256 KiB cannot deliver '
-    'a checkpoint at all, however large the attempts budget is.'))
 def test_a_cut_inside_the_first_chunk_still_resumes(configured, peer):
     """Same fault as the resume test, one order of magnitude smaller.
 
-    The comment on `_download` says a retry continues "as long as the previous
-    attempt made progress" — and below one chunk, no attempt ever does. Nothing
-    is corrupted (the run reports the failure), but the file never arrives.
+    WAS BROKEN AS: `iter_content(chunk_size=1024 * 256)` plus a retry loop that
+    broke out the moment an attempt gained nothing. urllib3 2.x raises
+    `IncompleteRead` when the stream is cut mid-chunk and DISCARDS the bytes it
+    had already buffered (measured here: 40 000 read, 0 delivered), so an
+    attempt cut below one chunk wrote zero bytes, `got == before`, and the
+    transfer ended after a single try however large the attempts budget was.
+    Nothing was corrupted — the run reported the failure — but a host that cut
+    more often than 256 KiB could not deliver a checkpoint at all.
+
+    Fixed on both sides: the chunk shrank to 32 KiB so one cut costs less, and
+    a stalled attempt is now counted rather than treated as proof of death.
     """
     from app.extensions import db
 
@@ -1129,19 +1139,20 @@ def test_a_cut_inside_the_first_chunk_still_resumes(configured, peer):
         assert fh.read() == weights
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    'DEFECT: _fetch_checkpoints does not pass `expected_size`, although '
-    '/api/jobs/<id>/files returns `size` for every entry and _download accepts '
-    'it. peer_training.py:673 therefore treats a checkpoint like a sample: '
-    '"completion is a stream that ends without error". A transport that '
-    're-frames the response with connection-close (a proxy, a tunnel) can end a '
-    'TRUNCATED stream cleanly, and aitoolkit_remote.py:314 promotes the partial '
-    '.part file to the final name. A short .safetensors is then indistinguishable '
-    'from a good one until something tries to load it.'))
 def test_a_cleanly_ended_short_stream_is_not_promoted_as_a_checkpoint(configured, peer):
-    """The failure that would be silent, which is what makes it the expensive one.
+    """The failure that would have been silent, which is what made it the
+    expensive one.
 
-    The size is already on the wire — `list_files` returns it — so the fix costs
+    WAS BROKEN AS: `_fetch_checkpoints` called `download_public_file` without
+    `expected_size`, so a checkpoint was treated like a sample — "completion is
+    a stream that ends without error". A transport that re-frames the response
+    with connection-close (a proxy, a tunnel) ends a TRUNCATED stream cleanly,
+    and the partial `.part` was renamed onto the final `.safetensors`. Measured
+    here: 921 600 bytes advertised, 500 000 delivered, promoted to the real
+    filename with no `.part` left behind — indistinguishable from a good file
+    until something tried to load it, while the run said "Done. Weights copied".
+
+    The size was already on the wire (`list_files` returns it), so the fix is
     one keyword argument, and with it a short stream is just another resume
     point instead of a finished download.
     """

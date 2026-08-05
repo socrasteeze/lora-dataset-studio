@@ -16,6 +16,22 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = 30
 _UPLOAD_TIMEOUT = 300
+
+# How much of a cut stream is lost, and how many fruitless retries are allowed.
+#
+# urllib3 2.x raises `IncompleteRead` out of `iter_content` when the stream is
+# cut mid-chunk, and DISCARDS the bytes it had already buffered for that chunk
+# (measured: 40 000 bytes read, 0 delivered). So the chunk size is not a
+# throughput knob here, it is the size of the hole a single cut punches: at
+# 256 KiB a host that cuts more often than that could never advance a single
+# byte, however large the retry budget was. 32 KiB bounds the loss instead, and
+# costs nothing that matters — the loop is socket-bound, not CPU-bound.
+_DOWNLOAD_CHUNK = 32 * 1024
+# A cut that lands inside one chunk therefore shows up as an attempt that made
+# no progress. One of those is not proof the transfer is dead — a retry from
+# the same offset usually lands — so allow a couple before giving up, rather
+# than treating the first as fatal.
+_MAX_STALLED_ATTEMPTS = 3
 _UPLOAD_BATCH = 8
 _DATA_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.txt')
 
@@ -224,7 +240,10 @@ class RemoteAiToolkit:
         hosts' proxies cut the stream every ~0.5-2 MB (observed live
         2026-07-13 on 2 of 3 pods — an 85 MB checkpoint needed ~100 resumed
         connections); each retry continues from the current offset with an
-        HTTP Range header, as long as the previous attempt made progress.
+        HTTP Range header. An attempt that gains nothing is tolerated a few
+        times (_MAX_STALLED_ATTEMPTS) rather than ending the transfer, because
+        a cut inside a single chunk delivers zero bytes and says nothing about
+        whether the next request would succeed.
         With expected_size, completion means EXACTLY that many bytes (a clean
         EOF short of it is just another resume point); without it, completion
         is a stream that ends without error (small files: samples).
@@ -260,6 +279,7 @@ class RemoteAiToolkit:
                 pass
         got = os.path.getsize(tmp) if (resume and os.path.exists(tmp)) else 0
         want = int(expected_size or 0)
+        stalled = 0
         for _ in range(max(1, int(attempts))):
             before = got
             clean = False
@@ -280,7 +300,7 @@ class RemoteAiToolkit:
                             got = 0           # Range ignored -> full restart
                         written = got
                         with open(tmp, 'ab' if got else 'wb') as fh:
-                            for chunk in r.iter_content(chunk_size=1024 * 256):
+                            for chunk in r.iter_content(chunk_size=_DOWNLOAD_CHUNK):
                                 if should_cancel is not None and should_cancel():
                                     fh.flush()
                                     raise TransferCancelled(
@@ -307,13 +327,23 @@ class RemoteAiToolkit:
                 if got == want:
                     os.replace(tmp, dest_path)
                     return
-                if got > want or got == before:
-                    break                      # garbage, or no progress -> dead
+                if got > want:
+                    break                      # garbage from a different save
             else:
                 if clean:
                     os.replace(tmp, dest_path)
                     return
-                if got == before:
+            # An attempt that gained nothing used to end the transfer outright,
+            # which spent the whole retry budget on a single try: a cut inside
+            # one chunk delivers zero bytes (see _DOWNLOAD_CHUNK), so the very
+            # first stall killed a download that a second request would have
+            # completed. Count them instead, and only give up once several in a
+            # row say the same thing.
+            if got > before:
+                stalled = 0
+            else:
+                stalled += 1
+                if stalled >= _MAX_STALLED_ATTEMPTS:
                     break
         try:
             os.remove(tmp)

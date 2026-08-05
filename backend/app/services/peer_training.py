@@ -522,7 +522,7 @@ def _watch(run: PeerTrainingRun) -> None:
                 logger.warning('peer_training: could not forward the stop')
 
         try:
-            remote = client.get_job(run.remote_job_id) or {}
+            remote = client.get_job(run.remote_job_id)
             failures = 0
         except Exception as e:      # noqa: BLE001
             failures += 1
@@ -532,6 +532,23 @@ def _watch(run: PeerTrainingRun) -> None:
                 return
             _set(run, phase_detail=f'{run.machine_label} is not answering…')
             continue
+
+        # `null`, not a missing key: ai-toolkit's job route answers HTTP 200
+        # with a bare `null` when the row is gone (it has a delete route, and a
+        # reset database does it too). That is a definite ANSWER — "there is no
+        # such run" — and the one shape that must not be read as a poll that
+        # went fine. `... or {}` did exactly that: the failure counter reset,
+        # every field came back empty, `status` matched neither the running set
+        # nor a terminal one, and the supervisor polled a run that no longer
+        # existed for ever — holding the dataset's single-run lock with it, so
+        # it could never be trained again without a restart. ai-toolkit's own
+        # remote driver ends the run here for the same reason.
+        if remote is None:
+            _set(run, status='failed', finished_at=datetime.utcnow(),
+                 phase_detail='',
+                 error=f'{run.machine_label} no longer has this job — it was '
+                       'deleted there, or that machine lost its job database.')
+            return
 
         log_offset = _mirror_log(client, run, log_offset)
         _mirror_samples(client, run, have_samples)
@@ -670,7 +687,19 @@ def _fetch_checkpoints(client, run: PeerTrainingRun) -> None:
             continue
         _set(run, phase_detail=f'Fetching {name} ({i}/{len(weights)})…')
         try:
-            client.download_public_file(str(entry['path']), dest)
+            # `expected_size` is what makes a SHORT download a failure instead
+            # of a finished one. Without it `_download` treats "the stream
+            # ended without raising" as completion — right for a sample, wrong
+            # for a checkpoint: a transport that re-frames the response with
+            # connection-close (a proxy, a tunnel) ends a truncated stream
+            # cleanly, and the partial `.part` was then renamed onto the final
+            # `.safetensors`. Nothing distinguished it from a good file until
+            # something tried to load it, and the run still said "Done. Weights
+            # copied". The true size is already on the wire — `/api/jobs/<id>/
+            # files` returns it for every entry — so this costs one argument
+            # and turns a short read into just another resume point.
+            client.download_public_file(str(entry['path']), dest,
+                                        expected_size=entry.get('size'))
         except Exception as e:      # noqa: BLE001
             # Reported, but never turned into a failed run: the training itself
             # succeeded and the weights are still on that machine.
