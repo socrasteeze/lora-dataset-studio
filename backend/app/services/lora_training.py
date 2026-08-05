@@ -623,10 +623,37 @@ def _is_custom_weights(value) -> bool:
 
 
 def assert_trainable_base_file(path) -> dict:
-    """Refuse an inference-only quantized export as a training base."""
+    """Refuse a base the trainer CANNOT LOAD — and only that one — at selection.
+
+    The community publishes fp8/int8 repacks of every popular base (~10 GB
+    instead of ~26 GB) and they are the files most people already have on disk.
+    What makes one unusable is its FORMAT, not its bit width, and the two forms
+    behave differently (measured — see model_integrity's block comment):
+
+    * a STRUCTURED export (ComfyUI scaled fp8 / comfy_quant, int8 repacks, this
+      app's own fp8 twin) ships extra dequantization tensors, and ai-toolkit
+      loads a base with ``load_state_dict(..., strict=True)`` — the load itself
+      raises, immediately. Refused here, so the failure lands when the file is
+      PICKED rather than after the dataset export and (in the cloud lane) after
+      a GPU has been rented, for a few kilobytes of header.
+    * a BARE cast adds no key of its own; the loader up-casts it to the training
+      dtype and nothing in the PACKING stands in the way. Allowed —
+      `model_integrity.base_precision_warning` states what it costs instead. It
+      can still be refused at load for an unrelated reason (a tensor the
+      architecture does not declare); this guard reads the packing only, and its
+      wording is careful not to promise otherwise.
+
+    An earlier version of this docstring claimed the trainer "dies deep in the
+    first optimizer step". It does not, for either form, and that sentence was
+    used to justify scoping decisions elsewhere — hence the detail here.
+
+    Returns the report (``checked=False`` = unreadable header → deliberately
+    permissive: the integrity validator owns "this file is broken", and refusing
+    a base nobody could inspect would be worse than the failure it prevents).
+    """
     from . import model_integrity
     report = model_integrity.quantization_report(path)
-    if report.get('quantized'):
+    if not report.get('trainable_as_base', True):
         raise ValueError(model_integrity.QUANT_REFUSAL)
     return report
 
@@ -3933,12 +3960,15 @@ def find_run_collision(user_id, dataset_id, base_model=_PERSISTED,
         return None
     target = _run_name(ds, variant=variant) if base_model is _PERSISTED \
         else _run_name(ds, base_model, variant=variant)
-    others = (FaceDataset.query
-              .filter(FaceDataset.user_id == str(ds.user_id),
-                      FaceDataset.id != int(ds.id))
-              .all())
-    for o in others:
-        if _run_name(o) == target:
+    # Enumerated through `fds.list_datasets` — the library's own definition of
+    # "the datasets that exist" — rather than a raw FaceDataset query. A refusal
+    # is only actionable if the user can OPEN the dataset it names: colliding
+    # with a row that is not in the library blocks a training run with an error
+    # nobody can act on. Today the two sets are identical; keeping the single
+    # source means a future listing rule (hidden/archived rows) is honoured here
+    # for free instead of being a second place someone must remember.
+    for o in fds.list_datasets(ds.user_id):
+        if int(o.id) != int(ds.id) and _run_name(o) == target:
             return o
     return None
 
@@ -6418,7 +6448,7 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None,
         if ttype != 'krea':
             dense_issues.append('it is supported only for Krea 2')
         elif not _krea_is_raw(ds):
-            dense_issues.append('Krea-2-Raw is required (Turbo is not supported)')
+            dense_issues.append('Krea-2-Raw is required (Turbo not tested yet for dense runs)')
         if str(getattr(ds, 'train_base_model', None) or '').strip():
             dense_issues.append('custom base models are not supported')
         if slider:

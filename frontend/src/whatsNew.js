@@ -50,6 +50,78 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-auto-reject-shows-the-number-it-will-actually-reject',
+    date: '2026-08-04',
+    title: 'Auto-reject stops promising more than it can do',
+    blurb:
+      '🧹 Auto-reject offered “5,930 flagged” for blurry shots, and rejecting them did nothing — because those 5,930 had already been rejected by an earlier run, and the pass deliberately never re-flips a decision. The count announced was not the count the button acted on, so the honest conclusion was that the feature was broken. It was not: the number was. Each checkbox now shows how many still-undecided images that exact click would reject, so a second run says “0 to reject” instead of advertising work it will not do — and running it really does reject that many. The filter chips keep counting every image carrying the flag, rejected ones included, which is what you want when you click one to look at them. Two things that used to hide behind an identical 0 now say which they are: a flag whose pass never ran tells you to run it first, and the panel names how many images have never been scanned at all — invisible to every quality flag until 🔎 Scan reaches them, which is very different from being clean. 🚀 Launch all shows the same numbers, and says plainly that the scan runs first so they will grow.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-04-the-merge-form-keeps-what-you-typed',
+    date: '2026-08-04',
+    title: 'The merge tool stops emptying itself when the window changes shape',
+    blurb:
+      'Turning a phone to landscape — or anything else that reshaped the page — folded “Merge a LoRA into a base checkpoint” shut and threw away the checkpoint path and the LoRA rows you had just typed, with nothing to undo. The panel it lives in is rebuilt when the layout moves, and it was taking the form down with it. What you type is now kept: the tool stays open where you left it and comes back filled in, after a resize, a rotation or a reload alike. It is cleared the moment a merge actually starts, so a form you already sent never comes back looking like unfinished work.',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-08-04-converting-a-custom-zimage-base-stops-hitting-the-paging-file',
+    date: '2026-08-04',
+    title: 'Converting a custom Z-Image base no longer dies on a “paging file” error',
+    blurb:
+      'If preparing your own Z-Image merge for training ended in “the paging file is too small to complete this operation”, nothing was wrong with your disk, your memory or your model — and buying more disk would not have helped. Opening the checkpoint reserved its whole size up front: on a 11.5 GB base that was 11.7 GB claimed in a tenth of a second, before a single number had been read, and about 15 GB by the time the conversion was under way. Big custom bases are exactly where this bit, because they are the ones people convert. The file is now read one tensor at a time and nothing is mapped: the same 11.5 GB conversion peaks at 0.19 GB and finishes in about a minute, so the size of your checkpoint no longer has anything to do with whether it can be opened. The check that runs before the conversion got faster too — it only ever compared shapes, which are in the file header, and it was loading all 11.5 GB to read them.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-08-04-typed-base-path-is-checked-while-you-type',
+    date: '2026-08-04',
+    title: 'A base you type by hand is checked before you launch, not after',
+    blurb:
+      'Pick a base from the dropdown and the panel tells you immediately if it is a packed export the trainer cannot load, or an fp8 cast that trains from already-degraded weights. Type the path yourself under “Custom weights…” and, until now, you got that same verdict only when you saved or launched — after the dataset had already been exported. The typed path is now read the moment you stop typing: same check, same sentence, same red box, and the Train button stays disabled if the file cannot be loaded at all. A path that is not there, or that is not a .safetensors, says so instead of letting the run find out.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-08-04-quantizing-no-longer-fails-on-the-paging-file',
+    date: '2026-08-04',
+    title: 'Quantizing a big model no longer dies on a “paging file” error',
+    blurb:
+      'If you tried to turn a full-precision model into its fp8 file and got “the paging file is too small to complete this operation”, nothing was wrong with your disk, your memory or your model — and adding disk space would not have helped. Opening the checkpoint reserved its entire size, 26 GB of it, before reading a single number. The app now reads big checkpoints one tensor at a time instead, so the size of the file no longer has anything to do with whether it opens: a 25.6 GB model that could not be opened at all now quantizes in about a minute, and the read-back check at the end works the same way, so it can no longer fail on the last step after twenty minutes of work.',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-08-04-studio-krea-base-is-chosen-not-hardcoded',
+    date: '2026-08-04',
+    title: 'The Test Studio picks its Krea base instead of hoping one file is there',
+    blurb:
+      'The Krea 2 base the Studio rendered on was a filename frozen into a workflow file — and not the one Setup installs. On a machine that simply followed Setup, that name matched nothing ComfyUI publishes, and the whole run was refused before a single step: it only ever worked if you happened to own that one community repack. The base is now chosen from what is actually on your disk, in an order you can check: the file Setup installs first, then a Turbo build (these graphs run at CFG 1 and a handful of steps, which only a distilled build can do), then whichever file the header says is in better shape — full precision ahead of a quantized cast, ahead of a packed export. Last of all comes anything carrying tensors the model family never declares: the repack that used to be the default hides about 75 MB of image inside itself, 432 tensors where Krea 2 has 430, announced in its own metadata. It stays usable — if it is the only Krea file you own it is still the default — but the Studio now tells you which file it picked and why, and the sampler numbers follow that file instead of assuming Turbo.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-04-merge-a-lora-into-a-base-checkpoint',
+    date: '2026-08-04',
+    title: 'Turn your LoRA into a full model you can publish',
+    blurb:
+      'Most of the checkpoints you download were not trained — they were merged: a LoRA folded into somebody’s base, quantized, uploaded. LDS could train the LoRA and could quantize the result, and could not do the step in between, so you could not reproduce what everyone else was doing. Now you can: pick a base, add one or more LoRAs with a weight each, and get a complete checkpoint. It also unlocks the speed problem on a Raw base — merging in the re-distillation LoRA Krea publishes for Turbo is the published route to getting few-step generation back on it (we have not tested that one ourselves, and the screen says so). Nothing starts on one click: the plan tells you how many tensors change, exactly how big the output is, which drive it lands on and how long it takes — about two minutes on a 26 GB base — and nothing is ever overwritten. And it calls the result what it is. A merged model is not a trained model, however often the model sites say “finetune” for it, so the file records the base, every LoRA and its weight, and the date, in its own metadata — which is what still identifies it in six months, after the name has changed.',
+    to: '/datasets?section=checkpoints',
+  },
+  {
+    id: '2026-08-04-train-krea-on-a-checkpoint-you-already-have',
+    date: '2026-08-04',
+    title: 'Train Krea 2 on a model you already have — including the one your last run delivered',
+    blurb:
+      'The Krea 2 base selector offered exactly one thing: the official base. So a full model you produced with 🧬 Merge, or any Krea 2 build sitting in your ComfyUI folders, could not be used as the starting point of the next run — while a Z-Image merge could. It now lists every Krea 2 checkpoint on your disk, the yaml-declared folders included, and hands the real file straight to the trainer. Each entry also states its format before you pick it: an ordinary fp8 file trains — the trainer up-casts it as it loads — and now says with numbers how much precision the cast dropped, instead of being refused outright as it used to be. Only a packed ComfyUI export is still refused, because it carries decompression tables a trainer literally cannot load; the message says that, and points at the bf16 master next to it.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-08-04-full-model-is-selectable-as-a-studio-base',
+    date: '2026-08-04',
+    title: 'The fp8 file of a full model you merged is now offered as a base in the Test Studio — with its own sample settings already filled in',
+    blurb:
+      'One line decided it: the base picker only accepted a Krea checkpoint if it sat in a folder whose name carried “krea”. The local fp8 quantize/merge tools write next to their source, which is often the root of ComfyUI’s diffusion_models folder — deliberately, because that is a folder ComfyUI reads — so a file those tools just produced was invisible to the one screen meant to try it, and the only way to test it was to open ComfyUI by hand. The picker now also accepts a file whose NAME carries “krea”, which is the rule the Generate side has always used, so every twin already on your disk appears without moving a byte. And because a full model produced this way is undistilled, selecting it fills in CFG 4 / 25 steps rather than the family’s few-step Turbo defaults, which render a blurry sketch on it. Those per-base settings now also reach the comparison and blend screen, which never received them.',
+    to: '/studio',
+  },
+  {
     id: '2026-08-04-launch-all-queue-survives-a-restart',
     date: '2026-08-04',
     title: 'The Launch-all queue survives a restart',
@@ -3542,6 +3614,41 @@ export const WHATS_NEW = [
     blurb:
       'Setup now repairs a mixed Pillow install on boot and keeps incompatible ML extras out of the Flask environment — fewer cryptic image errors the first time you run the app.',
     // No `to`: a reliability fix with nothing to click.
+  },
+  {
+    id: '2026-08-04-text-encoder-tolerates-a-chatty-worker',
+    date: '2026-08-04',
+    title: '🎨 Medium and 🔎 text search stop failing over a line of chatter',
+    blurb:
+      'On some installs 🎨 Medium and 🔎 text search died with “the text encoder produced no result — check the ✨ Score interpreter”, on machines whose ✨ Score interpreter was fine — it had just produced the embeddings both features read. The cause was one line: the first thing the text encoder printed had to be its answer, so a first-run banner, a weights download or any greeting from the ML environment ahead of it was read as a failure. Both features now step over anything that is not an answer, the way the ✨ Score pass already did. And when the encoder really does fail, the message quotes what it actually printed — including the error output, which used to be discarded — with home-folder paths stripped, so it is safe to paste into a help thread and it no longer sends you to check a component it never looked at.',
+    to: '/bank',
+  },
+  // Appended rather than prepended ON PURPOSE: several waves are editing the
+  // head of this array at the same time and ordering is by date desc then id
+  // desc, so position here changes nothing and a tail entry is a conflict less.
+  {
+    id: '2026-08-04-seedvr2-settings-say-which-lane-your-target-takes',
+    date: '2026-08-04',
+    title: 'SeedVR2 settings tell you whether your target will be tiled',
+    blurb:
+      'Tiling starts strictly above the crossover, and the crossover is 1.5× your tile size — so it lands exactly on the round numbers people type. Ask for 1536 px with the default 1024 px tile (or 768 px with a 512 px tile) and the upscale ran whole, with nothing anywhere saying why: no tiles, no warning, no line in the panel. The SeedVR2 card now names the lane your configured target will actually take, and when it sits on the crossover it says so and gives you the three ways to change it.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-04-setup-tells-a-broken-optional-file-from-a-dead-engine',
+    date: '2026-08-04',
+    title: 'Setup stops calling a damaged optional file a broken engine',
+    blurb:
+      'A corrupted Klein consistency LoRA lit up Setup in red with “⚠ On disk, unreadable”, exactly like a dead model file — while generation carried on working perfectly, because that LoRA has never been required. The alarm said the engine was down when the engine was fine. It now says what is true: an unreadable file that nothing waits on is flagged in amber as optional, with a line telling you Klein still generates without it and a button to download it again; only a file the engine really needs keeps the red badge. The same file also stopped hiding on the other screen — the download buttons used to print “✓ Installed” over it, because it was not on the required list, so the one place offering to fix it was the one place claiming nothing was wrong.',
+    to: '/setup?step=install',
+  },
+  {
+    id: '2026-08-04-captions-say-which-engine-wrote-them',
+    date: '2026-08-04',
+    title: 'See which engine actually wrote your captions',
+    blurb:
+      'The captioning engine is set to Auto by default, and Auto is a chain, not a choice: JoyCaption writes what it can, the Ollama vision model writes the rest, and on a Concept dataset Ollama rewrites JoyCaption’s drafts. Those engines do not write alike — so captions could come back in two different voices, or in a different voice than last week, with nothing anywhere to explain it. Every pass now reports who wrote what, in the toast and on a line under the caption buttons: “Written by JoyCaption.”, “Drafted by JoyCaption, rewritten by the Ollama vision model.”, or “8 by JoyCaption · 4 by Ollama” when the batch was shared. If you want one consistent voice, ⚙️ Options lets you name a single engine — and now you can tell whether it obeyed.',
+    to: '/datasets?section=captions&panel=generate',
   },
 ];
 

@@ -1059,6 +1059,33 @@ def set_dataset_klein_model(user_id, dataset_id, name):
     return dataset_klein_model(ds)
 
 
+# --- Who actually WROTE the captions of a pass ---------------------------------
+# The 'auto' backend is the default, and it is a CHAIN, not a coin toss: JoyCaption
+# drafts what it can (a whole batch in one model load), Ollama covers what it didn't
+# — and on a Concept dataset Ollama rewrites Joy's drafts as well. Three different
+# writing styles can therefore come out of one pass, and until now nothing told the
+# user which one they were reading: the pass returned a count and nothing else, so
+# "these captions don't look like last time" had no answer anywhere in the app.
+# These keys are the answer, counted where the text is actually STORED.
+CAPTION_WRITER_JOYCAPTION = 'joycaption'          # JoyCaption's own words
+CAPTION_WRITER_OLLAMA = 'ollama'                  # written by the Ollama vision model
+CAPTION_WRITER_REFINED = 'joycaption_refined'     # a JoyCaption draft rewritten by Ollama
+# Stored nowhere and read by the UI as keys — treat them like catalog labels: adding
+# one is free, renaming one breaks the caller that reads it.
+
+
+def _writer(report, key, n=1):
+    """Count one stored caption against the engine that wrote it. ``report`` is the
+    caller's optional out-dict — None means nobody asked, so this costs nothing.
+
+    Deliberately counts the DRAFTING engine, i.e. whose prose the user is reading.
+    The concept pipeline's omission guard can rewrite a sentence afterwards to remove
+    a banned term; that is a filter over someone else's words, not a second author,
+    and counting it as one would make the numbers stop matching what people see."""
+    if report is not None:
+        report[key] = report.get(key, 0) + n
+
+
 def _resolve_caption_backend(ds) -> str:
     """The engine a caption run uses: the dataset override when set, else the global
     captioning.backend (default 'auto')."""
@@ -1714,6 +1741,16 @@ def random_kept_caption(user_id, dataset_id) -> str | None:
 
 
 def list_datasets(user_id):
+    """Every dataset of this user, newest touched first.
+
+    The choke-point for "the datasets that exist": it feeds the library page,
+    `full_backup.build_full_backup` (its `datasets_total`, its per-dataset zips
+    AND its manifest), the name de-duplication of
+    `full_backup.restore_full_backup`, the canvas dataset index, the canvas
+    positions, the HF base-model index and `lora_training.find_run_collision`.
+    Eight surfaces, one query — so a rule about which datasets count belongs
+    HERE, never copied into a caller.
+    """
     return (FaceDataset.query.filter_by(user_id=str(user_id))
             .order_by(FaceDataset.updated_at.desc()).all())
 
@@ -1725,6 +1762,8 @@ def dataset_list_stats(user_id):
     'trained_families': [str]}}; datasets absent from a map just have zeros."""
     from sqlalchemy import case, func
     from ..models import TrainingRunRecord
+    # Same scope as list_datasets: the counts shown next to the library must add
+    # up to the library. One subquery, reused by BOTH grouped queries.
     owned = (db.session.query(FaceDataset.id)
              .filter_by(user_id=str(user_id))).subquery()
     stats = {}
@@ -5925,7 +5964,7 @@ def _enforce_concept_omission(caption, leak_re, image_bytes, concept_desc, descr
 
 
 def _caption_concept(ds, force, backend, token=None, image_ids=None,
-                     ollama_model=None, extra_instructions=''):
+                     ollama_model=None, extra_instructions='', report=None):
     """Concept caption pipeline (INVERTED logic): describe everything INCLUDING identity
     but OMIT the recurring act so it binds to the trigger. JoyCaption is literal (it NAMES
     the act/fluids/watermark) -> its drafts are REFINED by Qwen, then every caption passes
@@ -6008,6 +6047,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
             img.caption = _cap_caption(final)
             db.session.commit()
             n += 1
+            _writer(report, CAPTION_WRITER_JOYCAPTION)
         return n
     # 2b) Qwen passes ('auto'/'ollama'): refine Joy drafts, direct-caption the rest, all
     #     enforced. One model load -> unload once at the end.
@@ -6056,6 +6096,9 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                 except Exception as e:  # noqa: BLE001 - refine best-effort
                     logger.warning('caption concept: Qwen refine failed (%s)', e)
                 refined = (refined or '').strip().strip('"').strip()
+                # Which engine's prose ends up stored, decided branch by branch — the
+                # 'auto' concept path can produce all three on ONE dataset.
+                writer = CAPTION_WRITER_REFINED
                 if _refine_output_ok(refined, joycap):
                     final = refined
                 else:
@@ -6072,6 +6115,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                         alt = ''
                     alt = (alt or '').strip().strip('"').strip()
                     final = alt or joycap
+                    writer = CAPTION_WRITER_OLLAMA if alt else CAPTION_WRITER_JOYCAPTION
                 final = _enforce_concept_omission(final, leak_re, data, concept_desc,
                                                   describe=describe) or final
                 # Re-read only now: everything above is model work measured in
@@ -6085,6 +6129,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                     # prose), scrubbed of any leak; leave blank if even that fails.
                     final = _enforce_concept_omission(joycap, leak_re, data, concept_desc,
                                                       describe=describe) or joycap
+                    writer = CAPTION_WRITER_JOYCAPTION
                     if not _usable_caption(final):
                         # force=re-do-all: overwrite any stale pre-fix caption with blank
                         # (trigger-only is valid for a concept LoRA) rather than retain it.
@@ -6097,6 +6142,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                 img.caption = _cap_caption(final)
                 db.session.commit()
                 n += 1
+                _writer(report, writer)
             for image_id, p in remaining:
                 if dataset_activity.cancel_requested(ds.id):
                     break   # graceful stop at an image boundary (see caption_images)
@@ -6120,6 +6166,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                     img.caption = _cap_caption(cap)
                     db.session.commit()
                     n += 1
+                    _writer(report, CAPTION_WRITER_OLLAMA)
                 else:
                     if force and (img.caption or ''):
                         img.caption = ''
@@ -6137,7 +6184,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     return n
 
 
-def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
+def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, report=None):
     """Caption les images gardees. Defaut: seulement celles SANS caption ; force=True
     re-capte TOUTES les gardees (ecrase) - pour rejouer apres un changement de prompt.
     Chaque caption passe par drop_identity_sentences (retire une eventuelle phrase
@@ -6153,7 +6200,13 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
       - 'joycaption' -> JoyCaption seul, PAS de repli Ollama.
       - 'ollama'     -> Ollama (Qwen3-VL) seul, JoyCaption jamais tenté.
       - 'auto'       -> comportement historique : JoyCaption en priorité,
-                        fallback Ollama pour les images qu'il n'a pas captées."""
+                        fallback Ollama pour les images qu'il n'a pas captées.
+
+    `report` (optionnel) : dict rempli avec le nombre de captions écrites PAR MOTEUR
+    ({'joycaption': n, 'ollama': n, 'joycaption_refined': n} — clés absentes quand le
+    moteur n'a rien écrit). C'est la seule façon, après coup, de savoir QUI a rédigé :
+    'auto' enchaîne les deux moteurs sans le dire, et leurs styles diffèrent. La
+    valeur de retour reste le NOMBRE total de captions (contrat inchangé)."""
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return 0
@@ -6192,7 +6245,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
         try:
             n = _caption_concept(ds, force, backend, token=token, image_ids=ids,
                                  ollama_model=ollama_model,
-                                 extra_instructions=extra_instructions)
+                                 extra_instructions=extra_instructions, report=report)
             logger.info('captioning finished: dataset=%s backend=%s captioned=%s elapsed=%.1fs',
                         dataset_id, backend, n, time.monotonic() - started)
             return n
@@ -6302,6 +6355,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
                     img.caption = _cap_caption(cleaned)
                     db.session.commit()
                     n += 1
+                    _writer(report, CAPTION_WRITER_JOYCAPTION)
                     dataset_activity.bump(token)   # this image is captioned (done)
                 else:
                     still.append((image_id, p))
@@ -6349,6 +6403,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None):
                         img.caption = _cap_caption(cleaned)
                         db.session.commit()
                         n += 1
+                        _writer(report, CAPTION_WRITER_OLLAMA)
                     dataset_activity.bump(token)   # image handled (captioned or not)
             except RuntimeError as e:
                 # 'auto' tried JoyCaption first and it was unavailable, then Ollama

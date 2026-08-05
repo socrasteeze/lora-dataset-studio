@@ -119,8 +119,11 @@ test('the dialog can offer the LANE (local vs cloud), opt-in and reasoned', () =
   assert.match(dialog, /☁ Cloud/);
   assert.match(dialog, /disabled=\{off\}/);
   assert.match(dialog, /laneState\(lane\)\.reason/);
-  // the chosen lane rides the payload, and a blocked lane can't be submitted
-  assert.match(dialog, /lane,\s*\/\/ Never infer this server-side:/);
+  // The chosen lane rides the payload, and a blocked lane can't be submitted.
+  // Asserted as "the field is in the object" rather than "the field is followed
+  // by that exact comment": the adjacency version broke the day a second field
+  // was added next to it, which said nothing about the lane at all.
+  assert.match(dialog, /onResolve\(\{[\s\S]*?\blane,\r?\n/);
   assert.match(dialog, /disabled=\{busy \|\| latest === 0 \|\| laneBlocked/);
 });
 

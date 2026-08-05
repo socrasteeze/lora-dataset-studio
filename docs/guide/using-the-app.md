@@ -86,6 +86,122 @@ there is no need to return to the library and find the dataset first. The button
 is also available on a folded Recent dataset group, so you can start comparing
 checkpoints without expanding its run history.
 
+## Using a full model you trained
+
+Training the **whole model** (rather than a LoRA adapter) produces something
+different from a checkpoint, and **📦 Checkpoints & LoRAs** lists it in its own
+**🧱 Full models** block for exactly that reason.
+
+A delivered run leaves up to two files, and they are not interchangeable:
+
+- the **full-precision master** (~26 GB). This is the only file you can train
+  again or resume from. It is **never** sent to ComfyUI — 26 GB of a model folder
+  to do a job the smaller file does better;
+- the **fp8 twin** (~13 GB). This is the inference format: the file ComfyUI loads
+  with **Load Diffusion Model**.
+
+If the run has a master but no twin, **✨ Quantize to fp8** makes one. It works
+whether the master is on this computer or only in the run's private Hugging Face
+repository — in the second case it is downloaded first, with progress, and the
+transfer can be stopped and resumed. Once the twin exists, **→ Send to ComfyUI**
+puts it where ComfyUI looks. On the same drive that is a hard link: instant, and
+it costs no extra disk space.
+
+**🗑 Trash** moves one of those files to the app trash, so a mis-click on a file
+that cost hours of GPU is recoverable.
+
+**A run whose model is only on Hugging Face is not a lost run.** It shows
+**☁ on Hugging Face** on the board and in its card, and the app refuses to remove
+it: doing so would discard the only record of where that model is.
+
+### Testing a full model
+
+Once the fp8 twin is in ComfyUI, the **Test Studio** lists it as a base and
+**🧪 Test in Studio** opens straight onto it, with its own sample settings filled
+in. That matters: a full model trained here is **undistilled**, so it wants a
+real CFG and a real step count (CFG 4 / 25 steps for Krea 2). The family's
+few-step Turbo defaults render a blurry sketch on it that reads as a failed
+training.
+
+One limit worth knowing before you go looking for a button that is not there:
+**the Test Studio is entered through a LoRA of the dataset.** A dataset trained
+only as a full model has none, so it cannot open the Studio at all. If you have
+any LoRA of that dataset deployed, pick it and set its **strength to 0** — no
+LoRA node is added at 0, so you generate with the bare model.
+
+## Merge a LoRA into a base checkpoint
+
+This is the step between *"I trained a LoRA"* and *"I have a model to publish"*,
+and it is how most of the community checkpoints you can download were actually
+made. Of the Krea 2 checkpoints whose authors describe their method, the ones
+that explain themselves describe a **merge**, not a training run: train a LoRA on
+Raw, fold it into a base, quantize, upload.
+
+You will find it in **📦 Checkpoints & LoRAs**, as **🧬 Merge a LoRA into a base
+checkpoint**. Inside a full model's card the same tool appears with that model
+already filled in as the base.
+
+**Say what you are merging.** Pick a full-precision base, then add one or more
+LoRAs, each with a weight. `1.0` applies a LoRA exactly as it was trained;
+lower blends it in more gently; a negative weight subtracts it. Several LoRAs
+stack — that is what "baked in LoRAs with balanced weights" means when you read
+it on a model page.
+
+**Nothing starts on the first click.** The plan is computed from the file headers
+alone — no weight is read — and it tells you how many tensors change, exactly how
+big the output is, which drive it lands on, roughly how long it takes, and what
+happens if it fails. On a 26 GB Krea 2 base, a measured merge took **about two
+minutes** and rewrote 256 of 430 tensors.
+
+**Nothing is ever overwritten.** The result is written next to the base under a
+new timestamped name, through a temporary file that is only renamed once the
+merge finishes. A merge that fails, or that you stop, leaves the base, the LoRAs
+and any earlier merge exactly as they were.
+
+### It is a merged model, and it says so
+
+The file's own metadata records that it came from a merge, which base it used,
+which LoRAs at which weights, and when. That matters because **file names lie**,
+and because on the model sites "finetune" is routinely used for exactly this
+object — by authors who describe the merge themselves a sentence later. LDS does
+not copy that vocabulary: what comes out of here is a base with LoRAs folded into
+its weights, not a model that was trained as a whole, and the header keeps saying
+so after the file is renamed or re-uploaded.
+
+### Getting the speed back (the Turbo transplant)
+
+A full-model run in this app targets **Raw**, which is undistilled and therefore
+slow. Krea publishes a re-distillation LoRA for Turbo; merging it at **0.8-1.0**
+into a model trained on Raw is the published route people use to get few-step
+behaviour back, and it is how the same model ends up on the model sites in both a
+Raw and a Turbo flavour.
+
+**We have not tested this ourselves.** It is an approximation, not an identity —
+generate a few comparisons before you publish anything on the strength of it.
+
+### Merge first, quantize after
+
+Merging into an **already quantized** file is refused, on purpose. It would
+dequantize every weight, modify it and re-quantize it: lossy on the way in and
+again on the way out, and the loss compounds each time somebody does it. Merge
+into the full-precision (bf16) model, then quantize the merged result with the
+fp8 tool — which is the order the refusal points you at.
+
+### Two things it will tell you about, rather than hide
+
+- **A LoRA that does not belong to the base** is refused before anything is
+  written, naming the weights it expected to find. A LoRA trained for another
+  model has nothing to merge into.
+- **Tensors that are not part of the model** are reported, not dropped. Not every
+  `.safetensors` contains only a model: one community Krea 2 file circulating
+  today carries about 75 MB of an image in two tensors hiding under a legitimate
+  name. Nothing we do not understand is modified — it is copied through, and the
+  plan names it so you know it is there.
+
+**What the merge needs:** the same Python that quantization uses — one with
+`torch` available. If it is missing, the plan says so with the command to fix it,
+before you click anything.
+
 ## Recover a paused Test Studio batch
 
 If ComfyUI drops while Test Studio is processing a batch, the affected tile says
@@ -367,9 +483,17 @@ touching the folder itself:
    🧇 Soft detail, 🎞 Black bars, ≈ Duplicates) to review the worst
    offenders first. **🧹 Auto-reject
    flagged…** clears whole categories in one click (your manual ✓/✕ are never
-   flipped). In the Duplicates view, resolve every group at once with **keep
-   best** (highest resolution, then sharpest) or **keep first**, or pick the
-   keeper by eye.
+   flipped). The number beside each checkbox is what *that click* would reject —
+   still-undecided images only, which is why it is usually smaller than the
+   count on the matching filter chip: the chip shows every image carrying the
+   flag, including the ones a previous auto-reject already threw away. Run it
+   twice and the second run legitimately says **0 to reject**: there is nothing
+   left it is allowed to touch. A flag also warns when its pass never ran, and
+   the panel says how many images have **never been scanned** — those are
+   invisible to every quality flag until 🔎 Scan measures them, which is not the
+   same thing as being clean. In the Duplicates view, resolve every group at
+   once with **keep best** (highest resolution, then sharpest) or **keep
+   first**, or pick the keeper by eye.
 4. **👥 Group by person** — the face pass (needs the Quality tools from Setup)
    detects the dominant face of every remaining image and clusters the bank by
    person, *no reference photo needed*. Click a person card to see only them,
