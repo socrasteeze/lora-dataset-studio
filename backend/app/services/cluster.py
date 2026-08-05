@@ -37,7 +37,9 @@ ARTIFACT_MAX_AGE_SECONDS = 48 * 3600
 LOCAL_DEVICE_ID = 'local'
 
 _VALID_ROLES = frozenset({'standalone', 'primary', 'peer'})
-_VALID_KINDS = frozenset({'comfy', 'infer', 'vision', 'training'})
+# 'training' was removed on 2026-08-04 with the peer-training lane: it had no
+# UI caller, produced no run record, and its peer half discarded the cancel flag.
+_VALID_KINDS = frozenset({'comfy', 'infer', 'vision'})
 
 # In-memory join-token plaintext cache so Settings can show the token once
 # after mint (hash-only in DB). Cleared on redeem / expiry / restart.
@@ -226,24 +228,47 @@ def local_capabilities() -> dict:
     # Identity first, so the degraded return below cannot re-run whatever just
     # failed. A device that answers with no gates is still addressable; one that
     # answers with nothing is a 500.
+    try:
+        from ..version import APP_VERSION
+    except Exception:      # noqa: BLE001 — identity must survive a bad import
+        APP_VERSION = ''
     base = {
         'device_name': device_display_name(),
         'node_id': ensure_node_id(),
         'kinds': sorted(_VALID_KINDS),
+        # A mixed-version cluster used to be survivable but undetectable: a peer
+        # on older code answers an unparseable stdout with a different shape and
+        # writes its vision results under a different key, and both are handled
+        # defensively here — but nothing ever SAID the two machines disagreed.
+        # `kinds` above is the same idea for capability rather than version: it
+        # lets the hub see that a peer does not know a kind it is about to be
+        # sent, instead of finding out from a failed job.
+        'app_version': APP_VERSION,
     }
     # Keep the wire payload small — peers/hub only need routing gates.
     try:
         return {
             **base,
             'comfyui': bool((caps.get('comfyui') or {}).get('reachable')),
-            'ollama': bool((caps.get('ollama') or {}).get('reachable')),
+            # `reachable` alone means the Ollama SERVER answered, not that the
+            # vision model is pulled. A peer with Ollama running and no model
+            # therefore passed the 🚩 Watermark / 📐 Framing gate, the hub staged
+            # the whole bank across the network, and the pass died on the first
+            # image. probe() computes `vision_model_ready` separately and it was
+            # simply never forwarded. Both are required now, so the gate answers
+            # the question it is actually asked.
+            'ollama': bool((caps.get('ollama') or {}).get('reachable')
+                           and (caps.get('ollama') or {}).get('vision_model_ready')),
             'aitoolkit': bool((caps.get('aitoolkit') or {}).get('valid')),
             'joycaption': bool((caps.get('captioners') or {}).get('joycaption')),
             'face_scoring': bool(caps.get('face_scoring')),
             'masks': bool(caps.get('masks')),
             'bank_scoring': bool(caps.get('bank_scoring')),
             'watermark_inpaint': bool(caps.get('watermark_inpaint')),
-            'training': bool(caps.get('training_visible')),
+            # No `training` key: the peer-training kind was removed on
+            # 2026-08-04 and nothing reads this. A capability advertised for a
+            # job kind that cannot be sent is the "wiring implies a workload"
+            # trap — an older peer may still send one; it is ignored.
             # probe() carries no VRAM figure at all (it must stay network-free,
             # and the ComfyUI numbers live in comfyui_runtime_info). Reading a
             # `vram_gb` key off it therefore always yielded None and the picker
@@ -495,6 +520,18 @@ def list_devices(*, include_local: bool = True) -> list[dict]:
                     .all()):
             d = row.to_dict(online_ttl_seconds=ONLINE_TTL_SECONDS)
             d['local'] = False
+            # The per-pass verdict, computed HERE. The browser used to hold a
+            # second copy of the capability map and recompute this itself, kept
+            # in step by a test that string-parses this repo's Python source —
+            # which a reformat or an inline comment would quietly break. One
+            # function answers the question now, and the submit routes call the
+            # same one (bank_remote.device_pass_gate).
+            try:
+                from .bank_remote import device_pass_verdicts
+                d['passes'] = device_pass_verdicts(d.get('id'))
+            except Exception:      # noqa: BLE001 — a picker without verdicts
+                logger.exception('cluster: could not compute pass verdicts')
+                d['passes'] = {}
             devices.append(d)
     # API backends list in EVERY role — that is the standalone/SwarmUI case.
     # 'comfyui': True is definitional (a backend IS a ComfyUI), and busy is

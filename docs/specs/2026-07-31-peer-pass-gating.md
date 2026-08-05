@@ -87,16 +87,47 @@ none — the "stated prerequisite" case `pipelineVerdict.js` already renders as
   `onChange` never fires for that one — a restored peer being exactly the
   selection that must be gated.
 
+## 2026-08-04: one function, not three
+
+The map above was mirrored in JS and pinned by a test that string-parsed
+`bank_remote.py`. That is gone. `bank_remote.device_pass_gate(device_id, step)`
+is now the single answer, `/api/cluster/devices` ships each device's verdicts as
+`device.passes`, and `passDeviceGate.stepGate` renders them.
+`refuse_steps_for_device` calls the same function, so the dialog cannot offer a
+pass the launch route refuses.
+
+This is the sibling dataset-manager project's rule, ported:
+
+> a picker that offers a machine the submit route would refuse is worse than no
+> picker, because it turns a clear "you cannot" into a job that fails a minute
+> later on someone else's screen.
+
+**Unifying it found a real divergence.** `LOCAL_ONLY_STEPS` was checked inside
+`start_pipeline` and nowhere else, so `bank_queue.enqueue` — which calls
+`refuse_steps_for_device` and nothing more — accepted 🔖 Tags queued to a peer.
+The section above claims the two paths "refuse identically". They did not. Both
+go through the one gate now, and `test_pass_device_gate.py` pins it.
+
+The two source-parsing tests were brittle in a way worth remembering as well: a
+reformat, an inline comment or a `# noqa` inside either literal would have
+broken them with no behaviour change at all.
+
 ## Known limits
 
-- The peer blob's `ollama` key means the **server answered**, not that the vision
-  model is pulled (`capabilities.probe()` computes `vision_model_ready`
-  separately and `local_capabilities()` does not forward it). So a peer with
-  Ollama running but no model still passes the gate and fails at run time. Fixing
-  it means widening the wire payload, which is a separate change.
+- ~~The peer blob's `ollama` key means the **server answered**, not that the
+  vision model is pulled.~~ **Fixed 2026-08-04**: `local_capabilities()` now
+  requires `reachable` **and** `vision_model_ready`, both of which
+  `capabilities.probe()` already computed. A peer with Ollama up and no model is
+  refused at the picker instead of after the whole bank has been staged.
 - `DevicePicker` persists to one global `lds.cluster.device_id` shared by three
   surfaces with two different `kind` filters. The reconciliation effect keeps an
   ineligible id from being posted, but the key is still shared.
-- The `(some passes)` suffix on an option says a peer is partial without saying
-  which passes; the dialog names them. Duplicating that per-pass verdict inside
-  a single `<option>` would be a second, worse copy of the same rule.
+- ~~The `(some passes)` suffix on an option says a peer is partial without
+  saying which passes.~~ **Fixed 2026-08-04.** The argument for the vague label
+  was that naming them in the `<option>` meant a second copy of the per-pass
+  rule — true while the browser recomputed the verdict, and false once the
+  server ships it. `devicePartialLabel` reads the served verdicts and names up
+  to two passes, then counts. It also replaced a THIRD copy of the capability
+  rule that lived in the option loop as a hand-listed
+  `bank_scoring && face_scoring && ollama`, which no test pinned and which
+  would not have noticed a newly gated pass.

@@ -1092,6 +1092,15 @@ const TOPICS = [
   // training
   setting('training.default_family', 'training', 'training-default-family', 'Default training family',
     ['training', 'family', 'default', 'zimage', 'sdxl', 'krea', 'flux']),
+  // Two settings, one feature: the address turns the "Train on" picker on, the
+  // token is only needed if that ai-toolkit asks for one. Separate topics
+  // because they fail differently — a wrong address means "did not answer", a
+  // wrong token means "refused".
+  setting('aitoolkit.url', 'training', 'aitoolkit-url', 'ai-toolkit web address (train on another machine)',
+    ['train', 'training', 'another', 'machine', 'remote', 'peer', 'second', 'desktop',
+     'ai-toolkit', 'aitoolkit', 'url', 'address', 'web', 'gpu', 'hardware', '8675']),
+  setting('aitoolkit.token', 'training', 'aitoolkit-token', 'ai-toolkit access token',
+    ['ai-toolkit', 'aitoolkit', 'token', 'password', 'auth', 'access', 'remote', 'training']),
   // Divergence 4: no rental-GPU card in this fork's Settings → Training, so
   // none of upstream's VAST_API_KEY / cloud.* topics apply — there is nothing
   // in the UI for them to anchor to. The Hugging Face storage forecast and its
@@ -1390,6 +1399,10 @@ const TOPICS = [
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
   action('action-training-launch', 'Train the LoRA',
     ['train', 'training', 'launch', 'cloud', 'lora', 'start'],
+    '/datasets?section=training&panel=launch', 'dataset-guide', '5-pre-flight-checklist'),
+  action('action-training-machine', 'Train on another machine',
+    ['train', 'training', 'machine', 'another', 'other', 'remote', 'peer', 'second',
+     'gpu', 'hardware', 'run on', 'elsewhere', 'desktop', 'laptop', 'ai-toolkit'],
     '/datasets?section=training&panel=launch', 'dataset-guide', '5-pre-flight-checklist'),
   action('action-training-stop', 'Stop a training run',
     ['train', 'training', 'stop', 'cancel', 'abort', 'interrupt', 'kill', 'halt', 'finish',

@@ -81,28 +81,6 @@ def enqueue_infer_on_device(device_id, *, script, stdin, image_paths=None,
     return job_id
 
 
-def enqueue_training_on_device(device_id, *, dataset_archive_path, train_params,
-                               job_id=None) -> str:
-    device_id = cluster_svc.normalize_device_id(device_id)
-    if device_id == cluster_svc.LOCAL_DEVICE_ID:
-        raise ValueError('use local training for device=local')
-    job_id = job_id or str(uuid.uuid4())
-    archive_name = cluster_svc.stage_file_artifact(
-        job_id, dataset_archive_path,
-        dest_name=os.path.basename(dataset_archive_path) or 'dataset.zip')
-    cluster_svc.enqueue_generic(
-        device_id=device_id,
-        kind='training',
-        payload={
-            'dataset_archive': archive_name,
-            'artifacts': [archive_name],
-            'train': train_params or {},
-        },
-        job_id=job_id,
-    )
-    return job_id
-
-
 def wait_cluster_job(job_id, *, timeout=3600, poll=1.0) -> dict:
     """Block until a ClusterJob finishes. Returns to_dict()."""
     deadline = time.monotonic() + timeout

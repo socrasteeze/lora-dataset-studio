@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
 import { stepGate } from './passDeviceGate.js'
+import { buildSteps, defaultChecked } from './pipelineSteps.js'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 
 /** 🚀 Launch all — the overnight funnel. The user picks which passes run and how
@@ -37,39 +38,21 @@ export default function LaunchAllDialog({ caps, visionReady, scope, onClose, onL
   // the PEER's own capability report when one is picked, and this machine's
   // otherwise. Answering with `|| remote` (a truthy device id and nothing else)
   // ticked ✨ Score on a peer that had already said it has no scoring stack.
+  //
+  // The steps themselves come in the server's order, off the capability blob
+  // this dialog already holds. It used to keep three lists of its own — the
+  // gate keys, a render array and the default-ticked set — so a step added to
+  // one and not the others got a checkbox with no gate, or one the submit route
+  // would silently drop. See pipelineSteps.js.
+  const STEPS = useMemo(() => buildSteps(caps?.bank_pipeline_steps), [caps])
   const gates = useMemo(() => Object.fromEntries(
-    ['scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark', 'faces',
-      'framing', 'tags', 'caption'].map((k) => [k, stepGate(k, { caps, visionReady, device })]),
-  ), [caps, visionReady, device])
+    STEPS.map((s) => [s.key, stepGate(s.key, { caps, visionReady, device })]),
+  ), [STEPS, caps, visionReady, device])
   const ready = useMemo(
     () => Object.fromEntries(Object.entries(gates).map(([k, g]) => [k, g.ok])),
     [gates])
 
-  const STEPS = [
-    { key: 'scan', label: '🔎 Scan quality',
-      desc: 'Sharpness, noise, flatness, size + near-duplicate groups (CPU).' },
-    { key: 'auto_reject', label: '🧹 Auto-reject flagged',
-      desc: 'Reject the images carrying the flags below — reversible, nothing deleted.' },
-    { key: 'score', label: '✨ Score', needs: 'Bank scoring extra',
-      desc: 'Aesthetic 1–10, NSFW, style groups (GPU).' },
-    { key: 'semantic_dedup', label: '✂ Find crops & variants', needs: 'Bank scoring extra',
-      desc: 'Group crops/variants of the same shot from Score’s embeddings — no extra GPU (needs Score first).' },
-    { key: 'watermark', label: '🚩 Find watermarks', needs: 'Vision model',
-      desc: 'Detect overlaid watermarks/logos with the Qwen3-VL detector (GPU).' },
-    { key: 'faces', label: '👥 Group by person', needs: 'Quality tools',
-      desc: 'Face embeddings + person clusters, no reference photo (CPU/GPU).' },
-    { key: 'framing', label: '📐 Classify framing', needs: 'Vision model',
-      desc: 'Tag each shot face/bust/body/back — powers the framing filter & coverage advice (GPU).' },
-    { key: 'tags', label: '🔖 Tags', needs: 'Image tagging (WD14)',
-      desc: 'Label what is in each shot (hair, clothing, setting) so the bank can be filtered by it — local, CPU-friendly, never writes captions. Runs here only.' },
-    { key: 'caption', label: '🏷️ Caption', needs: 'Caption engine',
-      desc: 'Describe every image so it becomes searchable and rides to the dataset (GPU).' },
-  ]
-
-  const [steps, setSteps] = useState(() => new Set(
-    ['scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark', 'faces', 'framing',
-      'tags']
-      .filter((k) => ready[k])))
+  const [steps, setSteps] = useState(() => defaultChecked(STEPS, ready))
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [resolveDups, setResolveDups] = useState(true)
   // Only the multi-bank scopes narrow per bank; a single bank is queued through

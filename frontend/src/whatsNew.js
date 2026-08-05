@@ -50,6 +50,46 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-04-launch-all-queue-survives-a-restart',
+    date: '2026-08-04',
+    title: 'The Launch-all queue survives a restart',
+    blurb:
+      'Queue eleven banks, go to bed, and let the machine reboot for an update — the queue is still there in the morning and carries on. It used to live only in memory, so a restart emptied it with no row, no log line and nothing anywhere saying work had been dropped; you would find out by noticing nine hours of GPU time had not happened. A bank that was mid-run when the power went comes back as pending and runs again, which is cheap because scores already committed stay put. Where each bank was sent survives too — a restart no longer quietly pulls an overnight queue back onto this machine.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-04-train-on-another-machine',
+    date: '2026-08-04',
+    title: 'Train a LoRA on your other machine’s GPU',
+    blurb:
+      'If you have a second box with a GPU, a run can now go there instead of tying this one up for hours. Set your ai-toolkit’s web address in Settings → Training and a “Train on” picker appears next to Train the LoRA, listing the machines that ai-toolkit knows about. Pick one and the dataset is sent over, the run starts there, and its log, its preview samples and its checkpoints all arrive back here as it goes — into the same folders a local run writes, so the Training panel, the checkpoint browser and the Runs page work on it exactly as they would on a local run. Stop reaches it, and the checkpoints it already saved come home before it closes. Base models are not copied: the machine that trains downloads its own weights, so only your dataset and the job config cross the network. The readiness guards are the same either way — a dataset does not become well-formed by training somewhere else. And the limits, said out loud: the picker only ever offers OTHER machines (a run in this lane doesn’t take this machine’s GPU-busy flag, so generation would start on top of it), a run sent elsewhere always starts fresh because previous checkpoints aren’t sent over, one run per dataset at a time, and a machine that is switched off is listed and greyed out rather than hidden.',
+    to: '/settings/training',
+  },
+  {
+    id: '2026-08-04-run-on-says-which-passes-a-machine-cant-do',
+    date: '2026-08-04',
+    title: 'The Run-on picker names the passes a machine can’t do',
+    blurb:
+      'Picking another machine for a bank used to end in a vague “(some passes)” — true, but not something you could act on without opening the Launch dialog to find out which. It now names them: “G18 · peer (no ✨ Score, 👥 Group by person)”, and counts them once there are more than two. Underneath, the app stopped answering “can that machine run this pass?” in three different places — the dialog, the Queue button and the pass itself each had their own copy of the rule, and this app has shipped that going wrong in both directions on the same day. One answer now, computed once. That turned up a real hole while it was being done: queueing 🔖 Tags to another machine was accepted even though Tags can only ever run here, and you would only have found out on the other machine, an hour into an overnight run. Both buttons refuse it up front now.',
+    to: '/settings/devices',
+  },
+  {
+    id: '2026-08-04-peer-passes-start-sooner-and-stop-when-told',
+    date: '2026-08-04',
+    title: 'A pass sent to another machine starts sooner, and Stop reaches it',
+    blurb:
+      'Sending a bank to a second machine spent its first stretch transferring images one at a time — on a 5,000-image bank that is around fifteen minutes of nothing visibly happening before the pass even starts. Several files now travel at once, so that wait shrinks to a fraction of it; a transfer that goes wrong still fails the whole pass rather than quietly running against a partial bank. Two other things that were wrong on a peer: pressing ⏹ Stop during a remote *generation* did nothing — the other machine kept rendering, holding its GPU, for up to fifteen minutes — and it now stops within a second. And a machine running Ollama with no vision model pulled used to be offered for 🚩 Watermarks and 📐 Framing, accept the whole bank across the network, then fail on the first image; it is greyed out up front instead. Settings ▸ Devices also now says when a peer is on a different build from this machine — that still works, you just get told.',
+    to: '/settings/devices',
+  },
+  {
+    id: '2026-08-04-continue-lanes-stop-promising-cloud',
+    date: '2026-08-04',
+    title: 'The Continue dialog stopped offering a lane that does not exist',
+    blurb:
+      'When a training could not continue on this machine, the reason said “continue in the cloud” and the closed cloud lane said it “needs a rental key set up in Settings”. Neither was true: this build has no rented-GPU lane at all, so setting a key would have changed nothing and there was no second lane to fall back to. Every one of those messages now says what is actually the case — that this build trains on your own machine — so a blocked run sends you to the real fix instead of to a Settings page that cannot help. Nothing about what you can run changed; only the app’s account of itself did.',
+    to: '/cloud',
+  },
+  {
     id: '2026-08-04-comfyui-unreachable-is-said-out-loud',
     date: '2026-08-04',
     title: 'When LDS cannot reach ComfyUI, the banner now says exactly that — instead of blaming a paused job',

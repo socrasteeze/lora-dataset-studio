@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -21,6 +22,15 @@ logger = logging.getLogger(__name__)
 POLL_IDLE_SECONDS = 2
 POLL_ERROR_SECONDS = 5
 HEARTBEAT_SECONDS = 30
+
+# Artifact fetches in flight. Small on purpose: many small files, one Flask
+# process serving them, and a home link -- past a handful of sockets the gain
+# flattens and the hub's own UI starts competing for request workers.
+_ARTIFACT_DOWNLOAD_WORKERS = 6
+
+# Smallest gap between two progress relays for one job. Stop is noticed within
+# this, and the device's liveness stamp is refreshed at least this often.
+_PROGRESS_RELAY_SECONDS = 1.0
 
 # Which of THIS machine's python envs runs each known infer script — mirrors
 # the interpreter each pass picks when it runs locally (image_bank_service).
@@ -98,8 +108,14 @@ class PeerWorker:
         # work — the kind and the phase are what make the peer explain itself.
         self._current_kind = None
         self._phase = None
+        # Set when the hub answers a progress heartbeat with {'cancelled': True}
+        # during THIS job. Reset per job in the pull loop.
+        self._cancelled = False
         self._last_error = None
         self._connected = False
+        # Heartbeat pacing. -inf so the first tick always sends one.
+        self._last_heartbeat_at = float('-inf')
+        self._last_caps_sent = None
 
     def init_app(self, app):
         self._app = app
@@ -179,30 +195,50 @@ class PeerWorker:
     def _tick(self):
         from . import cluster as cluster_svc
         caps = cluster_svc.local_capabilities()
-        try:
-            r = requests.post(
-                self._url('/api/cluster/peer/heartbeat'),
-                headers=self._headers(),
-                json={'capabilities': caps, 'busy': self._busy},
-                timeout=15,
-            )
-            if r.status_code == 401:
+
+        # The heartbeat is a WRITE on the hub's SQLite, and it used to go out on
+        # every tick -- so an idle peer cost one write every 2 s, about 43 000 a
+        # day, to say nothing had changed, on the same database the hub's own UI
+        # polls. It is now sent on the HEARTBEAT_SECONDS cadence the constant
+        # always named, or immediately when the capability blob actually
+        # changes (a model finished downloading, ComfyUI came up) so the Run-on
+        # picker still reacts at once.
+        #
+        # The pull below deliberately keeps its 2 s cadence: that one is a read
+        # plus a conditional claim, and slowing it would just make a queued job
+        # sit there. 30 s is well inside ONLINE_TTL_SECONDS (90).
+        now = time.monotonic()
+        caps_changed = caps != self._last_caps_sent
+        if caps_changed or (now - self._last_heartbeat_at) >= HEARTBEAT_SECONDS:
+            try:
+                r = requests.post(
+                    self._url('/api/cluster/peer/heartbeat'),
+                    headers=self._headers(),
+                    json={'capabilities': caps, 'busy': self._busy},
+                    timeout=15,
+                )
+                if r.status_code == 401:
+                    self._connected = False
+                    self._last_error = 'rejected by Primary (check peer token)'
+                    time.sleep(POLL_ERROR_SECONDS)
+                    return
+                r.raise_for_status()
+                self._connected = True
+                self._last_error = None
+                self._last_heartbeat_at = now
+                self._last_caps_sent = caps
+            except requests.RequestException as e:
                 self._connected = False
-                self._last_error = 'rejected by Primary (check peer token)'
+                self._last_error = f'heartbeat failed: {e}'
                 time.sleep(POLL_ERROR_SECONDS)
                 return
-            r.raise_for_status()
-            self._connected = True
-            self._last_error = None
-        except requests.RequestException as e:
-            self._connected = False
-            self._last_error = f'heartbeat failed: {e}'
-            time.sleep(POLL_ERROR_SECONDS)
-            return
 
-        if self._busy:
-            time.sleep(HEARTBEAT_SECONDS)
-            return
+        # There is deliberately no `if self._busy: ...` guard here. `_execute`
+        # runs synchronously at the end of this method, so by the time the next
+        # tick starts `_busy` is always False again -- the guard that used to
+        # sit here could never fire. While a job runs it is `peer_job_heartbeat`
+        # (via _progress) that keeps this device's liveness stamp fresh. If
+        # execution ever moves off this thread, that guard has to come back.
 
         try:
             r = requests.post(
@@ -213,7 +249,12 @@ class PeerWorker:
             )
             r.raise_for_status()
             data = r.json() or {}
+            # The pull is now the more frequent of the two calls, so it is what
+            # keeps the peer's own status page honest between heartbeats.
+            self._connected = True
+            self._last_error = None
         except requests.RequestException as e:
+            self._connected = False
             self._last_error = f'pull failed: {e}'
             time.sleep(POLL_ERROR_SECONDS)
             return
@@ -227,6 +268,7 @@ class PeerWorker:
         self._current_job_id = job.get('job_id')
         self._current_kind = job.get('kind')
         self._phase = None
+        self._cancelled = False
         self._log(f'claimed a {job.get("kind") or "job"} from the Primary',
                   detail=f'job {str(job.get("job_id") or "")[:8]}')
         try:
@@ -237,20 +279,58 @@ class PeerWorker:
             self._current_kind = None
             self._phase = None
 
+    def _download_one_artifact(self, job_id: str, name: str, dest_dir: Path) -> tuple[str, Path]:
+        safe = os.path.basename(name)
+        url = self._url(f'/api/cluster/peer/artifacts/{job_id}/{safe}')
+        r = requests.get(url, headers=self._headers(), timeout=120, stream=True)
+        r.raise_for_status()
+        path = dest_dir / safe
+        with open(path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024 * 256):
+                if chunk:
+                    f.write(chunk)
+        return safe, path
+
     def _download_artifacts(self, job_id: str, names: list[str], dest_dir: Path) -> dict[str, Path]:
+        """Fetch a job's staged files, several at a time.
+
+        This is the longest silent stretch of a remote pass. `cluster.py`'s own
+        note measures it: a 5 000-image bank is roughly 15 minutes of the peer
+        downloading before its script prints anything at all. That was one
+        request at a time, so nearly all of it was round-trip latency rather
+        than bandwidth -- each small image cost a full request/response before
+        the next one started.
+
+        The concurrency is deliberately small. These are many small files over a
+        home link or a tailnet, and the hub serves them from one Flask process:
+        past a handful of sockets the gain flattens and the hub's own UI starts
+        competing for workers. One failure still fails the whole job, exactly as
+        the serial loop did -- an incomplete stage must never look like a
+        complete one.
+        """
         dest_dir.mkdir(parents=True, exist_ok=True)
-        out = {}
-        for name in names:
-            safe = os.path.basename(name)
-            url = self._url(f'/api/cluster/peer/artifacts/{job_id}/{safe}')
-            r = requests.get(url, headers=self._headers(), timeout=120, stream=True)
-            r.raise_for_status()
-            path = dest_dir / safe
-            with open(path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=1024 * 256):
-                    if chunk:
-                        f.write(chunk)
-            out[safe] = path
+        if not names:
+            return {}
+        out: dict[str, Path] = {}
+        if len(names) == 1:
+            safe, path = self._download_one_artifact(job_id, names[0], dest_dir)
+            return {safe: path}
+
+        workers = min(_ARTIFACT_DOWNLOAD_WORKERS, len(names))
+        with ThreadPoolExecutor(max_workers=workers,
+                                thread_name_prefix='lds-peer-fetch') as pool:
+            futures = [pool.submit(self._download_one_artifact, job_id, name, dest_dir)
+                       for name in names]
+            error = None
+            for future in as_completed(futures):
+                try:
+                    safe, path = future.result()
+                    out[safe] = path
+                except Exception as e:      # keep the FIRST failure, drain the rest
+                    if error is None:
+                        error = e
+            if error is not None:
+                raise error
         return out
 
     def _upload_artifact(self, job_id: str, path: Path, name: str | None = None) -> str:
@@ -315,8 +395,6 @@ class PeerWorker:
                 self._run_vision(job)
             elif kind == 'infer':
                 self._run_infer(job)
-            elif kind == 'training':
-                self._run_training(job)
             else:
                 self._complete(job_id, error=f'unsupported kind: {kind}')
             self._log(f'finished the {kind or "job"} for the Primary', 'ok')
@@ -360,7 +438,10 @@ class PeerWorker:
                 self._complete(job_id, error=f'ComfyUI returned no prompt_id: {result}')
                 return
 
-            filename = self._poll_comfy(prompt_id, job_id)
+            filename = self._poll_comfy(prompt_id, job_id, client_id)
+            if self._cancelled:
+                self._complete(job_id, error='cancelled on the Primary')
+                return
             if not filename:
                 self._complete(job_id, error='ComfyUI produced no output image')
                 return
@@ -386,11 +467,30 @@ class PeerWorker:
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
-    def _poll_comfy(self, prompt_id: str, job_id: str, timeout=15 * 60) -> str | None:
-        from ..utils.comfyui import get_comfyui_history
+    def _poll_comfy(self, prompt_id: str, job_id: str, client_id: str | None = None,
+                    timeout=15 * 60) -> str | None:
+        """The rendered filename, or None. Sets ``self._cancelled`` on a Stop.
+
+        The heartbeat RESPONSE is the hub's only channel into a running job, and
+        this loop used to throw it away -- so pressing Stop on the hub marked the
+        row cancelled while this peer kept rendering for up to the full 15-minute
+        timeout, holding its GPU the whole time. `_run_vision` and `_run_infer`
+        both read the same answer; this was the one kind that did not.
+        """
+        from ..utils.comfyui import cancel_comfyui_prompt, get_comfyui_history
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            self._progress(job_id, {'phase': 'rendering', 'prompt_id': prompt_id})
+            resp = self._progress(job_id, {'phase': 'rendering', 'prompt_id': prompt_id})
+            if resp.get('cancelled'):
+                self._cancelled = True
+                # Delete OUR exact prompt rather than /interrupt, which would
+                # also kill whatever else this machine's ComfyUI is rendering
+                # for its own user -- see cancel_comfyui_prompt_state.
+                try:
+                    cancel_comfyui_prompt(prompt_id, client_id)
+                except Exception:
+                    logger.exception('peer_worker: could not cancel comfy prompt %s', prompt_id)
+                return None
             history = get_comfyui_history(prompt_id) or {}
             entry = history.get(prompt_id, history) if isinstance(history, dict) else {}
             outputs = (entry or {}).get('outputs') or {}
@@ -566,8 +666,29 @@ class PeerWorker:
             timeout = int(payload.get('timeout') or 3600)
             self._progress(job_id, {'phase': 'infer', 'script': script_path.name})
 
+            # Rate-limit the relay. Every call here is an HTTP POST to the hub
+            # AND a write_with_retry on its SQLite, and these scripts print a
+            # line PER IMAGE: a 5 000-image pass therefore cost 5 000 of each,
+            # on the same database the hub's own UI is polling. The local phase
+            # is still updated on every line, so status() stays exact; only the
+            # trip to the hub is throttled. `run_peer_training` used to be the
+            # only caller that did this (every 20th line) and it was right.
+            #
+            # The floor also has to stay far below ONLINE_TTL_SECONDS (90):
+            # `peer_job_heartbeat` is what keeps `ClusterDevice.last_heartbeat`
+            # fresh while a job runs, because `_tick` is blocked inside
+            # `_execute` for the whole job and sends no device heartbeat at all.
+            # Throttling this too hard would make a working peer read offline.
+            last_relay = [0.0]
+
             def _on_line(line):
-                resp = self._progress(job_id, {'phase': 'infer', 'line': line[-200:]})
+                phase = {'phase': 'infer', 'line': line[-200:]}
+                now = time.monotonic()
+                if now - last_relay[0] < _PROGRESS_RELAY_SECONDS:
+                    self._phase = 'infer'          # local only, no round trip
+                    return
+                last_relay[0] = now
+                resp = self._progress(job_id, phase)
                 # Stop pressed on the hub: the script's OWN cancel mechanism —
                 # the sentinel file it polls — turns the abort into the clean
                 # `cancelled: true` exit these scripts already know how to make.
@@ -637,74 +758,6 @@ class PeerWorker:
             self._complete(job_id,
                            result={'result': result_obj, 'extra_artifacts': uploaded_extras},
                            output_artifact=uploaded)
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
-
-    def _run_training(self, job: dict):
-        """Download dataset archive, launch local ai-toolkit, upload checkpoints."""
-        from ..services import lora_training
-
-        job_id = job['job_id']
-        payload = job.get('payload') or {}
-        artifact_names = list(job.get('artifacts') or payload.get('artifacts') or [])
-        work = Path(tempfile.mkdtemp(prefix='lds-peer-train-'))
-        try:
-            downloaded = self._download_artifacts(job_id, artifact_names, work)
-            archive_name = payload.get('dataset_archive') or (
-                artifact_names[0] if artifact_names else None)
-            if not archive_name:
-                self._complete(job_id, error='missing dataset archive')
-                return
-            archive = downloaded.get(os.path.basename(archive_name))
-            if archive is None:
-                self._complete(job_id, error='dataset archive not downloaded')
-                return
-
-            self._progress(job_id, {'phase': 'extract'})
-            dataset_dir = work / 'dataset'
-            dataset_dir.mkdir()
-            if str(archive).endswith('.zip'):
-                import zipfile
-                with zipfile.ZipFile(archive, 'r') as zf:
-                    zf.extractall(dataset_dir)
-            else:
-                shutil.copy2(archive, dataset_dir / archive.name)
-
-            train_kwargs = dict(payload.get('train') or {})
-            self._progress(job_id, {'phase': 'training'})
-
-            # Peer-local training entry: services expose a helper that runs
-            # ai-toolkit against an arbitrary folder and returns checkpoint paths.
-            run_fn = getattr(lora_training, 'run_peer_training', None)
-            if run_fn is None:
-                self._complete(
-                    job_id,
-                    error='peer training helper not available on this build — '
-                          'update both installs')
-                return
-
-            def _on_progress(info):
-                self._progress(job_id, {'phase': 'training', **(info or {})})
-
-            result = run_fn(dataset_dir=str(dataset_dir),
-                            work_dir=str(work / 'run'),
-                            progress_cb=_on_progress,
-                            **train_kwargs)
-            ckpts = list((result or {}).get('checkpoints') or [])
-            uploaded = []
-            for ckpt in ckpts:
-                p = Path(ckpt)
-                if p.is_file():
-                    uploaded.append(self._upload_artifact(job_id, p))
-            meta_path = work / 'training_result.json'
-            meta_path.write_text(json.dumps({
-                'checkpoints': uploaded,
-                'detail': (result or {}).get('detail'),
-            }), encoding='utf-8')
-            meta_name = self._upload_artifact(job_id, meta_path, 'training_result.json')
-            self._complete(job_id,
-                           result={'checkpoints': uploaded, 'raw': result},
-                           output_artifact=meta_name)
         finally:
             shutil.rmtree(work, ignore_errors=True)
 

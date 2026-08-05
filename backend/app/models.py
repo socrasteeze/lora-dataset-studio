@@ -837,6 +837,112 @@ class SystemState(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class BankQueueEntry(db.Model):
+    """One bank waiting its turn in the cross-bank "Launch all" queue.
+
+    The queue itself is still the module-level FIFO in `bank_queue` — its lane,
+    unit and atomic-claim logic is intricate and well covered, and moving it
+    into SQL would have rewritten all of it. This table sits BESIDE it: the list
+    is the working copy, this is the record, and on boot the list is rebuilt
+    from here.
+
+    It exists because losing the queue to a restart was silent. Committed scores
+    survive, so a re-run only pays for what is missing — but that describes the
+    cost of a re-run somebody knows to start. Eleven banks queued overnight, a
+    reboot for an update, and by morning the panel is empty with no row, no log
+    line and no report saying anything was dropped.
+
+    Rows are deleted when an entry leaves the queue, so this table only ever
+    holds what is still pending or running. `id` carries the queue order.
+    """
+    __tablename__ = 'bank_queue_entry'
+    id = db.Column(db.Integer, primary_key=True)
+    bank_id = db.Column(db.Integer, nullable=False, index=True)
+    user_id = db.Column(db.String(64), nullable=False, default='local')
+    steps = db.Column(db.Text, default='[]')              # JSON list
+    reject_flags = db.Column(db.Text, default='[]')       # JSON list
+    resolve_dups = db.Column(db.Boolean, default=False)
+    # Which machine this bank was sent to. Without it a restart would silently
+    # repatriate a whole overnight queue onto this one — the exact outcome
+    # renting the second machine exists to avoid, and it would read as the queue
+    # merely being slow.
+    device_id = db.Column(db.String(64))
+    # The merged group this bank belongs to, so two lanes cannot split one card
+    # across two machines after a restore either.
+    group_key = db.Column(db.String(128))
+    enqueued_at = db.Column(db.Float)                     # time.time(), as the FIFO stores it
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PeerTrainingRun(db.Model):
+    """One training run sent to another machine's ai-toolkit.
+
+    A LANE OF ITS OWN, deliberately — the same shape `CloudTrainingRun` gave the
+    rented-pod lane, and for the same reason. Local training is single-flight
+    through the machine-wide `training_in_progress` flag, and that flag means
+    "this machine's GPU is busy": `gpu_window`, the bank's GPU passes and
+    generation all gate on it. A run happening on ANOTHER box must not set it,
+    or renting the second machine would idle the first one — the exact failure
+    the bank queue's lanes were introduced to fix. So a peer run cannot live in
+    `lora_training.training_status()`, which reports only that flag's single
+    run, and gets its own record and its own status instead.
+
+    Durable rather than in-memory because the supervisor thread is the thing
+    most likely to be missing: a restart mid-run must still be able to find the
+    run, resume watching it, and honour a stop.
+    """
+    __tablename__ = 'peer_training_run'
+    id = db.Column(db.Integer, primary_key=True)
+    dataset_id = db.Column(db.Integer, nullable=False)
+    # Which machine, as ai-toolkit names it: "<peerId>:<gpuIndex>", or a bare
+    # index for the ai-toolkit host's own GPU. Stored verbatim so the value the
+    # user picked is the value that was sent.
+    gpu_ids = db.Column(db.String(64), nullable=False, default='0')
+    machine_label = db.Column(db.String(128), default='')
+    run_name = db.Column(db.String(255))          # local run identity (lt._run_name)
+    job_name = db.Column(db.String(255))          # unique remote job/dataset name
+    status = db.Column(db.String(32), default='preparing')
+    phase_detail = db.Column(db.Text, default='')
+    remote_job_id = db.Column(db.String(64))
+    base_url = db.Column(db.String(255))
+    # Where this run's log is mirrored to. The Training page, the crash reader
+    # and the Runs page all read a run's log from disk, so mirroring the remote
+    # log into the SAME path a local run would have written means every one of
+    # them works against a peer run without knowing it is one.
+    log_path = db.Column(db.Text)
+    step = db.Column(db.Integer, default=0)
+    total_steps = db.Column(db.Integer)
+    train_params = db.Column(db.Text)             # JSON: steps/variant/train_type/masked
+    record_id = db.Column(db.Integer)             # the TrainingRunRecord this launch created
+    error = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Same lesson as the cloud lane, and as the sibling project's
+    # `cancel_requested` column: an in-memory threading.Event does not survive a
+    # restart and can only be enforced by the monitor thread — which is exactly
+    # what may be dead. A durable request can be honoured by whoever runs next.
+    stop_requested_at = db.Column(db.DateTime)
+    finished_at = db.Column(db.DateTime)
+
+    TERMINAL = ('done', 'failed', 'stopped')
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'dataset_id': self.dataset_id,
+            'gpu_ids': self.gpu_ids,
+            'machine_label': self.machine_label or '',
+            'status': self.status,
+            'phase_detail': self.phase_detail or '',
+            'step': self.step or 0,
+            'total_steps': self.total_steps,
+            'error': self.error,
+            'stop_requested': self.stop_requested_at is not None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'finished_at': self.finished_at.isoformat() if self.finished_at else None,
+        }
+
+
 class CloudTrainingRun(db.Model):
     """One cloud training run = one ephemeral vast.ai pod. Durable on purpose:
     boot-time reconciliation matches live vast instances (label 'lds-<id>')

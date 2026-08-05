@@ -508,7 +508,33 @@ Defaults for new local training runs.
 
 - **Default training family** → `training.default_family`. The model family preselected when you start a new run. One of `zimage`, `sdxl`, `krea`, `flux`, `flux2klein`, `anima`. Default **`zimage`**. Purely a starting point — you can switch family per run. `anima` trains the open [Anima](https://huggingface.co/circlestone-labs/Anima-Base-v1.0-Diffusers) anime model on its public base (no gated download); it is **local-only** for now (needs an up-to-date ai-toolkit + diffusers — cloud training arrives once the GPU pod image is verified). **Anima is the one family with hybrid prompting:** booru tags *and* natural language are both first-class on it, so the caption-style guard says nothing there — prose is merely the preselected default, and a booru-captioned Anima dataset trains without being flagged or forced. Every other family keeps its single expected form (SDXL = booru tags, the rest = prose).
 
-This fork's Settings → Training keeps only **Defaults** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
+This fork's Settings → Training keeps **Defaults** and **Train on another machine** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
+
+### Train on another machine
+
+Two fields, both blank by default. Blank means the feature is off and every run trains here, exactly as before.
+
+- **ai-toolkit web address** → `aitoolkit.url`. The address of a *running* ai-toolkit web UI, typically `http://localhost:8675`. Distinct from `aitoolkit.dir` under [Local tools](#local-tools): `dir` is the checkout this app shells `run.py` in, this is a UI a job can be **submitted** to so it can choose the GPU. Set it and a **Train on** picker appears next to *Train the LoRA* in a dataset's Training panel.
+- **Its access token** → `aitoolkit.token`. Only needed if that ai-toolkit runs with `AI_TOOLKIT_AUTH` set. Blank otherwise.
+
+**Point it at this machine's own ai-toolkit.** This app exports the dataset to a folder on this disk and hands that path over, so an address on another box would name a folder it cannot see. The machines you can then send a run to are the ones *that* ai-toolkit has configured — it stages the dataset onward, starts the job, and mirrors the log, samples and checkpoints back. This app never talks to the far machine itself.
+
+Known limits, all deliberate:
+
+| Limit | Why |
+|---|---|
+| The picker never offers **this machine's** GPUs, only other machines' | A run in this lane does not set the machine-wide GPU-busy flag, so image generation and the bank's GPU passes would start on top of it. *Train the LoRA* with **This machine** selected is the local path, unchanged |
+| A run sent elsewhere always starts **fresh** | Previous checkpoints are not sent over, so there is no Resume/Fresh question to ask |
+| One run per dataset at a time | Two runs would write the same run folder and the same log |
+| An offline machine is listed and **disabled**, not hidden | Hiding it reads exactly like never having configured it |
+| A failed run stays on screen for an hour, then ages out | Long enough to be read, short enough not to nag |
+
+The readiness guards are the same either way — captions that do not match the
+family, uncaptioned images, the image floor — and so are the "train anyway"
+confirms. A dataset does not become well-formed by being trained elsewhere.
+
+Base models are **not** copied. The machine that trains downloads its own weights with its own Hugging Face token — only the dataset and the job config cross the network.
+
 ### Training base & variant are per FAMILY
 
 The **Base** and **variant** chosen in *Advanced training options* belong to the
@@ -933,6 +959,8 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `aitoolkit.output_dir` | Override for ai-toolkit's output folder (defaults to `<aitoolkit.dir>/output`). |
 | `aitoolkit.hf_home` | Override for the Hugging Face cache directory ai-toolkit uses. |
 | `aitoolkit.python` | Full path to the Python interpreter to run ai-toolkit with. Empty = auto-detect a `venv/`/`.venv/` next to `run.py`; set it for conda/uv/system-Python installs that have no venv folder. |
+| `aitoolkit.url` | Web address of a running ai-toolkit UI to submit runs to, so they can be sent to one of its machines. Empty = the **Train on** picker is not offered. |
+| `aitoolkit.token` | Access token for that ai-toolkit, if it runs with `AI_TOOLKIT_AUTH`. Empty = none sent. |
 | `engines.default` | Image-generation engine preselected in the UI. Local-only on this fork: `klein` or `krea`. |
 | `engines.enabled` | List of engines shown as options in the UI (`['klein', 'krea']` on this fork). Doubles as the engine catalogue: an engine added by an update is merged into a stored list on read, so a new engine reaches installs that already have saved settings. An engine you unticked yourself is never added back. |
 | `engines.known` | Not a setting — the ledger of which engines the app was offering the last time this list was saved. Tells "this engine did not exist yet" apart from "I unticked it". Written automatically; `[]` or absent means the app assumes Klein alone. Delete it to be re-offered every engine. |
