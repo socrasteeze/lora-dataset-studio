@@ -1023,12 +1023,21 @@ def test_stop_reaches_the_peer_and_still_brings_the_weights_home(configured, pee
 
 # ── 11. the peer dies ────────────────────────────────────────────────────────
 
-def test_a_peer_that_goes_away_fails_the_run_and_names_the_machine(configured, peer,
-                                                                   monkeypatch):
-    """Never a fabricated success. A machine that stops answering has to end the
-    run as FAILED, with the machine in the message — that string is the whole
-    notice the user gets, and "it finished" would be a lie about weights that do
-    not exist."""
+def test_a_peer_that_goes_away_never_reports_a_success(configured, peer,
+                                                       monkeypatch):
+    """Never a fabricated success, and never a claim about weights.
+
+    This test used to require the run be marked FAILED, and that was changed
+    deliberately: "failed" is terminal, and a terminal run leaves
+    `active_runs()`, which is the only thing `resume_supervisors` re-attaches
+    to — so the status meaning "I cannot see this run" also meant "never look
+    again", while the job carried on training. See
+    `test_losing_contact_leaves_the_run_re_attachable`.
+
+    What must NOT change is the half this test was really written for: silence
+    is never success, the machine is always named, and nothing is claimed to
+    have been brought home.
+    """
     from app.extensions import db
 
     monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
@@ -1044,13 +1053,12 @@ def test_a_peer_that_goes_away_fails_the_run_and_names_the_machine(configured, p
 
         peer_training._watch(run)
         db.session.refresh(run)
-        status, error, finished = run.status, run.error, run.finished_at
+        status, detail = run.status, run.phase_detail or ''
         save_root = json.loads(run.train_params)['save_root']
 
-    assert status == 'failed'
-    assert finished is not None
-    assert 'lost contact' in (error or '')
-    assert 'Workshop GPU 0' in (error or ''), 'the message has to name the machine'
+    assert status != 'done', 'silence must never be read as a finished run'
+    assert 'Lost contact' in detail, f'the user is told what happened: {detail!r}'
+    assert 'Workshop GPU 0' in detail, 'the message has to name the machine'
     assert not os.path.isdir(save_root) or os.listdir(save_root) == [], (
         'nothing may be reported as brought home')
 
@@ -1182,3 +1190,246 @@ def test_a_cleanly_ended_short_stream_is_not_promoted_as_a_checkpoint(configured
         with open(landed, 'rb') as fh:
             assert fh.read() == weights, (
                 'a truncated checkpoint must never be promoted to the final name')
+
+
+# ── 12. the re-attach path ───────────────────────────────────────────────────
+
+def test_a_restart_does_not_mirror_the_whole_log_twice(configured, peer, monkeypatch):
+    """The cursor into the remote log has to outlive the supervisor holding it.
+
+    WAS BROKEN AS: `_watch` opened with `log_offset = 0`, which is right for a
+    fresh launch and wrong for every re-attach. `resume_supervisors` re-enters
+    `_watch` with no memory, so it asked the peer for the log from byte 0; a
+    valid offset is not a truncation, so the answer carried `reset: false`, and
+    `_mirror_log` appended the run's entire history to the mirror a second time.
+    The restart marker could not fire to explain it — that needs `reset` true —
+    so the local log simply showed the run happening twice, step counter and
+    all, which is exactly what a reader uses the log to rule out.
+    """
+    from app.extensions import db
+
+    monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
+    first = 'step 1/1200\nstep 2/1200\n'
+    second = 'step 3/1200\nstep 4/1200\n'
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='restartlog', trigger='restartlogtrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+        job_id, log_path = run.remote_job_id, run.log_path
+
+        # One supervisor mirrors the first stretch and ends. (`_watch` only
+        # returns on a terminal status, so the leg is ended with one; what is
+        # under test is where the NEXT one starts reading, not how this one
+        # stopped.)
+        peer.write_log(job_id, first)
+        peer.on_poll[job_id] = [{'status': 'running', 'step': 2, 'total_steps': 1200},
+                                {'status': 'completed', 'step': 2, 'total_steps': 1200}]
+        peer_training._watch(run)
+
+        db.session.refresh(run)
+        assert run.log_offset == len(first), (
+            'the cursor must be recorded on the run, not only in the watcher — '
+            'a supervisor that dies takes a local variable with it')
+
+        # A second supervisor picks the same run up, which is all
+        # `resume_supervisors` does after a restart: `_watch` on an existing row.
+        peer_training._set(run, status='running', finished_at=None)
+        peer.write_log(job_id, second)
+        peer.on_poll[job_id] = [{'status': 'completed', 'step': 4, 'total_steps': 1200}]
+        peer_training._watch(run)
+
+    with open(log_path, encoding='utf-8') as fh:
+        mirrored = fh.read()
+    assert mirrored == first + second, (
+        'the re-attached watcher re-mirrored the log it already had; the local '
+        f'copy is {len(mirrored)} bytes for a {len(first + second)}-byte run')
+    assert mirrored.count('step 1/1200') == 1, 'the first step appears twice'
+
+
+def test_a_job_that_was_created_but_never_started_is_not_called_finished(
+        configured, peer, monkeypatch):
+    """`stopped` is ai-toolkit's creation DEFAULT as well as a real end state.
+
+    WAS BROKEN AS: `REMOTE_TERMINAL_STATUS` maps 'stopped' straight to a
+    finished run whose weights are worth collecting. But `POST /api/jobs`
+    creates the row already 'stopped' — only `GET /api/jobs/<id>/start` moves it
+    to 'queued' — and `_submit` deliberately records the job id BEFORE calling
+    start, so that a start which times out is not mistaken for a job never sent.
+    Crash in that gap and the next boot skips `_submit` (there is a job id now),
+    polls, sees the creation default, and quietly marked the run finished, then
+    asked for weights nothing had written. The run read as "stopped" for no
+    reason a user could see, and the job it left behind never ran at all.
+    """
+    from app.extensions import db
+
+    monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='neverstarted', trigger='neverstartedtrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+        job_id = run.remote_job_id
+
+        # Exactly the state a crash between create and start leaves behind: the
+        # job exists, carries its creation default, and has never stepped —
+        # and, decisively, no start was ever confirmed. `_submit` stamps
+        # `started_at` only AFTER `start_job` returns, so clearing it here is
+        # what reproduces a process that died inside that window.
+        peer.jobs[job_id]['status'] = 'stopped'
+        peer.jobs[job_id]['step'] = 0
+        peer_training._set(run, status='queued', started_at=None)
+
+        peer_training._watch(run)
+        db.session.refresh(run)
+        status, error, detail = run.status, run.error or '', run.phase_detail or ''
+
+    assert status == 'failed', (
+        f'a job that never started was reported as {status!r}; only a run that '
+        'really ran may end in a state that claims its weights are home')
+    assert 'never started' in error, f'the reason must say what happened: {error!r}'
+    assert 'Weights copied' not in detail, (
+        'nothing may claim weights came home from a run that never began')
+
+
+# ── 13. what a re-attach must not get wrong ──────────────────────────────────
+
+def test_losing_contact_leaves_the_run_re_attachable(configured, peer, monkeypatch):
+    """Silence is a fact about the CONVERSATION, not about the run.
+
+    WAS BROKEN AS: the lost-contact path set `status='failed'`, which is in
+    `PeerTrainingRun.TERMINAL`. `active_runs()` filters those out and
+    `resume_supervisors` only ever re-attaches to what `active_runs()` returns —
+    so the single status meaning "I can no longer see this run" also guaranteed
+    nothing would ever look again, while the job kept training for hours. Boot
+    is when it was most likely to fire: a minute of silence is what an
+    ai-toolkit that is still starting up looks like.
+    """
+    from app.extensions import db
+
+    monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.001)
+    monkeypatch.setattr(peer_training, 'MAX_POLL_FAILURES', 2)
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='silence', trigger='silencetrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+
+        peer.stop()                      # the machine stops answering entirely
+        peer_training._watch(run)
+
+        db.session.refresh(run)
+        status, detail = run.status, run.phase_detail or ''
+        still_active = [r.id for r in peer_training.active_runs()]
+        run_id = run.id
+
+    assert status not in ('done', 'failed', 'stopped'), (
+        f'a run we merely cannot see was marked {status!r}, which removes it '
+        'from active_runs() and so from every future resume_supervisors')
+    assert run_id in still_active, 'the run must stay re-attachable'
+    assert 'Lost contact' in detail, f'the panel must say what happened: {detail!r}'
+
+
+def test_stop_finalises_a_run_no_supervisor_is_watching(configured, peer):
+    """The escape hatch has to actually open.
+
+    WAS BROKEN AS: `request_stop` set `stop_requested_at` and nothing else, and
+    that flag is only ever acted on by a watcher. For a run left non-terminal
+    with no supervisor — exactly what losing contact now produces — Stop set a
+    flag nobody would read, so the row stayed non-terminal for ever and went on
+    holding the dataset's single-run lock. The one action offered for getting
+    out of that state did nothing.
+    """
+    from app.extensions import db
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='orphan', trigger='orphantrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+        peer_training._set(run, status='running')
+        assert run.id not in peer_training._threads, 'no supervisor, by construction'
+
+        assert peer_training.request_stop(run.id) is True
+        db.session.refresh(run)
+        status = run.status
+        active = [r.id for r in peer_training.active_runs()]
+        run_id = run.id
+
+    assert status == 'stopped', (
+        f'Stop left an unwatched run at {status!r}; nothing would ever move it')
+    assert run_id not in active, 'a stopped run must release the dataset'
+
+
+def test_a_failed_copy_back_does_not_rewrite_a_finished_run(configured, peer,
+                                                            monkeypatch):
+    """Training finished; only the copy home did not.
+
+    WAS BROKEN AS: `_watch` sets the terminal status BEFORE fetching weights,
+    and `_fetch_checkpoints` created the destination folder outside its own
+    try. A save_root that could not be made therefore raised out of `_watch`,
+    and `_supervise`'s catch-all rewrote a run that genuinely COMPLETED as
+    'failed' — losing the one fact that mattered, that the checkpoints exist and
+    are sitting on the other machine.
+    """
+    from app.extensions import db
+
+    monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
+    weights = bytes(range(256)) * 8
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='copyfail', trigger='copyfailtrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+        job_id = run.remote_job_id
+        peer.add_job_file(job_id, 'lora_copyfailtrig_000000500.safetensors', weights)
+        peer.on_poll[job_id] = [{'status': 'completed', 'step': 500,
+                                 'total_steps': 500}]
+
+        def _boom(*a, **k):
+            raise OSError('read-only file system')
+        monkeypatch.setattr(peer_training.os, 'makedirs', _boom)
+
+        # Through _supervise, because that catch-all is half the defect.
+        peer_training._supervise(configured, run.id)
+        db.session.refresh(run)
+        status, detail = run.status, run.phase_detail or ''
+
+    assert status == 'done', (
+        f'a completed run was rewritten as {status!r} because the copy home '
+        'failed; the training finished and its weights are on that machine')
+    assert 'machine' in detail.lower(), (
+        f'the copy-back problem must still be reported: {detail!r}')
+
+
+def test_a_run_polls_the_machine_it_was_sent_to(configured, peer, monkeypatch):
+    """The address recorded at launch is the one that has the job.
+
+    WAS BROKEN AS: `base_url` was written at launch and never read — every poll
+    rebuilt the client from live config. Repoint `aitoolkit.url` while a run is
+    in flight, or restart after doing so, and the supervisor polled job ids
+    against a DIFFERENT machine's database. Ids are per-database, so the answer
+    is a 404 that reads as "the job is gone", or a same-id job reporting a
+    stranger's progress into this run.
+    """
+    from app.extensions import db
+    from app import config as cfg
+
+    monkeypatch.setattr(peer_training, 'POLL_SECONDS', 0.01)
+
+    with configured.app_context():
+        _, run = _new_run(peer, name='moved', trigger='movedtrig')
+        peer_training._submit(run, _job_config(run))
+        db.session.refresh(run)
+        job_id = run.remote_job_id
+
+        # Settings now point somewhere else entirely — a port nothing serves.
+        cfg.save_config({'aitoolkit': {'url': 'http://127.0.0.1:9', 'token': peer.token}})
+
+        peer.on_poll[job_id] = [{'status': 'completed', 'step': 9, 'total_steps': 9}]
+        peer_training._watch(run)
+        db.session.refresh(run)
+        status, step = run.status, run.step
+
+    assert status == 'done' and step == 9, (
+        f'the run ended as {status!r} at step {step}; it must keep polling the '
+        'machine it was actually sent to, not whatever the settings now say')
