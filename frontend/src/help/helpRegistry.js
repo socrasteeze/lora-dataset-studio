@@ -225,6 +225,27 @@ const TOPICS = [
       'graph', 'lineage', 'runs graph', 'continue', 'download'],
     guide: { chapter: 'dataset-guide', anchor: '6-after-training-pick-the-right-checkpoint' },
     app: { route: '/datasets?section=checkpoints' } },
+  // A full model is not an adapter, and the panel gives it its own block and its
+  // own verbs (quantize / send the fp8 twin / trash). It therefore needs its own
+  // topic: searching "26 GB", "master" or "send to ComfyUI" must not land on the
+  // LoRA deploy instructions, which say the opposite of what a full model needs.
+  { id: 'workspace-dense-models', kind: 'section', title: 'Full models',
+    keywords: ['full model', 'dense', 'full transformer', 'master', 'fp8', 'twin',
+      'quantize', 'send to comfyui', '26 gb', 'diffusion_models', 'raw', 'undistilled',
+      'hugging face', 'checkpoint store'],
+    guide: { chapter: 'using-the-app', anchor: 'using-a-full-model-you-trained' },
+    app: { route: '/datasets?section=checkpoints' } },
+  // Its own topic, not a line under "Full models": a merge is how most published
+  // checkpoints are actually made, and someone searching "turbo", "bake",
+  // "finetune" or "publish a checkpoint" is asking for THIS, not for the
+  // quantize button or the LoRA deploy instructions.
+  { id: 'workspace-lora-merge', kind: 'action', title: 'Merge a LoRA into a base',
+    keywords: ['merge', 'merge lora', 'bake', 'bake in', 'fold', 'full model from lora',
+      'checkpoint from lora', 'finetune', 'turbo', 'transplant', 're-distillation',
+      'distill', 'publish a checkpoint', 'civitai', 'base plus lora', 'stack loras',
+      'merged model', 'speed back', 'few-step'],
+    guide: { chapter: 'using-the-app', anchor: 'merge-a-lora-into-a-base-checkpoint' },
+    app: { route: '/datasets?section=checkpoints' } },
   { id: 'workspace-studio', kind: 'section', title: 'Studio',
     keywords: ['studio', 'test', 'lora', 'checkpoint', 'winning settings'],
     guide: { chapter: 'dataset-guide', anchor: '6-after-training-pick-the-right-checkpoint' },
@@ -268,6 +289,14 @@ const TOPICS = [
       'caption', 'captions', 'search', 'find', 'tag', 'tags', 'describe',
       'launch all', 'pipeline', 'auto-reject', 'overnight', 'run everything',
       'one click', 'batch', 'chain',
+      // "auto-reject doesn't work" — what it really means, in the words people
+      // type: the button only touches UNDECIDED images, so a second run has
+      // nothing left to do, and a never-scanned image is invisible to every
+      // quality flag.
+      'auto reject does nothing', "auto-reject doesn't work", 'rejected 0',
+      '0 to reject', 'nothing rejected', 'count is wrong', 'wrong count',
+      'flagged but not rejected', 'never scanned', 'not scanned', 'unscanned',
+      'blind spot', 'run it twice', 'second pass',
       'framing', 'shot type', 'face', 'bust', 'body', 'back', 'full body',
       'close-up', 'back view', 'classify framing', 'composition',
       'coverage advice', 'balance', 'what to add', 'missing', 'thin', 'imbalance',
@@ -1119,11 +1148,28 @@ const TOPICS = [
       '26 gb', '10 gb', 'checkpoint', 'full model', 'load diffusion model', 'cpu'],
     guide: { chapter: 'settings-reference', anchor: 'storage' },
     app: { route: '/settings/storage', focus: 'storage-fp8-quantize' } },
+  // Two questions behind one word. The refusal topic keeps its id (in-app help
+  // badges and bookmarked links resolve against it), but the title and keywords
+  // now cover BOTH answers: a packed export is refused, a plain fp8 cast is
+  // allowed and merely costly.
   { id: 'training.quantized_base_refused', kind: 'setting',
-    title: 'Why a quantized checkpoint is refused as a training base',
+    title: 'Which quantized checkpoints can be trained on, and which cannot',
     keywords: ['quantized', 'quantised', 'fp8', 'int8', 'gguf', 'custom weights',
-      'base', 'refused', 'inference only', 'training', 'bf16', 'fp16', 'error'],
+      'base', 'refused', 'inference only', 'training', 'bf16', 'fp16', 'error',
+      'scaled fp8', 'scale_weight', 'comfy_quant', 'packed export', 'fp8 cast',
+      'cannot be loaded', 'strict', 'state dict', 'degraded', 'precision'],
     guide: { chapter: 'dataset-guide', anchor: '10-local-fp8-model-conversion' },
+    app: { route: '/datasets?section=training' } },
+  // The Krea base LIST is a different question from the quantization verdict a
+  // listed entry may carry ("where are my models?" vs "why is this one greyed
+  // out?"), and it is searched with the family name, so it gets its own topic.
+  { id: 'training.krea_installed_bases', kind: 'setting',
+    title: 'Training Krea 2 on a checkpoint you already have',
+    keywords: ['krea', 'krea 2', 'base', 'base model', 'checkpoint', 'unet',
+      'diffusion_models', 'my model', 'installed', 'continue training', 'merge',
+      'community model', 'full model', 'not listed', 'missing from the list',
+      'custom weights', 'absolute path'],
+    guide: { chapter: 'dataset-guide', anchor: '1-pick-your-model-family-first' },
     app: { route: '/datasets?section=training' } },
   // Dual captions is a per-run Advanced training option (not a global Setting),
   // so it points at the dataset guide's dedicated section rather than
@@ -1428,7 +1474,12 @@ const TOPICS = [
   action('continue-training', 'Continue a training run',
     ['continue', 'resume', 'more steps', 'epoch', 'checkpoint', 'restart', 'undercook', 'overcook',
      'learning rate', 'lr', 'half', 'tenth', 'gentle finish', 'polish', 'timestep', 'cadence',
-     'lane', 'local', 'cloud', 'run it'],
+     'lane', 'local', 'cloud', 'run it',
+     // How a full model's 26 GB reaches the pod — the priced choice in this
+     // same dialog. Searchable from the words a user would actually type when
+     // they are staring at a GPU cost they did not expect.
+     'send it via', 'transport', 'upload', 'uplink', 'hugging face copy',
+     'gpu cost', 'how long', 'slice', 'resumable upload'],
     '/datasets?section=checkpoints', 'dataset-guide', '6-after-training-pick-the-right-checkpoint',
     { trigger: 'continue-any-epoch',
       text: 'Finished a run? ▶ Continue trains it further — for any number of steps, or resumed from an earlier, less-cooked epoch.' }),
