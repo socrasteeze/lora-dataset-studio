@@ -922,6 +922,15 @@ class PeerTrainingRun(db.Model):
     # that never came from the remote log (the restart marker), after which
     # file size and remote offset diverge for good.
     log_offset = db.Column(db.Integer, default=0)
+    # When the far side CONFIRMED the start call, not when it was issued.
+    # `_submit` records `remote_job_id` before starting, on purpose, so a start
+    # that times out is not mistaken for a job that was never sent — which
+    # leaves a window where the job exists and has never run. Its status over
+    # there is then ai-toolkit's creation default, 'stopped', which is
+    # indistinguishable from a real one. NULL here says "no start was ever
+    # confirmed", and it is the only signal that survives the restart which
+    # creates the window in the first place.
+    started_at = db.Column(db.DateTime)
     step = db.Column(db.Integer, default=0)
     total_steps = db.Column(db.Integer)
     train_params = db.Column(db.Text)             # JSON: steps/variant/train_type/masked
