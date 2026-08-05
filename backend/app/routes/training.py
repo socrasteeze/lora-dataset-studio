@@ -23,7 +23,7 @@ from ..services import face_mask_preview as fmp
 from ..models import FaceDatasetImage
 from ..services import lora_training as lt
 from ..services import zimage_convert as zc
-from ..utils.comfyui import get_zimage_models, get_checkpoint_models
+from ..utils.comfyui import get_zimage_models, get_checkpoint_models, get_krea_models
 from ._common import _map_error
 
 bp = Blueprint('training', __name__, url_prefix='/api')
@@ -738,6 +738,95 @@ def dataset_face_mask_preview_status(dataset_id):
                     **fmp.snapshot(dataset_id, fp)})
 
 
+def _krea_installed_bases():
+    """Every Krea 2 checkpoint on this machine, as TRAINING base entries.
+
+    The Studio and the trainer address a model with two different — and both
+    legitimate — vocabularies, so this is a translation, not a shortcut:
+
+    * the Studio picker speaks ComfyUI-relative loader names (``Krea\\x.safetensors``)
+      because it hands them to a ComfyUI running on this machine;
+    * the trainer reads a base value through ``lt._is_custom_weights`` — an
+      ABSOLUTE path means "custom weights, load this file", a RELATIVE name means
+      "a catalog entry the app installed" (Z-Image merges, the SDXL whitelist,
+      both of which have their own resolver), and ``''`` means the official base.
+      Krea has no relative-name resolver: ``foreign_base_reason`` classifies a
+      relative value on Krea as another family's base and the run silently falls
+      back to the official weights. The trainer can also run on a REMOTE pod that
+      must RECEIVE the file, which is why an absolute local path is the right
+      currency there and a ComfyUI folder name is not.
+
+    So: scan with the Studio's scanner (`get_krea_models` — no fifth scanner),
+    then resolve each name to the concrete file through the same search roots
+    ComfyUI itself uses. A name that resolves to nothing is DROPPED rather than
+    emitted relative: offering a value the trainer would quietly ignore is worse
+    than a shorter list.
+
+    Each entry also carries what the picker must say about the file before it is
+    chosen (`model_integrity.training_base_advisory`): a packed inference export
+    is not trainable and says why, a bare fp8 cast is trainable and says what it
+    costs. Header-only and cached per (path, mtime, size).
+    """
+    from ..services import comfy_model_paths
+    from ..services import model_integrity
+    out = []
+    for rel in (get_krea_models() or []):
+        path = comfy_model_paths.resolve_model_file('diffusion_models', rel)
+        if not path:
+            continue
+        advisory = model_integrity.training_base_advisory(path)
+        out.append({
+            'value': path,
+            'label': os.path.basename(str(rel).replace('\\', '/')).rsplit('.', 1)[0],
+            'trainable': advisory['trainable'],
+            'quantization': advisory['form'],
+            'note': advisory['note'],
+        })
+    return out
+
+
+@bp.get('/train/base-file-advisory')
+def train_base_file_advisory():
+    """The verdict a LISTED base already carries, for a path the user TYPED.
+
+    « Custom weights… » is a free text field, and until now the only thing that
+    ever read the file was the save and the launch. So the one base nobody can
+    pick from a list — a checkpoint downloaded five minutes ago, the exact case
+    the field exists for — was also the only one whose "this is a packed export,
+    the trainer cannot load it" arrived after the dataset had been exported and,
+    on the cloud lane, after a GPU had been rented. Same answer, same wording,
+    same `model_integrity.training_base_advisory` — just at typing time.
+
+    Read-only and header-only, and it never echoes the path back: the reply
+    carries the BASENAME, because these payloads end up in pasted diagnostics.
+    `status` is `ok` / `missing` / `not_a_model`; a file it cannot inspect is
+    reported as such and never as a refusal — refusing a base nobody could read
+    would be worse than the failure it prevents.
+    """
+    from ..services import model_integrity
+    raw = (request.args.get('path') or '').strip().strip('"')
+    if not raw:
+        return jsonify({'status': 'missing', 'trainable': True, 'note': None}), 200
+    name = os.path.basename(raw.replace('\\', '/'))
+    if not name.lower().endswith(('.safetensors', '.sft')):
+        # .gguf is loadable by ComfyUI and NOT by a trainer; anything else is not
+        # a single-file checkpoint at all. Both are "not a base", said the same way.
+        return jsonify({'status': 'not_a_model', 'filename': name,
+                        'trainable': False, 'level': 'error', 'quantization': '',
+                        'note': f'{name} is not a .safetensors checkpoint — training '
+                                f'needs a single-file model in that format.'}), 200
+    if not os.path.isfile(raw):
+        return jsonify({'status': 'missing', 'filename': name, 'trainable': False,
+                        'level': 'error', 'quantization': '',
+                        'note': f'{name} is not at that path.'}), 200
+    advisory = model_integrity.training_base_advisory(raw)
+    return jsonify({'status': 'ok', 'filename': name,
+                    'trainable': advisory['trainable'],
+                    'level': advisory['level'],
+                    'quantization': advisory['form'],
+                    'note': advisory['note']}), 200
+
+
 @bp.get('/dataset/<int:dataset_id>/train/base-info')
 def dataset_train_base_info(dataset_id):
     """Bases entraînables (officielle + merges Z-Image), base/variante choisies du
@@ -761,9 +850,12 @@ def dataset_train_base_info(dataset_id):
         name = c['name'] if isinstance(c, dict) else c
         sdxl_bases.append({'value': name,
                            'label': name.replace('\\', '/').split('/')[-1].rsplit('.', 1)[0]})
-    # Krea 2 : base officielle fixe (pas de checkpoint custom, pas de conversion) ; le
-    # choix Raw/Turbo se fait via le sélecteur `variant`, pas ici → label neutre.
-    krea_bases = [{'value': '', 'label': 'Official - Krea 2'}]
+    # Krea 2 : la base officielle (le choix Raw/Turbo se fait via le sélecteur
+    # `variant`, pas ici → label neutre) PUIS tout checkpoint Krea 2 installé sur
+    # cette machine — un modèle que l'utilisateur vient d'entraîner, un build
+    # communautaire. Même scanner que le Studio (get_krea_models), pas un
+    # cinquième : leur divergence a déjà produit un bug.
+    krea_bases = [{'value': '', 'label': 'Official - Krea 2'}] + _krea_installed_bases()
     # Flux : base officielle fixe (FLUX.1-dev, gated HF) — pas de checkpoint custom ni
     # de conversion. Entrée explicite pour que l'UI n'aille PAS retomber sur les bases
     # Z-Image (fallback `bases_by_type[type] || bases`) quand la famille est Flux.
@@ -1774,10 +1866,30 @@ def dataset_train_cloud_continue():
                                     from_step=d.get('from_step'),
                                     overrides=d.get('overrides'),
                                     resume_mode=d.get('resume_mode', 'weights_only'),
-                                    state_bundle_id=d.get('state_bundle_id'))
+                                    state_bundle_id=d.get('state_bundle_id'),
+                                    transport=d.get('transport'))
     except Exception as e:
         return _map_error(e)
     return jsonify({'ok': True, **res})
+
+
+@bp.post('/dataset/train/cloud/resume-plan')
+def dataset_train_cloud_resume_plan():
+    """The two roads a full model can take back to a pod, with their duration
+    and their GPU cost — answered BEFORE anything is rented, like every other
+    plan endpoint here. Always 200: a road that cannot be taken comes back
+    unavailable with the reason, because a disabled button that explains itself
+    is the whole point of this panel."""
+    gate = _require_cloud()
+    if gate:
+        return gate
+    d = request.get_json(silent=True) or {}
+    try:
+        return jsonify({'ok': True, **ct.dense_resume_plan(
+            LOCAL_USER, int(d.get('run_id') or 0),
+            from_step=d.get('from_step'))})
+    except Exception as e:
+        return _map_error(e)
 
 
 @bp.post('/dataset/train/cloud/recheck-delivery')

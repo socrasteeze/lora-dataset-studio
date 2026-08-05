@@ -1327,7 +1327,7 @@ def _require_cloud_weights_only(resume_mode='weights_only', state_bundle_id=None
 
 def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
                        overrides=None, resume_mode='weights_only',
-                       state_bundle_id=None) -> dict:
+                       state_bundle_id=None, transport=None) -> dict:
     """Reprend un run cloud TERMINAL (done OU en échec) depuis un checkpoint
     harvesté et vise step_de_reprise + extra_steps — le pendant cloud de
     lora_training.continue_training. C'est un VRAI launch_cloud_training (pod
@@ -1667,7 +1667,8 @@ def launch_cloud_training(user_id, dataset_id, steps=None, base_model=_UNSET,
                              'for Krea 2')
         if variant and variant != 'base':
             raise ValueError('full_transformer cloud training requires '
-                             'Krea-2-Raw (variant "base"); Turbo is unsupported')
+                             'Krea-2-Raw (variant "base"); Turbo not tested yet '
+                             'for dense runs')
         variant = 'base'
         if base_model:
             raise ValueError('full_transformer cloud training requires the '
@@ -6705,7 +6706,8 @@ def gpu_tiers(user_id, dataset_id, train_type=None, steps=None,
                              'for Krea 2')
         if selected_variant != 'base':
             raise ValueError('full_transformer cloud training requires '
-                             'Krea-2-Raw (variant "base")')
+                             'Krea-2-Raw (variant "base"); Turbo not tested yet '
+                             'for dense runs')
         if lt.slider_mode_enabled(ds):
             raise ValueError('full_transformer cloud training is incompatible '
                              'with Slider LoRA mode')
