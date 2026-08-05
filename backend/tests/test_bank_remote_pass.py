@@ -47,7 +47,7 @@ def test_remote_start_score_skips_every_local_gate(app, tmp_path, monkeypatch):
     monkeypatch.setattr(banks, '_gpu_busy_reason', lambda: 'training holds the GPU')
     ran = {}
     monkeypatch.setattr(banks, '_score_job',
-                        lambda bank_id, device_id=None:
+                        lambda bank_id, device_id=None, rescore=False:
                         (lambda job: ran.update(device_id=device_id)))
     with app.app_context():
         bank_id = _bank(tmp_path)

@@ -240,6 +240,11 @@ _SCHEMA_ADDITIONS = (
     ('face_dataset_image', 'watermark_state', 'VARCHAR(16)'),
     ('face_dataset_image', 'watermark_bbox', 'TEXT'),
     ('face_dataset_image', 'watermark_regions', 'TEXT'),
+    # Who ruled ('detector' | 'vision') and with what score. Existing rows stay
+    # NULL — read as "before the source was recorded", never attributed to a
+    # route at random (same rule the bank's identical pair already follows).
+    ('face_dataset_image', 'watermark_source', 'VARCHAR(16)'),
+    ('face_dataset_image', 'watermark_score', 'REAL'),
     ('face_dataset_image', 'source_metadata', 'TEXT'),
     # Back-link to the bank_image a promotion copied here. Existing rows keep
     # NULL: a bank that was promoted before this column existed still relies on
@@ -337,6 +342,18 @@ _SCHEMA_ADDITIONS = (
     # person" declaration wrote it with no inference. Additive: a database that
     # never gains it simply has no assertions and clusters exactly as before.
     ('bank_image', 'face_cluster_origin', 'VARCHAR(10)'),
+    # WHO wrote a caption: NULL = never recorded | 'asserted' (a human) |
+    # 'joycaption'/'ollama' (the engine). Deliberately NO server default: NULL is
+    # the value that carries meaning here, and back-filling every existing row
+    # with 'joycaption' or with 'asserted' would BOTH be a claim nobody measured
+    # — the first would make Re-caption destroy hand-written work it just
+    # promised to spare, the second would freeze every bank that exists today.
+    # A row that predates the column keeps NULL, is re-captioned as it always
+    # was, and is counted on screen as "origin never recorded". See
+    # services/caption_origin.py.
+    ('bank_image', 'caption_origin', 'VARCHAR(16)'),
+    ('face_dataset_image', 'caption_origin', 'VARCHAR(16)'),
+    ('face_dataset_image', 'caption_short_origin', 'VARCHAR(16)'),
     ('image_bank', 'pipeline_report', 'TEXT'),
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).

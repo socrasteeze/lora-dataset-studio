@@ -314,6 +314,45 @@ def bank_images(bank_id):
     return jsonify(payload)
 
 
+@bp.get('/bank/<int:bank_id>/facets')
+def bank_facets(bank_id):
+    """The chip counters for the CURRENT filter — same query keys as /images.
+
+    Its own route rather than a slice of the workspace payload: that payload is
+    also the 2 s job poll, and hanging the filter state off it would re-measure
+    every facet twice a second for a question only a filter change can change
+    the answer to. Read-only, and each facet is counted with its OWN value
+    lifted (see facet_counts)."""
+    args = request.args
+
+    def _int(name):
+        v = args.get(name)
+        try:
+            return int(v) if v not in (None, '') else None
+        except ValueError:
+            return None
+
+    subfolder = args.get('subfolder')
+    out = banks.facet_counts(
+        LOCAL_USER, bank_id,
+        status=args.get('status') or None,
+        flag=args.get('flag') or None,
+        cluster=_int('cluster'), group=_int('group'), style=_int('style'),
+        semantic_group=_int('semantic_group'),
+        subfolder=subfolder if subfolder is not None else None,
+        search=args.get('search') or None,
+        exclude=args.get('exclude') or None,
+        tags=args.get('tags') or None,
+        res_bucket=args.get('res_bucket') or None,
+        framing=args.get('framing') or None,
+        origin=args.get('origin') or None,
+        medium=args.get('medium') or None,
+        angle=args.get('angle') or None)
+    if out is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(out)
+
+
 @bp.get('/bank/<int:bank_id>/subfolders')
 def bank_subfolders(bank_id):
     payload = banks.subfolders_payload(LOCAL_USER, bank_id)
@@ -336,6 +375,17 @@ def _start(fn, *args, **kwargs):
     return jsonify({'ok': True}), 202
 
 
+def _scope(data):
+    """The two keys every pass dialog can send: WHERE to run.
+
+    {statuses:["keep"|"pending"|"reject"]} and {image_ids:[...]}. Both optional;
+    a body without them is the request that shipped before the dialogs existed,
+    byte for byte. Validation lives in the service (one definition, 400 on a bad
+    value) — this only reads the body."""
+    return {'statuses': data.get('statuses') or None,
+            'ids': data.get('image_ids') or None}
+
+
 @bp.post('/bank/<int:bank_id>/scan')
 def bank_scan(bank_id):
     """Quality pass. {rescan: true} walks every image again; {regroup: true} asks
@@ -344,11 +394,13 @@ def bank_scan(bank_id):
     data = request.get_json(silent=True) or {}
     return _start(banks.start_scan, _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
-                  regroup=bool(data.get('regroup')))
+                  regroup=bool(data.get('regroup')), **_scope(data))
 
 
 @bp.post('/bank/<int:bank_id>/faces')
 def bank_faces(bank_id):
+    """Face embeddings + person clustering. Takes NO scope on purpose: the
+    clusters are one numbering of the whole bank (400 if one is sent anyway)."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_faces, _app(), LOCAL_USER, bank_id,
                   device_id=data.get('device_id'))
@@ -356,9 +408,14 @@ def bank_faces(bank_id):
 
 @bp.post('/bank/<int:bank_id>/score')
 def bank_score(bank_id):
-    """Aesthetic + NSFW + style scoring pass (bank-scoring extra). 202/409/503."""
+    """Aesthetic + NSFW + style scoring pass (bank-scoring extra). 202/409/503.
+
+    {rescore: true} throws the cached embeddings away and recomputes everything —
+    the ✨ Score button itself always ran, and still runs, the complete pass (it
+    just skips what is already computed)."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_score, _app(), LOCAL_USER, bank_id,
+                  rescore=bool(data.get('rescore')),
                   device_id=data.get('device_id'))
 
 
@@ -388,7 +445,7 @@ def bank_watermark(bank_id):
     # machine's card with nothing in the UI admitting the difference.
     return _start(banks.start_watermark, _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
-                  device_id=data.get('device_id'))
+                  device_id=data.get('device_id'), **_scope(data))
 
 
 @bp.get('/bank/<int:bank_id>/watermark/levels')
@@ -479,7 +536,7 @@ def bank_framing(bank_id):
     data = request.get_json(silent=True) or {}
     return _start(banks.start_framing, _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')),
-                  device_id=data.get('device_id'))
+                  device_id=data.get('device_id'), **_scope(data))
 
 
 @bp.post('/bank/<int:bank_id>/tags')
@@ -518,7 +575,7 @@ def bank_medium(bank_id):
     re-inferred."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_medium, _app(), LOCAL_USER, bank_id,
-                  rescan=bool(data.get('rescan')))
+                  rescan=bool(data.get('rescan')), **_scope(data))
 
 
 @bp.post('/bank/<int:bank_id>/angles')
@@ -528,8 +585,9 @@ def bank_angles(bank_id):
     detector on those rows ONLY, writes nothing but the yaw, and leaves the
     person clusters untouched. 202/409/503; 400 when there is nothing to
     backfill."""
+    data = request.get_json(silent=True) or {}
     return _start(banks.start_faces, _app(), LOCAL_USER, bank_id,
-                  angles_only=True)
+                  angles_only=True, **_scope(data))
 
 
 @bp.get('/bank/<int:bank_id>/coverage')
@@ -554,9 +612,16 @@ def bank_caption(bank_id):
     {backend} ('auto'|'joycaption'|'ollama') and {ollama_model} override the engine
     and the vision model for THIS run only, without touching the global settings —
     same keys and same validation as the dataset caption options. {statuses} picks
-    the scope: ["keep"], ["pending"] or ["keep","pending"]; "reject" is refused. Every
-    one of these keys is optional, and a body without them runs exactly the pass that
-    ran before they existed. 202/409/503/400."""
+    the scope: any combination of "keep" / "pending" / "reject". "reject" aims the
+    pass at the bin — reachable only by asking for it by name, never part of the
+    default. Every one of these keys is optional, and a body without them runs
+    exactly the pass that ran before they existed.
+
+    {force:true} SPARES the captions a human wrote or corrected (caption_origin =
+    'asserted'); {include_asserted:true} is the explicit opt-out that rewrites those
+    too. Its default is False and it is meaningless without force — the destructive
+    reading of this endpoint is never the one you get by omitting a key.
+    202/409/503/400."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_caption, _app(), LOCAL_USER, bank_id,
                   ids=data.get('image_ids') or None, force=bool(data.get('force')),
@@ -565,7 +630,8 @@ def bank_caption(bank_id):
                   device_id=data.get('device_id'),
                   backend=data.get('backend') or None,
                   ollama_model=data.get('ollama_model') or None,
-                  statuses=data.get('statuses') or None)
+                  statuses=data.get('statuses') or None,
+                  include_asserted=bool(data.get('include_asserted')))
 
 
 @bp.post('/bank/<int:bank_id>/pipeline')

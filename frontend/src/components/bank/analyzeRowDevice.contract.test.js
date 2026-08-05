@@ -13,11 +13,23 @@ import test from 'node:test';
 const ws = fs.readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');
 
 test('every travelling single pass sends the chosen machine', () => {
-  for (const route of ['faces', 'score', 'framing']) {
-    assert.ok(ws.includes('/' + route + '`, on())'),
-      `${route} still posts {} — it will run here whatever the picker says`);
-  }
-  assert.match(ws, /\/caption`, \{[\s\S]{0,10}\.\.\.on\(\),/);
+  // 👥 Faces still has its own literal launcher — the preflight gate calls it
+  // directly, bypassing the dialog when nothing needs asking — so it has to
+  // carry on() on its own rather than inheriting it from anywhere.
+  assert.ok(ws.includes('/faces`, on())'),
+    'faces still posts {} — it will run here whatever the picker says');
+  // ✨ Score and 📐 Framing no longer have their own launchers: both open the
+  // shared dialog and run through the generic runPass(), which hands the body
+  // to passBody() — and THAT is what spreads on() into every travelling pass
+  // now, unconditionally, rather than each pass having to ask for it.
+  assert.match(ws,
+    /const runPass = async \(passId, run, extra = \{\}\) => \{[\s\S]{0,300}?passBody\(passId, run, extra\)/,
+    'runPass no longer hands the body through passBody() — score/framing would stop carrying on()');
+  assert.match(ws, /const passBody[\s\S]{0,600}?\.\.\.on\(\)/,
+    'passBody() no longer spreads on() — every dialog-launched pass would run locally');
+  // 🏷 Caption builds its OWN options object (engine/model/vocab/length,
+  // passed as passBody's `extra`) and has to spread on() into that directly.
+  assert.match(ws, /const captionRunOptions = \(\) => \(\{\s*\n\s*\.\.\.on\(\),/);
   // 'local' is folded to nothing rather than sent as a string: bank_queue had
   // to learn that lesson once already.
   assert.match(ws, /passDevice && passDevice !== 'local' \? \{ device_id: passDevice \} : \{\}/);

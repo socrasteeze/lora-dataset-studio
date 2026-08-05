@@ -88,7 +88,14 @@ export function jobProgress(activity) {
   const done = Number(activity.done);
   if (!Number.isFinite(done)) return '';
   const total = Number(activity.total);
-  return Number.isFinite(total) && total > 0 ? `${done} / ${total}` : `${done}`;
+  if (Number.isFinite(total) && total > 0) return `${done} / ${total}`;
+  // A phase with no countable unit reports done=0, total=0 — the long tail of
+  // ✨ Score does exactly that while it groups styles. Printing the bare `done`
+  // then put "— 0" in front of the phase name, which reads as "0 done" on a
+  // pass that is working. No number is honest; a zero is not. A positive `done`
+  // with no total is still worth showing: that is a pass counting up without
+  // knowing where it stops.
+  return done > 0 ? `${done}` : '';
 }
 
 /** Is a job holding this bank right now? STALE counts: we lost contact, but the
@@ -105,11 +112,17 @@ const STOP_HINT = 'Wait for it to finish, or press Stop in the progress bar at t
 /** One sentence naming the blocker and its progress, e.g.
  *  "✨ Score pass is running on this bank — 137 / 412". No remedy: callers add
  *  the part that fits their surface. */
-export function busyLine({ kind, activity } = {}) {
+export function busyLine({ kind, activity, withDetail = true } = {}) {
   const k = kind || activity?.kind;
   const label = jobLabel(k);
   const progress = jobProgress(activity);
-  const detail = activity && !activity.finished ? usefulDetail(label, activity.detail) : null;
+  // `withDetail: false` for a surface that sits on the SAME screen as the
+  // progress bar. The bar narrates the phase already; repeating it beside a
+  // threshold slider printed the same sentence twice, and on a phone the second
+  // copy is what pushes the setting off screen. A refusal is the opposite case:
+  // it answers "why did my click do nothing", so it keeps the detail.
+  const detail = withDetail && activity && !activity.finished
+    ? usefulDetail(label, activity.detail) : null;
   let line = `${label} is running on this bank`;
   if (progress) line += ` — ${progress}`;
   if (detail) line += `${progress ? ' · ' : ' — '}${detail}`;
@@ -122,9 +135,14 @@ export function busyLine({ kind, activity } = {}) {
    is exactly what a 400 px phone does not have. */
 function usefulDetail(label, detail) {
   if (!detail) return null;
-  const d = String(detail).trim();
+  // Everything after the first `;` explains what Stop would cost. That belongs
+  // where Stop is — the progress bar — and nowhere else. Echoed next to a
+  // threshold slider it is 150 characters of advice about a button that is not
+  // on screen, and on a 400 px phone it pushed the setting itself out of view.
+  // The clause BEFORE the `;` names the phase, which is the whole point here.
+  const d = String(detail).split(';')[0].trim().replace(/[\s—·-]+$/u, '');
   const stripped = label.replace(/^\P{L}+/u, '').toLowerCase();
-  return d.toLowerCase() === stripped ? null : d;
+  return !d || d.toLowerCase() === stripped ? null : d;
 }
 
 /**
