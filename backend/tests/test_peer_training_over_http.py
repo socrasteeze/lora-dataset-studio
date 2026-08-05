@@ -460,7 +460,13 @@ class FakePeer:
     def write_log(self, job_id, text, mode='a'):
         folder = self.job_folder(job_id)
         os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, 'log.txt'), mode, encoding='utf-8') as fh:
+        # newline='': the peer serves this file's SIZE as the log cursor, so the
+        # bytes on disk must be exactly the bytes handed in. Text mode turns
+        # every '\n' into os.linesep, which on Windows made the file one byte
+        # per line longer than the string the test wrote — and the backend CI
+        # runner is windows-latest, so this failed there too, not only locally.
+        with open(os.path.join(folder, 'log.txt'), mode, encoding='utf-8',
+                  newline='') as fh:
             fh.write(text)
 
     def add_sample(self, job_id, name, data: bytes):
@@ -810,7 +816,12 @@ def test_samples_are_fetched_once_into_the_folder_the_panel_reads(configured, pe
     assert '/' not in segment, (
         'the whole absolute path is ONE percent-encoded segment; a bare slash '
         'here means the catch-all sees several and resolves none of them')
-    assert '%2F' in segment
+    # The separator that must be encoded is THIS platform's: '/' -> %2F on
+    # POSIX, '\' -> %5C on Windows. Pinning %2F asserted a POSIX path on a
+    # windows-latest CI runner, so it failed for the platform rather than for
+    # the property — which is that the separator is encoded and none leaks out.
+    assert '%2F' in segment or '%5C' in segment, (
+        f'the path separator must be percent-encoded, got {segment!r}')
     assert all(c['status'] == 200 for c in peer.calls('/api/img/'))
 
 
