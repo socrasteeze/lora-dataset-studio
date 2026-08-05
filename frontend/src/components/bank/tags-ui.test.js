@@ -21,8 +21,16 @@ const setup = fs.readFileSync(
 
 test('the tag pass posts no device — it only runs here', () => {
   assert.match(workspace, /startTags\s*=\s*\(\)\s*=>\s*act\(\(\)\s*=>\s*postJson\(`\/api\/bank\/\$\{bankId\}\/tags`,\s*\{\}\)/);
-  // …unlike its neighbours, which pass on().
-  assert.match(workspace, /startFraming[\s\S]{0,120}?on\(\)/);
+  // …unlike its neighbours (🖼 Framing among them), which no longer have their
+  // own launcher at all — they go through the dialog's generic passBody(),
+  // and that builder spreads on() FIRST, so every dialog-launched pass gets
+  // device threading without asking for it individually.
+  assert.match(workspace, /const passBody[\s\S]{0,600}?\.\.\.on\(\)/);
+  // …and confirm 🖼 Framing actually takes that generic path rather than a
+  // special case: only 'faces' (the preflight gate) and 'caption' (its own
+  // options) are singled out in the dialog's onLaunch dispatch.
+  assert.match(workspace,
+    /onLaunch=\{\(run\) => \(passOpen === 'faces'[\s\S]{0,150}?passOpen === 'caption'[\s\S]{0,150}?: runPass\(passOpen, run\)\)\)\}/);
 });
 
 test('the facet vocabulary is fetched on the tagged count, not on the payload poll', () => {

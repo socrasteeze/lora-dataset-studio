@@ -58,6 +58,93 @@ export const WHATS_NEW = [
     to: '/settings/training',
   },
   {
+    id: '2026-08-05-bank-passes-say-what-they-left-out',
+    date: '2026-08-05',
+    title: 'Bank passes now say what they were doing, what they grouped, and what they left out',
+    blurb:
+      '✨ Score used to go quiet for minutes once its counter reached the last image, bar full, Stop still offered — on a 21 000-image bank that silence read as a freeze. It was writing a 70 MB cache and then comparing every embedding against every other; both steps now name themselves while they run, and the ones where Stop costs something different say what it costs before you press it. The style grouping stopped hiding behind a number too: "1 style group of 2+" was printed both when almost nothing grouped and when a single group had swallowed 24 928 of 24 931 images. It now states the size of the biggest group against the total, and names the threshold when the grouping is too loose to separate anything or too tight to join anything. And every pass that skips part of your bank says so at the end: 🎨 Classify medium answering "0 classified" on a 50 000-image bank was exact — 25 464 rejected images had been dropped by the scope before the pass even began, and that figure appeared nowhere. It does now, on 🔎 Scan, 🏷️ Caption, 📐 Framing, 💧 Watermark and 🎨 Medium alike, and stays silent when a run really did reach everything. 🎨 Medium\'s launch window also counts, per scope, the images it cannot answer for because ✨ Score never reached them — and refuses to start a run where that is all of them.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-05-every-bank-pass-asks-where-to-run-before-it-runs',
+    date: '2026-08-05',
+    title: 'Every bank pass now asks where to run — kept, undecided, unkept, or your selection',
+    blurb:
+      'Pressing 🔎 Scan, 🏷️ Caption, 📐 Classify framing or any other pass used to fire immediately on whatever the app had decided was its pool. Each of them now opens a window first, and that window says three separate things. Where the run applies: kept only, undecided only, unkept (the bin), all three, or the images you have selected — each line quoting the number of images IT would actually touch, so a scope with nothing to do is refused before the click rather than reported as a success afterwards. What the pass reads: only the settings its calculation consumes, with where they live, so you stop guessing whether nudging a threshold costs you a rescan. And what is NOT decided there: the knobs that only re-sort and re-flag the grid, retunable any time with no pass at all. "Rescan all" and "Rescore all" were never separate actions and no longer pretend to be — they are a tick box in their pass\'s window, next to the pool they re-run and with their price written next to them. Three passes refuse a partial scope, and now say so instead of quietly not offering it: ✨ Score, 👥 Group by person and ✂ Find crops & variants each produce one numbering of the whole bank, and handed a slice they would land fresh group ids on top of unrelated groups already saved. Aiming a pass at the bin is offered everywhere it makes sense, always with what that run costs, and never as a default.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-05-the-launch-all-report-names-every-step',
+    date: '2026-08-05',
+    title: 'The Launch-all report calls every step by the name on its button',
+    blurb:
+      'Three of the nine steps in the "Last Launch-all run" summary printed their internal identifier instead of their name — you would read "semantic_dedup", "framing" or "tags" in your own report and have no way to tell which button that was. They are now "✂ Find crops & variants", "📐 Classify framing" and "🔖 Tags", the exact words on the buttons you pressed. The fallback that made the omission invisible is now guarded by a test that reads the server\'s own step list, so a tenth step cannot ship nameless.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-05-select-images-and-see-their-tags-with-how-often-each-is-cited',
+    date: '2026-08-05',
+    title: 'Select images and their tags are right there, with how often each is cited',
+    blurb:
+      'Once a bank is captioned, selecting an image now shows its tags immediately — no extra click, no hunting for a badge. Select several and you get the tags across the whole selection, each with how many of them mention it: "red dress 7 / 12" tells you at a glance that over half of what you picked is that, which is the judgement you were making anyway. Ticking a chip filters the bank exactly as before, and the row holds still while it does. It is honest about its own reach: images with no caption yet are counted apart and named, so are captions whose every word was a grammar word, and a selection too large to read in one go says how many it left out instead of quietly shrinking the denominator. The 🏷️ button on a tile has also moved out of the badge cluster in the top-left corner — that corner is a state readout where nothing is clickable — down to the bottom-right next to ▶ and ⛶, where the tile\'s other actions live. When an image has no caption, or a caption with no word worth filtering on, the button stays visible and says which of the two it is, instead of disappearing and reading as a feature that does not exist.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-05-bank-chip-counts-follow-the-filters',
+    date: '2026-08-05',
+    title: 'The numbers on the bank filter chips now match what they open',
+    blurb:
+      'Every chip in the bank — 🌫 Blurry, 📺 Noisy, the resolution tiers, 🔎 Origin, 📐 Framing, 🎨 Medium, ⤢ Angle — used to print a total for the whole bank whatever else you had filtered. Pick ✕ Rejected, read "📺 Noisy 4 043", click it, get twelve images. The counts now describe the bank you are actually looking at: each one is measured with your other filters applied. The value you already picked is deliberately left out of its own count, so choosing 🌫 Blurry never zeroes 📺 Noisy next to it and you can always switch to a neighbour without clearing everything first. Chips stay on screen even when they hold nothing under the current filter, for the same reason. Two smaller things went with it: clicking a ✨ Score or ≈ Duplicates chip no longer silently drops the person or style group you were in, and the "showing N of M" line now notices 🔎 Origin, the 🚫 exclude box and the 🏷️ tag chips, which it used to ignore.',
+  },
+  {
+    id: '2026-08-05-a-scoring-pass-that-came-back-empty-now-says-why',
+    date: '2026-08-05',
+    title: 'A ✨ Score pass that could not load its models tells you why',
+    blurb:
+      'A scoring pass could finish, announce "done", and leave every image without a single number — with sorting by aesthetics, find crops and variants all greyed out because there was nothing to sort on. The closing line named the head that had gone quiet and stopped there: "(aesthetic + NSFW head unavailable)". Both models are fetched over the internet the first time they are used — the aesthetic predictor from GitHub, the NSFW classifier from Hugging Face — so on a machine that cannot reach them, typically a container without outbound network, both go down together and the whole pass comes back empty for one reason nobody was told. That reason was known all along, in the scoring log, and never made it to the screen. It does now: the sentence carries the actual error, so "no scores" reads as a network problem you can fix rather than a feature that looks broken. Reported by @_nofaceman on Discord.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-05-upscale-improve-finds-its-lora-on-a-docker-install',
+    date: '2026-08-05',
+    title: '✨ Upscale & improve stops re-downloading a LoRA you already have',
+    blurb:
+      'On a Docker or Linux install, raising the enhancement-LoRA strength made every ✨ Upscale & improve answer “Klein needs klein_enhancement_lora — I’ve started downloading it”, then download the file it already had, then say it again. The file was never missing: the improve workflow was exported from a Windows ComfyUI and names that LoRA klein\\realistic.safetensors, and on Linux a backslash is part of a filename rather than a folder separator — so the app looked for one file with a strange name instead of realistic.safetensors inside klein/. Setup, which spelled it correctly, kept showing it installed, which is why the two screens disagreed and only that one file looked broken while every other model loaded. The name is now respelled for whichever system opens it, on the way in and on the way out to ComfyUI. Nothing to reinstall — the LoRA already on your disk is picked up after an Update & restart. Reported by @_nofaceman on Discord.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-05-stopping-score-no-longer-throws-away-what-it-computed',
+    date: '2026-08-05',
+    title: 'Stopping ✨ Score keeps the scores it had already computed',
+    blurb:
+      'Pressing Stop during a scoring pass used to leave your images exactly as they were: the work reached a cache on disk, but not a single image got its aesthetic or NSFW number. Now everything it computed is written to your images before the pass ends, and the closing line tells you how many were scored, how many are left, and how many were reused from the cache instead of recomputed — so a relaunch is visibly paying only for the rest. The 🎨 style groups are the one thing that still needs a full pass to land, because those ids are a single numbering of the whole bank and half of one would mix two unrelated styles under the same chip; a stopped pass now leaves the previous grouping untouched and says so, rather than writing a contradiction. Two more things that were quietly wrong: a run where the aesthetic or NSFW model could not be downloaded no longer wipes the scores your bank already had, and the images scored during such a window are picked up again once the missing piece is back, instead of staying half-scored forever. Finally, "Rescore all" is available for when you do want everything recomputed from scratch — it is the last line of ✨ Score\'s launch window, unticked, with its price next to it.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-05-reject-every-flagged-watermark-in-one-click',
+    date: '2026-08-05',
+    title: 'Drop every watermarked image at once — and get them back if you change your mind',
+    blurb:
+      'Reviewing flagged images one by one is still the careful way through a watermark scan, but it is no longer the only way: a dataset\'s curation row now offers ✕ Reject all flagged next to 🔍 Review flagged. The number on the button is what it will really reject, not how many are flagged — small-image rescue pairs and failed rows are left out, because including even one rescue row made the server refuse the whole batch and reject nothing at all. It asks before it acts, tells you exactly what it is about to do, and then tells you the way back: rejected images stay on disk, and Show ▸ Rejected in the grid followed by ✓ Keep brings any of them home. The one thing it does destroy is said out loud beforehand — rejecting clears the watermark flags, so 🔍 Review flagged will be empty afterwards and only a new scan can flag them again.',
+    to: '/datasets?section=curation&panel=reject-flagged',
+  },
+  {
+    id: '2026-08-05-choose-which-engine-finds-your-watermarks',
+    date: '2026-08-05',
+    title: 'Datasets and banks now find watermarks the same way — and you pick which way',
+    blurb:
+      'The two screens had quietly drifted apart: a bank used the fast watermark detector whenever its extra was installed, while a dataset always asked the vision model, one slow question per image, with no way to change it. Both now read one setting — Settings ▸ Captioning & quality ▸ Watermark detection — with three values: Auto, Watermark detector, or Vision model. Auto is the default and behaves exactly as before, so an untouched install changes nothing. Pin the detector without its extra installed and the scan still runs on the vision model rather than failing, and the app says so, with the link to install the extra. Where the two engines genuinely differ, the screen says that too: only the detector can flag an image without knowing where the mark is, and those are now counted apart and left for 🔍 Review instead of being marked failed. A ⟲ Rescan incl. dismissed button appears when you have ruled some flags false positives — the only way to have them judged again by a different engine.',
+    to: '/settings/captioning',
+  },
+  {
+    id: '2026-08-05-stop-a-watermark-scan-without-losing-it',
+    date: '2026-08-05',
+    title: 'A watermark scan can be stopped, and keeps everything it already found',
+    blurb:
+      'Starting 🧽 Find watermarks on a large dataset used to be a commitment: there was no Stop button anywhere, and the only way out was closing the tab and hoping. The progress banner now carries the same ⏹ Stop the captioning pass has. It stops after the image in flight — never mid-inference — and every watermark already found is kept, so running 🧽 Find watermarks again simply picks up where you left off. The live "Scanning… 12/340" counter now actually moves in the tab that started the scan, too; it only ever updated after a page reload before.',
+    to: '/datasets?section=curation&panel=watermarks',
+  },
+  {
     id: '2026-08-05-restarting-mid-remote-run-picks-up-where-it-left-off',
     date: '2026-08-05',
     title: 'Restarting the app during a run on your other machine no longer garbles its log or loses the run',
@@ -68,9 +155,18 @@ export const WHATS_NEW = [
   {
     id: '2026-08-05-remote-training-brings-whole-checkpoints-home',
     date: '2026-08-05',
-    title: 'A LoRA trained on your other machine can no longer come home half-copied',    blurb:
+    title: 'A LoRA trained on your other machine can no longer come home half-copied',
+    blurb:
       'Three faults in the “Train on another machine” lane, found by testing it against a stand-in for the second machine rather than by waiting for it to go wrong on yours. The worst was silent: a checkpoint whose transfer was cut short could still be renamed to its final .safetensors and announced as “Done. Weights copied” — a file indistinguishable from a good one until something tried to load it, and on the machine that measured it, 921,600 bytes arrived as 500,000. The size is now checked against what the other machine said it was sending, so a short copy is retried instead of accepted. Second: a transfer chopped up by a flaky connection used to give up on the very first stumble, which is why some transfers simply never finished; it now loses far less to each cut and keeps trying. Third: if the job disappeared on the other machine — deleted there, or its database reset — this one waited for it for ever, and because a dataset allows only one run at a time, that dataset could not be trained again until you restarted the app. It now says that machine no longer has the job, and stops. None of this changes what you do; it changes whether what comes back is whole.',
     to: '/settings/training',
+  },
+  {
+    id: '2026-08-05-re-caption-keeps-the-captions-you-wrote-yourself',
+    date: '2026-08-05',
+    title: 'Re-caption no longer destroys the captions you wrote yourself',
+    blurb:
+      '🔄 Re-caption used to warn you, honestly, that it could not tell a caption you had typed from one a model had written — one column, one string, no author. It can now: every caption records who wrote it, whether that is JoyCaption, Ollama, or you (typing one in a dataset, running a find/replace, or bringing .txt files back from another tool), and that record travels with the text through dataset → bank, bank → bank, promotion and backups. So a forced run keeps your own words and says so, the way the face pass already skips a person you declared yourself. The button now tells you three separate things instead of two: how many images it rewrites, how many captions it keeps because you wrote them, and how many it overwrites whose author was never recorded — captions written before this existed, which cannot be recovered and are re-captioned, so you learn that before the click and not after. If you actually want your own captions redone by a better model there is a tick box for it, offered only when you have something to lose.',
+    to: '/bank',
   },
   {
     id: '2026-08-04-auto-reject-shows-the-number-it-will-actually-reject',

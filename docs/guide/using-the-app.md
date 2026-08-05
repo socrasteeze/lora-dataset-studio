@@ -486,7 +486,13 @@ touching the folder itself:
    flipped). The number beside each checkbox is what *that click* would reject —
    still-undecided images only, which is why it is usually smaller than the
    count on the matching filter chip: the chip shows every image carrying the
-   flag, including the ones a previous auto-reject already threw away. Run it
+   flag, including the ones a previous auto-reject already threw away — and it
+   counts them **inside whatever else you have filtered**, so it always states
+   the size of the page it opens. (Each chip is measured with your other filters
+   applied and its own value lifted, so picking one never blanks its
+   neighbours, and a chip stays on offer even when it holds nothing under the
+   current filter. The auto-reject number stays whole-bank on purpose: that pass
+   runs over the bank, not over the view.) Run it
    twice and the second run legitimately says **0 to reject**: there is nothing
    left it is allowed to touch. A flag also warns when its pass never ran, and
    the panel says how many images have **never been scanned** — those are
@@ -758,6 +764,58 @@ designed and is not flagged; a pass the machine refused ("GPU busy", never
 reached) is. When the queue empties, one line says how many finished and how
 many had problems.
 
+## Choosing where a bank pass runs
+
+Every pass button in the bank ends in `…` and opens a **launch window** before
+anything runs. The window is not a settings panel — it says three separate
+things, and keeping them apart is the point.
+
+**This run — where it applies, and how big that is.** Five lines, and each one
+quotes the number of images *that pass* would actually walk:
+
+| Line | What it means |
+|---|---|
+| Kept + undecided | What every pass has always run on. The default; picking it sends exactly the request the app sent before this window existed. |
+| ✓ Kept only | The images you already decided to keep. |
+| Undecided only | The ones you have not ruled on. |
+| ✕ Unkept only (the bin) | Images you rejected. Nothing is deleted or un-rejected — but the run spends its time on shots you set aside, and the window says what that costs for this particular pass. |
+| All three, the bin included | Everything. |
+
+If you have images **selected**, that becomes the first line and wins by
+default — the pass runs on your selection, narrowed by what it still has to do.
+It says *"up to N"*, never a bare N, because the server intersects your selection
+with the pass's own pool and the run can only ever be shorter.
+
+Under those lines sits the **"do it again"** tick: *also re-measure images that
+were already scanned*, *throw the cached embeddings away*, and so on. This is
+where the old **Rescan all** and **Rescore all** buttons went. They were never
+separate passes — they were this scope, wearing a button's clothes — so they now
+sit next to the pool they re-run, unticked, with their price written next to
+them.
+
+**Settings this pass reads.** Only what the *calculation* consumes, with where
+each value lives. 🔎 Scan quality, for instance, reads exactly one of the twelve
+🎚 filter thresholds (`dup_distance`), and it reads it for the duplicate grouping
+at the end — not for the measuring.
+
+**Not decided here.** The knobs that only change how the grid is **sorted and
+flagged**. Those re-apply the moment you save them, with no pass at all. The
+sharpness, noise and aesthetic thresholds live here: nudging one costs you
+nothing.
+
+Three passes **refuse a partial scope**, and the window shows the option greyed
+out with the reason rather than hiding it: **✨ Score**, **👥 Group by person**
+and **✂ Find crops & variants** each produce one numbering of the *whole* bank,
+recomputed from scratch on every run. Handed a slice, they would number that
+slice from 1 and land those ids on top of unrelated groups already saved.
+
+Two things the scope does **not** cover, stated in the windows that need it:
+🔎 Scan's duplicate grouping always covers the whole bank (it works from stored
+hashes and renumbers them together), and 🎨 Classify medium also runs chained
+inside ✨ Score with the default scope.
+
+A run with **nothing to do** is refused before it starts, with the reason and a
+suggestion — not launched and then reported as a success.
 ## When a folder is already one person
 
 Scraped material usually arrives sorted: one folder per person. **👤 Group by
@@ -1264,23 +1322,36 @@ runs the same pass with the same engine, model, register and length you picked o
 that row, on the pile the scope select names — and it **overwrites** the captions
 that are already there.
 
-**It tells you the number before you click, in two places.** The button quotes
-what it will rewrite ("🔄 Re-caption 1 240 kept" — the whole pile, captioned or
-not), and the amber line under the row quotes what it will *destroy*: how many of
-those images already carry a caption. The confirmation repeats both. Neither
-number is an estimate; both come from the same count the pass itself uses.
+**It keeps the captions you wrote yourself.** Every caption now records who wrote
+it — JoyCaption, Ollama, or you. "You" means: typed or corrected in a dataset's
+caption box, changed by a find/replace across a dataset, or brought back as `.txt`
+sidecars from another tool. That record travels with the text through
+**Import to bank**, bank-to-bank copies, promotion back to a dataset, and backup
+restores, so a caption you wrote in a dataset three steps ago is still recognised
+as yours here. Re-caption skips those rows, exactly as the person pass skips a
+subfolder you declared to hold one person.
 
-**There is no undo, and no way to spare hand-written captions.** This app stores
-one caption per image and records nothing about who wrote it — a caption you typed
-or corrected yourself and one a model produced are the same text in the same
-column. So a guard that "protected your edits" would have to guess, and would
-guess wrong in both directions. The honest version is the one you get: it
-overwrites everything in the pile and says so first. The bank's ↩ Undo covers
-keep/reject decisions only; it has never covered captions.
+**It tells you three numbers before you click, and never merges two of them.**
+The button quotes what it will rewrite (the pile, minus what it spares). The amber
+line under the row breaks the rest apart: how many captions it *keeps* because you
+wrote them, how many it overwrites **whose author was never recorded**, and how
+many a model wrote. The confirmation repeats them. None is an estimate; they all
+come from the same count the pass itself uses, so the figure on the button is the
+number of images that change.
 
-The case to be careful about is a bank built with **Import to bank** from a
-dataset whose captions you had corrected by hand: those corrections came along,
-and nothing on screen marks them.
+**"Origin never recorded" is the one to read carefully.** Captions written before
+the app started keeping track carry no author, and there is no way to work one out
+after the fact. Those are re-captioned — sparing them would make this button do
+nothing at all on any bank that already exists — so if you hand-wrote captions in
+an older version, they are in that count. It is stated separately from the
+machine-written ones for exactly that reason.
+
+**If you do want your own captions redone**, tick **"Also rewrite the N caption(s)
+I wrote"** next to the button. It only appears when there is something to protect,
+it is never pre-ticked, and the confirmation names it again.
+
+**There is still no undo.** The bank's ↩ Undo covers keep/reject decisions only;
+it has never covered captions, and this change does not add one.
 
 **It works by pile, never on a selection.** With images selected the button goes
 inert and says why: a selection can cover pages that were never loaded, so the
@@ -1412,10 +1483,37 @@ The 🔄 rotate button needs no undo entry: turn the other way and the image is
 byte-for-byte the original again.
 ## Find more images like this one — by attribute, not by look
 
-Every captioned tile in a bank carries a 🏷️ badge. **Click it** and that image's
-caption opens as a row of chips in the filter bar: `woman`, `red`, `dress`,
-`balcony`. Tick the ones you care about and the grid narrows to the images whose
-captions mention them.
+**Select an image** in a captioned bank and its tags are already there, in the
+filter bar: `woman`, `red`, `dress`, `balcony`. Tick the ones you care about and
+the grid narrows to the images whose captions mention them. No extra click, no
+badge to find.
+
+**Select several and the row counts.** Each chip carries how many of your
+selected images cite it — `red dress 7 / 12` means 7 of the 12 captioned images
+you picked mention it. That is deliberately *not* an intersection: keeping only
+the tags every single image shares would print 12 next to each survivor (a number
+that says nothing) and usually leave you with one word. What you want to know is
+that a tag describes over half of what you selected.
+
+The row is honest about what it did **not** count, on its own lines:
+
+- images in your selection with **no caption yet** — named, not folded into the
+  denominator, so `7 / 12` always means 7 of 12 images that had something to say;
+- images whose caption held **no word worth filtering on** (`a photo of her`) —
+  a different problem with a different fix;
+- a selection **too large to read in one request**, which says how many images it
+  left out rather than quietly shrinking the total.
+
+Tick a chip and the row **holds still** while the filter runs, even though
+filtering clears the selection — it keeps showing the tags of the selection you
+filtered *from*.
+
+The 🏷️ **badge on a tile** is still there, in the bottom-right corner next to ▶
+and ⛶ where the tile's actions live. It reads one image's tags *without*
+selecting it. On an image with no caption — or a caption with no word worth
+filtering on — the badge stays visible and greyed, and its tooltip says which of
+the two it is: a feature that silently disappears is indistinguishable from one
+that was never built.
 
 This is the readable cousin of **🎯 Similar to selected**, and the difference is
 worth knowing because they fail differently:
@@ -1823,6 +1921,43 @@ a separate copy. A rotated image is shown unrotated here, because the whole
 watermark lane works on your original file, which the ↻ turn never changed.
 
 
+## Reject every flagged image at once
+
+In a dataset, **🧽 Find watermarks** flags the kept images that carry an overlaid
+mark. The recommended way through the pile is **🔍 Review flagged**, one image at
+a time — the detector is a review flag, not a verdict, and it *does* flag clean
+images sometimes. When you would rather drop the whole pile and move on,
+**✕ Reject all flagged (N)** does exactly that.
+
+Four things worth knowing before you click it:
+
+- **The number is the number.** `N` is what the button will really reject, not
+  how many are flagged. Small-image rescue pairs are excluded (the server refuses
+  a batch containing one, so including them would reject *nothing*) and failed
+  rows are excluded (the server skips them). If the two differ, the row says so
+  in plain text rather than showing you the bigger figure.
+- **Nothing is deleted.** Rejected images stay on disk and simply leave the
+  training set. To bring any of them back: **Show ▸ Rejected** in the grid,
+  select, then **✓ Keep**.
+- **It clears the watermark flags.** That is the one thing rejecting destroys:
+  after the click, 🔍 Review flagged is empty and nothing records which images
+  had been flagged. Re-run 🧽 Find watermarks to flag them again.
+- **Stop is available while a scan runs.** The ⏹ Stop button in the progress
+  banner ends the scan at the next image; everything already judged is kept, and
+  running 🧽 Find watermarks again finishes the rest.
+
+Which engine does the flagging is a setting — **Settings ▸ Captioning & quality ▸
+Watermark detection** — and it applies to datasets and banks alike. *Auto* uses
+the optional watermark detector when it is installed and the vision model
+otherwise, which is what the app has always done. Pin *Watermark detector*
+without the extra installed and the scan still runs, on the vision model, and
+says so with the link to install it. Only the detector can flag an image
+**without a position**; those are counted apart, 🧽 Clean leaves them alone, and
+you can draw the zone in 🔍 Review flagged. Images you dismissed as false
+positives are skipped by every later scan — **⟲ Rescan incl. dismissed** is the
+only way to have them judged again, which is what you want after changing engine.
+
+
 ## A bank and a dataset never share files
 
 A dataset and an image bank can hand images to each other in both directions,
@@ -2050,6 +2185,43 @@ everything refusing "GPU busy".
 reversible at any time, and the note under the passes always says which
 interpreter is in use. If you never open this dialog, nothing changes: an install
 that works today keeps working, untouched.
+
+## Stopping Score, and what a relaunch costs
+
+**✨ Score** always covers the whole bank — but it only *computes* what it does
+not already have. Every image it scores is written to a cache next to the bank
+(the CLIP embedding plus the aesthetic and NSFW numbers), and a relaunch reads
+that cache and pays only for the rest. On a bank that is fully scored, the pass
+does not even load the model: it goes straight to the grouping.
+
+So **Stop is safe**, and it is now safe in the database too. When you stop a run,
+the scores it had already computed are written to your images before the pass
+ends — that work was paid for, and it used to reach the cache and never reach a
+single row. The line at the end of the pass says exactly what happened: how many
+images were scored, how many remain, and how many were reused instead of
+recomputed.
+
+One thing does *not* survive a stop: the **🎨 style groups**. Those ids are not a
+per-image measurement, they are a single numbering of the whole bank, computed
+from every embedding at once and renumbered on each pass. Half of one is not
+partial progress — it would put a new group 1 next to an old group 1 and mix two
+unrelated styles under the same chip. So a stopped pass leaves the previous
+grouping alone and says so. Relaunch and it finishes: the scoring part is already
+cached, and only the grouping is left. That grouping is the slow tail of the pass
+— about **8 seconds over 5 000 images and 3 minutes over 23 000** — so on a big
+bank it is worth letting it finish.
+
+**Rescore all** is the last line of ✨ Score's launch window, unticked. It is the
+opposite intent: throw the cache away and recompute everything, for a bank you
+scored with a different setup or whose results you no longer trust. It costs a
+full pass, which is why it is a deliberate tick and never a default — ✨ Score
+itself has always meant "cover the whole bank", and it still does.
+
+One more thing a relaunch fixes on its own: if the aesthetic head or the NSFW
+model could not be downloaded during an earlier run, the images scored in that
+window carry a hole. They are picked up again the next time you run Score, once
+the missing piece is available — an image is never left permanently half-scored
+because a download failed once.
 
 ## The LoRA Canvas (every run on one board)
 
