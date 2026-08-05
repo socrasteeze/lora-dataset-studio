@@ -338,9 +338,13 @@ def _start(fn, *args, **kwargs):
 
 @bp.post('/bank/<int:bank_id>/scan')
 def bank_scan(bank_id):
+    """Quality pass. {rescan: true} walks every image again; {regroup: true} asks
+    for the duplicate grouping whatever the scan finds — that is the 🎚 panel's
+    "↻ Re-group duplicates", whose pool is empty on an already-scanned bank."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_scan, _app(), LOCAL_USER, bank_id,
-                  rescan=bool(data.get('rescan')))
+                  rescan=bool(data.get('rescan')),
+                  regroup=bool(data.get('regroup')))
 
 
 @bp.post('/bank/<int:bank_id>/faces')
@@ -545,13 +549,23 @@ def bank_caption(bank_id):
     dataset caption engines. {force:true} re-captions already-captioned rows.
     {vocabulary} picks the register ('explicit'|'clinical'|'safe') and {length} the
     size preset ('concise'|'detailed', absent = standard) — same lane as the dataset
-    caption; invalid → 400. 202/409/503/400."""
+    caption; invalid → 400.
+
+    {backend} ('auto'|'joycaption'|'ollama') and {ollama_model} override the engine
+    and the vision model for THIS run only, without touching the global settings —
+    same keys and same validation as the dataset caption options. {statuses} picks
+    the scope: ["keep"], ["pending"] or ["keep","pending"]; "reject" is refused. Every
+    one of these keys is optional, and a body without them runs exactly the pass that
+    ran before they existed. 202/409/503/400."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_caption, _app(), LOCAL_USER, bank_id,
                   ids=data.get('image_ids') or None, force=bool(data.get('force')),
                   vocabulary=data.get('vocabulary') or None,
                   length=data.get('length') or None,
-                  device_id=data.get('device_id'))
+                  device_id=data.get('device_id'),
+                  backend=data.get('backend') or None,
+                  ollama_model=data.get('ollama_model') or None,
+                  statuses=data.get('statuses') or None)
 
 
 @bp.post('/bank/<int:bank_id>/pipeline')

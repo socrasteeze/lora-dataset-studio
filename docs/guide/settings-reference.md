@@ -636,7 +636,6 @@ could only fail, and points at `face_scoring.python` so you can aim it at a
 separate 3.10–3.12 interpreter.
 
 ### Advanced options (per run)
-
 These live under **⚙️ Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. Two are worth calling out because of a caveat.
 
 #### Krea 2 Raw · LoKr likeness — a reported community starting point

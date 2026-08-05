@@ -37,7 +37,6 @@ The big capabilities, each with what's actually inside it. Every block links dow
 <p align="center">
   <img src="docs/screenshots/01-create.png" alt="New-dataset panel with Character / Concept / Style tabs selected, plus name, trigger word, target model and fidelity fields" width="820">
 </p>
-
 </details>
 
 Four ways to fill a dataset, and one choice at creation that rewires everything downstream.
@@ -67,7 +66,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 |---|---|
 | **Guided local training** | ai-toolkit underneath, family-scoped starters, adaptive step policies, launch guards, queueing and advanced controls |
 | **Slider LoRA (Beta)** | Train a bipolar conceptual slider from positive and negative prompt poles, so LoRA strength moves the learned trait in either direction and Test Studio can sweep both sides |
-| **Merge a LoRA into a checkpoint** | Fold one or more of your LoRAs into a base, each at its own weight, and get a complete model you can publish. A plan answers first, from the file headers alone: how many tensors change, how big the output is, which drive it lands on, how long it takes, and what a half-way failure leaves. What comes out is a **merged** model, not a trained one — the file's own metadata records the base, every LoRA and its weight, so it stays true after a rename |
+| **Merge a LoRA into a checkpoint** | Fold one or more of your LoRAs into a base, each at its own weight, and get a complete model you can publish. A plan answers first, from the file headers alone: how many tensors change, how big the output is, which drive it lands on, how long it takes, and what a half-way failure leaves. What comes out is a **merged** model, not a trained one — the file's own metadata records the base, every LoRA and its weight, so it stays true after a rename. It is also the published route to getting few-step speed back on a Raw full model, by folding in the re-distillation LoRA Krea publishes for Turbo; that one we have not tested ourselves, and the screen says so before you start it |
 | **Custom bases and continuation** | Train compatible custom weights, continue from any saved epoch, or use verified full-state resume where available |
 | **Runs hub** | Every run together with progress, logs, stop/retry/continue/download actions and paste-safe config sharing |
 | **Experiment lineage** | Inspect, annotate and diff the exact tree of runs and the checkpoint each continuation resumed from |
@@ -96,6 +95,7 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 | **✂ Find crops & variants** | Catches the same shot re-cropped or re-compressed, reusing Score's embeddings (no extra GPU pass) |
 | **🚩 Find & 🧽 clean watermarks** | Flags overlaid logos/URLs with a box, then removes them in two manual passes — a model-free crop, or a LaMa/Klein repaint into a *separate* file |
 | **👥 Group by person** | Clusters faces into people **with no reference photo needed**, GPU-accelerated when the card is free |
+| **🏷️ Caption the bank** | Writes the search text, choosing the engine, the Ollama vision model and the pile (Kept, Undecided or both) **for that run only** — your settings are never rewritten. The button quotes the number it will actually write, not the size of the pile, and greys out at zero. Rejected images are never captioned. Once a pile is fully captioned, **Re-caption** redoes it with a different model, saying first how many existing captions it will overwrite — nothing records *who* wrote a caption, so one you fixed by hand is indistinguishable from a generated one and **cannot be recovered** (undo does not cover captions). It refuses to run on a selection, because a selection can span pages that were never loaded and the count would be a guess. On a compute peer the pass uses **that machine's own captioner**, so the per-run engine/model choice applies to local runs only |
 | **🎨 Medium · ⤢ Angle** | Splits a mixed dump into photographs, anime, 3D renders and illustrations, reusing ✨ Score's embeddings (no extra GPU pass), and sorts by head angle from the same face pass that already clusters people. Both answer *unsure* / *not measured* instead of guessing — non-photo verdicts are rare by design, and profiles are under-counted because a hard-turned head often defeats face detection |
 | **🔖 Tags** | A local ~400 MB tagger labels what's in each shot — hair colour, clothing, setting — so a huge pile can be sliced by that *before* you spend GPU hours captioning it. Facet dropdowns over the common questions, an **All other tags** list for the rest. Runs on CPU. Never writes captions. **Bank only** (not the dataset workspace), and **cannot run on a compute peer** |
 | **🔍 Search & filter** | Full-text search over captions **and 🔖 tags** plus Status / Quality / Score / Groups / Resolution filters with a live count. On a small screen the panel opens folded behind a summary of what's active; **✓ Keep / ✕ Reject** ride along in a bar pinned to the bottom of the screen once anything is selected |
@@ -347,7 +347,7 @@ Much of the above came from people reporting things in public: **wannadecryptor*
 
 Directions, not dates. These are discussed openly on the project's Discord, and the most-requested ideas move up the list.
 
-- **🧬 Merge Lab** *(partly shipped)* — baking your LoRAs into a standalone checkpoint has landed, and so has full-model training on Krea 2. What is left is the *lab* part: **model ↔ model** merges with guided recipes, judged side by side in the Test Studio (same seeds, A/B grids), and full-model training beyond Krea 2 Raw and beyond the cloud lane.
+- **🧬 Merge Lab** *(partly shipped)* — baking your LoRAs into a standalone checkpoint has landed. What is left is the *lab* part: **model ↔ model** merges with guided recipes, judged side by side in the Test Studio (same seeds, A/B grids). Full-model (dense) training is **not** part of this fork at all — see the backend matrix below.
 - **🎬 WAN 2.1 / 2.2 video LoRAs** — ai-toolkit already trains WAN and the scraper can already pull video, so the whole pipeline (scrape, curate, caption, train, test) extends naturally to motion. Community-driven.
 - **🧠 Watermark cleaning during import** — cleaning that happens **during import** instead of as a separate errand, and automation you can trust unattended. *(Detection has caught up: a dedicated detector that needs no vision model now ships alongside the Ollama path, and manual two-pass cleaning already works in datasets and in the Image Bank.)*
 - **🧩 More base models** — additional Flux-family bases (Chroma, Qwen-Image…) with the same one-click flow as Krea 2.

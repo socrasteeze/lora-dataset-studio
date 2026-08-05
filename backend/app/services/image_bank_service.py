@@ -48,7 +48,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image, ImageOps
-from sqlalchemy import and_, case, func, or_, update
+from sqlalchemy import and_, case, func, or_, text, update
 
 from .. import config as cfg
 from ..extensions import db
@@ -87,6 +87,28 @@ _COMMIT_EVERY = 25          # scan DB flush cadence
 _VISION_FLUSH_EVERY = 25
 _PROMOTE_CHUNK = 20         # files per import_images call (bounded memory)
 _SQL_IN_CHUNK = 500         # SQLite bound-variable ceiling is 999
+# --- duplicate regrouping budgets (see rebuild_dup_groups) -------------------
+# Rows written between two commits. The whole regrouping used to be ONE
+# transaction: a global clear plus one UPDATE per group, ~5 000 of them on a
+# 50 000-image bank, measured holding the single SQLite write lock 6 to 9.5 s —
+# past the 5 s busy_timeout, so every other writer in the app died on
+# `database is locked` (3 attempts out of 3) while the progress bar sat at 100 %.
+_DUP_WRITE_ROWS = 2000
+# And the pause AFTER each batch. Without it the next batch re-takes the write
+# lock in the microsecond after the commit, inside the sleep of another writer's
+# busy handler: batching alone still left a concurrent writer waiting 620 ms and
+# refused (measured, test_bank_scan_no_db_lock.py). Five batches on a 50 000-image
+# bank make this 100 ms of wall time in total.
+_DUP_WRITE_YIELD = 0.02
+# Bucket size from which the pairwise comparison goes to numpy. Below it the
+# plain Python loop is cheaper than allocating arrays, and it is bounded by
+# construction (at most 21 pairs).
+_DUP_NUMPY_FROM = 8
+# Ceiling on the cells of ONE comparison block, so peak memory follows this
+# constant and not the bucket size: 2e6 cells ≈ 34 MB of uint64 XOR plus its
+# popcount lookup, freed at every block.
+_DUP_BLOCK_CELLS = 2_000_000
+_POPCOUNT8 = None           # lazily built uint8 popcount table (see _popcount_lut)
 # A quality pass that keeps finding NOTHING on disk is not looking at a bank of
 # broken images — it is looking at the wrong folder. Bail out after this many
 # absent files (when they are at least half of what has been walked) rather than
@@ -1587,6 +1609,22 @@ def bank_payload(user_id, bank_id) -> dict | None:
     th = thresholds()
     base = BankImage.query.filter_by(bank_id=bank_id)
     total = base.count()
+    # 🏷️ What each caption SCOPE would really caption: in that status AND still
+    # without a caption. NOT counts.keep / counts.pending — the pass skips rows
+    # that already have one, so quoting the status total would advertise a number
+    # the run does not act on. That exact mistake was paid for once already by the
+    # 🧹 Auto-reject counter (see _flag_counts): a button that offers "5 930" and
+    # moves 0 reads as a broken feature, and it is the counter's fault. One query,
+    # two conditional sums, so telling the truth costs nothing on a 100 000-image
+    # bank.
+    todo_keep, todo_pending = (
+        db.session.query(
+            func.coalesce(
+                func.sum(case((BankImage.status == 'keep', 1), else_=0)), 0),
+            func.coalesce(
+                func.sum(case((BankImage.status == 'pending', 1), else_=0)), 0))
+        .filter(BankImage.bank_id == bank_id)
+        .filter(or_(BankImage.caption.is_(None), BankImage.caption == '')).one())
     counts = {
         'total': total,
         'scanned': base.filter(BankImage.quality_state.isnot(None)).count(),
@@ -1605,6 +1643,9 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'pending': base.filter_by(status='pending').count(),
         'keep': base.filter_by(status='keep').count(),
         'reject': base.filter_by(status='reject').count(),
+        # …and the caption-pass sizes of the two scopes it can be aimed at.
+        'caption_todo_keep': int(todo_keep or 0),
+        'caption_todo_pending': int(todo_pending or 0),
         # Images a dataset REALLY holds today (back-link), plus the ones promoted
         # before that link existed (legacy flag). Counting the flag alone kept
         # advertising copies the user had since deleted.
@@ -2437,15 +2478,22 @@ def _scan_one(src_root: str, thumbs: Path, item: tuple) -> dict:
     return out
 
 
-def start_scan(app, user_id, bank_id, rescan=False):
+def start_scan(app, user_id, bank_id, rescan=False, regroup=False):
     """Launch the quality pass. Raises BankJobBusy when a job is already live,
-    ValueError when the bank is unknown."""
+    ValueError when the bank is unknown.
+
+    ``regroup`` asks for the duplicate grouping EXPLICITLY, whatever the scan
+    itself finds. That is what the 🎚 threshold panel's "↻ Re-group duplicates"
+    sends: on an already-scanned bank its pool is empty, and the tail of the pass
+    now only regroups when the stored hashes moved — without this flag that
+    button would have quietly become a no-op."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
     total = _scan_pool(bank_id, rescan).count()
     return bank_jobs.start(app, bank_id, 'scan',
-                           _scan_job(bank_id, rescan), total=total)
+                           _scan_job(bank_id, rescan, regroup=regroup),
+                           total=total)
 
 
 def _scan_pool(bank_id, rescan):
@@ -2476,7 +2524,7 @@ def _scan_pool(bank_id, rescan):
     return q
 
 
-def _scan_job(bank_id, rescan):
+def _scan_job(bank_id, rescan, regroup=False):
     def run(job):
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
@@ -2496,6 +2544,7 @@ def _scan_job(bank_id, rescan):
         vanished = 0
         pending = {}
         unreadable_ids = []
+        hashed = 0      # rows whose STORED hash actually changed (see the tail)
         with ThreadPoolExecutor(max_workers=workers) as ex:
             it = iter(items)
             futures = deque()
@@ -2528,7 +2577,8 @@ def _scan_job(bank_id, rescan):
                 # An EXISTENCE test only: this shape never crashed on it — a
                 # staged UPDATE for a gone id simply matches no rows — but it
                 # would have counted the image as scanned and paid to decode it.
-                if _live_image(res['id']) is None:
+                _row = _live_image(res['id'])
+                if _row is None:
                     logger.info('bank quality scan: image %s was deleted mid-pass, '
                                 'skipping it', res['id'])
                     vanished += 1
@@ -2537,6 +2587,13 @@ def _scan_job(bank_id, rescan):
                     if not bank_jobs.cancelled(job):
                         submit_next()
                     continue
+                # Did the STORED hash actually move? This is the input to the
+                # regroup gate below, and it is read HERE because the existence
+                # test above already has the row in hand — the fork's staged
+                # writes never load it again, so counting this at write time
+                # would mean a second SELECT per image.
+                if _row.dhash != res['dhash']:
+                    hashed += 1
                 # Staged as plain data, NOT via db.session.get(). That get() was
                 # a real SELECT, and autoflush turned it into a flush of the
                 # previous rows — opening the write transaction, which then
@@ -2578,34 +2635,91 @@ def _scan_job(bank_id, rescan):
                 bank_jobs.bump(job)
                 if not bank_jobs.cancelled(job):
                     submit_next()
+        # The fork's staged flush, not upstream's db.session.commit(): the loop
+        # above never dirties an ORM row, so there is nothing in the session to
+        # commit — the writes live in `pending` / `unreadable_ids`.
         _flush_scan_batch(pending, unreadable_ids)
-        if not bank_jobs.cancelled(job):
+        if bank_jobs.cancelled(job):
+            return
+        tail = (f' — {missing} file(s) were not on disk and were left '
+                'untouched') if missing else ''
+        if vanished:
+            tail += f', {vanished} skipped (deleted while the pass ran)'
+        # Regroup only when the input to the grouping CHANGED, or when the
+        # caller asked for it on purpose (the 🎚 panel's "↻ Re-group duplicates",
+        # which is how a new dup_distance is applied without decoding anything).
+        #
+        # This is the whole freeze the owner reported. A scan with rescan off has
+        # an empty-to-tiny pool on an already-scanned bank — measured 2 rows out
+        # of 50 397 — and the tail then re-grouped the 50 389 hashed rows anyway:
+        # the bar reached 100 %, said "grouping duplicates", and the app went
+        # away for 96 to 124 s. When no stored hash moved and no row disappeared,
+        # the grouping's input is byte-for-byte what produced the groups already
+        # on screen, so running it can only reproduce them.
+        if regroup or hashed or vanished:
             bank_jobs.progress(job, detail='grouping duplicates')
-            groups = rebuild_dup_groups(bank_id)
-            tail = (f' — {missing} file(s) were not on disk and were left '
-                    'untouched') if missing else ''
-            if vanished:
-                tail += f', {vanished} skipped (deleted while the pass ran)'
-            bank_jobs.progress(
-                job, detail=f'done — {groups} duplicate group(s){tail}')
+            groups = rebuild_dup_groups(bank_id, job=job)
+            if bank_jobs.cancelled(job):
+                return
+            head = f'done — {groups} duplicate group(s)'
+        elif done:
+            head = f'done — {done} image(s) checked, no new hash to group'
+        else:
+            head = 'done — every image was already scanned'
+        bank_jobs.progress(job, detail=f'{head}{tail}')
     return run
 
 
 # --- duplicate groups -------------------------------------------------------
-def rebuild_dup_groups(bank_id, max_distance=None) -> int:
-    """Recompute near-duplicate groups over every hashed image of the bank.
-    Banded prefilter (pigeonhole: two hashes within Hamming d share at least
-    one of d+1 equal bands) keeps this out of the full O(n²) — then candidate
-    pairs are verified exactly and grouped by union-find. Groups of ≥2 get a
-    1-based id ordered by size (biggest first). Returns the group count."""
-    th = thresholds()
-    d = int(th['dup_distance'] if max_distance is None else max_distance)
-    rows = (db.session.query(BankImage.id, BankImage.dhash)
-            .filter(BankImage.bank_id == bank_id, BankImage.dhash.isnot(None))
-            .order_by(BankImage.id.asc()).all())
-    ids = [r[0] for r in rows]
-    hashes = [int(r[1], 16) for r in rows]
-    n = len(ids)
+def _job_progress(job, **values):
+    """bank_jobs.progress for a phase that also runs OUTSIDE a job (tests, and
+    any future caller): no job, no reporting, no branch at every call site."""
+    if job is not None:
+        bank_jobs.progress(job, **values)
+
+
+def _job_cancelled(job) -> bool:
+    return job is not None and bank_jobs.cancelled(job)
+
+
+def _popcount_lut():
+    """256-entry uint8 popcount table, built once.
+
+    numpy only grew `bitwise_count` in 2.0 and the app still ships on 1.26, so
+    the table is the portable way to popcount a whole XOR block in one C pass —
+    which is also the point: the GIL is released for the duration instead of
+    being held by a Python loop over pairs."""
+    global _POPCOUNT8
+    if _POPCOUNT8 is None:
+        import numpy as np
+        _POPCOUNT8 = np.array([bin(i).count('1') for i in range(256)],
+                              dtype='uint8')
+    return _POPCOUNT8
+
+
+def _dup_groups_from_hashes(hashes, d, job=None):
+    """The grouping itself: 64-bit hashes in, groups of ≥2 POSITIONS out, biggest
+    group first and ties broken by the smallest position. None when the job was
+    stopped mid-way (nothing has been written at that point).
+
+    Banded prefilter (pigeonhole: two hashes within Hamming d share at least one
+    of d+1 equal bands) keeps this out of the full O(n²); candidate pairs are
+    then verified exactly and grouped by union-find.
+
+    WHY IT LOOKS LIKE `rebuild_semantic_dup_groups`. The pairs used to be walked
+    in Python, with a `set` of every pair already looked at. That set is not
+    bounded by anything: 13 MB at 2 000 images, 829 MB at 16 000, ~4.3 GB
+    extrapolated at 36 000 — and the garbage collector sweeping it was ~79 % of
+    the wall time (disabling the GC took one measured phase from 68 s to 14 s and
+    a typical handler's p95 from 351 ms back to 22 ms). Comparing a whole block
+    at once in numpy has no such set, releases the GIL while it works, and caps
+    its own memory at `_DUP_BLOCK_CELLS`. The pair set it unions is EXACTLY the
+    one the Python loops produced — same buckets, same `x < y`, same threshold —
+    so the groups are identical, which `test_bank_dup_groups_identity.py` pins
+    against a verbatim copy of the old code.
+    """
+    import numpy as np
+    n = len(hashes)
     parent = list(range(n))
 
     def find(a):
@@ -2626,37 +2740,128 @@ def rebuild_dup_groups(bank_id, max_distance=None) -> int:
         for b in range(bands):
             key = (b, (h >> (b * band_bits)) & ((1 << band_bits) - 1))
             buckets.setdefault(key, []).append(i)
-    seen_pairs = set()
-    for members in buckets.values():
-        if len(members) < 2:
+    work = [m for m in buckets.values() if len(m) >= 2]
+    total = sum(len(m) for m in work)
+    _job_progress(job, done=0, total=total,
+                  detail=f'grouping duplicates — comparing {n} hash(es)')
+    lut = _popcount_lut()
+    seen = 0
+    for members in work:
+        if _job_cancelled(job):
+            return None
+        m = len(members)
+        if m < _DUP_NUMPY_FROM:
+            # Tiny buckets are the majority and an array costs more than the
+            # handful of comparisons it would save.
+            for x in range(m):
+                for y in range(x + 1, m):
+                    a, b = members[x], members[y]
+                    if find(a) != find(b) and _hamming(hashes[a], hashes[b]) <= d:
+                        union(a, b)
+            seen += m
+            _job_progress(job, done=seen)
             continue
-        for x in range(len(members)):
-            for y in range(x + 1, len(members)):
-                a, b = members[x], members[y]
-                if find(a) == find(b) or (a, b) in seen_pairs:
-                    continue
-                seen_pairs.add((a, b))
-                if _hamming(hashes[a], hashes[b]) <= d:
-                    union(a, b)
+        arr = np.array([hashes[i] for i in members], dtype='uint64')
+        cols = np.arange(m, dtype='int64')[None, :]
+        step = max(1, min(m, _DUP_BLOCK_CELLS // m))
+        for i0 in range(0, m, step):
+            if _job_cancelled(job):
+                return None
+            block = arr[i0:i0 + step, None] ^ arr[None, :]
+            rows_n = block.shape[0]
+            dist = lut[block.view('uint8').reshape(rows_n, m, 8)].sum(
+                axis=2, dtype='uint8')
+            # `> row index` is the vectorised form of the old `for y in
+            # range(x + 1, ...)`: the diagonal and the mirror pair are skipped,
+            # so each unordered pair is offered to union-find exactly once.
+            keep = (dist <= d) & (cols > np.arange(
+                i0, i0 + rows_n, dtype='int64')[:, None])
+            for a_rel, b in np.argwhere(keep):
+                union(members[i0 + int(a_rel)], members[int(b)])
+            seen += rows_n
+            _job_progress(job, done=min(seen, total))
     comps: dict = {}
     for i in range(n):
         comps.setdefault(find(i), []).append(i)
-    groups = sorted((m for m in comps.values() if len(m) >= 2),
-                    key=lambda m: (-len(m), m[0]))
-    # Everything above is pure CPU. The write transaction opens HERE and is
-    # committed in bounded slices: a bank with thousands of groups otherwise held
-    # SQLite's single write lock for one transaction of thousands of statements,
-    # which is exactly what made a ✓/✕ on another bank fail with "database is
-    # locked" (see utils.dbbusy). A concurrent reader can briefly see a partly
-    # regrouped bank — harmless, the pass finishes seconds later.
+    return sorted((m for m in comps.values() if len(m) >= 2),
+                  key=lambda m: (-len(m), m[0]))
+
+
+def rebuild_dup_groups(bank_id, max_distance=None, job=None) -> int:
+    """Recompute near-duplicate groups over every hashed image of the bank.
+    Groups of ≥2 get a 1-based id ordered by size (biggest first). Returns the
+    group count (what was written, when the job was stopped part-way).
+
+    ``job`` makes the phase VISIBLE and STOPPABLE. It used to be neither: no
+    progress, no cancel check anywhere in its body, so a bank of 50 000 images
+    left the progress bar at 100 % under the words "grouping duplicates" for 96
+    to 124 s with no way out — which reads as a dead application, and was
+    reported as one."""
+    th = thresholds()
+    d = int(th['dup_distance'] if max_distance is None else max_distance)
+    rows = (db.session.query(BankImage.id, BankImage.dhash)
+            .filter(BankImage.bank_id == bank_id, BankImage.dhash.isnot(None))
+            .order_by(BankImage.id.asc()).all())
+    ids = [r[0] for r in rows]
+    hashes = [int(r[1], 16) for r in rows]
+    # Everything below the comparison is pure CPU over data already in memory,
+    # so the session must not sit on a transaction across it — same guard, same
+    # reason, as every inference pass (see _release_db_before_inference).
+    _release_db_before_inference()
+    groups = _dup_groups_from_hashes(hashes, d, job=job)
+    if groups is None:
+        return 0            # stopped before any write: the bank is untouched
+    _job_progress(job, done=0, total=len(groups),
+                  detail=f'grouping duplicates — writing {len(groups)} group(s)')
     BankImage.query.filter_by(bank_id=bank_id).update(
         {'dup_group': None}, synchronize_session=False)
     db.session.commit()
-    _assign_groups(BankImage.dup_group, ((gid, [ids[i] for i in members])
-                                         for gid, members in enumerate(groups, start=1)))
-    # Regrouping is what can leave a shot with no surviving copy (see
-    # restore_stranded_dup_keepers), so the repair belongs HERE, against the
-    # groups this call just wrote — not at resolve time, which never causes it.
+    # ONE prepared statement per batch, and a real pause between batches.
+    #
+    # The clear plus one `UPDATE ... WHERE id IN (…)` per group — about 5 000 of
+    # them on a 50 000-image bank — used to be a single transaction holding the
+    # write lock 6 to 9.5 s, past the 5 s busy_timeout: `database is locked` for
+    # everybody else, 3 attempts out of 3. Splitting it into batches is only half
+    # the fix, and the half that measures nothing on its own:
+    #   • 4 000 separate UPDATE statements cost 0.67 s of pure statement overhead
+    #     whatever the transaction boundaries are; one executemany over the same
+    #     8 000 rows is ~30 ms, so the lock is barely taken at all;
+    #   • and without the pause, the next batch re-takes the lock in the
+    #     microsecond after the commit, inside the sleep of the other writer's
+    #     busy handler. Batching alone left a concurrent writer waiting 620 ms
+    #     and still refused — measured, and the reason this loop yields.
+    # The cost of the trade is stated where the user reads it: groups land
+    # biggest-first, and a stop part-way keeps the ones already written (the
+    # panel already says "the groups are whatever it had reached").
+    stmt = text('UPDATE bank_image SET dup_group = :gid WHERE id = :iid')
+    pending: list = []
+
+    def flush():
+        if not pending:
+            return
+        db.session.execute(stmt, pending)
+        db.session.commit()
+        pending.clear()
+        time.sleep(_DUP_WRITE_YIELD)
+
+    for gid, members in enumerate(groups, start=1):
+        pending.extend({'gid': gid, 'iid': ids[i]} for i in members)
+        if len(pending) >= _DUP_WRITE_ROWS:
+            flush()
+            _job_progress(job, done=gid)
+            if _job_cancelled(job):
+                # A stop part-way strands a keeper exactly like a full pass
+                # does, so the repair runs on this exit too (see below).
+                restore_stranded_dup_keepers(bank_id)
+                return gid
+    flush()
+    _job_progress(job, done=len(groups))
+    # Regrouping is what can leave a shot with no surviving copy, so the repair
+    # belongs HERE, against the groups this call just wrote — not at resolve
+    # time, which never causes it. Upstream's rewrite of this function dropped
+    # the call; this fork measured 444 groups stranded that way before it
+    # existed, so it is re-applied on BOTH exits — a stop part-way strands a
+    # keeper exactly like a full pass does.
     restore_stranded_dup_keepers(bank_id)
     return len(groups)
 
@@ -2744,7 +2949,6 @@ def restore_stranded_dup_keepers(bank_id, col=BankImage.dup_group,
         logger.info('bank %s: restored %d duplicate group(s) that regrouping had '
                     'left with no surviving member', bank_id, restored)
     return restored
-
 
 # --- semantic near-duplicate groups (stage 2 — crops / re-compressed variants) --
 # One-entry memo for the parsed score cache. Reading it is 350 ms on a 14 700-row
@@ -5332,8 +5536,11 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None):
     use_detector = not remote and watermark_detector.available()
     if not remote:
         if not use_detector and not probe_ollama_model().get('ok'):
+            # Settings ▸ Local tools, not ▸ Captioning & quality: that is where
+            # the Ollama vision model field actually lives (upstream corrected
+            # this pointer across four surfaces).
             raise RuntimeError('the vision model is not available '
-                               '(Settings ▸ Captioning & quality)')
+                               '(Settings ▸ Local tools)')
         reason = _gpu_busy_reason()
         if reason:
             raise RuntimeError(reason)
@@ -6507,8 +6714,9 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None):
         refuse_steps_for_device(device_id, ['framing'])
     if not remote:
         if not probe_ollama_model().get('ok'):
+            # Settings ▸ Local tools: see the pointer note in start_watermark.
             raise RuntimeError('the vision model is not available '
-                               '(Settings ▸ Captioning & quality)')
+                               '(Settings ▸ Local tools)')
         reason = _gpu_busy_reason()
         if reason:
             raise RuntimeError(reason)
@@ -6962,8 +7170,76 @@ def _medium_job(bank_id, rescan):
 
 
 # --- caption pass (reuses the dataset caption engines) ----------------------
+# The statuses a caption pass may be AIMED at. 'reject' is absent on purpose and
+# it is not an oversight: you curate from what you might keep, never from the bin
+# — the same rule every other pass on this page follows. Values are the ones
+# stored in the column ('keep' / 'pending'); the UI says "Kept" and "Undecided".
+# Renaming either would break stored queries, so the wire keeps the column's
+# vocabulary and the translation happens in the label.
+CAPTION_SCOPES = ('keep', 'pending')
+
+
+def _normalize_caption_statuses(statuses):
+    """Validate a per-run caption scope, or None for the historical set.
+
+    None / [] → None, which means the pass keeps its original
+    ``status != 'reject'`` filter: a client that sends no scope is
+    byte-identical to before this option existed. Anything outside
+    CAPTION_SCOPES — 'reject' first among them — raises ValueError → 400,
+    exactly like a bad vocabulary or length."""
+    if statuses is None:
+        return None
+    if isinstance(statuses, str):       # a lone 'keep' is a scope of one
+        statuses = [statuses]
+    if not isinstance(statuses, (list, tuple, set)):
+        raise ValueError('invalid caption statuses: expected a list of statuses')
+    want = []
+    for s in statuses:
+        if not isinstance(s, str):
+            raise ValueError('invalid caption status: expected status names')
+        v = s.strip().lower()
+        if not v:
+            continue
+        if v not in CAPTION_SCOPES:
+            raise ValueError(f'invalid caption status: {v}')
+        want.append(v)
+    if not want:
+        return None
+    # Canonical order + dedup, so ['pending','keep'] and ['keep','pending'] are
+    # one value and never two code paths.
+    return [s for s in CAPTION_SCOPES if s in want]
+
+
+def _caption_name_option(name, value):
+    """Normalize one free-text caption option, or raise ValueError → 400.
+
+    Every one of these options is a NAME out of a closed list. A non-string reached
+    ``.strip()`` and answered 500 — a bad request rendered as a broken server, while
+    ``statuses`` next door already answered 400 for exactly the same mistake. The
+    validation now matches the promise the route's docstring makes ("invalid → 400")."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f'invalid caption {name}: expected a name, not '
+                         f'{type(value).__name__}')
+    return value.strip().lower() or None
+
+
+def _caption_scope_q(bank_id, statuses):
+    """The rows a caption pass may touch, for this bank and this scope.
+
+    ONE definition, called by the launch (to price the run) and by the job (to do
+    it). Two copies of this filter is precisely how a button comes to announce a
+    number it does not act on."""
+    q = BankImage.query.filter_by(bank_id=bank_id)
+    if statuses is None:
+        return q.filter(BankImage.status != 'reject')
+    return q.filter(BankImage.status.in_(statuses))
+
+
 def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
-                  length=None, device_id=None):
+                  length=None, device_id=None, backend=None, ollama_model=None,
+                  statuses=None):
     """Launch the caption pass over a selection (``ids``) or, when empty, every
     non-rejected readable image. Reuses the dataset caption engines (JoyCaption /
     Ollama per Settings) through a dataset-free descriptive brick; the captions
@@ -6980,19 +7256,47 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
 
     ``length`` picks the SIZE preset (one of CAPTION_LENGTHS: 'concise' | 'detailed';
     None/'' = standard, nothing appended) — an axis orthogonal to the register, again
-    the same lane and the same text as the dataset caption."""
+    the same lane and the same text as the dataset caption.
+
+    ``backend`` overrides ``captioning.backend`` for THIS run only (one of
+    CAPTION_BACKENDS) and ``ollama_model`` overrides ``ollama.vision_model`` for THIS
+    run only — the global settings stay the default and are never written. Which model
+    writes a caption is not a matter of taste: a captioner that describes what it sees
+    in evasive terms produces captions that are about something slightly other than the
+    images, and a LoRA trained on them learns to look away too, with nothing in the
+    output to reveal it (measured on the video lane, commit "the model that writes the
+    captions stops being a decision we made"). Both empty → the global settings, so a
+    call without them is byte-identical to before. 'auto' is left alone deliberately:
+    it CHAINS JoyCaption then Ollama on what JoyCaption missed, so forcing 'joycaption'
+    removes the Ollama half rather than "picking one of two".
+
+    ``statuses`` picks the SCOPE of the run: ['keep'], ['pending'] or ['keep','pending']
+    (CAPTION_SCOPES). None = the historical non-rejected set, byte-identical to before.
+    'reject' is refused — the bin is never captioned. When ``ids`` are also given the
+    two INTERSECT (the selection is narrowed by the scope, never widened)."""
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
-    from .face_dataset_service import CAPTION_LENGTHS, CAPTION_VOCABULARIES
-    vocab = (vocabulary or '').strip().lower() or None
+    from .face_dataset_service import (CAPTION_BACKENDS, CAPTION_LENGTHS,
+                                       CAPTION_VOCABULARIES)
+    vocab = _caption_name_option('vocabulary', vocabulary)
     if vocab and vocab not in CAPTION_VOCABULARIES:
         raise ValueError(f'invalid caption vocabulary: {vocab}')
-    size = (length or '').strip().lower() or None
+    size = _caption_name_option('length', length)
     if size and size not in CAPTION_LENGTHS:
         raise ValueError(f'invalid caption length: {size}')
-    # Both gates describe THIS machine: its configured engine and its card. A
-    # pass aimed at a peer uses the peer's captioner and the peer's GPU.
+    # Input validation runs for BOTH lanes: a malformed scope, engine or model
+    # ref is wrong wherever the pass ends up executing.
+    want = _normalize_caption_statuses(statuses)
+    engine = _caption_name_option('backend', backend)
+    if engine and engine not in CAPTION_BACKENDS:
+        raise ValueError(f'invalid captioning backend: {engine}')
+    # Same charset check the Caption Lab uses (never shelled out — it is a JSON
+    # field to the local Ollama server), and the same allow_empty contract.
+    from .ollama_control import normalize_ollama_model_ref
+    model = normalize_ollama_model_ref(ollama_model or '', allow_empty=True) or None
+    # Both gates below describe THIS machine: its configured engine and its
+    # card. A pass aimed at a peer uses the peer's captioner and the peer's GPU.
     remote = _remote_pass_device(device_id)
     # …and the PASS against that machine, not just the id — the same refusal
     # Launch all makes, so clicking a pass on its own cannot quietly try
@@ -7000,8 +7304,11 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
     if remote:
         refuse_steps_for_device(device_id, ['caption'])
     if not remote:
-        backend = (cfg.get('captioning.backend') or 'auto').lower()
-        if backend == 'none':
+        # The RESOLVED engine decides whether there is anything to run at all —
+        # a per-run 'none' is refused exactly like the global one, and a per-run
+        # engine rescues a run on an install whose global setting is 'none'.
+        resolved = engine or (cfg.get('captioning.backend') or 'auto').lower()
+        if resolved == 'none':
             raise ValueError('no captioning backend configured '
                              '(Settings ▸ Captioning & quality)')
         reason = _gpu_busy_reason()
@@ -7009,14 +7316,16 @@ def start_caption(app, user_id, bank_id, ids=None, force=False, vocabulary=None,
             raise RuntimeError(reason)
     device_id = device_id if remote else None
     ids = [int(i) for i in ids] if ids else None
-    q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+    q = _caption_scope_q(bank_id, want)
     if ids is not None:
         q = q.filter(BankImage.id.in_(ids[:_SQL_IN_CHUNK]))
     if not force:
         q = q.filter(or_(BankImage.caption.is_(None), BankImage.caption == ''))
     total = q.count()
     return bank_jobs.start(app, bank_id, 'caption',
-                           _caption_job(bank_id, ids, force, vocab, size, device_id),
+                           _caption_job(bank_id, ids, force, vocab, size, device_id,
+                                        backend=engine, ollama_model=model,
+                                        statuses=want),
                            total=total, device_label=_device_label(device_id))
 
 
@@ -7094,14 +7403,15 @@ def _peer_caption_kind(device_id) -> str | None:
     return None
 
 
-def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=None):
+def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=None,
+                 *, backend=None, ollama_model=None, statuses=None):
     def run(job):
         from .face_dataset_service import caption_paths, caption_preset_instructions
         from ..gpu_window import gpu_exclusive_vision_window
         bank = db.session.get(ImageBank, bank_id)
         if not bank:
             return
-        q = BankImage.query.filter_by(bank_id=bank_id).filter(BankImage.status != 'reject')
+        q = _caption_scope_q(bank_id, statuses)
         if ids is not None:
             rows = []
             for i0 in range(0, len(ids), _SQL_IN_CHUNK):
@@ -7166,6 +7476,9 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
         # The vocabulary register and the length preset ride in as the SAME appended
         # instructions the dataset pass uses, in the same order (None when neither is
         # set → byte-identical to the plain pass).
+        # The engine and the Ollama model ride the SAME per-call seam the Caption
+        # Lab uses (caption_paths already takes both); None on either means "the
+        # global setting", so a run that picks nothing is byte-identical.
         extra = caption_preset_instructions(vocabulary, length)
         # A peer captions with ITS OWN engine and its own model. The hub only
         # asks the peer's last heartbeat what it has (see _peer_caption_kind) —
@@ -7207,6 +7520,13 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
                 with gpu_exclusive_vision_window(flag_ttl=1800):
                     caption_paths(
                         paths,
+                        # Per-run overrides: None on either means "the global
+                        # setting", so a run that picks nothing is byte-identical.
+                        # The REMOTE branch above deliberately does not take
+                        # them — a peer captions with its own engine and its own
+                        # model (see _peer_caption_kind).
+                        backend=backend,
+                        ollama_model=ollama_model,
                         extra_instructions=extra,
                         should_cancel=lambda: bank_jobs.cancelled(job),
                         on_caption=_on_caption,
@@ -7306,7 +7626,7 @@ def _score_prereq() -> str | None:
 def _watermark_prereq() -> str | None:
     from ..capabilities import probe_ollama_model
     if not probe_ollama_model().get('ok'):
-        return 'vision model not available (Settings ▸ Captioning & quality)'
+        return 'vision model not available (Settings ▸ Local tools)'
     return None
 
 
@@ -7320,7 +7640,7 @@ def _faces_prereq() -> str | None:
 def _framing_prereq() -> str | None:
     from ..capabilities import probe_ollama_model
     if not probe_ollama_model().get('ok'):
-        return 'vision model not available (Settings ▸ Captioning & quality)'
+        return 'vision model not available (Settings ▸ Local tools)'
     return None
 
 

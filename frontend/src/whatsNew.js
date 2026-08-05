@@ -52,8 +52,7 @@ export const WHATS_NEW = [
   {
     id: '2026-08-05-remote-training-brings-whole-checkpoints-home',
     date: '2026-08-05',
-    title: 'A LoRA trained on your other machine can no longer come home half-copied',
-    blurb:
+    title: 'A LoRA trained on your other machine can no longer come home half-copied',    blurb:
       'Three faults in the “Train on another machine” lane, found by testing it against a stand-in for the second machine rather than by waiting for it to go wrong on yours. The worst was silent: a checkpoint whose transfer was cut short could still be renamed to its final .safetensors and announced as “Done. Weights copied” — a file indistinguishable from a good one until something tried to load it, and on the machine that measured it, 921,600 bytes arrived as 500,000. The size is now checked against what the other machine said it was sending, so a short copy is retried instead of accepted. Second: a transfer chopped up by a flaky connection used to give up on the very first stumble, which is why some transfers simply never finished; it now loses far less to each cut and keeps trying. Third: if the job disappeared on the other machine — deleted there, or its database reset — this one waited for it for ever, and because a dataset allows only one run at a time, that dataset could not be trained again until you restarted the app. It now says that machine no longer has the job, and stops. None of this changes what you do; it changes whether what comes back is whole.',
     to: '/settings/training',
   },
@@ -3658,6 +3657,33 @@ export const WHATS_NEW = [
       'The captioning engine is set to Auto by default, and Auto is a chain, not a choice: JoyCaption writes what it can, the Ollama vision model writes the rest, and on a Concept dataset Ollama rewrites JoyCaption’s drafts. Those engines do not write alike — so captions could come back in two different voices, or in a different voice than last week, with nothing anywhere to explain it. Every pass now reports who wrote what, in the toast and on a line under the caption buttons: “Written by JoyCaption.”, “Drafted by JoyCaption, rewritten by the Ollama vision model.”, or “8 by JoyCaption · 4 by Ollama” when the batch was shared. If you want one consistent voice, ⚙️ Options lets you name a single engine — and now you can tell whether it obeyed.',
     to: '/datasets?section=captions&panel=generate',
   },
+  // Appended at the TAIL on purpose. Ordering is by date desc then id desc
+  // (sortedEntries), never by array position, so a new entry does not have to be
+  // prepended — and not prepending is what keeps two branches editing this file
+  // from merging into one mangled object.
+  {
+    id: '2026-08-04-bank-caption-engine-and-scope',
+    date: '2026-08-04',
+    title: 'Choose who writes your bank captions, and which pile gets them',
+    blurb:
+      'The 🏷️ Caption pass used to take whatever engine and vision model your Settings held, and always ran over everything you had not rejected. It now has its own row: pick the engine and the Ollama vision model for THIS run without touching your Settings, and aim the pass at the kept images only, the undecided only, or both. Which model writes a caption is not a matter of taste — one that describes things in evasive terms produces captions that are about something slightly other than your images, and a LoRA trained on them learns to look away too. The button also stops saying “Caption all” and starts saying how many images it is really about to write, because already-captioned ones are skipped and the count you could see was never the count it acted on. Rejected images stay out of reach, whatever you pick. One limit worth knowing: sent to another machine under **Run on**, the pass uses that machine’s own captioner and its own model, so the engine and model you pick here apply to runs on this computer.',
+    // No `to`: the control lives inside a bank workspace, which has no deep link.
+  },
+  {
+    id: '2026-08-04-bank-recaption-button',
+    date: '2026-08-04',
+    title: 'Redo a bank’s captions with a better model — and see what that costs first',
+    blurb:
+      'Once every image in a bank had a caption, 🏷️ Caption reached zero and went grey — taking the engine and model selects beside it out of reach, on exactly the bank whose captions you wanted to redo. A 🔄 Re-caption button now sits at the end of the Caption options row and runs the same pass over the pile you chose, with the engine, model, register and length you picked. It overwrites, so it tells you the numbers before you click: the button quotes how many images it will rewrite, an amber line quotes how many of those already carry a caption, and the confirmation repeats both. It also says the part we cannot fix: this app stores one caption per image and records nothing about who wrote it, so a caption you corrected by hand looks exactly like a generated one and is overwritten too — and no undo covers captions. With images selected the button stays inert and says why, because a selection can span pages that were never loaded and the count would be a guess.',
+  },
+  {
+    id: '2026-08-04-the-quality-scan-no-longer-takes-the-app-away-with-it',
+    date: '2026-08-04',
+    title: 'The 🔎 quality scan leaves the rest of the bank usable',
+    blurb:
+      'On a big bank, pressing 🔎 Scan quality could take the whole app away for a couple of minutes: the bar reached 100 %, said “grouping duplicates”, and nothing else answered — sorting, renaming, promoting, all of it waited. Three things were behind that, and all three are fixed. The duplicate grouping no longer re-runs over your whole bank at the end of a scan that had nothing to scan — it runs when the hashes actually changed, and when you ask for it with “↻ Re-group duplicates”, which still applies a new duplicate distance without decoding a single file. When it does run it now shows its own progress and stops when you press Stop, instead of leaving you in front of a frozen-looking bar with no way out. And it no longer holds the database while it works, so the rest of the bank keeps answering: on a 50 000-image bank the grouping went from up to two minutes of dead application to a phase you can watch and interrupt, and the worst wait a click had to sit through fell from over five seconds to a few dozen milliseconds.',
+    to: '/bank',
+  }
 ];
 
 // ── Ordering ────────────────────────────────────────────────────────────────
