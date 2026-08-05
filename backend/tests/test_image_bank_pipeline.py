@@ -373,3 +373,26 @@ def test_a_caption_pass_that_refused_itself_is_not_reported_as_done(
     assert cap['status'] == 'skipped', 'a pass that never ran was reported done'
     assert cap['blocked'] is True
     assert 'captioner' in (cap['reason'] or '')
+
+
+def test_the_step_list_is_published_so_the_dialog_need_not_keep_one(client):
+    """The Launch-all dialog renders from this, instead of its own copy.
+
+    The taxonomy used to live in four places — `PIPELINE_STEPS` (the only one
+    that decides anything: `_sanitize_pipeline_steps` drops whatever is not in
+    it), `bank_remote.PASS_LABELS`, and TWO more inside `LaunchAllDialog.jsx`
+    alone, a key list for the gates and an array for the rendering, plus a third
+    for the default ticks. A step added to one and not the others gave you a
+    checkbox with no gate, or one that silently did nothing.
+
+    It rides on the capability blob the dialog already holds, so publishing it
+    costs no extra request. ORDER matters as much as membership: the dialog
+    renders in this sequence, and ✂ Find crops reuses ✨ Score's embeddings, so
+    it has to come after it.
+    """
+    from app.services.image_bank_service import PIPELINE_STEPS
+
+    caps = client.get('/api/capabilities').get_json()
+    assert caps['bank_pipeline_steps'] == list(PIPELINE_STEPS)
+    assert caps['bank_pipeline_steps'].index('semantic_dedup') == \
+        caps['bank_pipeline_steps'].index('score') + 1

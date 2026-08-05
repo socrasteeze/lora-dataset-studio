@@ -142,7 +142,7 @@ test('the dataset panel routes the chosen lane to the matching call', () => {
   assert.match(panel, /lanes=\{continueLanes\}/);
   assert.match(panel, /where=\{laneOfStep\(continueInitialStep\)\}/);
   // each lane carries its own honest reason, cloud reusing the app's single source
-  assert.match(panel, /Cloud training needs a rental key set up in Settings/);
+  assert.match(panel, /rented-GPU training was removed/);
   assert.match(panel, /Local training needs ai-toolkit/);
   // Fork is local-only (FORK_NOTES Divergence 4): the cloud lane is always closed.
   assert.match(panel, /!caps\.cloud_training\s*\n?\s*\?\s*\{ available: false,/);

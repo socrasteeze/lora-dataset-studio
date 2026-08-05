@@ -2,7 +2,8 @@
 
 **Date:** 2026-07-29  
 **Branch:** `cursor/remote-gpu-workers`  
-**Status:** implemented in this branch (foundation through training kind + docs/UI)
+**Status:** implemented (foundation, comfy/vision/infer kinds, docs/UI). The
+`training` kind was removed on 2026-08-04 — see the job-kinds table below.
 
 ## Why
 
@@ -16,7 +17,7 @@ Either machine can be designated Primary — same product shape, not “laptop i
 |------|---------|
 | `standalone` | Default; today’s single-machine behaviour. |
 | `primary` | Owns `data/`, issues join tokens, schedules jobs, serves the UI browsers should bookmark. |
-| `peer` | Joins a Primary with a one-time token; pulls jobs; runs Comfy / vision / infer / training locally; uploads artifacts. |
+| `peer` | Joins a Primary with a one-time token; pulls jobs; runs Comfy / vision / infer locally; uploads artifacts. |
 
 Config: `cluster.*` in [`config.py`](../../backend/app/config.py) / Settings → **Devices**.
 
@@ -39,12 +40,29 @@ Browser (any machine) → Primary LDS (datasets + queue)
 | `comfy` | `ImageGenerationQueue.worker_id` + `ClusterJob`; generate / improve paths pass `device_id` | Local ComfyUI; output uploaded | **Closed** — hub `_finish_comfy_bridge` → `_dispatch_completion` |
 | `vision` | `POST /api/cluster/jobs/vision` | Ollama `describe_image_ollama` batch | **Live (2026-07-31)** — the bank's 📐 Framing, 🚩 Watermark and (Ollama-only peers) 🏷️ Caption passes, via `bank_remote.run_remote_vision` |
 | `infer` | `POST /api/cluster/jobs/infer` | `backend/infer/<name>.py` (own install only) via `infer_stream` | **Live** — the bank's ✨ Score, 👥 Faces and (JoyCaption peers) 🏷️ Caption passes, via `bank_remote.run_remote_pass` |
-| `training` | `POST /api/dataset/<id>/train` with remote `device_id`, or `/api/cluster/jobs/training` | Zip + config with `{{DATASET_DIR}}` / `{{OUTPUT_DIR}}`; `run_peer_training` | **Open** — checkpoints upload as artifacts; no `TrainingRunRecord`, no Training-page progress |
 
-Only `comfy` is a finished user-facing feature. `complete_cluster_job` bridges back
-into the app for that kind alone; the other three land their output in
-`data/cluster_artifacts/<job_id>/` and stop there. Say so wherever the feature is
-described — a picker that silently does nothing is worse than one that isn't offered.
+`comfy`, `vision` and `infer` all bridge back into the app. `_VALID_KINDS` lists
+exactly these three.
+
+**`training` was removed on 2026-08-04.** It had been listed here as Open since
+this document was written: `POST /api/dataset/<id>/train` read a `device_id`,
+`prepare_peer_training_bundle` zipped the export folder, and
+`peer_worker._run_training` shelled ai-toolkit on the peer against a config whose
+`{{DATASET_DIR}}` / `{{OUTPUT_DIR}}` placeholders it rewrote. Three things were
+wrong with keeping it:
+
+- **Nothing ever called it.** No surface in `frontend/src` sent `device_id` to
+  `/train`, so the whole lane was unreachable from the UI it was built for.
+- **It could not be stopped.** `_run_training`'s progress callback discarded the
+  heartbeat's `{'cancelled': …}` answer, so a hub-side Stop marked the row
+  cancelled and the peer trained on for up to its 24-hour timeout.
+- **It produced no run record and no progress**, which is what "Open" meant here.
+
+Training on another machine is **ai-toolkit's own feature** now: it takes the
+machine in its GPU picker, stages the dataset itself, and mirrors the log,
+samples and checkpoints home. Doing it there rather than here keeps one
+implementation instead of two, and it works from ai-toolkit's own UI as well as
+from this app. See that repo's `FORK_NOTES.md` → "Remote execution".
 
 ## Key files
 

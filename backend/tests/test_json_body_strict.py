@@ -175,8 +175,11 @@ def test_a_binary_stream_is_not_buffered_before_the_route_reads_it(app, client):
         cfg.save_config({'cluster': {'role': 'primary'}})
         minted = cluster_svc.mint_join_token()
         redeemed = cluster_svc.redeem_join_token(minted['token'], name='peer-json-guard')
+        # Any valid kind will do -- this test is about the request body not
+        # being buffered, not about what the job does. It used 'training'
+        # until that kind was removed on 2026-08-04.
         cluster_svc.create_cluster_job(
-            device_id=redeemed['device_id'], kind='training',
+            device_id=redeemed['device_id'], kind='infer',
             payload={}, job_id='train-json-guard')
 
     blob = b'x' * (64 * 1024)

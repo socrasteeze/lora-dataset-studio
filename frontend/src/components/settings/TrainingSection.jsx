@@ -85,6 +85,37 @@ export default function TrainingSection(props) {
         </div>
       </Card>
 
+      <Card title="Train on another machine"
+        help="Set this and a “Train on” picker appears beside Train the LoRA on a dataset's Training panel, listing the OTHER machines your ai-toolkit is configured to use. Pick one and the run happens there: the dataset is sent over, and its log, samples and checkpoints come back here. Point the address at this machine's own ai-toolkit — this app exports the dataset to a folder on this disk and hands over that path. This machine's own GPUs are deliberately not in the picker: “This machine” is the ordinary local run, and it is the only one that tells the rest of the app the GPU is busy. Blank means every run trains here, exactly as before.">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="aitoolkit-url" className="block text-sm font-medium text-content">
+              ai-toolkit web address
+            </label>
+            <input
+              id="aitoolkit-url"
+              type="text"
+              placeholder="http://localhost:8675"
+              value={config.aitoolkit?.url || ''}
+              onChange={(e) => setField('aitoolkit', 'url', e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label htmlFor="aitoolkit-token" className="block text-sm font-medium text-content">
+              Its access token <span className="text-content-subtle">(blank if it has none)</span>
+            </label>
+            <input
+              id="aitoolkit-token"
+              type="password"
+              value={config.aitoolkit?.token || ''}
+              onChange={(e) => setField('aitoolkit', 'token', e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+        </div>
+      </Card>
+
       <ConceptFaceMaskCard config={config} setField={setField} configDefaults={configDefaults} />
     </div>
   )

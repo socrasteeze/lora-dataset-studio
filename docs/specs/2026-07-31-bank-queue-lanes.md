@@ -98,5 +98,9 @@ shows what a waiting bank is waiting for.
   `resolve_dups` still wrap a whole bank's mutations in a single
   `write_with_retry`. If `database is locked` reappears, that pair is where to
   look first, and `LDS_DB_TRACE=2` will name it.
-- No reaper for a peer that dies mid-`comfy` job: the `ClusterJob` stays
-  `running` and its queue row stays `pending`.
+- ~~No reaper for a peer that dies mid-`comfy` job.~~ **Fixed since this was
+  written**: `cluster.reap_dead_peer_jobs` fails the jobs of a peer that stopped
+  checking in, is called from the `job_queue` worker, and is covered by
+  `test_bank_write_holds.py`. The grace is `DEAD_PEER_JOB_GRACE_SECONDS`
+  (10 min), deliberately well above `ONLINE_TTL_SECONDS` so a merely slow peer
+  does not have its work killed out from under it.

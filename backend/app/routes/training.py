@@ -17,6 +17,7 @@ from .. import capabilities
 from .. import config as cfg
 from ..config import LOCAL_USER
 from ..services import cloud_training as ct
+from ..services import peer_training
 from ..services import face_dataset_service as svc
 from ..services import face_mask
 from ..services import face_mask_preview as fmp
@@ -96,6 +97,38 @@ def _full_transformer_artifact_response(run):
     }), 409
 
 
+@bp.get('/training/machines')
+def training_machines():
+    """GPUs a run can be sent to, via the configured ai-toolkit.
+
+    Deliberately NOT gated on `_require_aitoolkit()`: that checks this machine's
+    ai-toolkit CHECKOUT, and this list is about a web address. A user who has
+    only the address configured must still see the picker.
+    """
+    try:
+        return jsonify({'configured': peer_training.is_configured(),
+                        'machines': peer_training.machines()})
+    except Exception as e:      # noqa: BLE001 — a picker must degrade, not 500
+        return jsonify({'configured': peer_training.is_configured(),
+                        'machines': [], 'error': str(e)})
+
+
+@bp.get('/training/peer-runs')
+def training_peer_runs():
+    """This lane's status. Separate from /dataset/train/status on purpose — that
+    one reports the single local run the machine-wide flag describes."""
+    ds_id = request.args.get('dataset_id', type=int)
+    return jsonify(peer_training.status_summary(ds_id))
+
+
+@bp.post('/training/peer-runs/<int:run_id>/stop')
+def training_peer_run_stop(run_id):
+    ok = peer_training.request_stop(run_id)
+    if not ok:
+        return jsonify({'error': 'no such run, or it has already finished'}), 404
+    return jsonify({'ok': True})
+
+
 @bp.post('/dataset/<int:dataset_id>/train')
 def dataset_train(dataset_id):
     gate = _require_aitoolkit()
@@ -120,23 +153,26 @@ def dataset_train(dataset_id):
                       'run can offer — switch to LoRA'),
             'training_mode': mode,
         }), 400
-    # Remote peer training: zip the export folder and enqueue a ClusterJob.
-    from ..services import cluster as cluster_svc
-    device_id = cluster_svc.normalize_device_id(d.get('device_id'))
-    if device_id != cluster_svc.LOCAL_DEVICE_ID:
+    # A machine other than this one runs in its OWN lane (peer_training), never
+    # through the code below. The local path takes the machine-wide
+    # `training_in_progress` flag, which means "this machine's GPU is busy" and
+    # gates generation and the bank's GPU passes too — a run happening on
+    # another box must not set it, or renting that box would idle this one.
+    device_id = (d.get('device_id') or '').strip()
+    if device_id and device_id != 'local':
         try:
-            from ..services import cluster_remote
-            archive, config_text = lt.prepare_peer_training_bundle(
-                LOCAL_USER, dataset_id, steps=d.get('steps'),
+            run = peer_training.launch(
+                LOCAL_USER, dataset_id, gpu_ids=device_id, steps=d.get('steps'),
                 base_model=d.get('base_model'), variant=d.get('variant', 'turbo'),
-                train_type=d.get('train_type'), masked=d.get('masked'))
-            job_id = cluster_remote.enqueue_training_on_device(
-                device_id,
-                dataset_archive_path=archive,
-                train_params={'config_text': config_text},
-            )
-            return jsonify({'ok': True, 'mode': 'peer', 'job_id': job_id,
-                            'device_id': device_id})
+                train_type=d.get('train_type'), masked=d.get('masked'),
+                # Same confirmable refusals as the local path — a dataset does
+                # not become well-formed by training somewhere else, and the
+                # panel already retries each of these with its flag set.
+                allow_caption_mismatch=bool(d.get('allow_caption_mismatch')),
+                allow_uncaptioned=bool(d.get('allow_uncaptioned')),
+                allow_caption_quality=bool(d.get('allow_caption_quality')),
+                allow_not_ready=bool(d.get('allow_not_ready')))
+            return jsonify({'ok': True, 'mode': 'peer', 'run': run})
         except Exception as e:
             return _map_error(e)
     try:

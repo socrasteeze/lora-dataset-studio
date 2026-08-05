@@ -19,16 +19,24 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
+import { FALLBACK_ORDER, buildSteps } from './pipelineSteps.js';
+
 const src = fs.readFileSync(new URL('./LaunchAllDialog.jsx', import.meta.url), 'utf8');
 
 test('readiness is decided by the selected device, not by "a peer exists"', () => {
   assert.match(src, /import \{ stepGate \} from '\.\/passDeviceGate\.js'/);
   const gates = src.slice(src.indexOf('const gates = useMemo'),
     src.indexOf('const ready = useMemo'));
+  // Every step is gated, whatever the list contains. This used to grep the
+  // dialog for each key literal — which stopped being possible, and stopped
+  // being the right question, when the step list moved out of this file and
+  // onto the server (pipelineSteps.js). The dialog maps the list; the list is
+  // asserted here as a real import rather than as a regex over source.
+  assert.match(gates, /STEPS\.map\(\(s\) => \[s\.key, stepGate\(s\.key, \{ caps, visionReady, device \}\)\]\)/);
+  const keys = buildSteps(FALLBACK_ORDER).map((s) => s.key);
   for (const key of ['score', 'faces', 'watermark', 'framing', 'caption']) {
-    assert.ok(gates.includes(`'${key}'`), `${key} is not gated at all`);
+    assert.ok(keys.includes(key), `${key} is not in the step list at all`);
   }
-  assert.match(gates, /stepGate\(k, \{ caps, visionReady, device \}\)/);
   // Comments stripped: the header above `gates` explains the old `|| remote`
   // by name, and that prose is worth keeping.
   const code = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');

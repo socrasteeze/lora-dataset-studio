@@ -1599,6 +1599,21 @@ def autodetect() -> dict:
     }
 
 
+def _pipeline_steps() -> tuple:
+    """`image_bank_service.PIPELINE_STEPS`, imported lazily.
+
+    Lazy because that module pulls the whole bank service in, and `probe()` runs
+    on every page load — including on installs that never open a bank. Degrades
+    to an empty tuple, which the dialog reads as "no list published" and falls
+    back to its own order, rather than rendering nothing.
+    """
+    try:
+        from .services.image_bank_service import PIPELINE_STEPS
+        return PIPELINE_STEPS
+    except Exception:      # noqa: BLE001
+        return ()
+
+
 def probe(force=False) -> dict:
     global _cache, _cache_ts
     now = time.time()
@@ -1858,6 +1873,14 @@ def probe(force=False) -> dict:
         # Bank scoring extra (CLIP aesthetic + NSFW + style clustering). Gates the
         # bank's "Score (aesthetic · NSFW · style)" button; False → install hint.
         'bank_scoring': bank_scoring['ok'],
+        # The bank pipeline's steps, in order, straight from the one list that
+        # decides them (`image_bank_service.PIPELINE_STEPS`). Published so the
+        # Launch-all dialog can RENDER from it rather than keep its own copy:
+        # a step this list does not contain is one `_sanitize_pipeline_steps`
+        # would silently drop, so a checkbox for it could only ever do nothing.
+        # It rides here because the dialog already holds this blob — a separate
+        # endpoint for a constant would be a second request for a static fact.
+        'bank_pipeline_steps': list(_pipeline_steps()),
         # 🏷️ WD14 tagger. Gates the bank's Tags button; False → install hint. The
         # detail rides along because this capability can be ✗ for TWO different
         # reasons (no onnxruntime vs no model download) that the user fixes in

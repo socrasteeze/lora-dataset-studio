@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
+import { FALLBACK_ORDER, buildSteps, defaultChecked } from './pipelineSteps.js';
+
 const ws = fs.readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');
 const panel = fs.readFileSync(new URL('./DupGroupsPanel.jsx', import.meta.url), 'utf8');
 const dialog = fs.readFileSync(new URL('./LaunchAllDialog.jsx', import.meta.url), 'utf8');
@@ -46,15 +48,20 @@ test('the resolution panel hits the semantic endpoints and uses same-shot wordin
 });
 
 test('Launch all inserts the semantic step right after Score, defaulting on when ready', () => {
-  assert.match(dialog, /key:\s*'semantic_dedup'/);
-  // Its readiness rule lives in passDeviceGate.js now: it follows Score's
-  // verdict on whichever machine will run Score, and is never blocked by the
-  // device because it always runs here.
+  // The step list moved out of the dialog and onto the server
+  // (pipelineSteps.js), so this is asserted through the module rather than by
+  // grepping the JSX for a `key: 'semantic_dedup'` literal.
+  const keys = buildSteps(FALLBACK_ORDER).map((s) => s.key);
+  assert.ok(keys.includes('semantic_dedup'));
+  assert.equal(keys.indexOf('semantic_dedup'), keys.indexOf('score') + 1,
+    'semantic_dedup reuses Score’s embeddings, so it belongs immediately after it');
+  // Its readiness rule lives in passDeviceGate.js: it follows Score's verdict
+  // on whichever machine will run Score, and is never blocked by the device
+  // because it always runs here.
   const gate = fs.readFileSync(new URL('./passDeviceGate.js', import.meta.url), 'utf8');
   assert.match(gate, /if \(key === 'semantic_dedup'\)[\s\S]{0,200}stepGate\('score', ctx\)/);
-  const m = dialog.match(/\[([^\]]*)\]\s*\n\s*\.filter\(\(k\)\s*=>\s*ready\[k\]\)/);
-  assert.ok(m, 'found the default step set');
-  const order = m[1];
-  assert.ok(order.indexOf("'semantic_dedup'") > order.indexOf("'score'"),
-    'semantic_dedup follows score in the default set');
+  const steps = buildSteps(FALLBACK_ORDER);
+  const ready = Object.fromEntries(steps.map((s) => [s.key, true]));
+  assert.equal(defaultChecked(steps, ready).has('semantic_dedup'), true,
+    'it defaults on when Score can run');
 });

@@ -23,7 +23,7 @@ test('a blocked lane keeps its slot and states its reason — it never disappear
   // the cloud key missing closes the OTHER lane the same way
   const noKey = runsHubContinueLanes(RUN, { ...OK, configured: false });
   assert.equal(noKey.cloud.available, false);
-  assert.match(noKey.cloud.reason, /rental key/);
+  assert.match(noKey.cloud.reason, /rented-GPU training was removed/);
 });
 
 test('local is single-flight for the WHOLE machine — a run on another dataset closes it', () => {
@@ -64,10 +64,10 @@ test('the concurrency limit closes the cloud lane and names the count', () => {
   assert.match(lanes.cloud.reason, /limit reached \(1\/1\)/);
 });
 
-test('a run with no dataset can only go to the cloud', () => {
+test('a run with no dataset cannot be continued on this machine', () => {
   const lanes = runsHubContinueLanes({ run_id: 9, train_type: 'zimage' }, OK);
   assert.equal(lanes.local.available, false);
-  assert.match(lanes.local.reason, /only be continued in the cloud/);
+  assert.match(lanes.local.reason, /cannot be continued on this machine/);
   assert.equal(lanes.cloud.available, true);
 });
 
