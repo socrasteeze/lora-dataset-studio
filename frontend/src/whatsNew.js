@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-05-remote-training-brings-whole-checkpoints-home',
+    date: '2026-08-05',
+    title: 'A LoRA trained on your other machine can no longer come home half-copied',
+    blurb:
+      'Three faults in the “Train on another machine” lane, found by testing it against a stand-in for the second machine rather than by waiting for it to go wrong on yours. The worst was silent: a checkpoint whose transfer was cut short could still be renamed to its final .safetensors and announced as “Done. Weights copied” — a file indistinguishable from a good one until something tried to load it, and on the machine that measured it, 921,600 bytes arrived as 500,000. The size is now checked against what the other machine said it was sending, so a short copy is retried instead of accepted. Second: a transfer chopped up by a flaky connection used to give up on the very first stumble, which is why some transfers simply never finished; it now loses far less to each cut and keeps trying. Third: if the job disappeared on the other machine — deleted there, or its database reset — this one waited for it for ever, and because a dataset allows only one run at a time, that dataset could not be trained again until you restarted the app. It now says that machine no longer has the job, and stops. None of this changes what you do; it changes whether what comes back is whole.',
+    to: '/settings/training',
+  },
+  {
     id: '2026-08-04-auto-reject-shows-the-number-it-will-actually-reject',
     date: '2026-08-04',
     title: 'Auto-reject stops promising more than it can do',
