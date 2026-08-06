@@ -62,7 +62,7 @@ cd frontend && npm test 2>&1 | tail -20 > /tmp/baseline-frontend.txt && cd ..
 pre-merge tree; a run that starts before the merge and finishes against merged
 files is not a baseline. Record the failure **list**, not just the total.
 
-### Expected failures on a Windows dev box
+### Expected failures on a dev box
 
 **Know which OS each CI job runs on before you call anything "environment".**
 `.github/workflows/ci.yml`: **backend tests run on `windows-latest`**; the
@@ -71,12 +71,46 @@ failure is *not* a local quirk — CI reproduces it exactly.
 
 | Test | Status |
 |---|---|
-| `test_watermarks.py::test_prefill_falls_back_to_telea_when_lama_absent` | **Genuinely environment.** OpenCV is absent here; CI installs `opencv-python-headless` from `requirements-dev.txt`, so it is green there. |
+| *(none)* | There is currently **no accepted environment failure.** Everything must be green. |
 
-That is the whole list as of 2026-08-05. Everything else must be green.
+That is the whole list as of 2026-08-06, and the shortest it has been. Read the
+two paragraphs below before you add a row: **every entry this table has ever
+carried was eventually removed as wrong** — the peer-training four because they
+were a real bug CI had been red on for three pushes, the OpenCV one because its
+reason had quietly expired.
+
+**A stale dev env is not an environment failure.** The current way to get this
+wrong is `test_zimage_convert_streaming.py`: 1 failed + 4 errors, all
+`ModuleNotFoundError: No module named 'safetensors'`. That box is not missing
+something CI happens to have — `safetensors>=0.4` has been declared in
+`backend/requirements-dev.txt` since 2026-08-04 (`2912e86c`), so the box is
+simply behind that file. It is a stale virtualenv wearing an environment
+failure's clothes, and the fix is one command, not a table row:
+
+```bash
+python -m pip install -r backend/requirements-dev.txt
+```
+
+The trap has a shape: this suite `importorskip`s **Torch**, and a dev box that
+has Torch but not `safetensors` sails past the guard and dies on the import.
+`requirements-dev.txt` says so in its own comment, which also records that the
+box used to get `safetensors` transitively — so when that stopped being true,
+nothing announced it.
+
+**The row this table used to carry was stale for the same reason, in reverse.**
+`test_watermarks.py::test_prefill_falls_back_to_telea_when_lama_absent` was
+recorded as "OpenCV is absent here" and left standing after
+`opencv-python-headless` was declared on 2026-07-28 (`7a6ca302`) and installed.
+Measured 2026-08-06: `test_watermarks.py`, **134 passed**. The row outlived its
+fact by a week, and a table entry nobody re-measures is a place for a real
+failure to hide — which is precisely what the warning below was written about.
 
 **This table is a snapshot, not a licence.** Confirm each against your own
-baseline run. A failure not in this table is damage, whoever wrote the test.
+baseline run. A failure not in this table is damage, whoever wrote the test —
+and a failure *in* it is damage too once the reason expires. Three questions
+before you write a row: name the CI job and read its `runs-on`; check whether
+the package is already declared in `requirements-dev.txt` (if it is, your env is
+behind, not excused); and re-measure the rows already here.
 
 > **How this table earned its warning.** On 2026-08-05 four
 > `test_peer_training_over_http.py` failures were recorded here as

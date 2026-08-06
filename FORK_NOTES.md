@@ -1096,9 +1096,16 @@ a decision, and don't miss the parts that merge with zero conflict markers.
     which does not care who wrote the failing test.** So: run the baseline diff
     to CLASSIFY a failure, then fix any failure that is red at HEAD regardless of
     where it came from, and record the fix under Divergence 5 so the next merge
-    knows to keep it. A pre-existing failure that was ALREADY red before the sync
-    (`test_prefill_falls_back_to_telea_when_lama_absent`) is the only kind to
-    leave alone, and only because CI installs the numpy/OpenCV it needs.
+    knows to keep it. There is currently **no failure of the leave-alone kind**:
+    the one this bullet used to name
+    (`test_prefill_falls_back_to_telea_when_lama_absent`, red because OpenCV was
+    absent locally) has been green since `opencv-python-headless` was declared on
+    2026-07-28 and installed — re-measured 2026-08-06, `test_watermarks.py` 134
+    passed — and the sentence excusing it outlived the fact by a week. Anything
+    red today is either damage or a dev env behind `requirements-dev.txt`; the
+    live list and how to tell those apart are in
+    [`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md), which is the one copy —
+    do not restate a baseline here again.
     Corollary: **reproduce CI's exact invocation, from the repo root.** The
     routine below runs pytest from `backend/`; CI runs `python -m pytest
     backend/tests` from the root, which is a different rootdir and `sys.path`.
