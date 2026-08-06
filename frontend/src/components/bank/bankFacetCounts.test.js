@@ -11,6 +11,7 @@ const PAYLOAD = {
   origins: { unknown: 100 },
   mediums: { photo: 70 },
   angles: { frontal: 55 },
+  reject_reasons: { duplicate: 6887, blur: 412, unrecorded: 0 },
 };
 
 const FILTERED = {
@@ -21,6 +22,7 @@ const FILTERED = {
   origins: { unknown: 12 },
   mediums: { photo: 8 },
   angles: { frontal: 6 },
+  reject_reasons: { duplicate: 9, blur: 3, unrecorded: 0 },
 };
 
 test('nothing filtered is not a filter', () => {
@@ -39,10 +41,18 @@ test('the facets that are meaningful at 0 or empty still count as filters', () =
 });
 
 test('every chip facet is recognised as a filter', () => {
-  for (const key of ['status', 'flag', 'search', 'exclude', 'tags', 'resBucket',
-    'framing', 'origin', 'medium', 'angle']) {
+  for (const key of ['status', 'reason', 'flag', 'search', 'exclude', 'tags',
+    'resBucket', 'framing', 'origin', 'medium', 'angle']) {
     assert.equal(isFacetFiltered({ [key]: 'x' }), true, key);
   }
+});
+
+test('a reason set on its own still fetches the filtered counts', () => {
+  // ✕ Why carries its own status scope server-side, so it can narrow the grid
+  // with no status chip lit. Left out of TRUTHY it would skip the /facets fetch
+  // and print bank-wide numbers over a narrowed grid — the defect this whole
+  // module exists to prevent, reintroduced by one missing key.
+  assert.equal(isFacetFiltered({ reason: 'duplicate' }), true);
 });
 
 test('with no filtered answer the chips keep the bank-wide numbers', () => {
@@ -59,9 +69,14 @@ test('the printed count follows the filter, the visibility one does not', () => 
   assert.equal(filtered, true);
   assert.equal(print.flags.blur, 12);
   assert.equal(wide.flags.blur, 4043);
-  for (const key of ['resBuckets', 'framing', 'origins', 'mediums', 'angles']) {
+  for (const key of ['resBuckets', 'framing', 'origins', 'mediums', 'angles',
+    'reasons']) {
     assert.notDeepEqual(print[key], wide[key], key);
   }
+  // The reported shape, in the row this change adds: 6 887 duplicates in the
+  // bank, 9 under the filter actually in force.
+  assert.equal(print.reasons.duplicate, 9);
+  assert.equal(wide.reasons.duplicate, 6887);
 });
 
 test('a chip whose filtered count is 0 is still offered', () => {

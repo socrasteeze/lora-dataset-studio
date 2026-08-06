@@ -108,6 +108,7 @@ def test_with_no_filter_the_chips_still_describe_the_whole_bank(client, tmp_path
     assert facets['origins'] == payload['origins']
     assert facets['mediums'] == payload['mediums']
     assert facets['angles'] == payload['angles']
+    assert facets['reject_reasons'] == payload['reject_reasons']
     for k in ('total', 'pending', 'keep', 'reject'):
         assert facets['counts'][k] == payload['counts'][k], k
 

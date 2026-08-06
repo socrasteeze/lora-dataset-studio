@@ -7,6 +7,8 @@ const LABELS = {
   RES_BUCKETS: [{ id: 'res_1_2', label: '1–2 MP' }, { id: 'res_2_4', label: '2–4 MP' }],
   FRAMING_BUCKETS: [{ id: 'face', label: '😀 Face' }],
   ORIGIN_BUCKETS: [{ id: 'ai', label: '🤖 AI' }],
+  REASON_BUCKETS: [{ id: 'duplicate', label: '≈ Duplicate' },
+    { id: 'unrecorded', label: '❔ Not recorded' }],
 }
 
 test('an empty filter has nothing to say', () => {
@@ -49,6 +51,25 @@ test('resolution, origin and framing buckets read their label table', () => {
 
 test('an unmapped bucket id falls back to its raw id, not silence', () => {
   assert.deepEqual(bankFilterParts({ resBucket: 'res_gt_16' }, { labels: LABELS }), ['res_gt_16'])
+})
+
+test('✕ Why is named, and counts, even with no status chip lit', () => {
+  // The reason facet scopes itself to rejected rows server-side, so it can
+  // narrow the grid on its own. Unnamed here, a folded panel would show
+  // "6 887 shown" with nothing explaining why the other 40 000 are gone —
+  // which reads as data loss, the failure this module exists to prevent.
+  assert.deepEqual(bankFilterParts({ reason: 'duplicate' }, { labels: LABELS }),
+    ['Rejected as: ≈ Duplicate'])
+  assert.equal(bankFilterCount({ reason: 'duplicate' }, { labels: LABELS }), 1)
+  // It reads after the status it belongs to, in the panel's own order.
+  assert.deepEqual(
+    bankFilterParts({ status: 'reject', reason: 'unrecorded' }, { labels: LABELS }),
+    ['✕ Rejected', 'Rejected as: ❔ Not recorded'])
+})
+
+test('an unmapped reason id is still named', () => {
+  assert.deepEqual(bankFilterParts({ reason: 'some_future_flag' }, { labels: LABELS }),
+    ['Rejected as: some_future_flag'])
 })
 
 test('an empty-string subfolder is the bank root, and counts', () => {
