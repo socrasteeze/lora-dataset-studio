@@ -530,9 +530,14 @@ class BankImage(db.Model):
     # dropped). Additive column — existing banks carry NULL and behave as before.
     rotation = db.Column(Integer, nullable=True)
     # Triage decision — same words as dataset images (pending|keep|reject).
-    # reject_reason: blur|noise|uniform|small|duplicate|unreadable|manual
-    #                |low_aesthetic|nsfw|watermark (the V2 score-derived flags)
-    #                |soft_detail|bars (the provenance pass).
+    # reject_reason: blur|noise|uniform|small|duplicate|semantic_dup|unreadable
+    #                |manual|low_aesthetic|nsfw|watermark (the V2 score-derived
+    #                flags)|soft_detail|bars (the provenance pass), or NULL for a
+    #                row rejected before the column meant anything.
+    # This list is prose and drifts (it was missing semantic_dup for a release).
+    # The AUTHORITY is image_bank_service.REJECT_REASONS, which derives itself
+    # from the flag tuples because 🧹 Auto-reject writes the flag id itself —
+    # and REASON_KEYS adds the 'unrecorded' bucket the ✕ Why chips filter on.
     status = db.Column(String(10), nullable=False, default='pending', index=True)
     reject_reason = db.Column(String(16), nullable=True)
     # Set once the image has been promoted (copied) into a dataset — the funnel's

@@ -277,6 +277,9 @@ def bank_images(bank_id):
     payload = banks.list_images(
         LOCAL_USER, bank_id,
         status=args.get('status') or None,
+        # WHY a rejected image was rejected — the ✕ Rejected sub-facet. Carries
+        # its own status scope service-side, so it never rewrites `status`.
+        reason=args.get('reason') or None,
         flag=args.get('flag') or None,
         cluster=_int('cluster'), group=_int('group'), style=_int('style'),
         semantic_group=_int('semantic_group'),
@@ -336,6 +339,7 @@ def bank_facets(bank_id):
     out = banks.facet_counts(
         LOCAL_USER, bank_id,
         status=args.get('status') or None,
+        reason=args.get('reason') or None,
         flag=args.get('flag') or None,
         cluster=_int('cluster'), group=_int('group'), style=_int('style'),
         semantic_group=_int('semantic_group'),

@@ -1481,6 +1481,42 @@ half-working one would be worse than none:
 
 The 🔄 rotate button needs no undo entry: turn the other way and the image is
 byte-for-byte the original again.
+
+## See why each image was rejected
+
+Pick **✕ Rejected** and a second row of chips appears under it — **✕ Why** —
+with one chip per reason and its count: ≈ Duplicate, ✂ Same shot, ✋ By hand,
+Blurry, ⬜ Flat, 🔞 NSFW, and so on. Click one and the grid shows only that pile.
+
+This is what you want before **🗑 Delete rejected**: that action is the one with
+no undo, so being able to look at exactly what a pass took — and nothing else —
+is the last check before the files go to the recycle bin.
+
+**Where this matters most: duplicates.** Auto-reject and "Resolve ALL — keep
+best" both close every duplicate group in one click. After that the **≈
+Duplicates** chip reads **0**, and it is right to: it counts groups that are
+still waiting on a decision from you, and there are none left. But the images it
+just rejected are still in the bank, and until this row existed nothing could
+select them. If you have ever auto-rejected duplicates and then wondered where
+they went, ✕ Rejected → ✕ Why → **≈ Duplicate** is the answer. Crops and
+variants found by the ✂ pass are under **✂ Same shot**, which goes quiet on
+resolution for the same reason.
+
+**Its limits, stated plainly.**
+
+- **This selects, it never repairs.** These chips are a filter. Nothing here
+  un-rejects an image or changes which copy of a duplicate group was kept. To
+  put something back, select it and press ✓ Keep like anywhere else in the grid.
+- **❔ Not recorded is a real answer, not an error.** Images rejected by an older
+  build — before the app wrote down why — land here. Nothing is wrong with them
+  beyond the decision itself; the chip exists so that pile is reachable instead
+  of invisible. On a bank you triaged a long time ago it may hold everything.
+- **The counts follow your other filters**, like every chip row: with a
+  subfolder or a search active, ≈ Duplicate shows how many are in *that* view,
+  not in the whole bank.
+- **A reason is not a re-check.** It says what the app decided at the time, at
+  the thresholds in force then. Re-tuning 🎚 thresholds does not rewrite it.
+
 ## Find more images like this one — by attribute, not by look
 
 **Select an image** in a captioned bank and its tags are already there, in the

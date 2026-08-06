@@ -1120,6 +1120,24 @@ _QUALITY_FLAGS = ('blur', 'noise', 'uniform', 'small', 'soft_detail', 'bars',
 # and filter independently (each only meaningful once its pass has run).
 _SCORE_FLAGS = ('low_aesthetic', 'nsfw', 'watermark')
 
+# --- ✕ Why: every value reject_reason can carry ------------------------------
+# DERIVED from the two flag tuples above rather than retyped, because 🧹
+# Auto-reject writes the flag id ITSELF (auto_reject_by_flags) — so a new flag
+# becomes a new reason for free, and a hand-copied list would be a release
+# behind. That drift IS the bug this facet exists to end: ✕ Rejected was one
+# undifferentiated pile, and a user who auto-rejected a bank's duplicates then
+# had no address for them at all (the ≈ chip correctly reads 0 once every group
+# is resolved — see _unresolved_dup_groups_q and test_bank_dup_live_badge).
+#
+# Ids are user-facing query values AND stored column values — never rename one
+# without an alias path.
+REJECT_REASONS = ('duplicate', 'semantic_dup', 'manual') + _QUALITY_FLAGS + _SCORE_FLAGS
+# Rejected before this column meant anything, or by a path that recorded nothing.
+# Its OWN bucket, never silence: on an old bank that is where the pile is, and a
+# chip row that cannot reach it is the same defect one level down.
+REASON_UNRECORDED = 'unrecorded'
+REASON_KEYS = REJECT_REASONS + (REASON_UNRECORDED,)
+
 # Resolution tiers for the Bank grid — bucketed on MEGAPIXELS (width×height, the
 # same rank as the resolution sort) so a mixed dump can be skimmed and mass-acted
 # one tier at a time. Each entry is (stable_id, lo, hi) in raw pixels, a HALF-OPEN
@@ -1408,6 +1426,30 @@ def _origin_counts(bank_id) -> dict:
          .filter(BankImage.bank_id == bank_id, BankImage.origin.isnot(None)))
     got = {k: n for k, n in q.group_by(BankImage.origin).all()}
     return {k: int(got.get(k, 0)) for k in ORIGINS}
+
+
+def _reason_case():
+    """reject_reason with NULL folded into its own selectable bucket. ONE
+    expression, used to COUNT (one GROUP BY) and to FILTER — the same discipline
+    as _angle_case — so a ✕ Why chip can never print a number the page it opens
+    does not have."""
+    return func.coalesce(BankImage.reject_reason, REASON_UNRECORDED)
+
+
+def _reason_counts(bank_id) -> dict:
+    """Per-reason image counts for the ✕ Why sub-chips, in ONE GROUP BY.
+
+    Scoped to status == 'reject', and that scope is load-bearing rather than
+    decoration: reject_reason is NULL on every pending and kept row, so an
+    unscoped 'unrecorded' bucket would count the whole undecided bank. Every key
+    is present with a real count, so a reason that is empty today still offers
+    the way back to it."""
+    bucket = _reason_case()
+    rows = (db.session.query(bucket, func.count(BankImage.id))
+            .filter(BankImage.bank_id == bank_id, BankImage.status == 'reject')
+            .group_by(bucket).all())
+    got = {k: n for k, n in rows}
+    return {k: int(got.get(k, 0)) for k in REASON_KEYS}
 
 
 def _subfolder_of(relpath: str) -> str:
@@ -1842,6 +1884,10 @@ def bank_payload(user_id, bank_id) -> dict | None:
         'res_buckets': res_buckets,
         'framing': framing, 'origins': origins,
         'mediums': _medium_counts(bank_id), 'angles': _angle_counts(bank_id),
+        # WHY each rejected image was rejected. Bank-wide here (the payload's
+        # job): this map decides whether a ✕ Why chip is OFFERED at all, while
+        # facet_counts supplies the number it PRINTS under the active filters.
+        'reject_reasons': _reason_counts(bank_id),
         # What the ⤢ backfill would cost, in the app's own words. ~2 s/image is
         # the MEASURED cost of antelopev2 on this project's CPU path (144 images,
         # ~2 s each); it is a ballpark shown before the click, never a promise.
@@ -2255,16 +2301,16 @@ def _apply_text_filters(q, search=None, exclude=None, tags=None):
 # names are BOTH the keyword arguments below and the ids ``skip`` accepts, which
 # is what lets facet_counts measure a facet with every OTHER filter in force and
 # its own left out. Stored query keys — never rename one without an alias.
-FACETS = ('status', 'flag', 'cluster', 'group', 'semantic_group', 'style',
-          'framing', 'origin', 'medium', 'angle', 'subfolder', 'search',
+FACETS = ('status', 'reason', 'flag', 'cluster', 'group', 'semantic_group',
+          'style', 'framing', 'origin', 'medium', 'angle', 'subfolder', 'search',
           'exclude', 'tags', 'res_bucket')
 
 
-def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, flag=None,
-                  cluster=None, group=None, semantic_group=None, style=None,
-                  subfolder=None, search=None, exclude=None, tags=None,
-                  res_bucket=None, framing=None, origin=None, medium=None,
-                  angle=None):
+def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, reason=None,
+                  flag=None, cluster=None, group=None, semantic_group=None,
+                  style=None, subfolder=None, search=None, exclude=None,
+                  tags=None, res_bucket=None, framing=None, origin=None,
+                  medium=None, angle=None):
     """Narrow ``q`` by the composing facets and return ``(q, order)``.
 
     ONE place, because the grid and the chip counters ask the same question and
@@ -2279,6 +2325,20 @@ def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, flag=None,
     change their mind without clearing everything first."""
     if status in ('pending', 'keep', 'reject') and skip != 'status':
         q = q.filter(BankImage.status == status)
+    if reason in REASON_KEYS and skip != 'reason':
+        # WHY a rejected image was rejected — the sub-facet of ✕ Rejected, and
+        # the answer to the note in the `flag == 'dups'` branch below. That one
+        # keeps a still-OPEN group's already-rejected member; this one keeps
+        # everything rejected AS a duplicate, open group or long since resolved.
+        # Two questions, two predicates; neither is the other's fallback.
+        #
+        # `status == 'reject'` lives in the PREDICATE, not in the caller: a NULL
+        # reject_reason is what every pending and kept row carries, so
+        # 'unrecorded' without this scope would hand back the undecided bank. It
+        # does NOT write the `status` facet either — a chip toggles its own facet
+        # and nothing else, so facet_counts can still lift status with
+        # skip='status' and the Status chips stay switchable.
+        q = q.filter(BankImage.status == 'reject', _reason_case() == reason)
     order = BankImage.id.asc()
     if skip == 'flag':
         flag = None
@@ -2392,7 +2452,8 @@ def _apply_facets(q, th, skip=None, *, bank_id=None, status=None, flag=None,
     return q, order
 
 
-def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
+def list_images(user_id, bank_id, status=None, reason=None, flag=None,
+                cluster=None,
                 group=None, style=None, subfolder=None, search=None,
                 semantic_group=None, sort=None, res_bucket=None, framing=None,
                 origin=None, medium=None, angle=None, ids=None, exclude=None,
@@ -2434,6 +2495,14 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
     verdict and has to be reachable. ``angle`` (an ANGLES id) narrows to one head
     angle, recomputed from the stored yaw at read time. Both compose with
     everything, like every other facet.
+    ``reason`` (a REASON_KEYS id) narrows to the images rejected FOR that reason
+    — the ✕ Rejected sub-facet, including 'unrecorded' for rows rejected before
+    the column meant anything. It carries `status == 'reject'` inside its own
+    predicate, so it composes with everything and never rewrites the status
+    facet. This is the way back to a pile a bulk action has already closed: 🧹
+    Auto-reject and "Resolve ALL duplicates" both end with nothing left to
+    resolve, so the ≈ chip correctly reads 0 while thousands of images sit in
+    the bin. Read-only — it selects, it never un-rejects.
     ``ids`` is the "show selected" VIEW: an explicit ordered list of image ids
     that OVERRIDES every facet/sort (the selection IS the scope) and renders the
     page in the SAME order the caller passed — so a similarity ranking from
@@ -2468,7 +2537,7 @@ def list_images(user_id, bank_id, status=None, flag=None, cluster=None,
         return {'images': _page_images(page, th, bank_id), 'total': total, 'offset': off}
     q, order = _apply_facets(
         BankImage.query.filter_by(bank_id=bank_id), th, bank_id=bank_id,
-        status=status, flag=flag, cluster=cluster, group=group,
+        status=status, reason=reason, flag=flag, cluster=cluster, group=group,
         semantic_group=semantic_group, style=style, subfolder=subfolder,
         search=search, exclude=exclude, tags=tags, res_bucket=res_bucket,
         framing=framing, origin=origin, medium=medium, angle=angle)
@@ -2511,8 +2580,9 @@ def facet_counts(user_id, bank_id, **f) -> dict | None:
     """Every chip counter, measured under the filters ACTUALLY in force.
 
     Same shape (and the same keys) as the matching slices of ``bank_payload`` —
-    'counts', 'flags', 'res_buckets', 'framing', 'origins', 'mediums', 'angles'
-    — so the workspace can swap one for the other without a second code path.
+    'counts', 'flags', 'res_buckets', 'framing', 'origins', 'mediums',
+    'angles', 'reject_reasons' — so the workspace can swap one for the other
+    without a second code path.
 
     Why this exists. The payload's numbers are bank-wide, which was RIGHT for the
     question they were built to answer ("clicking this chip shows exactly these
@@ -2528,7 +2598,7 @@ def facet_counts(user_id, bank_id, **f) -> dict | None:
     about without clearing everything first, which is a worse bug than the one
     being fixed.
 
-    Cost: SEVEN queries whatever the bank's size — one per facet family, each a
+    Cost: EIGHT queries whatever the bank's size — one per facet family, each a
     GROUP BY or a row of conditional SUMs. The bank-wide flag map it replaces
     spends one query PER FLAG (ten), so the filtered answer is cheaper than the
     unfiltered one. Nothing here writes."""
@@ -2581,6 +2651,11 @@ def facet_counts(user_id, bank_id, **f) -> dict | None:
             extra=and_(BankImage.width.isnot(None), BankImage.height.isnot(None))),
         'framing': by_bucket('framing', BankImage.framing, _FRAMING_KEYS),
         'origins': by_bucket('origin', BankImage.origin, ORIGINS),
+        # Scoped to the rejected pile by `extra`, the same mechanism res_bucket
+        # uses for "rows this bucket does not describe" — reject_reason is NULL
+        # on every undecided row, so an unscoped 'unrecorded' would swallow them.
+        'reject_reasons': by_bucket('reason', _reason_case(), REASON_KEYS,
+                                    extra=BankImage.status == 'reject'),
         'mediums': by_bucket('medium', BankImage.medium, MEDIUM_KEYS),
         'angles': by_bucket('angle', _angle_case(), ANGLES),
     }

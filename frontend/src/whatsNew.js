@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-06-see-why-each-image-was-rejected',
+    date: '2026-08-06',
+    title: 'Find the duplicates you already threw out',
+    blurb:
+      'Reported: “the duplicates got auto-rejected, but filtering by duplicates shows 0 and finds nothing.” The ≈ Duplicates chip was right — it counts groups still waiting on a decision from you, and auto-reject makes that decision, so a bank it has been through honestly has none left. The problem was that the thousands of images it had just binned then had no filter that could reach them. Pick ✕ Rejected and there is now a second row of chips saying WHY each one is in there — ≈ Duplicate, ✋ By hand, Blurry, ⬜ Flat, one per reason, each with its count. Click one to see just that pile, which is what you want before 🗑 Delete rejected. It reads your existing banks with no re-scan: the reason was recorded on every image all along, nothing showed it. Looking only — these chips select a pile, they never un-reject anything. Images binned by an older version, before the reason was written down, get their own ❔ Not recorded chip rather than quietly going missing.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-05-a-remote-run-is-not-lost-when-the-link-drops',
     date: '2026-08-05',
     title: 'A run on your other machine is no longer written off the moment this one cannot see it',

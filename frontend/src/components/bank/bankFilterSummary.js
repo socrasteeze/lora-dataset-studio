@@ -45,9 +45,9 @@ const STATUS_LABEL = { pending: 'Undecided', keep: '✓ Kept', reject: '✕ Reje
 
 /**
  * Every facet currently narrowing the bank grid, as display strings, in the
- * open panel's own reading order (Status → Quality/Score/Groups → Resolution
- * → Origin → 🎨 Medium → ⤢ Angle → Framing → 🔖 tag facets → 🏷️ caption tags
- * → search/exclude).
+ * open panel's own reading order (Status → ✕ Why → Quality/Score/Groups →
+ * Resolution → Origin → 🎨 Medium → ⤢ Angle → Framing → 🔖 tag facets → 🏷️
+ * caption tags → search/exclude).
  * Deliberately excludes `sort` — a ranking is not a filter, it changes which
  * image is first, never which images match, so counting it would make
  * "N shown of M" lie about why the total differs.
@@ -55,15 +55,19 @@ const STATUS_LABEL = { pending: 'Undecided', keep: '✓ Kept', reject: '✕ Reje
  * @param {object} filter same shape as BankWorkspace's `filter` state
  * @param {object} [ctx]
  * @param {object} [ctx.labels] { FLAG_LABEL, RES_BUCKETS, FRAMING_BUCKETS,
- *   ORIGIN_BUCKETS, MEDIUM_BUCKETS, ANGLE_BUCKETS }
+ *   ORIGIN_BUCKETS, MEDIUM_BUCKETS, ANGLE_BUCKETS, REASON_BUCKETS }
  * @returns {string[]}
  */
 export function bankFilterParts(filter, { labels = {} } = {}) {
   const f = filter || {}
   const { FLAG_LABEL = {}, RES_BUCKETS = [], FRAMING_BUCKETS = [], ORIGIN_BUCKETS = [],
-    MEDIUM_BUCKETS = [], ANGLE_BUCKETS = [] } = labels
+    MEDIUM_BUCKETS = [], ANGLE_BUCKETS = [], REASON_BUCKETS = [] } = labels
   const out = []
   if (f.status) out.push(STATUS_LABEL[f.status] || f.status)
+  // ✕ Why narrows to ONE reason inside the rejected pile. It carries its own
+  // status scope server-side, so it can be active with no status chip lit — all
+  // the more reason for the folded header to keep naming it.
+  if (f.reason) out.push(`Rejected as: ${bucketLabel(REASON_BUCKETS, f.reason)}`)
   if (f.flag) out.push(FLAG_LABEL[f.flag] || GROUP_FLAG_LABEL[f.flag] || f.flag)
   if (f.cluster != null) out.push(`👥 Person #${f.cluster}`)
   if (f.style != null) out.push(`🎨 Style #${f.style}`)

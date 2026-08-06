@@ -107,6 +107,11 @@ import {
 // 🗃️ Chip counters — the number a chip PRINTS (measured under the filters in
 // force) is not the number that decides the chip EXISTS (bank-wide).
 import { chipCounts, facetDataKey, isFacetFiltered } from './bankFacetCounts.js'
+// ✕ Why — the reason an image is in the bin. The way back to a pile a bulk
+// action has already closed: once every duplicate group is resolved the ≈ chip
+// correctly reads 0, and without this row the images it rejected have no
+// address at all. Read-only; it selects, it never un-rejects.
+import { reasonBuckets, reasonHint } from './bankRejectReasons.js'
 
 const PAGE_SIZE = 120
 /* How many off-page captions the 🏷️ row will fetch for a selection.
@@ -663,7 +668,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     framing: null,
     // Dedicated keys, never folded into `flag` or the text lane.
     medium: null,
-    angle: null }))
+    angle: null,
+    // WHY a rejected image was rejected — the sub-facet of ✕ Rejected. Its own
+    // key rather than a `flag` value: the two ask different questions, and
+    // `flag=dups` (members of a still-OPEN group) must keep meaning what it
+    // means while `reason=duplicate` reaches everything already resolved.
+    reason: null }))
   const [searchText, setSearchText] = useState('')
   // 🚫 The inverse of the search box: hide what already carries a word. Session
   // state, deliberately NOT remembered like the sort — an order you can see in a
@@ -912,6 +922,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // them for one.
     if (f.medium) params.medium = f.medium
     if (f.angle) params.angle = f.angle
+    // ✕ Why. Carries its own `status = reject` scope server-side, so it is sent
+    // on its own and never rewrites the status facet — see _apply_facets.
+    if (f.reason) params.reason = f.reason
     return params
   }, [])
 
@@ -1101,7 +1114,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     setTagSource(null); setTagPicked(new Set())
     setF({ status: null, flag: null, cluster: null, style: null, subfolder: null,
       search: null, exclude: null, tags: null, resBucket: null, origin: null,
-      wd14Tags: [], framing: null })
+      wd14Tags: [], framing: null,
+      // medium/angle were missing here until the ✕ Why row was added: "Clear
+      // all" left them narrowing a grid the header then called unfiltered,
+      // which is the exact failure bankFilterSummary.js exists to prevent.
+      // Every facet, or the button is lying.
+      medium: null, angle: null, reason: null })
   }
 
   // Sort only reorders — the same rows match, so the selection (a set of ids)
@@ -1785,6 +1803,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const mediumNote = mediumLimits(chipWide.mediums, counts?.medium_classified)
   const angleCounts = chipPrint.angles
   const shownAngles = shownBuckets(ANGLE_BUCKETS, chipWide.angles, filter.angle)
+  // ✕ Why — the same "only show what holds something, plus the active one" rule.
+  // Labels are built from FLAG_LABEL rather than copied, so a flag renamed there
+  // is renamed here too (bankRejectReasons.reasonLabel).
+  const REASON_BUCKETS = reasonBuckets(FLAG_LABEL)
+  const reasonCounts = chipPrint.reasons
+  const shownReasons = shownBuckets(REASON_BUCKETS, chipWide.reasons, filter.reason)
   const angleState = angleReadiness(payload)
   const visionReady = !!caps.ollama?.vision_model_ready
   // The explicit lane only spells acts out with an uncensored (abliterated) vision
@@ -1961,7 +1985,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // `filter.origin`: set only an exclude term or an origin chip and the old
   // readout said "412 shown" with no "of 9,004" behind it.
   const filterLabels = { FLAG_LABEL, RES_BUCKETS, FRAMING_BUCKETS, ORIGIN_BUCKETS,
-    MEDIUM_BUCKETS, ANGLE_BUCKETS }
+    MEDIUM_BUCKETS, ANGLE_BUCKETS, REASON_BUCKETS }
   const filterSummary = bankFilterSummary(filter, { labels: filterLabels })
   const isFiltered = bankFilterCount(filter, { labels: filterLabels }) > 0
 
@@ -2519,12 +2543,40 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <FilterGroup label="Status">
-            <Chip active={!filter.status && !filter.flag && filter.cluster == null && filter.style == null}
-              onClick={() => setF({ status: null, flag: null, cluster: null, style: null })}>All</Chip>
+            {/* "All" is this row's reset, not a facet of its own — so it clears
+                ✕ Why with the status it belongs to. Leaving `reason` behind
+                would light "All" up over a grid showing only rejected
+                duplicates, which is the chip lying about its own grid. */}
+            <Chip active={!filter.status && !filter.flag && !filter.reason
+              && filter.cluster == null && filter.style == null}
+              onClick={() => setF({ status: null, flag: null, reason: null, cluster: null, style: null })}>All</Chip>
             <Chip active={filter.status === 'pending'} onClick={() => setF({ status: filter.status === 'pending' ? null : 'pending' })}>Undecided</Chip>
             <Chip active={filter.status === 'keep'} onClick={() => setF({ status: filter.status === 'keep' ? null : 'keep' })}>✓ Kept</Chip>
             <Chip active={filter.status === 'reject'} onClick={() => setF({ status: filter.status === 'reject' ? null : 'reject' })}>✕ Rejected</Chip>
           </FilterGroup>
+
+          {/* WHY each rejected image was rejected — a sub-row of ✕ Rejected, and
+              the only way back to a pile a bulk action has already closed. 🧹
+              Auto-reject and "Resolve ALL duplicates" both end with nothing left
+              to resolve, so the ≈ chip correctly drops to 0 while thousands of
+              images sit in the bin with no handle on them: reported as "the
+              duplicates got auto-rejected and the Duplicates filter shows 0".
+              reject_reason had the answer on every row the whole time.
+              Read-only — look before 🗑 Delete rejected; nothing here un-rejects.
+              Shown while ✕ Rejected is on AND whenever a reason is still set:
+              switching status must never leave a filter narrowing the grid with
+              no chip left to clear it. */}
+          {(filter.status === 'reject' || filter.reason) && shownReasons.length > 0 && (
+            <FilterGroup label="✕ Why">
+              {shownReasons.map((b) => (
+                <Chip key={b.id} active={filter.reason === b.id}
+                  onClick={() => setF({ reason: filter.reason === b.id ? null : b.id })}
+                  title={reasonHint(b.id, FLAG_HINT)}>
+                  {b.label} {reasonCounts[b.id] ?? 0}
+                </Chip>
+              ))}
+            </FilterGroup>
+          )}
 
           <FilterGroup label="Quality">
             {['blur', 'noise', 'uniform', 'small', 'soft_detail', 'bars', 'unreadable'].map((f) => (

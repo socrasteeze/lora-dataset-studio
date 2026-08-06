@@ -18,8 +18,8 @@
 // `subfolder` are meaningful at 0 / '' (cluster 0 is a cluster, '' is the bank
 // root), so they are tested against null, not for truthiness.
 const NULLABLE = ['cluster', 'style', 'subfolder']
-const TRUTHY = ['status', 'flag', 'search', 'exclude', 'tags', 'resBucket',
-  'framing', 'origin', 'medium', 'angle']
+const TRUTHY = ['status', 'reason', 'flag', 'search', 'exclude', 'tags',
+  'resBucket', 'framing', 'origin', 'medium', 'angle']
 
 /** Is anything narrowing the grid right now? `sort` is NOT a filter — it
  *  reorders the same rows, so it never changes a count. */
@@ -62,6 +62,7 @@ export function chipCounts(payload, facets) {
     origins: payload?.origins || EMPTY,
     mediums: payload?.mediums || EMPTY,
     angles: payload?.angles || EMPTY,
+    reasons: payload?.reject_reasons || EMPTY,
   }
   const print = facets ? {
     flags: facets.flags || EMPTY,
@@ -70,6 +71,7 @@ export function chipCounts(payload, facets) {
     origins: facets.origins || EMPTY,
     mediums: facets.mediums || EMPTY,
     angles: facets.angles || EMPTY,
+    reasons: facets.reject_reasons || EMPTY,
   } : wide
   return { print, wide, filtered: !!facets }
 }
