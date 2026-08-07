@@ -107,6 +107,7 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 | **📦 Move folder…** | Move a bank's images to another disk and keep every analysis: scores, duplicate groups, faces, decisions, captions |
 | **🚀 Launch all** | Runs the whole chain end to end overnight and leaves a morning report |
 | **④ Promote · ↑ Import to bank** | Pushes a bank's keepers into a target dataset, or copies a dataset's keepers into a new bank. Both choices retain Dataset-owned captions, curation, framing, watermark and provenance. By default compatible final-file technical analysis is restored; **Start fresh** skips only reuse of prior analysis. Face/Score AI results are intentionally not reused after normalization. |
+| **The one destructive action** | Everything above leaves your files alone — 🗑 **Delete rejected** is the single bank action that touches the source folder. It sends the rejected files to the OS trash (or the app's own, or deletes them) behind a type-DELETE confirmation that first states how many files, where they go, and which other banks share that folder. It refuses outright when the folder is also a dataset's |
 
 *Details: [The Image bank](#the-image-bank--triage-a-giant-folder-in-place)*
 
@@ -131,7 +132,7 @@ the target model accepts.
 | **Train it without leaving the app** | A promoted set gets a ▶ Train button that runs it through the ai-toolkit installed here — no export, no hand-written config. It queues behind the same GPU as everything else: a captioning pass, a ComfyUI render or an image training in flight refuses the launch instead of racing it |
 | **Shots described in words** | A pass writes what HAPPENS in each shot ("a woman turns and walks away"), which becomes the clip's `.txt` — the prompt it trains on. Captions are drafts: editable per shot, and a re-run never overwrites what you wrote |
 | **Spot the shot you already have** | A pass compares every shot to every other and groups the near-identical takes — ten copies of one gesture do not teach a model ten things. Each pile keeps its **sharpest** member unflagged, so you know which one to keep, and flagged shots can be selected and rejected in one gesture. It costs no GPU and no new decode: it reuses the frame vectors *Find a scene* already cached |
-| **Spot the watermarked shots** | A logo burned into the same corner of every frame is the most consistent thing in a dataset, so it is the first thing a LoRA learns to draw — and it is invisible at thumbnail size. An optional pass runs the same detector the image bank uses over each shot's sharpest frame and flags what it finds. Needs the watermark detector from Setup; a shot it could not judge stays **"not evaluated"**, never "clean" |
+| **Spot the watermarked shots** | A logo burned into the same corner of every frame is the most consistent thing in a dataset, so it is the first thing a LoRA learns to draw — and it is invisible at thumbnail size. An optional pass runs the same detector the image bank uses over each shot's sharpest frame and flags what it finds. Needs the watermark detector from Setup; a shot it could not judge is counted apart and reported as one it **could not judge**, never folded into the clean ones |
 | **Find a scene by typing a word** | One pass looks at a few frames of every shot; after it, typing *a woman walking on a beach* ranks the bank instantly and tells you **which second** of each shot matched. Several frames per shot, so a subject that only appears at the end is still findable. It is a **ranking, not a filter** — every shot scores something against every phrase — and the model **ignores "without"**, so `-word` pushes something down instead |
 
 **What it does NOT do yet**, plainly:
@@ -157,13 +158,15 @@ the target model accepts.
 - **Training starts here, but only one target is proven here — and locally
   only.** A promoted set has a **▶ Train this dataset** button that hands the
   clips to the ai-toolkit installed on your machine. The eight offered targets
-  (Wan 2.1 and 2.2 in their T2V and I2V variants, LTX-2 and 2.3, MiniMax H3) are
-  exactly the video architectures that ai-toolkit ships, and each one's settings
-  were read in its code — but **Wan 2.2 14B is the only one a finished run has
-  been through here**, and the card says so on the others. Measured on that run:
-  24 GB was full, at 170-185 s per step, with the CPU offload that makes 24 GB
-  possible at all. LTX-2 and 2.3 additionally need you to name a base
-  repository, because nothing installed locally states one. (Upstream also
+  (Wan 2.1 T2V and I2V, Wan 2.2 T2V and I2V A14B, Wan 2.2 TI2V-5B, LTX-2 and 2.3,
+  MiniMax H3) are exactly the video architectures that ai-toolkit ships, and each
+  one's settings were read in its code — plus a "Generic / other" escape hatch
+  that imposes no frame rule at all. But **Wan 2.2 14B is the only one a finished
+  run has been through here**, and the card says so on the others. Measured on
+  that run: 24 GB was full, at 170-185 s per step, with the CPU offload that makes
+  24 GB possible at all. Only three bases are stated by anything installed
+  locally, so **five of the eight need you to name a base repository** — both
+  I2V Wan variants, Wan 2.2 TI2V-5B, and both LTX-2 versions. (Upstream also
   offers a rented-pod cloud lane for this; this fork trains locally only — see
   Divergence 4 in FORK_NOTES.md.)
 - **MiniMax H3 needs about 43 GB of weights, and will say so rather than fetch
@@ -768,7 +771,7 @@ Nothing here locks your data in — every stage has an exit.
 | Stage | ai-toolkit alone | LoRA Dataset Studio |
 |---|---|---|
 | Build from references | ❌ bring your own images | ✅ Klein and Krea 2 Edit through ComfyUI, subject-aware catalogs including Anime, reference edits and exact retries |
-| Build from the web | ❌ none | ✅ Reddit, Pexels, keyword search across the open web, and gallery/direct-media URL scans (~300 sites via gallery-dl) into a dataset or Image Bank, with deduplication and explicit provider warnings |
+| Build from the web | ❌ none | ✅ Reddit, Pexels, keyword search across the open web, and gallery/direct-media URL scans (through gallery-dl, which covers several hundred sites) into a dataset or Image Bank, with deduplication and explicit provider warnings |
 | Triage a large dump | ❌ none | ✅ Image Bank scans, scores, search, filters, sorts, balanced/diverse shortlists, watermark masks and dataset round trips |
 | Curate and repair | ❌ external file tools | ✅ keep/reject, crop/mirror/rotate, InsightFace scoring, composition guidance, improve/compare and recoverable originals |
 | Captions | ❌ write or prepare them yourself | ✅ JoyCaption/Ollama, kind/family rules, Caption Lab, external `.txt` round trip and dual-caption support |
@@ -782,7 +785,7 @@ Nothing here locks your data in — every stage has an exit.
 
 ## Feature matrix by backend
 
-Missing dependencies are shown in Setup/Settings and gated features stay unavailable until their requirements are satisfied.
+Missing dependencies are shown in Setup/Settings and gated features stay unavailable until their requirements are satisfied. Setup's closing screen lists the installable capabilities — including bank scoring, the optional SigLIP 2 engine, the watermark detector and the scraping extras — and each row that is not ready leads to the step that installs it. The SeedVR2 upscaler is the exception: it installs from its own Setup ▸ ComfyUI card and is not counted on that screen.
 
 | Feature | Requires |
 |---|---|
@@ -797,7 +800,11 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Image Bank scoring, crops and semantic tools | The Bank scoring extra provides CLIP and ✨ Score. Each Bank can instead select the optional pinned SigLIP 2 engine from Setup; it builds a separate index, while aesthetic/NSFW/style/medium remain on CLIP. Balanced picks also need Framing. Both ship **CPU-only PyTorch** on purpose; on a machine that already has a CUDA Python (ai-toolkit's, ComfyUI's) each can be pointed at it instead — checked package by package, never installed into, and separately for ✨ Score and for SigLIP 2. |
 | Watermark detection | Ollama with a vision model, **or** the dedicated detector (torch + transformers — the bank-scoring extra's environment is reused when present — plus ~0.9 GB of model downloads at first use) |
 | Watermark inpainting | LaMa extra from `backend/requirements-ml.txt`, or ComfyUI + Klein for the refine lane; crop remains model-free |
-| Scraping | `backend/requirements-scrape.txt`; Pexels also needs `PEXELS_API_KEY` and explicit authorization. Gallery/URL scanning goes through gallery-dl for any site it recognizes (~300); an unrecognized site returns "No images found" in the picker (the single item gallery-dl's yt-dlp fallback can still fetch is video-typed, so it never reaches the image list), and a listing of albums returns one cover per album unless **Scan full albums** is ticked. Web image search needs no key — it queries multiple search backends, but only one of them honors the "photo" type filter, so some non-photo results can still come through; results are capped per search rather than guaranteed (e.g. asking for 120 has returned 35), come from third-party sites whose licence is your responsibility, and a few links — mainly stock-photo CDNs that redirect to the actual file — are refused by the hardened fetch that protects every import |
+| Scraping | `backend/requirements-scrape.txt`; Pexels also needs `PEXELS_API_KEY` and explicit authorization. Gallery/URL scanning goes through gallery-dl for any site it recognizes, whatever its bundled extractors cover; an unrecognized site returns "No images found" in the picker (the single item gallery-dl's yt-dlp fallback can still fetch is video-typed, so it never reaches the image list), and a listing of albums returns one cover per album unless **Scan full albums** is ticked. A scan that was cut short — by the time budget, a result cap, or a source that blocked or rate-limited it — now says so under the results ("this scan stopped before the end of the listing"), instead of presenting a partial list as the whole thing. Web image search needs no key — it queries a metasearch layer over several backends and asks for photos, but the filter is not honored uniformly, so some non-photo results can still come through; results are capped per search rather than guaranteed — a request for the 120 maximum routinely comes back with far fewer — come from third-party sites whose licence is your responsibility, and a few links — mainly stock-photo CDNs that redirect to the actual file — are refused by the hardened fetch that protects every import |
+| Video Bank — reading and triaging | `backend/requirements-ml.txt` (PyAV). Shot detection additionally needs `transnetv2-pytorch` (weights bundled, nothing to download), which rides the bank-scoring environment because it pulls torch. The three pieces install and fail **apart**, and Setup reports them as three separate rows |
+| Video Bank — cutting clips into a dataset | An ffmpeg binary: `imageio-ffmpeg` ships one, or any ffmpeg on PATH. Needed **only to promote** — without it you can still scan, detect shots, watch and triage a whole bank |
+| Video Bank — shot captions and scene search | The Bank scoring extra's environment (torch + `transformers` ≥ 4.57) plus a Qwen3-VL checkpoint downloaded at first use; the model is a setting, and the same environment serves ✨ Score, SigLIP 2 and the watermark detector |
+| Civitai scanning | `backend/requirements-scrape.txt`; without `CIVITAI_API_KEY` the scan runs but returns SFW results only |
 | Local LoRA training: Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein / Anima | ai-toolkit; no ComfyUI is needed for official Hugging Face bases. Krea 2 can start from any Krea 2 checkpoint already on your disk instead — including one a full-model run delivered — discovered through ComfyUI's model tree; an ordinary fp8 build trains (the trainer up-casts it, and the app says with numbers how much precision that cast dropped), while a packed ComfyUI export is refused because it carries decompression tables a trainer cannot load |
 | Local SDXL training | ai-toolkit + a base checkpoint discoverable in ComfyUI's model tree |
 | Cloud / rented-GPU training | **Not available in this fork.** Training always runs on this machine's own GPU; the Devices lane covers generation and analysis passes, not training |
@@ -857,6 +864,8 @@ Ollama on the machine — it cannot tell whose); it leaves ComfyUI alone. After
 Settings ▸ Restart, Ctrl+C still works — the relaunch stays in the same
 console.
 
+A ZIP install updates from inside the app too: **Update & restart** downloads the next **release** and swaps it in, keeping `data/`, `config.json`, `.env`, `.venv` and `.python` untouched. A git checkout follows every commit instead — and needs `git` on your PATH, which an install made through a desktop Git client does not always provide.
+
 From a git checkout, the same launcher works and **Update & restart** can pull fixes directly:
 
 ```bash
@@ -888,7 +897,7 @@ npm run build
 
 ### Option 3 — Docker + your existing ComfyUI
 
-**Beginner Windows flow:** download/extract the GitHub ZIP, start Docker Desktop, then double-click **`start-docker.bat`**. On the first run, select either the ComfyUI folder containing `main.py` and `models`, or its portable parent containing `ComfyUI\main.py`. LDS validates the folder and remembers it for this checkout.
+**Beginner Windows flow:** download/extract the **source** ZIP (GitHub ▸ **Code → Download ZIP**) — the release asset `LoRA-Dataset-Studio-windows.zip` does not carry the Docker launchers — start Docker Desktop, then double-click **`start-docker.bat`**. On the first run, select either the ComfyUI folder containing `main.py` and `models`, or its portable parent containing `ComfyUI\main.py`. LDS validates the folder and remembers it for this checkout.
 
 Start your usual ComfyUI on the host. LDS uses `http://host.docker.internal:8188` from its container and mounts the selected folder at `/external-comfyui`. If the folder later moves, double-click **`configure-docker.bat`**. The launcher chooses a free Studio port and opens the browser automatically. Local training still needs ai-toolkit on the host — this fork has no cloud fallback.
 
@@ -927,6 +936,8 @@ existing-ComfyUI adoption, UID/GID, DNS, update commands, resource caps and
 operational limits are documented in the dedicated
 [Docker guide](docs/guide/docker.md).
 
+To update any Docker install, double-click **`update-docker.bat`** (latest stable release; pass `main` for the preview channel) — it rebuilds transactionally and rolls back if the container does not come up healthy. Both `start-docker.bat` and `start-docker-gpu.bat` also accept `--rebuild` and `--update-rebuild`; `start-docker.bat` additionally accepts `--configure`, which is what `configure-docker.bat` calls.
+
 ### Option 5 — Pinokio (one click, any OS)
 
 In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/socrasteeze/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
@@ -957,17 +968,19 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 
 | Mode / capability | GPU (NVIDIA) | Disk | Notes |
 |---|---|---|---|
-| **Curation-only** (import/scrape, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10–3.12; Docker image available |
+| **Curation-only** (import/scrape, curate, caption manually, export/backup) | none | ~2 GB | Any machine with Python 3.10+ (3.13/3.14 run the core app fine — the 3.10–3.12 window is an ML-extras constraint); Docker image available |
 | **Auto-captioning & framing** (Ollama vision, 8B model) | ~8 GB VRAM | ~7 GB | Runs alongside generation, not concurrently |
 | **Local generation** (Klein 9B **KV** fp8 via ComfyUI) | ~16 GB VRAM | ~30 GB (model + text encoder + VAE) | Free, local and NSFW-capable; Setup downloads the models. The KV build is up to **2.5× faster on multi-reference edits** at the same quality. Available in Docker GPU mode |
 | **LoRA training — Z-Image / SDXL** (ai-toolkit) | 16 GB+ recommended | 10 GB+ free enforced per run | Quantized (qfloat8) + low-VRAM mode |
 | **LoRA training — Krea 2** (ai-toolkit) | **24 GB VRAM** at 1024 px (enforced warning) | ~24 GB base download (Raw), or none if you start from a Krea 2 checkpoint you already have, + 10 GB+ free | Under 24 GB, select **Resolution → 768 only** in Advanced options |
 | **LoRA training — FLUX.2 Klein** (ai-toolkit) | 4B: **16–24 GB VRAM** · 9B: **32–48 GB** | base download + 10 GB+ free | Both bases are gated on Hugging Face; 9B needs a card most desktops don't have |
+| **LoRA training — FLUX.1 / Anima** (ai-toolkit) | ~24 GB VRAM (both are 12B-class families) | base download + 10 GB+ free | **Local only — neither has a cloud lane.** FLUX.1 is gated on Hugging Face; Anima's base is public and reads booru tags natively |
 | **Face scoring / person masks / watermark inpaint** (ML extras) | none (CPU) | ~3 GB (+ CPU torch for LaMa) | Python **3.10–3.12 required** for wheels; installable per capability from Setup |
 
-- **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux/macOS work for curation-only + manual venv.
+- **OS**: Windows 10/11 for the full local stack (`start.bat`). Linux/macOS work for curation-only + manual venv; GPU Docker depends on host NVIDIA support.
 - **Python**: 3.10–3.12 — but not required up front: `start.bat` fetches a self-contained CPython 3.12 if your machine has none. 3.13+ (already installed) runs the core app but can't install the ML extras.
-- **RAM**: 16 GB+ recommended when training locally.
+- **RAM**: 16 GB+ recommended when training locally. Unlike VRAM and free disk, this one is a recommendation the app never measures — a run that dies for want of system memory has no guard-rail in front of it.
+- **Dataset size**: a launch is gated on a per-family floor — 12 images for Z-Image, 15 for Krea 2 / FLUX.1 / FLUX.2 Klein, 20 for SDXL, 4 for a slider LoRA — with 20-30 recommended. Below the floor the app asks you to confirm and warns about overfitting rather than refusing outright.
 - Reference rig used for development: RTX 4090 (24 GB) — every number above was measured or enforced there.
 
 ## Configuration & network access
@@ -983,11 +996,17 @@ The short version:
 
 ## Exposing the app beyond localhost
 
-The simplest path is the UI. **Settings → Server & access** has an *Available on the local network* toggle (flips the bind between `127.0.0.1` and `0.0.0.0`), an optional *Require an access token* switch (off by default — a home LAN is trusted), and an **Open it on your phone** card that shows a scannable **QR code** plus copyable URLs built from this machine's real LAN IP (and Tailscale IP, if present) — no guessing which address to type. Changing the port or the LAN toggle needs a restart; the card does it in one click.
+The simplest path is the UI. **Settings → Server & access** has an *Available on the local network* toggle (flips the bind between `127.0.0.1` and `0.0.0.0`), an optional *Require an access token* switch (off by default — a home LAN is trusted), and an **Open it on your phone** card that shows a scannable **QR code** plus copyable URLs built from this machine's real LAN IP (and Tailscale IP, if present) — no guessing which address to type. Changing the port or the LAN toggle needs a restart; the card does it in one click. Before enabling LAN access or publishing a port, read [SECURITY.md](SECURITY.md#the-default-threat-model) and configure the access-token/VPN/reverse-proxy boundary that fits your network.
 
 To **rent another PC’s GPU** while keeping datasets on one machine, use **Settings → Devices**. The simplest path is a **remote ComfyUI backend**: start ComfyUI on the other box with `--listen`, paste its URL, done — no second app install. This machine uploads inputs and downloads results over ComfyUI’s own API; backends render in parallel and are not paused by a local training. The trade is visible where you make it: **ComfyUI’s API has no authentication**, so backends belong on networks you trust (Tailscale, home LAN) — never a port forwarded to the internet. When you want a credential you can revoke, use the heavier path instead: install the app on the second box as a **compute peer** and join with a one-time token. The difference is what each can DO, not just how it authenticates: a backend renders images, and that is all — the bank's passes are refused with a reason. A **peer** additionally runs ✨ Score, 👥 Faces, 📐 Framing, 🚩 Watermarks and 🏷️ Captions on its own GPU and models — captions with whichever captioner that machine has (JoyCaption or Ollama), chosen there rather than here. A bank's scan, auto-reject and duplicate steps always run on the Primary: they read the database rather than the GPU, so sending them would be slower. Remote training exists at the API level but no screen drives it, and it returns loose checkpoint files rather than a run you can see on the Training page. Each job’s models must exist on the box that runs it, and a peer executes work its Primary sends — join only a Primary you control.
 
-Under the hood: the app has **no user accounts**, so on `127.0.0.1` (the default) that's fine, but any other bind would hand the whole network your API keys, GPU and datasets. On a non-loopback bind you can require an **access token**: with the token gate on, `run.py` generates one at boot (printed to the console with a ready-to-open URL) unless you set `LDS_ACCESS_TOKEN` yourself. Open `http://<machine>:<port>/?token=<token>` once from the remote device — a signed session cookie takes over from there. Requests from localhost never need the token. If your network is already locked down (VPN, authenticated reverse proxy), `LDS_ALLOW_UNAUTHENTICATED=1` disables the guard explicitly.
+Under the hood: the app has **no user accounts**, so on `127.0.0.1` (the default) that's fine, but any other bind would hand the whole network your GPU and datasets. On a non-loopback bind you can require an **access token**: with the token gate on, `run.py` generates one at boot (printed to the console with a ready-to-open URL) unless you set `LDS_ACCESS_TOKEN` yourself. Open `http://<machine>:<port>/?token=<token>` once from the remote device — a signed session cookie takes over from there. Requests from localhost never need the token. If your network is already locked down (VPN, authenticated reverse proxy), `LDS_ALLOW_UNAUTHENTICATED=1` disables the guard explicitly. The whole interface also works on a phone or tablet on your own network, so checking a run or triaging a bank does not need the machine that is training.
+
+**What leaves this machine.** There is no telemetry and no analytics: nothing about you, your images or your datasets is sent anywhere. The app does reach the internet in three situations:
+
+- **Update check** — on load and once an hour, it asks GitHub whether a newer version exists (a `git fetch` on a checkout, the releases API on a packaged install). It sends nothing about you, and there is currently **no setting to turn it off** — block the process at the firewall if you need it silent.
+- **Model downloads you start** — Setup and the Install buttons stream weights from Hugging Face, Civitai, Ollama and pytorch.org. Two extras also fetch their own weights the first time you use them: the aesthetic head (~13 MB, from GitHub) and the NSFW classifier plus SigLIP 2 (Hugging Face).
+- **The built-in scraper** — the sites you ask it to scan, and nothing else.
 
 ## Known limitations
 
