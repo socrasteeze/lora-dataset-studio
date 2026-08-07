@@ -1,7 +1,6 @@
 # Train on another machine
 
 **Date:** 2026-08-04
-**Branch:** `claude/hub-peer-architecture-review-0ud684`
 **Status:** implemented; **not yet exercised on two real machines** (see
 [Verification debt](#verification-debt)).
 

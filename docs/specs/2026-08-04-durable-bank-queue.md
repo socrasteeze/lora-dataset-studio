@@ -1,7 +1,6 @@
 # The Launch-all queue survives a restart
 
 **Date:** 2026-08-04
-**Branch:** `claude/hub-peer-architecture-review-0ud684`
 **Status:** implemented, tested.
 
 ## What was wrong

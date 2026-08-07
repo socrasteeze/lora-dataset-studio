@@ -1,7 +1,6 @@
 # Remote GPU workers (Primary + peer)
 
 **Date:** 2026-07-29  
-**Branch:** `cursor/remote-gpu-workers`  
 **Status:** implemented (foundation, comfy/vision/infer kinds, docs/UI). The
 `training` kind was removed on 2026-08-04 — see the job-kinds table below.
 
