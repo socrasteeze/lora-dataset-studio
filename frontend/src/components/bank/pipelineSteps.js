@@ -36,9 +36,16 @@ export const STEP_COPY = {
     label: '✨ Score', needs: 'Bank scoring extra',
     desc: 'Aesthetic 1–10, NSFW, style groups (GPU).',
   },
+  // Only present in the step list when the bank's semantic engine is SigLIP 2
+  // (backend _SIGLIP2_PIPELINE_STEPS). The server decides that; this file only
+  // has to know the words, which is the whole point of one registry.
+  semantic_index: {
+    label: '🧠 Build SigLIP 2 semantic index', needs: 'SigLIP 2 Quality tool',
+    desc: 'Build or resume the whole-bank SigLIP 2 cache the semantic features read. Existing CLIP data is kept.',
+  },
   semantic_dedup: {
-    label: '✂ Find crops & variants', needs: 'Bank scoring extra',
-    desc: 'Group crops/variants of the same shot from Score’s embeddings — no extra GPU (needs Score first).',
+    label: '✂ Find crops & variants', needs: 'Semantic index',
+    desc: 'Group crops/variants of the same shot from the bank’s semantic index — no extra GPU (needs that index first).',
   },
   watermark: {
     label: '🚩 Find watermarks', needs: 'Vision model',

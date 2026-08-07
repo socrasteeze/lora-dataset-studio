@@ -117,11 +117,13 @@ test('Krea is a counted capability, never quietly dropped from the total', () =>
   assert.ok(krea, 'Krea must appear in the capability summary');
   assert.equal(krea.ok, false);
   assert.equal(!!krea.pending, false, 'a real disk gap is not a "waiting" state');
-  // It counts against the total instead of disappearing from it. 10, not
-  // upstream's 12: the three cloud API engines are not capabilities on this
+  // It counts against the total instead of disappearing from it. 17, not
+  // upstream's 19: the three cloud API engines are not capabilities on this
   // fork (Divergence 1) — see capability-destinations-contract.test.mjs. The
-  // WD14 tagger joined the list for the same reason this test exists.
-  assert.equal(rows.length, 10);
+  // WD14 tagger joined the list for the same reason this test exists, and the
+  // video/SigLIP2/watermark-detector/scraping rows joined with this sync.
+  // Run deriveCapabilitySummary with this fixture and count — never copy.
+  assert.equal(rows.length, 17);
   assert.ok(rows.filter((r) => r.ok).length < rows.length);
 });
 

@@ -17,7 +17,7 @@ import {
 } from './lightboxActionPlacement';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { displayLabel } from '../../utils/labels';
-import PexelsAttribution from './PexelsAttribution';
+import SourceAttribution from './SourceAttribution';
 
 const COMPARE_HELP = 'Show the original this image was made from, next to it, at the same scale.';
 
@@ -250,7 +250,7 @@ export default function DatasetLightbox({
           <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/80">
             {img.source === 'import' ? 'real' : 'generated'}{img.framing ? ` · ${img.framing}` : ''}
           </span>
-          <PexelsAttribution metadata={img.source_metadata}
+          <SourceAttribution metadata={img.source_metadata}
             className="text-[11px] text-white/70" />
           <span className="text-white/50 text-[11px]">
             {inCompare
@@ -282,9 +282,9 @@ export default function DatasetLightbox({
           </span>
         )}
         {onCrop && (
-          <button type="button" onClick={() => onCrop(img)}
+          <button type="button" onClick={() => onCrop(img)} disabled={busy}
             title="Open the crop editor for this image (stretchable box, any ratio)"
-            className="min-h-9 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold">
+            className="min-h-9 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             ✂ Crop
           </button>
         )}

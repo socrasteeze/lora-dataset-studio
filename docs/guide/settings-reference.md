@@ -482,7 +482,7 @@ with **no rescan**. (The two exceptions are noted below.)
 - **Aesthetic minimum** → `bank.aesthetic_min`. LAION aesthetic score (~1–10) under which an image is flagged **💔 low aesthetic** — the "keep the nice ones" cut. Default **`5`**. Only images the **✨ Score** pass reached carry a score; an unscored image is never flagged. The score also drives "keep best" on duplicate groups (the nicest-looking copy wins).
 - **NSFW maximum** → `bank.nsfw_max`. NSFW probability (0–1) over which an image is flagged **🔞 NSFW**, to split a mixed SFW/NSFW dump. Default **`0.5`**. Set by the **✨ Score** pass; a review flag, not a verdict.
 - **Same-style similarity** → `bank.style_threshold`. Cosine similarity on the CLIP image embeddings at or above which two images share a visual **🎨 style** (screenshots/memes cluster apart from photoreal) in the **✨ Score** pass. Default **`0.6`**. *Applies at the next scoring pass* — the embeddings are cached, so re-clustering at another threshold costs **no inference at all**: the pass does not even load the model. It is not instant, though, and the cost is the grouping itself, which compares every image with every other: **~8 s over 5 000 images, ~3 min over 23 000** (measured). Stopping the pass during that phase leaves the previous grouping in place rather than writing half of a new one — the ids are one numbering of the whole bank, so half of them would collide with the other half. **A measured limit, on a big single-subject bank:** the grouping is *transitive* (A groups with B and B with C puts A with C, even if A and C look nothing alike), so on a bank whose images are all of one person a chain of near-neighbours can merge everything into one group. Measured on a 25 058-image bank at the default `0.6`: **one group holding 25 056 of them** — and raising the threshold does not open a middle ground so much as move the cliff (0.8 → one group of 24 735; 0.9 → one of 15 066; 0.95 → the grouping shatters into 19 716 groups, 17 137 of them single images). The end-of-pass line now states the size of the biggest group against the total, so this is visible without opening the database. If your bank is varied, the default behaves; if it is one subject shot over and over, expect the 🎨 style chip to be close to useless whatever the threshold, and use ✂ **Find crops & variants** (a much tighter, per-pair comparison) for the grouping you probably wanted.
-- **Semantic duplicate similarity** → `bank.semantic_dup_threshold`. Cosine similarity on the *same* CLIP embeddings at or above which two scored images are grouped as a **✂ semantic near-duplicate** — a crop or re-compressed variant of the *same shot* that the perceptual-hash **≈ Duplicates** (stage 1) misses. Default **`0.96`** (much higher than the style threshold: a crop is far closer than merely "same style"). Needs the **✨ Score** pass first (it reuses those embeddings — no extra GPU work). *Re-running at another threshold re-sorts instantly* from the cached embeddings, no re-scan.
+- **Semantic duplicate similarity** → `bank.semantic_dup_threshold`. CLIP cosine similarity at or above which two images are grouped as a **✂ semantic near-duplicate** — a crop or re-compressed variant of the *same shot* that the perceptual-hash **≈ Duplicates** (stage 1) misses. Default **`0.96`**. With CLIP selected it needs **✨ Score** first. SigLIP 2 uses the separate conservative starting value `bank_semantic.siglip2_semantic_dup_threshold`; it deliberately does not inherit the CLIP cutoff, and should be reviewed/calibrated on your Banks. Re-running the grouping reuses the selected cache; no image inference.
 
 The **Score** pass (aesthetic · NSFW · style) needs the **Bank scoring** extra (Setup ▸ Quality tools); **Find watermarks** reuses the vision model from **Captioning**. Both are GPU passes, serialized against training and captioning, and detection-only — the bank never edits your source files.
 - **Which Python runs ✨ Score** → `bank_scoring.python`. **Auto-managed:** leave it empty and Setup ▸ Quality tools builds a dedicated environment and fills it in. It carries **CPU-only PyTorch** on purpose (a first install stays small instead of pulling ~2.5 GB of CUDA wheels on machines with no card), which costs roughly **336 ms per image** instead of ~15 ms on a GPU. On a machine that already has a working CUDA PyTorch — ai-toolkit's venv, ComfyUI's, a conda env — you can point Score at it instead: open a bank and click **⚡ Use a GPU Python I already have** under the CPU warning. The picker checks each candidate *package by package* (`torch`, `open_clip`, `transformers`, `timm`, `numpy`, `Pillow`) and **refuses** any interpreter that can't run the whole pass — CUDA alone is not enough, and a missing `open_clip` would only surface an hour into a run. Nothing is ever installed into an environment the app did not build: a missing package is named with the exact command, for you to run. A GPU interpreter is **not purely a speed setting**: a Score pass that really runs on the card takes it exclusively — ComfyUI is unloaded, a training run cannot start, and other GPU passes and queued banks answer *“GPU busy”* until it finishes. On the CPU-only default Score holds nothing. A borrowed interpreter that wedges (ComfyUI's own can stall on CUDA start-up while ComfyUI still holds the card) is stopped after **15 minutes of no output** so the GPU is released rather than left refusing everything. Reversible at any time (**Back to the app default**), and leaving it alone changes nothing — detection is an offer, never a prerequisite. The picker also accepts a path you type: an interpreter **or** the environment folder holding it (venv, conda/miniconda, uv, a portable bundle, the system Python, another disk), spaces and accents included. No torch or CUDA *version* is required — only that the modules import and `torch.cuda.is_available()` is true. On a machine with no NVIDIA card the picker says so and stops suggesting CUDA; it still lets you borrow an interpreter that already has the packages, to avoid installing them twice. The **Install / ↻ Reinstall** button in Setup ▸ Quality tools honours the same rule: while Score is pointed at a borrowed interpreter it installs nothing and prints the `pip install` command instead — clear the setting (**Back to the app default**) if you want the app to build and fill its own environment again. See *Using the app ▸ Make Score use a GPU Python you already have*.
@@ -710,10 +710,13 @@ on that drive.
 
 ### Moving a folder to another drive
 
-**Dataset images root** (`paths.dataset_images_root`) can be pointed anywhere.
-It defaults to **empty → a folder inside the app's data directory**; the
+Two roots can be pointed anywhere: **Dataset images root**
+(`paths.dataset_images_root`) and **Video datasets** (`paths.video_datasets_dir`).
+Both default to **empty → a folder inside the app's data directory**; the
 field's *Reset to default* gives that implicit state back rather than writing
-today's path in.
+today's path in. (Upstream also exposes **Cloud run staging** and a
+**Checkpoint store** for rented-pod training here — this fork trains locally
+only, so those two stay off this tab; see Divergence 4 in FORK_NOTES.md.)
 
 Type a path, press **Check folder**, and the app proves it can write there — by
 actually writing a probe file, because permission bits lie on Windows. A relative
@@ -730,12 +733,16 @@ refused with the reason. Then **you choose**, and nothing happens until you do:
   fits.
 
 The setting is saved **after** the files have moved, so an interrupted move never
-leaves the app pointing at a half-filled folder. This folder (and every dataset
-folder under it) is refused as an **image bank** source: a bank points at a live
-folder and can delete from it, so the two must never share files — see *Using
-the app → A bank and a dataset never share files*. Moving this root onto a
-folder an existing bank already uses is not blocked here, but that bank will say
-so the next time you open it, and its 🗑 Delete rejected will be refused.
+leaves the app pointing at a half-filled folder.
+
+- **Dataset images root** → `paths.dataset_images_root`. Where dataset images are stored. Default **empty → `<data dir>/datasets`**. This folder (and every dataset folder under it) is refused as an **image bank** source: a bank points at a live folder and can delete from it, so the two must never share files — see *Using the app → A bank and a dataset never share files*. Moving this root onto a folder an existing bank already uses is not blocked here, but that bank will say so the next time you open it, and its 🗑 Delete rejected will be refused.
+- **Video datasets** → `paths.video_datasets_dir`. The flat folders of `.mp4` clips (plus their homonym `.txt` captions) that a video bank produces when you promote a selection. Default **empty → `<data dir>/video_datasets`**. **This is where the video lane actually uses disk.** A video bank itself stores almost nothing — only timestamps and one small thumbnail per detected shot — because cutting a clip means re-encoding it, and that is paid once, at promotion, for the clips you kept.
+- **Video banks (working data)** → no path setting; it follows the data directory. Holds the shot thumbnails only: never your source videos, which a bank references in place and never writes to, and never the clips, which do not exist until you promote them.
+
+*(Upstream additionally documents a **Cloud run staging** root, a **Checkpoint
+store** and "Cloud run housekeeping" for rented-pod training runs. This fork
+trains locally only — see Divergence 4 in FORK_NOTES.md — so none of that
+applies here.)*
 
 ### Trash and archives
 
@@ -887,6 +894,44 @@ These have no UI control — they're for advanced users editing `config.json` by
 
 *(The four ComfyUI folder overrides used to live here. They are now editable in **Settings → Local tools → ComfyUI → Advanced: ComfyUI folder overrides** — see that section above. Values set by hand in `config.json` are unaffected: the same keys, read the same way, now simply shown in the app.)*
 
+*(Upstream also documents a router-model config key here for its ChatGPT
+subscription lane — Divergence 1: this fork carries no cloud image engines, so
+that key does not exist here.)*
+
+**Shot detection (video bank):** the boundary detector that cuts a long source into
+individual shots. No UI control yet — the defaults are the reference
+implementation's, and neither of the two numbers below has been measured against
+this app's material, so they are stated as adjustable rather than tuned.
+
+| Key | Default | Role |
+|---|---|---|
+| `shot_detect.python` | `''` | Interpreter that runs the detector. Empty means **reuse the Bank scoring environment**, which already carries torch — a second copy would cost you ~2.5 GB for nothing. Written by the installer; you rarely set it by hand. |
+| `shot_detect.threshold` | `0.5` | Cut probability at or above which a frame is treated as a shot boundary. Lower it to cut more finely on soft transitions; raise it if dissolves are being split into fragments. |
+| `shot_detect.min_shot_frames` | `5` | Shots shorter than this are **dropped, not merged** into a neighbour. Merging would silently move that neighbour's boundary, and a boundary is the one thing this whole lane exists to get right. 5 rejects a stray flash cut while leaving real rapid montages intact. |
+| `shot_detect.device` | `auto` | `auto` \| `cuda` \| `cpu`. The network runs on 48×27 frames and is never the bottleneck — decoding is. CPU is a perfectly reasonable choice, and it leaves the GPU free for captioning and training. |
+
+**Video bank quality cuts:** the thresholds behind the video bank's amber flags.
+The cuts that describe your *footage* default to **empty = no cut** — that is a
+decision, not an omission: published thresholds measurably do not transfer between
+collections, so the app never ships one. `watermark_max` is the exception and the
+reason is worth knowing: it does not measure your footage, it reads a *classifier's*
+probability, which is calibrated with the model rather than with your material — so
+the image lane's measurement transfers where a motion floor does not. Set them from
+**Video bank → 🎚 Quality cuts**, where **Preview** shows how many shots each value
+would flag before you apply it. Raw scores stay stored, so changing any of these
+re-sorts every bank instantly, without rescanning.
+
+| Key | Default | Role |
+|---|---|---|
+| `video_bank.min_duration_s` | *(empty)* | Flags shots shorter than this, in seconds (`brief`). The only cut here that needs no measuring pass — it reads the shot bounds, so it works straight after detection. Not the same thing as the promotion's `too short` refusal, which is your target profile's own arithmetic and no setting moves it; this one only decides what gets flagged for your eyes. |
+| `video_bank.motion_floor` | *(empty)* | Flags shots whose average motion falls below this (`still`). |
+| `video_bank.motion_ceiling` | *(empty)* | Flags shots whose busiest moments exceed this (`agitated`). |
+| `video_bank.luma_floor` | *(empty)* | Flags shots whose darkest frame falls below this brightness (`black`). |
+| `video_bank.freeze_max` | *(empty)* | Flags shots where more than this share of frames do not move (`freeze`). |
+| `video_bank.sharpness_floor` | *(empty)* | Flags shots whose sharpest stretch stays below this (`soft`). |
+| `video_bank.watermark_max` | `0.94` | Flags shots whose watermark score exceeds this (`watermark`), after the **🔖 Watermarks** pass has scored them. This model's scores are compressed hard against 1, so 0.94 is the measured cut and not the 0.5 a probability normally implies — on a 110-image hand-labelled sample it flagged none of the 55 clean images and still caught 54 of the 55 marked ones. Lower it toward 0.92 to catch the faintest marks and hand-check a few clean shots. A shot the pass has not judged carries no score and is **never** flagged — that is "not evaluated", not "clean". Set it to empty to flag nothing. |
+| `video_bank.duplicate_threshold` | `0.96` | Cosine similarity at or above which two shots are grouped as near-duplicates by the **✂ Duplicates** pass, comparing them at their closest pair of embedded frames. Not a read-time cut like the rows above: changing it means re-running that pass — which is instant and costs no GPU, since it re-reads the frame vectors **🔎 Find scenes** already cached. **Where the number comes from:** it is inherited from the image bank's `bank.semantic_dup_threshold`, measured over the *same* CLIP space, and no video-pair calibration exists yet. Comparing shots at their closest frame pair also reaches any given value more easily than a single-image comparison does, so **raise** it if your bank over-groups. |
+
 **Imported shot catalogs** — written by the workspace, not meant to be hand-edited (see *Using the app → Your own shot catalog*), but this is where they live so you know what to back up:
 
 | Key | Default | Role |
@@ -925,7 +970,11 @@ These have no UI control — they're for advanced users editing `config.json` by
 | `wd14.python` | `''` | Interpreter for the 🔖 WD14 tagger subprocess. Empty = reuse `masks.python`, then the current interpreter — the tagger needs only `onnxruntime`, which any environment carrying rembg or InsightFace already has. |
 | `wd14.models_root` | `''` | Where the WD14 model files (`model.onnx` + `selected_tags.csv`, ~400 MB) are stored. Empty = `data/models/wd14`. |
 | `wd14.threshold` | `0.35` | Confidence at or above which a tag is kept when the 🔖 Tags pass runs (clamped to 0.05–0.95). The **full** scored output is stored regardless, so this only decides what a pass writes — it does not have to be right first time. |
-| `bank_scoring.text_search_idle_minutes` | How long the 🔤 **Find by text** encoder stays warm after its last query (default `10`, capped at `120`). Loading CLIP costs ~10 s on the CPU; encoding a phrase afterwards costs ~20 ms, so the worker is kept alive to make a refine-and-retry session instant. It holds roughly **2.4 GB of RAM** while it lives, and is released when you close the search panel or when the window elapses. Set to `0` to never keep it warm — every new phrase then pays the ~10 s load, which is the right trade on a memory-tight machine. Already-searched phrases are cached on disk and cost nothing either way. |
+| `bank_scoring.text_search_idle_minutes` | `10` | How long the 🔤 **Find by text** encoder stays warm after its last query (capped at `120`). Loading CLIP costs ~10 s on the CPU; encoding a phrase afterwards costs ~20 ms, so the worker is kept alive to make a refine-and-retry session instant. It holds roughly **2.4 GB of RAM** while it lives, and is released when you close the search panel or when the window elapses. Set to `0` to never keep it warm. Text caches are separated by engine/model key and already-searched phrases are cached on disk regardless. |
+| `bank_semantic.python` | `''` | Interpreter for SigLIP 2 image/text workers and capability probes. Setup installs SigLIP 2 into `data/envs/bank_scoring` and records that managed Python here without changing `bank_scoring.python` (so a borrowed GPU Score runtime stays selected and untouched). You can also point it at a CUDA interpreter you already have, from the Bank's **Semantic engine** panel (**GPU Python I already have**) - an EXECUTION choice only: Setup's Install/repair keeps targeting the managed environment and now preserves your pick instead of overwriting it. The check uses SigLIP 2's own dependency list (`torch`, a `transformers` carrying `Siglip2Model`, `numpy`, `Pillow`) - no `open_clip`, no `timm`. Empty keeps backward compatibility: use `bank_scoring.python`, then the app Python. |
+| `bank_semantic.models_root` | `''` | SigLIP 2 model cache (empty = `data/models/bank_semantic`). Setup downloads only the pinned files after an explicit click; inference is local-files-only. |
+| `bank_semantic.device` | `'auto'` | Device for the SigLIP 2 image index (`auto`, `cuda`, `cpu`). Resolved against `bank_semantic.python`: `auto` only reaches the GPU if THAT interpreter's torch sees a card, which is what the Semantic engine panel's device line reports. A GPU run uses the same exclusive window as other Bank ML work. |
+| `bank_semantic.siglip2_semantic_dup_threshold` | `0.97` | SigLIP 2 cosine threshold for **✂ Find crops & variants**. Separate from CLIP because the two spaces are not numerically interchangeable. |
 | `watermark.python` | `''` | Interpreter for the LaMa watermark subprocess. **Auto-managed:** leave it empty and the **Install inpainting** button builds a dedicated Python 3.10-3.12 environment for you (`simple-lama-inpainting` needs Pillow&lt;10, so it can't share the app's own Python) and fills this in automatically. Set it yourself only to point at an environment you already have — a manual value is always respected and never overwritten. |
 
 **Klein consistency LoRA:**
@@ -987,6 +1036,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `paths.dataset_images_root` | Where dataset images are stored. Empty string defaults to `<data dir>/datasets`. |
 | `paths.cloud_runs_dir` | Working area of cloud training runs (dataset copy, samples, logs). Empty string defaults to `<data dir>/cloud_runs`. |
 | `paths.checkpoints_dir` | Durable store for the checkpoints cloud runs produce. Empty string defaults to `<data dir>/checkpoints`. No cleanup ever removes a file from it. |
+| `paths.video_datasets_dir` | Where promoted video datasets are written — a flat folder of `.mp4` clips with homonym `.txt` captions per dataset. Empty string defaults to `<data dir>/video_datasets`. |
 | `dataset_import.max_side` | Longest side for opt-in WebP normalization (default `1024`; `0` = original size). It is ignored by the default `preserve` mode; ratio is always preserved, never enlarged, and normalized paths clamp at 8192 px. Every source must still be at most 16 Mi-pixels and 8192 px per side; a larger one is rejected and must be converted or resized before import. Not retroactive. Editable in Settings → Captioning & quality. |
 | `dataset_import.encoding` | How an un-cropped imported image is written: `preserve` (default; original JPG/JPEG, PNG, WebP or BMP bytes with the matching extension), or the opt-in WebP modes `standard` (q92), `high` (q100), and `lossless`. Auto head-crop is always a derived WebP. The 16 Mi-pixel / 8192 px-per-side input limit applies to every mode. Editable in Settings → Captioning & quality. |
 | `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |
@@ -1037,8 +1087,11 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `wd14.python` | Python interpreter that runs the 🔖 WD14 tagger (empty = reuse `masks.python`, then the current interpreter). |
 | `wd14.models_root` | Directory where the WD14 model files are stored/downloaded (empty = `data/models/wd14`). |
 | `wd14.threshold` | Confidence cut for the 🔖 Tags pass, 0.05–0.95 (default `0.35`). |
+| `video_caption.style` | Which PROMPT writes the captions: `standard` (default, the shipped wording) or `plain`. Measured to matter **more than the checkpoint**: asked the standard way, even an uncensored model describes *around* explicit footage, while the base model asked plainly named things precisely and wrote the best action description of the four combinations tried. `plain` adds explicit permission to state what is visible and what occurs, and forbids the two evasive words the test caught models hiding behind. It matters because a caption that talks around its subject teaches the trained model to look away, and the captions read perfectly well either way. Anything unknown falls back to `standard` — never to `plain`. Also pickable per run, next to the **🗣 Describe shots** button; every caption records the style that produced it. |
+| `video_caption.model` | Which model writes the 🗣 **Describe shots** captions (empty = the shipped default, `Qwen/Qwen3-VL-4B-Instruct`). Any checkpoint of the **same architecture** is a drop-in; a different architecture fails loudly at load rather than silently misbehaving. Worth changing when the default **talks around** what your footage shows — a caption that names things evasively teaches the trained model to do the same, and nothing in the output reveals it. Pointing this at a model the machine does not have is allowed and downloads it on the first run, but never in silence: the pass says so in its own progress line before captioning anything. Every caption records which model wrote it, so a bank captioned across a change stays readable. |
 | `quantize.python` | Python interpreter that runs the **fp8 conversion** and the **LoRA→base merge** (empty = the one ✨ Score uses, then ai-toolkit's, then the app's own). Both need `torch`, which this app deliberately does **not** install — it is gigabytes and nothing else here needs it — so they run in a subprocess, like the scoring and masking passes. One setting governs both on purpose: "the Python on this machine that has torch" is one fact, and saying it twice is how the two drift apart. The chosen interpreter is probed while the *plan* is drawn: one that lacks the packages disables the button with the reason and the `pip install` line, instead of failing after the click (or after a 26 GB download). `torch` is the only module either of them needs: both read and write the safetensors format themselves rather than memory-mapping it, so an environment with torch alone is enough. |
 | `bank_scoring.python` | Python interpreter that runs the ✨ Score pass (empty = the app's own). Auto-filled by Setup with a CPU-only environment; repointable at any CUDA interpreter already on the machine via the bank's **⚡ Use a GPU Python I already have** picker, which verifies every dependency first and never installs into an environment it did not create. |
+| `bank_semantic.python` | Python interpreter that runs SigLIP 2. New installs record the LDS-managed Bank environment here independently of Score; repointable at any CUDA interpreter already on the machine from the Bank's **Semantic engine** panel, verified against SigLIP 2's own (shorter) dependency list and never installed into. Empty falls back to `bank_scoring.python` for older configs, then the app's own interpreter. |
 | `watermark.python` | Python interpreter used to run the LaMa watermark-inpainting subprocess (empty = reuse `masks.python`, then the current interpreter). |
 | `watermark.device` | LaMa processing device: `auto` (CUDA when available, otherwise CPU), `cuda`, or `cpu`. |
 | `watermark.allow_crop` | When `true` (default), a border watermark is cropped off; when `false`, it is repainted instead. Also editable in the Clean bar. |

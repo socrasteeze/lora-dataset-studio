@@ -139,6 +139,28 @@ class ArchiveAwareRequest(Request):
     def max_content_length(self, value):
         self._forced_max_content_length = value
 
+    def _raise_if_declared_body_is_too_large(self):
+        """Apply the selected ceiling on Flask/Werkzeug versions before 2.3.
+
+        Older Werkzeug guarded multipart parsing but its raw ``get_data``
+        stream did not consult Flask's ``MAX_CONTENT_LENGTH`` at all.  Keep the
+        same endpoint-aware limit for both entry paths so an ordinary upload
+        cannot bypass its 64 MiB ceiling merely by using a non-form body.
+        """
+        limit = self.max_content_length
+        if (limit is not None and self.content_length is not None
+                and self.content_length > limit):
+            from werkzeug.exceptions import RequestEntityTooLarge
+            raise RequestEntityTooLarge()
+
+    def _load_form_data(self):
+        self._raise_if_declared_body_is_too_large()
+        return super()._load_form_data()
+
+    def get_data(self, *args, **kwargs):
+        self._raise_if_declared_body_is_too_large()
+        return super().get_data(*args, **kwargs)
+
 
 def _positive_env_int(name, default):
     """Read a positive integer without making a bad optional env var fatal."""
@@ -258,6 +280,7 @@ _SCHEMA_ADDITIONS = (
     # Versioned, byte-fingerprinted Bank analysis used by the durable Bank <-> Dataset
     # transfer path. Legacy Dataset rows simply have no snapshot to restore.
     ('face_dataset_image', 'bank_analysis_snapshot', 'TEXT'),
+    ('face_dataset_image', 'transfer_metadata', 'TEXT'),
     ('training_run_record', 'settings', 'TEXT'),
     # Full launch freeze: caption text, per-image content hashes, environment.
     # NULL on every run recorded before it existed — the compare panel says so.
@@ -268,6 +291,11 @@ _SCHEMA_ADDITIONS = (
     ('training_run_record', 'note', 'TEXT'),
     ('training_preset', 'dataset_kind', 'VARCHAR(16)'),
     ('training_preset', 'variants', 'TEXT'),
+    # Which table `cloud_training_run.dataset_id` points into. Deliberately
+    # NULLABLE with no server default: every historical run predates the column
+    # and must be READ as 'face_dataset' rather than rewritten by a migration —
+    # see services/cloud_run_dataset.table_of, the only reader of this value.
+    ('cloud_training_run', 'dataset_table', 'VARCHAR(32)'),
     ('lora_test_image', 'error', 'TEXT'),
     ('lora_test_image', 'resolution_multiplier', 'REAL'),
     # WHICH checkpoint produced this image, written at generation time instead of
@@ -295,6 +323,10 @@ _SCHEMA_ADDITIONS = (
     # rows remain NULL, just like they were before source attribution was added.
     ('bank_image', 'source_metadata', 'TEXT'),
     ('bank_image', 'semantic_dup_group', 'INTEGER'),
+    # The visible semantic_dup_group is a projection of the selected engine.
+    # These nullable lanes retain both partitions across engine switches.
+    ('bank_image', 'clip_semantic_dup_group', 'INTEGER'),
+    ('bank_image', 'siglip2_semantic_dup_group', 'INTEGER'),
     ('bank_image', 'framing', 'VARCHAR(8)'),
     # Bank watermark CLEANING (two manual levels) — the detected bbox is now kept
     # (the scan used to parse it and throw it away) and the cleaned blob's method
@@ -325,10 +357,16 @@ _SCHEMA_ADDITIONS = (
     ('bank_image', 'medium', 'VARCHAR(16)'),
     ('bank_image', 'medium_margin', 'REAL'),
     ('bank_image', 'face_yaw', 'REAL'),
+    # Exact-byte authority shared by every Bank analysis lane.  Existing rows
+    # stay NULL and enter the explicit legacy compatibility path until a pass
+    # re-attests them; inventing a backfill hash would falsely bless stale data.
+    ('bank_image', 'analysis_fingerprint', 'VARCHAR(64)'),
+    ('bank_image', 'watermark_fingerprint', 'VARCHAR(64)'),
     # ⬆ Promote's second destination: the bank a selection was copied into.
     # Additive and independent of promoted_dataset_id — a database that never
     # gains it simply never shows the "promoted to a bank" badge.
     ('bank_image', 'promoted_bank_id', 'INTEGER'),
+    ('bank_image', 'transfer_metadata', 'TEXT'),
     # Manual quarter-turn of a bank image (degrees clockwise, NULL = untouched).
     # Additive: a database that never gains it simply has no rotated images.
     ('bank_image', 'rotation', 'INTEGER'),
@@ -359,6 +397,9 @@ _SCHEMA_ADDITIONS = (
     # must NOT recurse when its live folder is re-walked (see refresh_bank).
     ('image_bank', 'root_only', 'BOOLEAN'),
     ('image_bank', 'keep_separate', 'BOOLEAN'),
+    # Per-Bank semantic engine. The non-null default makes every historical row
+    # byte-for-byte compatible with the CLIP behaviour it already had.
+    ('image_bank', 'semantic_engine', "VARCHAR(16) NOT NULL DEFAULT 'clip'"),
     # Cloud stop that cannot lie: the moment the user asked for a stop, kept in
     # the database so the supervisor can terminate a pod whose monitor thread
     # never honoured it. Additive — existing runs simply carry NULL.
@@ -379,6 +420,22 @@ _SCHEMA_ADDITIONS = (
     # that predates the column reads NULL too, which is why the guard that
     # consults it also requires the run to have never been seen live.
     ('peer_training_run', 'started_at', 'DATETIME'),
+    # 🎬 Video wave 2: the metrics scan's raw per-clip summary. Additive so a
+    # video bank cut by wave 1 keeps every clip and simply reads "not measured".
+    ('video_clip', 'metrics_json', 'TEXT'),
+    # 🎬 Video wave 3: whether this shot's frames were embedded for 🔎 Search.
+    # Additive so a bank cut and measured by the earlier waves keeps every clip
+    # and simply reads "not searchable yet" until the pass runs.
+    ('video_clip', 'embed_state', 'VARCHAR(12)'),
+    # 🎬 Video wave 5: the shot's caption and whether a human has touched it.
+    # Additive, so every bank cut by the earlier waves keeps its clips and simply
+    # reads "not captioned yet".
+    ('video_clip', 'caption', 'TEXT'),
+    ('video_clip', 'caption_state', 'VARCHAR(12)'),
+    # Which checkpoint wrote the caption. Additive: rows captioned before the
+    # model became configurable read NULL, which is honest — nobody recorded it.
+    ('video_clip', 'caption_model', 'VARCHAR(120)'),
+    ('video_clip', 'caption_style', 'VARCHAR(16)'),
 )
 
 # Indexes that only a FRESH database ever got. `index=True` on a model column is
@@ -411,6 +468,37 @@ def _apply_additive_migrations():
                 db.session.commit()
         except Exception:
             db.session.rollback()  # a failed ALTER must never block boot
+    # Before the engine selector there was only ``semantic_dup_group`` and its
+    # space was necessarily CLIP.  Copy that visible partition into the durable
+    # lane (or into SigLIP2 for Banks already switched by an intermediate build)
+    # so the first switch after this migration cannot erase existing work.  The
+    # NULL guard makes this safe and idempotent on every boot.
+    try:
+        db.session.execute(text("""
+            UPDATE bank_image
+               SET clip_semantic_dup_group = semantic_dup_group
+             WHERE clip_semantic_dup_group IS NULL
+               AND semantic_dup_group IS NOT NULL
+               AND bank_id IN (
+                   SELECT id FROM image_bank
+                    WHERE LOWER(TRIM(COALESCE(semantic_engine, 'clip')))
+                          != 'siglip2'
+               )
+        """))
+        db.session.execute(text("""
+            UPDATE bank_image
+               SET siglip2_semantic_dup_group = semantic_dup_group
+             WHERE siglip2_semantic_dup_group IS NULL
+               AND semantic_dup_group IS NOT NULL
+               AND bank_id IN (
+                   SELECT id FROM image_bank
+                    WHERE LOWER(TRIM(COALESCE(semantic_engine, 'clip')))
+                          = 'siglip2'
+               )
+        """))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()  # legacy backfill is best-effort, boot stays open
     # Same loop, same discipline: idempotent (IF NOT EXISTS), additive only, and
     # fail-open — a database that cannot take an index still boots, just slower.
     for table, col in _INDEX_ADDITIONS:

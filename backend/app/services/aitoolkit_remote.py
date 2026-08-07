@@ -33,7 +33,99 @@ _DOWNLOAD_CHUNK = 32 * 1024
 # than treating the first as fatal.
 _MAX_STALLED_ATTEMPTS = 3
 _UPLOAD_BATCH = 8
-_DATA_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.txt')
+# What upload_dataset ships to the pod. `.mp4` is here because a video dataset is
+# a flat folder of clips with homonym .txt captions, and without it the upload
+# succeeded while carrying ONLY the captions — the pod would then train on a
+# folder with zero samples, after the GPU had been rented. An image dataset folder
+# is written by the exporter and holds no video, so nothing else changes.
+_DATA_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.txt', '.mp4')
+_STREAM_BLOCK = 1024 * 1024
+
+
+class _StreamedPart:
+    """One multipart/form-data body, produced as it is sent instead of built.
+
+    THE SAME DEFECT AS c09dba7b AND d062606c, ON THE SENDING SIDE. `requests`
+    with ``files=`` hands the payload to urllib3's ``encode_multipart_formdata``,
+    which calls ``read()`` on every file object and concatenates the result: the
+    whole body exists in memory before the first byte leaves. That is fine for
+    an 85 MB LoRA and is an OOM for a 26 GB checkpoint — and it is why a full
+    model could not be sent to a pod at all. The remedy has the same shape it
+    had the other two times: seek to an offset and read one block at a time.
+
+    ``__len__`` is not decoration, it is the whole reason this works. requests'
+    ``prepare_body`` treats any non-mapping iterable as a stream and then asks
+    ``super_len`` for its size; a size means a real ``Content-Length`` header,
+    no size means ``Transfer-Encoding: chunked``. We want the former: the
+    receiving route is ai-toolkit's Next.js ``request.formData()``, and a body
+    whose length is declared up front is the shape it is known to accept.
+
+    Iterating twice would send a truncated body (the file handle has moved), so
+    a redirect or a retry that replays the body is a silent corruption waiting
+    to happen. ``__iter__`` therefore refuses a second pass rather than
+    producing a short one, and the caller retries by building a new instance.
+    """
+
+    def __init__(self, field_name, filename, path, fields=None,
+                 offset=0, length=None, boundary=None, on_block=None,
+                 should_cancel=None):
+        self.path = path
+        self.offset = int(offset or 0)
+        size = os.path.getsize(path)
+        remaining = max(0, size - self.offset)
+        self.length = remaining if length is None else min(int(length), remaining)
+        self.boundary = boundary or uuid.uuid4().hex
+        self.on_block = on_block
+        self.should_cancel = should_cancel
+        self._spent = False
+        crlf = b'\r\n'
+        dash = b'--' + self.boundary.encode('ascii')
+        head = []
+        for key, value in (fields or {}).items():
+            head += [dash, crlf,
+                     b'Content-Disposition: form-data; name="'
+                     + str(key).encode('utf-8') + b'"', crlf, crlf,
+                     str(value).encode('utf-8'), crlf]
+        head += [dash, crlf,
+                 b'Content-Disposition: form-data; name="'
+                 + str(field_name).encode('utf-8') + b'"; filename="'
+                 + str(filename).encode('utf-8') + b'"', crlf,
+                 b'Content-Type: application/octet-stream', crlf, crlf]
+        self._head = b''.join(head)
+        self._tail = crlf + dash + b'--' + crlf
+
+    @property
+    def content_type(self) -> str:
+        return f'multipart/form-data; boundary={self.boundary}'
+
+    def __len__(self) -> int:
+        return len(self._head) + self.length + len(self._tail)
+
+    def __iter__(self):
+        if self._spent:
+            raise RemoteError('a streamed upload body cannot be sent twice — '
+                              'build a new one for the retry')
+        self._spent = True
+        yield self._head
+        left = self.length
+        with open(self.path, 'rb') as fh:
+            fh.seek(self.offset)
+            while left > 0:
+                if self.should_cancel is not None and self.should_cancel():
+                    raise TransferCancelled('upload cancelled mid-body')
+                block = fh.read(min(_STREAM_BLOCK, left))
+                if not block:
+                    # The file shrank under us. Padding to Content-Length would
+                    # land a file that is the right SIZE and the wrong BYTES,
+                    # which auto-resume would then happily train from.
+                    raise RemoteError(
+                        f'{os.path.basename(self.path)} shrank while it was '
+                        f'being sent ({left} bytes short)')
+                left -= len(block)
+                yield block
+                if self.on_block:
+                    self.on_block(len(block))
+        yield self._tail
 
 
 class RemoteError(RuntimeError):

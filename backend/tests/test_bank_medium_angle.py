@@ -94,7 +94,17 @@ def _fake_embeddings(monkeypatch, bank, rows):
     e[0] = 1.0
     by_path = {os.path.normpath(os.path.join(os.path.realpath(bank.source_path),
                                              r.relpath)): e for r in rows}
+    fingerprints = {
+        path: banks.bank_transfer_metadata.content_fingerprint_path(path)
+        for path in by_path}
+    for row in rows:
+        path = os.path.normpath(os.path.join(
+            os.path.realpath(bank.source_path), row.relpath))
+        row.analysis_fingerprint = fingerprints[path]
+    db.session.commit()
     monkeypatch.setattr(banks, '_load_score_embeddings', lambda _b: by_path)
+    monkeypatch.setattr(
+        banks, '_score_embedding_fingerprint', fingerprints.get)
 
 
 def test_medium_pass_writes_a_verdict_only_for_scored_images(app, client, tmp_path,
@@ -281,12 +291,13 @@ def test_face_cache_without_yaws_loads_as_not_measured(tmp_path):
         bfracs=np.array([0.3], dtype='float32'),
         embs=np.zeros((1, 4), dtype='float32'))
     loaded = fei._load_cache(str(p))
-    # (state, det, bfrac, emb, sig, yaw) — sig is the fork's own addition
-    # ahead of yaw in the tuple, see face_embed_infer._load_cache.
-    yaw = loaded['x.png'][5]
+    # (state, det, bfrac, emb, yaw, sig, hash) — yaw ahead of sig, and a
+    # trailing content hash, per the upstream shape this merge adopted; see
+    # face_embed_infer._load_cache.
+    yaw = loaded['x.png'][4]
     assert yaw != yaw                      # NaN, i.e. "not measured"
 
     # And it round-trips once re-saved, so nobody pays for the migration twice.
     fei._save_cache(str(p), loaded)
     again = fei._load_cache(str(p))
-    assert again['x.png'][5] != again['x.png'][5]
+    assert again['x.png'][4] != again['x.png'][4]

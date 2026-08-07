@@ -4,6 +4,15 @@ import { stepGate } from './passDeviceGate.js'
 import { buildSteps, defaultChecked } from './pipelineSteps.js'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
 import { flagCandidateLabel, launchRejectNote } from './autoRejectReadiness.js'
+// NOTE: upstream also imports normalizeSemanticEngine / semanticEngineLabel /
+// pipelineStepKeys / defaultPipelineStepKeys here, to build the step list and
+// its default ticks in this component. This fork does not: the step list comes
+// from the SERVER (`caps.bank_pipeline_steps`, which already publishes the
+// SigLIP 2 order) through buildSteps/defaultChecked, and the gates come from
+// stepGate — one registry each instead of three lists in this file, which is
+// what stopped a new step arriving with a checkbox and no gate. The semantic
+// engine reaches the dialog as a server-ordered key, so nothing here has to
+// know its name.
 
 /** 🚀 Launch all — the overnight funnel. The user picks which passes run and how
  * auto-reject behaves, sees a plain "here's what will run" preview, and hits Go.

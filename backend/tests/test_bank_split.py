@@ -21,8 +21,14 @@ def _tree(src, layout):
         _save(str(src / rel))
 
 
-def _banks(client):
-    return {b['name']: b for b in client.get('/api/banks').get_json()['banks']}
+def _banks(client, rescan=False):
+    # GET /api/banks no longer walks every folder on a plain load (see its own
+    # docstring) — that cost was measured and moved behind ?rescan=1 and the
+    # per-bank open cooldown. A test asserting on a file dropped AFTER the
+    # bank was created must ask for the walk explicitly, or it is reading the
+    # last-known count, not the folder as it is now.
+    url = '/api/banks?rescan=1' if rescan else '/api/banks'
+    return {b['name']: b for b in client.get(url).get_json()['banks']}
 
 
 def test_split_preview_counts_subfolders_and_loose(client, tmp_path):
@@ -106,7 +112,7 @@ def test_loose_bank_never_absorbs_the_subfolder_banks_images(client, tmp_path):
     _save(str(src / 'loose2.jpg'))
     from app.services import image_bank_service as svc
     svc.reset_folder_sync()
-    assert _banks(client)[f'{prefix}(loose files)']['total'] == 2
+    assert _banks(client, rescan=True)[f'{prefix}(loose files)']['total'] == 2
 
 
 def test_subfolder_bank_still_picks_up_new_files(client, tmp_path):
@@ -118,7 +124,7 @@ def test_subfolder_bank_still_picks_up_new_files(client, tmp_path):
     _save(str(src / 'chatA' / '2.jpg'))
     from app.services import image_bank_service as svc
     svc.reset_folder_sync()
-    assert _banks(client)[f'{prefix}chatA']['total'] == 2
+    assert _banks(client, rescan=True)[f'{prefix}chatA']['total'] == 2
 
 
 def test_split_bad_folder_is_400(client, tmp_path):

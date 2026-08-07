@@ -64,12 +64,10 @@ export function promoteCount({ useSelection, selectedCount, promotable, size }) 
 
 /** The weight sentence, or null when there is nothing honest to say.
  *
- *  Only for the NEW BANK destination: that copy is byte-for-byte, so the
- *  measured size IS the disk cost. BOTH dataset doors re-encode to webp on the
- *  way in, so quoting the source weight there would be a number the user could
- *  check and find wrong — this deliberately stays silent for 'new-dataset' too,
- *  and a test pins that. The instinct when adding a destination is to teach
- *  every helper about it; here the correct change is none. */
+ *  Only for the NEW BANK destination: that copy has no de-duplication step, so
+ *  the measured size IS the disk cost. A dataset promotion preserves the bytes
+ *  too, but may skip near-duplicates; quoting the whole source weight there
+ *  would therefore overstate what is actually written. */
 export function weightNotice({ destination, size }) {
   if (destination !== 'bank') return null
   if (!size) return 'Measuring what that weighs on disk…'
@@ -85,8 +83,9 @@ export function promoteSummary({ destination, useSelection, selectedCount,
   const n = promoteCount({ useSelection, selectedCount, promotable, size })
   const many = n == null ? 'The kept image(s)' : `The ${n} image(s)`
   if (destination === 'bank') {
-    return `${many} will be COPIED into a brand-new bank, left un-triaged so you can `
-      + 'work on them apart. This bank keeps every one of them, marked as promoted.'
+    return `${many} will be COPIED into a brand-new bank with their analysis and `
+      + 'keep/pending/reject decisions intact, so you can continue working on them '
+      + 'apart. This bank keeps every one of them, marked as promoted.'
   }
   // ABOVE the no-target branch below on purpose: a dataset that does not exist
   // yet has nothing "already in" it and no target to choose, so falling through
@@ -98,15 +97,16 @@ export function promoteSummary({ destination, useSelection, selectedCount,
   }
   if (!useSelection && !datasetChosen) {
     return 'Kept image(s) not yet in the chosen dataset will be COPIED into it'
-      + ' — normalized to webp, near-duplicates already in the dataset skipped.'
+      + ' byte-for-byte so their Bank analysis can travel with them; near-duplicates'
+      + ' already in the dataset are skipped.'
       + ' The bank and its source folder are left as they are.'
   }
   const scoped = useSelection ? `The ${selectedCount} selected image(s)`
     : (n == null ? 'The kept image(s) not yet in this dataset'
       : `The ${n} kept image(s) not yet in this dataset`)
-  return `${scoped} will be COPIED into the dataset — normalized to webp,`
-    + ' near-duplicates already in the dataset skipped. The bank and its source'
-    + ' folder are left as they are.'
+  return `${scoped} will be COPIED into the dataset byte-for-byte so their Bank`
+    + ' analysis can travel with them; near-duplicates already in the dataset are'
+    + ' skipped. The bank and its source folder are left as they are.'
 }
 
 /** May the confirm button arm? An existing dataset needs a target, a new bank

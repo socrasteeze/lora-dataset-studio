@@ -88,7 +88,7 @@ def test_an_installed_faces_cache_is_readable_by_the_faces_script(
 
     assert set(got) == set(hub_images), \
         'the faces script could not read the cache the peer just sent'
-    state, det, bfrac, emb, sig, yaw = got[hub_images[0]]
+    state, det, bfrac, emb, yaw, sig, _digest = got[hub_images[0]]
     assert str(state) == 'scorable'
     assert (det, bfrac) == (pytest.approx(0.9), pytest.approx(0.3))
     assert sig == '', 'a legacy entry carries no signature and is never stale'
@@ -328,7 +328,8 @@ def test_the_face_cache_re_embeds_an_image_replaced_at_the_same_path(tmp_path):
     cache_file = tmp_path / 'face_cache.npz'
 
     cache = {str(img): ('scorable', 0.9, 0.3,
-                        np.ones(4, dtype='float32'), embed._file_sig(str(img)))}
+                        np.ones(4, dtype='float32'), float('nan'),
+                        embed._file_sig(str(img)), embed._file_hash(str(img)))}
     embed._save_cache(str(cache_file), cache)
     loaded = embed._load_cache(str(cache_file))
     assert not embed._is_stale(str(img), loaded[str(img)]), \
@@ -412,7 +413,7 @@ def test_a_remote_vision_pass_actually_returns_its_answers(app, hub_images,
             object(), PEER, items=[(i, p) for i, p in enumerate(hub_images)],
             prompt='x', detail_label='framing'))
 
-    assert [raw for _rid, raw, _err in got] == ['answer 0', 'answer 1', 'answer 2']
+    assert [raw['raw'] for _rid, raw, _err in got] == ['answer 0', 'answer 1', 'answer 2']
 
 
 def test_a_peer_answering_the_older_shape_still_works(app, hub_images,
@@ -427,7 +428,7 @@ def test_a_peer_answering_the_older_shape_still_works(app, hub_images,
             object(), PEER, items=[(0, hub_images[0])], prompt='x',
             detail_label='framing'))
 
-    assert [raw for _rid, raw, _err in got] == ['from an older peer']
+    assert [raw['raw'] for _rid, raw, _err in got] == ['from an older peer']
 
 
 def test_a_stopped_vision_pass_keeps_what_the_peer_answered(app, hub_images,
@@ -443,7 +444,8 @@ def test_a_stopped_vision_pass_keeps_what_the_peer_answered(app, hub_images,
             object(), PEER, items=[(i, p) for i, p in enumerate(hub_images)],
             prompt='x', detail_label='framing'))
 
-    assert [raw for _rid, raw, _err in got] == ['done before the stop', None, None]
+    assert [raw['raw'] if raw else raw for _rid, raw, _err in got] == [
+        'done before the stop', None, None]
 
 
 def test_a_stop_the_peer_never_answers_yields_nothing_and_does_not_hang(

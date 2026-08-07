@@ -192,7 +192,7 @@ def test_the_inpaint_gpu_gate_only_applies_when_it_renders_here(
         def count(self):
             return 3
 
-    monkeypatch.setattr(banks, '_clean_pool_query', lambda _b: _Pool())
+    monkeypatch.setattr(banks, '_clean_pool_query', lambda *a, **k: _Pool())
     monkeypatch.setattr(banks, '_watermark_inpaint_prereq', lambda *a, **k: None)
     monkeypatch.setattr(banks, '_gpu_busy_reason',
                         lambda: 'a vision/GPU pass is already running')

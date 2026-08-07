@@ -40,13 +40,18 @@ const RIGS = [
 test('every capability row carries a destination, in every rig', () => {
   for (const [name, caps] of RIGS) {
     const rows = deriveCapabilitySummary(caps)
-    // 10, not upstream's 12: the three cloud API engines are not capabilities on
-    // this fork (Divergence 1) - see deriveCapabilitySummary. Upstream's count
-    // moved 11 -> 12 when Krea 2 Edit joined the list; that fix is adopted here
-    // (an absent capability must be visible and counted, never dropped from the
-    // denominator), so the fork's own count moved 8 -> 9 in step, then 9 -> 10
-    // when the WD14 tagger joined it — for exactly the same reason.
-    assert.equal(rows.length, 10, `${name}: expected 10 capabilities`)
+    // 19 upstream, not 17: the three cloud API engines (Nano Banana, ChatGPT,
+    // OpenRouter) are not capabilities on this fork (Divergence 1) — see
+    // deriveCapabilitySummary. Upstream's own count moved 12 (Krea 2 Edit) ->
+    // 14 (the two video pieces) -> 18 (bank scoring/SigLIP2/watermark
+    // detector/scraping extras) -> 19 (clip encoding, counted apart from
+    // decode/detect because they fail apart — ffmpeg can be absent on a
+    // machine that decodes fine, and that machine cannot export a single
+    // clip). This fork's count follows every one of those bumps and adds its
+    // own WD14 tagger row, recomputed here from the array
+    // deriveCapabilitySummary actually returns rather than copied from either
+    // side's prose — 19 - 3 cloud + 1 WD14 = 17.
+    assert.equal(rows.length, 17, `${name}: expected 17 capabilities`)
     for (const row of rows) {
       const dest = capabilityDestination(row)
       assert.ok(dest, `${name}: "${row.label}" has no destination`)

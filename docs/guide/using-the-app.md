@@ -439,17 +439,21 @@ touching the folder itself:
    off **every** subfolder the app says so before you press the button — it will
    make the loose-files bank if there is one, and refuse outright if there is
    not, rather than quietly importing the whole parent folder instead. The folder
-   also stays LIVE:
-   keep dropping images into it and they are picked up automatically the next
-   time you open the bank list or the bank itself ("42 new image(s) found in the
-   folder"), as undecided images ready for the next scan — your existing
-   keep/reject decisions, scores and captions are never touched. Files you
-   removed from the folder are reported at the top of the bank, never deleted
-   from it, so an unplugged drive can't wipe your triage. One bank holds up to
-   **200,000 images**; past that the refresh adds as many as fit and tells you
-   how many it left out, so nothing you already triaged stops working. That
-   ceiling counts what is in the folder now — files you deleted from it don't
-   count against it.
+   stays LIVE: keep dropping images into it and they are picked up as undecided
+   images ready for the next scan — your existing keep/reject decisions, scores
+   and captions are never touched. The bank LIST does not re-check the folders by
+   itself any more: on a big library that was a full inventory of every image on
+   disk each time you walked past the page. It tells you how fresh its counts
+   are, and **🔄 Rescan folders** checks them all on demand ("42 new image(s)
+   found in the folder"). Opening one bank still walks that bank's own folder, so
+   its own count is always current the moment you look at it. A folder that went
+   missing (unplugged drive, renamed folder) is still flagged from the list
+   without any rescan. Files you removed from the folder are reported at the top
+   of the bank, never deleted from it, so an unplugged drive can't wipe your
+   triage. One bank holds up to **200,000 images**; past that the refresh adds as
+   many as fit and tells you how many it left out, so nothing you already
+   triaged stops working. That ceiling counts what is in the folder now — files
+   you deleted from it don't count against it.
 1bis. **🕸 Scrape the web into a bank** — you don't need a folder you prepared
    by hand. Unfold **🕸 Scrape the web into a bank** on the bank list, choose a
    destination (a **new bank**, or **add to an existing one**), then scan a
@@ -561,8 +565,9 @@ clicking again is all it takes. Your decision is never partially applied.
 
 **🎨 Curate down to the right subset.** Culling removes the bad shots; curation
 picks the *good* subset — and it's most of what makes a LoRA good. Once **✨
-Score** has run (it caches a CLIP embedding per image), the **Curate** row under
-the selection bar offers two selectors that cost no extra GPU time:
+Score** has run (the default CLIP semantic index), or the Bank's optional
+**SigLIP 2 semantic index** is ready, the **Curate** row under the selection bar
+offers two selectors that cost no extra inference:
 
 - **🎨 Pick diverse** — enter a number and it selects the images that best
   *cover the variety* of what you're looking at (varied angles, outfits, scenes),
@@ -615,12 +620,14 @@ hundred near-identical shots from two hundred different ones, and they say
 nothing about outfits, lighting or camera angle. Two things you may already have
 on disk can, so the panel also reads them when they exist:
 
-- **Visual spread**, from the CLIP embeddings the ✨ Score pass caches. It reports
+- **Visual spread**, from the Bank's selected semantic index. It reports
   the average similarity across the pool — *"91% average similarity — a set this
   repetitive teaches one look"*. The bands were calibrated by measuring real
   banks: an ordinary one sits near 65%, an image plus its nearest neighbours
-  lands around 79-90%. Without ✨ Score it says **Not measured** — never
-  "varied", because nothing looked.
+  lands around 79-90% with CLIP. SigLIP 2 has its own score distribution, so LDS
+  shows its measured similarity but deliberately gives it no *varied/alike* band
+  until that engine has been calibrated on real Banks. Without the selected index
+  it says **Not measured** — never "varied", because nothing looked.
 - **Caption variety**, from the captions the 🏷️ pass wrote, read by the same
   lexicon the dataset Coverage panel uses. It reports which camera views,
   lightings, settings, outfits and expressions your captions mention and which
@@ -816,6 +823,21 @@ inside ✨ Score with the default scope.
 
 A run with **nothing to do** is refused before it starts, with the reason and a
 suggestion — not launched and then reported as a success.
+
+**The two watermark cleaning levels take the same scope**, and they are the two
+where it matters most: ✂ **Auto-crop** and 🧽 **Repaint** are the only actions on
+this page that produce a new image file. Their windows list the same five lines,
+with one difference — their pool is not a pile but *the flagged images carrying a
+usable mark*, so a scope narrows that set and can never widen it. The count on
+each line is the pool the level **walks**; ✂ then crops only the marks that sit
+in a border band, which is the narrower number written on the button itself.
+Both windows state what is reversible before you start: your own files are never
+written to, the cleaned pixels live in the bank's own copy, and ↩ **Undo
+cleaning** deletes those copies and re-flags the images. Undo is bank-wide rather
+than per run, and two things are out of its reach — an image you already promoted
+(that copy was written into the dataset) and an image whose source file changed
+on disk since the clean.
+
 ## When a folder is already one person
 
 Scraped material usually arrives sorted: one folder per person. **👤 Group by
@@ -1123,13 +1145,67 @@ you how many there are and roughly how long it will take on your machine, and
 does nothing until you click. It re-runs the face detector on those images only,
 writes nothing but the angle, and leaves your person groups exactly as they are.
 
+## Set the bank filters from a sentence
+
+At the top of **Triage**, **🗣 Describe the set you want** takes a plain request —
+`an amateur photo set, least polished first` — and moves the bank's own controls:
+medium, quality flags, resolution tier, sort. The chip counters below then say,
+measured, how many images that lands on.
+
+The model never looks at your images and never chooses any. It reads the sentence
+and nothing else, so a wrong reading costs you one glance at chips you can edit,
+not a silent selection you would have to trust. Everything it proposes lands in the
+same filters a click would set, and clearing them is the same gesture as always.
+
+It answers over what your bank has actually measured. The real per-value counts go
+to the model with the request, so it cannot reach for a bucket that holds nothing.
+
+**It says when it cannot.** Asking for what is *in* the pictures — `women
+outdoors` — has nowhere to land while captions cover a small fraction of a bank
+and framing almost none of it. That part of the request comes back as *not
+expressible here* rather than as a filter that would return a few thousand
+convincing, unrelated images.
+
+**It will not turn an exclusion into a search.** The ranker returns *more* of a
+negated thing, not less (`a woman without a bikini` measured 60% bikinis against a
+10.1% baseline), so `without a watermark` is reported back to you instead of being
+quietly sent. To guarantee an absence, use the word-exclude box.
+
+## Choose CLIP or SigLIP 2 for Bank semantics
+
+Each Bank has its own **Semantic engine** choice in **① Analyze**:
+
+- **CLIP** is the compatible default. Its index is the embedding cache already
+  produced by **✨ Score**, so every existing Bank behaves exactly as before.
+- **SigLIP 2** is optional. Install the pinned model once in **Setup ▸ Quality
+  tools**, select it on the Bank, then explicitly build that Bank's semantic
+  index. Selecting it never starts a scan or downloads a model by itself.
+
+The selected engine powers **Find by text**, **Similar to selected**, **Pick
+diverse**, **Balanced pick**, visual spread/coverage and **Find crops &
+variants**. The calibrated aesthetic head, NSFW score, visual-style groups and
+**🎨 Medium** remain on CLIP regardless of this choice.
+
+CLIP and SigLIP 2 use separate, model-versioned caches and separate **same-shot
+group partitions**. Switching swaps the visible partition but keeps both, so
+returning to an engine restores its grouping instead of erasing completed work.
+Both partitions and their exact cache entries travel with the existing analysis
+snapshot on Bank → Dataset, Dataset → Bank and Bank → Bank copies; a changed
+image fails the fingerprint check and is re-indexed instead of receiving stale
+analysis.
+
+The SigLIP 2 index is resumable and stoppable like Score: completed entries are
+written atomically, and a later launch pays only for missing, failed or changed
+images. **Reindex SigLIP 2** rebuilds that cache only; it never touches Score.
+
 ## Find bank images by describing them
 
 Under **Curate**, **🔤 Find by text…** ranks images by how close they are to a
 phrase you type — `brunette outdoors, wide shot`, `red dress against a white
-wall`, `close-up, harsh flash`. It reuses the embeddings **✨ Score** already
-computed, so there is no extra model, no download and no GPU work; searching
-while a LoRA trains is fine.
+wall`, `close-up, harsh flash`. It reads the Bank's selected semantic index:
+the existing **✨ Score** cache for CLIP, or the separate index you explicitly
+built for SigLIP 2. A search itself performs no image inference; searching while
+a LoRA trains is fine.
 
 **It is a ranking, not a filter.** Every image scores *something* against every
 phrase, so a result list always comes back full. The panel therefore reports the
@@ -1138,9 +1214,9 @@ are — *"all about equally close"*, *"the last ones are noticeably looser"*, or
 *"the tail is much weaker than the top"*. That spread is the useful signal: it
 says whether you can trust the bottom of the list.
 
-**Do not read those numbers as percentages.** They are much lower than intuition
-suggests. Measured on a real bank (48 images drawn from 8 unrelated datasets,
-using the exact model the app uses — ViT-L/14, `openai` weights):
+**Do not read those numbers as percentages, and do not compare engines by their
+raw values.** The following measurements are specifically for the default CLIP
+ViT-L/14 `openai` space, on a real bank (48 images from 8 unrelated datasets):
 
 | | Range |
 |---|---|
@@ -1175,14 +1251,13 @@ just a filter plus a phrase; nothing needs a second search grammar. Results land
 as a normal selection you review with ✓ Keep / ✕ Reject / ⬆ Promote — nothing is
 kept or deleted for you. **Clear search** returns to the full grid.
 
-**Images that were never scored cannot be found by any phrase.** Rather than
-letting them vanish, the summary counts them: *"3 of 27 images in this filter
-have no ✨ Score embedding yet and could NOT be searched."* Run ✨ Score to
-include them.
+**Images missing from the selected index cannot be found by any phrase.** Rather
+than letting them vanish, the summary counts them. Run **✨ Score** for CLIP, or
+complete the explicit **SigLIP 2 index**, to include them.
 
 ### What it is good at, and what it is not
 
-CLIP reads a picture as a whole. It is reliable for **subjects, styles, framing,
+The default CLIP engine reads a picture as a whole. It is reliable for **subjects, styles, framing,
 setting, materials and colour**, and unreliable for three things in particular:
 
 | Ask for | What you actually get | Measured |
@@ -1250,12 +1325,12 @@ brings the likeliest images to the front; the final call stays yours.
 
 ### Why the first search takes a moment
 
-The text encoder is CLIP's other half, and loading it costs about **ten seconds**
-on the CPU. The app therefore keeps it warm after the first search — subsequent
-searches are effectively instant — and releases it once you close the panel or
-after ten idle minutes, because it holds roughly 2.4 GB of RAM while it lives.
-Every phrase you have already searched is also cached on disk, so re-typing one
-is free even after a restart.
+The text encoder is the other half of the selected image/text model. Loading the
+default CLIP encoder costs about **ten seconds** on the CPU; SigLIP 2 also has a
+one-time model load. The app keeps the chosen encoder warm after the first
+search, then releases it when you close the panel or after the idle window.
+Every phrase is cached under that engine's model key, so CLIP and SigLIP 2 text
+vectors can never be mixed and re-typing one is free even after a restart.
 
 On a memory-tight machine you can set `bank_scoring.text_search_idle_minutes` to
 `0`: nothing is ever kept warm, and each new phrase pays the ten seconds instead.
@@ -1519,10 +1594,10 @@ resolution for the same reason.
 
 ## Find more images like this one — by attribute, not by look
 
-**Select an image** in a captioned bank and its tags are already there, in the
-filter bar: `woman`, `red`, `dress`, `balcony`. Tick the ones you care about and
-the grid narrows to the images whose captions mention them. No extra click, no
-badge to find.
+**Select an image** in a captioned bank and its tags are already there: beside
+the gallery on desktop, or in the filter bar on a phone. Tick `woman`, `red`,
+`dress` or `balcony` and the grid narrows to the images whose captions mention
+them. No extra click, no badge to find.
 
 **Select several and the row counts.** Each chip carries how many of your
 selected images cite it — `red dress 7 / 12` means 7 of the 12 captioned images
@@ -1556,7 +1631,7 @@ worth knowing because they fail differently:
 
 | | 🎯 Similar to selected | 🏷️ Tags of this image |
 |---|---|---|
-| Matches on | the whole look (CLIP embeddings) | words *you* ticked |
+| Matches on | the whole look (the selected CLIP or SigLIP 2 index) | words *you* ticked |
 | Works without captions | yes | no |
 | Tells you *why* it matched | no | yes — the chips you ticked |
 
@@ -2000,14 +2075,20 @@ A dataset and an image bank can hand images to each other in both directions,
 and both directions **copy**. That is not an implementation detail — it is the
 rule the whole flow rests on:
 
+The files generated for **ai-toolkit are not LDS's dataset registry**. At launch,
+LDS freezes a disposable training export (kept images, captions and a freshly
+generated job config) from its own Dataset rows. Bank/Dataset identity, analysis
+history and comparisons stay in LDS's database plus its SHA-bound snapshot/cache
+sidecars; they are not reconstructed from an old ai-toolkit config file.
+
 - **Bank → dataset** (**⬆ Promote…**) writes new files into the dataset.
 - **Dataset → bank** (**🗃 Import to bank**, on the dataset) copies the dataset's
   kept images into a folder of the bank's own. Both choices retain the
   Dataset-owned captions, keep/reject curation, framing, watermark and
   provenance. Its dialog defaults to **Reuse compatible final-file analysis**;
   **Start fresh analysis** skips only reuse of prior analysis, not that metadata.
-  The AI **Face** and **Score** results are not reused after normalization or
-  another transformation because they are no longer proved.
+  The AI **Face**, **Score** and **SigLIP 2 semantic** results are not reused after
+  normalization or another transformation because they are no longer proved.
 
 Neither ever *points* at the other's files. The reason is that the two containers
 have opposite contracts. A dataset **owns** its images; a bank merely **points**
@@ -2221,6 +2302,329 @@ everything refusing "GPU busy".
 reversible at any time, and the note under the passes always says which
 interpreter is in use. If you never open this dialog, nothing changes: an install
 that works today keeps working, untouched.
+
+
+## Build the SigLIP 2 index on a GPU Python you already have
+
+The **SigLIP 2** semantic engine is the same story with a different dependency
+list. Its index is built by a worker that lives in the app's own environment —
+the CPU-only one — so on a machine with a card the index crawls for the same
+reason Score used to.
+
+SigLIP 2 is the lighter of the two: **92.9 M parameters against 303 M for the
+CLIP ViT-L/14 Score runs**, measured at about **105 ms per image on the CPU**
+rather than 336. Lighter is not free: a 30 000-image bank is still the better
+part of an hour.
+
+The **Semantic engine** panel now tells you which device the index will actually
+use, and when a card is sitting idle it offers the same button, **⚡ Use a GPU
+Python I already have**. It is the same detector, the same dialog and the same
+promise — with one difference that matters:
+
+**The dependency list is SigLIP 2's, not Score's.** The semantic worker never
+imports `open_clip` or `timm`. An interpreter Score refuses for a missing
+OpenCLIP — the most common shape of a ComfyUI venv — can be perfectly good here,
+and refusing it would be a lie about a worker that does not need it. What it
+*does* need is a **Transformers recent enough to carry `Siglip2Model`** (4.49 or
+newer). That one is checked by really looking for the class, not just for the
+package: an older `transformers` imports fine and then dies at model load, an
+hour into an index. Such an interpreter is refused, and the repair line the
+dialog hands you carries the version floor.
+
+**Borrowing an interpreter downloads nothing here.** The pinned SigLIP 2
+checkpoint lives in the app's own data folder, not inside the interpreter, so a
+borrowed Python needs no copy of it.
+
+**Where the index runs is not where anything is installed.** Setup ▸ Quality
+tools always installs SigLIP 2 into the environment the app built, whatever you
+picked in this dialog — including when you later hit Install/repair, which now
+*keeps* your choice instead of quietly putting the index back on the CPU.
+
+Score and the semantic index are chosen separately. Pointing one at an
+interpreter never moves the other, and **Back to the app default** undoes either
+on its own.
+
+## The video bank (turn a folder of rushes into shots)
+
+Videos are a different kind of material and they get their own bank. On the
+**🗃️ Bank** page the switch at the top right says which kind you are making —
+**🖼 Images** or **🎬 Video**. This matters more than it looks: an image bank
+skips every `.mp4` you drop into its folder **without a word**, so a folder of
+video used to look like an empty bank.
+
+A video bank triages **shots**, not files. One two-hour rush is not something you
+can judge; the three hundred shots inside it are.
+
+1. **Create it** — name it, point it at the folder. Every `.mp4`, `.mov`, `.mkv`,
+   `.webm` and `.avi` under it (subfolders included) is inventoried in place.
+   Nothing is copied and the folder is never modified.
+2. **▶ Run everything** chains the three passes in the only order that works:
+   **scan** reads what each file is (length, size, frame rate), **find shots**
+   cuts it at its shot boundaries, and **make thumbnails** grabs one frame from
+   the middle of each shot. Each pass is also available on its own, and the box
+   above the buttons always names the one step to take next — run them out of
+   order and each simply finds nothing to do and reports success.
+3. **Triage** — the grid is thumbnails, and only thumbnails. Click one to watch
+   exactly that shot, `←`/`→` to move, `K` to keep, `R` to reject. Filter by
+   status, or click a file in the **Files** list to see only its shots.
+4. **🎬 Build the dataset** encodes what you kept. This is the only step that
+   writes video.
+
+**Nothing is encoded while you triage.** A bank stores where each shot starts and
+ends — no clip file exists until you promote — which is why a bank of hundreds of
+shots costs no disk space, and why the player streams the original file rather
+than a preview.
+
+**A missing piece never disables the whole lane.** The video extra is three
+independent things: reading files, finding shots, and encoding clips. The app
+says which one is missing and what still works — with no ffmpeg, for example, you
+can scan, cut, watch and triage an entire bank, and only the final build waits.
+
+## Measure your shots, and choose your own cuts
+
+**📊 Measure quality** reads every frame of every shot in one pass and scores the
+four things that quietly ruin a video dataset: shots that barely move, shots that
+are all blur, black moments, and frozen stretches. The pass stores raw numbers,
+never verdicts — so changing a threshold later re-sorts the bank instantly, with
+no rescan. Stopping is safe; a re-run picks up where it left off.
+
+Flagged shots get an **amber ⚑ mark** in the grid. Amber, not red, because a flag
+is a reason to *look* — nothing is ever rejected for you. Hover the mark to see
+which cuts a shot tripped.
+
+**There are deliberately no default thresholds.** The same number that flags 2 %
+of one bank flags 12 % of another — a cut only means something against *your*
+bank's own distribution. Open **🎚 Quality cuts**, type a value (leave a field
+empty to disable that cut), and press **👁 Preview**: it answers with how many
+shots each rule would flag, per rule, before anything is applied. If a draft
+would flag most of the bank, the preview says so in as many words instead of
+letting you apply it by accident.
+
+**One cut needs no measuring at all: Minimum length.** Shot detection keeps very
+short cuts on purpose — a real flash cut is a real shot, and a detector that
+refuses to emit one also hides genuine boundaries. The cost is a grid peppered
+with half-second shots you scroll past a hundred times. Type a value in seconds
+and every shorter shot wears the flag, immediately after detection, with no
+measuring pass — this cut reads the shot's own bounds rather than its pixels.
+
+Do not confuse it with the *too short* refusal you may see at promotion. That one
+is your target profile's arithmetic — so many frames at so many fps — and no
+setting on this panel moves it: those shots were never going to land. **Minimum
+length** only decides what gets flagged for your eyes, so you can see and sort
+them *before* spending triage time on them.
+
+Two touches you get for free once shots are measured: thumbnails move from the
+middle-of-shot guess to the **sharpest measured frame**, and the freeze detector
+catches the failure the averages never can — a shot that plays fine and then
+hangs on a still image for a second. On a real 4.5-hour test bank that turned
+out to be the most common defect of all.
+
+**The sound is measured too, for the targets that keep it.** LTX and MiniMax H3
+mux the source's audio into every clip; Wan has no audio at all and forces the
+track off. So the pass also reports, per shot, **how much of it is silence** and
+**its overall level in dBFS** — because a dataset of silent clips teaches the
+model to be silent, and nothing about the file on disk reveals it: it is the
+right length, the right sample rate, and mute. Two cuts go with them, **Silent
+share** and **Loudness floor**, and they raise two different flags on purpose —
+a quiet clip can be normalised, a silent one cannot be rescued.
+
+Three states are kept apart here, and it matters:
+
+- **no sound track** — a property of the file. Never flagged; a Wan dataset is
+  supposed to look like this.
+- **silent** — a track that is there and carries nothing. That is the defect.
+- **not measured** — nobody has listened yet. Shots measured before this shipped
+  carry no sound reading at all, and an audio cut will never flag them. **Run
+  Measure again with re-measure** to fill them in; the pass otherwise skips
+  everything it has already done.
+
+## Retouch a cut: trim, split, or draw a shot by hand
+
+Shot detection is good and it is not right. It cuts a slow dissolve a second
+early, and it happily hands back a shot whose last second is a frozen frame.
+Before this panel existed the only gesture available on either was **✕ Reject** —
+throwing away eight good seconds to be rid of one bad one.
+
+Open any shot and unfold **✂ Trim & split this shot**, under the player:
+
+- **Nudge either bound** by 1 s or by one frame. One frame means one frame *of
+  your source file*, at its own rate — a 25 fps rush steps by 0.040 s, a 59.94 fps
+  one by 0.017 s. The frame counts your target model wants are a different thing
+  entirely, decided at build time.
+- **⇤ playhead** snaps a bound to wherever the video is paused. Scrub to the frame
+  you want, click, save.
+- **✂ Split here** cuts the shot in two at the playhead. The half you were looking
+  at keeps its triage decision, and so does the new one: split a *kept* shot and
+  both halves stay kept, so you never have to find them again among hundreds.
+- **＋ New shot from here** draws a shot the detector missed entirely. The player
+  is pointed at the whole rush, so you can scrub anywhere in the file — not only
+  inside the shot you opened — and mark a boundary that was never found.
+
+**For image-to-video targets, the first frame is the conditioning image.** The
+trainer conditions an i2v sample on the clip's *first* frame, so moving a start is
+not trimming: it is choosing the exact picture the model learns to animate from.
+If the first second of a shot is a dissolve, an i2v LoRA trained on it learns to
+animate dissolves. The panel repeats this line where the buttons are.
+
+**A re-cut shot loses its thumbnail and its quality scores, on purpose.** They
+were measurements *of the old bounds* — a thumbnail showing a frame the shot no
+longer contains is not stale, it is wrong. The tile goes blank and the bank's
+next-step line offers **🖼 Make thumbnails** again; run it once when you are done
+cutting rather than after every edit.
+
+**Limits worth knowing.** A shot must last at least 0.5 s, and both halves of a
+split must too — the buttons say so rather than silently clamping. Retouching is
+refused while a pass is running on the bank (a thumbnail pass mid-edit would
+produce a picture of the old span marked as current), so stop the pass first.
+Re-detecting a file deletes the shots the detector drew and **never** the ones you
+cut by hand; those stay, and may overlap the fresh ones. And editing a shot that
+is already in a built dataset is allowed: the dataset stored its own copy of the
+bounds when it was encoded, so nothing already on disk changes.
+
+## Find scenes in a video bank by typing a word
+
+A folder of rushes is a haystack whose needles have no names. The quality cuts
+tell you which shots are sharp and which move; they cannot tell you which one has
+the red car in it. **🔎 Find scenes** does: type *a woman walking on a beach* and
+the gallery is replaced by the shots that look most like it, best first.
+
+**Run the pass once, search as often as you like.** The 🔎 Find scenes button
+looks at a few frames of every shot and remembers what they look like. It is the
+slow part — it needs the same environment as the image bank's ✨ Score (Setup ▸
+Quality tools, or a Python you already have with torch and open_clip), and on a
+CPU it is minutes rather than seconds. Every search afterwards is instant and
+costs nothing.
+
+**Several frames per shot, not one.** A shot is a span of time, and a thumbnail is
+one instant of it. If a car only drives into view in the last second, a search
+that had looked at the opening frame would never find that shot — and would give
+you no hint that it had missed it. So each shot contributes a frame near its
+start, its sharpest frame, and one near its end, and a shot's score is the best of
+the three. Every result tells you **which second matched**, and opening it starts
+the player right there.
+
+**It is a ranking, not a filter.** Every shot scores something against every
+phrase, so the results always come back full, however wrong the query. The line
+above the gallery says how strong the top and bottom of the ranking are, and how
+many shots could not be searched at all — a shot the pass has not reached cannot
+be found by any phrase, and it would be easy to conclude the scene simply is not
+in the bank.
+
+**What it cannot do**, measured on the model this app uses:
+
+- **“Without” is ignored, not honoured.** Ask for *a street without cars* and you
+  get cars. Type `-cars` instead: that subtracts the unwanted thing from the score
+  and pushes those shots down the ranking. It cannot promise their absence, and
+  the panel says so rather than pretending otherwise.
+- **It cannot count.** *Two people* barely outranks a picture of one.
+- **It cannot hear, and it cannot see motion.** Only still frames are looked at,
+  so *a door slamming* or *panning left* describe nothing it can use.
+- **Left and right carry almost no meaning.**
+
+Searching respects the triage filter you are on, so *keep only* plus a phrase
+ranks what you already decided to keep. Changing the filter clears the search: a
+ranking computed over one bucket has nothing to say about another.
+
+## Describe your shots, and search what happens in them
+
+🔎 Find scenes ranks by what a moment **looks like**. It cannot find an action —
+"turns and walks away" is a fact about *time*, and no single frame carries it. The
+**🗣 Describe shots** pass closes that gap: it watches eight frames spread across
+each shot and writes one or two sentences about what happens in it.
+
+That line does two jobs, and the second is the one nobody sees coming:
+
+- **It is what the clip trains on.** At promotion each clip gets a `.txt` sidecar
+  next to it, and that file *is* the prompt. Before this pass existed every
+  promoted clip shipped with an **empty** one — which the trainer accepts in
+  silence, training the clip on no prompt at all. The build dialog now tells you
+  how many clips are about to go out uncaptioned, before it encodes anything.
+- **It makes the search read words as well as pixels.** Once captions exist,
+  typing a phrase ranks on both, and the panel says which halves are running so
+  that "nothing found" can be read correctly.
+
+**Captions are drafts.** Open any shot and edit the caption under the player; a
+bulk re-run will never overwrite one you wrote. Clearing it puts the shot back in
+the queue. Regenerating over your own words is possible, but you have to ask for
+it by name.
+
+**You can change how plainly they are written.** Next to the button there is a
+**Caption wording** choice: *Standard* (the shipped wording) or *Plain*, which
+gives the model explicit permission to name what is on screen instead of
+describing around it. On adult footage that difference is not cosmetic — a
+captioner asked the standard way produces captions that are *about something
+other than the shot*, and a LoRA trained on those learns the evasion. It was
+measured rather than assumed: the wording turned out to matter **more than the
+model**, and the stock model asked plainly beat an uncensored one asked the old
+way. Every caption records which wording produced it, and the choice is
+remembered as `video_caption.style` if you set it in your config.
+
+**You can change which model writes them.** The pass ships with one checkpoint
+and uses it unless you say otherwise (`video_caption.model` — see *Settings
+reference*). It is worth changing when the default **talks around** what your
+footage shows: a caption that names things evasively is not a style choice, it
+teaches the trained model to look away too, and the captions read perfectly well
+while being about something slightly other than the shot. Any checkpoint of the
+same architecture is a drop-in. If it is not on your machine, the first run
+downloads it — and the pass says so in its progress line before captioning
+anything, rather than sitting at 0 % while gigabytes arrive. Every caption
+records which model wrote it, so a bank captioned across a change stays readable.
+
+**It needs the same environment as ✨ Score** (torch + transformers) and it uses
+the GPU when there is one — a 4B vision model on a CPU is minutes per shot. It
+will not start while a training run owns the card, and stopping is safe: what is
+captioned stays captioned and the next run picks up where it left off.
+
+## Video training sets (and the two things to check before you cut one)
+
+Promoting a video bank builds a flat folder of clips with a `.txt` caption next
+to each one, and lists it in your library under **🎬 Video training sets**.
+
+**You can cap how many clips one source contributes.** A 50-clip set that is
+three videos over-represented looks exactly like a diverse one on disk, and that
+imbalance is the kind that quietly overfits a source. **Max clips per source**
+caps it; leave it empty for no cap. The cap trims dominance without punishing
+scarcity — a file with fewer clips than the cap keeps all of them — and it is
+**not a random sample**: each source keeps its earliest clips, so promoting the
+same bank twice gives you the same dataset. When a finished set leans on one file
+anyway, the result tells you the real share.
+
+**You can trim the edges of every clip.** A shot boundary is where a cut just
+happened, so the first and last frames of a shot are disproportionately
+dissolves, fades and leftovers of a transition — and a dataset whose clips all
+open on half a dissolve teaches the model to open on half a dissolve. **Trim each
+end** takes a number of seconds off *both* bounds; 0.25 is the common figure, and
+the default is 0 so an existing recipe exports exactly what it exported before.
+
+The trim never shortens a clip. Frame counts are a property of the target's VAE,
+so a clip that no longer supplies the count is **dropped, not exported short** —
+ffmpeg would write the short file and exit 0, and ai-toolkit would train it as
+repeated stills without a word. The dialog says how many clips the trim will cost
+*before* you press the button, and those are counted separately from clips that
+were never long enough: only the first kind is fixed by lowering the trim.
+
+**The clip length is chosen in FRAMES, from a menu.** That is not pedantry: the
+legal frame counts are a property of each model's VAE, not of video. 29 frames is
+legal for Wan and illegal for LTX; MiniMax H3 wants counts of the form 17n+5. No
+trainer refuses an illegal count — they round it down in latent space and say
+nothing. So the menu offers only counts the target can actually ingest, with the
+duration shown next to each at that model's own frame rate.
+
+Two labels sit next to every target, and both are there to save a wasted week:
+
+- **Not trainable yet** — the app knows the model's geometry perfectly and no
+  LoRA trainer for it is known to exist. Exactly one target of the four currently
+  clears that bar (Wan 2.1 / 2.2 14B). You can still cut a dataset for the
+  others; just know that today nothing is known to train on it.
+- **Licence limits** — MiniMax H3's Community Licence grants rights **only**
+  inside an "Applicable Territory" that excludes the EU, the UK, South Korea and
+  the USA. The restriction covers the **outputs**, not just the model, so keeping
+  your training private is not a way around it. Check your territory before you
+  build the set, not after.
+
+Deleting a video dataset deletes the encoded clips and nothing else: the bank
+keeps every shot and every decision, so you can re-cut at another length or for
+another target without triaging again.
 
 ## Stopping Score, and what a relaunch costs
 

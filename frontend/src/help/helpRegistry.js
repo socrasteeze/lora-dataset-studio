@@ -284,6 +284,13 @@ const TOPICS = [
       'resolution tier', 'resolution filter', 'filter by resolution', 'megapixel',
       'small images', 'thumbnails', 'low resolution', 'high resolution',
       'promote', 'unsorted',
+      // "I dropped files in the folder and the bank list still shows the old
+      // count" — the list stopped re-walking every source folder on load (it
+      // cost a full disk inventory per visit); opening the bank re-checks its
+      // folder, and 🔄 Rescan folders re-checks them all.
+      'rescan', 'rescan folders', 'refresh folders', 'new files not showing',
+      'added images not showing', 'count not updated', 'counts out of date',
+      'stale count', 'bank list slow', 'bank page slow', 'slow to load',
       'aesthetic', 'score', 'nsfw', 'watermark', 'style', 'subfolder', 'keep best',
       'semantic', 'near-duplicate', 'crop', 'crops', 'variant', 'same shot',
       'caption', 'captions', 'search', 'find', 'tag', 'tags', 'describe',
@@ -415,7 +422,13 @@ const TOPICS = [
      'partial scope', 'whole bank', 'renumber', 'groups', 'style groups',
      'nothing to do', '0 images', 'scan', 'caption', 'framing', 'medium',
      'watermark', 'angles', 'settings this pass reads', 'not decided here',
-     'thresholds', 'bank', 'triage'],
+     'thresholds', 'bank', 'triage',
+     // The two levels that produce new image files joined the same window:
+     // someone looking for "how do I crop only my kept images" must land here,
+     // not nowhere.
+     'auto-crop', 'autocrop', 'crop watermarks', 'crop only', 'inpaint',
+     'repaint', 'clean watermarks', 'which images get cropped', 'undo cleaning',
+     'reversible', 'original files', 'lama', 'klein'],
     '/bank', 'using-the-app', 'choosing-where-a-bank-pass-runs'),
   action('bank-single-person-folder', 'Tell the bank a folder is already one person',
     ['single person', 'one person', 'same person', 'this folder is one person',
@@ -544,6 +557,17 @@ const TOPICS = [
      'review faster', 'grid', 'unscored', 'unscanned', 'not scored', 'greyed out',
      'disabled sort', 'bank', 'triage'],
     '/bank', 'using-the-app', 'sort-a-grid-to-review-faster'),
+  action('bank-describe-filter', 'Set the bank filters by describing the set you want',
+    ['describe', 'describe the set', 'say what you want', 'sentence', 'plain english',
+     'natural language', 'ask', 'ask for', 'prompt', 'agent', 'assistant', 'llm',
+     'ollama', 'amateur', 'amateur dataset', 'professional', 'candid', 'snapshot',
+     'automatic filter', 'set the filters', 'filter for me', 'pick for me',
+     'choose images', 'build a dataset', 'i want a dataset', 'smart selection',
+     // What people type when it declined — the answer most likely to send
+     // someone looking for a feature they think is broken.
+     'not expressible', 'cannot express', 'it did nothing', 'refused', 'no filter',
+     'needs captions', 'without', 'exclude', 'negation', 'why not'],
+    '/bank', 'using-the-app', 'set-the-bank-filters-from-a-sentence'),
   action('bank-tag-chips', 'See the tags of what you selected, and filter by them',
     ['tag', 'tags', 'chips', 'tag chips', 'clickable tags', 'attributes',
      'same tags', 'more like this', 'like this one', 'similar', 'find similar',
@@ -669,7 +693,11 @@ const TOPICS = [
      'wd14', 'tagger', 'image tagging', 'booru', 'danbooru', 'onnx', 'tag model',
      'watermark detector', 'detector', 'siglip', 'siglip2', 'grounding dino',
      'faster watermark', 'watermark speed', 'find watermarks faster',
-     'watermark without ollama']),
+     'watermark without ollama',
+     // Scraping extras got a card here too — previously installable only from
+     // the Concept Sources panel, so Setup had nothing to click for it.
+     'scraper extras', 'scrape extras', 'curl_cffi', 'gallery-dl', 'cloudscraper',
+     'scraping not installed', 'web image search', 'keyless search']),
   setupStep('setup-training', 'training', 'Set up ai-toolkit (LoRA training)',
     ['ai-toolkit', 'aitoolkit', 'training', 'lora training', 'run.py', 'python',
      'interpreter', 'install training', 'train']),
@@ -746,6 +774,173 @@ const TOPICS = [
       'start comfyui', 'cancel and resume', 'batch did not continue', 'no later prompt',
       '.bat', 'bat file', 'safe local profile'],
     '/setup?step=comfyui', 'using-the-app', 'recover-a-paused-test-studio-batch'),
+  // ---- 🎬 the video lane -------------------------------------------------
+  // Its own page topic rather than keywords bolted onto page-bank: someone with
+  // a folder of rushes searches for "video", and until this lane existed the
+  // honest answer was "your .mp4 files are skipped without a word".
+  { id: 'page-video-bank', kind: 'page', title: 'Video bank (rushes → shots)',
+    keywords: ['video', 'videos', 'video bank', 'rushes', 'rush', 'footage', 'clip',
+      'clips', 'shot', 'shots', 'shot detection', 'scene detection', 'cut', 'cuts',
+      'mp4', 'mov', 'mkv', 'webm', 'avi', 'movie', 'film',
+      'my video is ignored', 'mp4 skipped', 'video not imported', 'video in a bank',
+      'triage video', 'video triage', 'keep reject shots', 'watch a shot', 'preview',
+      'play a clip', 'lightbox', 'thumbnails', 'scan files', 'probe', 'find shots',
+      'make thumbnails', 'run everything', 'pipeline', 'cancel', 'stop a pass',
+      'duration', 'frame rate', 'fps', 'codec', 'resolution', 'unreadable',
+      'ffmpeg missing', 'av missing', 'transnetv2', 'shot detector', 'torch',
+      'video unavailable', 'video extra', 'which piece is missing'],
+    guide: { chapter: 'using-the-app', anchor: 'the-video-bank-turn-a-folder-of-rushes-into-shots' },
+    app: { route: '/video-bank' } },
+  action('video-bank-passes', 'Scan, find shots, make thumbnails',
+    ['scan files', 'find shots', 'make thumbnails', 'run everything', 'video passes',
+     'order of passes', 'nothing was detected', 'no shots found', '0 shots',
+     'why is my bank empty', 'next step', 'cancel a pass', 'stop', 'busy',
+     'already running', 'rescan folder', 'new videos'],
+    '/video-bank', 'using-the-app', 'the-video-bank-turn-a-folder-of-rushes-into-shots'),
+  action('video-quality-cuts', 'Measure shots and set quality cuts',
+    ['measure quality', 'quality cuts', 'flags', 'flagged shots', 'amber flag',
+     'still clip', 'barely moves', 'frozen', 'freeze', 'black frames',
+     'too much motion', 'soft', 'blurry shots', 'thresholds', 'dry run',
+     'preview cuts', 'how many would be flagged', 'motion floor',
+     'no default thresholds', 'sharpest frame thumbnail',
+     // The duration cut is searched for by the SYMPTOM, never by its name: what
+     // the user sees is a grid of shots that are barely a frame long.
+     'tiny clips', 'tiny shots', 'flash cut', 'flash cuts', '0.6 second shots',
+     'half second shots', 'very short clips', 'shots too short',
+     'minimum length', 'minimum duration', 'duration filter',
+     'hide short clips', 'too many clips'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  // People search for the SYMPTOM ("the cut is one second too early", "half my
+  // clip is frozen"), and — since it is the discovery this tool folds in — for
+  // the i2v conditioning frame, which they will have read about in a trainer's
+  // README long before they connect it to a control called "trim".
+  action('video-trim-split', 'Trim, split and hand-cut a shot',
+    ['trim a shot', 'trim', 'adjust bounds', 'change start', 'change end',
+     'cut is wrong', 'cut too early', 'cut too late', 'bad cut', 'missed cut',
+     'detector missed a cut', 'shot is too long', 'frozen tail', 'freeze at the end',
+     'split a shot', 'split in two', 'cut a shot in half', 'new shot',
+     'add a shot by hand', 'manual cut', 'manual', 'nudge', 'one frame',
+     'frame by frame', 'playhead', 'set to playhead', 'edit a clip',
+     'first frame', 'conditioning frame', 'conditioning image', 'i2v',
+     'image to video', 'start frame', 'which frame is used',
+     'thumbnail disappeared', 'lost my thumbnail', 'thumbnail gone after trimming',
+     'redetect deleted my cuts', 're-detect', 'lost my manual cuts'],
+    '/video-bank', 'using-the-app', 'retouch-a-cut-trim-split-or-draw-a-shot-by-hand'),
+  // The symptoms: a search that cannot find an action, a dataset that trained on
+  // nothing, and "why did my caption come back after I fixed it" (it must not).
+  action('video-captions', 'Describe shots, and search what happens',
+    ['caption', 'captions', 'describe shots', 'describe', 'video caption',
+     'empty prompt', 'empty txt', 'sidecar', 'trains on nothing', 'no caption',
+     'edit a caption', 'my caption was overwritten', 'recaption',
+     'search for an action', 'find what happens', 'hybrid search',
+     'qwen', 'vlm', 'caption model'],
+    '/video-bank', 'using-the-app',
+    'describe-your-shots-and-search-what-happens-in-them'),
+  // The symptom is "my captions are vague" — nobody searches for "prompt style".
+  action('video-caption-wording', 'Caption wording: standard or plain',
+    ['caption wording', 'caption style', 'plain captions', 'vague captions',
+     'captions are evasive', 'captions describe around', 'euphemism',
+     'explicit captions', 'name what is shown', 'video_caption.style',
+     'which prompt', 'caption prompt'],
+    '/video-bank', 'using-the-app',
+    'describe-your-shots-and-search-what-happens-in-them'),
+  // Two symptoms bring people here and neither mentions "audio metrics": a
+  // trained model that came out silent, and an audio cut that flags nothing.
+  // The second is almost always a bank measured before sound was looked at.
+  action('video-audio-cuts', 'Silence and loudness cuts',
+    ['audio', 'sound', 'silent clips', 'silence', 'no sound', 'mute', 'muted',
+     'volume', 'loudness', 'dbfs', 'rms', 'quiet clips', 'audio floor',
+     'silent share', 'my dataset is silent', 'model trained silent',
+     'audio cut flags nothing', 'no sound reading', 'remeasure for audio',
+     'ltx audio', 'minimax audio', 'wan has no audio'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  // Nobody searches "max_per_source". They search the SYMPTOM: a set that came
+  // out dominated by one file, or the question of whether the cap picks at
+  // random (it does not — earliest first, so the same bank gives the same set).
+  action('video-source-cap', 'Cap how many clips one source contributes',
+    ['max clips per source', 'per source cap', 'cap', 'one video dominates',
+     'unbalanced dataset', 'imbalance', 'overfit one source', 'top source share',
+     'spread the dataset', 'too many clips from one file', 'which clips the cap keeps',
+     'earliest clips', 'is the cap random'],
+    '/video-bank', 'using-the-app',
+    'video-training-sets-and-the-two-things-to-check-before-you-cut-one'),
+  action('video-edge-trim', 'Trim the edges of every clip',
+    ['trim edges', 'edge trim', 'trim each end', 'inset', 'dissolve', 'fade',
+     'transition at the start', 'first frames are a fade', 'crossfade',
+     'clips dropped by the trim', 'fewer clips than expected',
+     'dropped by the edge trim', 'too short after trimming'],
+    '/video-bank', 'using-the-app',
+    'video-training-sets-and-the-two-things-to-check-before-you-cut-one'),
+  // People arrive here from the SYMPTOM ("I can't find the shot with the car")
+  // and from the two failures that look like bugs: a search that returns nothing
+  // because the pass never ran, and a "without" that returns exactly what was
+  // excluded — which is CLIP ignoring the word, not the app ignoring the user.
+  // Searched for by the SYMPTOM — "I have the same shot twenty times", "my LoRA
+  // only draws one pose" — long before anyone looks for a control called dedup.
+  action('video-duplicate-shots', 'Find near-identical shots (✂ Duplicates)',
+    ['duplicate', 'duplicates', 'near duplicate', 'same shot twice', 'retake',
+     'retakes', 'takes', 'repeated shots', 'identical clips', 'dedup',
+     'deduplicate', 'too many similar clips', 'my lora only does one thing',
+     'overrepresented', 'same as another shot', 'duplicate threshold',
+     'representative', 'which one to keep', 'run find scenes first'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  action('video-watermark-flag', 'Find watermarked shots (🔖 Watermarks)',
+    ['watermark', 'watermarks', 'watermarked', 'logo', 'logos', 'stock footage',
+     'shutterstock', 'getty', 'corner logo', 'burned in logo', 'my lora draws a logo',
+     'watermark score', 'watermark cut', 'watermark detector', 'detector weights',
+     'not downloaded', 'ambassador frame'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  action('video-flag-chips', 'Filter the gallery by a quality flag',
+    ['flag chips', 'filter by flag', 'flagged shots', 'select flagged',
+     'reject all flagged', 'amber chips', 'show only flagged', 'counts loaded',
+     'load more to count', 'not measured yet'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  action('video-bank-search', 'Find scenes by typing a word',
+    ['find scenes', 'search shots', 'search clips', 'search by words',
+     'text search video', 'find a shot', 'find the scene', 'where is the shot with',
+     'keyword search', 'search my rushes', 'embed shots', 'shots searchable',
+     'no shots searchable', 'search returns nothing', 'run find scenes first',
+     'without is ignored', 'push down', '-word', 'minus word', 'exclude a word',
+     'which second matched', 'matched at', 'ranking not a filter'],
+    '/video-bank', 'using-the-app', 'find-scenes-in-a-video-bank-by-typing-a-word'),
+  action('video-capability-pieces', 'What the video extra is missing',
+    ['video extra', 'ffmpeg', 'ffmpeg missing', 'av', 'pyav', 'decode', 'decoder',
+     'encoder', 'shot detection missing', 'transnetv2', 'partly installed',
+     'what still works', 'promotion unavailable', 'cannot build the dataset',
+     'video is unavailable', 'three pieces'],
+    '/video-bank', 'using-the-app', 'the-video-bank-turn-a-folder-of-rushes-into-shots'),
+  // The library is what "Open this screen →" should open for this anchor, so the
+  // /datasets topic is listed FIRST (see the ordering note at the top).
+  action('video-datasets', 'Video training sets',
+    ['video dataset', 'video datasets', 'video training set', 'clip dataset',
+     'promoted clips', 'caption a clip', 'sidecar', 'txt next to the mp4',
+     'watch a promoted clip', 'delete a video dataset', 're-cut', 'recut',
+     'another length', 'library', 'where are my clips', 'output folder'],
+    '/datasets', 'using-the-app', 'video-training-sets-and-the-two-things-to-check-before-you-cut-one'),
+  action('video-train-local', 'Train a video dataset on this machine',
+    ['train this dataset', 'train video', 'video training', 'local training',
+     'video lora', 'train a video lora', 'start training', 'stop training',
+     'train button', 'minimax h3 weights', '43 gb', 'download weights',
+     'weights missing', 'comfy-org', 'gpu busy', 'already in progress',
+     'run folder', 'resume', 'different target', 'checkpoints', 'not proven',
+     'wired but not trained', 'steps', 'not enough disk', 'free space',
+     'no room', 'move the models folder', 'short edge', 'too small',
+     'low resolution', 'below the training size'],
+    '/datasets', 'using-the-app', 'video-training-sets-and-the-two-things-to-check-before-you-cut-one'),
+  action('video-promote-target', 'Pick a target model and a clip length',
+    ['target model', 'target profile', 'wan', 'wan 2.2', 'wan22', 'ltx', 'ltx 2.3',
+     'minimax', 'minimax h3', 'generic', 'clip length', 'frames', 'frame count',
+     'how many frames', 'seconds', 'duration', '4n+1', '8n+1', 'vae', 'stride',
+     'illegal length', 'rounded down', 'size', 'resolution', 'size multiple',
+     'training verified', 'not trainable', 'no trainer', 'trainer exists',
+     'licence', 'license', 'territory', 'eu', 'uk', 'south korea', 'usa',
+     'outputs', 'can i publish', 'am i allowed', 'keeps audio', 'audio'],
+    '/video-bank', 'using-the-app', 'video-training-sets-and-the-two-things-to-check-before-you-cut-one'),
+  // Divergence 4: upstream also registers a 'video-cloud-training' topic here
+  // (rented-pod video training). Not carried — this fork trains video locally
+  // only, and its Train button is the same local ai-toolkit lane the image
+  // side uses.
+
   { id: 'page-canvas', kind: 'page', title: 'LoRA Canvas',
     keywords: ['canvas', 'board', 'lineage', 'genealogy', 'graph', 'tree', 'all datasets',
       'zoom', 'pan', 'fit', 'compare runs', 'shift-click', 'lanes', 'descend', 'continuation',
@@ -1312,7 +1507,10 @@ const TOPICS = [
       // must land here, because this is where it is now installed from — the
       // capability is stored as `face_scoring`, but nobody calls it that.
       'insightface', 'face detection', 'detector', 'install', 'face scoring',
-      'not installed', 'missing', 'onnxruntime', 'ml extras'],
+      'not installed', 'missing', 'onnxruntime', 'ml extras',
+      // The preview can be stopped and picked back up. Searching for the way out
+      // of a long pass must land on the option that started it.
+      'stop', 'cancel', 'resume', 'continue', 'interrupt', 'looking for faces'],
     guide: { chapter: 'dataset-guide', anchor: '8-concept-loras-keeping-faces-out' },
     app: { route: '/datasets?section=training' },
     tip: { trigger: 'mask-faces-advanced',
@@ -1420,6 +1618,13 @@ const TOPICS = [
      'ai-toolkit', 'comfyui', 'venv', 'environment', 'faster', 'speed up',
      'aesthetic', 'nsfw', 'borrow', 'reuse'],
     '/bank', 'using-the-app', 'make-score-use-a-gpu-python-you-already-have'),
+  action('action-semantic-python', 'Build the SigLIP 2 index on a GPU Python you already have',
+    ['siglip', 'siglip2', 'siglip 2', 'semantic', 'semantic index', 'index', 'embedding',
+     'embeddings', 'gpu', 'cuda', 'cpu', 'slow', 'hours', 'torch', 'pytorch',
+     'transformers', 'siglip2model', 'too old', 'interpreter', 'python',
+     'ai-toolkit', 'comfyui', 'venv', 'environment', 'faster', 'speed up',
+     'borrow', 'reuse', 'device', 'bank'],
+    '/bank', 'using-the-app', 'build-the-siglip-2-index-on-a-gpu-python-you-already-have'),
   action('action-score-resume', 'Stopping ✨ Score, and what a relaunch costs',
     ['score', 'scoring', 'stop', 'stopped', 'cancel', 'resume', 'relaunch', 'restart',
      'rerun', 're-run', 'again', 'cache', 'cached', 'skip', 'already scored',
@@ -1538,6 +1743,9 @@ const TOPICS = [
     '/datasets?section=training&panel=launch', 'dataset-guide', '5-pre-flight-checklist'),
   action('action-scrape-scan', 'Scan a gallery URL',
     ['scrape', 'scan', 'gallery', 'url', 'import', 'concept'],
+    '/datasets?section=scrape&panel=scan', 'using-the-app', 'concept-datasets-an-object-or-action-not-a-person'),
+  action('action-scrape-websearch', 'Search the web for images by keyword',
+    ['scrape', 'search', 'websearch', 'web images', 'keyword', 'duckduckgo', 'import', 'concept'],
     '/datasets?section=scrape&panel=scan', 'using-the-app', 'concept-datasets-an-object-or-action-not-a-person'),
   action('action-import-from-bank', 'Import images from a bank',
     ['bank', 'import from bank', 'promote', 'triaged', 'kept images', 'add images',
