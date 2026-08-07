@@ -28,9 +28,14 @@ const KINDS = {
     header: (n) => `${n} "same shot" group${n > 1 ? 's' : ''}`,
     lead: 'Same shot, different crop/compression — the dHash never linked these. Losers are rejected (reversible), never deleted.',
     cardHint: 'same shot, different crop — click the one to KEEP',
-    empty: 'No unresolved semantic near-duplicate group. Same shots you already '
-      + 'rejected are still there, under ✕ Rejected → ✕ Why → ✂ Same shot. '
-      + '(Groups appear after ✨ Score, then ✂ Find crops & variants.)',
+    // Upstream's function form (the semantic index is CLIP or SigLIP 2 now, and
+    // the sentence has to name which) KEEPING the fork's pointer to where the
+    // already-rejected ones went — without it this panel reads as "there are no
+    // duplicates" to somebody who has just rejected thousands.
+    empty: (engineLabel) => 'No unresolved semantic near-duplicate group. Same shots '
+      + 'you already rejected are still there, under ✕ Rejected → ✕ Why → ✂ Same shot. '
+      + `(Groups appear after the ${engineLabel} semantic index is ready, `
+      + 'then ✂ Find crops & variants.)',
     pagesLabel: 'Semantic duplicate group pages',
   },
 }
@@ -40,7 +45,8 @@ const KINDS = {
  * the oldest by import order; clicking a member keeps THAT one. Losers are
  * rejected (a reversible status) — nothing is ever deleted from disk. ``kind``
  * selects stage 1 (exact/resized) or stage 2 (semantic crops/variants). */
-export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact' }) {
+export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact',
+  semanticLabel = 'CLIP' }) {
   const k = KINDS[kind] || KINDS.exact
   const toast = useToast()
   const [data, setData] = useState(null)
@@ -66,7 +72,7 @@ export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact'
       const d = await postJson(`/api/bank/${bankId}/${k.resolvePath}`, body)
       toast.success(okMsg || `Resolved ${d.resolved} group(s) — ${d.rejected} duplicate(s) rejected.`)
       await refresh(0)
-      onChanged?.()
+      await onChanged?.()
     } catch (e) {
       toast.error(e?.message || 'Resolution failed.')
     } finally {
@@ -76,7 +82,9 @@ export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact'
 
   if (data == null) return <p className="text-sm text-content-muted">Loading duplicate groups…</p>
   if (data.total === 0) {
-    return <p className="text-sm text-content-muted">{k.empty}</p>
+    return <p className="text-sm text-content-muted">
+      {typeof k.empty === 'function' ? k.empty(semanticLabel) : k.empty}
+    </p>
   }
 
   return (

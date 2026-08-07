@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { apiFetch, del, postJson } from '../../api/fetchClient'
+import { apiFetch, del, patchJson, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
 import GpuBusyNotice from '../common/GpuBusyNotice'
 // "This is configurable, here" — a deep link that lands ON the field, not on a tab.
@@ -12,12 +12,14 @@ import DupGroupsPanel from './DupGroupsPanel'
 import PromoteDialog from './PromoteDialog'
 import DeleteRejectedDialog from './DeleteRejectedDialog'
 import LaunchAllDialog from './LaunchAllDialog'
+import BankSemanticEngine from './BankSemanticEngine.jsx'
 import ScoringPythonDialog from './ScoringPythonDialog'
 import PipelineReport from './PipelineReport'
 import FolderSyncNote from './FolderSyncNote'
 import RelocateBankDialog from './RelocateBankDialog'
 import BankReviewLightbox from './BankReviewLightbox'
 import BankWatermarkPanel from './BankWatermarkPanel'
+import BankOverview from './BankOverview.jsx'
 // 👤 "Single person here" — a folder the user declares to hold one person.
 import SubfolderPersonPanel from './SubfolderPersonPanel'
 import { assertionFor, folderMarker, scanOffer, suggestionFor } from './folderPerson.js'
@@ -45,7 +47,7 @@ import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } f
 import { busyRefusal } from './bankPassRun.js'
 import { holdsTheGpu, scoreDeviceNote, scoreGpuHoldNote } from './bankScoreDevice.js'
 // Wording that adapts to the machine (a card-less box is never sold CUDA).
-import { openerLabel } from './scoringPython.js'
+import { openerLabel, PICKER_PROFILES } from './scoringPython.js'
 // Reuse the dataset's register list so the Bank lane never drifts from it — and the
 // same ENGINE list, so "which engine" means the same thing on both surfaces.
 import {
@@ -57,16 +59,27 @@ import {
   captionRecaptionConfirmation, captionRecaptionDisabledReason, captionRecaptionLabel,
   captionRecaptionNote, captionScopeNote, captionScopeStatuses,
 } from './bankCaptionScope.js'
+// …and the one thing the captioners are known to do badly, said where the engine is
+// still free to change. Pure/testable; stays silent unless the scope is measurably
+// the material it was measured on (see the module header for the evidence base).
+import { captionNsfwNotice } from './captionNsfwNotice.js'
+import { passScopeOption } from './bankPassScope.js'
 // 🎛 The launch window every pass now opens, and the two pure modules behind it:
 // what each pass is (blocks, offered scopes, refusals) and how big a run is.
 import PassDialog from './PassDialog.jsx'
 import { BANK_PASSES } from './bankPasses.js'
+import {
+  semanticEngineLabel, semanticEnginePatchBody, semanticEngineState, semanticPrerequisite,
+} from './bankSemanticEngine.js'
 // Ordered zone model + the "what's next" accent, both pure/testable.
 import { BANK_ZONES, nextBankStep } from './bankGuide.js'
 // Provenance wording (effective resolution, origin, black bars) — pure/testable.
 import { ORIGIN_CHIPS, PROVENANCE_FLAG_LABEL, detailSummary } from './bankProvenance.js'
 // Grid ordering menu (which sorts exist, and which ones have data) — pure/testable.
 import { bankSortGroups, loadBankSort, saveBankSort } from '../../utils/gridSort.js'
+// WHO wrote the caption on a tile — the per-image half of the same provenance the
+// pass reports in aggregate (utils/captionEngines.js).
+import { captionOriginTooltipLine } from '../../utils/captionOrigin.js'
 // 🏷️ One image's caption → the chips you can filter by, and the same chips over a
 // whole SELECTION with how often each was cited (pure/testable).
 import {
@@ -106,6 +119,7 @@ import {
 } from './autoRejectReadiness.js'
 // 🗃️ Chip counters — the number a chip PRINTS (measured under the filters in
 // force) is not the number that decides the chip EXISTS (bank-wide).
+import DescribeFilterBar from './DescribeFilterBar.jsx'
 import { chipCounts, facetDataKey, isFacetFiltered } from './bankFacetCounts.js'
 // ✕ Why — the reason an image is in the bin. The way back to a pile a bulk
 // action has already closed: once every duplicate group is resolved the ≈ chip
@@ -113,7 +127,23 @@ import { chipCounts, facetDataKey, isFacetFiltered } from './bankFacetCounts.js'
 // address at all. Read-only; it selects, it never un-rejects.
 import { reasonBuckets, reasonHint } from './bankRejectReasons.js'
 
+function semanticPayloadMatches(payload, engine, modelKey = null) {
+  return payload?.engine === engine
+    && (!modelKey || payload?.model_key === modelKey)
+}
+
 const PAGE_SIZE = 120
+/* How often the bank-wide counts refresh while a pass runs. The banner ticks
+   every 2 s off /activity; the dashboard follows on this slower beat — plus
+   immediately when the job lands, so the numbers you end on are exact. The
+   payload is ~60 full-table aggregates: on a 50 000-image bank, asking for it
+   every 2 s is what made the workspace unreadable and its Stop button
+   unreachable in the first place.
+   ⏱ A WALL-CLOCK deadline, deliberately, not "every Nth tick". The poll effect
+   re-subscribes whenever the job's `detail` string changes — which is every
+   couple of seconds during a real pass — so a counter living in the effect would
+   reset before it ever reached N and the dashboard would never refresh at all. */
+const FULL_PAYLOAD_MS = 10000
 /* How many off-page captions the 🏷️ row will fetch for a selection.
    Not a taste call: `ids=` travels in the query string, and a few thousand
    integers build a request line the server refuses outright (the same limit the
@@ -153,7 +183,7 @@ const RES_BUCKETS = [
   { id: 'res_025_1', label: '0.25–1 MP' },
   { id: 'res_1_2', label: '1–2 MP' },
   { id: 'res_2_4', label: '2–4 MP' },
-  { id: 'res_gt_4', label: '> 4 MP' },
+  { id: 'res_gt_4', label: '≥ 4 MP' },
 ]
 // Framing buckets — ids MUST mirror backend _FRAMING_KEYS. Face/bust/body/back
 // are the character composition axes; 'unknown' is a parseable-but-unclassed shot.
@@ -194,6 +224,7 @@ async function fetchAllIds(bankId, params) {
 
 const STEP_SHORT = {
   scan: '🔎 Scan', auto_reject: '🧹 Auto-reject', score: '✨ Score',
+  semantic_index: '🧠 Semantic index',
   semantic_dedup: '✂ Crops', watermark: '🚩 Watermarks', faces: '👥 Person',
   // 🔖 and not 🏷️ for the tag pass: 🏷️ Caption already carries that glyph
   // everywhere (README, the panel, What's new) and this app uses emoji AS
@@ -245,6 +276,7 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
           {pipe
             ? `🚀 Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${STEP_SHORT[pipe.current] || pipe.current}`
             : ({ scan: 'Quality scan', faces: 'Face pass', score: 'Scoring pass',
+              semantic_index: 'Semantic index',
               semantic_dedup: 'Crops & variants', watermark: 'Watermark scan',
               framing: 'Framing pass', caption: 'Captioning', promote: 'Promotion',
               medium: 'Medium pass', angles: 'Measuring head angles',
@@ -337,6 +369,69 @@ function FilterGroup({ label, children }) {
   )
 }
 
+// The selection's caption tags stay visible while the gallery changes. The
+// component is mounted once per responsive position: in the filter zone below
+// xl, and as a sticky inspector beside the gallery on desktop.
+function SelectionTagsPanel({ tagRow, tagPicked, onToggle, onClear }) {
+  return (
+    <div className="space-y-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/5 px-2.5 py-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <GroupLabel>
+          {tagRow.kind === 'image' ? `🏷️ Tags of ${tagRow.name}`
+            : tagRow.size === 1 ? '🏷️ Tags of the selected image'
+              : `🏷️ Tags across ${tagRow.size} selected images`}
+        </GroupLabel>
+        <span className="text-[11px] text-content-subtle">
+          attributes you pick — unlike 🎯 Similar, which matches the look
+        </span>
+        {tagRow.frozen && (
+          <span className="rounded border border-border px-1.5 text-[11px] text-content-subtle">
+            held from the selection you filtered on
+          </span>
+        )}
+        <button type="button" onClick={onClear}
+          className="ml-auto rounded border border-border px-2 py-0.5 text-[11px] text-content-muted hover:text-content">
+          ✕ Close
+        </button>
+      </div>
+      {tagRow.rows.length === 0 ? (
+        <p className="m-0 text-xs text-content-muted">
+          {tagRow.uncaptioned > 0 && tagRow.counted === 0
+            ? (tagRow.size === 1
+              ? 'This image has no caption yet — run 🏷️ Caption and its tags appear here.'
+              : `None of these ${tagRow.size} images has a caption yet — run 🏷️ Caption on them and their tags appear here.`)
+            : 'No caption here has a word worth filtering on.'}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {tagRow.rows.map(({ tag, count }) => {
+            const n = tagCountLabel(count, tagRow.counted)
+            return (
+              <Chip key={tag} active={tagPicked.has(tag)}
+                onClick={() => onToggle(tag)}
+                title={tagPicked.has(tag)
+                  ? `Stop requiring “${tag}”`
+                  : `Show only images whose caption mentions “${tag}”`
+                    + (n ? ` — cited by ${count} of the ${tagRow.counted} captioned images you selected` : '')}>
+                {tag}
+                {n && <span className="ml-1 text-[10px] text-content-subtle">{n}</span>}
+              </Chip>
+            )
+          })}
+        </div>
+      )}
+      {selectionTagsNotes(tagRow, tagRow.unread).map((note) => (
+        <p key={note} className="m-0 text-[11px] leading-snug text-content-subtle">{note}</p>
+      ))}
+      {tagPicked.size > 0 && (
+        <p className="m-0 text-[11px] text-content-muted">
+          {tagFilterSummary(tagPicked)} Matched as whole words, in captions and file names.
+        </p>
+      )}
+    </div>
+  )
+}
+
 // The individual analysis passes share one quiet, uniform button so they read
 // as a secondary group next to the prominent Launch all / Promote actions.
 function PassButton({ onClick, disabled, title, children }) {
@@ -401,16 +496,16 @@ function FramingBar({ framing }) {
 }
 
 // 👁 What the labels cannot see: how alike the pool actually LOOKS, measured on
-// the CLIP embeddings ✨ Score already cached. An unscored bank shows "Not
+// the currently selected semantic cache. A Bank with no usable index shows "Not
 // measured" rather than a reassuring colour — the whole point is that silence
 // must never read as variety.
-function VisualSpread({ visual, total }) {
-  const r = spreadReadout(visual)
+function VisualSpread({ visual, total, semanticEngine }) {
+  const r = spreadReadout(visual, semanticEngine)
   if (!r) return null
   const tone = r.tone === 'warn' ? 'border-amber-400/50 bg-amber-400/10 text-amber-200'
     : r.tone === 'ok' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
       : 'border-border bg-surface-raised text-content-subtle'
-  const note = spreadCoverageNote(visual, total)
+  const note = spreadCoverageNote(visual, total, semanticEngine)
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -458,7 +553,8 @@ function VarietyAxes({ variety }) {
   )
 }
 
-function CoveragePanel({ coverage, onClose, onBalance = null, balanceReason = '' }) {
+function CoveragePanel({ coverage, semanticEngine, semanticLabel,
+  onClose, onBalance = null, balanceReason = '' }) {
   if (!coverage) {
     return <p className="text-sm text-content-subtle">Reading coverage…</p>
   }
@@ -476,7 +572,8 @@ function CoveragePanel({ coverage, onClose, onBalance = null, balanceReason = ''
           className="rounded-md border border-border px-1.5 py-0.5 text-xs text-content-subtle hover:text-content">✕</button>
       </div>
       {coverage.framing_available && <FramingBar framing={coverage.framing} />}
-      <VisualSpread visual={coverage.visual} total={coverage.total} />
+      <VisualSpread visual={coverage.visual} total={coverage.total}
+        semanticEngine={semanticEngine} />
       <ul className="space-y-1 text-sm">
         {coverage.advice.map((a, i) => (
           <li key={i} className="flex items-start gap-2">
@@ -503,7 +600,7 @@ function CoveragePanel({ coverage, onClose, onBalance = null, balanceReason = ''
       <p className="text-[11px] text-content-subtle">
         Advice only — nothing is kept or rejected. Based on what the passes already computed:
         the labels, your captions (words, not pixels — a shot the captioner never described is
-        invisible here, and “not smiling” still counts as a smile) and the ✨ Score embeddings.
+        invisible here, and “not smiling” still counts as a smile) and the {semanticLabel} semantic index.
         Judged as a character source, like the framing target above.
       </p>
     </div>
@@ -539,7 +636,13 @@ function Tile({ img, bankId, selected, onToggle, onReview, onTags, size }) {
           + (img.style_cluster ? ` · style #${img.style_cluster}` : '')
           + (img.semantic_dup_group
             ? ` · same shot #${img.semantic_dup_group}${dupStateSuffix(img, 'sdup')}` : '')
-          + (img.caption ? `\n${img.caption}` : '')}
+          // The caption, and WHO WROTE IT in the same breath. The 'auto' backend
+          // chains two engines inside one run, so a bank holds both and the
+          // sentence alone cannot say which half produced it — exactly the reading
+          // this tooltip was missing.
+          + (img.caption
+            ? `\n${captionOriginTooltipLine(img.caption, img.caption_origin)}: ${img.caption}`
+            : '')}
         className="block w-full">
         {/* ?r= is a cache buster, not a parameter the server reads: the thumb
             route answers with max-age=3600, so a turned image would keep showing
@@ -616,7 +719,7 @@ function Tile({ img, bankId, selected, onToggle, onReview, onTags, size }) {
           something it cannot do. That silence has already cost once, the other way
           round: the feature had shipped for two days and was read as absent,
           because the bank simply had no captions. So the button says WHY it is
-          not there, exactly the way "✂ Find crops & variants (needs Score)" does
+          not there, exactly the way a semantic action names its missing index
           on the pass row — a shipped feature that says nothing is indistinguishable
           from one that does not exist. */}
       {tagChips.length > 0 ? (
@@ -648,6 +751,14 @@ function Tile({ img, bankId, selected, onToggle, onReview, onTags, size }) {
 export default function BankWorkspace({ bankId, onBack, onGone }) {
   const toast = useToast()
   const { caps, loading: capsLoading, refresh: refreshCaps } = useCapabilities()
+  // Updated on every render once the payload has been normalised. The unmount
+  // cleanup must release the engine selected NOW, not the one from first mount.
+  const semanticEngineRef = useRef('clip')
+  const semanticModelKeyRef = useRef(null)
+  // Every coverage response is tied to the request that produced it. Switching
+  // engines invalidates an older request even if that request finishes last.
+  const coverageRequestRef = useRef(0)
+  const textStatusRequestRef = useRef(0)
   const [payload, setPayload] = useState(null)
   // The chip counters measured under the ACTIVE filter (null = nothing filtered,
   // so the payload's bank-wide numbers are the honest answer). See
@@ -717,16 +828,21 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [undoBusy, setUndoBusy] = useState(false)
   const [undoDismissedAt, setUndoDismissedAt] = useState(0)
   const [launchOpen, setLaunchOpen] = useState(false)
+  const [semanticSwitching, setSemanticSwitching] = useState(false)
   /* 🎛 Which pass's launch window is open (a BANK_PASSES id, or null).
-     ONE piece of state for nine windows: a pass button no longer fires, it opens
+     ONE piece of state for every launch window: a pass button no longer fires, it opens
      the window that shows where the run applies, what the calculation reads and
      what is NOT decided there — then launches from the bottom of it. */
   const [passOpen, setPassOpen] = useState(null)
   // ✨ Score's interpreter picker — reuse a CUDA Python this machine already has
   // instead of downloading another torch. Opened from the CPU warning.
-  const [scoringPythonOpen, setScoringPythonOpen] = useState(false)
+  // Which interpreter picker is open, if any: a PICKER_PROFILES key ('scoring'
+  // for ✨ Score, 'semantic' for the SigLIP 2 index) or '' for none. One dialog
+  // serves both — the profile decides the endpoint and the wording.
+  const [pythonPickerFor, setPythonPickerFor] = useState('')
   const [dismissedReportAt, setDismissedReportAt] = useState(null)
   const [relocating, setRelocating] = useState(false)
+  const [openingSourceFolder, setOpeningSourceFolder] = useState(false)
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [showAutoReject, setShowAutoReject] = useState(false)
   // 🎚 The threshold editor folds away: the chips are the daily gesture, the
@@ -750,6 +866,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [balanceBusy, setBalanceBusy] = useState(false)
   const [balanceResult, setBalanceResult] = useState(null)
   const [similarN, setSimilarN] = useState(60)
+  const [similarBusy, setSimilarBusy] = useState(false)
   // 🔤 Text search. `textStatus` is the BEFORE-the-click truth (available? model
   // already warm? would it download?), `textResult` the AFTER-the-click one that
   // keeps the ranking legible once the grid has switched to it.
@@ -761,6 +878,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [textStatus, setTextStatus] = useState(null)
   const [textPending, setTextPending] = useState(false)
   const [textResult, setTextResult] = useState(null)
+  const semanticOperationBusy = diverseBusy || balanceBusy || similarBusy || textPending
   // "Show selected" VIEW: render ONLY the selected ids, in a chosen order.
   // showSelected flips the grid from the facet page to the selection; selectedOrder
   // holds the order to render them in — the similarity/diversity ranking after a
@@ -834,13 +952,23 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [review, setReview] = useState(null)
   const [reviewLoading, setReviewLoading] = useState(false)
   const activityWasLive = useRef(false)
+  // When the dashboard was last pulled in full. A ref, not effect-local state:
+  // the poll effect re-subscribes on every change of the job's `detail`.
+  const fullPayloadAt = useRef(0)
   // 📡 Drives the "we lost contact" note in the progress zone: a failed poll
   // must never render as "no job running".
   const connection = useConnectionStatus()
 
   const loadCoverage = useCallback(async () => {
+    const requestId = ++coverageRequestRef.current
+    const expectedEngine = semanticEngineRef.current
+    const expectedModelKey = semanticModelKeyRef.current
     try {
-      setCoverage(await apiFetch(`/api/bank/${bankId}/coverage`))
+      const next = await apiFetch(`/api/bank/${bankId}/coverage`)
+      if (requestId !== coverageRequestRef.current
+          || expectedEngine !== semanticEngineRef.current
+          || !semanticPayloadMatches(next, expectedEngine, expectedModelKey)) return
+      setCoverage(next)
     } catch { /* transient — the panel keeps its last read */ }
   }, [bankId])
 
@@ -993,11 +1121,33 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       return undefined
     }
     activityWasLive.current = true
-    // background: this 2 s tick is the one that stacked ten "Connection lost"
-    // banners over the whole app when the phone's connection dropped.
-    const t = setInterval(() => refreshPayload({ background: true }), 2000)
-    return () => clearInterval(t)
-  }, [live, refreshPayload, refreshImages, toast, payload?.activity?.error,
+    // ⏱ The 2 s tick asks for the JOB, not the dashboard. It used to re-fetch the
+    // whole bank payload — ~60 bank-wide aggregates plus a per-image path walk —
+    // which took 12.5 s at rest on a 50 397-image bank and 28.9 s while a pass
+    // ran. Requests issued every 2 s that take 12 s stack up, and that payload is
+    // what carries this banner: the bank went blank and Stop stopped answering,
+    // at the one moment both were needed. /activity reads one indexed row.
+    // The dashboard still refreshes, on its own slower beat, and IMMEDIATELY when
+    // the job lands so the final counts are never a poll behind.
+    let dropped = false
+    const tick = async () => {
+      let next = null
+      try {
+        // background: this tick is the one that stacked ten "Connection lost"
+        // banners over the whole app when the phone's connection dropped.
+        next = await apiFetch(`/api/bank/${bankId}/activity`, { background: true })
+      } catch { return }               // transient — the next tick retries
+      if (dropped) return
+      setPayload((p) => (p ? { ...p, activity: next.activity } : p))
+      const landed = !next.activity || next.activity.finished
+      if (landed || Date.now() - fullPayloadAt.current >= FULL_PAYLOAD_MS) {
+        fullPayloadAt.current = Date.now()
+        refreshPayload({ background: true })
+      }
+    }
+    const t = setInterval(tick, 2000)
+    return () => { dropped = true; clearInterval(t) }
+  }, [live, bankId, refreshPayload, refreshImages, toast, payload?.activity?.error,
       payload?.activity?.cancelled, payload?.activity?.detail])
 
   // The tag vocabulary: fetched once the pass has tagged anything, and re-fetched
@@ -1021,7 +1171,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       // The panel now also reads captions and embeddings, so it must refresh
       // when those passes land — otherwise it keeps showing "no captions yet"
       // after the 🏷️ pass finished.
-      payload?.counts?.captioned, payload?.counts?.scored])
+      payload?.counts?.captioned, payload?.counts?.scored,
+      payload?.counts?.semantic_indexed, payload?.semantic?.engine])
 
   // 👤 "Single person here" — the folder-level person assertions. Reloaded when
   // a job LANDS too: the sample check writes its verdict from the background.
@@ -1043,6 +1194,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       .then((d) => { if (alive) setOllamaModels(d?.models || []) })
     return () => { alive = false }
   }, [])
+
+  const openSourceFolder = async () => {
+    if (openingSourceFolder) return
+    setOpeningSourceFolder(true)
+    try {
+      await postJson(`/api/bank/${bankId}/open-source-folder`, {})
+    } catch (e) {
+      toast.error(e?.message || 'Could not open the bank source folder')
+    } finally {
+      setOpeningSourceFolder(false)
+    }
+  }
 
   const runFolderPerson = async (call, success) => {
     setFolderPersonBusy(true)
@@ -1384,7 +1547,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       // is harmless: every route reads its own named keys and never splats the
       // body, so an extra key nobody asked for is simply never looked at.
       ...on(),
-      ...(spec?.redo && redo ? { [spec.redo.key]: true } : {}),
+      ...(spec?.redo?.explicit
+        ? { [spec.redo.key]: !!redo }
+        : (spec?.redo && redo ? { [spec.redo.key]: true } : {})),
       ...(statuses ? { statuses } : {}),
       ...(imageIds === 'selection' && selected.size ? { image_ids: [...selected] } : {}),
       ...extra,
@@ -1434,6 +1599,40 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   })
   const startCaption = (run) => runPass('caption', run, captionRunOptions())
   const cancelJob = () => act(() => postJson(`/api/bank/${bankId}/cancel`, {}), null)
+
+  const changeSemanticEngine = async (engine) => {
+    if (engine === semanticState.engine || semanticSwitching || semanticOperationBusy || live) return
+    const previousEngine = semanticState.engine
+    setSemanticSwitching(true)
+    try {
+      const d = await act(
+        () => patchJson(`/api/bank/${bankId}/semantic-engine`, semanticEnginePatchBody(engine)),
+        `Semantic engine changed to ${engine === 'siglip2' ? 'SigLIP 2' : 'CLIP'} — both caches were kept.`,
+      )
+      if (d) {
+        // A text search may have left the previous engine warm. It no longer
+        // belongs to this Bank view after a successful switch.
+        releaseTextEncoder(previousEngine)
+        // Close engine-specific explanatory overlays; the user's selection,
+        // images and both caches stay exactly where they are.
+        setCurateOpen(null)
+        setTextStatus(null)
+        setTextResult(null)
+        setBalanceResult(null)
+        // A curated order and coverage response belong to one vector space. Keep
+        // the selection itself, but return to the ordinary grid and invalidate
+        // every old-engine coverage request/result before showing the new engine.
+        exitSelectionView()
+        setOffset(0)
+        refreshImages(filter, 0, { on: false })
+        coverageRequestRef.current += 1
+        textStatusRequestRef.current += 1
+        setCoverage(null)
+      }
+    } finally {
+      setSemanticSwitching(false)
+    }
+  }
   /* 🔄 THE DESTRUCTIVE TWIN. Same endpoint, same options, plus `force:true` — which
      drops the server's "no caption yet" filter and rewrites the whole pile. It exists
      because 🏷️ Caption greys out at zero uncaptioned rows and takes the engine/model
@@ -1616,7 +1815,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     }
   }
 
-  // --- Curation selectors (reuse the ✨ Score embeddings — no GPU) ------------
+  // --- Curation selectors (read the selected semantic index) -----------------
   // Both build a SELECTION the user then reviews with the existing ✓/✕/Promote
   // bar — nothing is auto-kept or deleted. The candidate pool is the current
   // filter (composable), so "60 most diverse of this subfolder" just works.
@@ -1634,13 +1833,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // The typicality guard reads the whole pool's neighbourhood before sampling, so
   // on a big bank this click is no longer instant — say so instead of looking dead.
   const pickDiverse = async () => {
+    const requestEngine = semanticState.engine
+    const requestModelKey = semanticState.modelKey
     setCurateOpen(null)
     setDiverseBusy(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/select-diverse`,
         { n: diverseN, typicality: diverseTypicality, ...filterParams(filter) })
-      if (!d.image_ids?.length) {   // scored, but the current filter holds nothing
-        toast.info('Nothing to sample — no scored images match the current filter.')
+      if (semanticEngineRef.current !== requestEngine
+          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
+      if (!d.image_ids?.length) {
+        toast.info(`Nothing to sample — no ${semanticState.label}-indexed images match the current filter.`)
         return
       }
       showCuratedSelection(d.image_ids)
@@ -1657,12 +1860,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // INSIDE each bucket. The result is only useful if the user can see its shape,
   // so the distribution is kept on screen (numbers, aria-live) after the click.
   const pickBalanced = async () => {
+    const requestEngine = semanticState.engine
+    const requestModelKey = semanticState.modelKey
     setCurateOpen(null)
     setBalanceBusy(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/select-balanced`,
         { n: balanceN, axis: balanceAxis, typicality: diverseTypicality,
           ...filterParams(filter) })
+      if (semanticEngineRef.current !== requestEngine
+          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
       if (!d.image_ids?.length) {
         toast.info('Nothing to balance — no labelled images match the current filter.')
         return
@@ -1680,14 +1887,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }
 
   const findSimilar = async () => {
+    const requestEngine = semanticState.engine
+    const requestModelKey = semanticState.modelKey
     setCurateOpen(null)
     const ref = [...selected][0]
     if (ref == null) return
+    setSimilarBusy(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/select-similar`,
         { ref_id: ref, n: similarN, ...filterParams(filter) })
+      if (semanticEngineRef.current !== requestEngine
+          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
       if (!d.image_ids?.length) {
-        toast.info('No matches — no scored images match the current filter.')
+        toast.info(`No matches — no ${semanticState.label}-indexed images match the current filter.`)
         return
       }
       // Backend returns the ids ranked by similarity (reference first); keep that
@@ -1696,6 +1908,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       toast.info(`Showing the ${d.image_ids.length} most similar to the reference (of ${d.pool}), closest first. Review, then ✓ Keep or ⬆ Promote — or “Show all” to leave this view.`)
     } catch (e) {
       toast.error(e?.message || 'Similarity search failed.')
+    } finally {
+      setSimilarBusy(false)
     }
   }
 
@@ -1706,42 +1920,65 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const openTextSearch = async () => {
     const next = curateOpen === 'text' ? null : 'text'
     setCurateOpen(next)
-    if (next !== 'text') { releaseTextEncoder(); return }
+    if (next !== 'text') {
+      textStatusRequestRef.current += 1
+      releaseTextEncoder()
+      return
+    }
+    const requestId = ++textStatusRequestRef.current
+    const expectedEngine = semanticState.engine
+    if (semanticState.text) setTextStatus(semanticState.text)
     try {
-      setTextStatus(await apiFetch('/api/bank/text-search/status'))
+      const status = await apiFetch('/api/bank/text-search/status'
+        + `?engine=${encodeURIComponent(expectedEngine)}`)
+      if (requestId === textStatusRequestRef.current
+          && expectedEngine === semanticEngineRef.current
+          && semanticPayloadMatches(status, expectedEngine)) setTextStatus(status)
     } catch {
-      setTextStatus(null)      // a status we couldn't read never blocks the field
+      // The Bank payload already carries an engine-aware status. Keep it when
+      // the optional warm/cold probe cannot be read.
+      if (!semanticState.text) setTextStatus(null)
     }
   }
 
-  // Hand the ~2.4 GB back as soon as the panel closes. Best effort by design —
-  // the backend's idle timer is the real guarantee for a tab that just vanished.
-  const releaseTextEncoder = () => {
-    postJson('/api/bank/text-search/release', {}).catch(() => {})
+  // Hand the selected text encoder's memory back as soon as the panel closes.
+  // Best effort by design — the backend idle timer remains the guarantee for a
+  // tab that simply vanished.
+  const releaseTextEncoder = (engine = semanticState.engine) => {
+    postJson('/api/bank/text-search/release', semanticEnginePatchBody(engine)).catch(() => {})
   }
 
   // Leaving the Bank entirely is the same signal as closing the panel: give the
   // memory back. The backend idle timer still covers a browser that just died.
-  useEffect(() => () => { releaseTextEncoder() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    postJson('/api/bank/text-search/release',
+      semanticEnginePatchBody(semanticEngineRef.current)).catch(() => {})
+  }, [])
 
   const runTextSearch = async () => {
     const q = textQuery.trim()
     if (!q) return
+    const requestEngine = semanticState.engine
+    const requestModelKey = semanticState.modelKey
     setTextPending(true)
     try {
       const d = await postJson(`/api/bank/${bankId}/search-text`,
         { query: q, n: textN, push_down: textExclude.trim() || null,
           push_down_weight: textExcludeW, ...filterParams(filter) })
+      if (semanticEngineRef.current !== requestEngine
+          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
       setTextResult(d)
       setCurateOpen(null)
       if (!d.image_ids?.length) {
         // NOT a silent empty grid: say why nothing could be ranked.
-        toast.info(summarize(d))
+        toast.info(summarize(d, semanticState.engine))
         return
       }
       showCuratedSelection(d.image_ids)
       // Refresh the warm flag so the panel now promises "instant" truthfully.
-      apiFetch('/api/bank/text-search/status').then(setTextStatus).catch(() => {})
+      apiFetch('/api/bank/text-search/status'
+        + `?engine=${encodeURIComponent(semanticState.engine)}`)
+        .then(setTextStatus).catch(() => {})
     } catch (e) {
       // 503 = this install cannot do it at all; 400 = do something first. Both
       // arrive as a message written for a human — show it as-is.
@@ -1752,6 +1989,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }
 
   const counts = payload?.counts
+  const semanticState = semanticEngineState(payload, capsLoading ? null : caps)
+  semanticEngineRef.current = semanticState.engine
+  semanticModelKeyRef.current = semanticState.modelKey
+  const semanticReady = semanticState.ready
+    && !(semanticState.engine === 'siglip2' && capsLoading)
+  const semanticIndexed = semanticState.indexed
+  const semanticBlocked = semanticState.engine === 'siglip2' && capsLoading
+    ? 'Checking whether the SigLIP 2 Quality tool is installed…'
+    : semanticPrerequisite(semanticState)
   // The Sort menu greys an entry out when its pass has measured NOTHING. Face
   // confidence is the one whose progress the payload reports outside `counts`
   // (faces_scanned, a sibling key), so it is folded in here rather than by
@@ -1848,6 +2094,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
      ("Standard — the prompt as⌄"). */
   const captionSelectClass = 'mt-0.5 w-full rounded-lg border border-border bg-app/60 '
     + 'px-2 py-1 text-xs text-content disabled:opacity-40'
+  /* Rendered UNDER the engine picker, because it is about the engine and the picker
+     is the lever it names. It re-computes as the engine changes, so ticking
+     JoyCaption turns the warning into its own confirmation instead of leaving an
+     alarm on screen about a half that will no longer run. */
+  const captionNsfw = captionNsfwNotice({
+    payload,
+    scopeId: captionScope,
+    piles: passScopeOption(captionScope).piles,
+    engineId: captionEngine,
+  })
   const captionRunControls = (
     <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
       <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
@@ -1906,6 +2162,23 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           </select>
         </label>
       </div>
+      {captionNsfw && (
+        <div role="note" aria-label="What this run is about to caption"
+          className={`space-y-1 rounded-md border px-2 py-1.5 ${
+            captionNsfw.tone === 'warn'
+              ? 'border-amber-400/40 bg-amber-500/10' : 'border-sky-400/40 bg-sky-500/10'}`}>
+          <p className={`m-0 text-[11px] font-semibold leading-snug ${
+            captionNsfw.tone === 'warn' ? 'text-amber-200' : 'text-sky-200'}`}>
+            {captionNsfw.tone === 'warn' ? '⚠ ' : 'ℹ ' }{captionNsfw.heading}
+          </p>
+          {captionNsfw.paragraphs.map((line) => (
+            <p key={line} className={`m-0 text-[11px] leading-snug ${
+              captionNsfw.tone === 'warn' ? 'text-amber-100/90' : 'text-sky-100/90'}`}>
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
       <p className="m-0 text-[11px] leading-snug text-content-subtle">
         {captionScopeNote(selected.size, counts, captionScope)}
       </p>
@@ -1949,9 +2222,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
   const scored = counts?.scored || 0
   // ⚖️ Can a balanced pick even run? Answered BEFORE the click when we already
-  // know (Score missing; coverage says nothing is classified) — otherwise the
+  // know (semantic index missing; coverage says nothing is classified) — otherwise the
   // backend answers it with the exact pass and the numbers.
-  const balanceReady = balanceReadiness({ scored, coverage })
+  const balanceReady = balanceReadiness({
+    semanticReady, coverage, engineLabel: semanticState.label,
+    prerequisite: semanticBlocked,
+  })
   // What ✨ Score will really run on — the pass no longer holds the GPU when it
   // computes on the CPU, and the UI must say which of the two is happening.
   const scoreDevice = payload?.score_device
@@ -2045,6 +2321,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               title={payload.source_path}>
               {payload.source_path}
             </p>
+            <button type="button" onClick={openSourceFolder}
+              disabled={openingSourceFolder} aria-busy={openingSourceFolder}
+              title="Open this Bank's source folder in the system file explorer."
+              className="shrink-0 rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content disabled:cursor-wait disabled:opacity-60">
+              {openingSourceFolder ? 'Opening…' : '📂 Open folder'}
+            </button>
             {/* Cold path. The folder-sync note below offers this too, but only once
                 the folder is already gone — and the real move is PLANNED: you look
                 for the option before you drag 30 000 files to another drive, not
@@ -2081,6 +2363,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             <Stat label="images" value={counts.total} />
             <Stat label="scanned" value={counts.scanned} />
             {scored > 0 && <Stat label="scored" value={scored} />}
+            {semanticState.hasStatus && (
+              <Stat label={`${semanticState.label} semantic-ready`}
+                value={semanticState.total > 0
+                  ? `${semanticIndexed.toLocaleString()}/${semanticState.total.toLocaleString()}`
+                  : semanticIndexed}
+                tone={semanticReady ? 'emerald' : undefined} />
+            )}
             {watermarkScanned > 0 && <Stat label="watermark-checked" value={watermarkScanned} />}
             <Stat label="undecided" value={counts.pending} />
             <Stat label="kept" value={counts.keep} tone="emerald" />
@@ -2098,6 +2387,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           onDismiss={() => setDismissedReportAt(payload.pipeline_report.finished_at)} />
       )}
 
+      {/* At xl the workflow uses the available width: the action-heavy Analyze
+          zone and the read-only, bank-wide overview sit side by side. Below xl
+          this remains the same simple vertical flow. */}
+      <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
+      <div className="min-w-0 xl:col-span-7">
       {/* ① Analyze — run the analysis passes (or 🚀 Launch all) on the dump.
           Grouping + accent only; every pass keeps its own endpoint/behaviour. */}
       <ZoneSection zone={analyzeZone} accented={activeStep === 'analyze'}>
@@ -2107,7 +2401,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       <GpuBusyNotice className="mb-2" onCleared={() => refreshPayload()} />
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
-          title="Run the whole triage in one go — scan, auto-reject, score, watermarks, group by person and (optionally) caption. Start it and walk away. If the person pass is in, it checks your folders first and asks once, before the run."
+          title={`Run the whole triage in one go — scan, auto-reject, Score${semanticState.engine === 'siglip2' ? ', SigLIP 2 semantic index' : ''}, crops/variants, watermarks, group by person and (optionally) caption. Start it and walk away. If the person pass is in, it checks your folders first and asks once, before the run.`}
           className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
           🚀 Launch all…
         </button>
@@ -2115,6 +2409,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           One-click funnel — or step through the passes below.
         </p>
       </div>
+
+      <BankSemanticEngine state={semanticState} capsLoading={capsLoading}
+        switching={semanticSwitching} disabled={semanticOperationBusy} live={live}
+        gpuPresent={scoreGpuPresent}
+        onPickPython={() => setPythonPickerFor('semantic')}
+        onChange={changeSemanticEngine}
+        onIndex={() => {
+          // The visible “Reindex” promise and the request body agree on first
+          // open; incomplete indexes resume with rescan:false.
+          setPassRedoFor('semantic_index', semanticState.complete)
+          setPassOpen('semantic_index')
+        }} />
 
       {/* Analysis passes — individual, quieter than the primary actions. */}
       <div className="space-y-1.5">
@@ -2170,11 +2476,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               Install it
             </a>
           )}
-          <PassButton onClick={() => setPassOpen('semantic_dedup')} disabled={live || scored === 0}
-            title={scored > 0
-              ? 'Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses — reuses the Score embeddings, so it costs no extra GPU time. Review them under the ✂ Same shot chip.'
-              : 'Run ✨ Score first — semantic near-duplicates reuse its embeddings'}>
-            ✂ Find crops &amp; variants…{scored === 0 && ' (needs Score)'}
+          <PassButton onClick={() => setPassOpen('semantic_dedup')} disabled={live || !semanticReady}
+            title={semanticReady
+              ? `Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses from the ${semanticState.label} semantic index. Review them under the ✂ Same shot chip.`
+              : semanticBlocked}>
+            ✂ Find crops &amp; variants…{!semanticReady
+              && ` (needs ${semanticState.engine === 'clip' ? 'Score' : 'SigLIP 2 index'})`}
           </PassButton>
           {/* The label QUOTES THE NUMBER IT WILL MOVE — the scope's uncaptioned rows,
               or the selection when there is one. "Caption all" was the older, vaguer
@@ -2214,6 +2521,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             their own per-level progress. Lives in its own component so the
             "which level can run, and why not" logic stays unit-tested. */}
         <BankWatermarkPanel bankId={bankId} live={live}
+          onFind={() => setPassOpen('watermark')}
+          payload={payload} selectedIds={[...selected]}
           onChanged={async () => { await refreshPayload(); await refreshImages() }} />
         {scoreNote && (
           <p className={`text-xs ${scoreNote.tone === 'warn'
@@ -2241,7 +2550,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             not a fix to chase. */}
         {!capsLoading && (scoreNote?.tone === 'warn' || !caps.bank_scoring) && (
           <div>
-            <button type="button" onClick={() => setScoringPythonOpen(true)}
+            <button type="button" onClick={() => setPythonPickerFor('scoring')}
               className={`rounded-md border px-2 py-1 text-xs font-medium ${scoreGpuPresent
                 ? 'border-amber-400/50 text-amber-300 hover:bg-amber-500/10'
                 : 'border-border text-content-muted hover:bg-surface-raised hover:text-content'}`}>
@@ -2266,10 +2575,21 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         )}
       </div>
       </ZoneSection>
+      </div>
+      <div className="min-w-0 xl:col-span-5 xl:sticky xl:top-20">
+        <BankOverview payload={payload} />
+      </div>
+      </div>
 
       {/* ② Triage — browse by facet/cluster and Keep/Reject to decide what stays.
           Stays fully visible; density was never the complaint. */}
       <ZoneSection zone={triageZone} accented={activeStep === 'triage'}>
+
+      {/* Say it in words; the app sets its own chips and the counters below —
+          measured, not the model — say what that lands on. Placed at the TOP of
+          triage because it is a shortcut to the controls underneath, not a
+          separate way of selecting. */}
+      <DescribeFilterBar bankId={bankId} onApply={setF} />
 
       {/* Person clusters (after the face pass) */}
       {clusters.length > 0 && (
@@ -2446,87 +2766,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
 
-        {/* 🏷️ Tags of ONE image, as chips you tick. Opened from a tile's 🏷️
-            badge, and rendered HERE — with the other filters — rather than in a
-            popover on the tile or inside ▶ Review: filtering is a grid gesture,
-            it has to stay visible while it is active, and the review lightbox
-            walks a FROZEN snapshot that a filter change could not honestly
-            alter. Ticking re-filters immediately; the sentence spells out that
-            several chips mean AND, because a set that shrinks with every click
-            is only obvious once you already know the rule. */}
-        {/* IT OPENS ON ITS OWN NOW, on the selection. Asked for in these words:
-            "when the captions are already done and you select an image, show the
-            tags in every case. When several images are selected, show the tags in
-            common with the number of times it was cited."
-
-            So there is no second click between selecting and reading: select one
-            captioned image and its chips are here; select twelve and each chip
-            carries how many of them cite it. The 🏷️ button on a tile is still the
-            way to read an image's tags WITHOUT selecting it.
-
-            THE NUMBER IS A FRACTION, never a bare count — see bankTags.js. "7"
-            alone is unreadable without knowing what it is out of, and "7 / 12" is
-            the whole judgement: this tag describes over half of what you picked. */}
+        {/* Phones keep the established placement inside the filter zone. The
+            desktop copy below is display:none here, so only one inspector is
+            visible (and reachable) at any viewport size. */}
         {tagRow && (
-          <div className="space-y-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/5 px-2.5 py-2">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <GroupLabel>
-                {tagRow.kind === 'image' ? `🏷️ Tags of ${tagRow.name}`
-                  : tagRow.size === 1 ? '🏷️ Tags of the selected image'
-                    : `🏷️ Tags across ${tagRow.size} selected images`}
-              </GroupLabel>
-              <span className="text-[11px] text-content-subtle">
-                attributes you pick — unlike 🎯 Similar, which matches the look
-              </span>
-              {tagRow.frozen && (
-                <span className="rounded border border-border px-1.5 text-[11px] text-content-subtle">
-                  held from the selection you filtered on
-                </span>
-              )}
-              <button type="button" onClick={clearTags}
-                className="ml-auto rounded border border-border px-2 py-0.5 text-[11px] text-content-muted hover:text-content">
-                ✕ Close
-              </button>
-            </div>
-            {tagRow.rows.length === 0 ? (
-              <p className="m-0 text-xs text-content-muted">
-                {tagRow.uncaptioned > 0 && tagRow.counted === 0
-                  ? (tagRow.size === 1
-                    ? 'This image has no caption yet — run 🏷️ Caption and its tags appear here.'
-                    : `None of these ${tagRow.size} images has a caption yet — run 🏷️ Caption on them and their tags appear here.`)
-                  : 'No caption here has a word worth filtering on.'}
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {tagRow.rows.map(({ tag, count }) => {
-                  const n = tagCountLabel(count, tagRow.counted)
-                  return (
-                    <Chip key={tag} active={tagPicked.has(tag)}
-                      onClick={() => toggleTag(tag, tagRow)}
-                      title={tagPicked.has(tag)
-                        ? `Stop requiring “${tag}”`
-                        : `Show only images whose caption mentions “${tag}”`
-                          + (n ? ` — cited by ${count} of the ${tagRow.counted} captioned images you selected` : '')}>
-                      {tag}
-                      {n && <span className="ml-1 text-[10px] text-content-subtle">{n}</span>}
-                    </Chip>
-                  )
-                })}
-              </div>
-            )}
-            {/* What was counted, and everything that was NOT. Each shortfall gets
-                its own line: "no caption yet" and "captioned but word-less" have
-                different fixes, and a cap the row hit is not the same fact as
-                either. Silence on any of them is a denominator that lies. */}
-            {selectionTagsNotes(tagRow, tagRow.unread).map((note) => (
-              <p key={note} className="m-0 text-[11px] leading-snug text-content-subtle">{note}</p>
-            ))}
-            {tagPicked.size > 0 && (
-              <p className="m-0 text-[11px] text-content-muted">
-                {tagFilterSummary(tagPicked)} Matched as whole words, in captions
-                and file names.
-              </p>
-            )}
+          <div className="xl:hidden">
+            <SelectionTagsPanel tagRow={tagRow} tagPicked={tagPicked}
+              onToggle={(tag) => toggleTag(tag, tagRow)} onClear={clearTags} />
           </div>
         )}
 
@@ -3012,24 +3258,29 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       </div>
       </ZoneSection>
 
+      {/* The two short finishing zones share a row on wide screens. Promote
+          stays visible while a long Curate result is reviewed; phones retain
+          the natural Curate → Promote stack. */}
+      <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
+      <div className="min-w-0 xl:col-span-8">
       {/* ③ Curate — optional refinement (diverse/similar/coverage). Always
           accessible, but never the accented "next step". */}
       <ZoneSection zone={curateZone} accented={false}>
 
-      {/* Curation — build a good LoRA subset out of a big dump (reuses ✨ Score
-          embeddings, no GPU). Diversity coverage + reference similarity, both
+      {/* Curation — build a good LoRA subset out of a big dump from this Bank's
+          selected semantic index. Diversity coverage + reference similarity, both
           producing a SELECTION the user reviews above. */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Curate</span>
         <div className="relative">
-          <button type="button" disabled={live || scored === 0 || diverseBusy}
+          <button type="button" disabled={live || !semanticReady || diverseBusy}
             onClick={() => setCurateOpen((v) => (v === 'diverse' ? null : 'diverse'))}
             aria-expanded={curateOpen === 'diverse'}
-            title={scored > 0
-              ? 'Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) — the fix for a dump of near-identical shots. Reuses the ✨ Score embeddings, no GPU.'
-              : 'Run ✨ Score first — diversity sampling reuses its embeddings'}
+            title={semanticReady
+              ? `Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) using the ${semanticState.label} semantic index.`
+              : semanticBlocked}
             className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-            🎨 Pick diverse…{scored === 0 && ' (needs Score)'}{diverseBusy && ' (sampling…)'}
+            🎨 Pick diverse…{!semanticReady && ` (needs ${semanticState.label})`}{diverseBusy && ' (sampling…)'}
           </button>
           {curateOpen === 'diverse' && (
             <>
@@ -3089,7 +3340,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             onClick={() => setCurateOpen((v) => (v === 'balanced' ? null : 'balanced'))}
             aria-expanded={curateOpen === 'balanced'}
             title={balanceReady.ready
-              ? 'Select N images SPREAD OVER the framings (face / bust / body / back) instead of the top of one ranking — so a LoRA does not learn one shot type and fail the rest. Reuses the ✨ Score embeddings, no GPU.'
+              ? `Select N images SPREAD OVER the framings (face / bust / body / back), then diversify each bucket with the ${semanticState.label} semantic index.`
               : balanceReady.reason}
             className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
             ⚖ Balanced pick…{balanceBusy && ' (sampling…)'}
@@ -3137,16 +3388,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
         <div className="relative">
-          <button type="button" disabled={live || scored === 0 || selected.size !== 1}
+          <button type="button"
+            disabled={live || !semanticReady || selected.size !== 1 || similarBusy}
             onClick={() => setCurateOpen((v) => (v === 'similar' ? null : 'similar'))}
             aria-expanded={curateOpen === 'similar'}
-            title={scored === 0
-              ? 'Run ✨ Score first — reference similarity reuses its embeddings'
+            title={!semanticReady
+              ? semanticBlocked
               : selected.size === 1
-                ? 'Rank the current filter by how much it looks like the ONE selected image, and select the closest N — pull a person/look out of a mixed dump. Reuses the ✨ Score embeddings, no GPU.'
+                ? `Rank the current filter against the ONE selected image with the ${semanticState.label} semantic index and select the closest N.`
                 : 'Select exactly one image to use as the reference'}
             className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-            🎯 Similar to selected…
+            🎯 Similar to selected…{similarBusy && ' (ranking…)'}
           </button>
           {curateOpen === 'similar' && (
             <>
@@ -3155,7 +3407,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   see its comment for the measured cause. */}
               <div className="fixed inset-x-4 bottom-4 z-50 max-h-[75vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72 sm:max-h-none sm:overflow-visible">
                 <p className="text-xs text-content-muted">
-                  Ranks the current filter by CLIP similarity to your one selected image and selects
+                  Ranks the current filter by {semanticState.label} similarity to your one selected image and selects
                   the closest — a fast way to extract one person or look. The reference is kept in
                   the selection.
                 </p>
@@ -3165,23 +3417,23 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                     onChange={(e) => setSimilarN(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
                     className="w-20 rounded-md border border-border bg-surface px-2 py-0.5 text-sm text-content" />
                 </label>
-                <button type="button" onClick={findSimilar}
-                  className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white">
-                  Select {similarN} most similar
+                <button type="button" onClick={findSimilar} disabled={similarBusy}
+                  className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-60">
+                  {similarBusy ? 'Ranking…' : `Select ${similarN} most similar`}
                 </button>
               </div>
             </>
           )}
         </div>
         <div className="relative">
-          <button type="button" disabled={live || scored === 0}
+          <button type="button" disabled={live || !semanticReady}
             onClick={openTextSearch}
             aria-expanded={curateOpen === 'text'}
-            title={scored > 0
-              ? 'Describe what you are looking for in words ("brunette outdoors, wide shot") and rank the current filter by how close each image is. Reuses the ✨ Score embeddings, no GPU.'
-              : 'Run ✨ Score first — text search ranks the embeddings it computes'}
+            title={semanticReady
+              ? `Describe what you are looking for in words ("brunette outdoors, wide shot") and rank the current filter with ${semanticState.label}.`
+              : semanticBlocked}
             className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-            🔤 Find by text…{scored === 0 && ' (needs Score)'}
+            🔤 Find by text…{!semanticReady && ` (needs ${semanticState.label})`}
           </button>
           {curateOpen === 'text' && (
             <>
@@ -3259,8 +3511,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 </label>
                 {/* The cost, BEFORE the click — a cold CLIP load is ~10 s and an
                     unexplained wait is exactly how this reads as a hang. */}
-                <p className="text-xs text-content-subtle">{readinessHint(textStatus)}</p>
-                <p className="text-xs text-amber-300/80">{limitsSentence()}</p>
+                <p className="text-xs text-content-subtle">
+                  {readinessHint(textStatus, semanticState.engine)}
+                </p>
+                <p className="text-xs text-amber-300/80">
+                  {limitsSentence(semanticState.engine)}
+                </p>
                 <button type="button" onClick={runTextSearch}
                   disabled={textPending || !textQuery.trim()}
                   className="w-full rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">
@@ -3270,8 +3526,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             </>
           )}
         </div>
-        {scored === 0 && (
-          <span className="text-xs text-content-subtle">Run ✨ Score to unlock curation.</span>
+        {!semanticReady && (
+          <span className="text-xs text-content-subtle">{semanticBlocked}</span>
         )}
         <button type="button" onClick={() => setCoverageOpen((v) => !v)}
           aria-expanded={coverageOpen}
@@ -3290,7 +3546,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         {textResult && (
           <div className="mt-2 space-y-1 rounded-lg border border-indigo-400/40 bg-indigo-500/10 px-3 py-2 text-xs text-content">
             <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-              <span className="min-w-0 flex-1">{summarize(textResult)}</span>
+              <span aria-hidden>🔤</span>
+              <span className="min-w-0 flex-1">
+                {summarize(textResult, semanticState.engine)}
+              </span>
               <button type="button"
                 onClick={() => { setTextResult(null); setShowSelected(false); refreshImages(filter, 0, { on: false }) }}
                 className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised">
@@ -3308,7 +3567,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 This phrase is now cached — searching it again is instant, even after a restart.
               </p>
             )}
-            <p className="text-amber-300/80">{limitsSentence()}</p>
+            <p className="text-amber-300/80">{limitsSentence(semanticState.engine)}</p>
           </div>
         )}
       </div>
@@ -3346,14 +3605,18 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       </div>
 
       {coverageOpen && (
-        <CoveragePanel coverage={coverage} onClose={() => setCoverageOpen(false)}
+        <CoveragePanel coverage={coverage} semanticEngine={coverage?.engine || semanticState.engine}
+          semanticLabel={semanticEngineLabel(coverage?.engine || semanticState.engine)}
+          onClose={() => setCoverageOpen(false)}
           onBalance={balanceReady.ready ? () => setCurateOpen('balanced') : null}
           balanceReason={balanceReady.reason} />
       )}
       </ZoneSection>
+      </div>
 
       {/* ④ Promote — ship the kept set into a dataset, or clear rejects off
           disk. Same actions/handlers as before — just grouped as the last step. */}
+      <div className="min-w-0 xl:col-span-4 xl:sticky xl:top-20">
       <ZoneSection zone={promoteZone} accented={activeStep === 'promote'}>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
@@ -3378,15 +3641,32 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         </button>
       </div>
       </ZoneSection>
+      </div>
+      </div>
 
-      {filter.flag === 'dups' ? (
-        <DupGroupsPanel bankId={bankId} live={live} kind="exact"
-          onChanged={() => { refreshPayload(); refreshImages() }} />
-      ) : filter.flag === 'semantic_dups' ? (
-        <DupGroupsPanel bankId={bankId} live={live} kind="semantic"
-          onChanged={() => { refreshPayload(); refreshImages() }} />
-      ) : (
-        <>
+      {/* The selected-image tags are an inspector for the desktop gallery, not
+          another full-width filter row. This responsive mount is hidden below
+          xl; phones keep their established copy in the filter zone above. */}
+      <div className={`grid gap-4 ${tagRow
+        ? 'xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start'
+        : 'grid-cols-1'}`}>
+        {tagRow && (
+          <aside aria-label="Image tags"
+            className="hidden xl:col-start-2 xl:row-start-1 xl:block xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
+            <SelectionTagsPanel tagRow={tagRow} tagPicked={tagPicked}
+              onToggle={(tag) => toggleTag(tag, tagRow)} onClear={clearTags} />
+          </aside>
+        )}
+        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+        {filter.flag === 'dups' ? (
+          <DupGroupsPanel bankId={bankId} live={live} kind="exact"
+            onChanged={async () => { await refreshPayload(); await refreshImages() }} />
+        ) : filter.flag === 'semantic_dups' ? (
+          <DupGroupsPanel bankId={bankId} live={live} kind="semantic"
+            semanticLabel={semanticState.label}
+            onChanged={async () => { await refreshPayload(); await refreshImages() }} />
+        ) : (
+          <>
           <ul className={`grid gap-2 ${tileSize === 'S'
             ? 'grid-cols-4 sm:grid-cols-6 lg:grid-cols-8'
             : 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6'}`}>
@@ -3417,8 +3697,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 className="rounded-md border border-border px-2 py-1 text-content disabled:opacity-40">Next →</button>
             </nav>
           )}
-        </>
-      )}
+          </>
+        )}
+        </div>
+      </div>
 
       <BankDecisionBar selected={selected}
         onKeep={() => batchStatus([...selected], 'keep')}
@@ -3448,13 +3730,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           onDone={() => { setDeleteRejectedOpen(false); setSelected(new Set()); refreshPayload(); refreshImages() }} />
       )}
 
-      {/* 🎛 THE PASS LAUNCH WINDOW — one component, nine passes. 👥 routes through
+      {/* 🎛 THE PASS LAUNCH WINDOW — one component for every pass. 👥 routes through
           the folder preflight, 🏷️ Caption carries its five options and its
           destructive twin; everything else is the shared three blocks. */}
       {passOpen && (
         <PassDialog passId={passOpen} payload={payload} live={live}
+          semanticEngine={semanticState.engine}
           selectionSize={selected.size}
-          detectorReady={!!caps.watermark_detector}
+          detectorReady={!!caps.watermark_detect}
           scope={passScopes[passOpen] || ''}
           onScope={(v) => setPassScope(passOpen, v)}
           redo={!!passRedo[passOpen]}
@@ -3485,11 +3768,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           onCancel={() => setPreflight(null)} />
       )}
 
-      {scoringPythonOpen && (
-        <ScoringPythonDialog onClose={() => setScoringPythonOpen(false)}
+      {pythonPickerFor && (
+        <ScoringPythonDialog profile={PICKER_PROFILES[pythonPickerFor]}
+          onClose={() => setPythonPickerFor('')}
           onChanged={async () => {
-            // The pass reads bank_scoring_gpu_available(); force both probes so
-            // the CPU warning and the "holds the GPU" tooltip agree at once.
+            // The passes read bank_scoring_gpu_available() /
+            // bank_siglip2_gpu_available(); force both probes so the CPU warning
+            // and the "holds the GPU" tooltip agree at once.
             await refreshCaps(true)
             await refreshPayload()
           }} />

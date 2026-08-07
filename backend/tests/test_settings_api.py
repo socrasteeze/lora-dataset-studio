@@ -273,6 +273,55 @@ def test_put_settings_accepts_bank_scoring_and_keeps_autoprovisioned_python(clie
     assert body['klein']['generation_lora_presets'][0]['name'] == 'My preset'
 
 
+def test_put_settings_protects_the_shot_detection_interpreter(client):
+    """shot_detect.python is written by its installer and has no Settings input, so
+    the frontend echoes it back as "" on every full Save. Without the guard, saving
+    any unrelated setting silently un-installs shot detection: the probe falls back
+    to the app's own Python, which has no torch, and the capability reads "missing"
+    forever despite a perfect install — the exact defect the other auto-provisioned
+    interpreters already carry a guard for."""
+    from app import config
+    config.save_config({'shot_detect': {'python': '/envs/scoring/py.exe'}})
+    r = client.put('/api/settings', json={'config': {
+        'shot_detect': {'python': '', 'device': 'cuda'},
+    }})
+    assert r.status_code == 200, r.get_json()
+    saved = r.get_json()['config']['shot_detect']
+    assert saved['python'] == '/envs/scoring/py.exe'
+    assert saved['device'] == 'cuda'      # the rest of the section still saves
+
+
+def test_stale_full_config_save_keeps_installed_bank_semantic_python(client):
+    """A Settings form opened before SigLIP2 finishes must not undo the install.
+
+    The stale form still carries ``bank_semantic.python: ''``. Setup records the
+    managed runtime out-of-band while that tab is open; saving another semantic
+    setting afterwards must preserve the new runtime instead of falling back to
+    Score's borrowed interpreter.
+    """
+    from app import config
+
+    borrowed = '/borrowed/gpu/python'
+    managed = '/data/envs/bank_scoring/python'
+    config.save_config({
+        'bank_scoring': {'python': borrowed},
+        'bank_semantic': {'python': ''},
+    })
+    stale = client.get('/api/settings').get_json()['config']
+    assert stale['bank_semantic']['python'] == ''
+
+    # SigLIP2 Install completes after the Settings tab loaded.
+    config.save_config({'bank_semantic': {'python': managed}})
+    stale['bank_semantic']['device'] = 'cpu'
+    r = client.put('/api/settings', json={'config': stale})
+
+    assert r.status_code == 200, r.get_json()
+    saved = r.get_json()['config']
+    assert saved['bank_semantic']['python'] == managed
+    assert saved['bank_semantic']['device'] == 'cpu'
+    assert saved['bank_scoring']['python'] == borrowed
+
+
 def test_capabilities_endpoint(client):
     caps = client.get('/api/capabilities').get_json()
     assert 'engines' in caps and 'studio_visible' in caps

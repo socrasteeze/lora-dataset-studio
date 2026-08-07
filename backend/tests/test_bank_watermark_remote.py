@@ -23,7 +23,7 @@ def test_the_route_threads_device_id_through(app, client, monkeypatch):
     from app.services import image_bank_service as banks
     seen = {}
 
-    def fake_start(app_, user_id, bank_id, method='auto', device_id=None):
+    def fake_start(app_, user_id, bank_id, method='auto', device_id=None, **_kw):
         seen.update(method=method, device_id=device_id)
         return {'ok': True}
     monkeypatch.setattr(banks, 'start_watermark_inpaint', fake_start)

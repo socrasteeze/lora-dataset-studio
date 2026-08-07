@@ -8,6 +8,7 @@ import { deriveSetupSteps, deriveCapabilitySummary, SETUP_STEP_IDS, kleinMissing
   aitoolkitVerdict, AITOOLKIT_INSTALL_STEPS } from '../hooks/useSetupSteps'
 import SettingsLink from '../components/common/SettingsLink'
 import GuidedSteps from '../components/setup/GuidedSteps'
+import { ML_INSTALL_CARDS, cardInstalled } from '../components/setup/mlInstallCards'
 import InstallRunner from '../components/setup/InstallRunner'
 import InstallEverything from '../components/setup/InstallEverything'
 import { HelpBadge } from '../help/HelpMode'
@@ -50,11 +51,24 @@ const STATUS_META = {
 // (Auto-classify framing / Auto head-crop), just phrased differently here.
 const CAPABILITY_STEP_ID = {
   'Klein (local)': 'comfyui',
+  'Krea 2 Edit (local)': 'install',
   'Captioning': 'ollama',
   'Auto-framing & head-crop': 'ollama',
   'Face-similarity scoring': 'quality',
   'Person masks': 'quality',
   'Watermark inpainting': 'quality',
+  'Image tagging (WD14)': 'quality',
+  'Video bank — reading files': 'quality',
+  'Video bank — shot detection': 'quality',
+  'Video bank — clip encoding': 'quality',
+  // Same step as the four rows above: each has its own one-click card in the
+  // quality step's install list (mlInstallCards.js) — bank scoring/SigLIP2/the
+  // watermark detector were already there; the scraping-extras card was added
+  // alongside this row (it previously only lived on the Concept Sources panel).
+  'Bank scoring (aesthetic · NSFW · style)': 'quality',
+  'SigLIP2 Bank semantics (optional)': 'quality',
+  'Watermark detector (optional)': 'quality',
+  'Scraping extras (optional)': 'quality',
   'LoRA training': 'training',
   'Test Studio': 'comfyui',
 }
@@ -994,31 +1008,17 @@ export default function SetupPage() {
       // who's missing just one (e.g. watermark inpainting on an older install) fixes
       // that one without redoing the whole monolithic step. The all-at-once install
       // stays available below for a first-time setup.
-      const ML_CAPS = [
-        { action: 'face_scoring', cap: 'face_scoring', icon: '🎭', title: 'Face-similarity scoring',
-          body: 'Powers the "Analyze faces" pass: scores how closely each generated image resembles your reference photo, so you keep the ones that truly look like the person. It only ranks — it never deletes anything.' },
-        { action: 'masks', cap: 'masks', icon: '🧍', title: 'Person masks',
-          body: 'Isolates the subject from the background for masked training: the surroundings are weighted down so the LoRA binds the identity to the person, not the room. A training without masks is still valid.' },
-        { action: 'watermark_inpaint', cap: 'watermark_inpaint', icon: '🧽', title: 'Watermark inpainting',
-          body: 'Repaints small off-center watermarks (LaMa) during 🧽 Clean instead of only cropping border marks. It can use CUDA or CPU from Settings. Without it, off-center marks are skipped.' },
-        { action: 'bank_scoring', cap: 'bank_scoring', icon: '✨', title: 'Bank scoring (aesthetic · NSFW · style)',
-          body: "Powers the 🗃️ Bank's ✨ Score pass: rates images for aesthetics (1–10), flags NSFW and groups them by visual style with one CLIP pass — and makes 'keep best' prefer the nicest-looking duplicate. Installs into its own Python (CLIP + a small NSFW model). Without it, the Score button is disabled with this hint." },
-        // The only tile here whose install has TWO halves (pip + a ~400 MB model
-        // download), which is why its ✓/✗ can disagree with "pip succeeded" and
-        // why the reason under it is the server's own, not a fixed string.
-        { action: 'wd14', cap: 'wd14', icon: '🔖', title: 'Image tagging (WD14)',
-          detailKey: 'wd14_detail',
-          body: "Powers the 🗃️ Bank's 🔖 Tags pass: labels what is IN each picture as booru tags — hair colour, clothing, setting — so a huge unsorted dump can be filtered by those before you spend GPU hours captioning it. It never writes captions; the tags live in their own column. Runs fine on CPU. Includes a ~400 MB model download." },
-        { action: 'watermark_detect', cap: 'watermark_detect', icon: '🚩',
-          title: 'Watermark detector (faster 🚩 Find)',
-          body: "Makes the Bank's 🚩 Find watermarks pass roughly ten times faster and lets it run without Ollama: a small classifier scores each image (~0.14 s instead of ~1.7 s asking the vision model in words), and a second model marks where the logo sits so ✂ Crop and 🧽 Inpaint have something to work on. Adds ~0.9 GB of weights into the scoring Python it shares with ✨ Score. Without it nothing breaks — the vision model keeps doing the same job, slower." },
-      ]
+      // The list itself lives in mlInstallCards.js so the bare node --test suite
+      // can hold Setup to the promises the capability strips make (JSX never
+      // executes there — a list defined here is a list no test can see).
+      const ML_CAPS = ML_INSTALL_CARDS
       return (
         <div className="space-y-3">
           <p className="text-sm text-content-muted">
-            Optional helpers installed into this app's own Python environment. Face scoring and masks run on
+            Optional helpers installed into this app's managed ML environments. Face scoring and masks run on
             CPU; watermark inpainting can use CUDA or CPU. The app works fully without them; they just make
-            curation and training cleaner. Install each on its own below, or all at once at the bottom. Already installed?
+            curation and training cleaner. Install each on its own below. The legacy pip bundle at the bottom covers
+            the shared ML requirements only; isolated Bank engines and large model downloads stay explicit. Already installed?
             Use <span className="font-medium text-content">↻ Reinstall</span> to repair or update it.
           </p>
           {caps.python && !caps.python.ml_supported && (
@@ -1038,7 +1038,8 @@ export default function SetupPage() {
           )}
           <div className="space-y-3">
             {ML_CAPS.map((c) => {
-              const present = !!caps[c.cap]
+              // Every piece the action installs, not just the first — see cardInstalled.
+              const present = cardInstalled(c, caps)
               return (
                 <div key={c.action} className="rounded-md border border-border bg-surface-raised p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -1162,7 +1163,17 @@ export default function SetupPage() {
   const INSTALL = SCREENS.indexOf('install')   // the install/reinstall step, after config
   const isReady = (id) => stepById[id].status === 'ready' || stepById[id].disabled
   const toolIdx = (id) => SETUP_STEP_IDS.indexOf(id)
-  const screenOf = (id) => SETUP_STEP_IDS.indexOf(id) + 1   // welcome=0, tools=1..N
+  // welcome=0, tools=1..N — and, for the two screens that are not tool steps
+  // ('install', 'done'), their index in SCREENS. Without that second lookup a
+  // capability row pointing at the install/repair menu (Krea 2 Edit, whose only
+  // one-click installer lives there) silently resolved to -1+1 = 0 and dumped the
+  // user on the welcome screen. Unknown ids still fall back to welcome, as before.
+  const screenOf = (id) => {
+    const i = SETUP_STEP_IDS.indexOf(id)
+    if (i >= 0) return i + 1
+    const j = SCREENS.indexOf(id)
+    return j > 0 ? j : 0
+  }
   const allReady = SETUP_STEP_IDS.every(isReady)
   const nextUnfinished = (fromIdx) => {
     for (let i = fromIdx + 1; i < SETUP_STEP_IDS.length; i += 1)

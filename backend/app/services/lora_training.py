@@ -39,7 +39,8 @@ from PIL import Image, ImageOps
 from .. import config as cfg
 from ..models import FaceDataset, FaceDatasetImage
 from ..job_queue import GPU_ARBITER_LOCK, queue_manager
-from . import face_dataset_service as fds, face_mask, trash
+from . import cloud_run_dataset as _crd
+from . import dataset_activity, face_dataset_service as fds, face_mask, trash
 from .person_mask import generate_person_masks
 
 logger = logging.getLogger(__name__)
@@ -4301,6 +4302,59 @@ def export_dataset_to_aitoolkit(user_id, dataset_id, masked: bool = True, dest_d
     return out
 
 
+def _export_and_freeze_local_dataset(user_id, dataset_id, *, masked, base_model):
+    """Create one coherent local-training export and provenance snapshot.
+
+    Dataset mutations use the same ingest lock and consult the exclusive
+    activity below.  Keeping both the ai-toolkit export and
+    ``prepare_launch`` inside that reservation prevents a run from training on
+    generation A while its LDS record describes generation B.
+    """
+    lock = fds._dataset_ingest_lock(user_id, dataset_id)
+    with lock:
+        token = dataset_activity.begin_exclusive(
+            dataset_id, 'training_export',
+            detail='freezing the Dataset for training')
+        if token is None:
+            raise dataset_activity.DatasetActivityBusy(
+                'This dataset already has work in progress. Wait for it to '
+                'finish before launching training.')
+        heartbeat_stop = threading.Event()
+
+        def keep_reservation_alive():
+            while not heartbeat_stop.wait(30.0):
+                dataset_activity.progress(token)
+
+        heartbeat = threading.Thread(
+            target=keep_reservation_alive, daemon=True,
+            name=f'dataset-{dataset_id}-training-export-heartbeat')
+        heartbeat.start()
+        try:
+            dataset_folder = export_dataset_to_aitoolkit(
+                user_id, dataset_id, masked=masked)
+            # A cloud/other-lane launch can win while a large local export is
+            # being written.  Refuse before the expensive snapshot if so; the
+            # final queue/GPU lock remains authoritative for spawning.
+            if (queue_manager._get_system_state('training_in_progress', False)
+                    and not _training_process_is_definitely_dead(
+                        queue_manager._get_system_state('training_pid', None))):
+                raise ValueError(
+                    'a training is already in progress - wait for it to finish '
+                    'or queue this dataset')
+            from . import checkpoint_registry
+            prepared = checkpoint_registry.prepare_launch(
+                user_id, dataset_id, base_model=base_model)
+            if checkpoint_registry.prepared_generation_identity(prepared) is None:
+                raise RuntimeError(
+                    'could not freeze the Dataset provenance for training; no '
+                    'run was started — retry after checking the backend log')
+            return dataset_folder, prepared
+        finally:
+            heartbeat_stop.set()
+            heartbeat.join(timeout=1.0)
+            dataset_activity.end(token)
+
+
 # --- Overrides STYLE (communs aux familles) ------------------------------------
 _STYLE_CAPTION_DROPOUT = 0.05
 
@@ -7447,7 +7501,8 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
                 exc, exc_info=True)
             _bridge_candidate = False
             _bridge_model_pins = None
-    dataset_folder = export_dataset_to_aitoolkit(user_id, dataset_id, masked=masked)
+    dataset_folder, _prepared = _export_and_freeze_local_dataset(
+        user_id, dataset_id, masked=masked, base_model=base_model)
     _job_config = build_job_config(ds, dataset_folder, steps=steps)
     if _bridge_candidate:
         _configure_exact_state_dataloaders(_job_config)
@@ -7486,27 +7541,9 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
         log_path = _run_log_path(
             ds, base_model=base_model, family=launch_fam, variant=variant)
     run_token = secrets.token_hex(16)
-    # Freeze the dataset (manifest + caption text + image content hashes +
-    # environment) BEFORE taking the lock. All of the reading — file hashes,
-    # nvidia-smi, the ai-toolkit revision — happens here so the registration
-    # under `_queue_lock` stays a single short write; the launch path has
-    # already lost cloud runs to `database is locked` once.
+    # The Dataset manifest/snapshot was frozen atomically with the export above;
+    # only the short registry write remains for the spawn transaction below.
     from . import checkpoint_registry
-    # Re-ask the cheap question BEFORE the freeze. The same check already runs at
-    # the top of this function, but the dataset export in between takes minutes on
-    # a real dataset — long enough for another launch to have won the process slot.
-    # Without this, that loser still paid for a full freeze (hashing every image,
-    # probing nvidia-smi and the ai-toolkit revision) before the authoritative
-    # check under `_queue_lock` refused it. Two reads of an in-memory flag; the
-    # copy inside the lock stays the authority, this one only saves the work.
-    if (queue_manager._get_system_state('training_in_progress', False)
-            and not _training_process_is_definitely_dead(
-                queue_manager._get_system_state('training_pid', None))):
-        raise ValueError(
-            'a training is already in progress - wait for it to finish or '
-            'queue this dataset')
-    _prepared = checkpoint_registry.prepare_launch(
-        user_id, dataset_id, base_model=base_model)
     _bridge_identity_path = None
     _bridge_status_path = None
     with _queue_lock:
@@ -7603,11 +7640,15 @@ def launch_training(user_id, dataset_id, steps: int | None = None, check_caption
         _launch_settings = launch_settings_snapshot(ds, masked=masked)
         if allow_not_ready and isinstance(_launch_settings, dict):
             _launch_settings = {**_launch_settings, 'acknowledged_not_ready': True}
-        checkpoint_registry.register_launch(
+        _run_record = checkpoint_registry.register_launch(
             user_id, dataset_id, family=launch_fam, source='local',
             base_model=base_model or '', variant=variant, masked=bool(masked),
             steps=int(steps), settings=_launch_settings, prepared=_prepared,
             parent_record_id=parent_record_id, resumed_from=resumed_from)
+        if _run_record is None:
+            raise RuntimeError(
+                'could not persist the Dataset provenance for local training; '
+                'no training process was started')
         queue_manager._set_system_state('training_error', None, ttl_seconds=1)
         identity = {
             'training_in_progress': True,
@@ -8436,19 +8477,29 @@ class TrainingStopVerificationError(RuntimeError):
     """The kill was issued but the training process could not be confirmed dead."""
 
 
-def stop_training(expected_dataset_id=None, expected_run_token=None) -> bool:
+def stop_training(expected_dataset_id=None, expected_run_token=None,
+                  expected_dataset_table=None) -> bool:
     """Kill the local training process, then release its GPU ownership fence.
 
     The final state transition is deliberately fail-closed: a non-zero
     taskkill result, a missing PID, or an unavailable PID probe leaves the
     training fence in place. Releasing it without proof would let Vision or
     ComfyUI allocate the GPU while ai-toolkit may still be running.
+
+    `expected_dataset_table` completes `expected_dataset_id`, which is an integer
+    two tables now share. Omitted, it means `face_dataset` — so the image lane's
+    Stop button keeps refusing, rather than killing, a video run of the same id.
+    An unconditional stop (no expected id at all) is unchanged and still stops
+    whatever is running: it is the "get off my GPU" button, and it is not asked
+    to know what it is stopping.
     """
     # Keep the launch lock order: training ownership first, then shared GPU
     # admission. This makes the final clear atomic with Vision/ComfyUI admission.
     with _queue_lock, GPU_ARBITER_LOCK:
         current_id = queue_manager._get_system_state('training_dataset_id', None)
         current_token = queue_manager._get_system_state('training_run_token', None)
+        current_table = (queue_manager._get_system_state(
+            'training_dataset_table', None) or _crd.FACE)
         in_progress = bool(queue_manager._get_system_state(
             'training_in_progress', False))
         if expected_dataset_id is not None:
@@ -8456,6 +8507,8 @@ def stop_training(expected_dataset_id=None, expected_run_token=None) -> bool:
                 same_run = int(current_id) == int(expected_dataset_id)
             except (TypeError, ValueError):
                 same_run = False
+            if same_run:
+                same_run = current_table == (expected_dataset_table or _crd.FACE)
             if not in_progress or not same_run:
                 return False
         if expected_run_token is not None:
@@ -8728,8 +8781,34 @@ def is_local_run_active(dataset_id) -> bool:
 def training_status(user_id=None) -> dict:
     cur_id = queue_manager._get_system_state('training_dataset_id', None)
     in_progress = bool(queue_manager._get_system_state('training_in_progress', False))
+    cur_table = (queue_manager._get_system_state('training_dataset_table', None)
+                 or _crd.FACE)
     current = None
-    if in_progress and cur_id is not None:
+    if in_progress and cur_id is not None and cur_table == _crd.VIDEO:
+        # A video run. Resolved here rather than below because every line of the
+        # face branch — the family, the variant, the base model, the Z-Image
+        # recipe diagnostic — is a question about a `face_dataset` row that this
+        # id does not name. Answering them from the colliding face row is how the
+        # run ends up on the wrong page under the wrong name.
+        from ..models import VideoDataset
+        vds = VideoDataset.query.get(int(cur_id))
+        current = {
+            'dataset_id': cur_id,
+            'dataset_table': cur_table,
+            'name': vds.name if vds else f'video dataset {cur_id}',
+            'run_token': queue_manager._get_system_state('training_run_token', None),
+            'train_type': 'video',
+            'target_profile': vds.target_profile if vds else None,
+            'slider_mode': False,
+            'variant': None,
+            'base_model': None,
+            'effective_base': None,
+            'training_adapter': None,
+            'recipe_version': None,
+            'recipe_status': None,
+            'recipe_warning': None,
+        }
+    elif in_progress and cur_id is not None:
         ds = FaceDataset.query.get(int(cur_id))
         fam = (queue_manager._get_system_state('training_train_type', None)
                or (_train_type(ds) if ds else None))
@@ -8747,6 +8826,7 @@ def training_status(user_id=None) -> dict:
             fam, variant, effective_base, adapter, recipe_version)
         current = {
             'dataset_id': cur_id,
+            'dataset_table': cur_table,
             'name': ds.name if ds else _dataset_name(cur_id),
             'run_token': queue_manager._get_system_state(
                 'training_run_token', None),
@@ -9162,6 +9242,12 @@ _queue_lock = threading.RLock()
 
 _TRAIN_IDENTITY_KEYS = (
     'training_pid', 'training_pid_create_time', 'training_dataset_id',
+    # WHICH TABLE `training_dataset_id` POINTS INTO. Absent means `face_dataset`,
+    # the only meaning it could have had before the video lane existed. Without
+    # it the fence is one integer shared by two tables: face dataset #3 and video
+    # dataset #3 both exist, so a video run would show up under a face dataset's
+    # name and be killed by that dataset's Stop button.
+    'training_dataset_table',
     'training_target_step',
     'training_run_token', 'training_train_type', 'training_variant',
     'training_base_model', 'training_effective_base', 'training_slider_mode',

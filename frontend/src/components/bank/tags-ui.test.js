@@ -18,6 +18,11 @@ const workspace = fs.readFileSync(
   new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');
 const setup = fs.readFileSync(
   new URL('../../pages/SetupPage.jsx', import.meta.url), 'utf8');
+// The ML install tiles (including WD14's) moved out of SetupPage.jsx and into
+// this data module — mlInstallCards.test.js pins every strip hint to a card
+// here, and SetupPage.jsx now only renders the ML_INSTALL_CARDS import.
+const mlCards = fs.readFileSync(
+  new URL('../../components/setup/mlInstallCards.js', import.meta.url), 'utf8');
 
 test('the tag pass posts no device — it only runs here', () => {
   assert.match(workspace, /startTags\s*=\s*\(\)\s*=>\s*act\(\(\)\s*=>\s*postJson\(`\/api\/bank\/\$\{bankId\}\/tags`,\s*\{\}\)/);
@@ -69,7 +74,9 @@ test('picking a facet value replaces that facet, not appends to it', () => {
 test('the Setup tile explains WHICH half of the install is missing', () => {
   // ✗ here means either "no onnxruntime" or "no model download", fixed in
   // different places — a bare "Not installed" would misdirect half the users.
-  assert.match(setup, /detailKey: 'wd14_detail'/);
+  // The card's OWN detailKey lives in mlInstallCards.js; SetupPage.jsx renders
+  // it generically for every card that has one.
+  assert.match(mlCards, /detailKey: 'wd14_detail'/);
   assert.match(setup, /caps\[c\.detailKey\]/);
 });
 

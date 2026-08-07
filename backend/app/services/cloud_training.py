@@ -26,11 +26,24 @@ from sqlalchemy import func
 from .. import config as cfg
 from ..extensions import db
 from ..models import CloudTrainingRun, SystemState
+from . import checkpoint_registry
+from . import dataset_activity
+# Divergence 4: dense_local_delivery / dense_weights are the full-model
+# (dense) delivery lane and are not carried here. Nothing in this file
+# references them outside the import upstream added.
 from . import face_dataset_service as fds
 from . import gpu_speed
 from . import lora_training as lt
+from . import cloud_run_dataset as crd
 from . import vast_client
-from .aitoolkit_remote import RemoteAiToolkit
+# Imported for its checkpoint-name parser, which is not video-specific: it is the
+# one place that knows a save may carry a multistage suffix, and every family's
+# step is read through it so the single-file and the paired case cannot drift.
+# The module is pure (no torch, no ffmpeg, no database), so this costs nothing.
+from . import video_run_lineage
+from . import video_targets
+from . import video_training
+from .aitoolkit_remote import RemoteAiToolkit, TransferCancelled
 
 logger = logging.getLogger(__name__)
 
@@ -876,20 +889,38 @@ def _verify_full_transformer_artifact_with_retries(run, _api=None) -> str:
     return state
 
 
-def _assert_launch_guardrails(dataset_id, fam):
+def _assert_launch_guardrails(dataset_id, fam, dataset_table=crd.FACE):
     """Raise when a cloud launch cannot reserve an active slot.
 
     Callers may use this once as a cheap fast-fail before expensive preflight,
     but the authoritative call must happen while ``_launch_reservation_lock``
     is held and immediately before inserting the ``preparing`` row.
+
+    `dataset_table` is part of the per-dataset uniqueness key, not decoration:
+    face and video datasets share one integer space, so without it an active
+    video run of id 3 would refuse every launch on FACE dataset 3 — a button
+    locked by a run on someone else's data, with no explanation available. The
+    fleet-wide limit and the budget below are deliberately NOT scoped: they are
+    about the account's pods and its money, which one lane cannot claim.
     """
     actives = get_active_runs()
     limit = max(1, int((cfg.get('cloud.max_concurrent_runs') or 1)))
-    # Uniqueness is per (dataset, family): a zimage run and a krea run may
+    # Uniqueness is per (dataset, table, family): a zimage run and a krea run may
     # train the same dataset in parallel. An active run whose family is
     # unknown (pre-feature row) blocks every family of its dataset, out of
-    # caution.
-    if any(r.dataset_id == dataset_id and (_run_family(r) or fam) == fam
+    # caution — and so does one whose TABLE cannot be read, for the same reason.
+    # `crd.owns` answers False there, which is right for a route deciding whether
+    # to serve a file and wrong for a guard deciding whether to spend money, so
+    # this one asks the question itself.
+    def _same_dataset(r):
+        if int(r.dataset_id or 0) != int(dataset_id):
+            return False
+        try:
+            return crd.table_of(r) == dataset_table
+        except ValueError:
+            return True          # unreadable table -> block, never spend twice
+
+    if any(_same_dataset(r) and (_run_family(r) or fam) == fam
            for r in actives):
         raise RuntimeError(f'this dataset already has an active {fam} cloud run')
     if len(actives) >= limit:
@@ -1047,17 +1078,29 @@ def _assert_recipe_replayable(params, action):
             'run with the validated Z-Image recipe instead.')
 
 
-def latest_run_for(dataset_id, train_type=None):
+def latest_run_for(dataset_id, train_type=None, dataset_table=crd.FACE):
     """Newest run of the dataset; with train_type, the newest run OF THAT
     FAMILY. Falls back to the plain newest when none matches (or the filter
-    is absent) so rows without a stamped family stay reachable."""
-    q = (CloudTrainingRun.query.filter_by(dataset_id=dataset_id)
-         .order_by(CloudTrainingRun.id.desc()))
-    newest = q.first()
+    is absent) so rows without a stamped family stay reachable.
+
+    Scoped to ONE table. The progress and sample routes call this with nothing
+    but the URL's integer and no ownership check of their own, so an unscoped
+    query would let a face dataset's progress endpoint return a video run's
+    phase, cost and preview files the moment a video run of the same id became
+    the newest — the single most exposed mis-attribution in this file.
+
+    A row whose table cannot be read is EXCLUDED rather than raised on: this
+    feeds a progress poll, and a 500 on every poll would be a worse answer than
+    omitting one unattributable run. The launch guard makes the opposite choice,
+    deliberately — there, ambiguity must block rather than spend."""
+    rows = [r for r in CloudTrainingRun.query.filter_by(dataset_id=dataset_id)
+            .order_by(CloudTrainingRun.id.desc()).all()
+            if crd.owns(r, dataset_id, dataset_table)]
+    newest = rows[0] if rows else None
     if not train_type:
         return newest
     fam = fds.normalize_train_type(train_type)
-    for r in q.all():
+    for r in rows:
         if _run_family(r) == fam:
             return r
     return newest
@@ -1154,6 +1197,35 @@ def _reconcile_before_launch(app):
     reconcile_orphans(app)
 
 
+def _video_lane(run):
+    """The video lane's own relauncher for this run, or None when it is a face
+    run and this module's own path applies.
+
+    `retry_cloud_run` and `continue_cloud_run` both rebuild their arguments from
+    a run's stamped params and call `launch_cloud_training`, which resolves
+    `dataset_id` as a FACE dataset. Handed a video run they would either 404 on
+    a dataset that is not there or — on a colliding id — launch a face training
+    on someone else's data and charge for it. Both used to refuse for exactly
+    that reason; what was actually missing was the video-side rebuild, which now
+    exists, so they DISPATCH instead.
+
+    `crd.is_video` still raises on a run naming a table this build does not know
+    — that refusal was never about the video lane, it is about a row that cannot
+    say which dataset it trained, and guessing there is the silent
+    mis-attribution the whole column exists to prevent.
+
+    DIVERGENCE 4 — this fork trains video LOCALLY only, so
+    `cloud_video_training` is not carried and there is no lane to dispatch to.
+    The function is kept (rather than deleted with its two call sites) because
+    both callers already treat None as "this module's own path applies", so the
+    shape stays upstream's and the next sync has less surface. `crd.is_video`
+    is still called: it RAISES on a run naming a table this build does not know,
+    and that refusal is about a row that cannot say which dataset it trained —
+    nothing to do with the rental lane, and worth keeping."""
+    crd.is_video(run)
+    return None
+
+
 def retry_cloud_run(user_id, run_id) -> dict:
     """Relance un run TERMINÉ EN ERREUR avec les paramètres exacts persistés au
     lancement d'origine (train_params) — le bouton ↻ Retry de la page Cloud.
@@ -1164,6 +1236,9 @@ def retry_cloud_run(user_id, run_id) -> dict:
     run = db.session.get(CloudTrainingRun, int(run_id))
     if not run:
         raise ValueError('unknown cloud run')
+    video = _video_lane(run)
+    if video:
+        return video.retry_cloud_video_run(user_id, run.id)
     if run.status != 'error':
         raise ValueError('only a failed run can be retried')
     try:
@@ -1238,14 +1313,16 @@ def _run_staging_checkpoints(run) -> list:
     target = int(_run_param(run, 'steps') or 0)
     out = []
     for name, path in saves.items():
-        m = re.search(r'_(\d{6,})\.safetensors$', name)
+        step, _stage = video_training.split_checkpoint_name(name)
         out.append({'filename': name,
-                    'step': int(m.group(1)) if m else target,
+                    'step': step if step is not None else target,
                     'path': path,
                     'resume_state': _cloud_resume_state()})
     # step asc; a suffixed save wins ties over the unsuffixed final (deterministic).
-    out.sort(key=lambda e: (e['step'], bool(re.search(r'_(\d{6,})\.safetensors$',
-                                                       e['filename']))))
+    out.sort(key=lambda e: (
+        e['step'],
+        video_training.split_checkpoint_name(e['filename'])[0] is not None,
+        e['filename']))
     return out
 
 
@@ -1348,6 +1425,15 @@ def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
     run = db.session.get(CloudTrainingRun, int(run_id))
     if not run:
         raise ValueError('unknown cloud run')
+    video = _video_lane(run)
+    if video:
+        # The video lane's own continue: its checkpoints come in steps that may
+        # hold TWO files, and its launcher is the one that resolves a video
+        # dataset id. `overrides` / `transport` / state bundles are face-lane
+        # concepts with no video counterpart yet, and are not silently dropped —
+        # `_require_cloud_weights_only` above already refused a state bundle.
+        return video.continue_cloud_video_run(
+            user_id, run.id, extra_steps=extra_steps, from_step=from_step)
     # Continue from any TERMINAL run — a run that failed at pod teardown
     # ('pod did not become ready in time') can still have harvested, complete
     # checkpoints in its staging, and resuming from one is valid. Only a run
@@ -1398,8 +1484,9 @@ def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
             raise ValueError(
                 f'no harvested checkpoint at step {want} for this run (available: {avail})')
         # Prefer a suffixed save over the unsuffixed final when steps tie.
-        chosen = min(matches, key=lambda c: not re.search(
-            r'_(\d{6,})\.safetensors$', c['filename']))
+        chosen = min(matches, key=lambda c: (
+            video_training.split_checkpoint_name(c['filename'])[0] is None,
+            c['filename']))
     try:
         extra = max(100, int(extra_steps))
     except (TypeError, ValueError):
@@ -1577,6 +1664,48 @@ def continue_local_run_in_cloud(user_id, dataset_id, extra_steps=1000,
     res['resumed_from'] = chosen['step']
     res['target_steps'] = chosen['step'] + extra
     return res
+
+
+def _with_frozen_dataset_generation(user_id, dataset_id, detail, operation):
+    """Run ``operation`` while every LDS Dataset mutation is excluded."""
+    lock = fds._dataset_ingest_lock(user_id, dataset_id)
+    with lock:
+        token = dataset_activity.begin_exclusive(
+            dataset_id, 'training_export', detail=detail)
+        if token is None:
+            raise dataset_activity.DatasetActivityBusy(
+                'This dataset already has work in progress. Wait for it to '
+                'finish before launching cloud training.')
+        stop = threading.Event()
+
+        def heartbeat():
+            while not stop.wait(30.0):
+                dataset_activity.progress(token)
+
+        lease = threading.Thread(
+            target=heartbeat, daemon=True,
+            name=f'dataset-{dataset_id}-cloud-freeze-heartbeat')
+        lease.start()
+        try:
+            return operation()
+        finally:
+            stop.set()
+            lease.join(timeout=1.0)
+            dataset_activity.end(token)
+
+
+def _prepare_cloud_generation(user_id, dataset_id, base_model):
+    def prepare():
+        frozen = checkpoint_registry.prepare_launch(
+            user_id, dataset_id, base_model=base_model)
+        if checkpoint_registry.prepared_generation_identity(frozen) is None:
+            raise RuntimeError(
+                'could not freeze the Dataset provenance for cloud training; '
+                'no run was started — retry after checking the backend log')
+        return frozen
+
+    return _with_frozen_dataset_generation(
+        user_id, dataset_id, 'freezing the Dataset for cloud training', prepare)
 
 
 def launch_cloud_training(user_id, dataset_id, steps=None, base_model=_UNSET,
@@ -1759,9 +1888,8 @@ def launch_cloud_training(user_id, dataset_id, steps=None, base_model=_UNSET,
     # only file I/O of the registration happens here, so the registration itself
     # stays one short write and neither the reservation window nor the launch
     # response grows a second writer competing for the database lock.
-    from . import checkpoint_registry
-    _prepared = checkpoint_registry.prepare_launch(
-        user_id, dataset_id, base_model=base_model)
+    _prepared = _prepare_cloud_generation(
+        user_id, dataset_id, base_model)
     with _launch_reservation_lock:
         # Authoritative re-check + insert. Keeping the commit inside this
         # process-wide critical section means a second request always sees the
@@ -1881,8 +2009,12 @@ def launch_cloud_training(user_id, dataset_id, steps=None, base_model=_UNSET,
                 _run_config_dataset(ds, params), fam, masked=masked),
             prepared=_prepared,
             parent_record_id=parent_record_id, resumed_from=resumed_from)
-        if rec is not None:
-            params['version'] = rec.version
+        if rec is None:
+            raise RuntimeError(
+                'could not persist the Dataset provenance for cloud training; '
+                'the run was not started')
+        params['version'] = rec.version
+        params['record_id'] = rec.id
         _set(run, train_params=json.dumps(params))
         _stop_event_for(run.id).clear()
         _start_monitor(run.id)
@@ -2068,14 +2200,131 @@ def _prepare_staging(run):
     handler (run flips to 'error', slot freed)."""
     if run.staging_dir:
         return
+    staging = _staging_root() / f'run_{run.id}'
+    if crd.is_video(run):
+        # Nothing to export, and none of the face-dataset generation checks
+        # below apply: the checkpoint registry resolves FACE datasets, and a
+        # video dataset's folder is ALREADY the flat mp4 + homonym .txt shape
+        # ai-toolkit wants — that is what the builder writes — so the staging
+        # copy the image lane needs (rembg masks, ~1-2 s an image) would only
+        # duplicate gigabytes of clips to no end. The staging dir still exists
+        # for the samples the pod sends back; _staging_dataset_dir is what
+        # points the upload at the real folder.
+        (staging / 'samples').mkdir(parents=True, exist_ok=True)
+        _set(run, staging_dir=str(staging))
+        return
     _set(run, phase_detail='Preparing dataset (masks)…')
     params = json.loads(run.train_params or '{}')
-    staging = _staging_root() / f'run_{run.id}'
-    (staging / 'samples').mkdir(parents=True, exist_ok=True)
-    lt.export_dataset_to_aitoolkit('local', run.dataset_id,
-                                   masked=bool(params.get('masked', True)),
-                                   dest_dir=str(staging / 'dataset'))
+
+    def verify_and_export():
+        record = checkpoint_registry.record_by_id(params.get('record_id'))
+        expected = checkpoint_registry.record_generation_identity(record)
+        current = checkpoint_registry.prepare_launch(
+            'local', run.dataset_id,
+            base_model=params.get('base_model') or None)
+        observed = checkpoint_registry.prepared_generation_identity(current)
+        if expected is None or observed is None or observed != expected:
+            raise RuntimeError(
+                'The Dataset changed after this cloud run was requested. '
+                'Nothing was uploaded or trained; launch a new run from the '
+                'current Dataset.')
+        current_ds = current['ds']
+        if (getattr(current_ds, 'train_settings', None)
+                != params.get(_TRAIN_SETTINGS_SNAPSHOT)
+                or getattr(current_ds, 'train_slider', None)
+                != params.get(_TRAIN_SLIDER_SNAPSHOT)):
+            raise RuntimeError(
+                'The Dataset training options changed after this cloud run was '
+                'requested. Nothing was uploaded or trained; launch a new run.')
+        (staging / 'samples').mkdir(parents=True, exist_ok=True)
+        return lt.export_dataset_to_aitoolkit(
+            'local', run.dataset_id,
+            masked=bool(params.get('masked', True)),
+            dest_dir=str(staging / 'dataset'))
+
+    _with_frozen_dataset_generation(
+        'local', run.dataset_id,
+        'verifying and exporting the Dataset for cloud training',
+        verify_and_export)
     _set(run, staging_dir=str(staging))
+
+
+def _build_pod_job_config(run, staging_dataset: str, pod_settings: dict) -> dict:
+    """The ai-toolkit job config this run's pod will receive.
+
+    Extracted from the monitor's boot path so the video branch is one `if` in one
+    place rather than a second copy of the build-then-cloudify pair — and so a
+    test can assert what the pod gets without provisioning anything.
+
+    Built from the run's STAMPED family/variant, NEVER the dataset's current
+    train_type/train_variant: a later launch on the same dataset (or a
+    /train-type change) may have moved that row since this run launched, and this
+    rebuild happens minutes later at pod boot. `_run_config_dataset` presents the
+    run's own launch params so two concurrent multi-family runs each get their
+    own arch (incident 2026-07-14 — see _RunConfigDataset)."""
+    params = json.loads(run.train_params or '{}')
+    if crd.is_video(run):
+        vds = crd.dataset_row(run)
+        if vds is None:
+            raise RuntimeError(f'run {run.id} trained a video dataset that is gone')
+        job_config = video_training.build_job_config(
+            vds, staging_dataset, steps=params.get('steps') or 1000,
+            training_folder='__POD__', base_model=params.get('base_model') or None,
+            # The measured reason this run is on a rented GPU at all: low_vram
+            # cost 170-185 s a step on 24 GB by shuttling the idle expert over
+            # PCIe. Stamped at launch so the pod cannot be re-decided later.
+            low_vram=bool(params.get('low_vram', False)))
+    else:
+        ds = fds.get_dataset('local', run.dataset_id)
+        job_config = lt.build_job_config(
+            _run_config_dataset(ds, params),
+            staging_dataset, steps=params.get('steps') or 3000,
+            training_folder='__POD__')
+    return _cloudify_job_config(job_config, run.job_name, staging_dataset,
+                                pod_settings, run_params=params)
+
+
+def _staging_dataset_dir(run) -> str:
+    """The folder whose contents get uploaded to the pod as this run's dataset.
+
+    For a face run that is the exported copy under staging. For a video run it is
+    the dataset's OWN output_dir: it already has the right shape, and a dataset of
+    81-frame clips is gigabytes — copying it would double the disk and the wait to
+    produce a byte-identical folder."""
+    if crd.is_video(run):
+        row = crd.dataset_row(run)
+        if row is None or not row.output_dir:
+            raise RuntimeError(f'run {run.id} has no video dataset folder left')
+        return str(row.output_dir)
+    return os.path.join(run.staging_dir, 'dataset')
+
+
+def _assert_pod_can_decode(run, remote, pod_settings):
+    """Before the job starts: can this pod READ the clips it was just sent?
+
+    Only for a video run — a face run uploads jpegs and would gain a new way to
+    fail for a decoder it never calls.
+
+    The placement is the design. A pod is billed from boot, and whether its image
+    can decode these mp4s is genuinely unknown: OpenCV's bundled ffmpeg has no
+    software AV1 decoder, PyAV is absent from some images, and an image without
+    libGL cannot import cv2 at all. Each of those ends the same way — a job that
+    runs and yields nothing. Asked here, the answer costs seconds of an
+    already-booted pod; discovered later it costs the run. This is run #138's
+    lesson one step further along: the phase you do not observe is the phase that
+    bills you.
+
+    A refusal RAISES, and the monitor's generic handler turns it into a failed
+    run with the pod released. Standing down "just in case the probe is wrong"
+    would restore exactly the blind launch this exists to remove.
+
+    DIVERGENCE 4 — the probe itself (`pod_video_probe`) is the rented-pod lane
+    and is not carried here; this fork trains video locally. Only a VIDEO run
+    ever reached the body, and no video run can be launched at a pod from this
+    fork, so the function keeps upstream's signature and call site and answers
+    None. Deleting it outright would orphan its caller in the monitor and give
+    the next sync a conflict for nothing."""
+    return None
 
 
 def _register_instance(run, instance_id, offer, token):
@@ -3879,7 +4128,13 @@ def _monitor(app, run_id):
 
                 # -- upload dataset (+ masks folder if present) --------------
                 _set(run, status='uploading', phase_detail='Uploading dataset')
-                staging_dataset = os.path.join(run.staging_dir, 'dataset')
+                staging_dataset = _staging_dataset_dir(run)
+                # Timed, because this is the app's ONLY regular observation of
+                # how fast this machine can push bytes to a pod, and a
+                # checkpoint-push forecast built on a guess is a forecast the
+                # user is right not to believe. A dataset upload is the same
+                # link, the same protocol and the same route.
+                _upload_started = time.monotonic()
                 remote.upload_dataset(
                     run.job_name, staging_dataset,
                     on_progress=_upload_heartbeat(run, 'Uploading the dataset'))
@@ -3889,23 +4144,17 @@ def _monitor(app, run_id):
                         run.job_name + '_masks', masks_dir,
                         on_progress=_upload_heartbeat(run, 'Uploading the masks'))
 
+                # A rented pod that cannot decode these clips is a job that runs
+                # and yields nothing. Asked here, one command after the bytes
+                # landed and before the GPU starts.
+                _assert_pod_can_decode(run, remote, pod_settings)
+
                 # -- build + submit the job -----------------------------------
-                # Build from the run's STAMPED family/variant, NEVER the dataset's
-                # current train_type/train_variant: a later launch on the same
-                # dataset (or a /train-type change) may have moved that row since
-                # this run launched, and this rebuild happens minutes later at pod
-                # boot. _run_config_dataset presents the run's own launch params
-                # so two concurrent multi-family runs each get their own arch
-                # (incident 2026-07-14 — see _RunConfigDataset).
-                params = json.loads(run.train_params or '{}')
-                ds = fds.get_dataset('local', run.dataset_id)
-                job_config = lt.build_job_config(
-                    _run_config_dataset(ds, params),
-                    staging_dataset, steps=params.get('steps') or 3000,
-                    training_folder='__POD__')
-                job_config = _cloudify_job_config(job_config, run.job_name,
-                                                  staging_dataset, pod_settings,
-                                                  run_params=params)
+                # Built from the run's own STAMPED params, and from the right
+                # dataset table — see _build_pod_job_config, which now carries
+                # the why (incident 2026-07-14, and the face/video split).
+                job_config = _build_pod_job_config(run, staging_dataset,
+                                                   pod_settings)
                 job_id, adopted = _create_or_adopt_job(run, remote, job_config)
                 # Persist the id THE INSTANT the job exists on the pod, before
                 # the (slow) seeding and the start. Recording it only after
@@ -4068,6 +4317,11 @@ def _monitor(app, run_id):
                     _download_intermediates(run, remote)
                     _import_result(run)
                     _mirror_into_local_run(run)
+                    # The video lane's provenance, written beside the weights —
+                    # the face lane's registry cannot hold it (its manifest is
+                    # face IMAGES, its dataset_id a face id). No-op for a face
+                    # run, and best-effort: bookkeeping never fails a run.
+                    video_run_lineage.record(run)
                     _finish_if_open(run, 'done', detail='Training complete')
                     return
                 if status in ('error', 'stopped'):
@@ -4325,14 +4579,47 @@ def _seed_resume_checkpoint(run, remote, pod_settings):
     normal launch). A missing/failed seed RAISES: a 'continue' that cannot
     resume must fail loudly, never silently train from scratch."""
     src = _run_param(run, 'resume_ckpt_path')
-    if not src:
+    # The video lane stamps a LIST. A Wan 2.2 MoE checkpoint is two files at one
+    # step, and ai-toolkit's auto-resume globs the save_root, takes the newest
+    # match, and then `Wan2214bModel.load_lora` reads its SIBLING by rewriting
+    # `_high_noise` into `_low_noise` — so both must land, under this job's
+    # prefix, with their stage suffixes intact. Seeding one of them resumes one
+    # expert and restarts the other from zero, and nothing raises.
+    sources = list(_run_param(run, 'resume_ckpt_paths') or ())
+    repo_id = _run_param(run, 'resume_hf_repo_id')
+    if not src and not sources and not repo_id:
         return
-    if not os.path.isfile(src):
-        raise RuntimeError(f'resume checkpoint vanished before upload: {src}')
+    # The single-file existence check lives BELOW, after the `sources` branch.
+    # Upstream moved it there when the video lane began stamping a LIST; the
+    # fork's copy sat outside the conflict and merged back in up here, where
+    # `src` is empty for every video run and it raised "resume checkpoint
+    # vanished" before the branch that actually handles those files.
     step = int(_run_param(run, 'resume_step') or 0)
     remote_name = f'{run.job_name}_{step:09d}.safetensors'
     training_folder = pod_settings['TRAINING_FOLDER'].rstrip('/')
     dest_dir = f'{training_folder}/{run.job_name}'
+    if sources:
+        _set(run, phase_detail='Seeding checkpoint for resume…')
+        for one in sources:
+            if not os.path.isfile(one):
+                raise RuntimeError(f'resume checkpoint vanished before upload: {one}')
+            _, stage = video_training.split_checkpoint_name(one)
+            name = video_training.restage_checkpoint_name(run.job_name, step, stage)
+            _push_resume_checkpoint(run, remote, pod_settings, one, dest_dir, name)
+        logger.info('run %s: seeded %s resume file(s) -> %s',
+                    run.id, len(sources), dest_dir)
+        return
+    if repo_id:
+        # Divergence 4: upstream fetches the resume checkpoint straight onto the
+        # pod from a private Hugging Face repo (`dense_pod_hub`), which is the
+        # full-model delivery lane this fork does not carry. Refused loudly
+        # rather than left to fall through to the single-file path below, which
+        # would look at an empty `src` and blame a vanished file.
+        raise RuntimeError('resuming from a Hugging Face repo is not available '
+                           'in this build — it belongs to the full-model '
+                           'delivery lane, which is not installed')
+    if not os.path.isfile(src):
+        raise RuntimeError(f'resume checkpoint vanished before upload: {src}')
     _set(run, phase_detail='Seeding checkpoint for resume…')
     remote.seed_checkpoint(pod_settings['DATASETS_FOLDER'], dest_dir,
                            remote_name, src)
@@ -4610,6 +4897,17 @@ def _import_result(run):
     route). Import failure must not fail the run."""
     if _is_full_transformer_run(run):
         return
+    # A video run's dataset_id names the video table, so this import would deploy
+    # a Wan LoRA into the ComfyUI folder of the FACE dataset of the same id — and
+    # a Wan 2.2 checkpoint is a high-noise/low-noise pair no loader here can take
+    # anyway. Deploying video weights is a separate piece of work; until it
+    # exists, standing down is the only correct answer. The weights stay in the
+    # store and remain downloadable from the hub.
+    if crd.is_video(run):
+        logger.info('run %s trained a video dataset — ComfyUI import skipped '
+                    '(no video deploy lane yet); weights kept in the store',
+                    run.id)
+        return
     try:
         if not run.checkpoint_local_path:
             return
@@ -4668,6 +4966,12 @@ def _mirror_into_local_run(run):
     configured locally; best-effort, never fails the run."""
     if _is_full_transformer_run(run):
         return
+    # `lt._run_dir` builds a path from a FACE dataset's folder. There is no local
+    # video training lane, so a video run has no local run directory to mirror
+    # into — and calling it anyway would write this run's checkpoints into the
+    # run folder of the face dataset that happens to share its id.
+    if crd.is_video(run):
+        return
     try:
         saves = run_checkpoint_files(run)
         if not saves:
@@ -4691,8 +4995,11 @@ def _mirror_into_local_run(run):
 def _mirror_one(run, run_dir, base, src_path):
     try:
         src_name = os.path.basename(src_path)
-        m = re.search(r'_(\d{6,})\.safetensors$', src_name)
-        dest_name = f'{base}_{m.group(1)}.safetensors' if m else f'{base}.safetensors'
+        # Step AND stage: a Wan 2.2 checkpoint is a high-noise/low-noise pair, and
+        # a name rebuilt from the step alone is identical for both halves — the
+        # second copy would then be refused as a collision with the first.
+        step, stage = video_training.split_checkpoint_name(src_name)
+        dest_name = video_training.restage_checkpoint_name(base, step, stage)
         dest = os.path.join(run_dir, dest_name)
         if os.path.exists(dest):
             # A LOCAL run of the same dataset+family already produced this
@@ -4740,6 +5047,22 @@ def _dataset_name(dataset_id):
         from ..models import FaceDataset
         ds = FaceDataset.query.get(dataset_id)
         return ds.name if ds is not None else None
+    except Exception:
+        return None
+
+
+def run_dataset_name(run):
+    """Human-readable dataset name for ONE run, resolved in the table that run
+    actually trained on.
+
+    `_dataset_name(dataset_id)` above cannot do this: an id alone is ambiguous
+    now that face and video datasets share an integer space, so it would name the
+    face dataset of the same id for a video run — a label that is not merely
+    unhelpful, but wrong about what was trained. Every payload that has the run
+    in hand uses this instead; the id-only helper survives for the callers that
+    genuinely only have a face dataset id."""
+    try:
+        return crd.display_name(run)
     except Exception:
         return None
 
@@ -4906,7 +5229,7 @@ def _run_payload(run) -> dict:
             # cloud row (active/finished/legacy) addresses by its pod row id;
             # local rows use 'rec-<record id>' (set in all_runs).
             'share_key': f'cloud-{run.id}',
-            'run_name': run.run_name, 'dataset_name': _dataset_name(run.dataset_id),
+            'run_name': run.run_name, 'dataset_name': run_dataset_name(run),
             'vast_instance_id': run.vast_instance_id,   # for the per-run "console ↗" tooltip
             'phase_detail': run.phase_detail, 'gpu': run.gpu_name,
             'price_per_hour': run.price_per_hour,
@@ -5177,7 +5500,7 @@ def _node_checkpoints(rec, crun):
     out = []
     if crun is not None:
         for c in _run_staging_checkpoints(crun):
-            final = not re.search(r'_(\d{6,})\.safetensors$', c['filename'])
+            final = video_training.split_checkpoint_name(c['filename'])[0] is None
             out.append({
                 'step': c['step'], 'filename': c['filename'],
                 'final': bool(final and crun.status == 'done'), 'present': True,
@@ -6787,18 +7110,25 @@ def gpu_tiers(user_id, dataset_id, train_type=None, steps=None,
             'max_runtime_minutes': max_runtime}
 
 
-def cloud_checkpoint_groups(dataset_id, train_type=None, variant=None) -> list:
+def cloud_checkpoint_groups(dataset_id, train_type=None, variant=None,
+                            dataset_table=crd.FACE) -> list:
     """Locally-synced cloud checkpoints GROUPED by their source run (newest run
     first, step-sorted within a run). Each group carries the run's identity and
     outcome — id / status / GPU / cost / timing, the SAME facts the Runs hub
     shows — so the Checkpoints panel can label WHICH run produced which epochs
     and deep-link back to its row, instead of listing several indistinguishable
-    step-500→final sets. Runs whose saves were all hand-deleted are omitted."""
+    step-500→final sets. Runs whose saves were all hand-deleted are omitted.
+
+    Scoped to one dataset TABLE: this feeds a face dataset's checkpoints panel,
+    and an id-only query would list a video run's Wan saves there as if they were
+    that dataset's — offered for deployment into its ComfyUI folder."""
     fam = fds.normalize_train_type(train_type) if train_type else None
     wanted_variant = str(variant).strip().lower() if variant else None
     groups = []
     for run in (CloudTrainingRun.query.filter_by(dataset_id=dataset_id)
                 .order_by(CloudTrainingRun.id.desc()).all()):
+        if not crd.owns(run, dataset_id, dataset_table):
+            continue
         if _is_full_transformer_run(run):
             # Dense outputs live exclusively in their private HF repository;
             # never reinterpret a stray/stale staging file as a LoRA checkpoint.
@@ -6817,13 +7147,15 @@ def cloud_checkpoint_groups(dataset_id, train_type=None, variant=None) -> list:
         run_variant = _run_param(run, 'variant')
         entries = []
         for name in saves:
-            m = re.search(r'_(\d{6,})\.safetensors$', name)
-            step = int(m.group(1)) if m else int(_run_param(run, 'steps') or 0)
+            saved_step, _stage = video_training.split_checkpoint_name(name)
+            step = (saved_step if saved_step is not None
+                    else int(_run_param(run, 'steps') or 0))
             entries.append({'filename': name, 'step': step, 'cloud': True,
                             'run_id': run.id, 'version': _run_param(run, 'version'),
                             'variant': run_variant,
                             'resume_state': _cloud_resume_state(),
-                            'final': bool(not m and run.status == 'done'),
+                            'final': bool(saved_step is None
+                                          and run.status == 'done'),
                             'active': run.status in ACTIVE_STATES,
                             'trained_at': run.created_at.isoformat()
                                           if run.created_at else None})
@@ -6855,13 +7187,18 @@ def cloud_checkpoints(dataset_id, train_type=None, variant=None) -> list:
     return out
 
 
-def delete_cloud_checkpoint(dataset_id, run_id, filename) -> str:
+def delete_cloud_checkpoint(dataset_id, run_id, filename,
+                            dataset_table=crd.FACE) -> str:
     """Move a cloud run's synced checkpoint to the trash. The run must belong
     to the dataset and be TERMINAL (deleting an active run's save is pointless
     — the sync re-downloads it). Clears checkpoint_local_path when it pointed
-    at the trashed file."""
+    at the trashed file.
+
+    Ownership is (id, table): the id alone stopped being a complete test the
+    moment two dataset tables shared one integer space, and this one authorises
+    a DELETE."""
     run = CloudTrainingRun.query.get(int(run_id))
-    if not run or run.dataset_id != int(dataset_id):
+    if not run or not crd.owns(run, dataset_id, dataset_table):
         raise ValueError('unknown cloud run')
     if run.status in ACTIVE_STATES:
         raise ValueError('this cloud run is still active — its save would just '

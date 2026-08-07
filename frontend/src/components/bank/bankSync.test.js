@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bankListSyncToast, folderSyncNote, folderSyncToast, forgetMissingConfirm } from './bankSync.js';
+import {
+  bankListSyncToast, folderCheckNote, folderSyncNote, folderSyncToast,
+  forgetMissingConfirm,
+} from './bankSync.js';
 
 const clean = { added: 0, missing: 0, unavailable: false, error: null };
 
@@ -122,4 +125,40 @@ test('the confirm names what is lost AND what is not touched', () => {
   assert.match(c, /decisions and scores are lost/);
   assert.match(c, /Nothing on disk is touched/);
   assert.match(c, /Move folder/, 'the non-destructive alternative is named');
+});
+
+/* ── folderCheckNote: the price of not walking on every page load ────────── */
+// The bank list stopped re-inventorying every source folder before rendering
+// (690-1 190 ms on a real 86 493-image library, on a page people pass through).
+// The counts can therefore lag, and the ONLY thing that makes that acceptable
+// is the page saying so — a silently stale list would be worse than a slow one.
+test('folderCheckNote: an unwalked list says its counts can lag, and how to fix it', () => {
+  const n = folderCheckNote([{ folder_sync: { ...clean, walked: false, age: null } }]);
+  assert.equal(n.stale, true);
+  assert.match(n.text, /Rescan folders/);
+});
+
+test('folderCheckNote: after a rescan it says how fresh it is, not that it is stale', () => {
+  const n = folderCheckNote([
+    { folder_sync: { ...clean, walked: true, age: 4 } },
+    { folder_sync: { ...clean, walked: true, age: 130 } },
+  ]);
+  assert.equal(n.stale, false);
+  // The OLDEST walk is the honest one to quote for a list of several banks.
+  assert.match(n.text, /2 min ago/);
+});
+
+test('folderCheckNote: one unchecked bank among fresh ones is counted, not hidden', () => {
+  const n = folderCheckNote([
+    { folder_sync: { ...clean, walked: true, age: 3 } },
+    { folder_sync: { ...clean, walked: false, age: null } },
+  ]);
+  assert.equal(n.stale, true);
+  assert.match(n.text, /1 of these banks/);
+});
+
+test('folderCheckNote: nothing to be honest about -> no line', () => {
+  assert.equal(folderCheckNote([]), null);
+  assert.equal(folderCheckNote(null), null);
+  assert.equal(folderCheckNote([{}]), null);
 });

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { defaultPipelineStepKeys, pipelineStepKeys } from './bankSemanticEngine.js';
 
 import { FALLBACK_ORDER, buildSteps, defaultChecked } from './pipelineSteps.js';
 
@@ -57,6 +58,18 @@ test('a heavy pass whose tool is not ready is auto-unchecked and flagged "will s
   const steps = buildSteps(['scan', 'score']);
   assert.deepEqual([...defaultChecked(steps, { scan: true, score: false })], ['scan']);
   assert.match(dialog, /will skip/);
+});
+
+test('Launch all only offers the SigLIP2 index step on a Bank actually using it', () => {
+  // No semanticEngine prop to carry: caps.bank_pipeline_steps is published by
+  // the SERVER already scoped to the bank's own selected engine (see
+  // capabilities.py / _SIGLIP2_PIPELINE_STEPS), so the dialog needs nothing
+  // beyond buildSteps(caps?.bank_pipeline_steps) to get the right step list.
+  assert.match(dialog, /buildSteps\(caps\?\.bank_pipeline_steps\)/);
+  const siglip = pipelineStepKeys('siglip2');
+  const clip = pipelineStepKeys('clip');
+  assert.ok(siglip.includes('semantic_index'));
+  assert.equal(clip.includes('semantic_index'), false);
 });
 
 test('the progress bar understands the pipeline kind (step X/N + per-step chips)', () => {

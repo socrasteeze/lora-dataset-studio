@@ -43,8 +43,20 @@ function peerOf(device) {
 function localReady(key, caps, visionReady) {
   switch (key) {
     case 'score':
-    case 'semantic_dedup':
       return !!caps?.bank_scoring
+    // 🧠 SigLIP 2 builds its OWN whole-bank index and only appears in the step
+    // list when that engine is selected (backend _SIGLIP2_PIPELINE_STEPS), so
+    // it gates on its own tool, never on Score's. Without a case here it would
+    // fall to `default: true` and tick on a machine that cannot run it.
+    case 'semantic_index':
+      return !!caps?.bank_siglip2
+    // Stage 2 reads whichever index this bank has — CLIP's (from Score) or
+    // SigLIP 2's. Either is enough; the launch route is the authority and
+    // refuses honestly if the selected engine produced no usable cache, so
+    // being permissive here is the safe direction for a picker that must never
+    // be MORE restrictive than the submit path.
+    case 'semantic_dedup':
+      return !!(caps?.bank_scoring || caps?.bank_siglip2)
     case 'faces':
       return !!caps?.face_scoring
     case 'watermark':

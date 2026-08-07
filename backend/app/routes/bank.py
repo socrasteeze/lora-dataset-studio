@@ -14,6 +14,9 @@ from ..models import BankImage
 from ..services import bank_groups
 from ..services import bank_jobs
 from ..services import bank_queue
+from ..services import bank_jobs, dataset_activity
+from ._common import _map_error
+from ..services import bank_filter_translator as translator
 from ..services import image_bank_service as banks
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,55 @@ def _busy(e):
     return jsonify({'error': str(e), 'busy_kind': e.kind}), 409
 
 
+@bp.errorhandler(bank_jobs.BankJobBusy)
+def _busy_after_service_fence(e):
+    """Map service-level lease races to the same 409 as the advisory guard."""
+    return _busy(e)
+
+
+_BUSY_WRITE_EXEMPT_ENDPOINTS = frozenset({
+    # Read-only preview despite using POST (it carries unsaved thresholds).
+    'bank.bank_flag_preview',
+    # Read-only curation queries. They may warm/read the Score cache, but never
+    # mutate Bank rows or source files.
+    'bank.bank_select_diverse',
+    'bank.bank_select_balanced',
+    'bank.bank_select_similar',
+    'bank.bank_search_text',
+    # Read-only host integration: opening Explorer/Finder never mutates the Bank.
+    'bank.bank_open_source_folder',
+    # The one write that must stay reachable precisely while a job is live.
+    'bank.bank_cancel',
+})
+
+
+@bp.before_request
+def _guard_reserved_bank_writes():
+    """Keep a building destination readable/cancellable but immutable.
+
+    Bank jobs reserve every Bank whose rows or files they own.  Most heavy-pass
+    services already check their own source slot, but lightweight synchronous
+    routes (status flips in particular) historically did not.  Enforce the
+    reservation once at the HTTP boundary so a destination cannot be edited or
+    deleted while its copy is still being assembled.
+    """
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        return None
+    if request.endpoint in _BUSY_WRITE_EXEMPT_ENDPOINTS:
+        return None
+    if request.endpoint == 'bank.bank_relocate':
+        # The first relocation POST is a read-only filesystem preview. Only the
+        # explicit confirmation changes source_path and must wait for the job.
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or not bool(body.get('confirm')):
+            return None
+    bank_id = (request.view_args or {}).get('bank_id')
+    if bank_id is None or not bank_jobs.running(bank_id):
+        return None
+    snap = bank_jobs.get(bank_id) or {}
+    return _busy(bank_jobs.BankJobBusy(snap.get('kind') or 'background'))
+
+
 @bp.get('/banks')
 def banks_list():
     """Every bank + its card previews. ?dataset_id=<id> additionally embeds each
@@ -46,17 +98,26 @@ def banks_list():
     opens on ONE request instead of one per bank. An unknown/junk dataset_id
     simply omits the field (never a 400: the list itself is still valid).
 
-    Every bank's source folder is re-walked first (see refresh_bank): a bank
-    points at a LIVE folder, so images dropped in it after the bank was created
-    show up here instead of needing a rebuild. Strictly additive, ~5 ms a bank,
-    and the per-bank outcome rides back in ``folder_sync`` so the UI can say why
-    the counters moved."""
-    sync = banks.refresh_banks(LOCAL_USER, force=True)
+    A bank points at a LIVE folder, and this route used to re-walk EVERY bank's
+    folder before answering — so merely navigating to the page cost a full
+    inventory of every image in the library (measured on a real one of 8 banks /
+    86 493 images: 690-1 190 ms per load, 1 341-1 777 ms on the reporter's
+    instance). A GET that expensive punishes passing through.
+
+    The walk now happens where it is worth its price: automatically when a bank
+    is OPENED (``GET /bank/<id>``, cooldown-limited, forced on open), and on
+    demand here with ``?rescan=1`` behind the list's 🔄 button. Without it the
+    list still probes each folder's EXISTENCE (one syscall per bank) and reports
+    how old the last walk is, so the page can say its counts may lag instead of
+    showing stale ones silently. ``folder_sync`` carries both shapes."""
+    rescan = request.args.get('rescan') == '1'
+    sync = (banks.refresh_banks(LOCAL_USER, force=True) if rescan
+            else banks.folder_sync_state(LOCAL_USER))
     rows = banks.list_banks(
         LOCAL_USER, dataset_id=request.args.get('dataset_id') or None)
     for row in rows:
         row['folder_sync'] = sync.get(row['id'])
-    return jsonify({'banks': rows})
+    return jsonify({'banks': rows, 'rescanned': rescan})
 
 
 @bp.post('/bank/create')
@@ -127,11 +188,17 @@ def bank_from_dataset():
     if not isinstance(preserve_analysis, bool):
         return jsonify({'error': 'preserve_analysis must be a boolean'}), 400
     try:
+        dataset_id = dataset_activity.normalize_dataset_id(data.get('dataset_id'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    try:
         bank_id = banks.start_dataset_import(_app(), LOCAL_USER,
-                                             data.get('dataset_id'), data.get('name'),
+                                             dataset_id, data.get('name'),
                                              preserve_analysis=preserve_analysis)
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
+    except dataset_activity.DatasetActivityBusy as e:
+        return jsonify({'error': str(e), 'busy_kind': 'bank_export'}), 409
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except RuntimeError as e:
@@ -194,6 +261,19 @@ def bank_rename(bank_id):
     if bank is None:
         return jsonify({'error': 'not found'}), 404
     return jsonify({'ok': True, 'id': bank.id, 'name': bank.name})
+@bp.post('/bank/<int:bank_id>/open-source-folder')
+def bank_open_source_folder(bank_id):
+    """Open the owned Bank's recorded source; the client supplies no path."""
+    try:
+        path = banks.open_bank_source_folder(LOCAL_USER, bank_id)
+    except banks.BankSourceFolderUnavailable as exc:
+        return jsonify({'error': str(exc)}), 409
+    except Exception:
+        current_app.logger.exception('could not open Bank source folder')
+        return jsonify({'error': 'could not open the bank source folder'}), 500
+    if path is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True})
 
 
 @bp.post('/bank/<int:bank_id>/flag-preview')
@@ -221,7 +301,13 @@ def bank_flag_preview(bank_id):
 
 @bp.delete('/bank/<int:bank_id>')
 def bank_delete(bank_id):
-    if not banks.delete_bank(LOCAL_USER, bank_id):
+    try:
+        deleted = banks.delete_bank(LOCAL_USER, bank_id)
+    except bank_jobs.BankJobBusy as e:
+        # The blueprint guard covers an already-live reservation; this catches
+        # the narrower race where a job acquires the Bank after that check.
+        return _busy(e)
+    if not deleted:
         return jsonify({'error': 'not found'}), 404
     return jsonify({'ok': True})
 
@@ -232,12 +318,28 @@ def bank_relocate(bank_id):
     rename). Two-step ON PURPOSE: {folder} alone only REPORTS how many of the
     bank's files are in there, {folder, confirm: true} applies it. 400 when the
     folder holds none of them (that is a different folder, not a moved one),
-    409 while a pass is running. Nothing is ever deleted — a partial match keeps
-    every row and its analysis."""
+    The preview stays readable while a pass runs; only a confirmed write returns
+    409. Nothing is ever deleted — a partial match keeps every row and its
+    analysis."""
     data = request.get_json(silent=True) or {}
+    confirm = bool(data.get('confirm'))
     try:
-        out = banks.relocate_bank(LOCAL_USER, bank_id, data.get('folder'),
-                                  confirm=bool(data.get('confirm')))
+        if confirm:
+            out = banks.relocate_bank(
+                LOCAL_USER, bank_id, data.get('folder'), confirm=True)
+        else:
+            # relocate_bank also owns the write-side busy guard. Calling its
+            # read-only primitive directly keeps the preview usable while a job
+            # owns the Bank without weakening confirmation.
+            out = banks.relocate_preview(LOCAL_USER, bank_id, data.get('folder'))
+            out['needs_confirm'] = out['missing'] > 0
+            out['applied'] = False
+            if out['total'] and not out['found']:
+                raise banks.BankRelocateMismatch(
+                    'none of this bank\'s '
+                    f"{out['total']} image(s) are in that folder — it does not look "
+                    'like this bank. Pick the folder that CONTAINS the images '
+                    '(the one you moved), not its parent.', out)
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
     except banks.BankRelocateMismatch as e:
@@ -372,6 +474,8 @@ def _start(fn, *args, **kwargs):
         fn(*args, **kwargs)
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
+    except dataset_activity.DatasetActivityBusy as e:
+        return jsonify({'error': str(e), 'busy_kind': 'bank_import'}), 409
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except RuntimeError as e:
@@ -423,18 +527,64 @@ def bank_score(bank_id):
                   device_id=data.get('device_id'))
 
 
+@bp.get('/bank/<int:bank_id>/semantic-engine')
+def bank_semantic_engine_get(bank_id):
+    """Selected image/text space plus the usable cache coverage for this Bank."""
+    payload = banks.semantic_engine_info(LOCAL_USER, bank_id)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
+
+
+@bp.patch('/bank/<int:bank_id>/semantic-engine')
+def bank_semantic_engine_set(bank_id):
+    """Persist ``clip`` or ``siglip2`` for this Bank without deleting either cache."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'request body must be an object'}), 400
+    try:
+        payload = banks.set_semantic_engine(LOCAL_USER, bank_id, data.get('engine'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, **payload})
+
+
+@bp.post('/bank/<int:bank_id>/semantic-index')
+def bank_semantic_index(bank_id):
+    """Build/resume the selected semantic image cache.
+
+    This is deliberately a whole-Bank partition like ✨ Score: semantic
+    near-duplicate grouping cannot mix ids produced from two partial spaces.
+    ``rescan`` only discards the selected engine's cache; the other engine and
+    the aesthetic CLIP cache are preserved.
+    """
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'request body must be an object'}), 400
+    return _start(banks.start_semantic_index, _app(), LOCAL_USER, bank_id,
+                  rescan=bool(data.get('rescan')))
+
+
 @bp.post('/bank/<int:bank_id>/semantic-dedup')
 def bank_semantic_dedup(bank_id):
-    """Stage-2 semantic near-duplicate pass (crops/variants) over the ✨ Score
-    embeddings — CPU, no GPU. {threshold: 0.95} overrides the config for an ad-hoc
-    re-tri without a re-scan. 202/409; 400 with a "run Score first" hint when no
-    embeddings exist yet."""
-    data = request.get_json(silent=True) or {}
+    """Stage-2 near-duplicates over the Bank's selected semantic engine.
+
+    CPU-only after the engine cache exists. ``threshold`` remains an explicit
+    per-run override; default calibration is engine-specific.
+    """
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'request body must be an object'}), 400
+    # Keep the raw value: the service owns the single finite [0, 1] validation
+    # used by HTTP, pipeline and direct callers. Invalid input must never fall
+    # back silently to a permissive default.
     threshold = data.get('threshold')
-    try:
-        threshold = float(threshold) if threshold not in (None, '') else None
-    except (TypeError, ValueError):
-        threshold = None
     return _start(banks.start_semantic_dedup, _app(), LOCAL_USER, bank_id,
                   threshold=threshold)
 
@@ -466,19 +616,29 @@ def bank_watermark_levels(bank_id):
 def bank_watermark_crop(bank_id):
     """Level 1 — crop away the border-band watermarks (CPU/PIL, invents no pixel).
     The source folder is never written to: the crop lands in the bank's own
-    working copy. 202/409/400."""
-    return _start(banks.start_watermark_crop, _app(), LOCAL_USER, bank_id)
+    working copy. 202/409/400.
+
+    Takes the same {statuses}/{image_ids} scope as the other passes — this one
+    produces new image files, so being able to aim it is worth more here than
+    anywhere else. A body without them is the request that shipped before, byte
+    for byte."""
+    data = request.get_json(silent=True) or {}
+    return _start(banks.start_watermark_crop, _app(), LOCAL_USER, bank_id,
+                  **_scope(data))
 
 
 @bp.post('/bank/<int:bank_id>/watermark/inpaint')
 def bank_watermark_inpaint(bank_id):
     """Level 2 — repaint what is still flagged. {method:'auto'|'lama'|'klein',
     device_id?: 'local'|peer|'api:…' — Klein renders only; LaMa stays local}.
-    202/409/400/503 (503 carries the actionable reason: engine missing, GPU busy)."""
+    202/409/400/503 (503 carries the actionable reason: engine missing, GPU busy).
+
+    Takes the same {statuses}/{image_ids} scope as the other passes. A body
+    without them repaints exactly what it repainted before."""
     data = request.get_json(silent=True) or {}
     return _start(banks.start_watermark_inpaint, _app(), LOCAL_USER, bank_id,
                   method=data.get('method') or 'auto',
-                  device_id=data.get('device_id'))
+                  device_id=data.get('device_id'), **_scope(data))
 
 
 @bp.post('/bank/<int:bank_id>/watermark/undo')
@@ -571,12 +731,11 @@ def bank_tag_facets(bank_id):
 
 @bp.post('/bank/<int:bank_id>/medium')
 def bank_medium(bank_id):
-    """Classify every scored image by MEDIUM (photo / anime / 3D render /
-    illustration, or an honest 'unsure') from the CLIP embeddings the ✨ Score
-    pass already cached. {rescan:true} re-classifies rows that already have a
-    verdict. 202 on launch · 409 when the bank is busy · 503 when ✨ Score has
-    not run here or CLIP cannot be reached. No GPU is taken and no image is
-    re-inferred."""
+    """Classify images by medium from the CLIP vectors cached by ✨ Score.
+
+    The calibrated prompt set remains CLIP-specific even when this Bank selects
+    SigLIP2 for its general semantic tools. ``rescan`` recomputes verdicts.
+    """
     data = request.get_json(silent=True) or {}
     return _start(banks.start_medium, _app(), LOCAL_USER, bank_id,
                   rescan=bool(data.get('rescan')), **_scope(data))
@@ -592,6 +751,21 @@ def bank_angles(bank_id):
     data = request.get_json(silent=True) or {}
     return _start(banks.start_faces, _app(), LOCAL_USER, bank_id,
                   angles_only=True, **_scope(data))
+
+
+@bp.get('/bank/<int:bank_id>/activity')
+def bank_activity(bank_id):
+    """The live job alone — what the progress banner and its Stop button need.
+
+    Deliberately NOT the workspace payload: that one runs ~60 bank-wide
+    aggregates and is polled every 2 s while a pass runs, which is exactly when
+    it is slowest. This route reads one indexed row and an in-memory job
+    snapshot, so the banner keeps arriving on a 50 000-image bank. No source
+    folder re-walk either — this is the poll, not the open."""
+    payload = banks.bank_activity(LOCAL_USER, bank_id)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
 
 
 @bp.get('/bank/<int:bank_id>/coverage')
@@ -802,13 +976,15 @@ def bank_queue_clear():
 
 @bp.post('/bank/<int:bank_id>/promote')
 def bank_promote(bank_id):
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body must be an object'}), 400
     try:
-        dataset_id = int(data.get('dataset_id'))
-    except (TypeError, ValueError):
-        return jsonify({'error': 'dataset_id is required'}), 400
+        dataset_id = dataset_activity.normalize_dataset_id(data.get('dataset_id'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     return _start(banks.start_promote, _app(), LOCAL_USER, bank_id,
-                  data.get('image_ids') or [], dataset_id)
+                  data.get('image_ids'), dataset_id)
 
 
 @bp.post('/bank/<int:bank_id>/promote-to-bank')
@@ -822,10 +998,12 @@ def bank_promote_to_bank(bank_id):
     The files are COPIED: banks never share theirs, and the app rewrites images
     in place, so anything cheaper would make the two banks one at the first
     re-crop. 409 while another pass runs on the SOURCE bank."""
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'JSON body must be an object'}), 400
     try:
         new_id = banks.start_bank_promote(_app(), LOCAL_USER, bank_id,
-                                          data.get('image_ids') or [],
+                                          data.get('image_ids'),
                                           data.get('name'))
     except bank_jobs.BankJobBusy as e:
         return _busy(e)
@@ -866,8 +1044,15 @@ def bank_selection_size(bank_id):
     footnote; video is three orders of magnitude above, which is exactly why the
     dialog states the measured figure instead of assuming one."""
     raw = request.args.get('ids')
-    ids = [int(p) for p in raw.split(',') if p.strip().isdigit()] if raw else []
-    out = banks.selection_size(LOCAL_USER, bank_id, ids)
+    try:
+        tokens = [part.strip() for part in raw.split(',') if part.strip()] \
+            if raw else []
+        if any(not token.isascii() or not token.isdigit() for token in tokens):
+            raise ValueError('ids must be positive integers')
+        ids = banks._normalize_promotion_ids([int(token) for token in tokens])
+        out = banks.selection_size(LOCAL_USER, bank_id, ids)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     if out is None:
         return jsonify({'error': 'not found'}), 404
     return jsonify(out)
@@ -879,9 +1064,10 @@ def bank_promotable(bank_id):
     — the honest count for the promote modal (per-target: images already on
     OTHER datasets still count)."""
     try:
-        dataset_id = int(request.args.get('dataset_id'))
-    except (TypeError, ValueError):
-        return jsonify({'error': 'dataset_id is required'}), 400
+        dataset_id = dataset_activity.normalize_dataset_id(
+            request.args.get('dataset_id'))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     n = banks.promotable_count(LOCAL_USER, bank_id, dataset_id)
     if n is None:
         return jsonify({'error': 'not found'}), 404
@@ -1111,9 +1297,10 @@ def bank_select_balanced(bank_id):
 
 @bp.post('/bank/<int:bank_id>/select-similar')
 def bank_select_similar(bank_id):
-    """Rank the current filter by CLIP similarity to a reference bank image
+    """Rank the current filter in the Bank's selected semantic space
     ({ref_id}); returns the top-N ids (or everything ≥ {min_score}) for the UI to
-    check. Reuses the ✨ Score embeddings (no GPU). 400 when unscored / bad ref."""
+    check. Reuses the active CLIP or SigLIP2 cache (no GPU inference). 400 when
+    the selected index is unavailable or the reference is invalid."""
     data = request.get_json(silent=True) or {}
     try:
         ref_id = int(data.get('ref_id'))
@@ -1139,8 +1326,10 @@ def bank_select_similar(bank_id):
 
 @bp.post('/bank/<int:bank_id>/search-text')
 def bank_search_text(bank_id):
-    """Rank the current filter by CLIP similarity to a written QUERY. Reuses the
-    ✨ Score embeddings; only the phrase is encoded, in the ML interpreter.
+    """Rank the current filter by the selected engine's text/image similarity.
+
+    Image vectors come from the active CLIP or SigLIP2 cache; only the phrase is
+    encoded in the matching ML interpreter.
 
     Top-N only, and deliberately NO min_score — unlike select-similar. On a real
     bank the correct-hit and unrelated-pair score distributions overlap (correct
@@ -1153,12 +1342,16 @@ def bank_search_text(bank_id):
     threshold is not: a weight scales a subtraction inside one ranking, where a
     threshold would claim a relevance boundary the measurements say is absent.
 
-    400 = the request cannot be answered (no query, bank never scored).
-    503 = the FEATURE is unavailable here (no torch/open_clip, encoder failed) —
+    400 = the request cannot be answered (no query or active semantic index).
+    503 = the FEATURE is unavailable here (matching encoder failed) —
     a different thing, and the UI says so differently: one is "do this first",
     the other is "this install cannot do this at all"."""
     from ..services.clip_text_encoder import TextEncodeError
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'request body must be an object'}), 400
     try:
         n = int(data.get('n') or 60)
     except (TypeError, ValueError):
@@ -1177,19 +1370,31 @@ def bank_search_text(bank_id):
 
 @bp.get('/bank/text-search/status')
 def bank_text_search_status():
-    """Is text search available, is the model already warm, how many phrases are
-    cached, would a download be needed — everything the UI needs to set
-    expectations BEFORE the click rather than after an unexplained wait."""
+    """Read warm/cache state for exactly one semantic text space."""
     from ..services import clip_text_encoder
-    return jsonify({'ok': True, **clip_text_encoder.status()})
+    engine = request.args.get('engine') or 'clip'
+    try:
+        status = clip_text_encoder.status(engine=engine)
+    except (ValueError, clip_text_encoder.TextEncodeError) as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **status})
 
 
 @bp.post('/bank/text-search/release')
 def bank_text_search_release():
-    """Reap the warm text encoder now (~2.4 GB back). Called when the search
-    panel closes; the idle timer is the backstop for a tab that just went away."""
+    """Reap only the selected engine's warm text worker."""
     from ..services import clip_text_encoder
-    return jsonify({'ok': True, 'released': clip_text_encoder.release()})
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'request body must be an object'}), 400
+    engine = data.get('engine') or 'clip'
+    try:
+        released = clip_text_encoder.release(engine=engine)
+    except (ValueError, clip_text_encoder.TextEncodeError) as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'released': released})
 
 
 @bp.get('/bank/<int:bank_id>/delete-rejected/preview')
@@ -1444,4 +1649,28 @@ def bank_accept_folder_persons(bank_id):
         out = folder_person.accept_suggestions(LOCAL_USER, bank_id, subs)
     except ValueError as e:
         return _folder_person_error(e)
+    return jsonify({'ok': True, **out})
+
+
+@bp.post('/bank/<int:bank_id>/describe-filter')
+def bank_describe_filter(bank_id):
+    """Turn a sentence into this bank's own filter — and apply NOTHING.
+
+    The response moves the visible controls; the grid's existing counters then say
+    how many images that lands on, measured, without the model. A wrong reading
+    therefore costs one glance at chips the user can edit, not a silent selection.
+
+    Errors go through the shared mapper so the local-fence refusal keeps its
+    `ollama_fence_blocked` code: this surface has no degraded mode, and a model
+    held by something outside the app is the one failure that carries its own
+    remedy."""
+    data = request.get_json(silent=True) or {}
+    try:
+        if banks.get_bank(LOCAL_USER, bank_id) is None:
+            # Checked before prompting: a model round-trip for a bank that is not
+            # there costs seconds and answers a question nobody asked.
+            return jsonify({'error': 'bank not found'}), 404
+        out = translator.translate(bank_id, data.get('request'))
+    except Exception as e:  # noqa: BLE001 — _map_error re-raises what it cannot map
+        return _map_error(e)
     return jsonify({'ok': True, **out})

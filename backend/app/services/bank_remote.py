@@ -354,10 +354,12 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
 
 def run_remote_vision(job, device_id, *, items, prompt, detail_label,
                       prefer_json=True, fmt='json', bank_id=None):
-    """Run an Ollama vision pass on a peer. Yields ``(row_id, raw, error)`` in
-    the SAME shape ``vision_pool.map_vision`` yields locally, so the three
-    callers keep their result-handling loop byte for byte — the parsing, the
-    staged ``pending`` writes and the flush cadence are the local ones.
+    """Run an Ollama vision pass on a peer. Yields ``(row_id, answer, error)``
+    in the SAME shape ``vision_pool.map_vision`` yields locally — ``answer`` a
+    dict of ``{raw, fingerprint, error}`` (``ask()``'s own return shape, not a
+    bare string) — so the three callers keep their result-handling loop byte
+    for byte, INCLUDING the fingerprint-guarded write it now performs before
+    staging a verdict.
 
     ``items`` is ``[(row_id, path)]``. Requires the peer's own heartbeat to have
     reported Ollama; a bank of 5 000 images must not cross the network to
@@ -375,6 +377,7 @@ def run_remote_vision(job, device_id, *, items, prompt, detail_label,
     this row alone", and each caller's own post-loop `bank_jobs.cancelled`
     check is what reports the stop.
     """
+    from . import bank_transfer_metadata
     from . import cluster as cluster_svc
     from . import cluster_remote
 
@@ -384,12 +387,22 @@ def run_remote_vision(job, device_id, *, items, prompt, detail_label,
     # any more than it is locally: `ask` returns None for it and the caller
     # counts it as "file gone" and leaves the row alone. Every input item is
     # still yielded below, so progress and the flush cadence stay whole.
+    #
+    # Fingerprinted HERE, at staging — the closest remote equivalent of the
+    # local worker fingerprinting the bytes it just read — so the caller's
+    # guard (_prepare_analysis_write / _prepare_watermark_write) can still
+    # refuse a write against a source that changed while the peer had it.
     order = []
     staged = []
+    fingerprint_by_row = {}
+    path_by_row = {}
     for row_id, path in items:
         name = _artifact_name(row_id, path) if path else None
         if name and os.path.isfile(path):
             staged.append((path, name))
+            fingerprint_by_row[row_id] = (
+                bank_transfer_metadata.content_fingerprint_path(path))
+            path_by_row[row_id] = path
         else:
             name = None
         order.append((row_id, name))
@@ -436,7 +449,16 @@ def run_remote_vision(job, device_id, *, items, prompt, detail_label,
             # already treat as leave-the-row-alone.
             yield (row_id, None), None, None
             continue
-        yield (row_id, None), got.get('text') or '', None
+        # The HUB's own path for this row, not the peer's — the guard
+        # re-resolves the row against ITS filesystem, and a None here would
+        # always fail that comparison and silently drop every remote verdict
+        # (found via a full round trip test, not a conflict marker: nothing
+        # here disagreed on merge, the two halves of this feature were simply
+        # never introduced to each other).
+        yield (row_id, path_by_row.get(row_id)), {
+            'raw': got.get('text') or '',
+            'fingerprint': fingerprint_by_row.get(row_id),
+            'error': None}, None
 
 
 def _stderr_progress(progress_re):

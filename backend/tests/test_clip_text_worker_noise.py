@@ -19,7 +19,9 @@ a banner. What they pin:
   * that quote is paste-safe: a home-dir path in the child's chatter is redacted
     before it reaches a message a user pastes into a public thread.
 """
+import hashlib
 import os
+from pathlib import Path
 import sys
 
 import pytest
@@ -115,7 +117,7 @@ def _write_score_cache(app, bank_id, embs_by_name):
         bank = banks.get_bank(_uid(), bank_id)
         rows = {os.path.basename(r.relpath): r
                 for r in BankImage.query.filter_by(bank_id=bank_id).all()}
-        paths, states, arr, sigs = [], [], [], []
+        paths, states, arr, sigs, hashes = [], [], [], [], []
         for nm, e in embs_by_name.items():
             p = banks.abs_image_path(bank, rows[nm])
             paths.append(p)
@@ -123,6 +125,8 @@ def _write_score_cache(app, bank_id, embs_by_name):
             arr.append(np.asarray(e, dtype='float32'))
             st = os.stat(p)
             sigs.append(f'{st.st_size}:{st.st_mtime_ns}')
+            hashes.append(np.frombuffer(
+                hashlib.sha256(Path(p).read_bytes()).digest(), dtype='uint8'))
         cache_path = banks._score_cache_path(bank_id)
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         np.savez_compressed(
@@ -130,7 +134,8 @@ def _write_score_cache(app, bank_id, embs_by_name):
             paths=np.array(paths), states=np.array(states),
             aes=np.array([float('nan')] * len(paths), dtype='float32'),
             nsfw=np.array([float('nan')] * len(paths), dtype='float32'),
-            embs=np.stack(arr).astype('float32'), sigs=np.array(sigs))
+            embs=np.stack(arr).astype('float32'), sigs=np.array(sigs),
+            hashes=np.stack(hashes).astype('uint8'))
 
 
 def _uid():
@@ -150,6 +155,27 @@ def test_banner_before_the_json_still_encodes(app, tmp_path, monkeypatch):
     # The vector is the child's, not a stand-in: it carries the stub's coordinate.
     assert int(np.argmax(vec)) == _stub_index('a red car')
     assert float(np.linalg.norm(vec)) == pytest.approx(1.0, abs=1e-5)
+
+
+def test_borrowed_clip_worker_ignores_the_user_site(app, tmp_path, monkeypatch):
+    """The readiness probe and the actual long-lived worker must use the same
+    isolated Python.  This prevents a user's global package from poisoning a
+    healthy ComfyUI embedded environment only when the worker starts."""
+    import subprocess
+    seen = []
+    real_popen = subprocess.Popen
+
+    def capture(command, *args, **kwargs):
+        seen.append(list(command))
+        return real_popen(command, *args, **kwargs)
+
+    with app.app_context():
+        enc = _install_worker(monkeypatch, tmp_path, CHATTY_WORKER, 'isolated.py')
+        monkeypatch.setattr(enc.subprocess, 'Popen', capture)
+        vec, _ = enc.encode_query('isolated')
+        enc.release()
+    assert vec.shape == (768,)
+    assert seen and seen[0][1] == '-s'
 
 
 def test_medium_prototypes_survive_a_chatty_worker(app, tmp_path, monkeypatch):

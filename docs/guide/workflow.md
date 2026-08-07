@@ -47,33 +47,18 @@ Sources mix freely inside one dataset:
 
 ### Generate from references
 
-The workspace offers five engines:
+This fork generates exclusively on **local** engines, both running through your own ComfyUI — free, private, NSFW-capable, no API key and no account. There are two:
 
-- **Nano Banana Pro** through Gemini, **ChatGPT** through `gpt-image-2`, and **OpenRouter** are API lanes.
-- **Klein** and **Krea 2 Edit** run through your own ComfyUI.
-- You can select several engines in one batch; the requested shots are divided between them and every result names its engine.
-- **Krea 2 Edit** uses the primary reference and the selected card's framing. It preserves identity without needing a character LoRA first.
+- **Klein**, the historical engine. It reads the dataset's extra reference angles to strengthen identity.
+- **Krea 2 Edit**, which re-stages a single reference photo while holding identity from that one photo alone — no character LoRA needed. It uses the primary reference and the selected card's framing.
+
+*(Upstream also offers three cloud API lanes here — Nano Banana Pro through Gemini, ChatGPT through `gpt-image-2`, and OpenRouter — with their own provider-limit notes about SynthID, filtering and billing. This fork carries none of that: no engine API keys, no subscription login, no provider to depend on. See Divergence 1 in FORK_NOTES.md.)*
 
 The variation catalog fans out expression, angle, lighting, framing, outfit and background. Each subject type has its own catalog, catalogs import/export as JSON, and a one-off custom shot can be kept permanently.
 
-<p align="center">
-  <img src="../screenshots/generate/engines-and-shots.png" alt="Generate panel with the subject type, the five engine cards and the shot catalog grouped by face, bust, body and back" width="820">
-</p>
-
-Ticking more than one engine adds a second decision. **Split across engines** sends each shot to a single engine, so the batch costs what one engine would cost but the dataset gains variety; **All engines** renders every shot on every engine for a side-by-side comparison, and multiplies the cost accordingly. The same panel imports real photos, opens the scraper and pulls keepers out of an Image Bank.
-
-<p align="center">
-  <img src="../screenshots/generate/multi-engine-batch.png" alt="Split across engines versus All engines, the shot selection, and the import, scrape and bank entry points below" width="820">
-</p>
+You can tick both engines for one batch. **Split across engines** sends each shot to a single engine, so the batch costs what one engine would cost but the dataset gains variety; **All engines** renders every shot on every engine for a side-by-side comparison, and doubles the cost accordingly. The same panel imports real photos, opens the scraper and pulls keepers out of an Image Bank.
 
 Every generated tile reopens the exact prompt used to make it. The separate reference editor also supports **Retry**, which repeats the exact prompt, engine and temporary references of that candidate; choose **Try another prompt** only when changing the instruction.
-
-Provider limits are part of the workflow:
-
-- Gemini screens returned images, may produce a successful response with no image, and applies invisible SynthID provenance. The filter is not configurable. LoRA Dataset Studio reports the provider reason but cannot override it. See [what the Gemini engine will and will not do](settings-reference.md#what-the-gemini-engine-will-and-will-not-do).
-- OpenRouter uses its own credits but forwards to the selected upstream model; it does not remove that model's restrictions. See [Image engines](settings-reference.md#image-engines).
-- The experimental ChatGPT-subscription lane is separate from OpenAI API billing and may stop working if the undocumented endpoint changes. See [ChatGPT subscription](settings-reference.md#chatgpt-subscription-experimental).
-- NSFW catalog variations remain local-only. Do not send content a provider forbids.
 
 ### The Image Bank
 
