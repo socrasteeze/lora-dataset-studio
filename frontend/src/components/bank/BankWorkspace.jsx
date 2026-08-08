@@ -43,6 +43,9 @@ import { dupBadges, dupStateSuffix } from './bankDupBadge.js'
 import { idsFromResponse } from './bankIds.js'
 // Four progress states, not two — including the honest "I don't know" (pure/testable).
 import { progressPresence, PROGRESS_HIDDEN, PROGRESS_UNKNOWN, PROGRESS_STALE } from './progressPresence.js'
+import { etaPhrase } from './passEta.js'
+// A Stop that answers the click locally, and says the phase's price (pure/testable).
+import { jobKey, stopLabel, stopNote, stopRequested } from './passStop.js'
 // An occupied bank refuses in OUR words, never in the server's (pure/testable).
 import { busyRefusal } from './bankPassRun.js'
 import { holdsTheGpu, scoreDeviceNote, scoreGpuHoldNote } from './bankScoreDevice.js'
@@ -260,18 +263,30 @@ function ProgressUnknown({ stale }) {
 // per-image counter is the whole fix for "the pass looks frozen", and a source
 // regex cannot see what the renderer produces.
 export function ProgressBar({ activity, onCancel, offline = false }) {
+  /* Held HERE and not in the parent on purpose: the click has to be answered
+     without waiting for the payload that takes 2.7 s to rebuild on a bank this
+     size. Keyed by job, so the next pass gets a live button back with no effect
+     and no cleanup — see passStop.js for the measurements behind this. */
+  const [stopAskedFor, setStopAskedFor] = useState(null)
   const presence = progressPresence(activity, offline)
   if (presence === PROGRESS_HIDDEN) return null
   if (presence === PROGRESS_UNKNOWN) return <ProgressUnknown />
   const stale = presence === PROGRESS_STALE
   const { kind, done, total, detail } = activity
   const pct = total > 0 ? Math.round((100 * done) / total) : null
+  // "12939 / 37800" says where the pass is; it never said how long that leaves.
+  // On a bank this size the difference between twenty minutes and four hours is
+  // the difference between waiting and going to do something else.
+  const eta = etaPhrase(activity)
+  const asked = stopRequested(activity, stopAskedFor)
+  const note = stopNote(activity, asked)
   const pipe = kind === 'pipeline' ? activity.pipeline : null
   return (
     <div className="space-y-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
       {/* flex-wrap: at 400 px the label, the bar and Stop cannot share one row —
           they used to squash the label to a sliver. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span aria-hidden>⏳</span>
         <span className={`text-content ${stale ? 'opacity-60' : ''}`}>
           {pipe
             ? `🚀 Launch all — step ${(pipe.index ?? 0) + 1}/${pipe.total_steps} · ${STEP_SHORT[pipe.current] || pipe.current}`
@@ -290,7 +305,8 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
               on work that is running — so the figure only appears when there
               is one. */}
           {(done || total) ? <>{' — '}{done}{total ? ` / ${total}` : ''}</> : null}
-          {detail ? `${(done || total) ? ' · ' : ' — '}${detail}` : ''}
+          {eta ? `${(done || total) ? ' · ' : ' — '}${eta}` : ''}
+          {detail ? `${(done || total || eta) ? ' · ' : ' — '}${detail}` : ''}
         </span>
         {pct != null && (
           <div className="h-1.5 w-40 overflow-hidden rounded bg-surface-raised" role="progressbar"
@@ -298,11 +314,23 @@ export function ProgressBar({ activity, onCancel, offline = false }) {
             <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
           </div>
         )}
-        <button type="button" onClick={onCancel}
-          className="ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised">
-          Stop
+        {/* `disabled` is the whole of requirement one: seven POSTs in 20 ms is
+            what an enabled button that looks identical after the click buys.
+            `title` carries the promise for the pointer that hovers before it
+            presses; the line below carries it for everyone else. */}
+        <button type="button" disabled={asked} title={note || undefined}
+          onClick={() => { setStopAskedFor(jobKey(activity)); onCancel?.() }}
+          className="ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-content hover:bg-surface-raised disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent">
+          {stopLabel(asked)}
         </button>
       </div>
+      {/* One line, xs, muted — and it REPLACES the Stop sentence that used to
+          ride inside the style-grouping phase label, where everyone read it all
+          the time and it wrapped the counter off its row at 400 px.
+          aria-live so the answer to the click reaches a screen reader too. */}
+      {note && (
+        <p className="m-0 pl-6 text-xs text-content-muted" aria-live="polite">{note}</p>
+      )}
       {stale && <ProgressUnknown stale />}
       {pipe && Array.isArray(pipe.results) && pipe.results.length > 0 && (
         <ul className="flex flex-wrap gap-1.5 pl-6 text-xs">

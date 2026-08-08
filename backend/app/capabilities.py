@@ -484,6 +484,10 @@ def clear_import_cache() -> None:
     cached-from-before-the-install result surviving a later restart."""
     global _cache, _cache_ts
     _import_cache.clear()
+    # The encoder verdict is a probe too (it RUNS ffmpeg), cached the same way —
+    # so it has to be dropped here or the video row keeps its pre-install ✗ for
+    # ten minutes after the install that fixed it.
+    ffmpeg_tools.clear_cache()
     _cache = None
     _cache_ts = 0.0
     try:
@@ -810,14 +814,19 @@ def probe_video() -> dict:
         (cfg.get('shot_detect.python') or cfg.get('bank_scoring.python')
          or sys.executable),
         CAPABILITY_IMPORTS['shot_detect'])
-    encode = ffmpeg_tools.ffmpeg_path() is not None
+    # RUNS the binary rather than trusting that a file sits at the resolved path:
+    # a truncated download and a quarantined stub both pass os.path.isfile and
+    # then crash from inside an export. Cached at the same TTL as the import
+    # probes, so this poll-path costs one subprocess per 10 min, not per call.
+    encoder = ffmpeg_tools.ffmpeg_ready()
+    encode = bool(encoder['ok'])
     missing = []
     if not decode:
         missing.append('av (video decoding)')
     if not detect:
         missing.append('shot detection (transnetv2-pytorch)')
     if not encode:
-        missing.append('ffmpeg (clip encoding)')
+        missing.append(f"ffmpeg (clip encoding) — {encoder['reason']}")
     return {
         'ok': bool(decode and detect and encode),
         'detail': 'video extra ready' if not missing else 'missing: ' + ', '.join(missing),
@@ -1830,8 +1839,32 @@ def probe(force=False) -> dict:
     # engine dark; the advisory too_small does not gate.
     krea_invalid = _krh.krea_invalid_assets()
     krea_blocking_invalid = any(i['blocking'] for i in krea_invalid)
+    # A model file PINNED in Settings that is not on disk. Kept apart from
+    # krea_missing because it is a different sentence and a different fix: the
+    # file the user chose is absent, so nothing should be elected in its place.
+    # See krea_edit_helper.KreaPinnedModelMissing for the run that made this a
+    # gate instead of a log line.
+    krea_pin_gaps = _krh.krea_pin_gaps()
+    # WHICH Krea base this install actually loads, named. `krea.base_model` blank
+    # means "elect one", and until now nothing on screen said what got elected —
+    # the only way to find out was to read a finished PNG's metadata. That silence
+    # is expensive: a folder holding both the canonical Turbo build and a
+    # community finetune whose name also reads as "turbo" puts BOTH in the top
+    # regime tier, and the tie-break can hand the run to the finetune. Every
+    # quality judgement made after that is about a model the user never chose.
+    # It is the SAME resolve_krea_unet() the generation path calls, not a second
+    # ranking. Cost: this is its THIRD call in this probe (krea_missing_assets and
+    # krea_invalid_assets each made one above), and the expensive part — the
+    # header tie-break between several same-tier candidates — is cached in
+    # model_integrity on (abspath, mtime_ns, size). Measured on a worst-case tree
+    # of six candidates that ALL read as "turbo" (so the tie-break really runs):
+    # 24 ms for the cold call, 1.4 ms for every later one. This one is always a
+    # later one, and probe() is itself cached for 30 s; a single-candidate install
+    # reads no header at all (step 3 of resolve_krea_unet only runs when more than
+    # one survives step 2). Empty string = nothing loadable on disk.
+    krea_base_resolved = _krh.resolve_krea_unet() or ''
     krea_ready = (comfy['ok'] and not krea_missing and not krea_nodes_missing
-                  and not krea_blocking_invalid)
+                  and not krea_blocking_invalid and not krea_pin_gaps)
     # SeedVR2 — the fidelity upscaler (issue #32). Same three-part shape as Krea
     # (weights on disk / node pack present / weights actually loadable), because
     # it has the same three ways to be half-installed. It is NOT a generation
@@ -1913,6 +1946,10 @@ def probe(force=False) -> dict:
             # (krea_edit_helper.KREA_ASSETS) and the custom-node class_types this
             # ComfyUI doesn't expose. Empty + empty => the engine is ready.
             'krea_missing': krea_missing,
+            # The ComfyUI-relative name of the Krea base the next run WILL load
+            # (pin honoured, else the election). '' = none on disk. Published so
+            # the Settings field can name it instead of promising "auto".
+            'krea_base_resolved': krea_base_resolved,
             'krea_nodes_missing': krea_nodes_missing,
             'krea_nodes_installed': krea_nodes_installed,
             # Krea assets PRESENT on disk but not real, loadable weights — same
@@ -1949,6 +1986,13 @@ def probe(force=False) -> dict:
             # badge next to the Settings field, so a typo is never silent.
             # Ported from socrasteeze's branch (GitHub #20).
             'klein_overrides': _keh.klein_override_status(),
+            # Pinned-but-absent model files, per engine:
+            # [{slot, key, configured[, status]}]. Non-empty keeps that engine
+            # dark above, and the engine card reads THIS to say which file the
+            # user chose is missing — never "download the base model", which
+            # would send them to fix something that is already there.
+            'klein_pin_gaps': _keh.klein_pin_gaps(),
+            'krea_pin_gaps': krea_pin_gaps,
         },
         'ollama': {
             'reachable': ollama['ok'],

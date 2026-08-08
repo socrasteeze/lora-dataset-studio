@@ -62,6 +62,27 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 
 *Details: [1. Decide what you're teaching](#1-decide-what-youre-teaching) · [2. Fill it with images](#2-fill-it-with-images)*
 
+A dataset is the thirty images you train on. A **bank** is the three thousand you had to look at to find them — and looking at three thousand images by hand is where most datasets die.
+
+Point a bank at a folder, or scrape straight into one. It reads what is there **in place**: your files are never modified, moved or renamed, and the single action that does touch the source folder announces itself in capitals before it runs. Then **one pass measures the whole pile**, and every question afterwards is answered against those measurements instead of against your eyes — what is blurry, what is a duplicate of what, who is in it, how it is framed, whether it is a photograph or a render, and what it actually shows. You keep, reject and shortlist; a kept selection graduates into a dataset with its analysis attached, and can come back the other way.
+
+The cuts are measured rather than guessed: the aesthetic and near-duplicate thresholds were calibrated on a real bank of **7,316 images**, and every measure that cannot answer says "unsure" or "not measured" instead of inventing a verdict. The image lane is out of Beta; the **video** lane still carries the chip, and says why below.
+
+<table>
+  <tr>
+    <td width="62%" valign="top">
+      <a href="docs/screenshots/bank/bank-analyze-and-overview.png"><img src="docs/screenshots/bank/bank-analyze-and-overview.png" alt="The Bank workspace: the Analyze panel with every pass, the three-level watermark cleaning, and a Bank overview reporting coverage, resolution, framing, medium and structure across 50,461 images" width="100%"></a>
+    </td>
+    <td width="38%" valign="top">
+      <a href="docs/screenshots/bank/bank-launch-all.png"><img src="docs/screenshots/bank/bank-launch-all.png" alt="The Launch all dialog: eight passes ticked, each quality flag quoting how many images it would reject, and a warning that unscanned images will change those counts" width="100%"></a>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top"><sub><strong>The workspace</strong> — every pass on the left, and on the right what the bank actually <em>is</em>: how much of it each pass has covered, its resolutions, framings, mediums, and how many duplicate and person groups are still unresolved. 50,461 images here, 93% measured for quality, 49% scored.</sub></td>
+    <td valign="top"><sub><strong>Launch all</strong> — the whole triage in one go. Every flag quotes what it would reject <em>today</em>, and says out loud that 3,602 images have not been scanned yet, so those counts will grow. Stop it any time; a pass whose tool is missing is skipped, never failed.</sub></td>
+  </tr>
+</table>
+
 | Capability | What it provides |
 |---|---|
 | **Guided local training** | ai-toolkit underneath, family-scoped starters, adaptive step policies, launch guards, queueing and advanced controls |
@@ -94,6 +115,8 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 | **Quality scan** | Flags 🌫 blurry, 📺 noisy, ⬜ flat and 📐 small shots, and groups ≈ near-duplicates with one **keep-best** click |
 | **✨ Score** | A LAION aesthetic score, an NSFW probability and a 🎨 style grouping — one GPU pass, all three. **Stopping it keeps what it computed**: the scores already measured are written before it ends, and a relaunch pays only for what is left. The 🎨 style grouping is the one part that needs a whole pass to land, so a stopped run leaves the previous grouping untouched and says so |
 | **✂ Find crops & variants** | Catches the same shot re-cropped or re-compressed, reusing Score's embeddings (no extra GPU pass) |
+| **🧬 Semantic near-duplicates** | A second dedup pass over the scoring embeddings, catching the near-identical shots pixel hashing cannot see. Its own per-run threshold, and its groups are kept apart from the pixel ones |
+| **🧹 Auto-reject by flag** | Turn any set of quality flags into one bulk rejection, on the number it will really reject rather than the number flagged — and take it back as a single decision |
 | **🚩 Find & 🧽 clean watermarks** | Flags overlaid logos/URLs with a box, then removes them in two manual passes — a model-free crop, or a LaMa/Klein repaint into a *separate* file |
 | **👥 Group by person** | Clusters faces into people **with no reference photo needed**, GPU-accelerated when the card is free |
 | **🏷️ Caption the bank** | Writes the search text, choosing the engine, the Ollama vision model and the pile (Kept, Undecided, the bin, or the images you selected) **for that run only** — your settings are never rewritten. The button quotes the number it will actually write, not the size of the pile. It stays clickable at zero on purpose: the launch window is where the engine and model pickers live, so greying it out used to take them down with it on exactly the bank you wanted re-captioned — the **launch** button inside refuses a run of 0, and says why. Rejected images are only captioned if you aim the run at them. Every caption now records **who wrote it** — JoyCaption, Ollama, or you — so **Re-caption** keeps your own words instead of overwriting them, and states three figures before the click: what it rewrites, what it keeps because you wrote it, and what it overwrites whose author was never recorded (captions written before this existed — those **cannot be recovered**, and undo does not cover captions). Redoing your own captions too is a separate tick box, offered only when there is something to lose. On a compute peer the pass uses **that machine's own captioner**, so the per-run engine/model choice applies to local runs only |
@@ -102,6 +125,7 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 | **🔍 Search & filter** | Full-text search over captions **and 🔖 tags** plus Status / Quality / Score / Groups / Resolution filters with a live count. On a small screen the panel opens folded behind a summary of what's active; **✓ Keep / ✕ Reject** ride along in a bar pinned to the bottom of the screen once anything is selected |
 | **🔤 Find by text** | Rank what you're looking at by a written phrase — *"brunette outdoors, wide shot"* — reusing ✨ Score's embeddings. A ranking, not a filter |
 | **🎨 Pick diverse · ⚖️ Balanced pick** | Cover the visual space, or spread the pick evenly over face / bust / body / back instead of taking the top of one ranking |
+| **📊 Coverage** | The readiness meter says the set is big enough; it does not say it is varied. Coverage reads the labels, the scoring embeddings and the captions to name what the pool never shows — no profile views, one outfit, eye level only. Advice only: nothing is kept or rejected, and anything unmeasurable says so instead of drawing an empty bar |
 | **🎚 Thresholds · ↩ Undo** | Retune the twelve numbers behind the flags without leaving the bank, and take the last bulk decision back |
 | **▶ Review one by one** | Full-screen, one image at a time, **Keep / Reject / Skip** — for the pile that needs an eye, not a filter |
 | **📦 Move folder…** | Move a bank's images to another disk and keep every analysis: scores, duplicate groups, faces, decisions, captions |

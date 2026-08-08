@@ -1186,7 +1186,10 @@ const TOPICS = [
   // Klein model-file pins (fork Divergence 2) — name the exact loader files.
   setting('klein.unet', 'engines', 'klein-model-unet', 'Klein diffusion model (UNET) file',
     ['klein', 'unet', 'diffusion model', 'model file', 'path', 'override', 'pin', 'custom model',
-     'unreadable', 'corrupt', 'says missing']),
+     'unreadable', 'corrupt', 'says missing',
+     // The field is a PICKER now, and a pin it cannot find stops the engine.
+     'dropdown', 'list', 'picker', 'choose', 'select', 'not found', 'refuses to run',
+     'engine will not start']),
   setting('klein.text_encoder', 'engines', 'klein-model-text_encoder', 'Klein text encoder file',
     ['klein', 'text encoder', 'clip', 'qwen', 'model file', 'path', 'override', 'pin']),
   setting('klein.vae', 'engines', 'klein-model-vae', 'Klein VAE file',
@@ -1196,9 +1199,28 @@ const TOPICS = [
     ['klein', 'consistency', 'lora', 'model file', 'path', 'override', 'pin', 'structure',
      'anchor', 'composition']),
   setting('klein.generation_lora_presets', 'engines', 'klein-generation-lora-presets', 'Klein generation LoRA presets',
-    ['lora', 'preset', 'presets', 'klein', 'generation', 'texture', 'anatomy', 'style', 'chain', 'nsfw'],
+    ['lora', 'preset', 'presets', 'klein', 'generation', 'texture', 'anatomy', 'style', 'chain', 'nsfw',
+     // The silently-dropped row: it names the consistency LoRA the graph already
+     // loads, so the server skips it. These are the words for the symptom.
+     'duplicate', 'skipped', 'ignored', 'row ignored', 'double', 'double-stack',
+     'stacked twice', 'blocky', 'posterized', 'macro-blocking', 'consistency lora'],
     { trigger: 'klein-tuning-open',
       text: 'Build named generation-LoRA presets in Settings → Image engines, then pick one per run.' }),
+  // The half of the preset feature that was missing: the run panel opened on
+  // "None" on every visit, so a configured preset applied only when the user
+  // remembered to re-pick it — and the keywords below are the words someone
+  // writes when they discover, in a finished PNG's metadata, that none of their
+  // LoRA lines were applied.
+  setting('klein.default_generation_lora_preset', 'engines', 'klein-default-lora-preset',
+    'Klein preset selected by default',
+    ['klein', 'lora', 'preset', 'default preset', 'default', 'always', 'automatic',
+     'applied', 'not applied', 'ignored', 'ignores my settings', 'nothing happens',
+     'resets to none', 'none', 'every run', 'remember', 'preselect']),
+  setting('krea.default_generation_lora_preset', 'engines', 'krea-default-lora-preset',
+    'Krea 2 Edit preset selected by default',
+    ['krea', 'krea 2', 'lora', 'preset', 'default preset', 'default', 'always',
+     'automatic', 'applied', 'not applied', 'ignored', 'resets to none', 'none',
+     'every run', 'preselect']),
   setting('klein.generation_steps', 'engines', 'klein-generation', 'Klein generation steps',
     ['klein', 'steps', 'sampler', 'generation', 'quality', 'slower', 'cleaner', 'sampling', '5 steps']),
   setting('klein.edit_base_lora_strength', 'engines', 'klein-generation',
@@ -1212,6 +1234,26 @@ const TOPICS = [
   setting('krea.grounding_px', 'engines', 'krea-grounding', 'Krea 2 Edit reference grounding',
     ['krea', 'krea 2', 'grounding', 'grounding_px', 'consistency', 'likeness', 'resemblance',
      'prompt adherence', 'variety', 'identity', 'reference', 'dial', 'slider', 'local engine']),
+  // The two calibration dials that had NO input anywhere until they got sliders
+  // in the workspace's "🧬 Krea 2 Edit tuning" panel. They are settings (they
+  // change every future run), so they are documented in settings-reference —
+  // but their only control lives on the Generate-variations screen, which is
+  // where these topics point. No `focus`: there is no field on the Settings
+  // page to scroll to, and pointing at one that does not exist is worse than
+  // landing on the panel that owns them.
+  { id: 'krea.ref_boost', kind: 'setting', title: 'Krea 2 Edit reference pull',
+    keywords: ['krea', 'krea 2', 'ref boost', 'ref_boost', 'reference pull', 'reference boost',
+      'likeness', 'resemblance', 'does not look like', 'identity', 'weak likeness',
+      'similarity', 'too different', 'face', 'calibration', 'slider', 'local engine'],
+    guide: { chapter: 'settings-reference', anchor: 'image-engines' },
+    app: { route: '/datasets?section=add&panel=generate' } },
+  { id: 'krea.identity_lora_strength', kind: 'setting',
+    title: 'Krea 2 Edit identity LoRA strength',
+    keywords: ['krea', 'krea 2', 'identity lora strength', 'identity_lora_strength',
+      'lora strength', 'identity', 'weight', 'face transfer', 'likeness', 'posterized',
+      'waxy', 'blocky', 'calibration', 'slider', 'local engine'],
+    guide: { chapter: 'settings-reference', anchor: 'image-engines' },
+    app: { route: '/datasets?section=add&panel=generate' } },
   setting('krea.steps', 'engines', 'krea-steps', 'Krea 2 Edit sampler steps',
     ['krea', 'steps', 'sampler', 'quality', 'slower', 'local engine']),
   setting('krea.base_model', 'engines', 'krea-base-model', 'Krea 2 Edit base model',
@@ -1220,15 +1262,25 @@ const TOPICS = [
      // A GGUF quantised base is a dead end ComfyUI reports as a bare
      // "value_not_in_list" — these terms are what someone stuck on it searches for.
      'gguf', 'quant', 'quantised', 'quantized', 'q4_k_m', 'q8', 'value not in list',
-     'not in list', 'not detecting', 'model not found', 'unet_name', 'safetensors']),
+     'not in list', 'not detecting', 'model not found', 'unet_name', 'safetensors',
+     'dropdown', 'list', 'picker', 'choose', 'select', 'not found', 'refuses to run',
+     'engine will not start',
+     // Naming the ELECTED base on screen. Two Krea builds in one folder both read
+     // as "turbo", the tie-break picks one, and until it was named the only way to
+     // find out was a finished PNG's metadata.
+     'which model', 'which base', 'wrong model', 'currently loading', 'elected',
+     'auto', 'finetune', 'community model', 'two models', 'several builds']),
   setting('krea.identity_lora', 'engines', 'krea-identity-lora', 'Krea 2 Edit identity LoRA',
     ['krea', 'identity', 'edit lora', 'lora', 'krea2_identity_edit', 'civitai',
-     'node pack', 'comfyui-krea2edit', 'missing', 'local engine']),
+     'node pack', 'comfyui-krea2edit', 'missing', 'local engine',
+     'dropdown', 'list', 'picker', 'choose', 'select', 'not found', 'refuses to run']),
   setting('krea.generation_lora_presets', 'engines', 'krea-generation-lora-presets',
     'Krea 2 Edit generation LoRA presets',
     ['krea', 'krea 2', 'lora', 'loras', 'generation lora', 'preset', 'presets',
      'always-on', 'always on', 'filter bypass', 'filterbypass', 'bypass', 'nsfw',
-     'uncensored', 'style lora', 'detail slider', 'chain', 'stack', 'strength']),
+     'uncensored', 'style lora', 'detail slider', 'chain', 'stack', 'strength',
+     'duplicate', 'skipped', 'ignored', 'row ignored', 'double', 'double-stack',
+     'blocky', 'posterized', 'macro-blocking', 'identity lora']),
   // No 'identity_prompts.face' topic: the API-engine identity locks are not
   // shown in this fork (Divergence 1) — only the local one below.
   setting('identity_prompts.klein_identity', 'engines', 'identity-prompts', 'Klein identity prompt',
@@ -1337,6 +1389,16 @@ const TOPICS = [
     ['import', 'encoding', 'webp', 'quality', 'lossless', 'compression', 'artifacts',
      'q92', 'recompress', 'disk space', 'preserve originals', 'jpeg', 'jpg', 'png', 'bmp',
      'original file', 'auto head crop', 'derived']),
+  setting('image_input.max_pixels', 'captioning', 'image-input-max-pixels',
+    'Image size budget — maximum total pixels',
+    ['input', 'budget', 'limit', 'safety', 'pixels', 'megapixels', 'mi-pixels', 'memory',
+     'ram', 'decode', 'bomb', 'panorama', 'camera master', 'too large', 'rejects images',
+     'reduce the image', '16777216', '8192', 'no limit', 'unlimited', 'oversized']),
+  setting('image_input.max_side', 'captioning', 'image-input-max-side',
+    'Image size budget — maximum side',
+    ['input', 'budget', 'limit', 'safety', 'side', 'width', 'height', 'px per side',
+     'panorama', 'wide', 'too large', 'rejects images', '8192', '16384', 'no limit',
+     'unlimited', 'oversized']),
   setting('captioning.backend', 'captioning', 'captioning-backend', 'Captioning backend',
     ['caption', 'captioning', 'backend', 'joycaption', 'ollama', 'auto']),
   setting('watermark.device', 'captioning', 'watermark-device', 'Watermark processing device',
@@ -1636,11 +1698,36 @@ const TOPICS = [
     ['filter', 'decision', 'undecided', 'awaiting', 'pending', 'kept', 'keep', 'rejected',
      'reject', 'improve', 'candidates', 'klein', 'isolate', 'triage', 'select all', 'grid'],
     '/datasets?section=images', 'dataset-guide', '2-how-many-images-and-which-ones'),
+  // ✎ Edit this instruction here — the improve prompt, editable from the note
+  // under the ✨ button instead of only from Settings. Its own topic because the
+  // question it answers is "how do I change this sentence WITHOUT leaving my
+  // images", and because the panel has a property the Settings card does not:
+  // it writes the app-wide value from a per-dataset-looking screen, which is the
+  // one thing a user must be told before they use it.
+  action('action-edit-improve-instruction', 'Edit the improve instruction without leaving the images',
+    ['improve', 'upscale', 'instruction', 'prompt', 'edit', 'edit here', 'inline', 'in place',
+     'change the prompt', 'turn off', 'disable', 'toggle', 'no prompt', 'upscale only',
+     'klein', 'anime', 'drawn', 'realistic', 'texture', 'skin', 'detail', 'lightbox',
+     'reset to default', 'built-in default', 'global', 'app-wide', 'every dataset',
+     'applies everywhere', 'same as settings'],
+    '/datasets?section=images', 'settings-reference', 'image-engines'),
   action('action-reimprove-tile', 'Re-run Upscale & improve after changing its settings',
     ['improve', 'upscale', 'reimprove', 're-improve', 'rerun', 're-run', 'redo', 'again',
      'regenerate', 'no regenerate button', 'missing button', 'klein improve', 'candidate',
      'steps', 'megapixels', 'strength', 'try again', 'source image', 'parent'],
     '/datasets?section=images', 'settings-reference', 'image-engines'),
+  // ⟨ / ⟩ in the dataset lightbox. The buttons are visible, but the ← → keys,
+  // the fact that the walk follows the FILTERS, and the deliberate absence of a
+  // wrap-around are all invisible — which is what earns this its own topic.
+  action('action-inspect-next-previous', 'Move through a dataset without closing the image',
+    ['next image', 'previous image', 'next', 'previous', 'navigate', 'navigation',
+     'arrows', 'arrow keys', 'left right', 'keyboard', 'shortcut', 'shortcuts',
+     'hotkey', 'browse', 'flip through', 'go through', 'one by one', 'review',
+     'lightbox', 'full screen', 'fullscreen', 'inspect', 'zoom', 'slideshow',
+     'close and reopen', 'have i seen everything', 'position', '12 / 340',
+     'counter', 'first image', 'last image', 'wrap', 'loop', 'end of the list',
+     'crosses pages', 'page', 'filters', 'sort'],
+    '/datasets?section=images', 'using-the-app', 'move-through-a-dataset-without-closing-the-image'),
   // The lightbox's ⧉ Compare with original. Its whole point is that the two
   // panes are shown at the SAME scale — the guide section explains why, and why
   // 100 % zoom is deliberately off in that mode.
@@ -1653,6 +1740,19 @@ const TOPICS = [
      'original pending', 'original undecided', 'automatic unkeep', 'keep both',
      'bulk keep', 'batch keep', 'nothing deleted', 'do not delete'],
     '/datasets?section=images', 'using-the-app', 'compare-an-improved-image-with-the-original'),
+  // The lightbox's ◐ Compare with reference — a DIFFERENT question from the one
+  // above ("same person?" vs "sharper?"), on a different set of images (all of
+  // them, not just candidates), with a different promise about scale. Its own
+  // topic on purpose: one topic answering both would have to hedge on the one
+  // sentence that matters, which pane geometry guarantees what.
+  action('action-compare-with-reference', 'Compare an image with the dataset reference photo',
+    ['compare', 'comparison', 'reference', 'reference photo', 'ref', 'side by side',
+     'side-by-side', 'same person', 'is it the same person', 'identity', 'likeness',
+     'resemblance', 'face', 'drift', 'off model', 'off-model', 'does not look like',
+     'doesn t look like', 'check the reference', 'show the reference', 'lightbox',
+     'generated image', 'variation', 'imported photo', 'different framings',
+     'no compare button', 'no reference', 'add a reference photo'],
+    '/datasets?section=images', 'using-the-app', 'compare-an-image-with-the-dataset-reference-photo'),
   // ✨ in the CANVAS lightbox AND in the checkpoint / run gallery's. Its own
   // topic, not a variant of the dataset one: the result lands somewhere else
   // (the checkpoint's gallery, not the curation grid), and "where did my upscale

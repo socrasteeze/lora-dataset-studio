@@ -59,7 +59,8 @@ from ..models import BankImage, FaceDataset, FaceDatasetImage, ImageBank
 from ..utils.dbbusy import write_with_retry
 from . import (bank_jobs, bank_queue, bank_semantic_engine,
                bank_transfer_metadata, bank_undo, caption_origin,
-               dataset_activity, image_encoding, path_guard, trash)
+               dataset_activity, image_encoding, input_budget, path_guard,
+               trash)
 from .face_dataset_service import (SCRAPE_IMPORT_MAX, _dhash, _download_scrape_item,
                                    _dataset_ingest_lock,
                                    _existing_dhash_rows, _hamming, _SCRAPE_DL_WORKERS,
@@ -3702,6 +3703,48 @@ def _scope_note(bank_id, todo_clause, statuses, ids=None):
     return f'; {n} image(s) left out by the scope ({words})'
 
 
+def _skipped_note(*, vanished=0, missing=0, unanswered=0, fenced=0, stale=0,
+                  unreadable=0) -> str:
+    """The clauses a pass owes about the images it did NOT write, in ONE
+    definition — same reasoning as `_framing_pool`, and the same failure when it
+    was four copies.
+
+    Every pass ends twice: once when it runs out of rows, once when the user
+    stops it. Those two lines were written separately, so they drifted: the
+    finished line named the failures and the CANCELLED one named only the
+    successes. A 📐 Framing run stopped after 12 images, of which 8 could not
+    reach the vision model (the GPU window kept expiring behind a
+    `database is locked`), therefore reported "cancelled — 4 classified so far"
+    and nothing else. Read literally, that says the other 8 were never processed;
+    read as the user did, it says framing does not persist. Both endings now
+    render these clauses from here, so a number can no longer exist in one and
+    not the other.
+
+    The wording is deliberately about the IMAGE, not about the internals: an
+    image that changed under an analysis is "changed while the pass ran", never
+    a fingerprint mismatch.
+    """
+    note = ''
+    if vanished:
+        note += f', {vanished} skipped (deleted while the pass ran)'
+    if missing:
+        note += f', {missing} skipped (the file was no longer on disk)'
+    if unanswered:
+        note += (f', {unanswered} not analysed (the vision model returned '
+                 'nothing — check Ollama in Settings, then run it again)')
+    if fenced:
+        # NOT "unreadable": the file was fine and the model never saw it. The
+        # row was left empty on purpose so a re-run finishes it, and that is the
+        # half the user cannot guess.
+        note += (f', {fenced} not analysed (the vision GPU window expired before '
+                 'the model could start — run the pass again to finish them)')
+    if stale:
+        note += f', {stale} skipped (the image changed while the pass ran)'
+    if unreadable:
+        note += f', {unreadable} unreadable'
+    return note
+
+
 def start_scan(app, user_id, bank_id, rescan=False, regroup=False,
                statuses=None, ids=None):
     """Launch the quality pass. Raises BankJobBusy when a job is already live,
@@ -3787,6 +3830,7 @@ def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
         vanished = 0
         pending = {}
         unreadable_ids = []
+        stale = 0       # measured, then the file changed before the write-back
         hashed = 0      # rows whose STORED hash actually changed (see the tail)
         with ThreadPoolExecutor(max_workers=workers) as ex:
             it = iter(items)
@@ -3836,6 +3880,7 @@ def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
                 # NOT do (the lane invalidation), and why.
                 if not _staged_write_authorised(res.get('path'),
                                                 res.get('fingerprint')):
+                    stale += 1
                     done += 1
                     bank_jobs.bump(job)
                     if not bank_jobs.cancelled(job):
@@ -3898,8 +3943,7 @@ def _scan_job(bank_id, rescan, regroup=False, statuses=None, ids=None):
             return
         tail = (f' — {missing} file(s) were not on disk and were left '
                 'untouched') if missing else ''
-        if vanished:
-            tail += f', {vanished} skipped (deleted while the pass ran)'
+        tail += _skipped_note(vanished=vanished, stale=stale)
         # Regroup only when the input to the grouping CHANGED, or when the
         # caller asked for it on purpose (the 🎚 panel's "↻ Re-group duplicates",
         # which is how a new dup_distance is applied without decoding anything).
@@ -6965,7 +7009,7 @@ def _faces_job(bank_id, device_id=None, angles_only=False, statuses=None, ids=No
         # sharing it means allocating in it.
         from . import folder_person
         offset = folder_person.asserted_offset(bank_id)
-        done = vanished = 0
+        done = vanished = stale = 0
         cluster_valid = not unresolved_ids
         valid_rows = {}
         for p, image_id in by_path.items():
@@ -6981,6 +7025,10 @@ def _faces_job(bank_id, device_id=None, angles_only=False, statuses=None, ids=No
                 continue
             res = results.get(p) or {}
             if not _prepare_analysis_write(row, p, res.get('fingerprint')):
+                # Counted, not only used to void the partition: in ⤢ angles-only
+                # mode there IS no partition, so this row would otherwise leave
+                # no trace anywhere.
+                stale += 1
                 cluster_valid = False
                 continue
             # A yaw is written whenever the child measured one. It is never
@@ -7059,8 +7107,7 @@ def _faces_job(bank_id, device_id=None, angles_only=False, statuses=None, ids=No
         # It only ever produces a suggestion the user confirms (folder_person).
         if not angles_only and not bank_jobs.cancelled(job):
             detail += folder_person.probe_after_faces(job, bank_id)
-        if vanished:
-            detail += f', {vanished} skipped (deleted while the pass ran)'
+        detail += _skipped_note(vanished=vanished, stale=stale)
         bank_jobs.progress(job, detail=detail)
     return run
 
@@ -7390,7 +7437,7 @@ def _apply_score_results(job, by_path, results, interruptible, *,
                          preserved_siglip2_groups=None,
                          selected_engine='clip'):
     """Write the PER-IMAGE scores (aesthetic, nsfw) back. Returns
-    (written, scored, vanished, stopped).
+    (written, scored, vanished, stale, stopped).
 
     Two rules earn their place here:
 
@@ -7406,7 +7453,7 @@ def _apply_score_results(job, by_path, results, interruptible, *,
 
     Whatever it wrote is committed either way: the job registry is in-memory, so
     a pass that only wrote at the very end lost everything to a restart."""
-    written = scored = vanished = 0
+    written = scored = vanished = stale = 0
     stopped = False
     # The write-back is the parent's own mute step, and on a large bank it is
     # minutes long: 21 000 rows one at a time, committed in batches. It used to
@@ -7416,6 +7463,24 @@ def _apply_score_results(job, by_path, results, interruptible, *,
     bank_jobs.progress(job, done=0, total=total, detail=(
         f'writing {total} score(s) to the database…'
         + (' — a few minutes on a bank this size' if total >= 5000 else '')))
+    # What Stop costs HERE, in the phase the user is actually looking at. The
+    # commit batch below is why the promise has to name a wait at all: the flag
+    # is read once every `_SCORE_COMMIT_EVERY` rows, so a click can sit for a
+    # batch, and a button that says nothing about that is indistinguishable from
+    # a button that did not register the click.
+    #
+    # The SALVAGE call (interruptible=False) reaches this same code with the
+    # cancel flag already set, and it deliberately ignores it — this write IS
+    # the rescue of the stopped run's GPU work. Promising "the current batch"
+    # there would be a lie the user watches fail: the counter runs to the end.
+    bank_jobs.set_stop_notice(
+        job,
+        cost='Scores already written stay. The style grouping is not written '
+             'yet and only re-runs whole, so it needs another full pass.',
+        wait=(f'Stopping — finishing the current batch of {_SCORE_COMMIT_EVERY} '
+              'rows, then saving.') if interruptible else
+             ('Stopping — saving the scores this run already computed; this '
+              'last write runs to the end so none of them is thrown away.'))
     for p, image_id in by_path.items():
         res = results.get(p)
         if res is None:
@@ -7432,6 +7497,7 @@ def _apply_score_results(job, by_path, results, interruptible, *,
             # no scalar from it may be attached to the replacement bytes.
             _restore_proven_siglip2_group(
                 row, p, preserved, selected_engine=selected_engine)
+            stale += 1
             continue
         _restore_proven_siglip2_group(
             row, p, preserved, selected_engine=selected_engine,
@@ -7459,7 +7525,7 @@ def _apply_score_results(job, by_path, results, interruptible, *,
                 stopped = True
                 break
     db.session.commit()
-    return written, scored, vanished, stopped
+    return written, scored, vanished, stale, stopped
 
 
 # A style grouping that swallowed almost the whole bank and one that grouped
@@ -7581,6 +7647,17 @@ def _score_job(bank_id, device_id=None, rescore=False):
             device, use_gpu = _resolve_score_device()
             bank_jobs.progress(job, done=0, total=len(paths),
                                detail=f'scoring pass ({device.upper()})')
+        # Phase 1 of three, each with a different price — see the cancelled
+        # branch below: whatever the child computed before it was told to stop
+        # is written to the database, and only the global style partition is
+        # lost (it is computed over the whole bank at once and cannot be halved).
+        bank_jobs.set_stop_notice(
+            job,
+            cost='Every image already scored is saved when you stop. The style '
+                 'grouping is computed over the whole bank at once, so it is '
+                 'the one thing a stop loses.',
+            wait='Stopping — waiting for the image being analyzed, then saving '
+                 'what was scored.')
         if not paths:
             # Never leave the label of a pass that did not run: the one-click
             # tunnel falls back to a count read from the DATABASE when a step
@@ -7657,7 +7734,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
         if data.get('cancelled') or (bank_jobs.cancelled(job) and not data.get('ok')):
             saved = 0
             if score_results:
-                _, saved, _v, _s = _apply_score_results(
+                _, saved, _v, _stale, _s = _apply_score_results(
                     job, by_path, score_results, interruptible=False,
                     preserved_siglip2_groups=preserved_siglip2_groups,
                     selected_engine=selected_engine)
@@ -7674,13 +7751,16 @@ def _score_job(bank_id, device_id=None, rescore=False):
         clusters = data.get('clusters') or {}
         computed = data.get('computed')
         reused = data.get('reused')
-        written, scored, vanished, stopped = _apply_score_results(
+        written, scored, vanished, stale, stopped = _apply_score_results(
             job, by_path, results, interruptible=True,
             preserved_siglip2_groups=preserved_siglip2_groups,
             selected_engine=selected_engine)
         if vanished:
             logger.info('bank scoring pass: %s image(s) were deleted while it ran',
                         vanished)
+        # Owed by BOTH endings of this pass — the stopped one below and the
+        # finished one at the tail (see _skipped_note).
+        skipped = _skipped_note(vanished=vanished, stale=stale)
         if stopped:
             # Stopped while saving. What landed is committed; the partition is
             # left alone precisely because only part of the bank got its scores.
@@ -7690,16 +7770,27 @@ def _score_job(bank_id, device_id=None, rescore=False):
                 # left: counting them here would inflate the only number the
                 # user has to judge how much is still pending.
                 f'({len(paths) - written - vanished} left); nothing was '
-                'recomputed, relaunch finishes from the cache'))
+                'recomputed, relaunch finishes from the cache' + skipped))
             return
         # The last mute step, and the one whose Stop semantics differ from every
         # other: the partition is written whole or not at all (see
         # _write_style_clusters), so a Stop landing here does NOT undo it.
+        # The sentence about Stop used to live INSIDE this label, where it was
+        # read by everyone at all times and answered a question only the person
+        # reaching for the button is asking — and at 400 px it pushed the
+        # counter and the pass name off their line. It now sits next to the
+        # button, as this phase's promise.
         bank_jobs.progress(job, done=0, total=0, detail=(
-            f'writing the style grouping over {len(clusters)} image(s) — this '
-            'step finishes even if you Stop, because a half-written grouping '
-            'would mix two numberings'))
+            f'writing the style grouping over {len(clusters)} image(s)'))
+        bank_jobs.set_stop_notice(
+            job,
+            cost='This step finishes even if you Stop — a half-written grouping '
+                 'would mix two numberings. Nothing already written is lost.',
+            wait='Stopping — the style grouping is written whole first.')
         style_written = _write_style_clusters(by_path, clusters, results)
+        # 🎨 Medium runs next inside this same job and stops on its own terms;
+        # leaving the grouping's promise up would describe a step that is over.
+        bank_jobs.set_stop_notice(job)
         sizes = {}
         for cid in clusters.values():
             sizes[cid] = sizes.get(cid, 0) + 1
@@ -7728,8 +7819,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
         if reused:
             detail += (f' · {computed} newly computed, '
                        f'{reused} reused from cache')
-        if vanished:
-            detail += f', {vanished} skipped (deleted while the pass ran)'
+        detail += skipped
         if missing:
             detail += f' ({" + ".join(missing)} head unavailable'
             # WHY, when the child said so. Both heads fetch their weights over the
@@ -7941,6 +8031,7 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
         if not items:
             return
         detected = clean = errors = checked = unanswered = seen = vanished = 0
+        missing = stale = 0
         pending = {}
 
         def prepared():
@@ -8039,7 +8130,12 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
                     # directly (fingerprint rebind / effective-analysis
                     # invalidation) — that is a different write category from
                     # the per-image results this loop stages into `pending`.
-                    row = _live_image(row_id)
+                    # no_autoflush (upstream 55a8fb41): this re-read is a SELECT
+                    # and SQLAlchemy flushes before one, so without it the row
+                    # mutations above would take the single SQLite write lock and
+                    # hold it across the NEXT image's model call.
+                    with db.session.no_autoflush:
+                        row = _live_image(row_id)
                     if row is None:
                         logger.info('bank watermark scan: image %s was deleted while '
                                     'it was being analysed, skipping it', row_id)
@@ -8054,12 +8150,16 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
                     if call_error is not None and not _prepare_watermark_write(
                             row, _path, fingerprint):
                         # No verdict is safer than attaching a worker error to
-                        # bytes the worker did not actually read.
+                        # bytes the worker did not actually read. Counted, for
+                        # the same reason the empty answer below is: an image
+                        # this pass did not write has to appear in its report.
+                        stale += 1
                         bank_jobs.bump(job)
                         db.session.commit()
                         continue
                     if call_error is None and raw is not None and not _prepare_watermark_write(
                             row, _path, fingerprint):
+                        stale += 1
                         bank_jobs.bump(job)
                         db.session.commit()
                         continue
@@ -8067,7 +8167,7 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
                         pending.setdefault(row_id, {})['watermark_state'] = 'error'
                         errors += 1
                     elif raw is None:      # file gone: leave the row as it was
-                        pass
+                        missing += 1
                     # Empty output = Ollama unreachable, NOT "clean": leave the
                     # state untouched so a retry can finish it (same reasoning as
                     # the dataset detector), never falsely mark everything clean.
@@ -8136,20 +8236,18 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
                     # local/remote branch when the two sources were split.)
                     if not device_id:
                         unload_vision_model()
+        skipped = _skipped_note(vanished=vanished, missing=missing,
+                                unanswered=unanswered, stale=stale,
+                                unreadable=errors)
         if bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail=f'cancelled — {detected} with a watermark '
-                                           f'so far' + (f' · ℹ {note}' if note else ''))
+                                           f'so far' + (f' · ℹ {note}' if note else '')
+                                           + skipped)
             return
         detail = f'done — {detected} with a watermark, {clean} clean'
         if note:
             detail += f' · ℹ {note}'
-        if vanished:
-            detail += f', {vanished} skipped (deleted while the pass ran)'
-        if unanswered:
-            detail += (f', {unanswered} not analysed (the vision model returned '
-                       'nothing — check Ollama in Settings, then run it again)')
-        if errors:
-            detail += f', {errors} unreadable'
+        detail += skipped
         detail += _scope_note(bank_id, _watermark_not_dismissed() if rescan
                               else _watermark_todo_clause(), statuses, ids)
         bank_jobs.progress(job, detail=detail)
@@ -8182,7 +8280,7 @@ def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None):
         bank_jobs.progress(job, done=0, total=len(rows), detail='watermark scan')
         if not rows:
             return
-        detected = clean = errors = vanished = 0
+        detected = clean = errors = vanished = stale = 0
         threshold = watermark_detector.threshold()
 
         # Paths are resolved HERE, on the owning thread, exactly like the vision
@@ -8262,6 +8360,7 @@ def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None):
                         bank_jobs.bump(job)
                         continue
                     if not _prepare_watermark_write(row, path, fingerprint):
+                        stale += 1      # same silent skip as the vision route
                         bank_jobs.bump(job)
                         db.session.commit()
                         continue
@@ -8321,9 +8420,10 @@ def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None):
         finally:
             db.session.commit()
             shutil.rmtree(cancel_dir, ignore_errors=True)
+        skipped = _skipped_note(vanished=vanished, stale=stale, unreadable=errors)
         if bank_jobs.cancelled(job):
             bank_jobs.progress(job, detail=f'cancelled — {detected} with a watermark '
-                                           f'so far')
+                                           f'so far' + skipped)
             return
         detail = (f'done — {detected} with a watermark, {clean} clean '
                   f'(detector, score ≥ {threshold:g})')
@@ -8331,10 +8431,7 @@ def _watermark_detector_job(bank_id, rescan, statuses=None, ids=None):
             detail += (f', {detected - located} flagged without a position '
                        '(they cannot be cropped or repainted until you draw a zone '
                        'in ▶ Review)')
-        if vanished:
-            detail += f', {vanished} skipped (deleted while the pass ran)'
-        if errors:
-            detail += f', {errors} unreadable'
+        detail += skipped
         detail += _scope_note(bank_id, _watermark_not_dismissed() if rescan
                               else _watermark_todo_clause(), statuses, ids)
         bank_jobs.progress(job, detail=detail)
@@ -8864,7 +8961,12 @@ def _watermark_inpaint_job(bank_id, method, device_id=None,
                 for rid in row_ids:
                     if bank_jobs.cancelled(job):
                         break
-                    row = _live_image(rid)
+                    # no_autoflush: this SELECT flushes by default, and what it
+                    # flushed would be locked in until the write-back below —
+                    # i.e. across the LaMa batch, which is minutes long. See the
+                    # quality scan for the original diagnosis.
+                    with db.session.no_autoflush:
+                        row = _live_image(rid)
                     if row is None:  # deleted since the pass started — _live_image
                         logger.info('bank inpaint: image %s was deleted mid-pass, '
                                     'skipping it', rid)
@@ -8916,7 +9018,14 @@ def _watermark_inpaint_job(bank_id, method, device_id=None,
                         dst = _stage_clean_copy(bank_id, row, src)
                     except (OSError, ValueError, MemoryError,
                             Image.DecompressionBombError, Image.DecompressionBombWarning):
+                        # Committed here, not left pending until the write-back:
+                        # the blob this row pointed at is already deleted from
+                        # disk, so an interrupted pass must not survive with a
+                        # row still naming it — and a pending write on the way
+                        # into a minutes-long batch is exactly the holder this
+                        # pass is tested against (test_bank_infer_no_db_lock).
                         _discard_clean_blob(bank_id, row)
+                        db.session.commit()
                         counts['failed'] += 1
                         bank_jobs.bump(job)
                         continue
@@ -9296,11 +9405,19 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
                            total=q.count(), device_label=_device_label(device_id))
 
 
+# How many images in a row may fail to reach the vision model before the pass
+# says so ON SCREEN instead of at the end. Five is short enough to appear within
+# a few seconds of a real outage and long enough that a couple of unlucky images
+# never trip it.
+_FENCE_STREAK_WARN = 5
+
+
 def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
     def run(job):
         import contextlib
         from .face_dataset_service import CLASSIFY_PROMPT, _parse_classify
-        from .vision_ollama import describe_image_ollama, unload_vision_model
+        from .vision_ollama import (LocalOllamaFenceError, describe_image_ollama,
+                                    unload_vision_model)
         from .vision_pool import map_vision
         from . import bank_remote
         from ..gpu_window import gpu_exclusive_vision_window
@@ -9331,6 +9448,8 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                 + _scope_note(bank_id, todo_clause, statuses, ids)))
             return
         classified = errors = missing = seen = vanished = 0
+        stale = fenced = unanswered = 0
+        fence_streak = 0
         pending = {}
 
         def prepared():
@@ -9345,15 +9464,21 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                 # the EFFECTIVE bytes, not the raw source — the staged-write
                 # shape below is untouched, this read never gets assigned into
                 # `pending`.
-                row = _live_image(row_id)
-                if row is None:
-                    logger.info('bank framing: image %s was deleted mid-pass, '
-                                'skipping it', row_id)
-                    vanished += 1
-                    bank_jobs.bump(job)
-                    continue
-                yield row_id, analysis_image_path(
-                    bank, row, refresh_rotation=True)
+                # no_autoflush (upstream 55a8fb41): this generator is pulled
+                # AHEAD of the model calls in flight, so a flush here would take
+                # the single SQLite write lock and hold it across them — which is
+                # what starved _set_system_state('vision_in_progress') and fenced
+                # the pass out of its own vision model.
+                with db.session.no_autoflush:
+                    row = _live_image(row_id)
+                    if row is None:
+                        logger.info('bank framing: image %s was deleted mid-pass, '
+                                    'skipping it', row_id)
+                        vanished += 1
+                        bank_jobs.bump(job)
+                        continue
+                    path = analysis_image_path(bank, row, refresh_rotation=True)
+                yield row_id, path
 
         def ask(item):
             """WORKER thread: file + network only, no session. None means the
@@ -9367,10 +9492,15 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                 raw = describe_image_ollama(
                     payload, CLASSIFY_PROMPT, num_predict=400,
                     prefer_json=True, fmt='json', keep_alive='5m')
-                return {'raw': raw, 'fingerprint': fingerprint, 'error': None}
+                return {'raw': raw, 'fingerprint': fingerprint, 'error': None,
+                        'fenced': False}
             except Exception as exc:  # noqa: BLE001 — one image, not the pass
+                # A fence refusal is kept apart from a bad file: the image was
+                # never shown to the model, so it is neither unreadable nor
+                # classified, and only a re-run fixes it (see _skipped_note).
                 return {'raw': None, 'fingerprint': fingerprint,
-                        'error': f'{type(exc).__name__}: {exc}'}
+                        'error': f'{type(exc).__name__}: {exc}',
+                        'fenced': isinstance(exc, LocalOllamaFenceError)}
 
         # Local: overlap the calls on this machine's Ollama, inside the GPU
         # window. Remote: the peer runs them on ITS Ollama and this machine
@@ -9401,7 +9531,9 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                     # deleted in that window. Kept live: _prepare_analysis_write
                     # below mutates the row directly, a different write
                     # category from the per-image results staged in `pending`.
-                    row = _live_image(row_id)
+                    # no_autoflush for the same reason as in prepared() above.
+                    with db.session.no_autoflush:
+                        row = _live_image(row_id)
                     if row is None:
                         logger.info('bank framing: image %s was deleted while it was '
                                     'being classified, skipping it', row_id)
@@ -9413,20 +9545,58 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                     fingerprint = answer.get('fingerprint')
                     raw = answer.get('raw')
                     call_error = error or answer.get('error')
+                    if answer.get('fenced'):
+                        fence_streak += 1
+                        if fence_streak >= _FENCE_STREAK_WARN:
+                            # WHILE it happens, not only in the last line: a
+                            # storm of these means the vision GPU window cannot
+                            # be renewed at all (it is what a `database is
+                            # locked` on system_state looks like from here), and
+                            # every remaining image will fail the same way. The
+                            # user watching the bar advance has to be able to
+                            # stop and fix Ollama instead of paying for a pass
+                            # that classifies nothing.
+                            bank_jobs.progress(job, detail=(
+                                f'framing — {fence_streak} images in a row could not '
+                                'reach the vision model (the GPU window keeps '
+                                'expiring). They stay unclassified and a re-run '
+                                'finishes them — stop the pass if you want to look '
+                                'at Ollama first.'))
+                    elif fence_streak:
+                        fence_streak = 0
+                        bank_jobs.progress(job, detail='framing')
                     if ((call_error is not None or raw is not None)
                             and not _prepare_analysis_write(
                                 row, _path, fingerprint)):
+                        # The bytes moved between the model call and this write,
+                        # so the answer describes an image that no longer exists
+                        # here. Nothing is stored — and it is COUNTED, because a
+                        # pass that reached 204 images and reported "12
+                        # classified" explained nothing about the other 192.
+                        stale += 1
                         bank_jobs.bump(job)
+                        # This branch mutates too — _prepare_analysis_write
+                        # invalidates the lanes it refused — so it owes the same
+                        # per-image commit as the bottom of the loop. Skipping it
+                        # would carry a pending write into the next model call.
+                        db.session.commit()
                         continue
                     if call_error is not None:  # one bad file never sinks the pass
-                        errors += 1
+                        if answer.get('fenced'):
+                            fenced += 1
+                        else:
+                            errors += 1
                     elif raw is None:      # file gone: leave the row as it was
                         missing += 1
                     # Empty output = Ollama unreachable, NOT "unknown": leave the
                     # framing NULL so a retry can finish it (same reasoning as the
                     # watermark/dataset classifier), never mislabel everything.
                     elif not raw.strip():
-                        pass
+                        # COUNTED, exactly like the watermark pass counts it: a
+                        # run where every answer came back empty said "done — 0
+                        # classified", which reads as "looked at them all", when
+                        # in truth not one image was looked at.
+                        unanswered += 1
                     else:
                         framing, _label = _parse_classify(raw)
                         # face|bust|body|back|unknown
@@ -9460,19 +9630,14 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
                     # local/remote branch when the two sources were split.)
                     if not device_id:
                         unload_vision_model()
+        skipped = _skipped_note(vanished=vanished, missing=missing,
+                                unanswered=unanswered, fenced=fenced,
+                                stale=stale, unreadable=errors)
         if bank_jobs.cancelled(job):
-            bank_jobs.progress(job, detail=f'cancelled — {classified} classified so far')
+            bank_jobs.progress(
+                job, detail=f'cancelled — {classified} classified so far' + skipped)
             return
-        detail = f'done — {classified} classified'
-        if vanished:
-            detail += f', {vanished} skipped (deleted while the pass ran)'
-        if errors:
-            detail += f', {errors} unreadable'
-        # Files that were not THERE are their own outcome. Unreported, a bank
-        # whose source folder walked away classified nothing and still said
-        # "done — 0 classified", which reads as "the model found nothing".
-        if missing:
-            detail += f', {missing} file(s) missing from disk'
+        detail = f'done — {classified} classified' + skipped
         detail += _scope_note(bank_id, todo_clause, statuses, ids)
         bank_jobs.progress(job, detail=detail)
         if missing and not classified:
@@ -9745,7 +9910,7 @@ def _medium_job(bank_id, rescan, statuses=None, ids=None):
         bank_jobs.progress(job, done=0, total=len(rows), detail='medium pass')
         base = os.path.realpath(bank.source_path)
         prefix = os.path.normcase(base + os.sep)
-        done = classified = unscored = 0
+        done = classified = unscored = stale = 0
         for r in rows:
             if bank_jobs.cancelled(job):
                 break
@@ -9770,7 +9935,10 @@ def _medium_job(bank_id, rescan, statuses=None, ids=None):
             else:
                 fingerprint = _score_embedding_fingerprint(p)
                 if not _prepare_analysis_write(r, p, fingerprint):
-                    unscored += 1
+                    # An embedding EXISTS here — it just describes bytes this
+                    # file no longer has. Counting it as "not scored yet" sent
+                    # the user to re-run ✨ Score, which is not what fixes it.
+                    stale += 1
                     done += 1
                     bank_jobs.bump(job)
                     continue
@@ -9786,17 +9954,19 @@ def _medium_job(bank_id, rescan, statuses=None, ids=None):
             if done % 500 == 0:
                 db.session.commit()
         db.session.commit()
-        detail = f'done — {classified} classified'
+        skipped = ''
         if unscored:
             # Never silent: an image with no ✨ Score embedding CANNOT get a
             # medium, and "0 results" without that sentence reads as a bug.
-            detail += f', {unscored} skipped (not scored yet)'
+            skipped += f', {unscored} skipped (not scored yet)'
+        skipped += _skipped_note(stale=stale)
+        detail = f'done — {classified} classified' + skipped
         detail += _scope_note(bank_id,
                               None if rescan else BankImage.medium.is_(None),
                               statuses, ids)
         if bank_jobs.cancelled(job):
             detail = (f'stopped — {classified} classified, '
-                      f'{len(rows) - done} left (re-run to finish)')
+                      f'{len(rows) - done} left (re-run to finish)' + skipped)
         bank_jobs.progress(job, detail=detail)
     return run
 
@@ -10281,10 +10451,24 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
             logger.exception('bank caption failed: bank=%s images=%d',
                              bank_id, len(paths))
             raise
+        # `skipped` computed BEFORE the cancelled check (upstream's order, not
+        # the fork's pre-merge one) so the early return below can include it —
+        # a stopped pass used to report only "N captioned so far" with no word
+        # on what it never reached.
+        skipped = ''
+        if skipped_asserted:
+            # Named in the RESULT, not only in the warning before the click: the
+            # user has to be able to see afterwards that the protection did
+            # something, otherwise it is a promise with no evidence.
+            skipped += f', {skipped_asserted} kept (written by you)'
+        skipped += _skipped_note(vanished=vanished, stale=stale)
+        if spared_mid_pass:
+            skipped += f', {spared_mid_pass} kept (newer caption won)'
         if bank_jobs.cancelled(job):
             logger.info('bank caption stopped: bank=%s %d/%d captioned',
                         bank_id, captioned, len(paths))
-            bank_jobs.progress(job, detail=f'cancelled — {captioned} captioned so far')
+            bank_jobs.progress(
+                job, detail=f'cancelled — {captioned} captioned so far' + skipped)
             return
         logger.info('bank caption finished: bank=%s %d/%d captioned',
                     bank_id, captioned, len(paths))
@@ -10297,7 +10481,8 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
         # mid-inference (the caption was correctly refused, not withheld by the
         # engine). Either way the pass produced nothing for a reason that has
         # nothing to do with the engine, and blaming Ollama there sends the user
-        # to fix a setting that was never wrong.
+        # to fix a setting that was never wrong. Checked AFTER cancelled: a
+        # stopped pass is its own outcome, never mistaken for this one.
         if not captioned and not vanished and not stale:
             bank_jobs.fail(job, 'no captions were produced — the caption engine '
                                 'answered nothing for every image. Check Ollama / '
@@ -10305,17 +10490,7 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
             return
         detail = f'done — {captioned} captioned'
         detail += _caption_writers_note(wrote, unrecorded_writes)
-        if skipped_asserted:
-            # Named in the RESULT, not only in the warning before the click: the
-            # user has to be able to see afterwards that the protection did
-            # something, otherwise it is a promise with no evidence.
-            detail += f', {skipped_asserted} kept (written by you)'
-        if vanished:
-            detail += f', {vanished} skipped (deleted while the pass ran)'
-        if stale:
-            detail += f', {stale} skipped (image changed while captioning)'
-        if spared_mid_pass:
-            detail += f', {spared_mid_pass} kept (newer caption won)'
+        detail += skipped
         detail += _scope_note(
             bank_id,
             None if force else or_(BankImage.caption.is_(None),
@@ -10341,6 +10516,16 @@ PIPELINE_STEPS = ('scan', 'auto_reject', 'score', 'semantic_dedup', 'watermark',
 # the pass would die on the other side. A step nobody can honestly delegate is
 # refused at launch instead, where the message can say so.
 LOCAL_ONLY_STEPS = ('tags',)
+# SigLIP2 needs its index built before the dedup that reads it, so its canonical
+# order carries one extra pass. DERIVED from PIPELINE_STEPS rather than written
+# out a second time: upstream's literal omits the fork-only 'tags' step, and
+# copying it would silently drop that pass from every SigLIP2 pipeline. (The name
+# was referenced by _sanitize_pipeline_steps with no definition anywhere on this
+# fork — a NameError on any siglip2 launch — because a past sync took the caller
+# and not the constant.)
+_SIGLIP2_PIPELINE_STEPS = tuple(
+    s for step in PIPELINE_STEPS
+    for s in (('semantic_index', step) if step == 'semantic_dedup' else (step,)))
 # Auto-reject inside the pipeline runs right after the quality scan, so it can
 # only act on the CPU-scan flags (and duplicates). The score-derived flags
 # (low_aesthetic/nsfw/watermark) have no data yet at that point.

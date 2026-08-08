@@ -1757,6 +1757,40 @@ In a bank the ordering is done by the database over the *whole* filter, not just
 the page you can see — so **Select all in filter** and **▶ Review one by one**
 walk the same order you are looking at.
 
+## Move through a dataset without closing the image
+
+Open any dataset image full screen (the 🔍 on its tile) and you can walk the
+whole grid from there: **⟨** and **⟩** on the left and right edges of the picture,
+or the **←** and **→** keys. **Esc** closes, as before.
+
+The badge next to the image's name — **12 / 340** — is the part worth reading. It
+counts *the images the grid is showing you*, so:
+
+- **The arrows follow your filters and your sort.** Chip the grid down to "34
+  awaiting ✓/✕", sort by face similarity, and ⟩ walks those 34 in that order.
+  Change a filter and the badge changes with it. They never step onto an image
+  the grid is currently hiding — if they did, you would have no way to notice.
+- **They cross pages.** A dataset over 500 images is paged, and ⟩ turns the page
+  under the overlay: close the lightbox and you are on the page holding the
+  image you were just looking at, not where you started.
+- **They stop at the ends.** There is no wrap-around: on the first image ⟨ goes
+  grey and says *"You are on the first of the 340 images shown here"*, and the
+  same at the other end. On a wall of near-identical shots, a loop that silently
+  restarts makes "have I seen everything?" unanswerable.
+
+What does **not** travel with you: the 100 % zoom, an open **⧉ Compare with
+original** pane, and an improvement running on the image you left. Each image is
+inspected from a clean slate — a pane captioned *original* is always the parent
+of the picture in front of you, never of the previous one.
+
+Navigating is a *read*, so it keeps working while a generation, a captioning
+pass or a watermark scan holds the dataset — the same rule as opening an image
+and ticking a selection. Only the edits in the bar (crop, mirror, rotate,
+improve) wait for the pass.
+
+The rescue pairs in **Curation** are the one place with no arrows: there you are
+judging one pair, not walking a list.
+
 ## Compare an improved image with the original
 
 Two things in the app never overwrite an image — they add a **candidate** next
@@ -1793,6 +1827,36 @@ old rows), there is no button — a short amber note says why instead, so a
 missing control can't be mistaken for a bug. Everything else in the lightbox —
 ✂ Crop, ⇄ Mirror, ✨ Upscale & improve — is unchanged and still acts on the
 image you opened.
+
+## Compare an image with the dataset reference photo
+
+⧉ *Compare with original* only exists on the two kinds of candidate above. The
+question you actually ask of an ordinary generated variation is a different one
+— **is this still the same person?** — and its answer is the reference photo,
+which lives in another panel and is therefore never on screen beside the image
+you are judging.
+
+Open any image in the dataset full screen and it now carries
+**◐ Compare with reference**. Same split view, same named panes — *Reference*
+and *This image* — side by side on a wide screen, stacked on a phone. It works
+on **every** image, generated or imported, not only on improve candidates.
+
+**Each pane fits its own image**, and that is the honest thing to do here: the
+reference is a square head crop and the image beside it may be a full-body plan,
+so there is no shared scale to promise. The hint under the panes says
+*different framings* rather than *same scale* — that promise belongs to the
+comparison against the original, where both images really are two renderings of
+one shot.
+
+The two comparisons are **exclusive**: pressing one leaves the other, because
+two pairs of panes at once are four thumbnails and prove nothing. On an improved
+image both buttons are there and you can flip between the two questions; on a
+plain variation only ◐ *Compare with reference* is.
+
+A dataset with **no reference photo yet** shows no button and no warning — the
+reference panel already asks you for one, and a second nudge here would be noise
+on a screen that cannot act on it. Zoom is off inside this comparison too; leave
+it (⊟) for the usual click-for-100 % inspection.
 
 ## Tune the Bank filter thresholds
 
