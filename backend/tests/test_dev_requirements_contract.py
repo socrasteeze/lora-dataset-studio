@@ -39,6 +39,17 @@ _TORCH_PATH_SAMPLES = (
     '.github/workflows/ci.yml',
 )
 
+# One per discovery root the two test jobs actually run: pytest over
+# backend/tests, node --test over both frontend/tests and the colocated
+# *.test.js beside their sources, and unittest over scripts/tests.
+_TEST_PATH_SAMPLES = (
+    'backend/tests/test_docker_gpu_updater.py',
+    'backend/tests/test_bank_scan_no_db_lock.py',
+    'frontend/tests/theme-token-contract.test.mjs',
+    'frontend/src/whatsNew.test.js',
+    'scripts/tests/test_check_release_artifacts.py',
+)
+
 
 def _lines(path):
     return [l.strip() for l in path.read_text(encoding='utf-8').splitlines()
@@ -181,6 +192,66 @@ def test_ci_path_gates_the_torch_overlay_and_forces_the_outer_heavy_gate():
     assert "Write-TorchDecision $true 'Manual run'" in decisions[0]
     assert "Write-TorchDecision $true 'No usable diff base'" in decisions[0]
     assert "Write-TorchDecision $false 'No Torch-sensitive changes'" in decisions[0]
+
+
+def test_ci_never_lets_a_test_change_skip_the_heavy_jobs():
+    """A test is validated by RUNNING it, so its diff size must not gate it.
+
+    What this pins happened: a one-file, 37-line fix to a Windows-only updater
+    test scored under the size threshold, skipped the Windows job, and shipped
+    broken — then stayed red on main until an unrelated 61-commit merge was
+    finally large enough to run the suite that catches it in seconds.
+    """
+    text = _CI.read_text(encoding='utf-8')
+    gate_steps = [step for step in _workflow_steps(text)
+                  if 'test_path_patterns=(' in step]
+    assert len(gate_steps) == 1, 'the push gate must recognize test paths'
+    gate = gate_steps[0]
+    patterns = _array_regexes(gate, 'test_path_patterns')
+
+    for path in _TEST_PATH_SAMPLES:
+        assert (_ROOT / path).is_file(), f'test path sample does not exist: {path}'
+        assert _matches_any(path, patterns), \
+            f'a change to this test could skip the job that runs it: {path}'
+    assert not _matches_any('backend/app/services/lora_training.py', patterns), \
+        'ordinary source must stay on the size threshold, not force every push'
+
+    override = gate.find('test_paths+=')
+    threshold = gate.find('$files" -ge')
+    assert 0 <= override < threshold, \
+        'the test-path check must be consulted before the size threshold'
+    assert 'run_heavy=true' in gate[gate.find('${#test_paths[@]}'):threshold], \
+        'a changed test must force the heavy jobs whatever the diff size'
+
+
+def test_the_ci_size_gate_names_its_blind_spots_instead_of_its_sources():
+    """An unlisted path must COUNT toward the threshold, not score zero.
+
+    This replaced an INCLUDE list of backend/ frontend/src frontend/tests, under
+    which every other path in the repo was invisible: scripts/update-docker-gpu.ps1
+    and the root update-docker*.bat launchers (owned by backend-tests), the
+    Dockerfile and packaging/ (owned by docker-smoke) could change by any amount
+    and never reach the job that tests them.
+    """
+    text = _CI.read_text(encoding='utf-8')
+    gate_steps = [step for step in _workflow_steps(text)
+                  if 'git diff --numstat' in step]
+    assert len(gate_steps) == 1
+    # To the end of the logical line: the pathspec carries its own parentheses,
+    # so it cannot be read up to the first ')'.
+    numstat = re.search(
+        r'git diff --numstat "\$BEFORE" "\$AFTER" --((?:[^\n]*\\\n)*[^\n]*)',
+        gate_steps[0])
+    assert numstat, 'the size gate must keep one auditable numstat pathspec'
+    pathspec = ' '.join(numstat.group(1).replace('\\', ' ').split())
+    assert pathspec.split()[0] == '.', \
+        'the size gate must start from the whole tree, not from an include list'
+    for blind_spot in ("':(exclude)frontend/dist'", "':(exclude)docs'",
+                       "':(exclude)*.md'"):
+        assert blind_spot in pathspec, f'{blind_spot} must stay excluded by name'
+    for covered in ('scripts/', 'packaging/', 'Dockerfile'):
+        assert f"':(exclude){covered}" not in pathspec, \
+            f'{covered} is covered by a CI job, so it must count toward the gate'
 
 
 def test_ci_cache_stays_lean_while_the_torch_wheel_bypasses_it():
