@@ -265,15 +265,33 @@ def test_the_duplicate_regrouping_lets_other_writers_through(file_db):
         f'{len(pressure.failures)} of {pressure.attempts} writes were refused '
         f'while the duplicate regrouping ran ({elapsed:.1f} s) — the app is '
         f'unusable for its whole duration: {pressure.failures[0]}')
-    # And the WORST wait, because that is the shape of this failure: the old code
-    # blocked one writer for 626 ms and let the rest through afterwards, so a
-    # median would have shrugged at it. Measured margin: 24 ms here against 626 ms
-    # for the shape the test below reproduces.
-    worst = max(pressure.waits)
-    assert worst < 0.4, (
-        f'a writer waited {worst * 1000:.0f} ms during the regrouping '
-        f'({elapsed:.1f} s, {pressure.attempts} attempts) — the lock is still '
-        'being parked')
+    # And the TAIL of the waits, because that is the shape of this failure: the
+    # old code blocks writers for as long as it holds the lock and lets the rest
+    # through afterwards, so a median shrugs at it (measured on the old shape:
+    # p50 of 2.4 ms in one run, 147 ms in the next — the median is noise here).
+    #
+    # p99 and not max(). Every wait is clipped by the writer's own 0.5 s busy
+    # timeout, so `max` saturates near 500 ms under BOTH shapes and has almost no
+    # room to say anything; the single worst sample is then really a report on
+    # the machine, and it was — a CI runner recorded 498 ms against this 400 ms
+    # ceiling on a phase with ZERO writes refused, one fsync stall out of 1 115
+    # attempts. p99 has the range the max does not. Measured over three runs of
+    # each shape on the same box, ~400 attempts against ~12:
+    #
+    #     healthy   p99  36-38 ms    max 109-147 ms    0 refused
+    #     parked    p99 507-516 ms   max 507-516 ms    4 refused
+    #
+    # 400 ms sits an order of magnitude above the healthy tail and below the
+    # clipped one, so the guard keeps biting: the control test below reproduces
+    # the old shape, and it fails this line by ~110 ms with the timeout in the
+    # way. Raising the timeout to uncap `max` is not the fix — it would buy that
+    # range by weakening the refusal assertion above, which is the stronger one.
+    waits = sorted(pressure.waits)
+    p99 = waits[min(len(waits) - 1, int(len(waits) * 0.99))]
+    assert p99 < 0.4, (
+        f'the slowest 1% of writers waited {p99 * 1000:.0f} ms during the '
+        f'regrouping (worst {max(waits) * 1000:.0f} ms, {elapsed:.1f} s phase, '
+        f'{pressure.attempts} attempts) — the lock is still being parked')
 
 
 def test_the_regrouping_really_did_lock_the_database_before(file_db):
