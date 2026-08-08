@@ -62,6 +62,34 @@ def _write(path: Path, data: bytes | str) -> None:
     path.write_bytes(data)
 
 
+def _ascii_harness(target_name: str, argument: str) -> bytes:
+    """A .cmd that calls a SIBLING script, with no non-ASCII byte in the file.
+
+    cmd.exe decodes a .bat/.cmd in the *console* codepage, which is not a
+    constant: it is 65001 (UTF-8) in a terminal that ran `chcp 65001` and 850
+    on a default French install. Encoding the file in `GetOEMCP()` -- what the
+    `oem` codec gives -- therefore guesses right only when the two happen to
+    agree. Measured on a machine with GetOEMCP=850 and console CP=65001: the
+    accented install path was written as cp850 `\\x82`, cmd read it as UTF-8,
+    got an invalid lead byte and answered "path not found" (exit 1). The
+    hostile argument never reached the .bat, so the rejection this test exists
+    for was never exercised -- a recurring false red that looked like a
+    product failure and was the harness every time.
+
+    The cure is to stop baking the path into the file: `%~dp0` expands to the
+    harness's OWN directory at run time, whatever its bytes are, so dropping
+    the harness NEXT TO the target makes the script pure ASCII and identical
+    under every codepage. The accented directory still gets exercised -- it is
+    where both files live, and it reaches cmd through argv, which Python hands
+    to Windows as native UTF-16.
+    """
+    return (
+        "@echo off\r\n"
+        f'call "%~dp0{target_name}" "{argument}"\r\n'
+        "exit /b %ERRORLEVEL%\r\n"
+    ).encode("ascii")
+
+
 def _fake_launcher(label: str) -> bytes:
     return (
         "@echo off\r\n"
@@ -454,24 +482,12 @@ def test_bat_alias_handles_special_path_and_rejects_hostile_argument(tmp_path):
     assert str(install) in written
 
     (install / "bat-result.txt").unlink()
-    # cmd.exe decodes the BYTES of a .cmd in the CONSOLE codepage, and Python
-    # cannot know that one: `oem` is the system OEM codepage, which matches a
-    # local console but not a CI runner's (a hosted Windows console runs UTF-8),
-    # and a path baked in under the wrong one arrives as mojibake -- cmd answers
-    # "path not found", exits 1, and the hostile argument never reaches the .bat,
-    # so the rejection this test exists for is never exercised. Both guesses at
-    # the right encoding have now shipped red, UTF-8 first and OEM after it.
-    # So bake NO non-ASCII into the harness and let it derive the deliberately
-    # accented install path from its OWN location instead: %~dp0 comes from argv,
-    # which Windows carries as native UTF-16, with no codepage in the path at all.
+    # The harness lives NEXT TO the .bat it calls and reaches it through %~dp0,
+    # so the accented install path never has to be encoded into the file --
+    # see _ascii_harness for the false red that cost.
     harness = install / "hostile argument harness.cmd"
-    _write(harness, (
-        "@echo off\r\n"
-        "setlocal DisableDelayedExpansion\r\n"
-        f'call "%~dp0{GENERIC_BAT.name}" '
-        '"main & echo PWNED_SENTINEL"\r\n'
-        "exit /b %ERRORLEVEL%\r\n"
-    ).encode("ascii"))
+    _write(harness, _ascii_harness(
+        GENERIC_BAT.name, "main & echo PWNED_SENTINEL"))
     rejected = subprocess.run(
         [COMSPEC, "/d", "/c", str(harness)],
         input="\n",

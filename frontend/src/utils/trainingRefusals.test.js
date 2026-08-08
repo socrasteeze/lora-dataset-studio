@@ -156,6 +156,9 @@ test('the retry lane can answer every pre-flight guard Start can answer', () => 
     'allow_caption_mismatch',
     'allow_caption_quality',
     'allow_not_ready',
+    // A second cloud run of the same family on the same dataset — the retry
+    // lane's sibling can hit this too (auto-retry replays it).
+    'allow_parallel_run',
     'allow_uncaptioned',
     'allow_unverified_weights',
   ]);
