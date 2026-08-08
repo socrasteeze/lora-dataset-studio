@@ -19,6 +19,7 @@ export const CONFIRMABLE_REFUSALS = [
   // Custom-weights arch sniff couldn't positively verify the file → the
   // window.confirm IS the answer, retry carries allow_unverified_weights.
   ['CUSTOM_WEIGHTS_UNVERIFIED: ', 'allow_unverified_weights'],
+  ['PARALLEL_RUN: ', 'allow_parallel_run'],
 ];
 
 /* The readiness floor (NOT_READY:) is confirmable too, but the dataset panel
