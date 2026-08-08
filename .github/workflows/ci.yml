@@ -74,10 +74,25 @@ jobs:
             '^\.github/workflows/'
           )
 
-          is_torch_sensitive() {
+          # A test is validated by RUNNING it and by nothing else, so the size
+          # threshold below must never gate one. This is not hypothetical: a
+          # one-file, 37-line fix to a Windows-only updater test scored under
+          # the threshold, skipped the heavy jobs, and shipped broken -- then
+          # stayed red on main until an unrelated 61-commit merge was finally
+          # large enough to run the suite that catches it in seconds. The
+          # smallest test commits are exactly the ones with no other signal.
+          test_path_patterns=(
+            '^backend/tests/'
+            '^frontend/tests/'
+            '^scripts/tests/'
+            '\.test\.[cm]?[jt]sx?$'
+          )
+
+          matches_any() {
             local path="$1"
+            shift
             local pattern
-            for pattern in "${torch_path_patterns[@]}"; do
+            for pattern in "$@"; do
               if [[ "$path" =~ $pattern ]]; then
                 return 0
               fi
@@ -87,10 +102,14 @@ jobs:
 
           changed_paths=$(git diff --name-only --no-renames "$BEFORE" "$AFTER" --)
           torch_sensitive_paths=()
+          test_paths=()
           while IFS= read -r path; do
             [ -z "${path:-}" ] && continue
-            if is_torch_sensitive "$path"; then
+            if matches_any "$path" "${torch_path_patterns[@]}"; then
               torch_sensitive_paths+=("$path")
+            fi
+            if matches_any "$path" "${test_path_patterns[@]}"; then
+              test_paths+=("$path")
             fi
           done <<< "$changed_paths"
 
@@ -101,11 +120,25 @@ jobs:
             exit 0
           fi
 
-          # Count changes only in the sources that can actually break the suite.
-          # frontend/dist (build output), docs/** and every *.md are deliberately
-          # excluded: a dist rebuild or a doc tweak must not trigger the full CI.
-          # (dist and docs already fall outside the include list; the *.md exclude
-          # catches markdown living inside backend/ or frontend/src/.)
+          if [ "${#test_paths[@]}" -gt 0 ]; then
+            printf 'Test changed: %s\n' "${test_paths[@]}"
+            echo "A test changed -> run the heavy jobs whatever the diff size."
+            echo "run_heavy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Count every source that can break the suite, and name the blind
+          # spots instead of the sources. frontend/dist (build output), docs/**
+          # and every *.md are deliberately excluded: a dist rebuild or a doc
+          # tweak must not trigger the full CI.
+          #
+          # This used to be an INCLUDE list of backend/ frontend/src frontend/tests,
+          # which silently scored zero for everything else in the repo -- so
+          # scripts/update-docker-gpu.ps1, the root update-docker*.bat launchers,
+          # the Dockerfile and packaging/ could change by any amount and never
+          # reach the jobs that test them, though backend-tests owns the first
+          # two and docker-smoke owns the others. An unlisted path now counts;
+          # only a named blind spot does not.
           files=0
           lines=0
           while IFS=$'\t' read -r added deleted path; do
@@ -115,7 +148,7 @@ jobs:
             [ "$deleted" = "-" ] && deleted=0
             lines=$((lines + added + deleted))
           done < <(git diff --numstat "$BEFORE" "$AFTER" -- \
-            backend/ frontend/src/ frontend/tests/ ':(exclude)*.md')
+            . ':(exclude)frontend/dist' ':(exclude)docs' ':(exclude)*.md')
 
           echo "Source files changed: $files, lines changed: $lines"
           if [ "$files" -ge 5 ] || [ "$lines" -ge 100 ]; then
