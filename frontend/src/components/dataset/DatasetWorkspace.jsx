@@ -14,6 +14,7 @@ import DatasetFolderNote from './DatasetFolderNote';
 import { isDatasetImportBlocked, isStopGenerationBlocked } from './scraperState';
 import { faceAnalysisState, faceAnalysisLabel } from './faceScoringGate.js';
 import DatasetGrid from './DatasetGrid';
+import { datasetBusyReason } from './datasetBusyReason.js';
 import KleinModelSetting from '../shared/KleinModelSetting';
 import SmallImageRescueReview from './SmallImageRescueReview';
 import CaptionToolsBar from './CaptionToolsBar';
@@ -1183,6 +1184,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onScoreFace={ds.scoreFace} scoringFaceIds={ds.scoringFaceIds}
                   onRegenerate={(id, loraStrength, prompt, opts) => ds.regenerate(id, loraStrength, prompt, opts)}
                   onReimprove={ds.reimproveImage} onView={setViewImg}
+                  /* ⟨ / ⟩ cross page boundaries, so the page underneath follows:
+                     closing the lightbox must not leave you on a page that no
+                     longer holds the image you were looking at. */
+                  viewingImageId={viewImg?.id ?? null}
                   onBatch={ds.batchImages} busy={ds.busy}
                   onBulkBusyChange={setGridBulkBusy}
                   onImproveBatch={ds.improveBatch} activity={act}
@@ -1222,7 +1227,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       extraRefs={d.ref_extra_filenames || []}
                       onAddExtraRef={ds.addExtraRef} onRemoveExtraRef={ds.removeExtraRef}
                       onCropExtraRef={(fn) => setExtraRefCrop(fn)}
-                      subjectType={d.subject_type || 'human'} />
+                      subjectType={d.subject_type || 'human'}
+                      referenceEdit={d.reference_edit} />
                   </div>
                 </div>
 
@@ -2053,6 +2059,13 @@ export default function DatasetWorkspace({ ds, onBack }) {
           compare={viewImgComparison}
           parentNonce={(ds.nonces && viewImgComparison?.parent
             && ds.nonces[viewImgComparison.parent.id]) || 0}
+          // The SECOND comparison — against the dataset's reference photo — is
+          // decided inside the lightbox: unlike the derived parent it is not a
+          // row of the payload, just this dataset's own filename, and it is
+          // served by the very same /img/<name> endpoint. `refNonce` is the
+          // reference's own cache buster (a crop or a re-upload bumps it).
+          refFilename={d.ref_filename || ''}
+          refNonce={ds.refNonce || 0}
           onClose={() => setViewImg(null)}
           onMirror={viewImgLive._rescueReviewPreview ? undefined : ds.mirrorImage}
           onRotate={viewImgLive._rescueReviewPreview ? undefined : ds.rotateImage}
@@ -2062,9 +2075,20 @@ export default function DatasetWorkspace({ ds, onBack }) {
           onImprove={canImproveViewImg
             ? ((imageId, engine) => ds.improveImage(imageId, { engine }))
             : undefined}
+          /* ⟨ / ⟩ walk `gridImages` — the filtered, sorted list the grid shows,
+             the SAME array it is handed below. Not `images` (the raw payload):
+             ⟩ would then land on a picture the current filters hide, behind an
+             overlay that gives no way to notice. The rescue-review preview
+             opens on a Curation pair, not on a position in that list, so it
+             gets no arrows rather than arrows into someone else's sequence. */
+          images={viewImgLive._rescueReviewPreview ? null : gridImages}
+          onNavigate={viewImgLive._rescueReviewPreview ? null : setViewImg}
           improvePending={viewImgImproving}
           improveReady={viewImgImprovementReady}
           busy={ds.busy || gridBulkBusy}
+          // The refused writes in there name the pass that holds them, exactly
+          // like the tiles behind the lightbox.
+          busyReason={(ds.busy || gridBulkBusy) ? datasetBusyReason(ds.busy ? act : null) : null}
           kleinAvailable={Boolean(caps.engines?.klein)}
           subjectType={d.subject_type || 'human'}
           onCrop={viewImgLive._rescueReviewPreview

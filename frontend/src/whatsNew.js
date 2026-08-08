@@ -50,6 +50,154 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-08-siglip2-launch-all-no-longer-crashes',
+    date: '2026-08-08',
+    title: '🚀 Launch all works on a bank using the SigLIP 2 engine',
+    blurb:
+      'On a bank set to the optional SigLIP 2 engine, 🚀 Launch all could not start at all — the request came back as a server error before a single pass ran, with nothing on screen naming a cause you could act on. The list of passes that engine runs in (it needs its index built before the duplicate hunt that reads it) was referred to by name and never actually defined, so the app crashed the moment it tried to work out the running order. It is now derived from the ordinary pass list, which also means the 🔖 Tags pass can no longer go missing from a SigLIP 2 run. Banks on the default CLIP engine were never affected.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-08-a-just-deployed-model-generates-right-away',
+    date: '2026-08-08',
+    title: 'A model you just deployed works right away, not a minute later',
+    blurb:
+      'Deploy a checkpoint, hit Generate, and the job died: "Your ComfyUI does not offer a model file this workflow requires", followed by advice to go and check your ComfyUI address — which was right all along. The app reads the list of models ComfyUI offers once a minute and reuses it, so a model deployed seconds ago was judged against a list drawn up before it existed, and the refusal it produced is final: the job was never retried. Now, before a job is refused over a missing model, the app asks ComfyUI again — once, on the spot, ignoring what it had cached — and the model it finds is used immediately, spelled exactly the way that ComfyUI spells it. When the file really is absent the job still stops before queuing, but the explanation has stopped guessing: it now says the list was just re-read, so a fresh deploy is not what you are looking at, which leaves a second ComfyUI install as the thing to check.',
+  },
+  {
+    id: '2026-08-07-compare-any-image-with-the-reference',
+    date: '2026-08-07',
+    title: 'Check any image against your reference photo, side by side',
+    blurb:
+      'The question you ask of a generated shot is "is this still the same person?" — and until now the only way to answer it was to remember the reference photo from another panel. Open any image in the dataset full screen and press ◐ Compare with reference: the reference and the image sit side by side, each named, each filling its own pane. It works on every image, generated or imported, not just on improve candidates — and on an improved one both buttons are there, so you can flip between "is it sharper?" and "is it still them?". The two never open at once, and neither follows you: press ⟩ and the next picture starts clean. Each pane fits its own image and says so — a square head crop next to a full-body plan has no shared scale to promise, unlike the comparison against the original.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-07-dataset-lightbox-next-previous',
+    date: '2026-08-07',
+    title: 'Walk a dataset image by image, without closing the picture each time',
+    blurb:
+      'Reviewing image 41 of 340 full screen used to mean closing it, hunting tile 42 on the wall, and opening that — for every single image. The inspection view now has ⟨ and ⟩ on the edges of the picture, ← and → on the keyboard, and a 12 / 340 badge telling you where you are. It walks what the grid is SHOWING: chip it down to "awaiting ✓/✕", sort by face similarity, and the arrows follow that list in that order, crossing pages as they go — close the view and you are on the page holding the image you were looking at. The ends do not wrap: on the first image ⟨ goes grey and says so, because a loop that silently restarts makes "have I seen everything?" unanswerable. Zoom, an open comparison pane and a running improvement stay behind with the image they belong to, so the pane labelled "original" is always the parent of the picture in front of you. And since moving is only reading, the arrows keep working while a generation or a captioning pass holds the dataset.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-07-lora-preset-applies-itself',
+    date: '2026-08-07',
+    title: 'Your LoRA preset can now apply itself, every run',
+    blurb:
+      'Building a generation-LoRA preset in Settings was only half the job: the tuning panel in the workspace opened on "None" every single time you came back to a dataset, so the preset applied only if you remembered to re-pick it — and a run that forgot showed no LoRA at all in the finished image\'s metadata, which looks exactly like the app ignoring your settings. Each local engine now has its own "Preset selected by default" in Settings → Image engines: pick one and every run starts there. It stays a starting point, not a lock — you can still choose another preset, or None, for a single run without touching the setting. Shipped as None, so nothing changes until you choose. Preset mechanism by @waltm (Discord).',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-07-lora-row-that-would-be-ignored-says-so',
+    date: '2026-08-07',
+    title: 'A LoRA line that would be ignored now tells you, in the editor',
+    blurb:
+      'Both local engines already load one LoRA outside your presets — Klein its consistency LoRA, Krea 2 Edit its identity edit LoRA — and a preset row naming that same file is deliberately dropped: chaining it twice adds both strengths together, well past what the file was trained for, and the result goes blocky. That drop happened in complete silence, one line in a server log nobody reads. Write such a row now and the preset editor says so on that exact line, explains why, and points at the strength setting to change instead. The check spells the path the same way the server does, so a slash the other way round or a different capitalisation cannot slip past it.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-07-krea-base-model-is-named',
+    date: '2026-08-07',
+    title: 'Settings now names the Krea base model your runs actually load',
+    blurb:
+      'The "Base model file" field said "auto — finds a Krea 2 Turbo/Raw build" and stopped there. If your ComfyUI holds more than one candidate — the official Turbo build next to a community finetune whose filename also reads as turbo — the tie-break picked one and never told you which, so the only way to find out was to open a finished PNG and read its metadata. Every judgement about quality in between was about a model you had not chosen. The field now names the file the next run will load — and, when a filename you pinned yourself was not found under any krea folder, says so and names what is being loaded instead.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-08-improve-instruction-editable-in-place',
+    date: '2026-08-08',
+    title: 'Fix the improve instruction where it goes wrong, not in Settings',
+    blurb:
+      'The note under ✨ Upscale & improve already told you what the pass was about to ask Klein for — "add detailed texture, add sharp details…" — and then sent you to Settings to change it. Now you can change it right there: ✎ Edit this instruction here opens the box under the button, in the lightbox and in the bulk toolbar, already filled with the exact text in force. Rewrite it for a drawing, or untick it and let the pass upscale with no instruction at all; both take effect on your next improve, with nothing to save. It edits the app-wide setting — the same value Settings shows, applying to every dataset — and the panel says so before you touch it. Reset to default appears only once you have actually overridden something, and puts you back on the shipped text rather than on a frozen copy of it, so later improvements to that text still reach you.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-07-bank-stop-answers-the-click',
+    date: '2026-08-07',
+    title: 'Stop on a Bank pass answers you the moment you press it',
+    blurb:
+      'Press Stop while ✨ Score is writing thirty-six thousand rows and nothing appeared to happen for about three seconds — so everyone pressed it again, several times. The click was always registered instantly; it was the banner around it that took that long to refresh, and the button looked exactly the same before and after. It now changes to "Stopping…" the instant you press it and stops taking clicks, without waiting for anything from the server. It also says what it is waiting for, in the words of the step actually running — "finishing the current batch of 200 rows, then saving" is why the counter keeps moving for a moment after you press. And it tells you the price BEFORE you press: while scores are being written, everything already written stays and only the style grouping has to be redone in full, while during the style grouping itself Stop costs nothing because that step is written whole either way.',
+  },
+  {
+    id: '2026-08-07-passes-survive-a-locked-cache',
+    date: '2026-08-07',
+    title: 'A pass no longer dies because something else touched its cache file',
+    blurb:
+      'A ✨ Score over 37,000 images stopped at image 1849 with "Access denied" on its own cache — not a permissions problem, but an antivirus holding the freshly written file for a fraction of a second while the pass tried to swap it into place. On Windows that is enough to refuse the swap, and the work the pass had already computed and written was thrown away with it. Now the swap waits and retries for a few seconds, and if something really is holding the file the message says so instead of sending you into folder permissions. Better still, nothing is lost either way: work a previous run finished but could not file away is picked up automatically when the pass next starts, so a run interrupted by a lock, a crash or a power cut resumes from where it got to. Recovered work is checked before it is trusted — a half-written file is refused and removed rather than quietly becoming your cache. Applies to ✨ Score, faces, the semantic index and the video search vectors.',
+  },
+  {
+    id: '2026-08-07-image-size-budget-is-a-setting',
+    date: '2026-08-07',
+    title: 'Big panoramas and camera masters import now — and the size limit is yours to set',
+    blurb:
+      'A 10418×2100 panorama used to be refused with "reduce the image before import", which was the only advice possible while the limit was welded into the code. The limit is now a setting, and its default has moved from 16 Mi-pixels / 8192 px per side to 64 Mi-pixels / 16384 px — room for a 61 MP camera master or a stitched panorama without a second thought. Settings ▸ Captioning & quality ▸ Image size budget lets you raise it further, or switch it off entirely; the choices are labelled in the memory each one commits (a decoded pixel costs 3 bytes, and an edit can hold a second copy at once), and "No limit" says plainly what it disarms. One number governs the whole app — import, ZIP and scrape ingest, Bank scan and thumbnails, edits, ComfyUI staging and vision captioning — so an image you can import is an image you can look at. And when something is refused, the message now tells you where to change the budget instead of just telling you to shrink the file.',
+    to: '/settings/captioning',
+  },
+  {
+    id: '2026-08-07-dataset-stays-readable-while-it-works',
+    date: '2026-08-07',
+    title: 'A dataset you can still look through while it works',
+    blurb:
+      'Starting a generation, a captioning run or a watermark scan used to freeze the whole grid: you could not open an image full screen, zoom into a face, or even tick a box, on a pass that might run for an hour. Inspecting and selecting are reads — they change nothing — so they now stay available throughout. Editing does not: crop, mirror, rotate, keep/reject, captions and delete still wait for the pass to finish, because a second writer would race it. What changed there is that they stop being silently grey — each one now says which pass is holding it, where that pass has got to and how long it still needs ("⚡ Variation generation is running on this dataset — 12 / 64"), and a line above the grid states the rule once: edits wait, looking and ticking do not.',
+    to: '/datasets?section=images&panel=review',
+  },
+  {
+    id: '2026-08-07-pick-the-model-file-you-actually-have',
+    date: '2026-08-07',
+    title: 'Choose your Klein and Krea model files from a list instead of typing a filename',
+    blurb:
+      'The Klein model-file fields and the Krea 2 Edit base model and identity LoRA were blank boxes you had to fill from memory — one typo and the engine quietly used a different file. Each is now a searchable list of the model files actually found in your ComfyUI (extra_model_paths.yaml roots included), with a ↻ to rescan after you drop a new one in, and a plain sentence naming the folder when nothing is there. The Krea base list shows only what the app would really elect, so a checkpoint it refuses is never offered. Typing still works for a file that is not on disk yet, or an absolute path from anywhere.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-07-a-pinned-model-that-is-missing-stops-the-run',
+    date: '2026-08-07',
+    title: 'A model file you chose that is no longer there now stops the engine instead of being swapped',
+    blurb:
+      'If you pinned a Klein or Krea model file and that file is gone or renamed, the app used to fall back to picking one for you and write a line in a log nobody reads — so the graph loaded a file other than the one on screen, and you only found out from the images. Now the pinned name stays in the field, marked "not found", the engine refuses to start and says which file it is looking for. Clearing the field is the explicit way back to automatic detection. The one exception is the shipped identity/consistency LoRA name, which nobody typed: at its default it still recovers a renamed download on its own.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-07-krea-likeness-dials-reachable',
+    date: '2026-08-07',
+    title: 'When Krea 2 Edit does not look enough like your reference, you can now fix it',
+    blurb:
+      'Krea has two dials that decide how strongly it holds on to your reference photo — the reference pull and the identity LoRA\'s own strength — and neither had a control anywhere in the app: the only way to move them was to hand-edit config.json. They are now sliders in the "🧬 Krea 2 Edit tuning" panel of Generate variations, right where you judge the result. Reference pull is the one to reach for when the face is too loose (it used to ship paired with reference grounding, so raising grounding alone left you on an uncalibrated mix), and the identity LoRA strength has 50% of headroom above its shipped 1.0. Both write your global Krea settings — the panel says so, and each has a one-click way back to the shipped value.',
+    to: '/datasets?section=add&panel=generate',
+  },
+  {
+    id: '2026-08-07-passes-say-how-long-is-left',
+    date: '2026-08-07',
+    title: 'Every pass now tells you how much longer it needs',
+    blurb:
+      '"12939 / 37800" told you where a pass was, never whether that meant twenty minutes or four hours — so the only way to find out was to sit and watch. Scan, ✨ Score, faces, framing, medium, captioning, watermark, crops & variants, the semantic index and the video passes now add "about 2 hours left" beside their counter, and a refusal to start a second pass tells you how long the first one still needs. The number is measured over the last minute of real work, not averaged since the pass began: a ✨ Score resuming from cache swallows twenty thousand rows in two seconds and an average would have promised "a few seconds" for the next hour and a half. It stays quiet until it can hold still — you get "estimating time left…" rather than a figure that changes every poll — it says "in this step" once a pass has moved on to a different kind of work, and a step with nothing to count (grouping styles, comparing shots) gets no estimate at all rather than an invented one.',
+  },
+  {
+    id: '2026-08-07-reference-edit-survives-a-restart',
+    date: '2026-08-07',
+    title: 'An edited reference photo is no longer lost if the app restarts',
+    blurb:
+      'Editing your reference photo is a one-to-three-minute job on your own GPU. If the app restarted before you pressed Keep, the finished image was still sitting in your dataset folder — but nothing could reach it any more: the modal came back empty, Keep refused, and the result was deleted half an hour later, so you paid for it in GPU time twice. It now comes back waiting for your Keep or Discard. If a second engine was still working when the app went down, it says so plainly instead of spinning forever on a result that is not coming.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-07-video-install-checks-the-encoder',
+    date: '2026-08-07',
+    title: 'Installing the video extra no longer claims success when clips still cannot be cut',
+    blurb:
+      'The video extra delivers two things — reading your files, and encoding the clips you keep — and Setup only ever checked the first. So on a machine where the bundled ffmpeg never finished downloading (or an antivirus emptied it), the install said "✓ installed successfully" while the "Video bank — clip encoding" row stayed ✗ right underneath, behind the very same ↻ button: you reinstalled the half that already worked. That install now fails honestly and tells you which half is missing and what repairs it. The Setup row got stricter too: it runs ffmpeg instead of trusting that a file exists at the right path, so a truncated or quarantined binary is caught in Setup rather than in the middle of an export.',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-07-face-mask-preview-survives-a-restart',
+    date: '2026-08-07',
+    title: 'The face-mask preview no longer disappears when you restart',
+    blurb:
+      'Looking for faces across a concept dataset is the slow part of the training panel — the detector alone takes seconds to load before the first image, then every kept photo on top. That whole pass used to live only in the app\'s memory, so restarting the server threw it away and the panel offered to run it all over again. It is now saved beside your images and comes back with them. Stopping a pass keeps its credit too: the faces already found survive the restart, so "Resume — 47 of 153 already analyzed" is still waiting for you. If you changed your kept images while the app was down, the preview comes back labelled out of date rather than pretending to be current.',
+    to: '/datasets',
+  },
+  {
     id: '2026-08-03-phone-layout-full-width',
     date: '2026-08-03',
     title: 'The dataset page uses the whole screen again on a phone',
@@ -4068,7 +4216,7 @@ export const WHATS_NEW = [
     date: '2026-08-04',
     title: '🎨 Medium and 🔎 text search stop failing over a line of chatter',
     blurb:
-      'On some installs 🎨 Medium and 🔎 text search died with “the text encoder produced no result — check the ✨ Score interpreter”, on machines whose ✨ Score interpreter was fine — it had just produced the embeddings both features read. The cause was one line: the first thing the text encoder printed had to be its answer, so a first-run banner, a weights download or any greeting from the ML environment ahead of it was read as a failure. Both features now step over anything that is not an answer, the way the ✨ Score pass already did. And when the encoder really does fail, the message quotes what it actually printed — including the error output, which used to be discarded — with home-folder paths stripped, so it is safe to paste into a help thread and it no longer sends you to check a component it never looked at.',
+      'On some installs 🎨 Medium and 🔎 text search died with “the text encoder produced no result — check the ✨ Score interpreter”, on machines whose ✨ Score interpreter was fine — it had just produced the embeddings both features read. The cause was one line: the first thing the text encoder printed had to be its answer, so a first-run banner, a weights download or any greeting from the ML environment ahead of it was read as a failure. Both features now step over anything that is not an answer, the way the ✨ Score pass already did. And when the encoder really does fail, the message quotes what it actually printed — including the error output, which used to be discarded — with home-folder paths stripped, so it is safe to paste into a help thread and it no longer sends you to check a component it never looked at. Reported by shinybtw (Discord), with the failing traceback.',
     to: '/bank',
   },
   // Appended rather than prepended ON PURPOSE: several waves are editing the
@@ -4124,7 +4272,15 @@ export const WHATS_NEW = [
     blurb:
       'On a big bank, pressing 🔎 Scan quality could take the whole app away for a couple of minutes: the bar reached 100 %, said “grouping duplicates”, and nothing else answered — sorting, renaming, promoting, all of it waited. Three things were behind that, and all three are fixed. The duplicate grouping no longer re-runs over your whole bank at the end of a scan that had nothing to scan — it runs when the hashes actually changed, and when you ask for it with “↻ Re-group duplicates”, which still applies a new duplicate distance without decoding a single file. When it does run it now shows its own progress and stops when you press Stop, instead of leaving you in front of a frozen-looking bar with no way out. And it no longer holds the database while it works, so the rest of the bank keeps answering: on a 50 000-image bank the grouping went from up to two minutes of dead application to a phase you can watch and interrupt, and the worst wait a click had to sit through fell from over five seconds to a few dozen milliseconds.',
     to: '/bank',
-  }
+  },
+  {
+    id: '2026-08-07-framing-stops-locking-itself-out-of-the-model',
+    date: '2026-08-07',
+    title: '📐 Framing classifies your whole bank instead of a handful of images',
+    blurb:
+      'On a bank of any size, 📐 Framing could classify a few images and then quietly stop classifying anything at all — the bar kept moving, the log filled with “vision GPU window renewal failed / database is locked”, and stopping the pass reported four images done out of the twelve it had walked. The pass was starving itself: it saved its results in batches of 25 and held the database write lock between them, across model calls that take seconds each, while the check that lets the app talk to the vision model needs that same database every single call. Failing that check is fail-safe by design, so every remaining image was refused rather than mislabelled — correct, and completely invisible. It now saves each image as it goes (measured at 0.17 ms per save) and never holds the lock across a model call, so a pass classifies what you gave it. The 🔎 Watermark scan and the watermark repaint level got the same treatment before they could hit it. And when something does go wrong, every pass now ends the same way whether it finished or you stopped it: what it classified, what it could not read, what was deleted under it, what changed while it was being analysed, and what the model was never shown. Reported by _mr.arrow_ (Discord).',
+    // No `to`: the passes live inside a bank workspace, which has no deep link.
+  },
 ];
 
 // ── Ordering ────────────────────────────────────────────────────────────────

@@ -37,7 +37,7 @@ For containerized or scripted setups, a handful of environment variables overrid
 
 The Overview section has **no settings of its own** — it's the at-a-glance dashboard for the rest of the page. If nothing is configured yet, it opens with a *Let's get you set up* banner. Below that, a **Capabilities** grid marks each feature ✓ or ✗ depending on what the app can currently see (a key, a reachable tool, an installed extra).
 
-Every row is a **link to the control that turns that capability on**, not just to the right screen: picking *OpenRouter* lands on the OpenRouter key field with it scrolled to and highlighted; picking *Person masks* opens the Setup wizard step that installs it. Use the grid as your first stop to answer "why is this feature greyed out?" — the answer is one click away on the row itself.
+Every row is a **link to the control that turns that capability on**, not just to the right screen: picking *Person masks* opens the Setup wizard step that installs it. Use the grid as your first stop to answer "why is this feature greyed out?" — the answer is one click away on the row itself.
 
 A row marked **◐ in amber** is not broken: the tool is installed, it just isn't running (typically *launch ComfyUI to enable* for Klein and the Test Studio). Those rows lead to the **ComfyUI API URL** field and its **Test** button rather than to an install you have already done. The counter at the top reads `X/11 ready` plus, when it applies, how many are waiting on a process.
 
@@ -70,14 +70,16 @@ Settings:
 
 - **Reference grounding** → `krea.grounding_px`. Range `512`–`1536`, default **`512`**. **The** dial of this engine: the resolution your reference is shown to the model's vision encoder at. At the low end it follows the shot description (more variety in pose, outfit and scene, looser likeness); **higher** values favor reference likeness and can copy the very pose and outfit you asked it to change. **512 is the dataset-restaging balance**: it keeps the prompt and selected catalog card in charge while preserving identity. Raise it deliberately when keeping the reference more closely matters than changing its pose. This is Krea-only: it does not change ChatGPT, Gemini/Nano Banana, OpenRouter, or Klein.
 - **Sampler steps** → `krea.steps`. Default **`10`**, the value the model's own reference workflow uses. More is slower and rarely better on this pipeline.
-- **Base model file** → `krea.base_model`. **This is the GENERATION setting only** — the checkpoint ComfyUI loads for Krea 2 Identity Edit. It has **nothing to do with LoRA training**, which never reads it: training pulls its base from Hugging Face and picks it from the **Krea 2 training base** dropdown in the training panel (**Raw**, the default and the official recommendation — you train on Raw and apply the LoRA on Turbo at inference). Nobody can accidentally train on Turbo by leaving this field alone. *(The naming confusion was raised by strouder, GitHub #19.)* Blank (default) = the app picks a Krea 2 **Turbo** then **Raw** build from your ComfyUI. Set it only if you own several. Checkpoints that merely carry "krea" in their name but are not Krea 2 bases are **skipped on purpose** — the identity LoRA renders pure noise on them, which looks like a broken app rather than a wrong file.
-- **Identity edit LoRA** → `krea.identity_lora`. Path relative to `models/loras`; if nothing is there under that name the app searches your LoRA folders for a `krea2_identity_edit` file, so a renamed download still works.
+- **Base model file** → `krea.base_model`. **This is the GENERATION setting only** — the checkpoint ComfyUI loads for Krea 2 Identity Edit. It has **nothing to do with LoRA training**, which never reads it: training pulls its base from Hugging Face and picks it from the **Krea 2 training base** dropdown in the training panel (**Raw**, the default and the official recommendation — you train on Raw and apply the LoRA on Turbo at inference). Nobody can accidentally train on Turbo by leaving this field alone. *(The naming confusion was raised by strouder, GitHub #19.)* Blank (default) = the app picks a Krea 2 **Turbo** then **Raw** build from your ComfyUI. Set it only if you own several. Checkpoints that merely carry "krea" in their name but are not Krea 2 bases are **skipped on purpose** — the identity LoRA renders pure noise on them, which looks like a broken app rather than a wrong file. The field is a **searchable list of the Krea bases actually on disk** — the same candidates the app itself would elect, so a checkpoint it refuses is never offered; you can still type a name for a file you have not downloaded yet. **A name that is not on disk stops the engine** rather than falling back to automatic election: this exact fallback once had a whole training run on a third-party finetune nobody chose, because the field showed one file and the graph loaded another. **When the field is blank, the line under it names the build your runs actually load** — with two Krea checkpoints whose filenames both read as "turbo", the tie-break used to pick one silently, and the only way to find out was reading a finished PNG's metadata, long after the quality judgements had been made on a model nobody chose. The name is resolved server-side by the same code the generation path calls, never re-ranked in the browser. Clear the field to go back to automatic detection.
+- **Identity edit LoRA** → `krea.identity_lora`. A searchable list of the LoRAs on disk (typing a path still works). At its **shipped default** — the canonical download name, which nobody typed — nothing is there under that name means the app searches your LoRA folders for a `krea2_identity_edit` file, so a renamed download still works. **A name you chose yourself and that is not on disk stops the engine instead**, naming the file: the identity LoRA *is* the face transfer, and quietly substituting another one changes every image you generate. Clear the field to return to the automatic search.
 - **Krea 2 Edit generation LoRA presets** → `krea.generation_lora_presets`. Named,
   ordered combinations of **your own** LoRA files, chained after the identity-edit
   LoRA when Krea 2 Edit generates dataset images. Max 8 LoRAs per preset, 12
   presets; inside a preset the row order **is** the chain order. Per run you pick
-  one preset (or None, the default on every visit) in the workspace's 🧬 Krea 2
-  Edit tuning panel — the run sends only the preset's NAME and the app resolves
+  one preset in the workspace's 🧬 Krea 2 Edit tuning panel — which opens on
+  **Preset selected by default** → `krea.default_generation_lora_preset` (default:
+  empty = *None*), a starting point you can override for a single run without
+  rewriting the setting — the run sends only the preset's NAME and the app resolves
   the files from this list, so renaming a preset can never make a run load
   something you didn't configure. Strength runs to 6, and to **20** for utility
   LoRAs whose filename says `filter-bypass`: those have no measurable effect below
@@ -89,10 +91,18 @@ Settings:
   pointing at the **same file as Identity edit LoRA** is skipped too — it would
   chain the identity LoRA a second time on top of itself, summing both strengths
   into one delta well past what the file was trained for (visible as blocky,
-  posterized output, not a subtler quality loss). Empty by default. *(Preset
+  posterized output, not a subtler quality loss) — **the preset editor flags that
+  row as you write it** rather than leaving the only trace in the server log, and
+  it compares paths the way the server does, so a different separator or
+  capitalisation cannot dodge the warning. Empty by default. *(Preset
   mechanism by @waltm, Discord.)*
 
-The pipeline's reference boost is an internal Krea calibration, not a second user-facing likeness slider; use **Reference grounding** for that trade-off.
+Two more Krea calibration dials exist, and they are **not on this page** — their sliders live in the **🧬 Krea 2 Edit tuning** panel of the workspace's *Generate variations* screen, because that is where you judge what they do. They are settings all the same: moving a slider there saves the value globally and it applies to **every** Krea run from now on, exactly as if you had changed it here. The panel says so above the sliders.
+
+- **Reference pull** → `krea.ref_boost`. Range `0`–`10`, default **`0.25`**. How hard the source latent is pushed back into the model at every denoising step. This is the lever for *"the subject doesn't look enough like my reference"* — raise it and likeness sharpens; raise it far and the model also recopies the composition, pose and outfit the shot card asked it to change. Historically it shipped **paired** with `grounding_px` (v1 = 1024 / 4.0, v2 = 512 / 1.0), so if you have raised grounding on its own you are on a combination no shipped profile ever calibrated — this is the dial that brings the pair back into balance.
+- **Identity LoRA strength** → `krea.identity_lora_strength`. Range `0`–`1.5`, default **`1.0`**. The weight applied to the Krea 2 identity-edit LoRA itself — the piece that carries the face across. Below 1 softens the likeness and leaves more room for the prompt; `0` disables the face transfer entirely; above 1 is past the weight the file was trained for and can look waxy or posterized rather than simply more similar.
+
+Both are re-clamped by the server on every run, so a hand-edited `config.json` out of range is corrected rather than obeyed.
 
 Two behaviours worth knowing before you build a dataset with it:
 
@@ -155,7 +165,7 @@ Without the pack nothing breaks: upscales still run, they are just capped by the
 
 ### Klein model files (optional)
 
-*Contributed by socrasteeze (GitHub).* Pin the exact files the Klein graph loads instead of relying on auto-detection. Every field accepts **a full absolute path or a ComfyUI-relative loader name**; empty fields keep the default behaviour (the canonical download filename first, then a narrow token scan of the ComfyUI model folders).
+*Contributed by socrasteeze (GitHub).* Pin the exact files the Klein graph loads instead of relying on auto-detection. Every field accepts **a full absolute path or a ComfyUI-relative loader name**; empty fields keep the default behaviour (the canonical download filename first, then a narrow token scan of the ComfyUI model folders). Each field now **lists the files actually found in that ComfyUI folder** (`extra_model_paths.yaml` roots included), with a ↻ to rescan after you drop a new file in; free text stays available because an absolute path from outside every ComfyUI root is a legitimate value no scan can enumerate.
 
 - **Diffusion model (UNET)** → `klein.unet`. A full path, or a name relative to a diffusion-model folder — e.g. `klein/flux-2-klein-9b-fp8.safetensors` under `models/unet`, or a bare filename for a file sitting at a folder root. This is also what lets you use a UNET that does **not** live in a `klein`-named subfolder, which the automatic scan would never find. Default **empty** (auto-detect).
 - **Text encoder** → `klein.text_encoder`. Full path, or relative to `models/text_encoders` — e.g. `qwen_3_8b_fp8mixed.safetensors`. Default **empty**.
@@ -166,7 +176,7 @@ How references resolve:
 
 - A **full path under any of ComfyUI's model folders** — including folders registered in `extra_model_paths.yaml` (the app parses it exactly like ComfyUI does) — is converted automatically to the relative loader name ComfyUI's nodes need, and the field shows **Found**. Nothing is copied or moved.
 - A **full path anywhere else** — Downloads, a Hugging Face cache, another drive — is **hardlinked (or symlinked) into `<ComfyUI models>/<type>/lds-pinned/`** so stock loader nodes can open it, and shows the same **Found**. Your config keeps the original absolute path; the link is created when the reference resolves, costs no extra disk, and is reused on later runs. Staged files are deliberately *not* put in a `klein`-named folder, so they never show up as a second copy in the Klein model picker.
-- A reference that **cannot be resolved** — no such file, or the link could not be created (a read-only models folder, or another volume on an account without symlink rights) — falls back to auto-detection instead of blocking generation, with a badge so the miss is never silent.
+- A reference that **cannot be resolved** — no such file, or the link could not be created (a read-only models folder, or another volume on an account without symlink rights) — **stops the Klein engine**, with a badge here and a sentence on the engine card naming the file. It used to fall back to auto-detection and only show the badge: the run then went ahead on a *different* file from the one displayed, and the only symptom arrived with the images. **Clearing the field is the explicit way back to auto-detection.** The one exception is **Consistency LoRA left at its shipped default**, which nobody chose: at that value a missing file is still simply skipped, exactly as before.
 - Native / **bf16 UNETs** (a filename without `fp8`) now load with `weight_dtype: default`; FP8 builds keep `fp8_e4m3fn`. Both shipped Klein graphs hardcoded `fp8_e4m3fn`, which quantized a full-precision pin on load without saying so. The canonical download carries `fp8` in its name, so a stock install renders exactly as before.
 - Generation-LoRA **preset rows** accept full paths the same way.
 - **Not cleaned up automatically.** Changing or clearing a pin leaves its link behind in `lds-pinned/`; the folder is safe to delete by hand when nothing points there any more.
@@ -190,11 +200,11 @@ Use **＋ New preset**, **Duplicate**, **Delete** and rename to manage them, and
 
 How presets are used matters:
 
-- A preset is **chosen per run** in the **🖥️ Klein tuning** panel of the workspace, and it **defaults to *None* every visit** — presets never apply on their own.
+- A preset is **chosen per run** in the **🖥️ Klein tuning** panel of the workspace. The panel opens on **Preset selected by default** → `klein.default_generation_lora_preset` (default: empty = *None*, the behaviour every install had before this key existed). That is a **starting point, not a lock**: the run panel still offers *None* and every other preset for that run, and choosing there **never rewrites the setting**. Fail-closed like the rest of the chain — a default naming a preset you have since renamed or deleted falls back to *None*, and the Settings field says so instead of pretending it is empty. Each engine has its **own** default key (`klein.default_generation_lora_preset` / `krea.default_generation_lora_preset`), because `klein.generation_lora_presets` and `krea.generation_lora_presets` are independent lists where the same name can designate two different chains.
 - Resolution happens **by name** on the server, and it's **fail-closed**: if a run references a preset name that no longer exists, it runs **with no extra LoRAs** rather than erroring.
 - **Trap:** *renaming* a preset does **not** follow a run that referenced it by the old name — that run silently falls back to no extra LoRAs. Rename before you queue, or re-pick the preset on the run.
 - There is deliberately **no automatic NSFW gating** on individual LoRAs — the preset you pick carries the intent. If you want an "NSFW full" stack, make it a preset.
-- **Trap:** a row pointing at the **same file as the consistency LoRA** (`klein.consistency_lora`) is skipped — it would chain that LoRA a second time on top of itself, summing both strengths into one delta well past what the file was trained for (visible as blocky, posterized output).
+- **Trap:** a row pointing at the **same file as the consistency LoRA** (`klein.consistency_lora`) is skipped — it would chain that LoRA a second time on top of itself, summing both strengths into one delta well past what the file was trained for (visible as blocky, posterized output). **The preset editor now flags that row as you write it**, on the row itself, instead of leaving the only trace in the server log — which is how a preset holding exactly one such row produced a run with no extra LoRA and nothing on screen to explain it. The check compares paths the way the server does (separators unified, case ignored), so `klein/x.safetensors` and `klein\X.safetensors` are both caught. It does **not** claim to catch an absolute path aliasing the same file — the server still drops that row, quietly.
 
 ### Klein generation quality
 
@@ -240,10 +250,12 @@ Storage follows that split, and nothing was renamed or migrated: the **Human** o
 
 **Reproducibility guarantee:** with nothing overridden, generation is **byte-identical** to before this setting existed — you only change behaviour if you deliberately edit the text away from the default.
 
+**Edit the improve instruction from the ✨ button itself.** `identity_prompts.klein_improve` is the one prompt on this card you never have to come here for: the note under **✨ Upscale & improve** (dataset lightbox, bulk toolbar, generated-image lightbox) carries **✎ Edit this instruction here**, which opens the same box and the same on/off tick under the button. It edits **this setting** — there is no per-image and no per-run copy, so what you write there is what this card shows and what every later improve sends, in every dataset. The panel says that in as many words before you type, because a control sitting inside one dataset's screen otherwise reads as belonging to that dataset. The rest of the contract is identical to the box here: the field is pre-filled with the text actually in force, text matching the built-in default is stored as blank, **Reset to default** shows up only once you really have an override, and edits save as you type (the last keystroke is saved even if you close the lightbox on it). What is *not* duplicated there, on purpose: the per-subject identity locks, the other prompt parts and the four strength knobs — the note links here for those.
+
 **Shortcut from the workspace.** The multi-reference instruction is also reachable from **Add images ▸ Extra refs ▸ ✎**, without opening Settings. That modal shows **both** `identity_prompts.face_multi` and `identity_prompts.klein_identity` — the shared config carries both keys, but only `klein_identity` actually drives generation on this fork's Klein-only engine, and it's the one badged. It edits the prompts of the **open dataset's subject type**, and says which one in its title and intro; edits made there are the same settings as here, for that subject.
 
 - **Klein — restage & face-identity block** → `identity_prompts.klein_identity`. The instruction block the local **Klein** engine uses to restage the shot (pose, framing, outfit, expression) while keeping the face identical. This is the only identity prompt shown in Settings — the `face_single`/`face_multi` keys exist in the shared config for the removed cloud engines and are not surfaced here.
-- **Klein upscale & improve prompt** → `identity_prompts.klein_improve`, with an on/off toggle `identity_prompts.klein_improve_enabled` (default **on**). The fixed instruction the manual **Klein upscale & improve** action sends to add texture and detail. The shipped text is `add detailed texture, add sharp details, add candid shot, add soft focus effect` — read it before you blame the model: those four clauses describe a **photograph**, and they are applied to every dataset, drawn ones included. **Turn the toggle off** to run that action with **no prompt at all** — a pure upscale with no added styling. Both the text in force and these two levers are now quoted and linked from the ✨ **Upscale & improve** button itself (lightbox and bulk toolbar), so you no longer have to know this setting exists to find it.
+- **Klein upscale & improve prompt** → `identity_prompts.klein_improve`, with an on/off toggle `identity_prompts.klein_improve_enabled` (default **on**). The fixed instruction the manual **Klein upscale & improve** action sends to add texture and detail. The shipped text is `add detailed texture, add sharp details, add candid shot, add soft focus effect` — read it before you blame the model: those four clauses describe a **photograph**, and they are applied to every dataset, drawn ones included. **Turn the toggle off** to run that action with **no prompt at all** — a pure upscale with no added styling. Both the text in force and these two levers are now quoted **and editable** from the ✨ **Upscale & improve** button itself (lightbox and bulk toolbar) — see *Edit the improve instruction from the ✨ button itself* above — so you no longer have to know this setting exists to find it, nor leave your images to fix it.
 - **Upscale & improve — strength** → `klein.improve_megapixels`, `klein.improve_base_lora_strength`, `klein.improve_consistency_strength`, `klein.improve_steps`. The output resolution, and how much that pass is allowed to change the image. Until these were exposed the whole profile was hardcoded — **both LoRA strengths pinned to 0**, so the *enhancement* LoRA baked into the workflow never applied at all, and the size was fixed at 2 MP whatever the source was worth. Defaults are those same historical values (**2 MP / 0 / 0 / 4 steps**), so leaving them alone keeps today's result exactly. These are read at each run, so to try a new value on an image you already improved, use the **🔄✨** button on that tile: it re-runs the pass on the same source image with the settings as they are now, and replaces the result in place. (The ordinary 🔄 stays hidden there — it would restart from the dataset's reference photo and make an unrelated image.)
   - **Output size (MP)** (0.5–8, default **2**) — the source is rescaled to this pixel budget before sampling, so it *is* the result's resolution. This is the knob that makes "Upscale" actually upscale.
   - **Enhancement LoRA** (0–2, default **0**) — the workflow's own detail LoRA. At 0 it does nothing; try **0.5–0.8**. It needs its weights file (`klein/realistic.safetensors`): when that file is missing the node is skipped entirely and this value changes nothing. **Setup ▸ Install everything downloads it** with the other Klein assets (from [dx8152/Flux2-Klein-9B-Enhanced-Details](https://huggingface.co/dx8152/Flux2-Klein-9B-Enhanced-Details), Apache-2.0) — run it first if the slider seems inert.
@@ -386,15 +398,49 @@ working copies. This follows **Qeeyana (Reddit)** asking: *"Images added to
   untouched.
 
 **Import safety limit — every mode:** Before preserve, WebP normalization, or
-auto head-crop can decode the source, it must be no larger than **16 Mi-pixels**
-and **8192 px per side**. A larger file is rejected; convert or resize it before
-importing. WebP normalization does not bypass this admission limit.
+auto head-crop can decode the source, it must fit the **Image size budget**
+below (shipped default **64 Mi-pixels** and **16384 px per side**). A larger
+file is rejected, and the message names the setting. WebP normalization does
+not bypass this admission limit.
 - **Stored resolution** → `dataset_import.max_side`. Used only by the three WebP
 normalization modes. Choose `1024`, `1536`, `2048`, `4096`, or `0` = original
 size. The aspect ratio is always preserved (no square padding) and an image is
 never enlarged. This output setting takes effect only after the source passes
 the import safety limit above; normalized output also clamps the longest side to
-**8192 px**.
+**8192 px** — that ceiling bounds what is *written* by a WebP mode and is
+deliberately independent of the input budget.
+
+### Image size budget
+
+How large a source image **any** part of the app may decode. Not an import-only
+rule: dataset import, ZIP and scrape ingest, Bank scan and thumbnails, edits,
+ComfyUI staging and Ollama vision captioning all read these two keys, so an
+image you can import is an image you can look at.
+
+- **Maximum total pixels** → `image_input.max_pixels`. Default
+  **`67108864`** (64 Mi-pixels). `0` = no limit.
+- **Maximum side** → `image_input.max_side`. Default **`16384`** px. `0` = no
+  limit.
+
+This is a **memory** budget, not an encoder limit: a decoded RGB pixel costs 3
+bytes (RGBA 4), and an edit or analysis pass can hold a second copy at the same
+time. So 64 Mi-pixels is about **192 MiB** for one decoded RGB buffer and
+roughly **384 MiB** while a working copy exists. It admits every current phone
+and 35 mm camera master (a 61 MP 9504×6336 frame is 57 Mi-pixels) and ordinary
+stitched panoramas — the previous fixed 16 Mi-pixels / 8192 px refused both.
+
+**What `0` disarms.** No limit means a corrupt or hostile file can be decoded
+until it fills memory: a few hundred header bytes can claim billions of pixels,
+and the app has no second guard behind this one — an unlimited budget also lifts
+Pillow's own decompression-bomb threshold, so the choice is real in both
+directions. It is offered because "let it through" is a legitimate answer for a
+panorama you produced yourself.
+
+**One consumer cannot follow it.** Image Bank *inference workers* (face,
+aesthetic and NSFW scoring, watermark inpainting) run in a separate Python
+interpreter that does not import the app or its config, and keep their own fixed
+16 Mi-pixel / 8192 px guard (`backend/infer/bank_image_guard.py`). An image above
+that imports, displays and trains normally; those workers skip it.
 
 **Auto head-crop is deliberately different.** It changes the picture into a
 square head shot, so it creates a derived WebP even when `preserve` is selected.
@@ -1037,8 +1083,10 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `paths.cloud_runs_dir` | Working area of cloud training runs (dataset copy, samples, logs). Empty string defaults to `<data dir>/cloud_runs`. |
 | `paths.checkpoints_dir` | Durable store for the checkpoints cloud runs produce. Empty string defaults to `<data dir>/checkpoints`. No cleanup ever removes a file from it. |
 | `paths.video_datasets_dir` | Where promoted video datasets are written — a flat folder of `.mp4` clips with homonym `.txt` captions per dataset. Empty string defaults to `<data dir>/video_datasets`. |
-| `dataset_import.max_side` | Longest side for opt-in WebP normalization (default `1024`; `0` = original size). It is ignored by the default `preserve` mode; ratio is always preserved, never enlarged, and normalized paths clamp at 8192 px. Every source must still be at most 16 Mi-pixels and 8192 px per side; a larger one is rejected and must be converted or resized before import. Not retroactive. Editable in Settings → Captioning & quality. |
-| `dataset_import.encoding` | How an un-cropped imported image is written: `preserve` (default; original JPG/JPEG, PNG, WebP or BMP bytes with the matching extension), or the opt-in WebP modes `standard` (q92), `high` (q100), and `lossless`. Auto head-crop is always a derived WebP. The 16 Mi-pixel / 8192 px-per-side input limit applies to every mode. Editable in Settings → Captioning & quality. |
+| `dataset_import.max_side` | Longest side for opt-in WebP normalization (default `1024`; `0` = original size). It is ignored by the default `preserve` mode; ratio is always preserved, never enlarged, and normalized paths clamp at 8192 px. Every source must still fit `image_input.*` below; a larger one is rejected and must be resized before import (or the budget raised). Not retroactive. Editable in Settings → Captioning & quality. |
+| `dataset_import.encoding` | How an un-cropped imported image is written: `preserve` (default; original JPG/JPEG, PNG, WebP or BMP bytes with the matching extension), or the opt-in WebP modes `standard` (q92), `high` (q100), and `lossless`. Auto head-crop is always a derived WebP. The `image_input.*` budget applies to every mode. Editable in Settings → Captioning & quality. |
+| `image_input.max_pixels` | Largest source image any lane may decode, in pixels (default `67108864` = 64 Mi-pixels; `0` = no limit). A memory budget: ~3 bytes per decoded RGB pixel, and an edit or analysis pass can hold a second copy. Read by dataset import, ZIP/scrape ingest, Bank scan and thumbnails, edits, ComfyUI staging and Ollama vision. Bank *inference workers* keep their own fixed 16 Mi-pixel guard. Editable in Settings → Captioning & quality. |
+| `image_input.max_side` | Largest side of a source image, in px (default `16384`; `0` = no limit). Separate from `max_pixels` because a wide panorama can sit inside the pixel budget and still exceed a side limit. Editable in Settings → Captioning & quality. |
 | `comfyui.api_url` | Base URL of your ComfyUI instance (default `http://127.0.0.1:8188`). |
 | `comfyui.base_dir` | ComfyUI install directory, used to derive `output`/`input`/`models`/`loras` dirs if those aren't set explicitly. |
 | `comfyui.output_dir` | Explicit override for ComfyUI's output folder. Set it when ComfyUI runs with `--output-directory`. Editable in Settings → Local tools. |
@@ -1102,6 +1150,8 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | `klein.generation_steps` | Sampler steps for Klein **generation** (variations, regenerate, small-image rescue). Default `5` = the value hardcoded in the shipped workflow; 1–50. Not the improve pass (`klein.improve_steps`). |
 | `klein.edit_base_lora_strength` | Strength of the enhancement LoRA (`klein/realistic.safetensors`, node 139) on Klein **edits** — reference edit, variations, regenerate, small-image rescue. Default `0` = off, the render before that LoRA became a Setup download; 0–2. Not the improve pass (`klein.improve_base_lora_strength`). |
 | `klein.generation_lora_presets` | Named generation-LoRA stacks (default empty) picked per run in Klein tuning; each has a name and up to 8 `{file, strength}` rows. Managed in Settings → Image engines. |
+| `klein.default_generation_lora_preset` | Which of `klein.generation_lora_presets` the 🖥️ Klein tuning panel STARTS on. Default `''` = *None*, the behaviour before this key existed. A starting point only — the run panel still offers None and every other preset for that run, and picking there does not rewrite this. Fail-closed: a name matching no preset behaves as *None*. |
+| `krea.default_generation_lora_preset` | The same, for `krea.generation_lora_presets` and the 🧬 Krea 2 Edit tuning panel. A SEPARATE key on purpose: the two preset lists are independent and one name can designate two different chains. Default `''`. |
 | `identity_prompts.markings_lock` | Krea's “hold the skin” order — forbids inventing or redrawing marks. Blank = shipped default. Naming a body feature here summons it. |
 | `identity_prompts.outfit_vary` | The outfit directive injected into every human shot with no named garment. Blank = shipped default. |
 | `identity_prompts.expression_neutral` | The neutral-expression directive injected into every human shot with no named expression. Blank = shipped default. |

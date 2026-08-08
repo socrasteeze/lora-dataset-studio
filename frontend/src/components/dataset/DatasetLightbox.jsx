@@ -17,9 +17,21 @@ import {
 } from './lightboxActionPlacement';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { displayLabel } from '../../utils/labels';
+import { describeReferenceComparison } from '../../utils/referenceCompare';
 import SourceAttribution from './SourceAttribution';
+import {
+  freshLightboxImageState, lightboxImageState, lightboxNeighbours, ownsArrowKeys,
+  stampedPatch,
+} from './lightboxNavigation';
 
 const COMPARE_HELP = 'Show the original this image was made from, next to it, at the same scale.';
+/* The SECOND comparison, and deliberately a second BUTTON rather than a picker:
+   an improved image can answer both questions and a selector would hide one of
+   them behind the other. The two modes are mutually exclusive though — two
+   pairs side by side stop showing anything at all — so one state holds which
+   reading is on screen. */
+const REFERENCE_COMPARE_HELP = 'Show the dataset\'s reference photo next to this image — '
+  + 'the framings differ, so each pane fits its own image.';
 
 /**
  * One half of the comparison. The two panes are cells of the SAME grid, so they
@@ -28,6 +40,12 @@ const COMPARE_HELP = 'Show the original this image was made from, next to it, at
  * rescales to a megapixel budget and keeps the aspect ratio, so this is the only
  * reading where "it looks better" means something. Each side is named in text,
  * never by colour alone.
+ *
+ * The reference comparison reuses this component unchanged, and gets the right
+ * behaviour for free rather than by accident: a square head reference and a
+ * full-body plan have different aspect ratios, so each fills its own identical
+ * box and the two are shown at whatever scale makes them whole. What must NOT
+ * be reused is the "same scale" sentence — see the status line below.
  */
 function ComparePane({ label, url, alt, accent }) {
   return (
@@ -50,27 +68,69 @@ function ComparePane({ label, url, alt, accent }) {
   );
 }
 
+/**
+ * One of the two edge arrows. At an end it goes disabled and its title AND
+ * aria-label become the sentence saying which end — the brief being that a dead
+ * end must be readable, not a mute no-op. Both channels carry it: a title alone
+ * is invisible to a screen reader and unreachable on a touch screen.
+ */
+function NavArrow({ side, glyph, label, target, reason, onNavigate }) {
+  const disabled = !target;
+  const text = disabled ? reason : `${label} (${side === 'left' ? '←' : '→'})`;
+  return (
+    <button type="button" disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); if (target) onNavigate(target); }}
+      title={text} aria-label={text}
+      /* The backdrop is bg-black/95, so a black pill on it is an invisible pill:
+         the ring is what makes the target readable over the gutter, and the
+         dark fill is what keeps it readable over a bright photo. A DISABLED end
+         must still be seen — an arrow faded to nothing is the mute no-op this
+         feature exists not to be — so it dims to 50 %, not to a ghost. */
+      className={`absolute top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center
+        justify-center rounded-full border border-white/25 bg-black/60 text-xl
+        leading-none text-white hover:bg-black/80 disabled:cursor-not-allowed
+        disabled:opacity-50 disabled:hover:bg-black/60
+        ${side === 'left' ? 'left-2' : 'right-2'}`}>
+      <span aria-hidden="true">{glyph}</span>
+    </button>
+  );
+}
+
 export default function DatasetLightbox({
   img,
   datasetId,
   nonce = 0,
   compare = null,
   parentNonce = 0,
+  refFilename = '',
+  refNonce = 0,
   onClose,
   onCrop,
   onMirror,
   onRotate,
   onImprove,
   busy = false,
+  // The sentence a refused write shows (which pass holds this dataset, where it
+  // is, what to do). Opening, zooming and comparing never consult it: they read
+  // the same bytes the grid is already showing.
+  busyReason = null,
   mirrorBusy = false,
   improvePending = false,
   improveReady = false,
   subjectType = '',
+  // The list the grid SHOWS, in its order, for ⟨ / ⟩. Omitted (rescue-review
+  // preview) = no navigation, rather than arrows onto a list that isn't there.
+  images = null,
+  onNavigate = null,
 }) {
   const { caps } = useCapabilities();
-  const [full, setFull] = useState(false); // false = fit screen, true = 100 %
-  const [comparing, setComparing] = useState(false);
-  const [improving, setImproving] = useState(false);
+  /* Zoom, comparison and "improving" belong to ONE image and are stamped with
+     its id: a render that finds another image's stamp uses a fresh state
+     instead. See lightboxNavigation.js — this is what stops ⟩ from carrying a
+     100 % zoom, or a pane labelled "original" showing the PREVIOUS image's
+     parent, onto the next picture. */
+  const [storedState, setStoredState] = useState(
+    () => freshLightboxImageState(img?.id ?? null));
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
 
@@ -80,6 +140,29 @@ export default function DatasetLightbox({
      lives in lightboxActionPlacement.js because `node --test` cannot parse JSX
      and this is the part that must be tested case by case. */
   const imageId = img?.id ?? null;
+  /* `compareMode` ('none' | 'derived' | 'reference') sits INSIDE the stamped
+     state, where the boolean `comparing` used to. Two reasons, and the second
+     is the one that matters: a mode held in its own useState would have been
+     the one piece of per-image state that travels — ⟩ would have carried
+     "reference comparison open" onto the next picture, and, worse, an open
+     "original" pane onto an image whose parent is somebody else's. Inside the
+     slot the guarantee is structural: a foreign stamp yields a fresh state, so
+     moving image closes the comparison with no reset effect to get right. */
+  const { full, compareMode, improving } = lightboxImageState(storedState, imageId);
+  /* Which image is on screen when a setter actually RUNS — a ref, because the
+     `finally` of an improve resolves long after the render that created its
+     callback and must be compared against the present, not against the past it
+     closed over. */
+  const currentIdRef = useRef(imageId);
+  useEffect(() => { currentIdRef.current = imageId; }, [imageId]);
+  // Stamped with the id of the render that created it, and DROPPED if that is
+  // no longer the image being shown: one slot, so a late writer stamping it
+  // would reset the picture you moved to. See stampedPatch.
+  const patchImageState = useCallback((patch) => {
+    setStoredState((prev) => stampedPatch(prev, patch, imageId, currentIdRef.current));
+  }, [imageId]);
+  const nav = lightboxNeighbours(images, imageId);
+  const canNavigate = !!onNavigate && nav.available;
   // A rail decided mid-rotation would move under the pointer that started it.
   const actionsLocked = busy || mirrorBusy || improving || improvePending;
   const [ratio, setRatio] = useState(() => readImageRatio(imageId));
@@ -113,7 +196,9 @@ export default function DatasetLightbox({
       imageWidth: ratio?.imageWidth,
       imageHeight: ratio?.imageHeight,
       current,
-      comparing,
+      // The placement rule only cares that TWO panes want the width, not which
+      // pair is on screen.
+      comparing: compareMode !== 'none',
       locked: actionsLocked,
     }));
     apply();
@@ -128,33 +213,67 @@ export default function DatasetLightbox({
       window.removeEventListener('resize', onResize);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [ratio, comparing, actionsLocked]);
+  }, [ratio, compareMode, actionsLocked]);
 
   const rail = placement === 'rail';
 
   // Focus trap keeps Tab inside the dialog (P2-7).
   useFocusTrap(dialogRef, !!(img && img.filename));
 
-  // Keyboard support: Escape closes, initial focus on the close button.
+  // Keyboard: Escape closes, ← / → step through the shown list, initial focus on
+  // the close button.
+  const prev = nav.prev;
+  const next = nav.next;
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      // A shortcut that fires on ⌥←/⇧→ would fight browser history and text
+      // selection; and a focused field owns its own caret keys.
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (ownsArrowKeys(e.target)) return;
+      const target = e.key === 'ArrowLeft' ? prev : next;
+      if (!onNavigate || !target) return;
+      e.preventDefault();
+      onNavigate(target);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, onNavigate, prev, next]);
   useEffect(() => { closeRef.current?.focus(); }, []);
-  // Moving to another image must not leave the previous comparison open on a
-  // parent that has nothing to do with it.
-  useEffect(() => { setComparing(false); }, [img?.id]);
+  /* No "close the comparison when the image changes" effect on purpose: the id
+     stamp above already guarantees it, for BOTH comparison modes, without a
+     frame in which the previous image's panes are painted next to the new one. */
 
   if (!img || !img.filename) return null;
   const fileUrl = (filename, v) =>
     `/api/dataset/${datasetId}/img/${encodeURIComponent(filename)}${v ? `?v=${v}` : ''}`;
   const url = fileUrl(img.filename, nonce);
   const alt = displayLabel(img.variation_label) || 'dataset image';
-  // A comparison is only ever entered when the original is actually renderable;
-  // an unavailable one degrades to a stated reason, never a dead button.
-  const canCompare = !!(compare && compare.available && compare.parent?.filename);
-  const inCompare = canCompare && comparing;
+  // A comparison is only ever entered when the other side is actually
+  // renderable; an unavailable one degrades to a stated reason, never a dead
+  // button. Both modes go through this same guard.
+  const refCompare = describeReferenceComparison(img, refFilename);
+  const usable = (c) => !!(c && c.available && c.parent?.filename);
+  const canCompare = usable(compare);
+  const canCompareRef = usable(refCompare);
+  // The mode currently on screen, re-checked against availability: a payload
+  // refresh can retire the parent under an open comparison, and a stale mode
+  // must fall back to the plain view rather than render a broken pane.
+  const activeCompare = (compareMode === 'derived' && canCompare) ? compare
+    : (compareMode === 'reference' && canCompareRef) ? refCompare
+      : null;
+  const inCompare = !!activeCompare;
+  // The reference lives beside the images, not among them: its own cache nonce.
+  const activeParentNonce = compareMode === 'reference' ? refNonce : parentNonce;
+  // Pressing the mode you are in leaves it; pressing the other one SWITCHES,
+  // which is what makes the two exclusive without a single line of teardown.
+  // Written through the stamped patch like every other per-image property, so a
+  // press that resolves after ⟩ cannot reopen a pane on the next image.
+  const toggleCompare = (mode) => (event) => {
+    event.stopPropagation();
+    patchImageState({ full: false, compareMode: compareMode === mode ? 'none' : mode });
+  };
   const improvementActive = improving || improvePending;
   /* ONE button per engine that can run here, exactly like the selection
      toolbar. The lightbox is where you are when you are looking at the one
@@ -164,20 +283,22 @@ export default function DatasetLightbox({
      a user with a screenshot of exactly that). The wording, the gating and the
      per-engine disabled reasons all come from the shared pure module, so this
      surface can never drift from the toolbar's. */
+  const refused = busy ? busyReason : null;
   const improveButtons = onImprove
     ? lightboxImproveButtons({
       caps, engines: caps?.engines, improving, improvePending, improveReady, busy,
+      busyReason,
     })
     : [];
 
   const improve = (engineId, disabled) => async (event) => {
     event.stopPropagation();
     if (!onImprove || disabled) return;
-    setImproving(true);
+    patchImageState({ improving: true });
     try {
       await onImprove(img.id, engineId);
     } finally {
-      setImproving(false);
+      patchImageState({ improving: false });
     }
   };
 
@@ -205,6 +326,11 @@ export default function DatasetLightbox({
         title="Close (Esc)" aria-label="Close inspection"
         className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white text-lg leading-none">✕</button>
 
+      {/* The image area is the positioning context for ⟨ / ⟩ — NOT the dialog:
+          in rail mode the dialog's right edge is the action rail, and an arrow
+          anchored there would sit on top of the buttons. Anchoring here also
+          keeps the arrows still while the 100 % view scrolls under them. */}
+      <div className="relative flex min-h-0 min-w-0 flex-1">
       {inCompare ? (
         /* Side by side once there is room for it (≥640 px), stacked below —
            two 190 px-wide thumbnails on a phone would prove nothing, and a
@@ -212,14 +338,14 @@ export default function DatasetLightbox({
            axis. Equal grid cells on both layouts = equal display scale. */
         <div onClick={(e) => e.stopPropagation()}
           className="flex-1 min-h-0 grid grid-rows-2 grid-cols-1 sm:grid-rows-1 sm:grid-cols-2 gap-2 p-2 sm:p-4">
-          <ComparePane label={compare.beforeLabel} alt={alt}
-            url={fileUrl(compare.parent.filename, parentNonce)} />
-          <ComparePane label={compare.afterLabel} alt={alt} url={url} accent />
+          <ComparePane label={activeCompare.beforeLabel} alt={alt}
+            url={fileUrl(activeCompare.parent.filename, activeParentNonce)} />
+          <ComparePane label={activeCompare.afterLabel} alt={alt} url={url} accent />
         </div>
       ) : full ? (
         <div className="flex-1 min-h-0 min-w-0 overflow-auto">
           <img src={url} alt={alt} onLoad={onImageLoad}
-            onClick={(e) => { e.stopPropagation(); setFull(false); }}
+            onClick={(e) => { e.stopPropagation(); patchImageState({ full: false }); }}
             className="max-w-none cursor-zoom-out select-none" />
         </div>
       ) : (
@@ -227,10 +353,23 @@ export default function DatasetLightbox({
            to shrink below its content and the rail gets pushed off-screen. */
         <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center p-4">
           <img src={url} alt={alt} onLoad={onImageLoad}
-            onClick={(e) => { e.stopPropagation(); setFull(true); }}
+            onClick={(e) => { e.stopPropagation(); patchImageState({ full: true }); }}
             className="max-h-full max-w-full object-contain cursor-zoom-in select-none" />
         </div>
       )}
+      {canNavigate && (
+        /* Both ends stay VISIBLE and say which end you reached. A button that
+           disappears at the edge of a list moves the other one under the cursor
+           mid-click, and "nothing happened" is indistinguishable from a bug.
+           44 px so a thumb can reach them at 400 px. */
+        <>
+          <NavArrow side="left" glyph="⟨" label="Previous image"
+            target={nav.prev} reason={nav.prevReason} onNavigate={onNavigate} />
+          <NavArrow side="right" glyph="⟩" label="Next image"
+            target={nav.next} reason={nav.nextReason} onNavigate={onNavigate} />
+        </>
+      )}
+      </div>
 
       {/* DOM order is the SAME in both placements — meta, then compare, crop,
           mirror, rotate, improve, then the Klein note. A rail that reads left
@@ -247,30 +386,69 @@ export default function DatasetLightbox({
         <div className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 ${
           rail ? 'justify-start' : 'justify-center'}`}>
           <span className="text-white text-sm">{alt}</span>
+          {/* Where you are in the list you are walking — the answer to "have I
+              seen everything?", which arrows alone cannot give. It counts the
+              images the grid SHOWS, so it moves when a filter does. */}
+          {canNavigate && (
+            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] tabular-nums text-white/80"
+              title={`Image ${nav.position} of the images the current filters show — ← → to move`}>
+              {nav.position}
+            </span>
+          )}
           <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/80">
             {img.source === 'import' ? 'real' : 'generated'}{img.framing ? ` · ${img.framing}` : ''}
           </span>
           <SourceAttribution metadata={img.source_metadata}
             className="text-[11px] text-white/70" />
           <span className="text-white/50 text-[11px]">
-            {inCompare
-              /* Zoom is OFF here, and says so. At 100 % a 2 MP result and a 0.5 MP
-                 original cover different parts of the subject, which is exactly
-                 the dishonest comparison this mode exists to avoid. */
+            {/* Zoom is OFF in both comparisons, and says so. What the two panes
+                GUARANTEE is not the same in both, and this line must not claim
+                otherwise: against the original, equal boxes plus a preserved
+                aspect ratio really do mean one shared scale, and that is the
+                whole point. Against the reference the two images are unrelated
+                crops — a square head next to a full-body plan — so each pane
+                fits its own image at its own scale. Reusing "same scale" there
+                would have been a sentence the pixels contradict. */}
+            {compareMode === 'derived' && inCompare
               ? 'same scale — exit comparison to zoom to 100 %'
-              : full ? '100 % — click image to fit' : 'fitted — click image for 100 %'}
+              : compareMode === 'reference' && inCompare
+                ? 'different framings — each pane fits its own image; exit comparison to zoom to 100 %'
+                : full ? '100 % — click image to fit' : 'fitted — click image for 100 %'}
           </span>
         </div>
         {canCompare && (
-          <button type="button" aria-pressed={comparing}
-            onClick={(e) => { e.stopPropagation(); setFull(false); setComparing((v) => !v); }}
-            aria-label={comparing
+          <button type="button" aria-pressed={compareMode === 'derived'}
+            onClick={toggleCompare('derived')}
+            aria-label={compareMode === 'derived'
               ? `Hide the original next to ${alt}`
               : `Show the original next to ${alt}`}
             title={COMPARE_HELP}
             className="min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-indigo-400/50 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 text-xs font-semibold">
-            {comparing ? '⊟ Exit comparison' : '⧉ Compare with original'}
+            {compareMode === 'derived' ? '⊟ Exit comparison' : '⧉ Compare with original'}
           </button>
+        )}
+        {/* TWO buttons, not a picker. On an improved image both questions are
+            live — "is it sharper than what it came from" and "is it still the
+            same person" — and a selector would have hidden one behind the
+            other. On a plainly generated variation only this one exists, which
+            is the whole reason it was added: until now that image, the bulk of
+            a character dataset, had no comparison at all. */}
+        {canCompareRef && (
+          <button type="button" aria-pressed={compareMode === 'reference'}
+            onClick={toggleCompare('reference')}
+            aria-label={compareMode === 'reference'
+              ? `Hide the reference photo next to ${alt}`
+              : `Show the reference photo next to ${alt}`}
+            title={REFERENCE_COMPARE_HELP}
+            className="min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg border border-sky-400/50 bg-sky-500/20 hover:bg-sky-500/30 text-sky-100 text-xs font-semibold">
+            {compareMode === 'reference' ? '⊟ Exit comparison' : '◐ Compare with reference'}
+          </button>
+        )}
+        {refCompare && !refCompare.available && (
+          <span role="note"
+            className="max-w-full break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100">
+            <span aria-hidden>⚠ </span>{refCompare.reason}
+          </span>
         )}
         {compare && !compare.available && (
           /* No affordance rather than a dead one — and it says why, because
@@ -283,7 +461,8 @@ export default function DatasetLightbox({
         )}
         {onCrop && (
           <button type="button" onClick={() => onCrop(img)} disabled={busy}
-            title="Open the crop editor for this image (stretchable box, any ratio)"
+            title={refused || 'Open the crop editor for this image (stretchable box, any ratio)'}
+            aria-label={refused || 'Open the crop editor for this image'}
             className="min-h-9 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             ✂ Crop
           </button>
@@ -291,8 +470,10 @@ export default function DatasetLightbox({
         {onMirror && (
           <button type="button" onClick={mirror} disabled={busy || mirrorBusy}
             aria-busy={mirrorBusy}
-            aria-label={mirrorBusy ? `Mirroring ${alt} horizontally` : `Mirror ${alt} horizontally`}
-            title={mirrorBusy ? 'Mirroring horizontally…' : 'Mirror horizontally (flip left and right)'}
+            aria-label={refused
+              || (mirrorBusy ? `Mirroring ${alt} horizontally` : `Mirror ${alt} horizontally`)}
+            title={refused
+              || (mirrorBusy ? 'Mirroring horizontally…' : 'Mirror horizontally (flip left and right)')}
             className="min-h-9 w-full sm:w-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45">
             {mirrorBusy ? '⇆ Mirroring…' : '⇆ Mirror horizontally'}
           </button>
@@ -306,15 +487,17 @@ export default function DatasetLightbox({
              Emoji stay aria-hidden — the label is the text. */
           <div className={`flex items-stretch gap-2 ${rail ? 'w-full' : 'w-full sm:w-auto'}`}>
             <button type="button" onClick={rotate(270)} disabled={busy || mirrorBusy}
-              aria-busy={mirrorBusy} aria-label={`Rotate ${alt} 90 degrees left`}
-              title="Rotate 90° left (counter-clockwise) — keeps the file's format; four turns come back round"
+              aria-busy={mirrorBusy} aria-label={refused || `Rotate ${alt} 90 degrees left`}
+              title={refused
+                || "Rotate 90° left (counter-clockwise) — keeps the file's format; four turns come back round"}
               className={`min-h-9 flex-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45 ${
                 rail ? '' : 'sm:flex-none'}`}>
               <span aria-hidden="true">↺</span> Rotate left
             </button>
             <button type="button" onClick={rotate(90)} disabled={busy || mirrorBusy}
-              aria-busy={mirrorBusy} aria-label={`Rotate ${alt} 90 degrees right`}
-              title="Rotate 90° right (clockwise) — keeps the file's format; four turns come back round"
+              aria-busy={mirrorBusy} aria-label={refused || `Rotate ${alt} 90 degrees right`}
+              title={refused
+                || "Rotate 90° right (clockwise) — keeps the file's format; four turns come back round"}
               className={`min-h-9 flex-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45 ${
                 rail ? '' : 'sm:flex-none'}`}>
               <span aria-hidden="true">↻</span> Rotate right
