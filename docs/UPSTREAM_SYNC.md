@@ -73,8 +73,27 @@ failure is *not* a local quirk — CI reproduces it exactly.
 |---|---|
 | *(none)* | There is currently **no accepted environment failure.** Everything must be green. |
 
-That is the whole list as of 2026-08-06, and the shortest it has been. Read the
-two paragraphs below before you add a row: **every entry this table has ever
+That is the whole list as of 2026-08-06, and the shortest it has been.
+
+**"Everything must be green" means green on CI, and CI is Windows — a LINUX box
+is a different question, measured 2026-08-09.** Running the whole backend suite
+in a Linux container gave **67 failed / 6818 passed**, while CI run #102 on the
+very same commit was **green on all four jobs** (backend `windows-latest`,
+56m 14s). Every one of the 67 was a path-separator artifact: fixtures across
+`test_studio_service.py`, `test_krea_training_bases.py`, `test_comfyui_utils.py`
+and the rest build model names like `z image\lora_bbb_….safetensors`, which is
+correct on the OS CI runs and unresolvable on this one.
+
+**This is NOT a table row, and must not become 67 of them.** It is a property of
+the platform, and the way to use it is the way this sync did: take the pre-merge
+baseline, diff the post-merge list against it, and investigate only the DELTA.
+That reduced 67 failures to one question worth answering — and the answer
+(upstream's own new test, reproduced failing on pristine detached `upstream/main`
+with a clean `git status`) took minutes rather than a triage of the whole floor.
+On a Linux box the frontend job is your fast signal, since it is `ubuntu-latest`
+and therefore identical to what CI runs.
+
+Read the two paragraphs below before you add a row: **every entry this table has ever
 carried was eventually removed as wrong** — the peer-training four because they
 were a real bug CI had been red on for three pushes, the OpenCV one because its
 reason had quietly expired.
