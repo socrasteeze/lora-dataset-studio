@@ -148,10 +148,10 @@ test('(5) each Settings section and Workspace section has its topic', () => {
 
 test('(6) tips have unique triggers and non-empty text', () => {
   const tips = helpTips()
-  // 12, not upstream's 17: the five extra tips belong to the full-model (dense)
+  // 13, not upstream's 18: the five extra tips belong to the full-model (dense)
   // and one-click fp8-delivery topics this fork rejects (Divergence 4). Counted
   // from this fork's own registry (helpTips().length), never copied.
-  assert.equal(tips.length, 12, 'expected exactly 12 one-time tips')
+  assert.equal(tips.length, 13, 'expected exactly 13 one-time tips')
   const triggers = new Set()
   for (const tip of tips) {
     assert.ok(tip.trigger, 'tip missing trigger')
