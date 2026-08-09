@@ -756,6 +756,10 @@ DEFAULTS = {
     # replaced this fork with upstream's code, removing every divergence it
     # exists for. It was inert only by accident of string ordering.
     'updates': {'repo': 'socrasteeze/lora-dataset-studio'},    # GitHub repo for the release feed
+    # ◉ LoRA Canvas: 🔌 external LoRA plugin nodes pinned on the board.
+    # Each: {filename (loras-relative), strength [0..2], x, y (board coords)}.
+    # Cap 16, deduped by filename — sanitized in the PUT route.
+    'canvas': {'external_loras': []},
 }
 
 _lock = threading.Lock()

@@ -52,6 +52,7 @@ import { useToast } from '../common/Toast';
 import ContinueDialog from './ContinueDialog';
 import { graphContinueRefusal } from './lineageContinue.js';
 import RunLineageGraph from './RunLineageGraph';
+import { UseDatasetCaptionsButton } from './UseDatasetCaptionsButton';
 import TrainingProgress from './TrainingProgress';
 import TrainingMachinePicker from './TrainingMachinePicker';
 import PeerTrainingCard from './PeerTrainingCard';
@@ -433,6 +434,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     }
   }, [advancedOpen, trainingMode]);
 
+  // Same problem for 🎲 Use dataset captions: it sits below the Preview-prompts
+  // textarea, in BOTH recipes, and nothing points at it. The TipHost shows one
+  // card at a time and does not mark the loser seen, so on the very first LoRA
+  // open dual-captions wins and this one arrives on the next open — in
+  // full-model mode, where dual captions does not apply, it shows right away.
+  useEffect(() => {
+    if (advancedOpen) requestHelpTip('sample-prompts-from-dataset');
+  }, [advancedOpen]);
+
   const togglePanel = (panelId, current, setter) => (event) => {
     event.preventDefault();
     const next = !current;
@@ -782,11 +792,22 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   useEffect(() => {
     setDifferentialGuidanceScaleDraft(String(adv?.differential_guidance_scale ?? 3));
   }, [adv?.differential_guidance_scale]);
-  const saveSamplePrompts = () => {
+  // Persist an EXPLICIT text. The blur handler below reads the state; the 🎲
+  // draw cannot — it has just called setSamplePromptsText, and the state it
+  // would read back is the previous render's, so it would save the old lines.
+  const persistSamplePrompts = (text) => {
     const stored = (adv?.sample_prompts ?? []).join('\n');
-    if (samplePromptsText === stored) return;      // no-op → skip the round-trip
-    saveAdv({ sample_prompts: samplePromptsText }); // server splits on newlines + trims
+    if (text === stored) return;                  // no-op → skip the round-trip
+    saveAdv({ sample_prompts: text });            // server splits on newlines + trims
   };
+  const saveSamplePrompts = () => persistSamplePrompts(samplePromptsText);
+  const applySamplePrompts = (text) => {
+    setSamplePromptsText(text);
+    persistSamplePrompts(text);
+  };
+  // Kept images carry the captions the 🎲 draw samples; the payload the panel
+  // already has is the only source, so the button costs no request.
+  const datasetImages = ds.data?.images || [];
   const saveDifferentialGuidanceScale = () => {
     const stored = String(adv?.differential_guidance_scale ?? 3);
     if (differentialGuidanceScaleDraft === stored) return;
@@ -2588,6 +2609,11 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   aria-label="Preview sample prompts, one per line"
                   className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content text-[0.75rem] font-mono leading-relaxed resize-y placeholder:text-content-subtle" />
               </label>
+              <div className="flex items-center gap-1.5 mt-1">
+                <UseDatasetCaptionsButton images={datasetImages} max={advMaxPrompts}
+                  onPick={applySamplePrompts} />
+                <HelpBadge topic="training.sample_prompts_from_dataset" />
+              </div>
               <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
                 <b className="text-content-muted font-medium">Why:</b> these are the test images ai-toolkit renders
                 during the run so you can watch the LoRA learn (and later pick the best epoch).

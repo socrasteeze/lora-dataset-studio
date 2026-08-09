@@ -1449,7 +1449,8 @@ def _require_cloud_weights_only(resume_mode='weights_only', state_bundle_id=None
 
 def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
                        overrides=None, resume_mode='weights_only',
-                       state_bundle_id=None, transport=None) -> dict:
+                       state_bundle_id=None, transport=None,
+                       allow_parallel_run=False) -> dict:
     """Reprend un run cloud TERMINAL (done OU en échec) depuis un checkpoint
     harvesté et vise step_de_reprise + extra_steps — le pendant cloud de
     lora_training.continue_training. C'est un VRAI launch_cloud_training (pod
@@ -1554,6 +1555,13 @@ def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
         snapshot = _merge_resume_overrides(snapshot, override_patch)
     # Lineage: the source record above is also the parent edge. Legacy cloud
     # runs that predate the registry have no record -> the child is a root.
+    # The source run's stamped answers replay as-is — except the sibling
+    # confirm, which the ▶ Continue dialog may have just answered FRESH: a run
+    # launched alone (stamped False) must still be continuable while a sibling
+    # trains, without the refusal looping on a flag nobody could carry.
+    flags = _confirmation_flags(p)
+    if allow_parallel_run:
+        flags['allow_parallel_run'] = True
     res = launch_cloud_training(
         user_id, run.dataset_id,
         steps=chosen['step'] + extra,
@@ -1561,7 +1569,7 @@ def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
         variant=p.get('variant'),
         train_type=p.get('train_type'),
         masked=p.get('masked', True),
-        **_confirmation_flags(p),
+        **flags,
         gpu_name=p.get('requested_gpu'),
         resume_ckpt_path=chosen['path'], resume_step=chosen['step'],
         train_settings_snapshot=snapshot,
@@ -1579,6 +1587,7 @@ def continue_local_run_in_cloud(user_id, dataset_id, extra_steps=1000,
                                 masked=None, allow_caption_mismatch=False,
                                 allow_uncaptioned=False, allow_caption_quality=False,
                                 allow_unverified_weights=False, allow_not_ready=False,
+                                allow_parallel_run=False,
                                 gpu_name=None, training_mode='lora',
                                 resume_mode='weights_only',
                                 state_bundle_id=None) -> dict:
@@ -1701,6 +1710,7 @@ def continue_local_run_in_cloud(user_id, dataset_id, extra_steps=1000,
         allow_caption_quality=allow_caption_quality,
         allow_unverified_weights=allow_unverified_weights,
         allow_not_ready=allow_not_ready,
+        allow_parallel_run=allow_parallel_run,
         gpu_name=gpu_name,
         resume_ckpt_path=path, resume_step=chosen['step'],
         train_settings_snapshot=snapshot,
