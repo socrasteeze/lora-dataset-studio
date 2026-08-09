@@ -50,6 +50,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-09-face-mask-preview-survives-a-timeout',
+    date: '2026-08-09',
+    title: 'A face-mask pass that runs out of time keeps every face it found',
+    blurb:
+      'The preview had one time budget for the whole set, which was really a per-image number in disguise: face detection is pinned to the CPU at nine to twenty seconds an image, so the budget fitted roughly forty-five photos and quietly ran out on anything larger. A 138-image concept dataset reached about image 100, was killed by its own watchdog, and lost every box it had found — the panel then offered to start again from image 1. The budget now grows with the number of images and the number appears in the message, so "it ran out of time" is something you can compare against your own set. More to the point, a pass cut short no longer throws its work away: each image is banked as it finishes, the watchdog asks the detector to wind up before it kills it, and a run that ends early comes back as "Resume — 97 of 138 already analyzed". A crash, a kill or a server restart now costs at most the last few images rather than the whole pass, and the panel says the pass was interrupted instead of calling it a failure you caused.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-08-09-style-captions-drop-the-medium-lead-in',
+    date: '2026-08-09',
+    title: 'Style captions stop opening with the medium',
+    blurb:
+      'A style dataset teaches a LOOK, so the medium has to be absorbed by the LoRA and never written into a caption — otherwise it binds to those words instead. The captioner was already told not to name it, but that instruction is a negative rule and JoyCaption does not follow those, so captions kept opening with "A digital illustration of a young woman…". Those openers are now cut afterwards and the sentence behind them repaired, so "A digital illustration shows five birds" becomes "Five birds" — on the full caption and on the shortened one alike. A medium named inside the scene is content, not a lead-in, and is left alone: "a painting hangs on the wall" survives untouched, and so does "An oil painting of a stormy sea hangs on the wall".',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-08-08-the-canvas-controls-live-on-the-board',
     date: '2026-08-08',
     title: 'The Canvas gives the screen back to the board',
