@@ -72,15 +72,16 @@ test('the undo offer moved into the bar and out of the page header', () => {
   assert.match(bar, /role="status" aria-live="polite"/)
 })
 
-test('the filter panel is collapsible and always names what is active', () => {
-  assert.match(workspace, /aria-expanded=\{filtersOpen\}/)
-  assert.match(workspace, /aria-controls="bank-filter-panel"/)
-  assert.match(workspace, /id="bank-filter-panel"/)
-  assert.match(workspace, /\{filtersOpen && \(/)
-  // The header must actually render the summary text, not just compute it.
-  assert.match(workspace, /\{filterSummary\.text\}/)
-})
-
+// DIVERGENCE — the Encre redesign (upstream 62cc6a11) replaced this fork's
+// collapsible filter PANEL with its own always-visible filter RAIL
+// (BankFilterRail.jsx), which is the centrepiece of that redesign rather than an
+// incidental move. The three assertions that pinned the panel's collapse
+// (aria-expanded={filtersOpen} / #bank-filter-panel), its header summary and the
+// "Results readout stays outside the collapse" rule therefore describe a surface
+// that no longer exists here. They are retired rather than weakened: re-adding a
+// second filter UI to satisfy them would be the regression, not the fix. The
+// decision bar's own contract above is untouched — that feature is fork-only and
+// survived the redesign.
 test('isFiltered and the header summary share one source, so they cannot disagree', () => {
   assert.match(workspace, /const filterSummary = bankFilterSummary\(filter, \{ labels: filterLabels \}\)/)
   assert.match(workspace, /const isFiltered = bankFilterCount\(filter, \{ labels: filterLabels \}\) > 0/)
@@ -95,12 +96,4 @@ test('Clear all resets every facet but leaves the sort order alone', () => {
   assert.doesNotMatch(body, /sort:/, 'Clear all must not touch the remembered sort order')
 })
 
-test('the results readout row (N shown, ▶ Review, Select all, 🧹 Auto-reject) stays outside the collapse', () => {
-  const readoutAt = workspace.indexOf('Results readout')
-  const nextZoneAt = workspace.indexOf('</ZoneSection>', readoutAt)
-  assert.ok(readoutAt > 0 && nextZoneAt > readoutAt)
-  const readoutBlock = workspace.slice(readoutAt, nextZoneAt)
-  assert.doesNotMatch(readoutBlock, /filtersOpen/, 'the readout row must not be gated by filtersOpen')
-  assert.match(readoutBlock, /Select all in filter/)
-  assert.match(readoutBlock, /▶ Review one by one/)
-})
+// (retired with the collapse, same reason as the note above.)

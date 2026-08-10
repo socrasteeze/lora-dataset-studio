@@ -50,6 +50,118 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-10-watermark-detector-gpu-python',
+    date: '2026-08-10',
+    title: 'Run the watermark detector on a GPU Python you already have',
+    blurb:
+      'The 🚩 Find scan quietly ran on the CPU even on machines with a perfectly good graphics card: its environment ships a CPU-only PyTorch on purpose, and nothing ever said so. The Bank’s Watermarks panel now tells you when the scan will run on the CPU and offers the same one-click picker ✨ Score already has — point the detector at the Python ComfyUI or ai-toolkit already uses and the scan runs about ten times faster, downloading nothing. The pass summary now also says which device it actually ran on.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-10-pass-report-and-flash-jobs-feedback',
+    date: '2026-08-10',
+    title: 'Re-run passes clear their old red report line — and instant passes say they finished',
+    blurb:
+      'Two silences fixed. A "Launch all" stopped early kept announcing "cancelled before it ran" over passes you had since re-run successfully — the re-run is now recorded for every pass, so the report marks the line as re-run since. And a pass that finishes in a couple of seconds (everything already cached) used to end without a progress bar, a toast, or any sign it had worked; its completion message now always arrives.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-10-group-by-person-smaller-faces',
+    date: '2026-08-10',
+    title: 'Group by person now recognises much smaller faces',
+    blurb:
+      'Point the Bank at a general photo library and most of it used to come back ungrouped: the pass only kept a face filling at least a quarter of the frame, so full-body shots, group photos and anything taken a few steps back were skipped as "face too small" and never joined their person. The size test is now a real measurement of the face in pixels rather than a share of the image, which is what identification actually depends on — the same head is the same head whether the photo is 1 or 24 megapixels. Faces below 64 pixels are still left out, because that is where the recognition itself stops being trustworthy and starts merging different people. Banks you already scanned keep their existing groups; photos you add from now on, and any bank scanned from here, use the new floor.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-10-sharpness-reads-the-sharpest-region',
+    date: '2026-08-10',
+    title: 'Bokeh portraits are no longer flagged as blurry',
+    blurb:
+      'The 🌫 blurry flag measured focus across the whole frame, so a shot with a razor-sharp subject on a creamy out-of-focus background averaged out as soft — and the pictures you most wanted to keep were the ones getting flagged. Sharpness is now read region by region and scored on the sharpest parts of the image, so the flag means what it always should have: even the crispest area of this photo is soft. It also stops the reverse mistake, where one blazing block — a watermark, a compression artefact, a burnt highlight — vouched for an otherwise soft frame. Scores are on a new, higher scale; run the Quality pass again on an already-scanned bank to pick them up. Thanks to the community for reporting it.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-10-bank-pass-remembers-itself',
+    date: '2026-08-10',
+    title: 'Find crops & variants shows its work, and remembers running',
+    blurb:
+      'Three things went wrong around this pass, none of them in the grouping itself. A "Launch all" you stopped before it reached the pass kept announcing "cancelled before it ran" — next to a standalone run that had just found 2358 groups; a step re-run since the report was written now says so, and the banner drops its 🛑 once nothing is left waiting. The run itself showed one line and then nothing for minutes, because its slowest phase — re-reading every file to prove none moved while it worked — ran unannounced; both phases now fill the bar. And the Bank had no memory of the pass at all, so the only way to know whether you had run it was to run it again: the launch window now tells you when it last ran and what it found, and relaunching an untouched Bank answers "already up to date" in a second instead of redoing the work.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-09-bank-filters-beside-the-grid',
+    date: '2026-08-09',
+    title: 'The bank filters now sit beside the images they filter',
+    blurb:
+      'Changing a filter on a 20 000-image bank meant scrolling up to the chips, clicking, and scrolling back down to see what it did. The filters now live in a rail down the left of the grid, and the rail stays put as you scroll, so the chips are still beside the images ten thousand rows down and the result is in front of you as you click. The eight analysis passes moved into a ⚙ Passes panel you open when you need them — all of them are still there, each with the same window, scope and counts as before — which gives the images the third of the screen the passes used to hold. Score, Framing, Medium, Angle, Resolution and Origin fold behind 🎛 More filters so the everyday chips stay on one screen. On a narrow window the rail becomes a drawer behind ☰ Filters, and it remembers whether you keep it open.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-10-canvas-edges-tinted-per-dataset',
+    date: '2026-08-10',
+    title: 'Tell whose line is whose on a multi-dataset Canvas',
+    blurb:
+      'Every connector on the board used to be the same pale grey, so once two datasets had pictures parked near each other their lines crossed and became one tangle. Each dataset now draws its links in its own colour, shown as a dot next to its name in the lane header. The colour is fixed per dataset, so it is the same next time you open the board. The three colours that mean something keep meaning it: amber for a superseded branch, violet for "blended from", cyan for an external LoRA file.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-10-lightbox-keep-reject-shortcuts',
+    date: '2026-08-10',
+    title: 'Judge a dataset image while you are looking at it — K, R, S',
+    blurb:
+      'The full-screen view is where you can actually see whether a hand is right, but the ✓/✕ lived on the thumbnail behind it. It now carries the Bank review bar: ✓ Keep (K), ✕ Reject (R), ⏭ Skip (S or →), and each verdict moves you to the next picture as soon as it is saved. Same keys as ▶ Review in the Image Bank, same green and red, and the same status the grid writes — a chip beside the name says whether the image is kept, rejected or still undecided. ← still goes back without deciding anything, and nothing is ever deleted.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-09-canvas-pins-float-both-ways',
+    date: '2026-08-09',
+    title: 'Park a pinned picture below its lane without shoving the next dataset',
+    blurb:
+      'On the Canvas, dragging a pinned image above its dataset always let it float free — dragging it below pushed every dataset underneath further down the board. Pinned pictures now sit on a free layer in both directions: they overlap the lane below if you park them there, and nothing else moves. Fit still frames them, Export PNG still includes them, and ✦ Tidy up still brings them back beside the run that made them.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-09-dataset-thumbnails',
+    date: '2026-08-09',
+    title: 'Grids and the board load in a blink',
+    blurb:
+      'Every thumbnail surface — the Canvas board, the dataset grid, Test Studio result tiles, checkpoint pills and the run cards — used to download and decode your full-resolution images just to paint a small tile. They now ask for a right-sized WebP thumbnail instead: a board that pulled 47 MB of pictures fetches 0.4 MB, and off-screen tiles no longer load at all. Opening an image, downloading it or exporting the board still uses the full-quality original — and a pinned image now carries an HQ button that swaps its tile for the original file in place, one picture at a time, for when you are judging skin or fine text and a re-encode is not good enough. A group of pinned images has the same HQ in its title bar, next to Export grid: one click puts the whole strip on its original files for a side-by-side comparison, and one more click gives the board its fast tiles back.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-09-canvas-machine-load',
+    date: '2026-08-09',
+    title: 'See how hard the machine is working, without leaving the board',
+    blurb:
+      'The Canvas toolbar now carries a small CPU · GPU · VRAM · RAM readout of the machine running LDS, so you can tell a run that is working from one that is stuck without opening Task Manager. It turns amber past 50% and red past 80%, refreshes only while the tab is open, and folds away with ▾ if you would rather not see it. No NVIDIA card: it simply shows no GPU numbers.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-09-lightbox-side-by-side-tablet',
+    date: '2026-08-09',
+    title: 'Full-height images on a tablet, with the facts beside them',
+    blurb:
+      'Opening a generated image on a tablet in landscape used to shrink it to a thumbnail with the prompt, Download and ✨ Upscale & improve buttons stacked below the fold. The picture now takes the whole height on the left and everything else reads in a scrollable column on the right — the same split you already had on a desktop, from 768 px up. Held upright, or on a phone, the stacked layout is unchanged.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-09-canvas-phone-board-room',
+    date: '2026-08-09',
+    title: 'The canvas gives the board back its screen on a phone',
+    blurb:
+      'On a phone the filter row was three wrapped lines floating on the board and the search box you rarely type in took most of one — it is now two lines: the chips keep their icon and their count, and 🔍 unfolds the search only when you ask for it (with the words still shown on the chip while a search is narrowing the board). The page blurb stays out of the way up to a laptop width, and a run in flight is announced once instead of twice when the Generate sheet is open. The board’s floating rows are also properly opaque now, so a strip of pinned images parked in a corner can no longer be read through Reset.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-09-canvas-external-lora-links',
+    date: '2026-08-09',
+    title: 'See which images an external LoRA actually touched',
+    blurb:
+      'A permanent cyan line now joins each 🔌 plugin node to every board image generated with it, and an image’s facts panel lists its External LoRAs on their own row instead of filing them under always-on.',
+    to: '/canvas',
+  },
+  {
     id: '2026-08-09-preview-prompts-from-captions',
     date: '2026-08-09',
     title: 'Preview images that finally show YOUR subject',
@@ -144,6 +256,14 @@ export const WHATS_NEW = [
     blurb:
       'The weight slider of a 🧬 Blend stopped at 2 and the strength sweep at 4 — both were comfort limits, not technical ones, and pushing an under-trained LoRA or an overwhelming style meant leaving the app for a hand-built workflow. The ceiling is 5 everywhere now: the blend slider, the strength chips behind « + », and the server that validates them. The weight next to each slider is also typeable, so getting to 3.35 no longer means eighty small drags.',
     to: '/canvas',
+  },
+  {
+    id: '2026-08-08-one-output-size-for-both-local-engines',
+    date: '2026-08-08',
+    title: 'Your generated shots are finally all the same size',
+    blurb:
+      'Klein and Krea 2 Edit used to size their images by two unrelated rules, so one dataset could hold 2 MP Klein tiles next to 0.84 MP Krea ones, in different shapes, with nothing on screen explaining either. There is now a single Output size dial at the top of the Generate variations panel, above the shot cards: both local engines spend that budget, on the shape of the shot card you picked. Klein therefore stops inheriting your reference photo\'s frame — a 16:9 card renders 16:9 even if your reference is portrait. It ships at 2.0 MP, exactly what Klein always did, so nothing moves until you touch it; drop it for quicker, lighter trial runs, or leave it at 2.0, which is as far as these edit models hold together (go bigger afterwards with ✨ Upscale & improve).',
+    to: '/datasets?section=add&panel=generate',
   },
   {
     id: '2026-08-08-start-comfyui-from-the-banner',

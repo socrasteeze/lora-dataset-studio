@@ -70,6 +70,7 @@ export default function BankScrapePanel({ banks, onDone }) {
       <button type="button" onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className="flex w-full items-center gap-2 px-4 py-3 text-left">
+        <span aria-hidden>🕸</span>
         <span className="text-sm font-semibold text-content">Scrape the web into a bank</span>
         <span className="hidden text-[0.6875rem] text-content-subtle sm:inline">
           no folder to prepare — the images land in a bank ready to triage

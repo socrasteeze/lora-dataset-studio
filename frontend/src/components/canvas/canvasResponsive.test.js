@@ -125,29 +125,125 @@ test('the Layouts menu opens on the screen, not off the side of it', () => {
    65vh = 520, and 304 + 520 > 800 — the board's bottom edge never fit. The
    blurb is 72 of those pixels and it explains the page exactly once. */
 test('the canvas page drops its blurb on a phone, never its help', () => {
-  assert.match(page, /className="mt-1 hidden text-content-muted text-\[0\.75rem\] sm:block"/);
+  // …and it stays dropped up to `lg`, not `sm`. 640 px was one breakpoint too
+  // early: measured at 900×2000 the paragraph came back and cost 40 px of page
+  // above the board (header 74 → 34), on a width a phone browser really does
+  // report. `lg` is also where every other control on this screen stops being
+  // finger-sized, so the whole screen now switches on ONE line.
+  assert.match(page, /className="mt-1 hidden text-content-muted text-\[0\.75rem\] lg:block"/);
+  assert.doesNotMatch(page, /text-\[0\.75rem\] sm:block/);
   // The ? badge stays at every width, so the explanation is still one tap away.
   assert.match(page, /<HelpBadge topic="page-canvas" \/>/);
 });
 
-/* …and the frame itself gives back the last 5vh, so the WHOLE board — bottom
-   edge included — is on screen at 400×800 rather than hanging under the fold.
-   A board whose bottom you have to scroll the page to reach is a board whose
-   pan gesture competes with the page's scroll. */
-test('the board frame fits the fold on a phone and is unchanged from sm up', () => {
-  // 60vh was the height left AFTER ~290 px of chrome — the zoom row, the colour
-  // key, the gestures sheet, the run tracker and the dataset filter, all stacked
-  // above the frame at 400 px. Every one of them now floats ON the board, so the
-  // frame takes that space back: the number went up because the reason it was
-  // small went away. Still short of the fold, which is the actual contract —
-  // a board whose bottom edge you have to scroll to is a board whose pan gesture
-  // fights the page's, and it is what makes ✦ Fit mean anything.
-  assert.match(canvas, /h-\[72vh\] min-h-\[380px\][^"]*sm:h-\[76vh\]/);
+/* 📏 Measured at 400×800 with a real board on screen: the filter bar wrapped to
+   THREE rows (132 px) of the frame it floats on, and 224 of the 346 available
+   px belonged to a search field that is empty on all but a handful of visits.
+   Folded behind 🔍 and with the chips down to glyph + count, the same bar is two
+   rows — 86 px. 46 px of board back, for nothing that was being used. */
+test('the board search folds behind 🔍 on a phone and is untouched from lg', () => {
+  assert.match(filter, /data-testid="canvas-filter-search-toggle"/);
+  // The toggle exists ONLY below lg — above it the field is in the bar, so a
+  // magnifier next to a visible search box would be a control with no job.
+  const toggle = filter.slice(filter.indexOf('data-testid="canvas-filter-search-toggle"'));
+  assert.match(toggle.slice(0, 600), /\blg:hidden\b/);
+  // The field itself: hidden while folded, its own full-width row while open,
+  // and from `lg` the exact 12-rem flex item it has always been.
+  assert.match(filter, /searchOpen \? 'basis-full ' : 'hidden '/);
+  assert.match(filter, /lg:h-9 lg:block lg:basis-48/);
+  // A filter you cannot see must still announce itself — the bar's own rule.
+  // Folding the field away does NOT clear the query, so the chip lights up and
+  // carries the words that are narrowing the board.
+  assert.match(filter, /queryActive\n?\s*\? 'border-indigo-400\/60 bg-indigo-500\/15/);
+  assert.match(filter, /max-w-\[6rem\] truncate font-normal">\{query\}</);
+});
+
+/* The chips carried "Datasets All 3 datasets" + "Models 1/1" + "Status 1/1" +
+   "Pinned" — 400 px cannot hold that and a search box on two rows. The words go
+   below `sm`, exactly like the board toolbar under them; the glyph, the count
+   and the 40-px target never do. */
+test('the filter chips drop their words on a phone, never their counts', () => {
+  const menu = fs.readFileSync(new URL('./CanvasFilterMenu.jsx', import.meta.url), 'utf8');
+  assert.match(menu, /className="hidden truncate sm:inline">\{label\}</);
+  // A hidden word is never a lost one: the accessible name stays a sentence.
+  const named = (menu.match(/\{`\$\{label\}\$\{summary \? ` — \$\{summary\}` : ''\}`\}/g) || []);
+  // Both the title AND the accessible name — an aria-label replaces the button's
+  // contents, so labelling it "Datasets" alone would take the count away from
+  // the one user who cannot see the chip light up.
+  assert.equal(named.length, 2, 'title and aria-label both carry label + count');
+  // The count survives at every width, in its short form where there is one —
+  // that count is the whole reason a folded filter can be trusted.
+  assert.match(menu, /\{short \?\? summary\}/);
+  assert.match(filter, /short=\{`\$\{sel\.size\}\/\$\{total\}`\}/);
+  // 🖼 Pinned loses its word too — but never its "off", which is the state that
+  // explains an empty-looking board.
+  assert.match(filter, /className="hidden sm:inline">Pinned</);
+  assert.match(filter, /\{!showPinned && <span className="font-normal">off<\/span>\}/);
+  assert.match(filter, /aria-label="Pinned images on the board"/);
+  // …and the readout keeps its number, dropping only the word "shown".
+  assert.match(filter, /<span className="hidden lg:inline"> shown<\/span>/);
+});
+
+/* 🎨 The board's tracker and the settings panel's in-flight bar read the SAME
+   numbers (useCanvasStudio hands one `run.data` to both), so an open panel on a
+   phone said "N generating · M queued · Stop (resumable)" twice. */
+test('a run in flight is announced once on a phone, and Stop stays reachable', () => {
+  // Only while the panel is open AND the run is working — the state the panel
+  // duplicates. It cannot be the other way round: RunSetupPanel hides its whole
+  // form while `pending > 0`, so dropping the PANEL's bar would leave an open
+  // sheet with nothing in it.
+  assert.match(canvas, /panelOpen && runPhase === 'working' \? ' hidden lg:block' : ''/);
+  // Stopped and finished runs keep the board's bar at every width: ▶ Resume,
+  // 📌 Pin all and the result links exist nowhere else.
+  assert.match(canvas, /runPhase !== 'idle' && \(/);
+  // One reading of the phase, from the helper the bar itself renders from.
+  assert.match(canvas, /const runPhase = describeCanvasRun\(tracker\.run\.data\)\.phase;/);
+});
+
+/* …and the frame takes the WHOLE fold, once, and then stops moving.
+
+   Three heights have now been tried on this frame and only the third answers
+   both halves of the complaint. `60vh`, then `72vh/76vh`, left dead page under
+   the board on a desktop. `clamp(floor, --canvas-content-h, ceiling)` — the
+   frame sized to its CONTENT, which shipped for a single day — fixed the dead
+   strip and bought a worse problem: an elastic canvas. ✦ Tidy up compacted the
+   board and the frame snapped shut around it, cutting cards off at the zoom the
+   user was on; dragging a node downwards inflated the frame live under the
+   hand.
+
+   So: no `vh` and no content term. `flex-1 min-h-0` in a one-viewport-tall
+   column (App.jsx pins the `/canvas` shell, CanvasPage the page root) — the
+   fold contract holds by CONSTRUCTION rather than by a fraction that had to be
+   re-measured every time the chrome above changed, and the frame is now the
+   most room there is on the screen. */
+test('the board frame is fixed and fills the fold, with no content term left', () => {
+  // Fills what is left of the viewport, floors at 320px, and no longer carries
+  // a height of its own at any breakpoint.
+  assert.match(canvas, /className="lds-canvas-frame relative isolate z-0 min-h-\[320px\] w-full flex-1 /);
+  assert.doesNotMatch(canvas, /--canvas-content-h/);
+  assert.doesNotMatch(canvas, /previewFrameHeight/);
+  const frameClass = canvas.slice(canvas.indexOf('className="lds-canvas-frame'));
+  assert.doesNotMatch(frameClass.slice(0, frameClass.indexOf('"', 11)), /vh\]/);
+  // The column the frame stretches inside: `min-h-0` is the load-bearing half —
+  // without it a flex child refuses to shrink below its content and the PAGE
+  // scrolls instead of the board.
+  assert.match(canvas, /className="lds-canvas-stage relative flex min-h-0 flex-1 flex-col"/);
   // The overlays must stay SIBLINGS of the frame, never children: the frame owns
   // the pointer handlers and `touch-none`, so a control nested inside it would
   // hand every tap to the board underneath.
   assert.match(canvas, /pointer-events-none absolute inset-x-0 top-0 z-20/);
   assert.match(canvas, /pointer-events-none absolute inset-x-0 bottom-0 z-20/);
+});
+
+/* ✦ Tidy up compacts the board on purpose, and it is only reachable from a
+   board the user has ARRANGED — so the auto-fit is switched off at exactly the
+   moment the framing stops matching the content. It has to re-frame itself. */
+test('✦ Tidy up re-fits the board it just compacted', () => {
+  assert.match(canvas, /onClick=\{handleTidyUp\}/);
+  assert.match(canvas, /refitAfterTidy\.current = true;\s*\n\s*onTidyUp\?\.\(\);/);
+  // Deferred: the parent still holds the OLD positions at click time, so the
+  // fit has to land on the next world, not this render's.
+  assert.match(canvas, /if \(!refitAfterTidy\.current\) return;[^]{0,400}setView\(fitView\(world, viewport\)\);/);
 });
 
 /* The 🎨 Generate chip carries the pick count, which is what makes closing the

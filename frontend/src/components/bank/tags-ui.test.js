@@ -83,6 +83,9 @@ test('the Setup tile explains WHICH half of the install is missing', () => {
 test('the tag pass wears its own glyph, not the caption one', () => {
   // This app uses emoji AS controls, so two passes sharing 🏷️ is a real
   // collision; 🏷️ Caption is the older, documented owner of that glyph.
-  assert.match(workspace, /tags: '🔖 Tags'/);
-  assert.match(workspace, /caption: '🏷️ Caption'/);
+  // STEP_SHORT moved out of BankWorkspace and into bankFacets.js with the Encre
+  // redesign; the glyph rule travels with the map, not with the file.
+  const facets = fs.readFileSync(new URL('./bankFacets.js', import.meta.url), 'utf8');
+  assert.match(facets, /tags: '🔖 Tags'/);
+  assert.match(facets, /caption: '🏷️ Caption'/);
 });
