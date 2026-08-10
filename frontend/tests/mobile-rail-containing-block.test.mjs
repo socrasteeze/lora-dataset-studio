@@ -76,7 +76,9 @@ test('the reason is written down where the class is', () => {
 // escapes YET — this pins the defensive `relative` so that stays true even if
 // a future edit drops the inner wrapper or adds a new unwrapped child.
 const BANK_RAILS = [
-  ['../src/components/bank/BankWorkspace.jsx', 'person- and style-cluster cover strips', 2],
+  // The Encre redesign moved both cover strips out of BankWorkspace and into the
+  // filter rail; the fix travels with them.
+  ['../src/components/bank/BankFilterRail.jsx', 'person- and style-cluster cover strips', 2],
   ['../src/components/bank/BankWatermarkPanel.jsx', 'before/after sample strip', 1],
 ]
 

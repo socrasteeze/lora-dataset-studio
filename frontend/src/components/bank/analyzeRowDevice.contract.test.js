@@ -7,10 +7,16 @@
  * exercised.
  */
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import test from 'node:test';
+import { bankTreeSource } from './bankTreeSource.js';
 
-const ws = fs.readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8');
+// Reads the bank TREE, not one file. The Encre redesign moved the pass buttons
+// and the Run-on picker out of BankWorkspace into BankPassesPanel, and these
+// assertions were pinned to the FILE — the exact trap bankTreeSource.js was
+// written for. Every assertion keeps its strength (the wiring must still exist
+// somewhere a user can reach); only "in which file" is dropped, which was never
+// what was being protected.
+const ws = bankTreeSource();
 
 test('every travelling single pass sends the chosen machine', () => {
   // 👥 Faces still has its own literal launcher — the preflight gate calls it
@@ -40,7 +46,13 @@ test('the row has its own picker, remembered separately from the inpaint one', (
   // Klein decide where a bank pass ran.
   assert.match(ws, /kind="bank-pass"/);
   assert.match(ws, /loadSavedDeviceId\('bank-pass'\)/);
-  assert.match(ws, /onDevice=\{setPassDeviceObj\}/);
+  // The picker's device object still reaches the state setter — now over two
+  // hops, because the picker moved into BankPassesPanel and the state stayed
+  // in BankWorkspace. Both are asserted, so a dropped hop still fails.
+  assert.match(ws, /onPassDeviceObj=\{setPassDeviceObj\}/,
+    'the workspace no longer hands its setter to the passes panel');
+  assert.match(ws, /onDevice=\{onPassDeviceObj\}/,
+    'the panel no longer wires that setter into the picker');
 });
 
 test('the buttons grey out per machine through the SAME gate as Launch all', () => {

@@ -397,6 +397,9 @@ _SCHEMA_ADDITIONS = (
     # must NOT recurse when its live folder is re-walked (see refresh_bank).
     ('image_bank', 'root_only', 'BOOLEAN'),
     ('image_bank', 'keep_separate', 'BOOLEAN'),
+    # When each pass last completed. A bank that predates it keeps NULL and
+    # simply reports "never recorded" until its next pass writes a row.
+    ('image_bank', 'last_passes', 'TEXT'),
     # Per-Bank semantic engine. The non-null default makes every historical row
     # byte-for-byte compatible with the CLIP behaviour it already had.
     ('image_bank', 'semantic_engine', "VARCHAR(16) NOT NULL DEFAULT 'clip'"),

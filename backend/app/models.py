@@ -304,6 +304,12 @@ class ImageBank(db.Model):
     # CLIP vectors needed by aesthetic, NSFW, style and medium analysis.
     semantic_engine = db.Column(String(16), nullable=False, default='clip',
                                 server_default='clip')
+    # {step: {at, detail, counts, ...}} — when each pass last COMPLETED on its
+    # own, whatever launched it. Two things depended on knowing this and had no
+    # way to: "did I already run this?" (the answer used to be "run it again and
+    # find out"), and whether the Launch-all report above still speaks for a step
+    # somebody has re-run since. NULL = no pass has ever finished here.
+    last_passes = db.Column(Text, nullable=True)
 
     def __repr__(self):
         return f'<ImageBank {self.id} {self.name}>'
@@ -328,7 +334,7 @@ class BankImage(db.Model):
     # Quality pass (pure-PIL, CPU). quality_state: NULL = not scanned yet |
     # 'ok' | 'unreadable'. Scores are raw metric values (see image_quality.py).
     quality_state = db.Column(String(12), nullable=True)
-    blur_score = db.Column(Float, nullable=True)         # Laplacian variance (sharpness)
+    blur_score = db.Column(Float, nullable=True)         # Laplacian variance of the sharpest regions
     noise_score = db.Column(Float, nullable=True)        # residual std vs Gaussian blur
     uniformity_score = db.Column(Float, nullable=True)   # grayscale std (low = flat)
     dhash = db.Column(String(16), nullable=True)         # 64-bit hex, same dHash as imports

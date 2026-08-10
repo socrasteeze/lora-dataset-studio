@@ -2904,6 +2904,11 @@ def delete_dataset(user_id, dataset_id):
         db.session.rollback()
         _restore_from_trash(trashed_path, dataset_path)
         raise
+    # The tile-size thumbnail cache is derived data that lives OUTSIDE the folder
+    # the trash just swallowed, so nothing else would ever collect it. Dropped
+    # after the commit, best effort: a locked cache file must not undo a delete.
+    from . import dataset_thumbs
+    dataset_thumbs.drop_dataset_thumbs(dataset_id)
     # Purge les artefacts d'entraînement (LoRA ComfyUI + ai-toolkit + config). Best
     # effort : un échec ici ne doit pas faire échouer la suppression du dataset.
     if lt is not None:
@@ -7152,7 +7157,8 @@ def _enforce_concept_omission(caption, leak_re, image_bytes, concept_desc, descr
 
 
 def _caption_concept(ds, force, backend, token=None, image_ids=None,
-                     ollama_model=None, extra_instructions='', report=None):
+                     ollama_model=None, extra_instructions='', report=None,
+                     outcome=None):
     """Concept caption pipeline (INVERTED logic): describe everything INCLUDING identity
     but OMIT the recurring act so it binds to the trigger. JoyCaption is literal (it NAMES
     the act/fluids/watermark) -> its drafts are REFINED by Qwen, then every caption passes
@@ -7192,6 +7198,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     # 1) JoyCaption batch (draft) when the backend allows it.
     if backend in ('auto', 'joycaption'):
         jc = {}
+        jc_errors = {}
         try:
             from .joycaption import caption_images_joycaption, is_available
             if is_available():
@@ -7199,7 +7206,8 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                     token, detail=f'Loading JoyCaption model and captioning {len(todo)} images…')
                 jc = caption_images_joycaption(
                     [p for _, p in todo], prompt=cap_prompt, activity_token=token,
-                    should_cancel=lambda: dataset_activity.cancel_requested(ds.id))
+                    should_cancel=lambda: dataset_activity.cancel_requested(ds.id),
+                    errors_out=jc_errors)
             elif backend == 'joycaption':
                 raise RuntimeError('JoyCaption backend is not available - check the ai-toolkit folder in Settings')
         except RuntimeError:
@@ -7217,6 +7225,17 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     # 2a) Backend 'joycaption' forced: no Qwen. Store Joy drafts scrubbed mechanically
     #     (leak_re from the desc words only) - respects "no Ollama fallback".
     if backend == 'joycaption':
+        # The images JoyCaption refused are HANDLED — nothing else in this run will
+        # look at them, because forcing the backend is exactly the promise that no
+        # Ollama pass follows. Counting them here is what keeps the indicator from
+        # freezing short of the total on a pass that is actually finished; the same
+        # freeze was reported on the main lane and fixed there (see caption_images).
+        if remaining:
+            dataset_activity.bump(token, len(remaining))
+            _record_caption_skips(outcome, remaining, jc_errors)
+            logger.info('caption concept: %d image(s) refused by JoyCaption, first '
+                        'reason: %s', len(remaining),
+                        _first_caption_skip_reason(remaining, jc_errors))
         leak_re = _concept_terms_re(_fallback_concept_terms(concept_desc))
         for image_id, p, joycap in refine_targets:
             if dataset_activity.cancel_requested(ds.id):
@@ -7448,7 +7467,8 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
         try:
             n = _caption_concept(ds, force, backend, token=token, image_ids=ids,
                                  ollama_model=ollama_model,
-                                 extra_instructions=extra_instructions, report=report)
+                                 extra_instructions=extra_instructions, report=report,
+                                 outcome=outcome)
             logger.info('captioning finished: dataset=%s backend=%s captioned=%s elapsed=%.1fs',
                         dataset_id, backend, n, time.monotonic() - started)
             return n
@@ -9417,6 +9437,10 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                             # path — deterministic, so a regenerate reproduces it.
                             label=v.get('label') or ''),
                         klein_model=klein_model,
+                        # Same card ratio the Krea lane asks for, resolved from
+                        # the same catalog: the two engines frame a shot alike
+                        # or the dataset is not one dataset.
+                        aspect_ratio=aspect_for_label(v.get('label'), v.get('framing')),
                         lora_strength=lora_strength, extra_ref_paths=extra_paths,
                         generation_loras=run_loras, sampler_steps=_generation_steps(),
                         base_lora_strength=_generation_base_lora_strength(),
@@ -10312,6 +10336,9 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
                 subject_type=subject_type_of(ds),
                 label=img.variation_label or ''),
             klein_model=model,
+            # The card's framing, like the Krea branch above — a regenerate must
+            # produce a tile the same shape and size as its siblings.
+            aspect_ratio=aspect_for_label(img.variation_label, img.framing),
             lora_strength=lora_strength, extra_ref_paths=extra_paths,
             generation_loras=resolve_generation_lora_preset(generation_lora_preset),
             sampler_steps=_generation_steps(),
