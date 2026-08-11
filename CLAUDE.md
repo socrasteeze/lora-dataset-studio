@@ -3,6 +3,11 @@
 Rules for AI agents (and humans) shipping changes to LoRA Dataset Studio.
 Public repo — everything here is visible; keep it free of personal data.
 
+Location-specific detail lives in `.claude/rules/` (frontend contracts, README
+& docs doctrine, release mechanics) and loads automatically when the matching
+files are touched. The checklist below stays here because it must be remembered
+even when those files haven't been opened yet.
+
 ## Identity & privacy (non-negotiable)
 
 - Commits are authored as `lora-dataset-studio <noreply@lora-dataset-studio.dev>`.
@@ -34,8 +39,6 @@ Public repo — everything here is visible; keep it free of personal data.
 
 ## Shipping checklist — the tail of EVERY user-visible wave
 
-Run through this before calling a wave done:
-
 1. **Tests green before commit.** Backend: `python -m pytest` (system Python).
    Frontend: `node --test` from `frontend/` — includes the help-registry,
    what's-new, and **local-only-engines** contract tests (the last one fails if
@@ -44,9 +47,8 @@ Run through this before calling a wave done:
    the bare-identifier merge leftovers the bundler and tests can't (three
    workspace-crashing `ReferenceError`s shipped this way — see FORK_NOTES
    merge diagnostic 6).
-2. **Source-only commits.** Never commit `frontend/dist/**` alongside sources;
-   the dist rebuild is a separate consolidated `build(frontend):` commit at the
-   end of the wave.
+2. **Source-only commits** — dist rebuild is its own `build(frontend):` commit
+   at the end of the wave.
    **This is a rule about commit GRANULARITY, not about whether dist ships.**
    Both `CONTRIBUTING.md` (here and upstream) require that a change under
    `frontend/src` reaches people with its rebuilt bundle — "commit the
@@ -59,27 +61,11 @@ Run through this before calling a wave done:
    **For an upstream PR, their `CONTRIBUTING.md` and
    `.github/PULL_REQUEST_TEMPLATE.md` are the authority, not this file** — read
    both before building the branch (see "Sending a PR UPSTREAM" below).
-3. **🎁 What's new** (`frontend/src/whatsNew.js`): prepend one benefit-first
-   entry per user-visible feature or fix. Between releases this panel is the
-   ONLY way users learn something shipped. Plumbing/refactors don't need one.
-4. **Help registry** (`frontend/src/help/helpRegistry.js`): any new setting,
-   section, page or big button needs a topic (and its Guide anchor), or the
-   contract test fails.
-5. **Docs**: update `docs/guide/settings-reference.md` when a setting is added
-   or changes meaning.
-   **README — at every release, not "at milestones".** "Milestone" was never
-   defined, so it meant never: seven features shipped in one day while the
-   README still described the app as it was that morning, and one line promised
-   a capability the Docker image does not have. Two questions, every time:
-   - does a section now describe something **that is no longer true**? (a
-     changed default, a renamed action, a capability that moved) — that is a
-     debt, not a gap, and it is the expensive one;
-   - does the wave change **what the tool can do**? Only then does it earn a
-     line. The README is what a stranger reads to decide if this is for them,
-     not a changelog — What's-new already is one.
-   **Every limit stays visible.** A ranking is not a filter, an undo that skips
-   deletes says so, a search that ignores "without" says so. That distinction
-   is what separates a README from a brochure.
+3. **🎁 What's new**: one benefit-first entry per user-visible change
+   (`frontend/src/whatsNew.js`) — release notes are built from it.
+4. **Help registry**: a topic for any new setting/section/page/big button.
+5. **Docs & README**: settings-reference on setting changes; README at every
+   release — fix anything no longer true, and only new capabilities earn a line.
    After an **upstream merge**, also update `FORK_NOTES.md` if a divergence
    changed, and **rebuild `frontend/dist`** — Flask serves dist; taking
    upstream's bundle can resurrect removed cloud engines even when
@@ -95,6 +81,12 @@ Run through this before calling a wave done:
    (shipped once: `stop.bat` could not run at all).
    `backend/tests/test_windows_scripts_are_ascii.py` enforces this; fix the
    character, don't add a BOM (invisible, strippable, and unusable on `.bat`).
+
+Details for steps 2-5 live in `.claude/rules/` and load when you touch the
+files involved. Releases are cut on validated waves only, never per commit —
+mechanics in `.claude/rules/release-mechanics.md`. The fork-specific halves of
+steps 1, 2 and 5 above stay here: those rules files are upstream's and carry
+no local-only-engine, lint-gate or FORK_NOTES obligations.
 
 ## Fork sync (upstream)
 
@@ -118,21 +110,6 @@ local-only contract test before calling the sync done.
 2026-07-29: this app uses emoji AS controls, so stripping them left real
 buttons rendering as empty boxes. Take upstream's glyphs exactly as they
 come — see Divergence 3 in `FORK_NOTES.md` for what it cost.
-
-## Releases
-
-Releases are cut on validated waves/milestones only — never per commit.
-Announcements tell users to "Update & restart". The dist-freshness check runs
-at release time (`release.yml`); CI on push gates heavy jobs on big changes
-(≥5 source files or ≥100 lines — see `.github/workflows/ci.yml`).
-
-**Release notes write themselves from step 3.** `frontend/scripts/releaseNotes.mjs`
-builds the body from the What's-new entries `frontend/src/whatsNew.js` gained
-since the previous tag (git diff of that file, not entry `date` — several
-releases can be cut on one day). Skipping step 3 therefore now costs a release,
-not just a panel line: a tag whose body would announce NOTHING fails the release
-job in seconds. A genuine plumbing-only release says so on purpose by carrying
-`[no-notes]` in its annotated tag message.
 
 ## Sending a PR UPSTREAM (the reverse direction of a sync)
 
