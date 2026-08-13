@@ -297,7 +297,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🚩 Edit mask",
+    "🚩",
     1
   ],
   [
@@ -473,7 +473,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Fix the watermark zones on this image (M) — decides nothing. 🧽 Inpaint then repaints exactly what you draw.",
+    "Draw the watermark zones on this image (M) — decides nothing. Works even when the scan found nothing: what you draw becomes the flag, and 🧽 Inpaint then repaints exactly that.",
     1
   ],
   [
