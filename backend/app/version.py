@@ -15,4 +15,4 @@ share this shape — which for a fork means the FORK's own releases. Comparing a
 F-marked version against a feed of unmarked upstream tags is how an "update"
 ends up being a different codebase; see the note on that key in config.py.
 """
-APP_VERSION = '2026.08.10.1F'
+APP_VERSION = '2026.08.13.1F'
