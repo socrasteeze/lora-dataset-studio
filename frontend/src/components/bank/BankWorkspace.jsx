@@ -52,7 +52,7 @@ import { preflightNeeded, preflightWillSample } from './personPreflight.js'
 import { folderSyncToast } from './bankSync.js'
 import { undoOffer, undoResultMessage } from './bankUndo.js'
 // An occupied bank refuses in OUR words, never in the server's (pure/testable).
-import { busyRefusal } from './bankPassRun.js'
+import { busyRefusalLive } from './bankPassRun.js'
 import { scoreDeviceNote } from './bankScoreDevice.js'
 // Wording that adapts to the machine (a card-less box is never sold CUDA).
 import { PICKER_PROFILES } from './scoringPython.js'
@@ -123,6 +123,14 @@ function semanticPayloadMatches(payload, engine, modelKey = null) {
 }
 
 const PAGE_SIZE = 120
+/* The Curate row's five buttons, one style. They were the same gray text-xs as
+   every utility control, and asked for from live use ("agrandir — ce sont des
+   features principales"): the semantic curation is what the Bank is FOR once
+   triage is done, and it dressed as a footnote. Same accent family as
+   ▶ Review one by one, one size up. */
+const CURATE_BTN = 'rounded-md border border-indigo-400/60 bg-indigo-500/20 '
+  + 'px-3 py-1.5 text-sm font-semibold text-indigo-200 disabled:opacity-50 '
+  + 'hover:bg-indigo-500/30'
 /* How often the bank-wide counts refresh while a pass runs. The banner ticks
    every 2 s off /activity; the dashboard follows on this slower beat — plus
    immediately when the job lands, so the numbers you end on are exact. The
@@ -271,7 +279,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // window dragged narrow must turn the rail into a drawer, not clip it.
   const [railIsColumnNow, setRailIsColumnNow] = useState(() => railIsColumn(viewportWidth()))
   const [railOpen, setRailOpen] = useState(() => loadRailOpen(viewportWidth()))
-  const [moreOpen, setMoreOpen] = useState(false)
+  /* Open by default (asked for from live use): the six measured axes are what
+     the passes were run FOR, and a closed disclosure hid them from exactly the
+     people who had just paid for the measurements. Still collapsible — the
+     fold exists for the 400 px drawer, not as the resting state. */
+  const [moreOpen, setMoreOpen] = useState(true)
   const [passesOpen, setPassesOpen] = useState(false)
   useEffect(() => {
     const onResize = () => setRailIsColumnNow(railIsColumn(window.innerWidth))
@@ -895,10 +907,31 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
      stays open so they survive. When it is given, the message goes THERE instead
      of to a toast: two copies of the same sentence is not twice as clear. Every
      other button keeps the toast, because it has nowhere else to put it. */
+  /* ⏱ The CHEAP liveness read, merged straight into the payload. The full
+     payload is the ~60-aggregate dashboard, measured at ~25 s AT REST on a
+     36 921-image bank and worse while a pass writes — so between a click and
+     that landing, the page believed the bank was idle: no progress bar, while
+     every further click 409'd about a pass "in the progress bar at the top of
+     the bank" that was not on screen. /activity is one in-memory registry
+     lookup; adopting its answer is what flips `live`, starts the 2 s poll and
+     puts the bar up within a beat of the click instead of half a minute later.
+     The merge is guarded on an existing payload: with none, nothing that could
+     show a bar has rendered yet, and the payload on its way carries activity. */
+  const adoptActivity = async () => {
+    try {
+      const next = await apiFetch(`/api/bank/${bankId}/activity`, { background: true })
+      setPayload((p) => (p ? { ...p, activity: next.activity } : p))
+      return next.activity
+    } catch { return null }
+  }
+
   const act = async (fn, okMsg, { onRefusal } = {}) => {
     try {
       const d = await fn()
       if (okMsg) toast.success(okMsg)
+      // The bar first, the dashboard after: a 202 means a job is running RIGHT
+      // NOW, and the heavy payload it rides in can be half a minute away.
+      await adoptActivity()
       await refreshPayload(); await refreshImages()
       return d
     } catch (e) {
@@ -910,9 +943,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       // goes through act(): the ✨ Analyze, the ↻ re-runs in the threshold
       // panel, Delete rejected, ⬆ Promote, Launch all. Anything else keeps
       // its own message — only a refusal that identified itself is reworded.
+      // The refusal reads /activity itself (and adoptActivity merges it), so
+      // the sentence carries the blocker's real progress AND the bar it points
+      // at actually appears — a 409 is proof the page's picture was stale.
       const kind = e?.body?.busy_kind
       const message = e?.status === 409 && kind
-        ? busyRefusal({ kind, activity: payload?.activity })
+        ? await busyRefusalLive({ kind, fetchActivity: adoptActivity,
+          fallback: payload?.activity })
         : (e?.message || 'Action failed.')
       if (onRefusal) onRefusal(message)
       else toast.error(message)
@@ -956,7 +993,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       } catch (e) {
         const kind = e?.body?.busy_kind
         const message = e?.status === 409 && kind
-          ? busyRefusal({ kind, activity: payload?.activity })
+          ? await busyRefusalLive({ kind, fetchActivity: adoptActivity,
+            fallback: payload?.activity })
           : (e?.message || 'Could not check the folders.')
         if (onRefusal) onRefusal(message); else toast.error(message)
         return 'refused'
@@ -1998,6 +2036,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               checkFolderPerson={checkFolderPerson} scanFolderPersons={scanFolderPersons}
               tagRow={tagRow} tagPicked={tagPicked} toggleTag={toggleTag} clearTags={clearTags}
               chipsFiltered={chipsFiltered} flags={flags}
+              statusCounts={chipPrint.status}
               availableScoreFlags={availableScoreFlags} payload={payload}
               shownResBuckets={shownResBuckets} resBuckets={resBuckets}
               originMeasured={originMeasured} originCounts={originCounts}
@@ -2158,7 +2197,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               title={semanticReady
                 ? `Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) using the ${semanticState.label} semantic index.`
                 : semanticBlocked}
-              className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+              className={CURATE_BTN}>
               🎨 Pick diverse…{!semanticReady && ` (needs ${semanticState.label})`}{diverseBusy && ' (sampling…)'}
             </button>
             {curateOpen === 'diverse' && (
@@ -2215,7 +2254,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               title={balanceReady.ready
                 ? `Select N images SPREAD OVER the framings (face / bust / body / back), then diversify each bucket with the ${semanticState.label} semantic index.`
                 : balanceReady.reason}
-              className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+              className={CURATE_BTN}>
               ⚖️ Balanced pick…{balanceBusy && ' (sampling…)'}
             </button>
             {curateOpen === 'balanced' && (
@@ -2270,7 +2309,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 : selected.size === 1
                   ? `Rank the current filter against the ONE selected image with the ${semanticState.label} semantic index and select the closest N.`
                   : 'Select exactly one image to use as the reference'}
-              className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+              className={CURATE_BTN}>
               🎯 Similar to selected…{similarBusy && ' (ranking…)'}
             </button>
             {curateOpen === 'similar' && (
@@ -2303,7 +2342,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               title={semanticReady
                 ? `Describe what you are looking for in words ("brunette outdoors, wide shot") and rank the current filter with ${semanticState.label}.`
                 : semanticBlocked}
-              className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+              className={CURATE_BTN}>
               🔤 Find by text…{!semanticReady && ` (needs ${semanticState.label})`}
             </button>
             {curateOpen === 'text' && (
@@ -2403,7 +2442,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <button type="button" onClick={() => setCoverageOpen((v) => !v)}
             aria-expanded={coverageOpen}
             title="See what your kept set leans on and what's thin for a good LoRA — advice only, nothing is kept or rejected."
-            className="rounded-md border border-border bg-surface-raised px-2.5 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+            className={CURATE_BTN}>
             📊 Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
           </button>
         </div>
