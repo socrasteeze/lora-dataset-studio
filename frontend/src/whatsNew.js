@@ -50,6 +50,14 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-14-studio-subfoldered-extra-checkpoints',
+    date: '2026-08-14',
+    title: 'Test Studio can finally run the checkpoints it was offering you',
+    blurb:
+      'If you keep checkpoints in subfolders of a root declared in extra_model_paths.yaml, the Studio picker listed them — and then refused to run them, with an error naming a path the file had never lived at. The picker and the runner now walk the same roots, so everything offered is actually launchable. A missing Detail Daemon node also names the pack to install (ComfyUI-Detail-Daemon) instead of just the bare class name, which every fresh SDXL install used to trip over.',
+    to: '/studio',
+  },
+  {
     id: '2026-08-13-mark-a-watermark-the-scan-missed',
     date: '2026-08-13',
     title: 'Mark a watermark the scan missed, yourself',
