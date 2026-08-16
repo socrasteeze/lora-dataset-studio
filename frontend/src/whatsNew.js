@@ -50,6 +50,13 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-16-pwa-icon',
+    date: '2026-08-16',
+    title: 'Installing the app now gives it a real icon',
+    blurb:
+      "Add to Home Screen / installing as a desktop app used to land a generic placeholder glyph, because the app had no install manifest. It now ships one, so the installed shortcut shows the same 🧬 mark as the browser tab, on the app's actual brand colors.",
+  },
+  {
     id: '2026-08-14-studio-subfoldered-extra-checkpoints',
     date: '2026-08-14',
     title: 'Test Studio can finally run the checkpoints it was offering you',
