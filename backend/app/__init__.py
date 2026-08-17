@@ -37,6 +37,7 @@ _STATIC_MIME_TYPES = {
     '.css': 'text/css',
     '.json': 'application/json',
     '.map': 'application/json',     # source maps: devtools-only, never executed
+    '.webmanifest': 'application/manifest+json',
     '.svg': 'image/svg+xml',
     '.webp': 'image/webp',
     '.png': 'image/png',
