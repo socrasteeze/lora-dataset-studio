@@ -122,6 +122,7 @@ def test_pin_overrides_an_already_loaded_entry(poisoned_mimetypes):
     assert mimetypes.inited, 'registry (if any) already loaded at this point'
     mimetypes.add_type('text/plain', '.js', strict=True)
     mimetypes.add_type('text/plain', '.mjs', strict=True)
+    mimetypes.add_type('text/plain', '.webmanifest', strict=True)
     mimetypes.add_type('application/octet-stream', '.webp', strict=True)
     mimetypes.add_type('application/octet-stream', '.bmp', strict=True)
 
@@ -129,6 +130,7 @@ def test_pin_overrides_an_already_loaded_entry(poisoned_mimetypes):
 
     assert mimetypes.guess_type('a.js')[0] == 'text/javascript'
     assert mimetypes.guess_type('a.mjs')[0] == 'text/javascript'
+    assert mimetypes.guess_type('a.webmanifest')[0] == 'application/manifest+json'
     assert mimetypes.guess_type('a.webp')[0] == 'image/webp'
     assert mimetypes.guess_type('a.bmp')[0] == 'image/bmp'
 

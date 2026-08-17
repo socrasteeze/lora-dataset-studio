@@ -553,7 +553,10 @@ def test_foreign_container_collision_fails_without_compose_mutation(tmp_path):
     )
 
     assert result.returncode == 1
-    assert "belongs to another project or folder" in result.stderr
+    # The xdist worker suffix lengthens the temporary script path enough for
+    # Windows PowerShell to wrap "or folder" across two console lines. Judge
+    # the error text, not that presentation-only whitespace.
+    assert "belongstoanotherprojectorfolder" in re.sub(r"\s+", "", result.stderr)
     assert not _compose_calls(calls, "up", "studio")
     assert not _compose_calls(calls, "stop", "ollama")
     assert [call for call in calls if "logs" in call["args"]]
