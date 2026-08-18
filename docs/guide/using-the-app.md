@@ -2086,6 +2086,96 @@ One caveat worth stating: the analysis passes (Subject, ✨ Score, Framing)
 still read the original file, so turning an image does **not** re-run them. Turn
 first, then run the passes if you want them to see it upright.
 
+## Crop and upscale inside a bank
+
+A bank is where the filtering and the curation happen, but reframing or
+upscaling a shot used to mean leaving it: promote into a dataset, edit there,
+export into a **new** bank, and start curating again. Both edits now happen in
+the bank itself, so the loop is *curate → edit → re-analyse → promote*, in one
+place. (Asked for by nofaceman on Discord, backed by mr.arrow.)
+
+**✂ Crop** is per image, in **▶ Review** — the only place a bank shows a picture
+big enough to draw a box on. Open Review (or press ▶ on a tile), then click
+**✂ Crop** or press `C`. Drag the box, or snap it to a ratio, and confirm.
+Cropping decides nothing: the image stays under your cursor so you can judge it
+once it is framed properly.
+
+**Nothing is resampled here**, and that is the one real difference from the crop
+inside a dataset. A dataset crop rescales the box you drew to a 1024 px long
+side, because a dataset image is training material and that is its size. A bank
+sits *upstream* of that choice — shrinking here would pick your training
+resolution before you have even picked a dataset, and would do it silently. So a
+bank crop is a pure cut: it keeps the pixels inside the box, and the dataset
+still decides the size when it imports.
+
+**✨ Upscale & improve** is a pass, on the **✂ Edits** panel (⚙ Passes). It takes
+the same kept / undecided / unkept / selection scope as everything else, which
+matters more here than anywhere: this one spends GPU-minutes **per image**. Pick
+the engine on the panel — **Klein** re-renders detail from a prompt (sharper, and
+skin and colour can shift) or **SeedVR2** resolves detail and leaves the original
+look alone — then launch. It runs in the background with a progress bar, and ⏹
+Stop ends it between two images, keeping everything already done. Unlike the
+dataset version, there is no candidate to validate: a bank *is* the review, so
+the result replaces what the bank shows.
+
+**Your own files are never written to.** Both edits land in a copy the app keeps
+next to the bank, exactly like the watermark cleaning. **↩ Revert** on the ✂
+Edits panel throws those copies away — for the selection, or for the whole bank —
+and gives you back the image it started from, including any rotation the edit had
+absorbed. In ▶ Review, **↩ Revert edit** does it for the image on screen.
+
+Two consequences worth knowing. First, an edit **clears every measurement taken
+from the old pixels**, so ✨ Score, 📐 Framing and the rest pass over those images
+again — which is the point: a sharpness score read off the shot before you cropped
+it describes an image the bank no longer holds. Second, ✨ Upscale & improve does
+not re-run on an image it has already improved; ↩ Revert is how you ask for a
+second attempt, and it is one click.
+
+## Repaint one detail without regenerating the image
+
+Two people asked for this from opposite directions on the same week: one wanted
+the watermark remover pointed at a necklace and some skin blemishes, the other
+wanted to fix a small glitch in a fresh picture without regenerating the whole
+thing. Same hole.
+
+The app already had the hard part. **🧽 Clean** repaints exactly the box you draw
+and leaves every pixel outside it **byte-identical** — but its instruction was
+frozen on "reconstruct a clean, natural image", so it could only ever be aimed at
+a watermark. **✦ Edit**, the other lane, takes any instruction but re-renders the
+**whole** image, which drifts outside the area you cared about.
+
+**✦ Repair** is the first lane with both. Open the image (click its tile) and press
+**✦ Repair** in the action bar. Draw the zone, type what should be there —
+*"remove the necklace"* — and press **✦ Repair** again. Only that zone is
+repainted. Everything outside it comes back exactly as it was, to the byte.
+
+The 🚩 button next to it opens the same editor from the other intention — you
+spotted a watermark the scan missed. Same screen, same zones; what differs is
+whether you press 🧽 Clean or ✦ Repair once you are there.
+
+A few things worth knowing:
+
+- **It says nothing about watermarks.** A repair does not flag, clear or stamp
+  anything: the image keeps whatever watermark state it had. It is an edit you
+  asked for, not a verdict.
+- **Your original is preserved first.** The master is copied aside *before*
+  anything is written, so a repair that fails costs you nothing — the file is
+  left exactly as it was.
+- **An empty description is refused**, on purpose. Falling back to the watermark
+  sentence would repaint your zone with an intention you never expressed.
+- **↩ Undo puts the previous image back**, one step deep, so trying another
+  description costs nothing — which is the normal way to use this: look, not
+  right, change the sentence, go again. The dialog stays open after a repair for
+  exactly that. The undo is consumed once used, and it never reaches the
+  write-once original kept for ↩ Undo cleaning — undoing a repair must not throw
+  away a watermark clean you made earlier and still want.
+- It runs on Klein through ComfyUI, one round-trip per repair.
+
+**On a picture you just generated, too.** Open a generated image full size — on
+the Canvas, or from a checkpoint gallery — and press **✦ Repair** next to ⬇ and
+✨. Same gesture, same guarantee: a stray finger or an unwanted object no longer
+means throwing away the render you liked and rolling the dice again.
+
 ## Clean the watermarks a bank found
 
 **🚩 Find watermarks** flags the images carrying an overlaid logo, URL or
@@ -3299,6 +3389,34 @@ sits above the board, and hovering a pill spells it out in words.
 The graph embedded in a dataset's *Checkpoints & LoRAs* panel is unchanged and
 still holds the per-checkpoint actions (download, deploy, continue from here,
 inline previews). The canvas is a second way in, not a replacement.
+
+## Undeploy several LoRAs at once
+
+Deploying a checkpoint copies it into ComfyUI's `loras` folder so you can use it
+in a workflow. Over a few months of training that folder fills up, and taking
+LoRAs back out used to be a one-at-a-time errand: open a run's checkpoint pill,
+open its popover, press ⏏ Undeploy, repeat. Nothing anywhere even told you how
+many were deployed.
+
+**⏏ Undeploy…** at the top of the **Canvas** page opens the whole list at once —
+every LoRA this app has put into ComfyUI, across *all* your datasets and all
+families, grouped by dataset. Tick the ones you want gone, press the button, and
+they go in one pass. **Select all** is there for the clear-out.
+
+**Only what the app deployed is listed.** A LoRA you downloaded yourself and
+dropped in the same folder never appears, and is never touched — the list is
+built from the app's own record of what it imported, not from a directory scan.
+That distinction matters because this screen deletes files.
+
+**It is the reversible half.** Your *training saves* are kept: every LoRA you
+undeploy can be deployed again from its checkpoint whenever you want. The
+removed copies go to the trash, recoverable until you empty it in
+**Settings ▸ Maintenance**.
+
+The run reports what it actually did, in three parts, because they are not the
+same thing: how many were **removed**, how many were **already gone** (you had
+deleted the file by hand — no error, you have the outcome you asked for), and how
+many were **refused**, each named so you can act on it.
 
 ## Upscale a picture straight from the board
 

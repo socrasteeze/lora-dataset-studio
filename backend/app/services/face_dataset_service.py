@@ -3270,7 +3270,7 @@ def _normalized_backup_image_meta(meta, *, version=BACKUP_VERSION):
         'watermark_state', 16,
         allowed=('none', 'detected', 'dismissed', 'cleaned', 'failed', 'error'))
     out['watermark_source'] = optional_text(
-        'watermark_source', 16, allowed=('detector', 'vision'))
+        'watermark_source', 16, allowed=('detector', 'vision', 'manual'))
     out['watermark_score'] = optional_number('watermark_score', 0.0, 1.0)
 
     def box_storage(field, *, many):
@@ -9295,6 +9295,160 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
         dataset_activity.end(token)
 
 
+REPAIR_UNDO_SUFFIX = '.prerepair'
+
+
+def repair_snapshot_path(path) -> str:
+    """Where the ONE-STEP undo of a ✦ Repair lives, next to the image.
+
+    NOT the `.orig` sibling. That one is write-once and holds the pixels from
+    before the FIRST edit ever made to this file, so restoring it would also
+    throw away a watermark clean the user made earlier and still wants — a
+    surprise nobody asked for when they press "undo my repair". This snapshot is
+    taken immediately before each repair and overwritten by the next one: it
+    undoes exactly the last repair, and nothing else.
+    """
+    stem, ext = os.path.splitext(path)
+    return f'{stem}{REPAIR_UNDO_SUFFIX}{ext or ".webp"}'
+
+
+def undo_repair_at(path) -> bool:
+    """Put the pre-repair pixels back at `path`. False when there is nothing to
+    undo (no snapshot), which the callers turn into a 404 rather than a failure.
+
+    The snapshot is CONSUMED: one repair, one undo. Keeping it would let a second
+    press silently revert a repair the user made after the first undo.
+    """
+    snap = repair_snapshot_path(path)
+    if not os.path.exists(snap):
+        return False
+    try:
+        shutil.copy2(snap, path)
+        os.remove(snap)
+    except OSError as e:
+        logger.warning('repair undo failed for %s: %s', path, e)
+        raise ValueError('could not put the previous image back') from e
+    return True
+
+
+def take_repair_snapshot(path) -> None:
+    """Copy the CURRENT pixels aside so the repair about to run can be undone.
+    Overwrites any previous snapshot — the undo is one step deep by design."""
+    try:
+        shutil.copy2(path, repair_snapshot_path(path))
+    except OSError as e:
+        # Not fatal: the repair still has the write-once .orig behind it. But the
+        # user loses the one-click undo, so it is worth a line in the log.
+        logger.warning('could not snapshot %s before repair: %s', path, e)
+
+
+@_serialize_dataset_ingest
+def undo_image_repair(user_id, dataset_id, image_id) -> dict | None:
+    """↩ Undo the last ✦ Repair of a dataset image.
+
+    Asked for by a user on Discord: "if the repair makes things worse than
+    before, a quick undo option to change the prompt would be welcome". An
+    inpaint is a dice roll — iterating on the sentence is the normal gesture, and
+    without this each attempt overwrote the file with no way back.
+
+    Deliberately does NOT touch `watermark_state`, unlike
+    restore_watermark_original: a repair never claimed anything about a
+    watermark, so undoing it must not claim anything either.
+
+    None = unknown/not yours (404). ValueError = the snapshot could not be put
+    back. {'ok': True, 'undone': False} = nothing to undo.
+    """
+    if not get_dataset(user_id, dataset_id):
+        return None
+    img = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, id=int(image_id)).first()
+    if img is None:
+        return None
+    path = _img_path(img)
+    if not path or not os.path.isfile(path):
+        raise ValueError('this image is no longer on disk')
+    return {'ok': True, 'undone': undo_repair_at(path)}
+
+
+@_serialize_dataset_ingest
+def repair_image_region(user_id, dataset_id, image_id, boxes, prompt, *, seed=None) -> dict:
+    """✦ Repaint ONE hand-drawn box of a dataset image from a FREE prompt, leaving
+    every pixel outside it byte-identical.
+
+    Asked for independently by two people on Discord: mr.arrow wanted the
+    watermark remover pointed at jewelry and skin imperfections, .samexit wanted
+    to fix one detail of a picture without regenerating the whole thing. Both
+    describe the same hole. The app had two lanes and neither could do it:
+
+      · 🧽 Clean repaints exactly a box and preserves everything outside it —
+        but its prompt is FROZEN on watermark reconstruction, so it cannot be
+        aimed at anything else;
+      · ✦ Edit takes any prompt — but re-renders the WHOLE image, which drifts
+        outside the zone (the mouth-and-teeth drift reported on this very lane).
+
+    So this is the masked lane with the prompt unfrozen. It reuses the cleaning
+    lane's safety verbatim rather than a second copy: an upright disposable
+    sibling is staged (EXIF orientation is what the boxes were drawn against), the
+    master is preserved as .orig BEFORE anything is written, and the edit is
+    promoted only once Klein succeeded — a failure leaves the user's file exactly
+    as it was.
+
+    It deliberately does NOT touch `watermark_state`: this is a repair the user
+    asked for, not a verdict about a watermark, and stamping one would make the
+    flag lie in both directions.
+
+    Raises LookupError (unknown dataset/image), ValueError (no prompt, no usable
+    box, unreadable image) and keh.KleinModelGone. Returns {'ok': True}.
+    """
+    ds = get_dataset(user_id, dataset_id)
+    if not ds:
+        raise LookupError('dataset not found')
+    img = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, id=int(image_id)).first()
+    if img is None:
+        raise LookupError('image not found')
+    text = (prompt or '').strip()
+    if not text:
+        # A blank prompt here is NOT the cleaning default: the caller asked for a
+        # prompted repair, and silently reconstructing "a clean natural image"
+        # instead would repaint the box with an intention nobody expressed.
+        raise ValueError('a prompt is required — say what should be painted in that area')
+    # Both imported HERE, like every other user of them in this module. `keh` is
+    # not a module-level name on purpose — further down the same alias means
+    # krea_edit_helper, so importing it at the top would be a trap, not a
+    # convenience — and watermark_klein is only ever pulled in where it is used.
+    from . import watermark_klein
+    from . import klein_edit_helper as keh
+    if not watermark_klein.is_available():
+        raise ValueError('Klein is not ready (ComfyUI unreachable or models missing)')
+    klein_model = dataset_klein_model(ds)
+    if klein_model and not keh.klein_model_on_disk(klein_model):
+        raise keh.KleinModelGone(klein_model)
+
+    path = _img_path(img)
+    if not path or not os.path.isfile(path):
+        raise ValueError('this image is no longer on disk')
+    staged = _stage_oriented_watermark_edit(path)
+    if not staged:
+        raise ValueError('could not stage the image (EXIF orientation)')
+    if not _preserve_original(path):
+        _discard_staged_watermark_edit(staged)
+        raise ValueError('could not preserve the original; your file was left unchanged')
+    # One step of undo, taken from the CURRENT pixels — see repair_snapshot_path
+    # for why this is not the .orig sibling.
+    take_repair_snapshot(path)
+    try:
+        ok, err = watermark_klein.inpaint_watermark_klein(
+            user_id, staged, boxes, seed=seed, klein_model=klein_model, prompt=text)
+        if not ok:
+            detail = (err or {}).get('detail') or 'the repair failed'
+            raise ValueError(detail)
+        if not _promote_staged_watermark_edit(staged, path):
+            raise ValueError('the repair rendered but could not be written back')
+    finally:
+        _discard_staged_watermark_edit(staged)
+    db.session.commit()
+    return {'ok': True}
+
+
 @_serialize_dataset_ingest
 def restore_watermark_original(user_id, dataset_id, image_id) -> dict | None:
     """Undo a watermark Clean on ONE image: copy the preserved `<stem>.orig<ext>` back
@@ -9742,17 +9896,25 @@ def _enqueue_improve(engine, *, user_id, source, source_path, prompt, label,
     spaces, and the completion callback is chosen by this metadata. The engine
     dispatch below stays the single place that knows Klein from SeedVR2 — that is
     the whole point of routing the second lane through here rather than growing a
-    parallel copy of it."""
+    parallel copy of it.
+
+    `source` only ever has to answer for its NAME here, and it is used to build a
+    staging file name — nothing else. A row that stores its name under another
+    column (a `BankImage` keeps a `relpath`) therefore falls back to the source
+    path's own basename rather than needing a shim object built for this one
+    line."""
     meta = (dict(extra_metadata) if extra_metadata is not None
             else _improve_extra_metadata(source, label, engine=engine))
+    source_filename = (getattr(source, 'filename', None)
+                       or os.path.basename(str(source_path or '')))
     if engine == 'seedvr2':
         from . import seedvr2_helper
         return seedvr2_helper.enqueue_seedvr2_upscale(
-            user_id=str(user_id), source_filename=source.filename,
+            user_id=str(user_id), source_filename=source_filename,
             source_path=source_path, extra_metadata=meta)
     from . import klein_edit_helper as keh
     return keh.enqueue_klein_edit(
-        user_id=str(user_id), source_filename=source.filename,
+        user_id=str(user_id), source_filename=source_filename,
         source_path=source_path, edit_prompt=prompt,
         **_improve_enqueue_profile(dataset), extra_metadata=meta)
 

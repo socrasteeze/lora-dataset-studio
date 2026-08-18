@@ -376,6 +376,13 @@ _SCHEMA_ADDITIONS = (
     ('bank_image', 'tags', 'TEXT'),
     ('bank_image', 'tags_text', 'TEXT'),
     ('bank_image', 'tags_state', 'VARCHAR(16)'),
+    # ✂ Crop / ✨ Upscale & improve made in the Bank itself: which edit produced
+    # the current derived blob, which generation of it is on disk, and the turn
+    # that was baked into it. Additive — a database that never gains them simply
+    # has no bank-side edits and resolves images exactly as before.
+    ('bank_image', 'edit_method', 'VARCHAR(16)'),
+    ('bank_image', 'edit_generation', 'INTEGER'),
+    ('bank_image', 'edit_baked_rotation', 'INTEGER'),
     # Where a face_cluster id came from: NULL = the embeddings pass computed it
     # (what every existing row means), 'asserted' = a "this subfolder is one
     # person" declaration wrote it with no inference. Additive: a database that
