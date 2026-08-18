@@ -14,6 +14,7 @@
  * and "what can I measure" are the same question asked twice.
  */
 import BankOverview from './BankOverview.jsx'
+import BankEditPanel from './BankEditPanel.jsx'
 import BankSemanticEngine from './BankSemanticEngine.jsx'
 import BankWatermarkPanel from './BankWatermarkPanel'
 import { GroupLabel, PassButton } from './BankAtoms.jsx'
@@ -152,6 +153,13 @@ export default function BankPassesPanel({
           {scoreHoldNote && (
             <p className="text-xs text-content-subtle">{scoreHoldNote.text}</p>
           )}
+          {/* ✂ Edits — the crop and the upscale made in the Bank itself, next to
+              the watermark cleaning because they are the same KIND of thing: the
+              three actions that produce new pixels, each undone by throwing away
+              a copy the app made (nofaceman, Discord). */}
+          <BankEditPanel bankId={bankId} live={live}
+            payload={payload} selectedIds={[...selected]}
+            onChanged={onChanged} />
           {scoreNote && (
             <p className={`text-xs ${scoreNote.tone === 'warn'
               ? 'text-amber-400/90' : 'text-content-subtle'}`}>

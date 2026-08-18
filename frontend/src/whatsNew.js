@@ -50,6 +50,62 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-17-watermark-review-on-a-phone',
+    date: '2026-08-17',
+    title: 'Review watermarks from your phone without squinting',
+    blurb:
+      'Opened on a phone, the watermark review gave the photo about a third of the screen and spent the rest on controls — including a model picker and a permanent text field — so the one thing you were there to judge was the smallest thing on screen. The picture now gets the screen: 🧽 Clean, ✓ Not a watermark, ✕ Reject and the arrows stay put, and the setup controls (zone editor, crop-or-repaint, engine, model) fold behind one “Zones & engine” button. Nothing moves on a desktop, and anything explaining why a button is greyed out stays visible at every size.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-17-undo-a-repair',
+    date: '2026-08-17',
+    title: 'Undo a repair, and try another description',
+    blurb:
+      'An inpaint is a dice roll, so the normal way to use ✦ Repair is: look at it, decide it is not right, change the sentence, go again. That was expensive — each attempt overwrote the image with no way back. Now the dialog stays open after a repair so you can repair again straight away, and ↩ Undo puts back the picture from just before it. One step deep, and it deliberately never touches the original kept for ↩ Undo cleaning, so undoing a repair cannot throw away a watermark clean you made earlier. (Suggested by a user on Discord the day ✦ Repair shipped.)',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-17-repair-a-generated-image',
+    date: '2026-08-17',
+    title: 'Fix one detail of a render instead of regenerating it',
+    blurb:
+      'A stray finger, an object you did not ask for — until now that meant throwing away the picture you liked and rolling the dice again, because the only prompted lane re-renders everything and gives you a different image. Open a generated image full size (on the Canvas, or from a checkpoint gallery) and press ✦ Repair next to ⬇ and ✨: draw the zone, say what should be there, and only that zone is repainted. Everything outside it comes back byte-identical, and your picture is preserved before anything is written, so a repair that fails costs you nothing. (Asked for by .samexit on Discord.)',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-17-repair-a-detail-free-prompt',
+    date: '2026-08-17',
+    title: 'Repaint one detail — and only that detail',
+    blurb:
+      'Until now the app had two halves of this and neither was the whole thing. 🧽 Clean repaints exactly the box you draw and leaves every pixel outside it byte-identical, but its instruction was frozen on watermark reconstruction. ✦ Edit takes any instruction but re-renders the whole image, drifting outside the part you cared about. ✦ Repair is the first lane with both: open an image, press ✦ Repair in the action bar, draw the zone, type what should be there ("remove the necklace"), and only that zone is repainted — the rest comes back to the byte. It stamps no watermark verdict, refuses an empty description rather than guessing, and preserves your original before writing anything, so a failed repair costs you nothing. (Asked for independently by mr.arrow and .samexit on Discord.)',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-17-canvas-bulk-undeploy',
+    date: '2026-08-17',
+    title: 'Undeploy a pile of LoRAs in one go',
+    blurb:
+      'Taking LoRAs back out of ComfyUI was a one-at-a-time errand buried in a checkpoint popover, and nothing anywhere told you how many were deployed. ⏏ Undeploy… at the top of the Canvas now opens the whole list — every LoRA the app has put into ComfyUI, across all your datasets and families, grouped by dataset. Tick what goes, press once, done; Select all is there for the clear-out. Only what the app deployed is listed, so a LoRA you downloaded into the same folder is never shown and never touched. Your training saves are kept — anything you undeploy can be deployed again from its checkpoint — and the removed copies go to the trash. The result is reported in three parts rather than a flat "done": removed, already gone, and refused (each one named).',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-17-caption-draw-from-a-bank',
+    date: '2026-08-17',
+    title: 'Draw a test prompt from a bank, not just a dataset',
+    blurb:
+      'The 🎲 Caption shortcut — the one that fills a test prompt with a real caption instead of something you invent — could only read datasets. But a bank is captioned by the 🏷️ Caption pass long before anything is promoted, so the biggest pile of real captions on your machine was the one it could not reach. The picker now lists your banks alongside your datasets, in their own section (a bank and the dataset it promotes into often share a name, so they are never mixed into one list). Your existing locked choice is untouched.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-08-16-bank-crop-and-upscale',
+    date: '2026-08-16',
+    title: 'Crop and upscale without leaving the Bank',
+    blurb:
+      'Reframing or upscaling a shot used to mean taking it out of the Bank: promote it into a dataset, edit it there, export the result into a NEW bank, and start curating all over again. Both now happen in the Bank itself. ✂ Crop is in ▶ Review — press C, drag the box, done; it decides nothing, so you can frame an image and then judge it. Nothing is resampled, unlike a dataset crop: a Bank sits upstream of the training resolution, so the cut keeps its pixels and the dataset still decides the size when it imports. ✨ Upscale & improve is a proper pass on the new ✂ Edits panel, with a scope, a progress bar and ⏹ Stop, running on Klein or SeedVR2. Your own files are never touched: both edits land in a copy the app keeps, ↩ Revert throws it away, and every measurement taken from the old pixels is cleared so the analysis passes re-read the image you are actually keeping. (Asked for by nofaceman on Discord, backed by mr.arrow.)',
+    to: '/bank',
+  },
+  {
     id: '2026-08-16-pwa-icon',
     date: '2026-08-16',
     title: 'Installing the app now gives it a real icon',
