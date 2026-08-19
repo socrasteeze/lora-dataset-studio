@@ -139,3 +139,16 @@ test('the overview has an explicit unavailable state before bank data arrives', 
   assert.match(overview, /Overview unavailable — waiting for bank data/)
   assert.match(overview, /'Total unavailable'/)
 })
+
+test('the header stats and actions sit in even grids, without idle ellipses', () => {
+  const ws = readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8')
+  assert.match(ws, /grid grid-cols-3 gap-2 border-t border-border pt-2 text-sm/)
+  assert.match(ws, /className="col-span-3"/)
+  assert.match(ws, /HEADER_BTN_PRIMARY/)
+  assert.match(ws, /🚀 Launch all/)
+  assert.match(ws, /⬆ Promote/)
+  assert.match(ws, /📦 Move folder/)
+  assert.doesNotMatch(ws, /🚀 Launch all…/)
+  assert.doesNotMatch(ws, /⬆ Promote…/)
+  assert.doesNotMatch(ws, /📦 Move folder…/)
+})

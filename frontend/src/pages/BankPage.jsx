@@ -101,7 +101,7 @@ function BankPreviewStrip({ bank, onOpen }) {
     <div className="relative grid grid-cols-5 gap-1">
       {previewSlots(bank.preview_ids).map((id, i) => (
         <div key={id ?? `empty-${i}`}
-          className="aspect-square overflow-hidden rounded border border-border bg-surface-raised">
+          className="aspect-[3/4] overflow-hidden rounded border border-border bg-surface-raised">
           {id != null && (
             <button type="button" onClick={onOpen} tabIndex={-1} aria-hidden="true"
               className="block h-full w-full">
@@ -620,13 +620,6 @@ export default function BankPage() {
             place someone with a folder of rushes would ever have looked. */}
         <BankLaneTabs className="w-full sm:ml-auto sm:w-auto" />
       </header>
-      <p className="text-sm text-content-muted max-w-3xl">
-        Point the app at a big unsorted folder (a Telegram export, a scrape dump…) and triage it
-        into dataset-ready selections: a quality pass flags blur/noise/flat/small shots and groups
-        near-duplicates, the face pass sorts the dump by person — then you promote the keepers
-        into a dataset. No pass ever modifies your files; the one thing that adds to the folder
-        is a scrape you send to this bank yourself.
-      </p>
 
       <form onSubmit={create}
         className="space-y-3 rounded-lg border border-border bg-surface p-4">
@@ -639,7 +632,7 @@ export default function BankPage() {
               className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content disabled:opacity-50" />
           </div>
           <div className="grow-[3] min-w-64">
-            <FolderPickerField id="bank-folder" label="Folder on this computer"
+            <FolderPickerField id="bank-folder" label="Folder"
               value={folder} onChange={setFolder} required
               placeholder="C:\path\to\unsorted-images (subfolders included)" />
           </div>
@@ -852,7 +845,7 @@ export default function BankPage() {
                   <button type="button" onClick={() => setDialogScope({ kind: 'bank', bankId: b.id })} disabled={b.total === 0}
                     title="Run Launch all now, or add this bank to the queue"
                     className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-content-muted hover:text-content hover:bg-surface-raised disabled:opacity-50">
-                    Launch all…
+                    Launch all
                   </button>
                 )}
               </div>

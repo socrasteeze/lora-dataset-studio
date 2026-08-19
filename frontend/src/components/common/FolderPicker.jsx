@@ -16,15 +16,13 @@ export async function pickNativeFolder(initial) {
   }
 }
 
-/** Read-only in-app folder browser (drives → subfolders), the fallback when the
- * server has no native dialog — used from the LAN/tablet or a headless Linux box.
+/** Read-only in-app folder browser (drives → subfolders).
  * Nothing is written; only directories are listed.
  *
  * `onPick(path)` MUST answer {ok:true} or {ok:false, error} (or throw). It used
  * to be fired unawaited and followed by an unconditional onClose(), so a refused
  * folder import ("no images in that folder", another dataset job running) closed
- * the browser and threw away both the chosen path and the position in the tree —
- * on a machine with no native dialog, walking back down there is the whole cost.
+ * the browser and threw away both the chosen path and the position in the tree.
  * A host that genuinely cannot fail says so explicitly (see FolderPickerField):
  * silence is not a success. */
 export function FolderBrowserModal({ initial, onPick, onClose }) {
@@ -96,10 +94,6 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
       <div className="flex w-full max-w-lg flex-col rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl"
         style={{ maxHeight: '80vh' }}>
         <h2 className="text-base font-bold text-content">📁 Choose a folder</h2>
-        <p className="mt-1 text-xs text-content-muted">
-          Folders on the machine running the app. Nothing is opened or modified —
-          you're only picking a location.
-        </p>
 
         {/* An address bar, for the same reason the native dialog needed one: the
             path is very often already on the clipboard (someone sent it, or it
@@ -176,31 +170,13 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
   )
 }
 
-/** A path text field with a Browse… button. The field stays editable (pasting a
- * path still works); Browse tries the server's native dialog first and, if the
- * server has no desktop, opens the in-app folder browser. Reused by the Image
- * bank and dataset folder-import. */
+/** A path text field with a Browse button. The field stays editable (pasting a
+ * path still works); Browse opens the in-app folder browser on the machine
+ * running the app. Reused by the Image bank, the video bank, and Move folder. */
 export default function FolderPickerField({
   id, label, value, onChange, placeholder, required, hint,
 }) {
-  const [busy, setBusy] = useState(false)
   const [browsing, setBrowsing] = useState(false)
-
-  const browse = async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const r = await pickNativeFolder(value)
-      if (r.available) {
-        if (r.path) onChange(r.path)
-        // r.cancelled → the user backed out of the native dialog; do nothing.
-      } else {
-        setBrowsing(true)  // no native dialog here → the in-app browser
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div>
@@ -211,9 +187,9 @@ export default function FolderPickerField({
         <input id={id} value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder} required={required}
           className="w-full min-w-0 grow rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content font-mono" />
-        <button type="button" onClick={browse} disabled={busy}
-          className="shrink-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-50">
-          {busy ? 'Opening…' : '📂 Browse…'}
+        <button type="button" onClick={() => setBrowsing(true)}
+          className="shrink-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface">
+          📂 Browse
         </button>
       </div>
       {hint && <p className="mt-1 text-xs text-content-muted">{hint}</p>}

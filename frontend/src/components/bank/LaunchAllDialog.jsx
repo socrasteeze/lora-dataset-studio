@@ -23,8 +23,10 @@ import { flagCandidateLabel, launchRejectNote } from './autoRejectReadiness.js'
  * pass whose tool is actually ready are pre-checked; captioning stays OFF by
  * default — it's the slowest GPU pass and a "clean my bank" run rarely needs a
  * description on every shot, so we make the user opt in rather than silently add
- * hours to an overnight run. Auto-reject defaults to the same flags as the
- * standalone button (blurry + flat) plus duplicate "keep best".
+ * hours to an overnight run. Auto-reject defaults to duplicate "keep best"
+ * only; the quality flags (blurry, flat, …) stay off so an overnight run does
+ * not bin shots the standalone sheet would still let you judge. That sheet
+ * still starts on blurry + flat, because it has no duplicates control.
  */
 const QUALITY_FLAGS = [
   { key: 'blur', label: '🌫 Blurry' },
@@ -65,7 +67,7 @@ export default function LaunchAllDialog({
     [gates])
 
   const [steps, setSteps] = useState(() => defaultChecked(STEPS, ready))
-  const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
+  const [rejectFlags, setRejectFlags] = useState(() => new Set())
   const [resolveDups, setResolveDups] = useState(true)
   // Only the multi-bank scopes narrow per bank; a single bank is queued through
   // enqueue(), which has no such notion. Offering the choice there would be a
@@ -169,14 +171,7 @@ export default function LaunchAllDialog({
       onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss() }}>
       <div ref={cardRef}
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-content">🚀 Launch all</h2>
-          <p className="mt-1 text-sm text-content-muted">
-            Chain the whole triage in one go — start it, walk away, come back to a
-            cleaned bank. Each pass runs in order; you can Stop it any time, and a
-            pass whose tool isn't installed is skipped (never fails the run).
-          </p>
-        </div>
+        <h2 className="text-base font-bold text-content">🚀 Launch all</h2>
 
         {blockedSteps.length > 0 && (
           <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
@@ -214,14 +209,13 @@ export default function LaunchAllDialog({
                       {gates[s.key].warn}
                     </span>
                   ) : null}
-                  <span className="block text-xs text-content-subtle">{s.desc}</span>
+                  {s.desc ? (
+                    <span className="block text-xs text-content-subtle">{s.desc}</span>
+                  ) : null}
                 </span>
               </label>
               {s.key === 'auto_reject' && autoRejectOn && (
                 <div className="ml-6 mt-1.5 space-y-2 rounded-md border border-border bg-surface p-2">
-                  <p className="text-xs text-content-muted">
-                    Reject the still-undecided images with these flags (manual ✓/✕ are never touched):
-                  </p>
                   {/* The count is what the flag would catch RIGHT NOW — undecided
                       images only, the same pile the pass touches. It is not the
                       outcome: 🔎 Scan runs before auto-reject in this funnel, so
@@ -247,7 +241,7 @@ export default function LaunchAllDialog({
                   <label className="flex items-center gap-1.5 text-sm text-content">
                     <input type="checkbox" checked={resolveDups}
                       onChange={(e) => setResolveDups(e.target.checked)} />
-                    ≈ Duplicates → keep the best, reject the rest
+                    ≈ Duplicates — keep best
                   </label>
                 </div>
               )}
@@ -262,12 +256,7 @@ export default function LaunchAllDialog({
               <input type="checkbox" checked={skipCompleted} className="mt-0.5"
                 onChange={(e) => setSkipCompleted(e.target.checked)} />
               <span>
-                Skip passes a bank has already had
-                <span className="block text-xs text-content-subtle">
-                  Each bank is queued only with the passes it still needs; one
-                  with nothing left is skipped by name. Untick for a deliberate
-                  re-run.
-                </span>
+                Skip finished passes
               </span>
             </label>
           )}

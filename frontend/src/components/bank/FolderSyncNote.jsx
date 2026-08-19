@@ -31,7 +31,7 @@ export default function FolderSyncNote({ sync, onRelocate, onForget }) {
         {note.canRelocate && onRelocate && (
           <button type="button" onClick={onRelocate}
             className="mt-1 rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
-            📦 Move folder…
+            📦 Move folder
           </button>
         )}
         {note.canForget && onForget && (

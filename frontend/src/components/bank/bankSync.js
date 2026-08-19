@@ -152,5 +152,5 @@ export function forgetMissingConfirm(missing) {
   return `Remove ${n} missing image(s) from this bank?\n\n`
     + 'Their keep/reject decisions and scores are lost with the rows. '
     + 'Nothing on disk is touched — those files are already gone. '
-    + 'If the folder was only moved, use Move folder… instead: that keeps everything.'
+    + 'If the folder was only moved, use Move folder instead: that keeps everything.'
 }

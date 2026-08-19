@@ -64,8 +64,7 @@ export const BANK_PASSES = {
     label: '🔎 Scan quality',
     verb: '🔎 Scan',
     endpoint: 'scan',
-    what: 'Measures sharpness, noise, flatness, size and effective detail, hashes '
-      + 'every image, then groups the exact duplicates. CPU only.',
+    what: 'Sharpness, noise, flatness, size, detail and exact duplicates. CPU.',
     scopes: true,
     selection: true,
     redo: {
@@ -97,8 +96,7 @@ export const BANK_PASSES = {
     label: '✨ Score',
     verb: '✨ Score',
     endpoint: 'score',
-    what: 'Rates every image for aesthetics (1–10), flags NSFW and groups the bank '
-      + 'by visual style — one CLIP pass, resumed from its cache.',
+    what: 'Aesthetics, NSFW and style groups from one CLIP pass.',
     scopes: PARTITION_REASON('The style grouping'),
     selection: PARTITION_REASON('The style grouping'),
     fixedScopeLine: 'The whole bank except the bin — every kept and undecided image.',
@@ -128,8 +126,7 @@ export const BANK_PASSES = {
     label: '🧠 Build semantic index',
     verb: '🧠 Build semantic index',
     endpoint: 'semantic-index',
-    what: 'Builds or resumes the selected semantic engine cache for search, '
-      + 'similarity, diversity, balanced sampling and crops/variants.',
+    what: 'Builds the selected engine cache for search and crops.',
     scopes: SEMANTIC_INDEX_REASON,
     selection: SEMANTIC_INDEX_REASON,
     fixedScopeLine: 'Every image in the Bank — one shared semantic space.',
@@ -160,8 +157,7 @@ export const BANK_PASSES = {
     label: '👥 Group by person',
     verb: '👥 Group',
     endpoint: 'faces',
-    what: 'Embeds the dominant face of every image and clusters the bank by person '
-      + '— no reference photo needed.',
+    what: 'Clusters the bank by person — no reference photo.',
     scopes: PARTITION_REASON('A person clustering'),
     selection: PARTITION_REASON('A person clustering'),
     fixedScopeLine: 'The whole bank except the bin, minus the folders you declared '
@@ -185,9 +181,7 @@ export const BANK_PASSES = {
     label: '⤢ Measure head angles',
     verb: '⤢ Measure',
     endpoint: 'angles',
-    what: 'Re-runs the face detector on images that were face-scanned by a build '
-      + 'that computed the head angle and threw it away. Writes the angle and '
-      + 'nothing else.',
+    what: 'Writes the head angle on images a previous build scanned without keeping it.',
     scopes: true,
     selection: true,
     redo: null,
@@ -214,8 +208,7 @@ export const BANK_PASSES = {
     label: '🚩 Find watermarks',
     verb: '🚩 Scan',
     endpoint: 'watermark',
-    what: 'Looks for overlaid watermarks and logos, and locates them so the '
-      + 'cleaning levels below can crop or repaint them.',
+    what: 'Finds watermarks and logos so crop or repaint can use them.',
     scopes: true,
     selection: true,
     redo: {
@@ -255,8 +248,7 @@ export const BANK_PASSES = {
     label: '✂ Auto-crop watermarks',
     verb: '✂ Crop',
     endpoint: 'watermark/crop',
-    what: 'Cuts off the border strip holding the mark, on the flagged images whose '
-      + 'mark sits in a border. CPU only — no model, no GPU, and no invented pixel.',
+    what: 'Crops the border holding the mark. CPU, no invented pixels.',
     scopes: true,
     selection: true,
     redo: null,
@@ -289,9 +281,7 @@ export const BANK_PASSES = {
     label: '🧽 Repaint watermarks',
     verb: '🧽 Repaint',
     endpoint: 'watermark/inpaint',
-    what: 'Repaints the marks a crop cannot remove, on every image still flagged. '
-      + 'LaMa is fast and invents little; Klein is slower and also clears a mark '
-      + 'sitting ON the subject.',
+    what: 'Repaints marks a crop cannot remove. LaMa is fast; Klein clears marks on the subject.',
     scopes: true,
     selection: true,
     redo: null,
@@ -345,10 +335,7 @@ export const BANK_PASSES = {
     label: '✨ Upscale & improve',
     verb: '✨ Improve',
     endpoint: 'improve',
-    what: 'Re-renders each image at a higher resolution, in the Bank itself. Klein '
-      + 'rewrites detail from a prompt (sharper, and skin and colour can shift); '
-      + 'SeedVR2 resolves detail and leaves the original look alone. GPU, one '
-      + 'ComfyUI round-trip per image.',
+    what: 'Upscales in the bank. Klein rewrites; SeedVR2 keeps the look.',
     scopes: true,
     selection: true,
     // No "do it again" lane on purpose: an improved image LEAVES the pool, and
@@ -394,8 +381,7 @@ export const BANK_PASSES = {
     label: '📐 Classify framing',
     verb: '📐 Classify',
     endpoint: 'framing',
-    what: 'Tags each shot face / bust / body / back with the vision model, feeding '
-      + 'the 📐 filter chips and the coverage advice.',
+    what: 'Tags face / bust / body / back.',
     scopes: true,
     selection: true,
     redo: {
@@ -421,9 +407,7 @@ export const BANK_PASSES = {
     label: '🎨 Classify medium',
     verb: '🎨 Classify',
     endpoint: 'medium',
-    what: 'Sorts scored images into photograph / anime / 3D render / illustration '
-      + '— or an honest “unsure” — by reading the embeddings ✨ Score already '
-      + 'cached. No image is looked at again and the GPU stays free.',
+    what: 'Photograph / anime / 3D / illustration from Score’s embeddings. No GPU.',
     scopes: true,
     selection: true,
     redo: {
@@ -464,8 +448,7 @@ export const BANK_PASSES = {
     label: '✂ Find crops & variants',
     verb: '✂ Find crops & variants',
     endpoint: 'semantic-dedup',
-    what: 'Groups crops and re-compressed variants of the SAME shot that the exact '
-      + 'hash misses, from this Bank’s selected semantic engine. No GPU after the index exists.',
+    what: 'Same-shot crops the hash missed. No GPU after the index exists.',
     scopes: PARTITION_REASON('The “same shot” grouping'),
     selection: PARTITION_REASON('The “same shot” grouping'),
     fixedScopeLine: 'Every image the selected semantic engine has indexed — rejected '
@@ -490,8 +473,7 @@ export const BANK_PASSES = {
     label: '🏷️ Caption',
     verb: '🏷️ Caption',
     endpoint: 'caption',
-    what: 'Describes each image so it becomes searchable, and the description rides '
-      + 'along when you promote it to a dataset.',
+    what: 'Writes a searchable description that rides to the dataset.',
     scopes: true,
     selection: true,
     // Caption's "redo" is 🔄 Re-caption: a destructive second launch with its own
@@ -527,8 +509,7 @@ export function bankPass(passId, { semanticEngine = 'clip' } = {}) {
       ...spec,
       label: `🧠 Build ${label} semantic index`,
       verb: `🧠 Build ${label} semantic index`,
-      what: `Builds or resumes the whole-Bank ${label} cache for search, similarity, `
-        + 'diversity, balanced sampling and crops/variants.',
+      what: `Builds the ${label} cache for search and crops.`,
       settings: [
         { name: `${label} — this Bank’s selected semantic engine` },
         ...spec.settings.slice(1),
@@ -537,8 +518,7 @@ export function bankPass(passId, { semanticEngine = 'clip' } = {}) {
   }
   return {
     ...spec,
-    what: `Groups crops and re-compressed variants of the SAME shot that the exact `
-      + `hash misses, from the ${label} semantic index. No GPU after the index exists.`,
+    what: `Same-shot crops from the ${label} semantic index.`,
     fixedScopeLine: `Every image ${label} has indexed — rejected ones included. `
       + 'That pool lives in the engine cache, so this window cannot put a number '
       + 'on it without inventing one.',

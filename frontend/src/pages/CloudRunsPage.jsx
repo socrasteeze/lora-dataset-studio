@@ -913,10 +913,6 @@ export default function CloudRunsPage() {
             <HelpBadge topic="page-cloud" />
           </h1>
         </div>
-        <p className="m-0 text-content-muted text-sm">
-          Every local training run in one place — watch progress, stop a run,
-          download a finished LoRA, and see the exact settings each launch used.
-        </p>
       </header>
 
       {/* Fork is local-only: remote rental prompts stay off. */}

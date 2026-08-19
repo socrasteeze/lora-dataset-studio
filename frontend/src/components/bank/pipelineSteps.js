@@ -30,7 +30,6 @@ export const STEP_COPY = {
   },
   auto_reject: {
     label: '🧹 Auto-reject flagged',
-    desc: 'Reject the images carrying the flags below — reversible, nothing deleted.',
   },
   score: {
     label: '✨ Score', needs: 'Bank scoring extra',
@@ -41,31 +40,31 @@ export const STEP_COPY = {
   // has to know the words, which is the whole point of one registry.
   semantic_index: {
     label: '🧠 Build SigLIP 2 semantic index', needs: 'SigLIP 2 Quality tool',
-    desc: 'Build or resume the whole-bank SigLIP 2 cache the semantic features read. Existing CLIP data is kept.',
+    desc: 'SigLIP 2 cache. CLIP data is kept.',
   },
   semantic_dedup: {
     label: '✂ Find crops & variants', needs: 'Semantic index',
-    desc: 'Group crops/variants of the same shot from the bank’s semantic index — no extra GPU (needs that index first).',
+    desc: 'Crops/variants of the same shot. Needs the index first.',
   },
   watermark: {
     label: '🚩 Find watermarks', needs: 'Vision model',
-    desc: 'Detect overlaid watermarks/logos with the Qwen3-VL detector (GPU).',
+    desc: 'GPU · watermarks and logos.',
   },
   faces: {
     label: '👥 Group by person', needs: 'Quality tools',
-    desc: 'Face embeddings + person clusters, no reference photo (CPU/GPU).',
+    desc: 'Person clusters, no reference photo.',
   },
   framing: {
     label: '📐 Classify framing', needs: 'Vision model',
-    desc: 'Tag each shot face/bust/body/back — powers the framing filter & coverage advice (GPU).',
+    desc: 'GPU · face / bust / body / back.',
   },
   tags: {
     label: '🔖 Tags', needs: 'Image tagging (WD14)',
-    desc: 'Label what is in each shot (hair, clothing, setting) so the bank can be filtered by it — local, CPU-friendly, never writes captions. Runs here only.',
+    desc: 'CPU · never writes captions. Runs here only.',
   },
   caption: {
     label: '🏷️ Caption', needs: 'Caption engine',
-    desc: 'Describe every image so it becomes searchable and rides to the dataset (GPU).',
+    desc: 'GPU · searchable, rides to the dataset.',
     // The only step that does NOT start ticked. It is the slowest by a wide
     // margin and the one people most often want to run separately, so an
     // overnight Launch-all should not quietly commit to it.

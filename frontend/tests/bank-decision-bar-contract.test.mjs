@@ -66,6 +66,19 @@ test('the selection actions exist in exactly one place — the bar, not inline',
   assert.doesNotMatch(workspace, />✓ Keep<\/button>/, 'no inline ✓ Keep button should remain in BankWorkspace.jsx')
 })
 
+test('Keep and Reject share one even row, Skip and CLR the next', () => {
+  const grids = [...bar.matchAll(/className="grid grid-cols-2 gap-1\.5"/g)]
+  assert.equal(grids.length, 2, 'two even two-column rows: Keep/Reject, then Skip/CLR')
+  assert.match(bar, />\s*✓ Keep\s*</)
+  assert.match(bar, />\s*✕ Reject\s*</)
+  assert.match(bar, />\s*Skip\s*</)
+  assert.match(bar, />\s*CLR\s*</)
+  assert.doesNotMatch(bar, />\s*↺ Undecided\s*</)
+  assert.doesNotMatch(bar, />\s*Undecided\s*</)
+  assert.match(bar, /aria-label="Clear selection"/)
+  assert.match(bar, /title="Set these images back to undecided"/)
+})
+
 test('the undo offer moved into the bar and out of the page header', () => {
   assert.doesNotMatch(workspace, /<UndoBar\b/)
   assert.match(bar, /undoOffer/)
