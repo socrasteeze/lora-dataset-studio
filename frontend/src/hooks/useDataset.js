@@ -87,6 +87,12 @@ export function faceScoringErrorMessage(scoringError) {
   if (kind === 'busy') {
     return 'Face scoring is already running. Wait for the current image to finish, then try again.';
   }
+  // Not a failure: the fast lane was asked for and the card is taken. Saying
+  // "Face scoring failed" here would send someone hunting a bug that is really
+  // a training holding the GPU.
+  if (kind === 'gpu_busy') return detail
+    ? `Face scoring is set to use the GPU, and it is busy: ${detail}`
+    : 'Face scoring is set to use the GPU, and it is busy right now.';
   if (kind === 'ref_unusable') return detail
     ? `The reference photo is not usable for scoring: ${detail}`
     : 'The reference photo is not usable for scoring.';
@@ -929,9 +935,12 @@ export function useDataset() {
      The nonce bump matters more here than almost anywhere: the file is
      overwritten IN PLACE, so the URL does not move and the browser would keep
      showing the pre-repair pixels. (mr.arrow and .samexit, Discord.) */
-  const repairImageRegion = useCallback(async (imageId, prompt, boxes) => {
+  const repairImageRegion = useCallback(async (imageId, prompt, boxes, mask = null) => {
+    /* `mask` is a painted PNG data URL and `boxes` a list of rectangles — the
+       dialog sends ONE of the two, and the server picks its geometry from
+       which one arrived. */
     const d = await postJson(`/api/dataset/${currentId}/image/${imageId}/repair`,
-      { prompt, boxes });
+      { prompt, boxes, mask });
     if (d.ok) {
       setNonces((m) => ({ ...m, [imageId]: (m[imageId] || 0) + 1 }));
     }

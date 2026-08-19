@@ -135,11 +135,30 @@ rem The browser is opened by run.py itself, at the REAL bound host:port (which
 rem may be a LAN/Tailscale address, not 127.0.0.1) and only once the server is
 rem actually accepting connections. Opening a hardcoded 127.0.0.1 here fired
 rem before the server bound and greeted LAN/tailnet setups with "cannot connect".
-rem Set LDS_NO_BROWSER=1 to disable the auto-open.
+rem Set LDS_NO_BROWSER=1 to disable the auto-open. Upstream additionally forces
+rem it ON here (LDS_OPEN_BROWSER=1); this fork does not, so Settings / Server &
+rem access stays the switch that decides.
 rem
-rem Supervisor loop: Settings / Update & restart exit with code 3 so we relaunch
-rem in THIS console (same process tree, Ctrl+C keeps working). Bare python /
-rem IDE / portable launcher never set LDS_SUPERVISOR and keep the old path.
+rem Launched through the supervisor, not directly: a native crash (an access
+rem violation in a C extension, or an antivirus hook faulting inside one) kills
+rem the interpreter outright, and the app used to stay down until someone
+rem double-clicked this file again. The supervisor brings it back, says so, and
+rem gives up after a few deaths in a row so a backend broken at boot cannot
+rem become an endless respawn loop. LDS_SUPERVISE=0 opts out.
+rem
+rem The opt-out path keeps this fork's OWN loop: Settings / Update & restart
+rem exits with code 3 and we relaunch in THIS console (same process tree, so
+rem Ctrl+C keeps working). Under the supervisor that loop is not needed --
+rem supervise.py sets LDS_RESTART_MODE=supervisor in the child, which updater.py
+rem tests BEFORE LDS_SUPERVISOR, so the same restart ends in exit 75 and the
+rem supervisor owns the relaunch. Two relaunchers would race for the port.
+if "%LDS_SUPERVISE%"=="0" goto unsupervised
+"%VPY%" backend\supervise.py
+goto :eof
+
+:unsupervised
+rem Bare python / IDE / portable launcher never set LDS_SUPERVISOR either, and
+rem keep the detached-helper path.
 set "LDS_SUPERVISOR=1"
 :run
 "%VPY%" backend\run.py

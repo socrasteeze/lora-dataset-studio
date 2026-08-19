@@ -2149,6 +2149,23 @@ a watermark. **✦ Edit**, the other lane, takes any instruction but re-renders 
 *"remove the necklace"* — and press **✦ Repair** again. Only that zone is
 repainted. Everything outside it comes back exactly as it was, to the byte.
 
+**Two shapes, one button.** Inside that dialog you choose how to point at the
+area:
+
+- **▭ Box** — drag a rectangle. The app crops a square around it and works on
+  that crop, so it is quick and its memory use does not depend on how large the
+  photo is. Right for a mark in a corner.
+- **🖌 Brush** — paint over the thing itself, with a size slider, an eraser and
+  Clear. The *whole* picture goes to the model together with what you painted,
+  so it reconstructs while seeing the face around the necklace instead of only a
+  square of skin. Right for jewelry, glasses, straps — anything a rectangle
+  would only enclose by taking a lot of its surroundings with it. Very large
+  photos are scaled down for this pass; the result is composited back at full
+  size, and pixels you did not paint are copied from your file either way.
+
+Both work under a finger, so this is usable from a phone. The brush was
+contributed by JacobArrow on GitHub.
+
 The 🚩 button next to it opens the same editor from the other intention — you
 spotted a watermark the scan missed. Same screen, same zones; what differs is
 whether you press 🧽 Clean or ✦ Repair once you are there.
@@ -2645,7 +2662,32 @@ can judge; the three hundred shots inside it are.
 
 1. **Create it** — name it, point it at the folder. Every `.mp4`, `.mov`, `.mkv`,
    `.webm` and `.avi` under it (subfolders included) is inventoried in place.
-   Nothing is copied and the folder is never modified.
+   Nothing is copied, and **no pass ever modifies your files** — scanning,
+   cutting and building all write elsewhere. The one thing that adds to that
+   folder is a scrape you send to this bank yourself (next step).
+1bis. **🕸 Scrape the web into a video bank** — you don't need a folder of rushes
+   you assembled by hand. Unfold **🕸 Scrape the web into a video bank** on the
+   video bank list, choose a destination, then scan a URL and pick clips exactly
+   as you would pick images. The scanner has always listed videos — RedGifs,
+   Erome, Picazor, TikTok, X, Civitai and the gallery sources all return them —
+   and the picker now shows them, with a ▶ badge and their length. They are
+   downloaded, inventoried on the spot, and cut into shots when you run the
+   passes above.
+
+   Two things are worth knowing:
+
+   - **Nothing is judged on the way in**, exactly like the image bank. Length,
+     motion, sharpness and near-duplicates are verdicts the **📊 Measure
+     quality** pass produces, with thresholds you move. A clip refused at
+     download time is one you could never have reviewed.
+   - **Any bank can receive them, and the picker says where they will land.**
+     A **new bank** gets a folder of its own under the app's own storage. **Add
+     to an existing bank** offers every bank you have, including one you pointed
+     at your own footage — the clips are simply added to the folder that bank
+     follows, and the picker prints that folder's path before you start.
+     Choosing the bank is the whole confirmation; there is no second checkbox.
+     The one destination that is refused is a bank sitting on a *dataset's* own
+     folder, where new files would end up inside training material.
 2. **▶ Run everything** chains the three passes in the only order that works:
    **scan** reads what each file is (length, size, frame rate), **find shots**
    cuts it at its shot boundaries, and **make thumbnails** grabs one frame from
@@ -2726,6 +2768,196 @@ Three states are kept apart here, and it matters:
   Measure again with re-measure** to fill them in; the pass otherwise skips
   everything it has already done.
 
+### 🔳 Safe zone — the bands and the text you cannot see at thumbnail size
+
+Two things eat a frame without ever showing up in a 90 px grid, and both are
+perfectly consistent across every clip that came out of the same file — which is
+exactly what a LoRA learns first:
+
+- **Bands.** Letterbox, pillarbox, a vertical video somebody padded into 16:9, a
+  4:3 broadcast scanned into a wide container. They survive a training crop.
+- **Burned-in text.** Subtitles, chyrons, lower thirds, a text watermark. A model
+  trained on subtitled footage does not learn the words — it learns that the
+  bottom sixth of a picture is a place where letters live, and then it draws
+  letter-shaped gibberish there forever.
+
+**🔳 Safe zone** decodes three frames of each shot and measures both, then
+works out the rectangle that excludes them — the *safe zone* — and how much of
+the frame that rectangle keeps. Three cuts read those numbers: **Letterbox
+share**, **Burned-in text share** and **Usable frame floor**. Like every cut in
+this panel they are empty by default and applied at read time, so moving one
+re-sorts the bank with nothing rescanned.
+
+**Only what holds still across the three frames counts.** That is the whole
+discrimination and it goes both ways: a band has to be on all three frames to be
+called structural, so a fade-out never invents one; and a text zone needs a
+partner in another frame, so a subtitle, a chyron and a station logo are caught
+while a shop sign in a pan and a newspaper someone holds up for a second are left
+alone as scene content.
+
+**Text in the MIDDLE of a frame is the case worth understanding.** It is small,
+so the text share barely moves — but there is no crop that removes it, so the
+usable frame collapses. That is what the third cut is for, and its answer to "can
+I save this clip by cropping" is an honest no.
+
+**Reading text needs one small extra**, *Burned-in text* in Setup (RapidOCR, CPU
+only, no GPU, and its weights ride inside the package so it works offline).
+Without it the pass still runs and still measures the bands — it reports **bands
+only** and stores no text reading at all, so the two text cuts flag nothing
+rather than quietly clearing every shot. This is the only pass in the app that
+works at half strength instead of refusing; the button stays enabled and says so
+in its tooltip.
+
+It is its own button rather than part of another pass, because unlike ✂ Duplicates
+and 🎨 Look it consumes nothing: a shot can be measured the moment its file has
+been scanned. It decodes three frames per shot and reads them on the CPU, so a
+big bank takes real time — and it never touches the GPU, so it can run while a
+training is going.
+
+### 🩻 Defects — what a re-encode left behind
+
+The passes above measure your *footage*: how it moves, how it is lit, how sharp
+it is. This one measures the *file* — what happened to it between the camera and
+your disk. Material that was uploaded, transcoded and re-uploaded a few times
+carries damage that no thumbnail shows and that sits identically on every frame
+of every shot from that file, which is precisely the kind of thing a LoRA learns
+first and fastest.
+
+**🩻 Defects** hands each source file to ffmpeg once and reads three things back:
+
+- **Duplicated frames.** Frames that are near-copies of the one before them. This
+  is what 24 fps material uploaded as 30 fps looks like — one frame in five is a
+  repeat — and it is *not* the frozen-stretch flag: that one says nothing moved,
+  this one says the same picture was delivered twice. A shot can be full of
+  movement and full of duplicates at the same time.
+- **Compression blocks.** The 8×8 macroblock grid showing through a hard squeeze.
+  Nothing legitimate produces one: no camera, no lens, no lighting.
+- **Blurred edges, at full size.** Edges that stay wide even in the shot's
+  sharpest moments.
+
+**That last one is the reason this pass exists**, because it is the one thing
+nothing else in the app can see. The **Sharpness floor** above reads a Laplacian
+computed on a 160-pixel-wide analysis copy — deliberately, since that measurement
+over a full frame costs more than decoding it — and at 160 pixels, footage
+upscaled from 480p and the genuine 1080p **are the same picture**. Measured on
+three files carrying identical footage, the sharpness score read 354.35, 353.69
+and 353.72 for native, 480p-upscaled and 320p-upscaled. Indistinguishable. This
+pass reads the edges at full resolution instead and separates them.
+
+It reads the *sharpest* tenth of each shot rather than the blurriest, and that is
+on purpose: softness is sometimes a choice — a fast pan, a shallow depth of
+field, a deliberate rack focus — so asking "is it soft even at its sharpest" is
+the only form of the question that does not flag exactly the shots with the most
+interesting movement.
+
+Three cuts read the numbers: **Duplicated frames**, **Compression blocks** and
+**Blurred edges**. Empty by default like everything else here, and applied at
+read time, so moving one re-sorts the bank with nothing rescanned. **The block
+score deserves one warning the others do not:** its absolute value depends on
+what is in the frame nearly as much as on the damage — measured here, one scene
+from a good encode to a ruined one moved from 13 to 43, while four *different*
+scenes at one fixed quality spanned 1 to 25 000. Preview a value, look at what it
+caught, move it. Do not carry a number over from somebody else's bank.
+
+**Each file card now also shows how hard the file was squeezed** — its codec
+profile, its bitrate, and *bits per pixel per frame*, which is the comparable one
+(5 Mb/s is generous at 480p and starving at 4K). Roughly, under 0.05 is visibly
+damaged and over 0.15 is comfortable. It is shown and never cut on, because it
+only *predicts* the damage that the block score actually *measures* — and some
+containers, MKV and WebM in particular, carry no bitrate at all, in which case
+the line simply says less rather than inventing a number.
+
+It is its own button, like 🔳 Safe zone and for the same reason: it consumes
+nothing, so there is no order to protect. Two things are worth knowing before you
+press it. It is the only reading pass that needs **ffmpeg** rather than the
+decode extra — the video extra installs it, and without it this one button is
+greyed with the reason in its tooltip while everything else keeps working. And it
+costs real time: roughly **nine seconds per minute of 1080p source**, on the CPU,
+never touching the GPU. A four-hour bank is a little over half an hour. Stopping
+is safe and a re-run picks up at the first file it had not reached.
+
+### 🤖 AI check — shots that may have been generated rather than filmed
+
+Every pass above measures something the camera did. This one asks whether there
+was a camera. A scrape in 2026 brings back generated clips mixed in with real
+footage, and they are invisible at thumbnail size — a clean, well-lit,
+well-framed synthetic clip passes the quality scan, the safe zone, the defect
+sweep and the look score without a mark on it. It is worth finding: the published
+curation work behind several open video models reports that even a small
+minority of synthetic material in a corpus — under a tenth of it — measurably
+degrades what a model trained on that corpus learns.
+
+**🤖 AI check** decodes two contiguous seconds from the middle of each shot and
+measures **how erratically the motion changes**. Not how much a shot moves — how
+much the *rate* of movement varies from instant to instant. Real footage is full
+of small irregularities: a hand shakes, a subject accelerates unevenly, light
+flickers, the sensor is noisy. Generated footage, on the evidence the method was
+built on, tends to be smoother than the world.
+
+The number is stored per shot and read by one cut in **🎚 Quality cuts**,
+**Motion irregularity floor** — the one threshold in the panel that works the
+other way round from the rest. **A LOW score is the suspicious one**, so this is
+a floor and raising it flags *more* shots; a shot below it wears a **May be
+AI-generated** chip in the grid like any other flag. Set it as a `_max` in your
+head and you will flag every handheld shot in the bank and clear every generated
+one.
+
+#### How much to trust it — read this before you use it
+
+Not much, and the pass is built around saying so.
+
+- **About three shots in four**, on material like yours. The SAFE Challenge
+  evaluated AI-video detectors *blind*, on footage the entrants had never seen:
+  the best system in the field scored **0.86** balanced accuracy on untouched
+  video and **0.74** once that video had been post-processed. Re-compression
+  alone moved AUC from 0.88 to 0.77. Anything scraped has been re-compressed by
+  definition, so 0.74–0.75 is the honest figure — not the high nineties a
+  detector's own paper reports on its own benchmark.
+- **It has never been measured against a 2025-or-later generator.** The method
+  was evaluated across forty subsets of 2023–24 output — ModelScope, Gen2, Pika,
+  LaVie, Sora, CogVideoX, OpenSora and a dozen more. Its whole thesis is that
+  *the generators of that moment* could not render second-order motion. That is
+  exactly the kind of claim that decays, and nothing here says anything about
+  Sora 2, Veo 3, Kling or Wan 2.5.
+- **It is worst on the cheapest fakes.** On one generator whose output is
+  incoherent and flickery, the reference implementation scores *below chance* —
+  chaotic generation reads as *more* real than clean generation. Heavily
+  stylised material and a hard cut inside the two-second window do the same
+  thing.
+
+So this is an **advisory** flag with a hedge built into its name. It ships with
+no default, nothing in the app rejects or deletes a shot because of it, and the
+chip says *may be*. Use it to decide what to look at, not what to throw away.
+
+#### The mechanics
+
+- Shots shorter than about **2.4 seconds** are not measured at all — the window
+  needs sixteen frames at 8 fps plus a margin at each end so a dissolve never
+  lands inside it. Those shots carry "too short" and no score, and they are
+  never flagged. Re-running will not change that; re-cutting them would.
+- **There is no value to type.** The method reports only rank metrics and its
+  reference implementation contains no threshold anywhere, so no published
+  number exists and nobody else's would transfer — the score's scale moves with
+  the encoder and with the frame count. Use **Preview** against your own bank,
+  look at what a value caught, move it.
+- It runs on the **CPU**, deliberately, at roughly **0.8 seconds per shot** —
+  about forty minutes for a three-thousand-shot bank. That is slower than the
+  card would be, and it is the trade that lets you check a bank *while a
+  training owns your GPU*. Stopping is safe; a re-run picks up where it left off.
+- It needs the same **✨ Score interpreter** the look score uses, and downloads
+  its encoder once on the first run.
+
+#### It is not the same claim the image bank makes
+
+The 🗃️ Bank already tells you whether a still is AI, and the two answers are
+**different in kind**, which is why they are worded differently. The image
+lane's `AI` verdict reads **metadata** — a generator's own prompt block inside
+the PNG, an A1111 parameter string, a C2PA mark — and that is *proof* when it is
+present. It is also absent from almost everything scraped, and its silence means
+"unknown", never "not AI". This pass reads **the pixels** and infers, so it is
+never proof and it is never silent. The image lane says *AI*; this one says *may
+be*. Neither is evidence for the other.
+
 ## Retouch a cut: trim, split, or draw a shot by hand
 
 Shot detection is good and it is not right. It cuts a slow dissolve a second
@@ -2768,6 +3000,82 @@ Re-detecting a file deletes the shots the detector drew and **never** the ones y
 cut by hand; those stay, and may overlap the fresh ones. And editing a shot that
 is already in a built dataset is allowed: the dataset stored its own copy of the
 bounds when it was encoded, so nothing already on disk changes.
+
+## Change how often a rush gets cut
+
+Shot detection does not find cuts. It scores every frame — *how likely is a
+transition here* — and the shot list is a **threshold** applied to that score
+afterwards. The number that was applied for you is 0.5, which comes from the
+detector's own paper, where it is never justified. It is a convention.
+
+That mattered because disagreeing with it used to cost a full pass over the
+file. It no longer does: the scores are kept next to the bank, so changing the
+threshold and re-cutting an entire folder happens with no decoding and no GPU at
+all. Unfold **🎬 Find shots — cut sensitivity** above the gallery.
+
+- **👁 Preview** counts what each threshold would actually leave you — on *your*
+  files, floor included — and says how each one differs from the value in force.
+  "4 shots" means nothing on its own; "8 fewer than now" is a decision.
+- **Save** stores the number and cuts nothing. **Save & re-cut this bank** does
+  both, in seconds.
+- **Leave the field empty to inherit** the app default. Empty is not zero — zero
+  is a threshold that fires on every single frame and shatters a rush into
+  hundreds of fragments.
+
+**Which way to move it.** Higher cuts less often: fewer, longer shots, and far
+fewer cuts invented inside footage that never had any. Lower catches the
+boundaries a slow dissolve hides, and finds more of them everywhere else too. If
+your folder is mostly single takes, 0.6–0.7 is the direction; if it is edited
+material, stay at 0.5 or go under it. Nobody has measured the right answer for
+amateur footage — that is exactly why the preview exists.
+
+**One folder is rarely one kind of footage**, so a single file can carry its own
+threshold and be re-cut on its own: **↻ Re-detect this file**, on the file's card
+under **Files**.
+
+### This file is one single take
+
+Some rushes have no cuts at all, and the failure there is not a missed
+boundary — it is a file quietly chopped into six fragments that each train on a
+third of a gesture. **▣ Single shot**, on the file's card, replaces every shot of
+that file with one covering the whole thing.
+
+It sticks. The bank-wide re-cut and the detection pass both walk past a file
+marked this way, and the card says **Single shot** so you can see why it never
+changes. The way back is **↻ Re-detect this file** on that same card.
+
+**↻ on a single file replaces hand-made cuts, and the bank-wide re-cut never
+does.** That asymmetry is deliberate — it is what makes ↻ the way back from ▣ —
+and both gestures ask before they act. Shots already promoted into a dataset are
+kept in every case; the dataset stored its own copy of the bounds when it was
+built.
+
+### Cut, or dissolve
+
+The detector produces a second output describing how *wide* each transition is,
+which the app used to compute and discard. It is now read, and a shot whose
+first or last frames are a cross-fade of its neighbour carries an amber
+**dissolve 18f** chip on its tile — the frame count is the width of the fade.
+
+No other tool in this space shows this, and it is worth knowing before you train
+on a clip: a shot that opens on a cross-fade of another shot teaches a model to
+open on a cross-fade. The chip is advisory, exactly like the quality flags — it
+changes nothing about the cut, and the width-to-kind rule is a reading of how the
+network was trained, not something anyone has measured on amateur footage.
+
+**🎬 Find shots again is instant too, now.** Re-running the pass over a bank it
+has already been through re-cuts from the stored scores instead of decoding
+again, and the progress line says how many files it reused. It falls back to a
+real pass for any file whose size on disk no longer matches what the scan
+recorded — you re-exported it, so its old boundaries describe footage that is not
+there any more.
+
+**Two limits worth saying out loud.** A file detected before this shipped has no
+stored scores, so it cannot be re-cut instantly — the panel says so and offers
+🎬 Find shots, which fills them in on the way past. And a re-cut replaces shots,
+so the replaced ones lose their thumbnails and quality scores: those measured
+bounds that no longer exist. Run 🖼 Make thumbnails once when you are done
+cutting, not after every change.
 
 ## Find scenes in a video bank by typing a word
 

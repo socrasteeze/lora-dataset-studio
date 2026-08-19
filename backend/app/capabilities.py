@@ -703,7 +703,22 @@ def probe_vast() -> dict:
 CAPABILITY_IMPORTS = {
     'face_scoring': 'import insightface, onnxruntime',
     'masks': 'import rembg',
-    'bank_scoring': 'import torch, open_clip, transformers',
+    # numpy and PIL are named even though nothing pip-installs them directly:
+    # they arrive transitively (torchvision, which open_clip_torch and timm both
+    # require, hard-requires both) and BOTH workers that run in this interpreter
+    # import them on any real call — infer/bank_score_infer.py reaches PIL at load
+    # time through bank_image_guard and numpy inside its scoring path, and
+    # infer/video_ai_check_infer.py imports both in _preprocess. Not at module
+    # scope in every case, which changes WHEN it fails and not whether: a probe
+    # that names only the headline packages reports ✓ while the feature dies on
+    # the first call, which is issue #24's exact shape; this entry under-imported
+    # for four waves and the AI check is what surfaced it.
+    # `from PIL import Image` rather than `import PIL`, because the bare package
+    # imports without its submodules and would pass on a broken install.
+    # setup_installer._verify_bank_scoring_import runs THIS string, so the
+    # install's honesty gate cannot fall behind the probe again.
+    'bank_scoring': ('import torch, open_clip, transformers, numpy; '
+                     'from PIL import Image'),
     'bank_siglip2': ('import torch, transformers, numpy; from PIL import Image; '
                      'from transformers import Siglip2Model, AutoProcessor'),
     'watermark_inpaint': 'import simple_lama_inpainting',
@@ -725,6 +740,16 @@ CAPABILITY_IMPORTS = {
     # av: the worker decodes with PyAV in this same environment — a probe that
     # skips it answers "ready" about a detector that cannot open a single file.
     'shot_detect': 'import torch, transnetv2_pytorch, av',
+    # 🔳 Burned-in text, for the video lane's safe-zone pass. BOTH names, because
+    # infer/video_text_infer.py imports both: cv2 is how it reads a frame and
+    # learns its size (the boxes come back normalised, which needs one), and
+    # rapidocr_onnxruntime is the engine. cv2 arrives as a DEPENDENCY of the
+    # engine rather than in its own right, which is exactly the shape that made
+    # issue #24 — a probe importing only the headline module reports ✓ while the
+    # feature dies on the first call. There is nothing else: no torch, no
+    # transformers, and no model download (the 1.4.x wheels carry the PP-OCRv4
+    # ONNX files, ~16 MB, so this works offline the day it is installed).
+    'video_text': 'import rapidocr_onnxruntime, cv2',
 }
 
 
@@ -745,6 +770,24 @@ def face_gpu_available() -> bool:
         'face_gpu', python,
         "import onnxruntime,sys; "
         "sys.exit(0 if 'CUDAExecutionProvider' in onnxruntime.get_available_providers() else 1)")
+
+
+def resolve_face_device():
+    """(device, use_gpu) for a face pass — the SINGLE answer both surfaces use.
+
+    The Bank pass and the dataset scorer ask the identical question ("may I put
+    InsightFace on the GPU for this run?"), so they must not answer it apart:
+    a divergence here is invisible until someone notices one surface is ten
+    times slower than the other. See the Bank/Dataset parity rule in CLAUDE.md.
+
+    `face_scoring.device`: 'auto' (default - GPU when truly available) | 'cpu'
+    | 'cuda'. A 'cuda' request on an interpreter without CUDA still degrades to
+    CPU here, so the caller never opens the GPU-exclusive window for a pass that
+    is going to run on CPU anyway.
+    """
+    pref = str(cfg.get('face_scoring.device') or 'auto').lower()
+    use_gpu = pref in ('auto', 'cuda') and face_gpu_available()
+    return ('cuda' if use_gpu else 'cpu'), use_gpu
 
 
 def bank_scoring_gpu_available() -> bool:
@@ -792,6 +835,22 @@ def probe_masks() -> dict:
     python = cfg.get('masks.python') or sys.executable
     ok = _cached_import('masks', python, CAPABILITY_IMPORTS['masks'])
     return {'ok': ok, 'detail': 'rembg import OK' if ok else 'import failed'}
+
+
+def probe_video_text() -> dict:
+    """Can this install read burned-in text? Used by 🔳 Safe zone.
+
+    Deliberately NOT folded into `probe_video`'s three pieces. Those three are
+    what the LANE needs to exist at all — without decoding there is no bank —
+    while this one gates HALF of one optional pass: with no OCR engine the safe
+    zone still measures letterbox and pillarbox bands and says so on every shot.
+    Folding it in would grey out buttons that work.
+    """
+    python = cfg.get('video_text.python') or sys.executable
+    ok = _cached_import('video_text', python, CAPABILITY_IMPORTS['video_text'])
+    return {'ok': ok,
+            'detail': 'RapidOCR import OK' if ok
+                      else 'install the burned-in text extra from Setup'}
 
 
 def probe_video() -> dict:
@@ -1740,14 +1799,15 @@ def probe(force=False) -> dict:
     ollama = probe_ollama()
     ollama_installed = probe_ollama_installed()
     aitoolkit = probe_aitoolkit()
-    # These TEN each shell out a cached-but-possibly-cold subprocess import
+    # These ELEVEN each shell out a cached-but-possibly-cold subprocess import
     # (insightface/rembg/torch+open_clip+transformers/SigLIP 2/
-    # simple_lama_inpainting/torch+transformers/onnxruntime/PyAV+ffmpeg/the
-    # scraping deps/the ai-toolkit venv's captioning deps — see _cached_import).
+    # simple_lama_inpainting/torch+transformers/onnxruntime/PyAV+ffmpeg/
+    # RapidOCR/the scraping deps/the ai-toolkit venv's captioning deps — see
+    # _cached_import).
     # Run them concurrently so a cold boot pays the SLOWEST one, not the sum.
     # Upstream calls these serially and starts with three more probes for its
     # cloud image engines; those are Divergence 1 and have no probe here.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
         f_face = pool.submit(probe_face_scoring)
         f_masks = pool.submit(probe_masks)
         f_bank = pool.submit(probe_bank_scoring)
@@ -1756,6 +1816,7 @@ def probe(force=False) -> dict:
         f_watermark_detect = pool.submit(probe_watermark_detect)
         f_wd14 = pool.submit(probe_wd14)
         f_video = pool.submit(probe_video)
+        f_video_text = pool.submit(probe_video_text)
         f_scrape = pool.submit(probe_scrape_deps)
         f_joycaption = pool.submit(probe_joycaption, aitoolkit)
         face_scoring = f_face.result()
@@ -1766,6 +1827,7 @@ def probe(force=False) -> dict:
         watermark_detect = f_watermark_detect.result()
         wd14 = f_wd14.result()
         video = f_video.result()
+        video_text = f_video_text.result()
         scrape_deps = f_scrape.result()
         joycaption = f_joycaption.result()
     models = _scan_models()
@@ -2082,6 +2144,12 @@ def probe(force=False) -> dict:
         'video_decode': video['decode'],
         'video_detect': video['detect'],
         'video_encode': video['encode'],
+        # 🔳 The safe-zone pass's OCR half, published on its own because it is
+        # the only capability in this app whose absence downgrades a pass instead
+        # of blocking it: the bands are still measured. The workspace uses it to
+        # say "bands only" on the button rather than greying it out.
+        'video_text': video_text['ok'],
+        'video_text_detail': video_text['detail'],
         # Klein-inpaint (V2, quality) readiness = same as the Klein engine (ComfyUI
         # reachable + Klein models on disk). The custom-node preflight is a clean-time
         # 409. Greys the batch's "Klein (quality)" option when False.
