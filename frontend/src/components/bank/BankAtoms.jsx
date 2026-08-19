@@ -29,11 +29,11 @@ export function Chip({ active, onClick, children, title }) {
 
 /** One header stat — a bold tabular figure with a subtle label. Kept/rejected/
  *  promoted carry their status colour so the strip reads at a glance. */
-export function Stat({ label, value, tone }) {
+export function Stat({ label, value, tone, className = '' }) {
   const toneCls = { emerald: 'text-emerald-300', rose: 'text-rose-300', indigo: 'text-indigo-300' }[tone] || 'text-content'
   const n = typeof value === 'number' ? value.toLocaleString() : value
   return (
-    <span className="inline-flex items-baseline gap-1">
+    <span className={`inline-flex w-full min-w-0 items-baseline justify-center gap-1 rounded-md border border-border bg-surface-raised px-2 py-1 ${className}`}>
       <span className={`font-semibold tabular-nums ${toneCls}`}>{n}</span>
       <span className="text-xs text-content-subtle">{label}</span>
     </span>

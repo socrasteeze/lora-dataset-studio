@@ -33,7 +33,7 @@ test('the overnight dialog offers no non-verdict flag; the attended button print
   assert.match(facets, /check before mass-rejecting/);
 });
 
-test('captioning is OFF by default; auto-reject defaults to blur+uniform and keep-best dedup', () => {
+test('captioning is OFF by default; auto-reject defaults to duplicates only', () => {
   // The default-checked RULE moved into pipelineSteps.defaultChecked when the
   // step list moved onto the server, so it is asserted through the module now
   // rather than by grepping this file for a literal Set — the same migration
@@ -45,9 +45,10 @@ test('captioning is OFF by default; auto-reject defaults to blur+uniform and kee
   assert.equal(checked.has('caption'), false);
   assert.equal(checked.has('scan'), true);
   assert.equal(checked.has('auto_reject'), true);
-  // These two literals still live in the dialog, so they are still greppable.
-  assert.match(dialog, /new Set\(\['blur',\s*'uniform'\]\)/);
-  assert.match(dialog, /useState\(true\)/);            // resolveDups defaults on
+  // Quality flags start empty so an overnight run does not bin blurry/flat
+  // unless the user ticks them; ≈ Duplicates (resolveDups) stays on.
+  assert.match(dialog, /const \[rejectFlags, setRejectFlags\] = useState\(\(\) => new Set\(\)\)/);
+  assert.match(dialog, /const \[resolveDups, setResolveDups\] = useState\(true\)/);
 });
 
 test('a heavy pass whose tool is not ready is auto-unchecked and flagged "will skip"', () => {

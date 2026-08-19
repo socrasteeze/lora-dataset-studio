@@ -7,24 +7,21 @@ const bank = fs.readFileSync(new URL('../../pages/BankPage.jsx', import.meta.url
 const dsWorkspace = fs.readFileSync(
   new URL('../dataset/DatasetWorkspace.jsx', import.meta.url), 'utf8');
 
-test('the field tries the native server dialog first, in-app browser as fallback', () => {
-  // Browse hits the native-dialog endpoint...
-  assert.match(picker, /postJson\('\/api\/system\/pick-folder'/);
-  // ...and only opens the in-app browser when the server has no native dialog.
-  assert.match(picker, /if \(r\.available\)/);
-  assert.match(picker, /setBrowsing\(true\)/);
-  // The browser lists folders through the read-only listing endpoint.
+test('the field opens the in-app folder browser, not the desktop explorer', () => {
+  const field = picker.slice(picker.indexOf('export default function FolderPickerField'));
+  assert.match(field, /setBrowsing\(true\)/);
+  assert.match(field, /<FolderBrowserModal/);
+  assert.match(field, /📂 Browse/);
+  assert.doesNotMatch(field, /📂 Browse…/);
+  // Native pick-folder stays exported for other callers; the field itself
+  // must not post it or the Create-bank Browse button opens Explorer.
+  assert.doesNotMatch(field, /pickNativeFolder/);
   assert.match(picker, /\/api\/system\/list-folders/);
 });
 
-test('a cancelled native dialog leaves the value untouched', () => {
-  // available + no path === cancelled: nothing is written.
-  assert.match(picker, /if \(r\.path\) onChange\(r\.path\)/);
-});
-
 test('pickNativeFolder never throws on the expected no-desktop case', () => {
-  // A network/endpoint failure degrades to available:false so the caller falls
-  // back rather than surfacing an error.
+  // A network/endpoint failure degrades to available:false so a remaining
+  // caller (dataset folder-import) can still fall back rather than error.
   assert.match(picker, /catch\s*\{\s*return \{ available: false/);
 });
 

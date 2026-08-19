@@ -174,8 +174,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
 
   return (
     <div className="space-y-4">
-      <Card title="Role"
-        help="Pick which machine owns the datasets (Primary) and which ones only rent GPU time (Peer). Both installs keep their own ComfyUI / Ollama / ai-toolkit.">
+      <Card title="Role">
         <fieldset id="cluster-role" className="space-y-2">
           <legend className="sr-only">Cluster role</legend>
           {ROLES.map((r) => (
@@ -192,14 +191,14 @@ export default function DevicesSection({ config, setField, handleSave, configDef
         </fieldset>
         <div className="mt-3">
           <label htmlFor="cluster-device-name" className="block text-sm font-medium text-content">
-            Device name
+            Name
           </label>
           <input id="cluster-device-name" type="text"
             value={config.cluster?.device_name ?? ''}
             onChange={(e) => setField('cluster', 'device_name', e.target.value)}
             placeholder="e.g. Desktop 5090 / G18 laptop"
             className={`${INPUT_CLASS} max-w-md`} />
-          <ResetToDefault label="Device name" section="cluster" field="device_name"
+          <ResetToDefault label="Name" section="cluster" field="device_name"
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
         {status?.node_id && (
@@ -216,12 +215,8 @@ export default function DevicesSection({ config, setField, handleSave, configDef
               interchangeable — one runs bank passes, the other cannot. Say so
               HERE, where the user is choosing between them. */}
           <p className="mb-3 text-xs text-content-muted">
-            <strong className="text-content">Generation only.</strong> A backend renders images
-            (Generate, Upscale &amp; improve, Test Studio, Klein watermark inpaint). It cannot run
-            the bank&apos;s Score, Faces, framing or watermark passes — those need the full app on
-            the other machine, so add it as a <em>compute peer</em> above instead.
-            {' '}A backend is reached over plain HTTP with <strong className="text-content">no
-            authentication</strong>: only add one on a network you trust, or over Tailscale.
+            <strong className="text-content">Generation only.</strong> Bank passes need a compute
+            peer. No auth — trusted network or Tailscale only.
           </p>
           {backends === null ? (
             <p className="text-sm text-content-muted">Loading…</p>
@@ -274,12 +269,6 @@ export default function DevicesSection({ config, setField, handleSave, configDef
             {backendTest === 'online' && <span className="text-xs text-emerald-400">✓ reachable</span>}
             {backendTest === 'offline' && <span className="text-xs text-rose-400">✕ not answering</span>}
           </div>
-          <p className="mt-3 text-[0.8125rem] text-content-muted">
-            The models and node packs for a job must already exist on that machine, and
-            generation is the only work that travels. ⚠️ ComfyUI’s API has <strong>no
-            authentication</strong> — only add machines on a network you trust
-            (Tailscale, home LAN). For token-gated access use a compute peer instead.
-          </p>
         </Card>
       )}
 
@@ -289,13 +278,8 @@ export default function DevicesSection({ config, setField, handleSave, configDef
           {/* The counterpart of the note on the backends card — the two are not
               interchangeable and the picker cannot show that on one line. */}
           <p className="mb-3 text-xs text-content-muted">
-            <strong className="text-content">The full app on the other machine.</strong> A peer
-            runs generation <em>and</em> the bank&apos;s heavy passes — ✨ Score, 👥 Faces, 📐
-            Framing, 🚩 Watermarks and 🏷️ Captions all move to its GPU, using its own models —
-            captions with whichever captioner that machine has. It needs LDS installed there
-            plus a join token, and it authenticates with a revocable token. A bank&apos;s scan,
-            auto-reject and duplicate steps always stay on this machine — they read the
-            database, not the GPU.
+            <strong className="text-content">Full app on the other machine.</strong> Score, Faces,
+            Framing, Watermarks and Captions can run there. Scan and auto-reject stay here.
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div>

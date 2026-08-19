@@ -3,8 +3,8 @@ import test from 'node:test'
 import { surfaceStrings } from './bankSurfaces.js'
 
 test('reads the label out of a button', () => {
-  assert.deepEqual(surfaceStrings('<button type="button">🚀 Launch all…</button>'),
-    ['🚀 Launch all…'])
+  assert.deepEqual(surfaceStrings('<button type="button">🚀 Launch all</button>'),
+    ['🚀 Launch all'])
 })
 
 test('reads aria-label and title', () => {

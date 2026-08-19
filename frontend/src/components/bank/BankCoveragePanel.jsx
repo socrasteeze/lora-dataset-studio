@@ -131,7 +131,7 @@ export default function CoveragePanel({ coverage, semanticEngine, semanticLabel,
             ? 'Select a set spread evenly over the framings, instead of the top of one ranking'
             : balanceReason}
           className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-emerald-500/20">
-          ⚖️ Pick a balanced set…
+          ⚖️ Pick a balanced set
         </button>
         {!onBalance && balanceReason && (
           <span className="text-[11px] text-content-subtle">{balanceReason}</span>

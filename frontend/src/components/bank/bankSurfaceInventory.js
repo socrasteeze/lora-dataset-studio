@@ -124,10 +124,6 @@ export const BANK_SURFACES = [
     3
   ],
   [
-    "↺ Undecided",
-    1
-  ],
-  [
     "↻",
     2
   ],
@@ -177,11 +173,11 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "⚖️ Balanced pick…",
+    "⚖️ Balanced pick",
     1
   ],
   [
-    "⚖️ Pick a balanced set…",
+    "⚖️ Pick a balanced set",
     1
   ],
   [
@@ -213,7 +209,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "⬆ Promote…",
+    "⬆ Promote",
     1
   ],
   [
@@ -229,7 +225,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🎨 Pick diverse…",
+    "🎨 Pick diverse",
     1
   ],
   [
@@ -237,7 +233,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🎯 Similar to selected…",
+    "🎯 Similar to selected",
     1
   ],
   [
@@ -265,7 +261,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "📦 Move folder…",
+    "📦 Move folder",
     2
   ],
   [
@@ -277,7 +273,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🔤 Find by text…",
+    "🔤 Find by text",
     1
   ],
   [
@@ -289,11 +285,11 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🧹 Auto-reject…",
+    "🧹 Auto-reject",
     1
   ],
   [
-    "🚀 Launch all…",
+    "🚀 Launch all",
     1
   ],
   [
@@ -374,7 +370,7 @@ export const BANK_SURFACES = [
   ],
   [
     "Clear",
-    3
+    2
   ],
   [
     "Clear search",
@@ -569,7 +565,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Move this bank's folder",
+    "Move folder",
     1
   ],
   [
@@ -753,7 +749,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Select all in filter",
+    "Select all",
     1
   ],
   [
@@ -774,6 +770,10 @@ export const BANK_SURFACES = [
   ],
   [
     "show all ✕",
+    1
+  ],
+  [
+    "Skip",
     1
   ],
   [

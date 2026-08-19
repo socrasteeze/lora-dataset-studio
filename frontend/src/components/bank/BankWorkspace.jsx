@@ -128,9 +128,24 @@ const PAGE_SIZE = 120
    features principales"): the semantic curation is what the Bank is FOR once
    triage is done, and it dressed as a footnote. Same accent family as
    ▶ Review one by one, one size up. */
-const CURATE_BTN = 'rounded-md border border-indigo-400/60 bg-indigo-500/20 '
-  + 'px-3 py-1.5 text-sm font-semibold text-indigo-200 disabled:opacity-50 '
-  + 'hover:bg-indigo-500/30'
+const CURATE_BTN = 'inline-flex w-full min-w-0 items-center justify-center '
+  + 'rounded-md border border-indigo-400/60 bg-indigo-500/20 '
+  + 'px-3 py-1.5 text-center text-sm font-semibold text-indigo-200 '
+  + 'disabled:opacity-50 hover:bg-indigo-500/30'
+/* Header actions share one box: even columns, same padding, colour carries
+   the role (quiet / primary / danger) instead of a bigger button. */
+const HEADER_BTN = 'inline-flex h-full w-full min-w-0 items-center justify-center '
+  + 'rounded-md border border-border bg-surface-raised px-3 py-1.5 text-center '
+  + 'text-sm font-semibold text-content hover:bg-surface disabled:opacity-50'
+const HEADER_BTN_PRIMARY = 'inline-flex h-full w-full min-w-0 items-center justify-center '
+  + 'rounded-md bg-gradient-primary px-3 py-1.5 text-center text-sm font-semibold '
+  + 'text-white shadow disabled:opacity-50'
+const HEADER_BTN_DANGER = 'inline-flex h-full w-full min-w-0 items-center justify-center '
+  + 'rounded-md border border-rose-500/50 px-3 py-1.5 text-center text-sm '
+  + 'font-semibold text-rose-300 disabled:opacity-40 hover:bg-rose-500/10'
+const PATH_BTN = 'inline-flex w-full items-center justify-center rounded border '
+  + 'border-border px-2 py-0.5 text-center text-xs text-content-muted '
+  + 'hover:bg-surface-raised hover:text-content disabled:cursor-wait disabled:opacity-60'
 /* How often the bank-wide counts refresh while a pass runs. The banner ticks
    every 2 s off /activity; the dashboard follows on this slower beat — plus
    immediately when the job lands, so the numbers you end on are exact. The
@@ -1861,10 +1876,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 title={payload.source_path}>
                 {payload.source_path}
               </p>
+              <div className="grid shrink-0 grid-cols-2 gap-1">
               <button type="button" onClick={openSourceFolder}
                 disabled={openingSourceFolder} aria-busy={openingSourceFolder}
                 title="Open this Bank's source folder in the system file explorer."
-                className="shrink-0 rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content disabled:cursor-wait disabled:opacity-60">
+                className={PATH_BTN}>
                 {openingSourceFolder ? 'Opening…' : '📂 Open folder'}
               </button>
               {/* Cold path. The folder-sync note below offers this too, but only once
@@ -1873,14 +1889,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   after breaking the bank to discover it could have been repaired. */}
               <button type="button" onClick={() => setRelocating(true)}
                 title="Moving this folder to another disk? Point the bank at its new location."
-                className="shrink-0 rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content">
-                📦 Move folder…
+                className={PATH_BTN}>
+                📦 Move folder
               </button>
+              </div>
             </div>
           )}
         </div>
         {counts && (
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm">
+          <div className="grid grid-cols-3 gap-2 border-t border-border pt-2 text-sm">
             <Stat label="images" value={counts.total} />
             <Stat label="scanned" value={counts.scanned} />
             {scored > 0 && <Stat label="scored" value={scored} />}
@@ -1889,7 +1906,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 value={semanticState.total > 0
                   ? `${semanticIndexed.toLocaleString()}/${semanticState.total.toLocaleString()}`
                   : semanticIndexed}
-                tone={semanticReady ? 'emerald' : undefined} />
+                tone={semanticReady ? 'emerald' : undefined}
+                className="col-span-3" />
             )}
             {watermarkScanned > 0 && <Stat label="watermark-checked" value={watermarkScanned} />}
             <Stat label="undecided" value={counts.pending} />
@@ -1899,36 +1917,40 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           </div>
         )}
         {/* The decisive actions. ⚙ Passes opens the analysis panel; the other
-            three are the ones that change what leaves this bank. */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+            three are the ones that change what leaves this bank. Two even rows:
+            Filters (when the rail is a drawer) / Passes / Launch all, then
+            Promote / Delete — colour carries the role, not a bigger box. */}
+        <div className="space-y-2 border-t border-border pt-2">
+          <div className={`grid gap-2 ${!railIsColumnNow ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {/* ☰ exists only where the rail cannot sit beside the grid — at 400 px
               it is the ONLY way back to the filters, so it is a real button and
               never a CSS-hidden one. */}
           {!railIsColumnNow && (
             <button type="button" onClick={openRail}
               aria-expanded={railOpen} aria-controls="bank-filter-rail"
-              className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+              className={HEADER_BTN}>
               ☰ Filters
             </button>
           )}
           <button type="button" onClick={togglePasses}
             aria-expanded={passesOpen} aria-controls="bank-passes-panel"
             title="Open the analysis passes — scan, score, group by person, framing, medium, crops, watermarks and captions."
-            className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+            className={HEADER_BTN}>
             {passesButtonLabel(live)}
           </button>
           <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
             title={`Run the whole triage in one go — scan, auto-reject, Score${semanticState.engine === 'siglip2' ? ', SigLIP 2 semantic index' : ''}, crops/variants, watermarks, group by person and (optionally) caption. Start it and walk away. If the person pass is in, it checks your folders first and asks once, before the run.`}
-            className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
-            🚀 Launch all…
+            className={HEADER_BTN_PRIMARY}>
+            🚀 Launch all
           </button>
-          <span className="ml-auto" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={() => setPromoteOpen(true)} disabled={live || !canPromote}
             title={canPromote
               ? 'Copy the kept selection into a dataset — or into a brand-new bank, to keep working on a shortlist apart'
               : 'Keep some images first'}
-            className="rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-            ⬆ Promote…
+            className={HEADER_BTN_PRIMARY}>
+            ⬆ Promote
           </button>
           {/* Disabled outright when this bank's folder belongs to a dataset: the
               banner below says it is, and a button that still opened a dialog only
@@ -1940,9 +1962,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               : (counts?.reject > 0)
                 ? 'Delete the rejected images from your disk (OS trash when available). Irreversible — asks you to type DELETE first. Kept images are untouched.'
                 : 'No rejected images to delete'}
-            className="rounded-md border border-rose-500/50 px-3 py-1.5 text-sm text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+            className={HEADER_BTN_DANGER}>
             🗑 Delete rejected from disk{(counts?.reject > 0) ? ` (${counts.reject})` : ''}
           </button>
+          </div>
         </div>
       </header>
 
@@ -1957,7 +1980,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <p className="font-semibold">⛔ This bank sits on a dataset’s image folder</p>
           <p className="text-rose-100/90">{payload.dataset_conflict.message}</p>
           <p className="text-rose-100/90">
-            🗑 Delete rejected is disabled here. Use 📦 Move folder… to point this
+            🗑 Delete rejected is disabled here. Use 📦 Move folder to point this
             bank at a folder of its own, or remove the bank — removing a bank never
             touches files.
           </p>
@@ -2090,13 +2113,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           <button type="button" onClick={() => openReview(null)} disabled={reviewLoading}
             title="Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order."
             className="rounded-md border border-indigo-400/60 bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30">
-            {reviewLoading ? '▶ Preparing…' : '▶ Review one by one'}
+            {reviewLoading ? '▶ Preparing…' : '▶ Review'}
           </button>
           <span aria-hidden className="h-4 w-px bg-border" />
           <span className="text-content-muted">{selected.size} selected</span>
           <button type="button" onClick={selectAllCurrent}
+            title="Selects every image the current filters show — all pages, not just the tiles on screen"
             className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
-            Select all in filter
+            Select all
           </button>
           {/* Bulk-reject undecided images by quality flag — a triage shortcut that
               leaves your manual ✓/✕ untouched and deletes nothing off disk. */}
@@ -2105,7 +2129,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               aria-expanded={showAutoReject}
               title="Bulk-reject the still-undecided images carrying the chosen quality flags"
               className="rounded-md border border-border bg-surface-raised px-2 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
-              🧹 Auto-reject…
+              🧹 Auto-reject
             </button>
             {showAutoReject && (
               <>
@@ -2119,8 +2143,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                     get. */}
                 <div className="fixed inset-x-3 bottom-3 z-50 max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-xl space-y-2 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:mt-1 sm:w-72">
                   <p className="text-xs text-content-muted">
-                    Rejects the UNDECIDED images with these flags. Your manual ✓/✕ are never changed;
-                    everything stays reversible (nothing is deleted from disk).
+                    Undecided only — nothing deleted.
                   </p>
                   {/* The pile no flag can reach. Every quality flag is gated on a
                       completed scan, so a never-scanned image is invisible to all
@@ -2204,9 +2227,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         {/* Curation — build a good LoRA subset out of a big dump from this Bank's
             selected semantic index. Diversity coverage + reference similarity, both
             producing a SELECTION the user reviews above. */}
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Curate</span>
-          <div className="relative">
+          <div className="grid grid-cols-2 gap-2">
+          <div className="relative min-w-0">
             <button type="button" disabled={live || !semanticReady || diverseBusy}
               onClick={() => setCurateOpen((v) => (v === 'diverse' ? null : 'diverse'))}
               aria-expanded={curateOpen === 'diverse'}
@@ -2214,7 +2238,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 ? `Pick the N images that best COVER the visual variety of the current filter (varied angles/outfits/scenes) using the ${semanticState.label} semantic index.`
                 : semanticBlocked}
               className={CURATE_BTN}>
-              🎨 Pick diverse…{!semanticReady && ` (needs ${semanticState.label})`}{diverseBusy && ' (sampling…)'}
+              🎨 Pick diverse{!semanticReady && ` (needs ${semanticState.label})`}{diverseBusy && ' (sampling…)'}
             </button>
             {curateOpen === 'diverse' && (
               <>
@@ -2263,7 +2287,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               my set varied?" but "does it cover the framings I want to generate?".
               Kept as its own button rather than a mode of the other one, because a
               bank with no 📐 Framing pass can still use diversity. */}
-          <div className="relative">
+          <div className="relative min-w-0">
             <button type="button" disabled={live || balanceBusy || !balanceReady.ready}
               onClick={() => setCurateOpen((v) => (v === 'balanced' ? null : 'balanced'))}
               aria-expanded={curateOpen === 'balanced'}
@@ -2271,7 +2295,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 ? `Select N images SPREAD OVER the framings (face / bust / body / back), then diversify each bucket with the ${semanticState.label} semantic index.`
                 : balanceReady.reason}
               className={CURATE_BTN}>
-              ⚖️ Balanced pick…{balanceBusy && ' (sampling…)'}
+              ⚖️ Balanced pick{balanceBusy && ' (sampling…)'}
             </button>
             {curateOpen === 'balanced' && (
               <>
@@ -2315,7 +2339,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               </>
             )}
           </div>
-          <div className="relative">
+          <div className="relative min-w-0">
             <button type="button"
               disabled={live || !semanticReady || selected.size !== 1 || similarBusy}
               onClick={() => setCurateOpen((v) => (v === 'similar' ? null : 'similar'))}
@@ -2326,7 +2350,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                   ? `Rank the current filter against the ONE selected image with the ${semanticState.label} semantic index and select the closest N.`
                   : 'Select exactly one image to use as the reference'}
               className={CURATE_BTN}>
-              🎯 Similar to selected…{similarBusy && ' (ranking…)'}
+              🎯 Similar to selected{similarBusy && ' (ranking…)'}
             </button>
             {curateOpen === 'similar' && (
               <>
@@ -2351,7 +2375,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               </>
             )}
           </div>
-          <div className="relative">
+          <div className="relative min-w-0">
             <button type="button" disabled={live || !semanticReady}
               onClick={openTextSearch}
               aria-expanded={curateOpen === 'text'}
@@ -2359,7 +2383,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                 ? `Describe what you are looking for in words ("brunette outdoors, wide shot") and rank the current filter with ${semanticState.label}.`
                 : semanticBlocked}
               className={CURATE_BTN}>
-              🔤 Find by text…{!semanticReady && ` (needs ${semanticState.label})`}
+              🔤 Find by text{!semanticReady && ` (needs ${semanticState.label})`}
             </button>
             {curateOpen === 'text' && (
               <>
@@ -2452,15 +2476,16 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               </>
             )}
           </div>
-          {!semanticReady && (
-            <span className="text-xs text-content-subtle">{semanticBlocked}</span>
-          )}
           <button type="button" onClick={() => setCoverageOpen((v) => !v)}
             aria-expanded={coverageOpen}
             title="See what your kept set leans on and what's thin for a good LoRA — advice only, nothing is kept or rejected."
-            className={CURATE_BTN}>
+            className={`${CURATE_BTN} col-span-2`}>
             📊 Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
           </button>
+          </div>
+          {!semanticReady && (
+            <span className="text-xs text-content-subtle">{semanticBlocked}</span>
+          )}
         </div>
 
         {/* 🔤 What the grid is currently showing, in words. This is the whole
@@ -2553,7 +2578,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               ? 'grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 2xl:grid-cols-10'
               : 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 2xl:grid-cols-8'}`}>
               {page.images.map((img) => (
-                <Tile key={img.id} img={img} bankId={bankId} size={tileSize}
+                <Tile key={img.id} img={img} bankId={bankId}
                   selected={selected.has(img.id)}
                   onReview={() => openReview(img.id)}
                   onTags={() => openTagPicker(img)}

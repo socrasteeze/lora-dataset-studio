@@ -425,7 +425,7 @@ touching the folder itself.
 parts, and knowing which is which saves reading the rest of this section twice:
 
 - a **top bar** with the bank's name, its counters, and the four actions that
-  change what leaves the bank — **⚙ Passes**, **🚀 Launch all…**, **⬆ Promote…**
+  change what leaves the bank — **⚙ Passes**, **🚀 Launch all**, **⬆ Promote**
   and **🗑 Delete rejected from disk**;
 - a **filter rail** down the left: the search, the exclude box, the subfolder
   picker, the person and style strips, and the chips. The six measured axes
@@ -663,7 +663,7 @@ and *"not smiling"* still counts as a smile. A bank has no character/concept/sty
 kind the way a dataset does, so it is judged as a **character source** — the same
 assumption the framing target and the person-mix advice already make.
 
-The advice becomes a gesture with **⚖️ Pick a balanced set…** at the bottom of
+The advice becomes a gesture with **⚖️ Pick a balanced set** at the bottom of
 the panel — see [Pick a balanced set](#pick-a-balanced-set).
 
 **🗑 Delete rejected from disk** (next to Promote) is the one exception to the
@@ -692,7 +692,10 @@ its files are about to disappear.
 **🚀 Launch all** does the whole funnel for you in one go. Tick which passes
 run and how auto-reject behaves, hit Go, and walk away — it chains *scan →
 auto-reject → score → find watermarks → group by person → classify framing →
-(optional) caption* in that exact order. Two things make it safe to run overnight: a pass whose
+(optional) caption* in that exact order. Auto-reject starts with only
+**≈ Duplicates** on (keep the best, reject the rest); Blurry / Noisy / Flat /
+Small are there, off, so an overnight run does not bin soft or plain shots
+unless you tick them. Two things make it safe to run overnight: a pass whose
 tool isn't installed, or a moment when the GPU is busy with a training run, is
 **skipped with a reason** instead of failing the whole run; and because
 auto-reject runs *before* the heavy passes, scoring/watermarks/person only ever
@@ -1014,7 +1017,7 @@ it lets the sampling go and launches the full pass.
 ## Pick a balanced set
 
 Advice is only half the gesture, so **📊 Coverage advice** ends with **⚖️ Pick a
-balanced set…** (the same button sits in the **Curate** row). It answers a
+balanced set** (the same button sits in the **Curate** row). It answers a
 question no per-image score can ask: *does my set cover what I want to be able to
 generate?*
 
@@ -1224,7 +1227,7 @@ images. **Reindex SigLIP 2** rebuilds that cache only; it never touches Score.
 
 ## Find bank images by describing them
 
-Under **Curate**, **🔤 Find by text…** ranks images by how close they are to a
+Under **Curate**, **🔤 Find by text** ranks images by how close they are to a
 phrase you type — `brunette outdoors, wide shot`, `red dress against a white
 wall`, `close-up, harsh flash`. It reads the Bank's selected semantic index:
 the existing **✨ Score** cache for CLIP, or the separate index you explicitly
@@ -1462,8 +1465,8 @@ pile. 🏷️ **Caption** still honours selections as it always did.
 
 Filter chips and bulk actions clear the obvious trash, but the last call —
 *is this shot good enough for the LoRA?* — is made one image at a time, and
-squinting at a 140-pixel thumbnail is not how you make it. **▶ Review one by
-one** (above the grid) opens the images of the **current filter** full size, one
+squinting at a 140-pixel thumbnail is not how you make it. **▶ Review** (above
+the grid) opens the images of the **current filter** full size, one
 after the other:
 
 - **✓ Keep**, **✕ Reject**, **⏭ Skip** — each one saves and jumps straight to the
@@ -1490,7 +1493,7 @@ on a tile still selects it for the bulk ✓/✕/⬆ bar, so both ways of working
 
 ## Promote a shortlist out of a bank
 
-**⬆ Promote…** has three destinations, and picking the right one saves you a mess.
+**⬆ Promote** has three destinations, and picking the right one saves you a mess.
 
 - **📁 An existing dataset** — the end of the funnel. The images are normalized
   to webp, deduplicated against what the dataset already holds, and become
@@ -1673,8 +1676,8 @@ Details that decide what you get:
 - **It only sees what a captioner wrote.** An attribute nobody put in words is
   invisible here, however plain it is in the picture. Caption more of the bank
   (🏷️ Caption all) and the chips get better.
-- It composes with every other filter, and it travels with them — **Select all
-  in filter**, **▶ Review** and the curation picks all work on what you can see.
+- It composes with every other filter, and it travels with them — **Select all**,
+  **▶ Review** and the curation picks all work on what you can see.
 
 ## Hide images you have already handled
 
@@ -1688,8 +1691,8 @@ file name** contains what you type. That turns a captioned bank into a checklist
 - **It composes with everything else** — the search box included. Searching
   `dress` while excluding `red` gives you the dresses that are not red, and the
   filter chips, subfolder, resolution tier and framing all still apply.
-- **It travels with the filter**: **Select all in filter**, **▶ Review one by
-  one** and the curation picks (🎨 diverse, ⚖️ balanced, similar) all work on the
+- **It travels with the filter**: **Select all**, **▶ Review** and the
+  curation picks (🎨 diverse, ⚖️ balanced, similar) all work on the
   visible set, so an image you hid is never handed back to you by a pick.
 
 Two limits worth knowing:
@@ -1723,9 +1726,10 @@ resetting it on every "start over" would be a second, unrelated surprise.
 
 Selecting thumbnails and deciding on them used to mean opposite ends of the
 page — tap tiles at the bottom, then scroll all the way back up past the filter
-panel to reach ✓ Keep / ✕ Reject. Those buttons — plus ↺ Undecided, the two
-rotate buttons and Clear — now live in a bar **pinned to the bottom of the
-screen** the moment anything is selected. It takes up real space at the end of
+panel to reach ✓ Keep / ✕ Reject. Those buttons — plus Skip (back to
+undecided), the two rotate buttons and CLR (clear the ticks) — now live in a
+bar **pinned to the bottom of the screen** the moment anything is selected.
+Keep and Reject share one even row; Skip and CLR share the next. It takes up real space at the end of
 the page rather than floating over it: the page grows to make room for it, so
 scrolling all the way down still shows you the last row of thumbnails and the
 pagination controls with nothing hidden behind the bar. The ↩ Undo offer after
@@ -1778,8 +1782,8 @@ Two things worth knowing:
   rather than pretending to reorder. Run the pass, and it lights up.
 
 In a bank the ordering is done by the database over the *whole* filter, not just
-the page you can see — so **Select all in filter** and **▶ Review one by one**
-walk the same order you are looking at.
+the page you can see — so **Select all** and **▶ Review** walk the same
+order you are looking at.
 
 ## Move through a dataset without closing the image
 
@@ -2353,7 +2357,7 @@ generated job config) from its own Dataset rows. Bank/Dataset identity, analysis
 history and comparisons stay in LDS's database plus its SHA-bound snapshot/cache
 sidecars; they are not reconstructed from an old ai-toolkit config file.
 
-- **Bank → dataset** (**⬆ Promote…**) writes new files into the dataset.
+- **Bank → dataset** (**⬆ Promote**) writes new files into the dataset.
 - **Dataset → bank** (**🗃 Import to bank**, on the dataset) copies the dataset's
   kept images into a folder of the bank's own. Both choices retain the
   Dataset-owned captions, keep/reject curation, framing, watermark and
@@ -2369,7 +2373,7 @@ allowed to remove files from it. Put a bank on a dataset's folder and that butto
 stops deleting your rejects and starts deleting the dataset's training images.
 
 So the app refuses it. If you paste a dataset's image folder into **➕ Create
-bank** — or into **📦 Move folder…** for an existing bank — you get a refusal
+bank** — or into **📦 Move folder** for an existing bank — you get a refusal
 that names the dataset and points you at **🗃 Import to bank** instead. The check
 looks through the disguises: a subfolder of the dataset, the folder *containing*
 all datasets, a different letter case, forward slashes instead of backslashes,
@@ -2379,7 +2383,7 @@ and symlinks or Windows junctions that resolve to the same place.
 nothing is repaired or deleted behind your back. Opening it shows a red banner
 naming the dataset, and 🗑 Delete rejected is refused on that bank — everything
 else keeps working, so you can finish triaging. When you are ready, either
-**📦 Move folder…** to point the bank at a folder of its own, or remove the bank
+**📦 Move folder** to point the bank at a folder of its own, or remove the bank
 (removing a bank never touches files).
 
 The dataset's own folder is shown at the top of the dataset, with a **⧉ Copy**
@@ -2443,12 +2447,12 @@ keep/reject decision are stored against the image row, and each row remembers
 its file *relative* to the bank's folder. So moving a 30 000-image bank to
 another drive costs nothing — you just have to tell the app where it went.
 
-You can do this in either order. **📦 Move folder…** sits in the bank's header
+You can do this in either order. **📦 Move folder** sits in the bank's header
 next to its path (and **📦** on the bank's card in the list), so you can open it
 before touching anything to see what the app will ask for; it also appears inside
 the warning shown once the app notices the folder is gone, if you moved first.
 Paste or browse to the new folder
-and press **🔍 Check this folder**. Nothing is written yet: the app walks the
+and press **🔍 Check folder**. Nothing is written yet: the app walks the
 candidate folder and tells you how many of *this bank's* images are in there and
 how many are not. Paste it however you like — Windows' *Copy as path* wraps the
 path in quotes, and a trailing `\` or forward slashes are equally fine; the field
@@ -2477,7 +2481,7 @@ built over hours.
 
 The cost is that a file you really did delete by hand is counted as *missing*
 forever, and the count never comes down. The bank's warning line now carries the
-way out: **Accept — remove N from this bank**, next to **📦 Move folder…**. It
+way out: **Accept — remove N from this bank**, next to **📦 Move folder**. It
 is on the bank's card in the list and in the workspace header, wherever the
 warning appears.
 
@@ -2490,7 +2494,7 @@ warning appears.
 - It is **not offered while the folder is unreachable**, and refused by the
   server if asked anyway. With the drive unplugged every row looks missing, so
   accepting would delete the whole bank. If the folder simply *moved*, use
-  **📦 Move folder…** instead — that keeps everything.
+  **📦 Move folder** instead — that keeps everything.
 
 
 ## Make Score use a GPU Python you already have

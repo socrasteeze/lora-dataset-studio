@@ -81,14 +81,12 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
   }[summary?.tone] || ''
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Move this bank's folder"
+    <div role="dialog" aria-modal="true" aria-label="Move folder"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4">
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-4 sm:p-5 shadow-2xl space-y-4">
-        <h2 className="text-base font-bold text-content">📦 Move this bank&apos;s folder</h2>
+        <h2 className="text-base font-bold text-content">📦 Move folder</h2>
         <p className="text-sm text-content-muted">
-          Moved <span className="font-semibold text-content">{bankName}</span> to
-          another disk or renamed its folder? Point it at the new location — every
-          score, caption and keep/reject decision stays exactly as it is.
+          {bankName}: scores and decisions stay. The folder must contain this bank&apos;s images.
         </p>
         <p className="text-xs text-content-subtle">
           Currently:{' '}
@@ -97,7 +95,7 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
         <FolderPickerField id={`relocate-folder-${bankId}`} label="New folder"
           value={folder}
           onChange={(v) => { setFolder(v); setPreview(null); setCheckedFor(null) }}
-          hint="The folder that CONTAINS the images — the one you moved, not its parent. Quotes around a pasted path are fine." />
+          hint="The folder that contains the images — not its parent." />
 
         {error && (
           <p className="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
@@ -128,7 +126,7 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
           </button>
           <button type="button" onClick={check} disabled={busy || !folder.trim()}
             className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-40">
-            {busy && !ready ? 'Checking…' : '🔍 Check this folder'}
+            {busy && !ready ? 'Checking…' : '🔍 Check folder'}
           </button>
           <button type="button" onClick={apply} disabled={busy || !ready}
             className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-40">

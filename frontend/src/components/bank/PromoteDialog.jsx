@@ -165,7 +165,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
           <div className="space-y-2">
             <div>
               <label htmlFor="promote-new-dataset-name" className="block text-sm font-medium text-content">
-                Name of the new dataset
+                Name
               </label>
               <input id="promote-new-dataset-name" type="text" value={newDsName} autoFocus
                 onChange={(e) => setNewDsName(e.target.value)}

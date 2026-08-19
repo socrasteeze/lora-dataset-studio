@@ -1,7 +1,7 @@
 // Reads the image Bank TREE, not one file: the Encre redesign split the
 // workspace into a top bar, a filter rail, a passes panel and the grid, and a
 // wiring assertion must survive a move (see bankTreeSource.js).
-import { bankTreeSource } from './bankTreeSource.js';
+import { bankTreeSource, bankWorkspaceSource } from './bankTreeSource.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -68,4 +68,19 @@ test('the curated selection actually switches the grid to a ?ids= view (not scat
   // refreshImages builds an id-scoped request from that order when the view is
   // on — this is what makes the selection VISIBLE instead of invisible ticks.
   assert.match(ws, /ids: \(order \|\| \[\]\)\.join\(','\)/);
+});
+
+test('Curate chips share even columns; Coverage advice is a full-width row', () => {
+  const src = bankWorkspaceSource();
+  const curate = src.slice(src.indexOf('>Curate<'), src.indexOf('{coverageOpen &&'));
+  assert.match(curate, /grid grid-cols-2 gap-2/);
+  assert.match(curate, /\$\{CURATE_BTN\} col-span-2/);
+  // Idle labels: the trailing ellipsis was a "opens a panel" hint that made
+  // every chip a different width. Progress suffixes ("sampling…") stay.
+  assert.match(curate, /🎨 Pick diverse\{/);
+  assert.match(curate, /⚖️ Balanced pick\{/);
+  assert.match(curate, /🎯 Similar to selected\{/);
+  assert.match(curate, /🔤 Find by text\{/);
+  assert.doesNotMatch(curate, /🎨 Pick diverse…/);
+  assert.doesNotMatch(src, /🧹 Auto-reject…/);
 });

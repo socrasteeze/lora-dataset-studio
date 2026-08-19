@@ -282,7 +282,7 @@ const TOPICS = [
       'telegram', 'duplicates', 'blurry', 'quality', 'cluster', 'person', 'sort',
       'sort resolution', 'resolution', 'megapixels', 'largest', 'smallest',
       'resolution tier', 'resolution filter', 'filter by resolution', 'megapixel',
-      'small images', 'thumbnails', 'low resolution', 'high resolution',
+      'small images', 'thumbnails', 'portrait', '3:4', 'low resolution', 'high resolution',
       'promote', 'unsorted',
       // "I dropped files in the folder and the bank list still shows the old
       // count" — the list stopped re-walking every source folder on load (it
@@ -643,7 +643,8 @@ const TOPICS = [
   action('bank-decision-bar', 'Keep and reject from the bottom of the screen',
     ['selection bar', 'bottom bar', 'pinned', 'sticky', 'floating', 'keep reject',
      'scroll up', 'scrolling', 'scroll back up', 'phone', 'mobile', 'small screen',
-     'undo', 'clear selection', 'rotate selection', 'bank', 'triage'],
+     'undo', 'clear selection', 'clr', 'skip', 'undecided',
+     'rotate selection', 'bank', 'triage'],
     '/bank', 'using-the-app', 'filter-a-bank-on-a-small-screen'),
   { id: 'page-setup', kind: 'page', title: 'Setup wizard',
     keywords: ['setup', 'wizard', 'onboarding', 'install', 'install everything',

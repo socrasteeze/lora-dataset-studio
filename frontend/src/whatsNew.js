@@ -50,6 +50,54 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-18-microcopy',
+    date: '2026-08-18',
+    title: 'Screens say less of what you can already see',
+    blurb:
+      'Image bank, Video bank and Training runs no longer open with a concept paragraph — the title already names the place. Settings sections dropped the blurb under each heading. ▶ Review and Select all are the button; the extra words live in the tooltip. Each pass dialog opens on one line of what it does. Launch all, Move folder, Promote, Devices and the folder picker already dropped the restating paragraphs. Help and the Guide still carry the long version.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-18-launch-all-dup-default',
+    date: '2026-08-18',
+    title: 'Launch all only auto-rejects duplicates unless you tick more',
+    blurb:
+      '🚀 Launch all used to tick Blurry and Flat as well as Duplicates, so an overnight run could bin soft or plain shots you still wanted to judge. Auto-reject now starts with only ≈ Duplicates on; the quality flags are there, off, for the banks where you do want them. The dialog also dropped the paragraph under the title — the pass list already says what will run.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-18-bank-decision-bar',
+    date: '2026-08-18',
+    title: 'Keep and Reject sit even on the selection bar',
+    blurb:
+      'Selecting thumbnails used to grow a wrapping jumble: Keep was a different width from Reject, Undecided and the rotate icons spilled onto a second row, and Clear sat alone on the right. Keep and Reject now share one even row, Skip (set them back to undecided) and CLR (clear the ticks) share the next, and the rotate buttons sit as a compact pair next to the count.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-18-browse-in-app',
+    date: '2026-08-18',
+    title: 'Browse for a folder inside the app, not in Explorer',
+    blurb:
+      '📂 Browse on Create bank, the video bank, and Move folder used to open the Windows folder dialog on this machine. It now opens the in-app folder list: drives, Up, a path you can paste, and Use this folder. Pasting a path into the field still works. Dataset folder-import still uses the native dialog, because that flow is a one-shot pick with no field beside it.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-18-bank-curate-chips',
+    date: '2026-08-18',
+    title: 'Bank chips and buttons sit in even rows, without the trailing dots',
+    blurb:
+      'The Bank’s Curate row used to wrap four different-width pills plus a half-width Coverage advice chip, each labelled with a trailing “…”. The four actions now share a two-column grid, Coverage advice takes the full row underneath, and the idle labels are just the action — Auto-reject included. The same cleanup landed on the header: the counters sit in even chips with the semantic-ready line on its own full-width row, Filters / Passes / Launch all share one row, Promote / Delete rejected share the next, and Move folder, Launch all and Promote dropped the dots. Busy states still say when they are working.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-18-bank-portrait-thumbs',
+    date: '2026-08-18',
+    title: 'Bank thumbnails are portrait now, like the photos',
+    blurb:
+      'Image-bank tiles used to be a short landscape crop — a 3:4 photo of a person lost everything below the collarbone, which is exactly the framing you are there to judge. Every bank thumbnail is now a 3:4 portrait box: the grid, the cards on the bank list, and the duplicate picker. Landscape shots are still centre-cropped, not squashed. Small vs medium tiles still means more or fewer per row.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-19-video-ai-check',
     date: '2026-08-19',
     title: 'See which shots may have been generated rather than filmed',

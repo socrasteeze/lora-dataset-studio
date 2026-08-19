@@ -15,7 +15,7 @@ import { detailSummary } from './bankProvenance.js'
 import { captionChips } from './bankTags.js'
 import { captionOriginTooltipLine } from '../../utils/captionOrigin.js'
 
-export default function Tile({ img, bankId, selected, onToggle, onReview, onTags, size }) {
+export default function Tile({ img, bankId, selected, onToggle, onReview, onTags }) {
   // `key` matters only for the flags list below (the one mapped array) — it was
   // missing and logged a React warning on every bank grid render.
   // The chips this image would actually offer. Computed HERE rather than asked of
@@ -53,16 +53,20 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
           + (img.caption
             ? `\n${captionOriginTooltipLine(img.caption, img.caption_origin)}: ${img.caption}`
             : '')}
-        className="block w-full">
+        className="block aspect-[3/4] w-full">
         {/* ?r=/?e= are cache busters, not parameters the server reads: the thumb
             route answers with max-age=3600, so a turned OR edited image would keep
             showing its old pixels for an hour and read as "the button did nothing".
             ?e= carries the edit GENERATION, so a second crop of the same image
-            moves the URL too — see bankEdits.imageVersionQuery. */}
+            moves the URL too — see bankEdits.imageVersionQuery.
+            3:4 portrait: bank photos are typically people, and a short
+            landscape crop cut the body off. Width comes from the grid; S vs M
+            is column count, not a second height. Landscape shots stay
+            centre-cropped (object-cover), not squashed. */}
         <img src={`/api/bank/${bankId}/thumb/${img.id}${imageVersionQuery(img)}`}
           alt={[img.name, img.rotation ? `rotated ${img.rotation}°` : null,
             edited ? edited.label : null].filter(Boolean).join(' — ')} loading="lazy"
-          className={`w-full object-cover ${size === 'S' ? 'h-24' : 'h-36'}`} />
+          className="h-full w-full object-cover" />
       </button>
       {selected && (
         <span aria-hidden className="absolute inset-0 bg-indigo-500/30 ring-2 ring-indigo-400 rounded-lg pointer-events-none" />

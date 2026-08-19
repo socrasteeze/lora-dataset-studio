@@ -2,7 +2,7 @@
  *
  * The backend hands each bank the ids of its first few non-rejected images
  * (`preview_ids`, id order = inventory order, stable across reloads). The card
- * renders a fixed-width strip so every card is the same height whether the bank
+ * renders a fixed-width 3:4 portrait strip so every card is the same height whether the bank
  * holds 3 images or 3 000. */
 
 export const PREVIEW_SLOTS = 5

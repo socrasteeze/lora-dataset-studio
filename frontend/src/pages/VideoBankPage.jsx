@@ -118,13 +118,6 @@ export default function VideoBankPage() {
         <HelpBadge topic="page-video-bank" />
         <BankLaneTabs className="w-full sm:ml-auto sm:w-auto" />
       </header>
-      <p className="max-w-3xl text-sm text-content-muted">
-        Point the app at a folder of rushes and turn it into a video training set: each
-        file is cut at its shot boundaries, you keep the shots worth training on, and
-        only those get encoded — at the length and frame rate your target model
-        actually demands. Nothing is copied and nothing is re-encoded until you promote,
-        so a bank of hundreds of shots costs no disk space at all.
-      </p>
 
       <VideoCapabilityStrip capability={capability} />
 
@@ -137,10 +130,10 @@ export default function VideoBankPage() {
             className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content" />
         </div>
         <div className="grow-[3] min-w-64">
-          <FolderPickerField id="video-bank-folder" label="Folder on this computer"
+          <FolderPickerField id="video-bank-folder" label="Folder"
             value={folder} onChange={setFolder} required
             placeholder="path\to\rushes (subfolders included)"
-            hint="Reads .mp4, .mov, .mkv, .webm and .avi. No pass ever modifies your files: scanning, cutting and building all write elsewhere. The one thing that adds to this folder is a scrape you send to this bank yourself." />
+            hint=".mp4, .mov, .mkv, .webm, .avi" />
         </div>
         <button type="submit" disabled={creating}
           className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">

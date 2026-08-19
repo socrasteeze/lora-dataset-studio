@@ -474,7 +474,7 @@ export default function SettingsPage() {
         </aside>
 
         <div ref={panelRef} className="mt-2 scroll-mt-20 space-y-6 lg:mt-0">
-          <SectionHeader eyebrow={active.eyebrow} title={active.title} description={active.description}
+          <SectionHeader eyebrow={active.eyebrow} title={active.title}
             badge={<HelpBadge topic={`settings-${activeId}`} />} />
           <ActiveSection {...sectionProps} />
         </div>
