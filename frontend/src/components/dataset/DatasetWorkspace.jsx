@@ -771,7 +771,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
           const prog = act.total ? ` ${act.done}/${act.total}` : '';
           // Passes that DON'T claim "ComfyUI is paused": the CPU ones, plus
           // 'generate' (the Klein case is obvious from the tiles appearing).
-          const cpu = act.kind === 'analyze_faces'
+          // 'analyze_faces' is CPU by default and then claims nothing — but it
+          // has a GPU lane (face_scoring.device), and THAT one really does hold
+          // the exclusive window. The pass advertises its engine so this line
+          // never has to guess.
+          const cpu = (act.kind === 'analyze_faces' && act.engine !== 'cuda')
             || (act.kind === 'watermark_clean' && !String(act.detail || '').includes('GPU'))
             || act.kind === 'generate'
             // Same reasoning as 'generate': the improve batch feeds ComfyUI, and
@@ -2099,6 +2103,15 @@ export default function DatasetWorkspace({ ds, onBack }) {
           onMarkWatermark={viewImgLive._rescueReviewPreview
             ? undefined
             : ((image) => { setViewImg(null); setReviewQueue([image]); })}
+          /* ✦ Repair acts HERE now, without the detour through the watermark
+             review. Same call the review screen makes, so both surfaces share
+             one lane, one undo and one set of refusals. */
+          onRepair={viewImgLive._rescueReviewPreview
+            ? undefined
+            : ((id, prompt, boxes, mask) => ds.repairImageRegion(id, prompt, boxes, mask))}
+          onUndoRepair={viewImgLive._rescueReviewPreview
+            ? undefined
+            : ((id) => ds.undoImageRepair(id))}
           improvePending={viewImgImproving}
           improveReady={viewImgImprovementReady}
           busy={ds.busy || gridBulkBusy}
@@ -2142,7 +2155,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           onRestore={(id) => ds.restoreWatermarkImage(id)}
           onDismiss={(id) => ds.dismissWatermarks([id])}
           onReject={(id) => ds.setStatus(id, 'reject')}
-          onRepair={(id, prompt, boxes) => ds.repairImageRegion(id, prompt, boxes)}
+          onRepair={(id, prompt, boxes, mask) => ds.repairImageRegion(id, prompt, boxes, mask)}
           onUndoRepair={(id) => ds.undoImageRepair(id)}
           onClose={(recap) => {
             setReviewQueue(null);

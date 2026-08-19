@@ -245,7 +245,7 @@ INSTALL_ACTIONS = ('ml_extras', 'scrape_extras', 'ollama_model',
                    'face_scoring', 'masks', 'watermark_inpaint',
                    'bank_scoring', 'bank_siglip2', 'wd14',
                    'watermark_detect',
-                   'video', 'shot_detect') + tuple(_MODEL_DOWNLOADS) + tuple(_NODE_PACKS)
+                   'video', 'shot_detect', 'video_text') + tuple(_MODEL_DOWNLOADS) + tuple(_NODE_PACKS)
 
 _ML_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-ml.txt'
 _SCRAPE_REQUIREMENTS = cfg.BACKEND_DIR / 'requirements-scrape.txt'
@@ -348,6 +348,22 @@ _CAPABILITY_PACKAGES = {
     #               kept failing in an environment nothing had put av into.
     'video': ('imageio-ffmpeg', 'av'),
     'shot_detect': ('transnetv2-pytorch', 'av'),
+    #   video_text  RapidOCR, for the safe-zone pass's burned-in-text half. It
+    #               lands in the SAME interpreter as face_scoring and masks (the
+    #               app's own by default) because it is the same kind of extra:
+    #               CPU onnxruntime, no torch, no second 2.5 GB copy of anything.
+    #               `onnxruntime` and `numpy` are named here for the reason the
+    #               masks line names them — a scoped install must resolve them
+    #               even when the headline package's own metadata is vague, and
+    #               _drop_provided_onnxruntime() still keeps this from stepping
+    #               on a GPU build the user installed themselves.
+    #               `opencv-python-headless` is named because RapidOCR depends on
+    #               the DESKTOP `opencv-python`, which drags a GUI stack onto a
+    #               server: naming the headless variant makes pip prefer it, the
+    #               same trick face_scoring and masks already use for the same
+    #               transitive dependency.
+    'video_text': ('rapidocr-onnxruntime', 'onnxruntime', 'numpy',
+                   'opencv-python-headless'),
     #   bank_scoring  has its own worker and its own package tuple
     #                 (_BANK_SCORING_PKGS); only the ONE package whose version
     #                 floor matters is declared in requirements-ml.txt, so it is
@@ -362,7 +378,7 @@ _CAPABILITY_PACKAGES = {
 # manual_command() all key off this. watermark_inpaint keeps its own worker
 # entirely, so it's excluded. wd14 is here for its pip half but registers a
 # wrapper worker (_run_wd14) that also fetches weights.
-_CAPABILITY_ML_ACTIONS = ('face_scoring', 'masks', 'wd14', 'video')
+_CAPABILITY_ML_ACTIONS = ('face_scoring', 'masks', 'wd14', 'video', 'video_text')
 
 # Actions whose success makes a NEW importable package appear -> the probe
 # import-cache must be dropped so the capability flips without waiting out the
@@ -1592,17 +1608,29 @@ def _run_bank_scoring(action) -> int:
 
 
 def _verify_bank_scoring_import(action, python) -> bool:
-    """Import torch/open_clip/transformers in the target env once pip reports done —
-    HONESTY (a torch/torchvision mismatch fails only at import) and WARMING (a heavy
-    cold import that would time out the 60 s capability probe fired right after). A
-    timeout is 'still warming', never a failure. Mirrors _verify_watermark_import."""
-    if not os.path.isfile(python):
+    """Run the bank-scoring PROBE's own import in the target env once pip reports
+    done — HONESTY (a torch/torchvision mismatch fails only at import) and WARMING
+    (a heavy cold import that would time out the 60 s capability probe fired right
+    after). A timeout is 'still warming', never a failure. Mirrors
+    _verify_watermark_import.
+
+    The expression is `capabilities.CAPABILITY_IMPORTS['bank_scoring']`, literally
+    the one the probe runs, for the reason `_verify_capability_import` gives at
+    length: a gate that checks a SHORTER list than the probe reports "ready" and
+    is then contradicted by a ✗ with no reason anywhere. That is not theoretical
+    here — this list was the headline three while the probe grew numpy and PIL
+    under it. This action cannot simply call that generic gate, because this
+    interpreter is probed with `-s` (_NO_USER_SITE_IMPORT_KEYS) and a probe run
+    with different argv answers a different question.
+    """
+    expr = capabilities.CAPABILITY_IMPORTS.get('bank_scoring')
+    if not expr or not os.path.isfile(python):
         return True
-    _append(action, 'verifying the install (first import — this also warms it, so the '
-                    'capability turns green without a restart)…')
+    _append(action, 'verifying the install (running the same import the capability '
+                    'check runs — this also warms it, so it turns green without a '
+                    'restart)…')
     try:
-        proc = subprocess.run([python, '-s', '-c',
-                               'import torch, open_clip, transformers'],
+        proc = subprocess.run([python, '-s', '-c', expr],
                               capture_output=True, text=True, encoding='utf-8',
                               errors='replace', timeout=_WARM_IMPORT_TIMEOUT,
                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))

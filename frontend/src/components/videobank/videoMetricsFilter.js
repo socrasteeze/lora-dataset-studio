@@ -31,6 +31,41 @@ export const FLAG_LABELS = {
   // means "you already have this one".
   duplicate: 'Same as another shot',
   watermark: 'Watermark',
+  // Same wording the image bank puts on a still, because it is the same head on
+  // the same scale — a user who learned "Low aesthetic" on the Bank must not
+  // have to learn a second name for the same finding on a shot.
+  low_aesthetic: 'Low aesthetic',
+  // 🔳 The safe zone's three findings, named apart because they have three
+  // different remedies: crop it, drop it, or stop trying. A single "bad framing"
+  // chip could only ever suggest the last one.
+  letterboxed: 'Letterbox bars',
+  burned_text: 'Burned-in text',
+  small_safe_zone: 'Little usable frame',
+  // 🩻 What a re-encode left behind, named apart for the same reason the safe
+  // zone's three are: three findings, three remedies — re-cut around the stall,
+  // drop the file, or go and find a better copy of it.
+  //
+  // 'Blurred edges' next to 'No sharp frames' is NOT a duplicate wording for one
+  // finding, and the difference is the whole point of the second measurement:
+  // 'soft' reads a Laplacian on a 160-pixel-wide analysis copy and answers "is
+  // there detail in this shot", while this one measures edge width at FULL size
+  // and answers "are the pixels real". Footage upscaled from something smaller
+  // is identical to the genuine article at 160 pixels and obviously fake at
+  // 1080 — a clip can honestly carry either chip without the other.
+  dup_frames: 'Duplicated frames',
+  blocky: 'Compression blocks',
+  blurry: 'Blurred edges',
+  // 🤖 The hedge is the label, and it is deliberate. Every other chip here
+  // states a measured fact about the pixels ("Letterbox bars", "Duplicated
+  // frames"); this one states an inference from a statistic that is right about
+  // three times in four on re-encoded material, so a chip reading "AI-generated"
+  // would be a confident claim the measurement cannot support.
+  //
+  // It also must not read like the Bank's own AI verdict on a still. That one
+  // is `origin: 'ai'` and comes from METADATA — a generator's own prompt block,
+  // a C2PA mark — which is proof when it is there. Different method, different
+  // certainty, so a different word: the image lane says AI, this one says may be.
+  maybe_generated: 'May be AI-generated',
   unmeasured: 'Not measured yet',
 }
 
@@ -154,6 +189,104 @@ export function thresholdFields() {
         + '🔖 Watermarks pass has run. The scores sit close to 1, so 0.94 is the '
         + 'measured cut, not 0.5 — lower it to catch faint marks and hand-check '
         + 'a few clean shots. Shots that pass has not judged are never flagged.' },
+    // The look score. Empty by default like the footage cuts, because the LAION
+    // references were chosen to filter a web crawl and deliberately-shot rushes
+    // sit well above them — so they belong in this hint, not in a default that
+    // would decide for the user what is beautiful.
+    { key: 'aesthetic_floor', flag: 'low_aesthetic', direction: 'below',
+      label: 'Aesthetic floor',
+      hint: 'Flags shots the LAION aesthetic head rates below this — the same '
+        + '~1–10 rating, and the same model, the Bank’s ✨ Score puts on a '
+        + 'still. LAION reference: 4 casual, 4.75 strict, both set for filtering '
+        + 'a web crawl, so start by previewing 4 against your own bank. Shots '
+        + 'rate after 🔎 Find scenes has run; an unrated shot is never flagged.' },
+    // 🔳 The safe zone. All three read what that pass measured on three frames
+    // of each shot, and all three ship empty: bands and burned-in text are
+    // properties of somebody's footage rather than of a classifier, so the
+    // published figures belong in these hints and in no default.
+    { key: 'bars_max', flag: 'letterboxed', direction: 'above',
+      label: 'Letterbox share',
+      hint: 'Flags shots where more than this share of the frame is a flat band '
+        + '— letterbox, pillarbox, or a vertical video padded into a wide one. '
+        + 'The same number the Bank puts on a still, where 0.04 was the measured '
+        + 'cut. Bands survive a training crop, so they are worth seeing; a '
+        + '2.35:1 film honestly carries about 0.12 and is not a defect. Needs '
+        + 'the 🔳 Safe zone pass; a shot it has not measured is never flagged.' },
+    { key: 'text_coverage_max', flag: 'burned_text', direction: 'above',
+      label: 'Burned-in text share',
+      hint: 'Flags shots where subtitles, chyrons or a text watermark cover more '
+        + 'than this share of the frame. Only text that HOLDS STILL across the '
+        + 'shot counts — a passing shop sign is scene content and is never '
+        + 'counted. 0.01 is already a full subtitle line. Needs the 🔳 Safe zone '
+        + 'pass AND its text extra from Setup; with the extra missing the pass '
+        + 'measures bands only and no shot is ever flagged here.' },
+    { key: 'safe_area_min', flag: 'small_safe_zone', direction: 'below',
+      label: 'Usable frame floor',
+      hint: 'Flags shots where cropping away the bands AND the burned-in text '
+        + 'would leave less than this share of the frame. HunyuanVideo 1.5 keeps '
+        + 'only clips whose crop leaves 60 % or more; below about 50 % there is '
+        + 'not enough picture left to be worth the trouble. Text in the MIDDLE '
+        + 'of a frame lands here rather than under the share above — it is '
+        + 'small, and there is no crop that removes it. Needs the 🔳 Safe zone '
+        + 'pass AND its text extra from Setup: without the extra the pass '
+        + 'measures bands only and stores no usable-frame reading at all, so '
+        + 'this cut flags nothing rather than clearing every shot.' },
+    // 🩻 The defect sweep. All three read one ffmpeg pass per SOURCE FILE and
+    // all three ship empty — and here the reason is not only "it is your
+    // footage": the two quality scores are raw filter outputs whose absolute
+    // value depends heavily on CONTENT, so the signal is in the spread inside
+    // one bank rather than in the number. That makes the dry run less optional
+    // here than anywhere else in this table, which is why every hint below
+    // gives an order of magnitude instead of a value to type.
+    { key: 'dup_frames_max', flag: 'dup_frames', direction: 'above',
+      label: 'Duplicated frames',
+      hint: 'Flags shots where more than this share of frames is a repeat of '
+        + 'the one before. 0.1 means a tenth. This is what 24 fps material '
+        + 'uploaded as 30 fps looks like — one frame in five is a copy, so 0.15 '
+        + 'catches it — and it is NOT the frozen-share cut above: that one says '
+        + 'nothing moved, this one says the same picture arrived twice. Needs '
+        + 'the 🩻 Defects pass; a shot it has not swept is never flagged.' },
+    { key: 'block_max', flag: 'blocky', direction: 'above',
+      label: 'Compression blocks',
+      hint: 'Flags shots where the macroblock grid shows through. No default, '
+        + 'and no useful published one: the score depends on what is IN the '
+        + 'frame as much as on the damage — measured here, the same scene from '
+        + 'a good encode to a ruined one moved from 13 to 43, while four '
+        + 'different scenes at ONE quality spanned 1 to 25 000. So read your own '
+        + 'bank: preview a value, look at what it caught, move it. Needs the '
+        + '🩻 Defects pass.' },
+    { key: 'blur_max', flag: 'blurry', direction: 'above',
+      label: 'Blurred edges',
+      hint: 'Flags shots whose edges stay wide even at their sharpest, measured '
+        + 'at FULL resolution. This is the one that catches footage upscaled '
+        + 'from something smaller, which the sharpness floor above cannot see at '
+        + 'all — it measures a 160-pixel-wide copy, where a 480p upscale and the '
+        + 'real 1080p are the same picture (measured: 353.7 against 354.4). '
+        + 'Typical readings are 4-6 for clean footage and 7-12 for upscaled or '
+        + 'heavily squeezed material. Deliberately reads the SHARPEST tenth of '
+        + 'each shot, so a fast pan is not called blurry. Needs the 🩻 Defects '
+        + 'pass.' },
+    // 🤖 The AI check — the only cut in this table whose LOW side is the
+    // suspicious one, and the only one whose hint has to carry an accuracy
+    // figure. Both are deliberate: a user who reads this as "high is bad" sets
+    // it backwards and flags every handheld shot in the bank, and a user who
+    // reads the flag as a verdict throws away real footage.
+    { key: 'motion_irregularity_floor', flag: 'maybe_generated', direction: 'below',
+      label: 'Motion irregularity floor',
+      hint: 'Flags shots whose motion is suspiciously SMOOTH — the low side is '
+        + 'the suspect one here, so raising this flags more. Real footage is '
+        + 'erratic (a hand shakes, a subject accelerates, the sensor is noisy) '
+        + 'and generated footage tends to be smoother than the world. '
+        + 'HOW RELIABLE: about three shots in four. Measured blind, the best '
+        + 'detector in the field scored 0.86 on untouched video and 0.74 once '
+        + 'it had been re-compressed — and anything scraped is re-compressed. '
+        + 'The method was also measured only against 2023–24 generators, and it '
+        + 'is worst on cheap, glitchy or heavily stylised output, which it reads '
+        + 'as MORE real. So treat a flag as "look at this one", never as a '
+        + 'verdict. There is no published value to type — the score has no '
+        + 'calibrated scale — so preview against your own bank. Needs the '
+        + '🤖 AI check pass; a shot it has not measured, or one too short for '
+        + 'its two-second window, is never flagged.' },
   ]
 }
 

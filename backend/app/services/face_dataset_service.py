@@ -8196,12 +8196,36 @@ def analyze_faces(user_id, dataset_id) -> dict:
     if not score_lock.acquire(blocking=False):
         return {}, _face_scoring_busy_error()
 
+    # Declared BEFORE the reservation loop, not after it. That loop sha1s every
+    # candidate file (run_snapshot._content_sig reads the image whole), which on a
+    # large dataset is minutes of pure I/O. Announced only afterwards, the entire
+    # phase ran with NO activity to report - so the screen fell back to its
+    # generic "GPU processing in progress... ComfyUI is paused" banner, wrong on
+    # both counts for a CPU pass, and showed no progress at all. Reported as
+    # "I launched an analyze but nothing seems to happen". The pass now names
+    # itself from its first second and counts files as it fingerprints them.
+    # The engine is advertised because it changes what the screen may CLAIM: on
+    # CPU this pass runs beside ComfyUI and must not say it paused anything, on
+    # GPU it holds the exclusive window and must say so. Resolved from the same
+    # shared answer the scorer itself will use.
+    from ..capabilities import resolve_face_device
+    face_engine, _face_use_gpu = resolve_face_device()
+    try:
+        token = dataset_activity.begin(dataset_id, 'analyze_faces',
+                                       total=len(by_path),
+                                       detail='Analyzing faces - checking images...',
+                                       engine=face_engine)
+    except Exception:
+        score_lock.release()
+        raise
+
     # Stamp every eligible file before inference.  A crop/mirror/rotate clears
     # this pair, making the final per-row write below fail closed if pixels move.
     reserved_by_path = {}
     try:
         from sqlalchemy import update
-        for p, img in by_path.items():
+        for checked, (p, img) in enumerate(by_path.items(), 1):
+            dataset_activity.progress(token, done=checked)
             revision = _face_score_content_revision(p)
             if revision is None:
                 continue
@@ -8223,17 +8247,19 @@ def analyze_faces(user_id, dataset_id) -> dict:
         db.session.commit()
     except Exception:
         db.session.rollback()
+        dataset_activity.end(token)
         score_lock.release()
         raise
     if not reserved_by_path:
+        dataset_activity.end(token)
         score_lock.release()
         return {}, None
 
-    try:
-        token = dataset_activity.begin(dataset_id, 'analyze_faces', total=len(reserved_by_path))
-    except Exception:
-        score_lock.release()
-        raise
+    # The real scope is only known now - images whose pixels moved under us
+    # dropped out. Clearing the detail (empty string, not None: None means
+    # "leave it as is") hands the screen back its counting label,
+    # "Analyzing faces... 12/340".
+    dataset_activity.progress(token, done=0, total=len(reserved_by_path), detail='')
 
     try:
         results, scoring_error = score_dataset_faces(
@@ -9076,9 +9102,19 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
             ok, err = watermark_klein.inpaint_watermark_klein(user_id, staged, boxes,
                                                               klein_model=klein_model)
             if ok and _promote_staged_watermark_edit(staged, path):
+                # The hand-drawn zones SURVIVE the clean. They used to be
+                # dropped here, which quietly cost the user their work: ↩ Restore
+                # original puts the watermarked pixels back and re-flags the image
+                # 'detected' so it can be cleaned again — often with the other
+                # engine, which is the whole point of the button — but the zones
+                # it was going to use were already gone, so the retry silently
+                # fell back to the DETECTED bbox. Those zones exist precisely
+                # because the detector missed or mis-drew it.
+                # Nothing needs them cleared: the clean set is selected on
+                # watermark_state alone, so a 'cleaned' row cannot re-enter it,
+                # and the Bank — the same feature on the other surface — has
+                # always kept them (image_bank_service never nulls this field).
                 img.watermark_state = 'cleaned'
-                if manual:
-                    img.watermark_regions = None
                 out['inpainted_klein'] += 1
             elif ok:
                 if not manual:
@@ -9248,9 +9284,8 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
                         (False, {'kind': 'failed', 'detail': 'missing inpaint result'}),
                     )
                     if ok and _promote_staged_watermark_edit(staged_path, live_path):
+                        # Kept, for the reason spelled out in the Klein lane above.
                         img.watermark_state = 'cleaned'
-                        if manual:
-                            img.watermark_regions = None
                         out['inpainted'] += 1
                     elif ok:
                         if not manual:
@@ -9296,6 +9331,12 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
 
 
 REPAIR_UNDO_SUFFIX = '.prerepair'
+# A painted mask arrives as a PNG data URL. Two bounds, because this is a body
+# a browser can make arbitrarily large: the blob itself, and the prompt beside
+# it. Neither is a guess about the model — they are refusals to buffer or
+# forward something no gesture in the UI can produce.
+REPAIR_MASK_MAX_BYTES = 8 * 1024 * 1024
+REPAIR_PROMPT_MAX = 500
 
 
 def repair_snapshot_path(path) -> str:
@@ -9331,9 +9372,77 @@ def undo_repair_at(path) -> bool:
     return True
 
 
+def decode_repair_mask(raw, size):
+    """A PNG data URL (or bare base64) -> an 'L' mask at `size`, white = repaint.
+
+    Refuses an all-black mask rather than letting it reach the GPU: a mask
+    nobody painted would cost a full Klein round-trip to return the same image,
+    and the honest answer is the one the user can act on.
+    """
+    import base64  # only user in this module; kept local like its neighbours
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError('mask is required')
+    text = raw.strip()
+    if text.startswith('data:'):
+        if ',' not in text:
+            raise ValueError('mask is not a valid image')
+        header, b64 = text.split(',', 1)
+        if 'base64' not in header.lower():
+            raise ValueError('mask is not a valid image')
+    else:
+        b64 = text
+    try:
+        blob = base64.b64decode(b64, validate=False)
+    except (ValueError, TypeError) as exc:
+        raise ValueError('mask is not a valid image') from exc
+    if not blob:
+        raise ValueError('mask is not a valid image')
+    if len(blob) > REPAIR_MASK_MAX_BYTES:
+        raise ValueError('mask is too large')
+    try:
+        with Image.open(io.BytesIO(blob)) as opened:
+            mask = opened.convert('L')
+    except (OSError, ValueError, UnidentifiedImageError) as exc:
+        raise ValueError('mask is not a valid image') from exc
+    if size and mask.size != tuple(size):
+        mask = mask.resize(tuple(size), Image.BILINEAR)
+    if mask.getextrema()[1] == 0:
+        raise ValueError('paint the area to repair first')
+    return mask
+
+
+def decode_repair_mask_for(frame_path, raw):
+    """`decode_repair_mask` sized against the frame at `frame_path`.
+
+    Exists so callers do not each need PIL and a probe of their own — the
+    generated-image lane has no PIL import at all, and adding one there to size
+    a mask would put the knowledge of what a mask is sized against in two
+    places."""
+    with Image.open(frame_path) as probe:
+        size = probe.size
+    return decode_repair_mask(raw, size)
+
+
 def take_repair_snapshot(path) -> None:
     """Copy the CURRENT pixels aside so the repair about to run can be undone.
-    Overwrites any previous snapshot — the undo is one step deep by design."""
+    Overwrites any previous snapshot — the undo is one step deep BY DESIGN.
+
+    WRITE-ONCE WAS PROPOSED AND REJECTED, so nobody re-derives it as an
+    improvement. PR #37 kept its snapshot from before the FIRST edit, which
+    sounds strictly safer and is not, because repairs are ITERATED: the dialog
+    stays open and offers "✦ Repair again". Walk a real session —
+
+        1. remove the necklace   -> good, keep it
+        2. remove the earring    -> bad
+
+    ...and press undo. One step deep gives back the picture with the necklace
+    gone. Write-once gives back the untouched original and silently throws away
+    step 1, which the user never asked to lose. The safer-sounding rule is the
+    one that destroys work.
+
+    Getting all the way back to pristine is not lost either: `.orig` is
+    write-once and ↩ Restore original still returns it.
+    """
     try:
         shutil.copy2(path, repair_snapshot_path(path))
     except OSError as e:
@@ -9370,7 +9479,8 @@ def undo_image_repair(user_id, dataset_id, image_id) -> dict | None:
 
 
 @_serialize_dataset_ingest
-def repair_image_region(user_id, dataset_id, image_id, boxes, prompt, *, seed=None) -> dict:
+def repair_image_region(user_id, dataset_id, image_id, boxes, prompt, *,
+                        seed=None, mask=None) -> dict:
     """✦ Repaint ONE hand-drawn box of a dataset image from a FREE prompt, leaving
     every pixel outside it byte-identical.
 
@@ -9396,6 +9506,15 @@ def repair_image_region(user_id, dataset_id, image_id, boxes, prompt, *, seed=No
     asked for, not a verdict about a watermark, and stamping one would make the
     flag lie in both directions.
 
+    TWO GEOMETRIES, ONE GESTURE. `boxes` alone keeps the crop-and-stitch lane:
+    a square is cut around the box and magnified to ~1 MP, which is fast and
+    bounds VRAM whatever the photo weighs — the right tool for a mark in a
+    corner. A painted `mask` instead sends the WHOLE frame with that mask, so
+    Klein reconstructs a necklace or a pair of glasses while actually seeing the
+    face they sit on. Same preserve/snapshot/promote safety either way; only the
+    geometry handed to the model differs. (Masked lane contributed by JacobArrow
+    on GitHub, PR #37.)
+
     Raises LookupError (unknown dataset/image), ValueError (no prompt, no usable
     box, unreadable image) and keh.KleinModelGone. Returns {'ok': True}.
     """
@@ -9411,6 +9530,8 @@ def repair_image_region(user_id, dataset_id, image_id, boxes, prompt, *, seed=No
         # prompted repair, and silently reconstructing "a clean natural image"
         # instead would repaint the box with an intention nobody expressed.
         raise ValueError('a prompt is required — say what should be painted in that area')
+    if len(text) > REPAIR_PROMPT_MAX:
+        raise ValueError(f'the description must be at most {REPAIR_PROMPT_MAX} characters')
     # Both imported HERE, like every other user of them in this module. `keh` is
     # not a module-level name on purpose — further down the same alias means
     # krea_edit_helper, so importing it at the top would be a trap, not a
@@ -9429,6 +9550,17 @@ def repair_image_region(user_id, dataset_id, image_id, boxes, prompt, *, seed=No
     staged = _stage_oriented_watermark_edit(path)
     if not staged:
         raise ValueError('could not stage the image (EXIF orientation)')
+    # Decoded against the STAGED frame, not the file on disk: the mask was
+    # painted on what the browser displayed, which is the EXIF-upright image.
+    # Sizing it to the raw file would rotate the painted area off its subject on
+    # every phone photo that carries an orientation tag.
+    pil_mask = None
+    if mask is not None:
+        try:
+            pil_mask = decode_repair_mask_for(staged, mask)
+        except ValueError:
+            _discard_staged_watermark_edit(staged)
+            raise
     if not _preserve_original(path):
         _discard_staged_watermark_edit(staged)
         raise ValueError('could not preserve the original; your file was left unchanged')
@@ -9436,8 +9568,13 @@ def repair_image_region(user_id, dataset_id, image_id, boxes, prompt, *, seed=No
     # for why this is not the .orig sibling.
     take_repair_snapshot(path)
     try:
-        ok, err = watermark_klein.inpaint_watermark_klein(
-            user_id, staged, boxes, seed=seed, klein_model=klein_model, prompt=text)
+        if pil_mask is not None:
+            ok, err = watermark_klein.inpaint_mask_klein(
+                user_id, staged, mask=pil_mask, seed=seed,
+                klein_model=klein_model, prompt=text)
+        else:
+            ok, err = watermark_klein.inpaint_watermark_klein(
+                user_id, staged, boxes, seed=seed, klein_model=klein_model, prompt=text)
         if not ok:
             detail = (err or {}).get('detail') or 'the repair failed'
             raise ValueError(detail)

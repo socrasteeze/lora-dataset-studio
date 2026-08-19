@@ -806,6 +806,23 @@ const TOPICS = [
       'video unavailable', 'video extra', 'which piece is missing'],
     guide: { chapter: 'using-the-app', anchor: 'the-video-bank-turn-a-folder-of-rushes-into-shots' },
     app: { route: '/video-bank' } },
+  // Searched for by what people TRIED and could not do: they pasted a RedGifs or
+  // TikTok link into the image scraper and got "no images found", or they
+  // downloaded clips by hand into a folder because nothing else was on offer.
+  action('video-bank-scrape', 'Scrape the web into a video bank',
+    ['scrape', 'scraper', 'scrape video', 'scrape videos', 'scrape into video bank',
+     'download videos', 'download a clip', 'video from the web', 'videos from a url',
+     'redgifs', 'tiktok', 'erome', 'picazor', 'x videos', 'twitter video',
+     'no videos found', 'my video link is ignored', 'video items dropped',
+     'fill a video bank', 'video bank without a folder', 'no folder',
+     'new video bank from the web', 'add more clips', 'resume scrape',
+     // People search for where the files END UP, and for the reassurance: the
+     // scrape is the one thing in this lane that adds to a folder of your own.
+     'where do the clips go', 'which folder', 'add to my own bank',
+     'scrape into an existing bank', 'add clips to my rushes folder',
+     'does it write to my folder', 'my rushes folder',
+     'bank not in the list', 'dataset folder'],
+    '/video-bank', 'using-the-app', 'the-video-bank-turn-a-folder-of-rushes-into-shots'),
   action('video-bank-passes', 'Scan, find shots, make thumbnails',
     ['scan files', 'find shots', 'make thumbnails', 'run everything', 'video passes',
      'order of passes', 'nothing was detected', 'no shots found', '0 shots',
@@ -823,7 +840,13 @@ const TOPICS = [
      'tiny clips', 'tiny shots', 'flash cut', 'flash cuts', '0.6 second shots',
      'half second shots', 'very short clips', 'shots too short',
      'minimum length', 'minimum duration', 'duration filter',
-     'hide short clips', 'too many clips'],
+     'hide short clips', 'too many clips',
+     // The look score arrives with 🔎 Find scenes but is READ here, and people
+     // search for it by the judgement ("ugly shots") or by the model's name,
+     // never by "aesthetic_floor".
+     'aesthetic', 'aesthetic floor', 'low aesthetic', 'ugly shots',
+     'pretty shots', 'nice looking', 'look score', 'laion', 'laion score',
+     'aesthetic score on video', 'rate how shots look'],
     '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
   // People search for the SYMPTOM ("the cut is one second too early", "half my
   // clip is frozen"), and — since it is the discovery this tool folds in — for
@@ -841,6 +864,30 @@ const TOPICS = [
      'thumbnail disappeared', 'lost my thumbnail', 'thumbnail gone after trimming',
      'redetect deleted my cuts', 're-detect', 'lost my manual cuts'],
     '/video-bank', 'using-the-app', 'retouch-a-cut-trim-split-or-draw-a-shot-by-hand'),
+  // The symptoms this one answers are the loudest in the whole lane: "it cut my
+  // video into 60 pieces" and "it missed every cut". Both are the SAME control,
+  // and until it was exposed the honest answer was "you cannot change that".
+  action('video-shot-threshold', 'Change how often a rush gets cut',
+    ['threshold', 'sensitivity', 'cut sensitivity', 'too many shots',
+     'too many clips', 'cut into pieces', 'chopped up', 'over-detected',
+     'over detection', 'false cuts', 'invented cuts', 'not enough shots',
+     'missed every cut', 'one shot only', 'under-detected', 'find shots again',
+     're-cut', 'recut', 're-cut a bank', 'redetect from cache', 'instant',
+     'preview shots', 'how many shots', 'dry run shots', 'shot_detect.threshold',
+     'per file threshold', 'per bank threshold', '0.5', 'transnetv2'],
+    '/video-bank', 'using-the-app', 'change-how-often-a-rush-gets-cut'),
+  action('video-single-shot', 'Mark a file as one single take',
+    ['single shot', 'single take', 'one take', 'one shot', 'no cuts',
+     'this file has no cuts', 'do not cut this file', 'whole file as one clip',
+     'stop splitting this video', 'undo single shot', 'redetect this file',
+     're-detect this file', 'keep the whole file'],
+    '/video-bank', 'using-the-app', 'change-how-often-a-rush-gets-cut'),
+  action('video-transition-kind', 'Cut or dissolve: what the chip on a shot means',
+    ['dissolve', 'cross fade', 'crossfade', 'fade', 'transition', 'hard cut',
+     'dissolve 18f', 'amber chip', 'what is that chip', 'transition type',
+     'clip starts on a fade', 'first frames are a fade', 'trim dissolves',
+     'shot_detect.trim_dissolves', 'shot_detect.dissolve_min_frames'],
+    '/video-bank', 'using-the-app', 'change-how-often-a-rush-gets-cut'),
   // The symptoms: a search that cannot find an action, a dataset that trained on
   // nothing, and "why did my caption come back after I fixed it" (it must not).
   action('video-captions', 'Describe shots, and search what happens',
@@ -904,6 +951,51 @@ const TOPICS = [
      'shutterstock', 'getty', 'corner logo', 'burned in logo', 'my lora draws a logo',
      'watermark score', 'watermark cut', 'watermark detector', 'detector weights',
      'not downloaded', 'ambassador frame'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  // Arrived at from the SYMPTOM in almost every case — "my LoRA writes
+  // subtitles", "black bars in every generation" — long before anyone goes
+  // looking for a control named after the measurement. The install question
+  // ("bands only") is here too: it is the one capability in the app whose
+  // absence downgrades a pass instead of blocking it, so the sentence a user
+  // meets is unlike every other missing-extra sentence.
+  action('video-safe-zone', 'Bands and burned-in text (🔳 Safe zone)',
+    ['safe zone', 'safezone', 'letterbox', 'letterboxed', 'pillarbox',
+     'black bars', 'bars', 'padding', 'padded video', 'vertical video padded',
+     'burned in text', 'burned-in text', 'subtitles', 'subtitle', 'captions in the picture',
+     'hardsub', 'hardsubs', 'chyron', 'lower third', 'text watermark',
+     'my lora writes text', 'my lora draws subtitles', 'gibberish text',
+     'text coverage', 'usable frame', 'crop', 'how much can i crop',
+     'bands only', 'rapidocr', 'ocr', 'text extra not installed'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  // Reached from the SYMPTOM in every case — "my LoRA output looks mushy",
+  // "everything I generate has blocks in it", "this 1080p file does not look
+  // like 1080p" — and from the one question this pass exists to answer that
+  // nothing else in the app can: whether a file was upscaled. The sharpness
+  // floor measures a small analysis copy and cannot see it, so a user who has
+  // already set that cut and still gets soft output arrives here next.
+  action('video-defect-sweep', 'Duplicated frames, blocks and soft edges (🩻 Defects)',
+    ['defects', 'defect sweep', 'duplicated frames', 'duplicate frames',
+     'repeated frames', 'same frame twice', 'pulldown', '24fps in 30fps',
+     'frame rate conversion', 'compression blocks', 'blocky', 'blocking',
+     'macroblock', 'macroblocks', 'artifacts', 'artefacts', 'squeezed',
+     'blurred edges', 'blurry', 'soft at full size', 'upscaled', 'upscale',
+     'fake 1080p', 'fake 4k', 'not really hd', 'reencoded', 're-encoded',
+     'reuploaded', 'bitrate', 'bits per pixel', 'bpp', 'codec profile',
+     'block max', 'blur max', 'dup frames max', 'needs ffmpeg'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  // Reached from the WORRY as much as from the feature name — "is this clip
+  // real", "my scrape is full of AI slop" — and from the two questions the
+  // hedge provokes the moment somebody sees the chip: how sure is it, and why
+  // does the Bank say "AI" about a still while this says "may be". The keywords
+  // carry both spellings of the cut, because its polarity is the thing people
+  // get wrong.
+  action('video-ai-check', 'Shots that may be AI-generated (🤖 AI check)',
+    ['ai check', 'aicheck', 'ai generated', 'ai-generated', 'is this real',
+     'synthetic video', 'generated video', 'ai slop', 'deepfake', 'fake video',
+     'sora', 'veo', 'kling', 'runway', 'generated clips in my bank',
+     'motion irregularity', 'motion irregularity floor', 'too smooth',
+     'suspiciously smooth', 'd3', 'second order', 'how accurate is the ai check',
+     'may be ai generated', 'why does the bank say ai and the video says maybe'],
     '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
   action('video-flag-chips', 'Filter the gallery by a quality flag',
     ['flag chips', 'filter by flag', 'flagged shots', 'select flagged',

@@ -357,6 +357,15 @@ DEFAULTS = {
     #   already-tagged bank instantly (same read-time-thresholds contract as the
     #   'bank' scores above) — 0.35 is the tagger's own published default.
     'wd14': {'python': '', 'models_root': '', 'threshold': 0.35},
+    # 🔳 The burned-in-text reader (RapidOCR on CPU onnxruntime), used by the
+    # video lane's safe-zone pass. Blank = the app's own interpreter, which is
+    # where Setup installs it: the extra is small (an ONNX runtime the app
+    # already ships for face scoring and masks, plus ~16 MB of bundled PP-OCR
+    # weights) and drags no torch, so it does NOT need an environment of its own
+    # the way the detector and the scorer do. The override exists for the user
+    # who already keeps a CPU-ML interpreter and would rather not have a second
+    # copy of onnxruntime.
+    'video_text': {'python': ''},
     # Bank ✨ Score pass interpreter (CLIP aesthetic/NSFW stack). Auto-provisioned
     # by the bank_scoring installer into its own venv — declared here so a
     # full-config Save round-trips it instead of failing "unknown config section".
@@ -485,11 +494,66 @@ DEFAULTS = {
     # no GPU). 0.96 is inherited from the image lane's semantic near-duplicate cut
     # over the SAME CLIP space (bank.semantic_dup_threshold); no video-pair
     # calibration exists yet, and video_clip_dedup says so out loud.
+    #
+    # aesthetic_floor is empty like the footage cuts and NOT numbered like
+    # watermark_max, even though it too reads a model rather than your material.
+    # The difference is what the model answers: a watermark score is a
+    # probability calibrated with the classifier, while the LAION head returns a
+    # TASTE rating on a 1..10 scale whose useful cut depends on the corpus — the
+    # published references (4 casual, 4.75 strict) were chosen to filter a web
+    # crawl, and a shelf of deliberately-shot rushes sits far above both. They
+    # ride in the panel as a hint, which is where a reference belongs; a default
+    # would be this app deciding what is beautiful.
     'video_bank': {'min_duration_s': None,
                    'motion_floor': None, 'motion_ceiling': None,
                    'luma_floor': None, 'freeze_max': None,
                    'sharpness_floor': None,
                    'watermark_max': 0.94,
+                   'aesthetic_floor': None,
+                   # 🔳 The safe zone's three cuts, all empty for the same reason
+                   # the footage cuts above are. Bands and burned text are
+                   # properties of SOMEBODY'S FOOTAGE, not of a classifier: a
+                   # 2.35:1 film legitimately carries 12 % of bands, a subtitled
+                   # documentary is a perfectly good LoRA source if the subtitles
+                   # get cropped, and the published figures (the image bank's own
+                   # measured 0.04 for bars on stills; HunyuanVideo 1.5 keeping
+                   # only clips whose crop leaves ≥60 % of the frame) were set
+                   # for corpora that are not this one. They ride in the panel
+                   # hints, which is where a reference belongs.
+                   'bars_max': None,
+                   'text_coverage_max': None,
+                   'safe_area_min': None,
+                   # 🤖 The may-be-AI-generated flag, and the ONE cut in this
+                   # section whose polarity is inverted: a LOW
+                   # `motion_irregularity` is the suspicious one, because real
+                   # footage moves erratically and generated footage is smoother
+                   # than the world. Hence a _floor, and raising it flags more.
+                   #
+                   # Empty, and here the reason is stronger than "it is your
+                   # footage". There IS no published cut to ship: the method's
+                   # own paper reports only AUC and average precision, which are
+                   # rank metrics that need no absolute scale, and its reference
+                   # implementation contains no threshold anywhere. The number's
+                   # magnitude also moves with the encoder and with the frame
+                   # count, so nobody's value transfers to anybody. Preview it
+                   # against your own bank; there is no other way to set it.
+                   'motion_irregularity_floor': None,
+                   # 🩻 The defect sweep's three cuts, empty for a reason that is
+                   # NOT quite the one above. Duplicated frames and blocking are
+                   # damage rather than taste, so a default would be defensible
+                   # in principle — but `block_score` and `blur_score` are raw
+                   # filter outputs whose absolute value depends heavily on
+                   # CONTENT: measured across four scenes at one fixed quality,
+                   # `lavfi.block` spanned three orders of magnitude, while the
+                   # same scene across a quality ladder moved by under 4×. So
+                   # the signal is in the SPREAD within one bank, not in the
+                   # number, and any default would be this app's test material
+                   # deciding what counts as damaged in somebody else's. The
+                   # dry run is how a cut gets chosen; the panel hints carry the
+                   # orders of magnitude that make a first guess possible.
+                   'dup_frames_max': None,
+                   'block_max': None,
+                   'blur_max': None,
                    'duplicate_threshold': 0.96},
     # consistency_strength: the dx8152 LoRA anchors STRUCTURE (composition/
     # background), not the face — its own guide says start at 0.5 and that
@@ -1336,6 +1400,25 @@ def video_banks_root() -> Path:
     independently in Settings › Storage — a user with four hundred hours of rushes
     and a user with fifty thousand photos have very different problems."""
     root = _data_dir() / 'video_banks'
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+def video_bank_sources_root() -> Path:
+    """Videos DOWNLOADED by 🕸 "Scrape the web into a bank" for the banks that
+    scrape CREATES — one folder per bank, owned by the app.
+
+    Deliberately NOT video_banks_root(): that tree's contract is thumbnails and
+    nothing else, and a scraped .mp4 is real source media.
+
+    Not every scraped clip lands here, and that is the point of the wording: a
+    scrape sent to a bank you pointed at your own folder is added THERE, to the
+    folder that bank follows. This root is what a scrape uses when it has no
+    folder to follow yet — so it never has to invent a place inside yours.
+
+    Same role as bank_sources_root() on the image side, kept apart for the same
+    reason the two working roots are: hours of rushes and tens of thousands of
+    photos are not the same storage problem."""
+    root = _data_dir() / 'video_bank_sources'
     root.mkdir(parents=True, exist_ok=True)
     return root
 

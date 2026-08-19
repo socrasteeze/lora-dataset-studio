@@ -195,10 +195,12 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
   useFocusTrap(dialogRef, !!img);
   useEffect(() => {
     if (!img) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    // Escape peels ONE layer — see RepairDialog: while it is open the key is
+    // its own, and this listener would close the lightbox underneath it.
+    const onKey = (e) => { if (e.key === 'Escape' && !repairOpen) onClose?.(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [img, onClose]);
+  }, [img, onClose, repairOpen]);
   useEffect(() => { if (img) closeRef.current?.focus(); }, [img]);
 
   if (!img) return null;
@@ -330,7 +332,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
           context — a sibling would need a fragment and would sit under it. */}
       <RepairDialog open={repairOpen} src={img?.url} alt={alt}
         onClose={(result) => { setRepairOpen(false); if (result && onRepair?.done) onRepair.done(result); }}
-        onSubmit={({ boxes, prompt }) => onRepair.submit(img.id, boxes, prompt)}
+        onSubmit={({ boxes, mask, prompt }) => onRepair.submit(img.id, boxes, prompt, mask)}
         onUndo={onRepairUndo} />
     </div>
   );

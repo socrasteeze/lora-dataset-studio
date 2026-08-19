@@ -25,7 +25,7 @@ same commit as any change that adds a new divergence.
 
 | Section | Answers |
 |---|---|
-| Divergences 1–7 (below) | what differs, why, and what must never come back |
+| Divergences 1–8 (below) | what differs, why, and what must never come back |
 | Merge diagnostics | how a past sync went wrong, so it does not repeat |
 | Merge routine | the short form of the procedure |
 | Fork changelog (at the end) | what shipped, wave by wave — a record, not a checklist |
@@ -856,6 +856,37 @@ p99 block unless upstream adopts an equivalent tail statistic. The deterministic
 control immediately below it remains unchanged and still proves the probe can
 see the legacy parked-lock shape.
 
+**A seventh entry, added 2026-08-18 — and this one is a fork CONTRACT breaking
+an upstream file, not an upstream bug.** `backend/tests/test_infer_result_channel.py`
+is fork-only (upstream carries no copy): it requires every script in
+`backend/infer/` that prints a JSON result to claim the result stream first
+(`_OUT = claim_result_stream(__name__)`, then `print(json.dumps(...), file=_OUT)`),
+so a dependency banner can never land on stdout ahead of the result. That guard
+exists because a peer pass that had finished came home as *"produced no output"*.
+
+Upstream's three new video workers — `video_aesthetic_infer.py`,
+`video_ai_check_infer.py`, `video_text_infer.py` — all print with a bare
+`print(json.dumps(obj), flush=True)`, so the contract went red the moment they
+merged. Each gained the claim, ahead of the heavy import in every case (the look
+score claims BEFORE `import bank_score_infer`, since importing a pass
+deliberately does not claim on the importer's behalf).
+
+**The knock-on is the part worth remembering**, because it is where a careless
+fix would have shipped a lie: `test_video_safe_zone.py::test_the_probe_imports_
+everything_the_worker_imports` reads the worker's OWN import statements and
+asserts the capability probe imports the same set. Adding `from infer_io import
+claim_result_stream` put a third name in that set, and `infer_io` is a sibling
+module in `backend/infer/` rather than anything pip installs — a probe cannot
+import it. Subtracted from the measured set with its reasoning, deliberately
+NOT added to the expected one, so a genuinely new dependency still fails the
+test. That is the same shape as the fourth entry above: widen what the assertion
+tolerates, never pin the literal it was measuring.
+
+Expect this on EVERY sync that adds an infer worker. The check is one command:
+
+```bash
+python -m pytest backend/tests/test_infer_result_channel.py -q
+```
 The section previously held the worked example of how these are meant to end:
 
 - ~~`backend/tests/test_face_mask_preview_progress.py` — an autouse
@@ -1066,6 +1097,45 @@ below for a branch-history correction found while preparing it):
   **On the next sync, prefer whichever side has `relative`** — this is additive
   and conflicts only if upstream rewrites the same className.
 
+## Divergence 8: `start.bat` is a TWO-LANE launcher
+
+Added 2026-08-18, when upstream's crash supervisor met this fork's own restart
+loop in the same seven lines of `start.bat`. Both are real and neither
+supersedes the other, so the file now branches instead of choosing:
+
+- **Default lane — upstream's `backend/supervise.py`.** A native crash (an
+  access violation inside a C extension, an antivirus hook faulting in one)
+  kills the interpreter outright and no `try` survives it; the supervisor
+  relaunches, says so, and gives up after five rapid deaths. `LDS_SUPERVISE=0`
+  opts out.
+- **Opt-out lane — this fork's `LDS_SUPERVISOR=1` + `:run` loop.** Settings ▸
+  *Update & restart* exits with code 3 and start.bat relaunches in THIS console,
+  so Ctrl+C keeps working and the process tree does not change.
+
+**Why both, rather than the fork's loop being retired:** they answer different
+questions and they do not collide, because `updater.py` tests
+`LDS_RESTART_MODE` (which `supervise.py` sets to `supervisor` in its child)
+**before** `LDS_SUPERVISOR`. Under the supervisor an in-app restart therefore
+ends in exit 75 and the supervisor owns the relaunch; only the opt-out lane ever
+reaches the exit-3 path. Two relaunchers racing for the port is the exact
+failure both mechanisms were written to avoid, and this ordering is what keeps
+them from being two.
+
+**Batch mechanics, not style:** the two lanes are `goto`-separated rather than
+written as `if () else ()`, because a `:label` inside a parenthesised block is
+not valid batch and the `:run` loop needs one. Keep it that way.
+
+**One upstream line is deliberately NOT taken:** `set "LDS_OPEN_BROWSER=1"`.
+`run.py` reads that as a FORCE-on that overrides the persisted Settings ▸ Server
+& access switch, and on this fork the double-click is the common launch path, so
+forcing it there would make that switch mean nothing for most users. The browser
+still opens by default through the persisted setting, at the real bound
+host:port, once the server is accepting connections — which is the fork's older
+divergence in this file and the reason a hardcoded `127.0.0.1` open is gone.
+
+**On the next sync:** expect this whole tail to conflict whenever upstream edits
+the launch lines. Resolve it by re-reading the two lanes above, never by taking
+either side whole.
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
 Lessons from actually doing these merges, aimed at an agent seeing this repo
@@ -1609,6 +1679,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-08-18 | *(merge)* + dist | **Upstream sync - 69 commits (`31bd48e2`...`d9cc4134`), nine source conflict regions plus the generated-bundle pair.** The largest window since the Video Bank landed, and the calmest: **nothing was rejected**. Not one incoming line matched a D1 or D4 identifier (checked with the merge-ADDED-lines grep of diagnostic 23, zero hits), the reject inventory is unchanged at **72 -> 72**, and all 39 files upstream added arrived here. Adopted: the ✦ Repair brush (paint a mask instead of boxing a rectangle; `mask` threads through the dataset route, `repair_image_region`, `useDataset.repairImageRegion` and the canvas host), the masked lane's staged-input and enqueue fixes, hand-drawn watermark zones surviving a clean, face scores for full-body and bust shots, the face pass's GPU lane behind the shared `capabilities.resolve_face_device()` (the Bank and the dataset scorer now answer that question once), 🎯 Auto-triage saying WHY it is empty, the video lane's four new passes (🔳 Safe zone, 🩻 Defects, 🎨 look score, 🤖 AI check), scrape-into-any-video-bank, instant re-cut at another shot threshold, per-checkpoint/per-LoRA pinned grids, and the crash supervisor. All of it renders or measures on this machine - the AI check is a CLIP-vector statistic, not a service - so Divergence 1 never came into it. **The conflicts, and what each cost:** `version.py` -> `2026.08.18F` (fork marker kept); `capabilities.py` -> upstream's serial probe list vs this fork's ThreadPoolExecutor, resolved by adding `probe_video_text` as an eleventh pooled probe rather than taking either side; `config.py` and `setup_installer.py` -> adjacent-addition, keep BOTH (the fork's 🔖 WD14 rows and upstream's `video_text` ones); `settings-reference.md` -> upstream's rewritten `face_scoring.device` row (it documents both surfaces now) over the fork's two `bank_scoring.*` rows, all three kept; `DatasetWorkspace.jsx` -> upstream's engine-aware `analyze_faces` banner logic, with its Nano Banana / ChatGPT clause reworded off a lane this fork does not have; `CLAUDE.md` -> upstream's three new sections (Bank/Dataset parity, wire-the-installer, work-on-a-pushed-branch) adopted whole, their two checklist items appended as 9 and 10 after this fork's eight, and one clause added to the branch section saying a push here is still asked for first. **The one silent number, caught by recomputing rather than by a gate:** `useSetupSteps.test.js` asserts `installCatalog` length, and BOTH sides said 16 - upstream's 16 counts `video_text` and no `wd14`, the fork's counted `wd14` and no `video_text`. Merged, the catalog is **17**. Neither the conflict markers nor lint nor the build could see it; the deepEqual list above it is what made it visible. **`start.bat` is now a two-lane launcher** - see Divergence 8 below. **Debt settled from the previous sync:** `ed9bec6d` (the merge before this one) carried no `build(frontend):` follow-up and no FORK_NOTES row, so the served bundle had been stale against its own source since then; this wave's rebuild is the first dist to include it. Gates: ESLint clean; production build clean; local-only contract **8 frontend + 3 backend** against the rebuilt dist; `create_app()` OK; hygiene 13 passed / 2 skipped; backend **7382 -> 7828**, 0 failed (two `test_gpu_window_close_race.py` reds on one parallel run were replayed on their own -> 6 passed, and the file is byte-identical to pre-merge HEAD: the elapsed-time class CLAUDE.md warns about, not damage; the confirming full run is clean); frontend **3866 -> 3978**, both 0 failed. **One red at Gate 6, and it was this fork's own contract catching an adopted file:** `test_infer_result_channel.py` (fork-only) requires every `backend/infer/` script to claim the result stream before printing its JSON, and all three of upstream's new video workers printed with a bare `print(json.dumps(...))`. Each gained the claim; the sibling import that fix adds then tripped upstream's `video_text` probe-import contract, widened by SUBTRACTING `infer_io` from the measured set rather than adding it to the expected one, so a real new dependency still fails it. Both recorded as Divergence 5's seventh entry. D5's carriers re-derived and intact (**13** venv-layout, **15** `**_kw`); D6's `local_rows_only` untouched (upstream changed neither `job_queue.py` nor `vision_keepalive.py` in this window). |
 | 2026-08-14 | *(merge)* + dist | **Upstream sync — 5 commits (`8a3e5f52`…`71d20fc7`), one source conflict plus generated-bundle conflicts.** Adopted the Test Studio checkpoint-resolution fix: `resolve_checkpoint_ckpt_name` now walks the default checkpoints tree *plus* every root from `extra_model_paths.yaml`, case-insensitively and returning the on-disk spelling, so a checkpoint in a subfolder of an extra root is launchable instead of 409-ing on a path it never lived at; `DetailDaemonSamplerNode` is mapped to `ComfyUI-Detail-Daemon` in `STUDIO_NODE_PACKS`. Report credit to KingyWolf (GitHub #36) remains in the upstream commit. Also took the `watermark_detector.py` docstring correction (the locator is Grounding DINO, not Florence-2 — comment only). **The only source conflict was `version.py`:** upstream bumped to `2026.08.14.1`, the fork carries the trailing `F` fork marker, resolved to `2026.08.14.1F` with the fork's marker docstring kept. Upstream's `build(frontend):` artifact was restored to pre-merge HEAD and rebuilt from this fork's source. **Convergent fix, no-op here:** upstream's `8a6c8ae2` repointed the bank-mask help topic at the renamed guide H2 — this fork had already made that exact change in the 2026-08-13 sync, so the merge carried no delta for `helpRegistry.js` or its contract test. Reject inventory remains **69 → 69**; no D1/D4 identifier or deleted file returned; D6's `worker_url` plumbing in `comfyui.py` was untouched by the incoming hunk (it lands in `resolve_checkpoint_ckpt_name`, which the fork does not modify). Gates: ESLint clean; production build clean; local-only contract **8 frontend + 3 backend** against rebuilt dist; `create_app()` OK; hygiene **13 passed / 2 skipped**; frontend suite **3,824 passed / 0 failed, identical to baseline**. **Backend Gate 6 was run in a container with only `requirements-dev.txt` installed** (no ML/torch overlay), which reds a block of environment-dependent tests both before and after the merge (diagnostic 7). Measured here: **71 failed / 7,033 passed / 124 skipped pre-merge**, and the post-merge run is diffed against that list rather than against zero. |
 | 2026-08-13 | *(merge)* + dist | **Upstream sync — 2 commits (`4770f895`…`2009b785`), one source conflict region plus generated-bundle conflicts.** Adopted the local watermark-miss recovery in both Dataset and Bank workspaces: a user may draw a mask on an unflagged, unscanned or dismissed image, which becomes a manual watermark flag; an already-cleaned image still refuses until its pixels are restored. Human report credit to vvilams remains in the upstream commit. The single source conflict in `BankReviewLightbox.jsx` was an adjacent-import keep-BOTH resolution: upstream's new `maskButtonLabel` beside the fork's `dupStateSuffix`. Upstream's `build(frontend):` artifact was restored to pre-merge HEAD and rebuilt from this fork's source. **Caught at Gate 6:** upstream renamed the guide H2 to cover both fixing a mask and marking a missed watermark, while `helpRegistry.js` and its contract still targeted `#fix-a-watermark-mask-in-a-bank`; both now use `#fix-a-watermark-mask-or-mark-one-the-scan-missed`. Reject inventory remains **69 → 69**; no D1/D4 identifier or deleted file returned; the D5 p99 guard, D6 `local_rows_only` scoping, Divergence-7 claim cleanup and mobile-rail containing blocks remain intact. Gates: ESLint clean; production build clean (**586 modules**); local-only contract **8 frontend + 3 backend** against rebuilt dist; `create_app()` OK; hygiene **13 passed / 2 skipped**; full suites **7,323 → 7,332 backend (+9), 3,823 → 3,824 frontend (+1), zero failures**. |
 | 2026-08-13 | *(merge)* | **Upstream sync — 4 commits (`8c2a7595`…`2ae9ea21`), two source conflict regions, no frontend or dist changes.** Adopted: the dormant cloud-Continue staging guard now compares decoded settings values and excuses only topology keys injected by the resume itself, so an untouched Dataset no longer reads as changed; the topology actually folded at launch is stamped for staging and retries rather than reconstructed later. The backend lane is intentionally retained under Divergence 4 even though its rental UI remains absent; upstream's human report credit to Arrow stays in the merged commit. Both release commits were adopted with the fork version rule, yielding `APP_VERSION = '2026.08.13.1F'`. **One incoming hunk was rejected as superseded:** `7cacaa4d` changed the Bank regrouping guard from an absolute worst-wait ceiling to a worst-wait/phase ratio, but this fork's earlier `78996107` already proved the writer timeout clips `max` near the same value for healthy and parked shapes and replaced it with a measured p99 discriminator; the p99 block remains, recorded as Divergence 5 entry 6. The live D5 venv-carrier derivation was also fixed to include `test_vision_features.py`'s platform-derived `bindir/exe` form: 12 literal carriers + that dynamic carrier = 13. Reject inventory **70 → 69**, the sole removal being the intentionally adopted `test_cloud_resume_settings_guard.py`; no rejected file returned, no merge-added D1/D4 identifier survived, and dead `API_ENGINES` membership branches remain zero. D6 scoping and both targeted guards remain intact. Gates: ESLint clean; production build clean (**586 modules**); local-only contract **8 frontend + 3 backend** against rebuilt dist; `create_app()` OK; hygiene **13 passed / 2 skipped**; full suites **7,317 → 7,323 backend (+6), 3,823 → 3,823 frontend, zero failures**. |

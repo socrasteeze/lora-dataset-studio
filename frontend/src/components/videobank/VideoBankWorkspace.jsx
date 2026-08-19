@@ -4,6 +4,7 @@ import { useToast } from '../common/Toast'
 import { HelpBadge } from '../../help/HelpMode'
 import {
   videoBankUrl, videoClipsUrl, videoPassUrl, videoSourceClipsUrl,
+  videoSourceRecutUrl, videoSourceSingleShotUrl,
 } from './videoBankApi'
 import { retouchToast } from './videoClipEdit'
 import { passBlockedBy } from './videoCapability'
@@ -18,6 +19,7 @@ import {
   hasMore,
 } from './videoTriage'
 import VideoCapabilityStrip from './VideoCapabilityStrip'
+import VideoShotCutsPanel from './VideoShotCutsPanel'
 import VideoThresholdsPanel from './VideoThresholdsPanel'
 import VideoSourceList from './VideoSourceList'
 import VideoClipGrid from './VideoClipGrid'
@@ -314,6 +316,47 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
     }
   }
 
+  /** ▣ "This file is one take" and ↻ "re-detect this one file".
+   *
+   * Both replace every shot of ONE file, so both confirm first — and the
+   * confirmation for ↻ names the thing the user could not get back: a re-cut of
+   * a single file replaces hand-made cuts too. That asymmetry with the
+   * bank-wide re-cut is deliberate (it is what makes ↻ the way back from ▣) and
+   * it is exactly the kind of asymmetry that has to be said out loud.
+   */
+  const perSource = async (src, url, question, done) => {
+    if (!window.confirm(question)) return
+    try {
+      const d = await postJson(url, {})
+      toast.success(done(d))
+      loadBank(false)
+      loadClips(false)
+    } catch (e) {
+      if (e?.status === 409) {
+        toast.warning('A pass is running on this bank — stop it first.')
+      } else if (e?.status === 503) {
+        toast.warning(e?.body?.error || 'This file has no cached measurement yet.')
+      } else {
+        toast.error(e?.body?.error || e?.message || 'That did not go through.')
+      }
+    }
+  }
+
+  const singleShot = (src) => perSource(
+    src, videoSourceSingleShotUrl(bankId, src.id),
+    `Replace every shot of ${src.relpath} with one full-length shot?\n\n`
+    + 'Shots already promoted into a dataset are kept. Bulk passes will leave '
+    + 'this file alone afterwards.',
+    () => 'One shot now covers the whole file.')
+
+  const recutSource = (src) => perSource(
+    src, videoSourceRecutUrl(bankId, src.id),
+    `Find the shots in ${src.relpath} again?\n\n`
+    + 'This replaces every shot on this file, INCLUDING any you cut by hand. '
+    + 'Shots already promoted into a dataset are kept.',
+    (d) => `${d.clips} shots`
+      + (d.replaced_manual ? `, replacing ${d.replaced_manual} hand-made.` : '.'))
+
   if (!bank) return <p className="text-sm text-content-muted">Loading…</p>
   const problems = countsProblems(counts)
 
@@ -357,14 +400,31 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
         {/* ✂ and 🔖 sit AFTER embed on purpose: duplicates reuse the vectors
             that pass caches, so running them before it is the one order that
             produces an honest-looking empty answer. */}
+        {/* 🩻 sits last: it is the only pass here that needs the ENCODER rather
+            than the decoder, so on an install without ffmpeg it is the one grey
+            button in a row of working ones — and the tooltip says which binary
+            rather than "unavailable". */}
+        {/* 🤖 sits at the end because it is the slowest button in the row —
+            about 0.8 s per shot on the CPU, measured — and because it is the
+            only one whose result is a hedge rather than a measurement. */}
         {['pipeline', 'probe', 'detect', 'thumbs', 'measure', 'embed',
-          'caption', 'dedup', 'watermark'].map((pass) => {
+          'caption', 'dedup', 'watermark', 'safezone', 'defects',
+          'aicheck'].map((pass) => {
           const blocked = passBlockedBy(capability, pass)
           const primary = pass === 'pipeline'
+          // 🔳 is the one pass that runs with HALF its dependencies: no OCR
+          // engine still measures the bands. So it is never disabled for that —
+          // the tooltip says what the run will and will not include instead,
+          // which is the difference between a working button and a dead one.
+          const partial = pass === 'safezone' && capability
+            && !capability.video_text
           return (
             <button key={pass} type="button" onClick={() => startPass(pass)}
               disabled={busy || !!blocked}
-              title={blocked ? blocked.why : undefined}
+              title={blocked ? blocked.why
+                : partial ? `Bands only — ${capability.video_text_detail
+                    || 'the burned-in text extra is not installed'}`
+                : undefined}
               className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
                 primary
                   ? 'bg-gradient-primary text-white'
@@ -408,6 +468,13 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
 
       {/* The cuts panel sits between the passes and the grid: it only means
           something once Measure has run, and it changes what the grid shows. */}
+      {/* Above the quality cuts on purpose: this panel decides which shots
+          EXIST, the other decides which of them get flagged. */}
+      {(counts.sources || 0) > 0 && (
+        <VideoShotCutsPanel bankId={bankId} shotDetect={bank?.shot_detect}
+          onChanged={() => { loadBank(false); loadClips(false) }} />
+      )}
+
       {(counts.clips || 0) > 0 && (
         <VideoThresholdsPanel bankId={bankId} saved={bank?.thresholds}
           totalClips={counts.clips || 0} onApplied={() => loadBank(false)} />
@@ -419,7 +486,8 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
         </summary>
         <div className="border-t border-border p-3">
           <VideoSourceList sources={bank.sources || []} activeSourceId={sourceId}
-            onFilter={setSourceId} onCut={cutByHand} />
+            onFilter={setSourceId} onCut={cutByHand}
+            onSingleShot={singleShot} onRecut={recutSource} />
         </div>
       </details>
 
