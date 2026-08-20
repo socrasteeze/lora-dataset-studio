@@ -54,6 +54,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # only redirects when the module IS the process.
 from infer_io import claim_result_stream  # noqa: E402
 _OUT = claim_result_stream(__name__)
+import import_report  # noqa: E402
 import bank_score_infer  # noqa: E402 — the head, imported rather than copied
 
 # The arrays this reads out of the store `video_clip_search.save_embeddings`
@@ -95,7 +96,7 @@ def main() -> int:
         import numpy as np
         import torch
     except Exception as e:  # noqa: BLE001 — clean JSON, never a mute traceback
-        _emit({'ok': False, 'error': f'ML deps missing: {type(e).__name__}: {e}'})
+        _emit({'ok': False, 'error': import_report.import_failure(e)})
         return 1
 
     try:

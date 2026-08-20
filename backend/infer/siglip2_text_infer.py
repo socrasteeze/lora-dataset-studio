@@ -18,6 +18,7 @@ from typing import Any
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from infer_io import claim_result_stream  # noqa: E402
 _OUT = claim_result_stream(__name__)
+import import_report  # noqa: E402
 
 
 def _log(message: str) -> None:
@@ -101,7 +102,7 @@ def main() -> int:
         from transformers import AutoModel, AutoProcessor
     except Exception as exc:
         _emit({'ok': False, 'ready': False,
-               'error': f'ML deps missing: {type(exc).__name__}: {exc}'})
+               'error': import_report.import_failure(exc)})
         return 1
 
     model_kwargs = {

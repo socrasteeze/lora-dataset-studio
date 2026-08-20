@@ -50,6 +50,30 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-20-coverage-chips-show-their-images',
+    date: '2026-08-20',
+    title: 'Click a coverage chip to see exactly those images',
+    blurb:
+      'The 🔍 Coverage panel could tell you that three captions mention a profile. It could not tell you WHICH three, so acting on it meant scrolling a grid of two hundred looking for them — the panel was easy to read and hard to use. Every chip with a count is now a button: click frontal 35, or nude 7, or backlit 1, and the grid opens showing exactly those images, with 🔍 profile — camera view in the filter bar and clear all beside it. It composes with everything already there, so filter to the profiles and Sort ▸ Shot type puts what is left in order. The images you get are the ones the number counted and no others: rejected and failed pictures are outside the panel, so they stay outside its filter. A chip showing zero stays a plain chip, because there is nothing to show you and the answer to that gap is generating, not filtering. Still advice only: it changes what you are looking at, never what your images are. (Asked for by .samexit on Discord.)',
+    to: '/datasets?section=add&panel=generate',
+  },
+  {
+    id: '2026-08-20-group-the-grid-by-shot-type',
+    date: '2026-08-20',
+    title: 'Compare like with like: group the grid by shot type',
+    blurb:
+      'The grid shows your images in the order they arrived, which means a face shot, then a back shot, then two bodies, then another face — and every question you actually ask at that point is about ONE kind at a time: do I have too many of these, not enough of those, and which of these near-identical ones do I keep? The Sort menu above the grid has two new entries. Shot type puts every face shot in one run, then the busts, then the bodies, then the backs, in the same order the Composition bar counts them; images the 📐 Classify framing pass never reached gather at the end rather than in the middle. Shot type, then face similarity ↓ is the same grouping with the closest to your reference at the head of each run, so you walk down a kind and the ones to cut are waiting at its end. Like every sort here it only reorders: the filters still decide which images are shown, the counts do not move, and select-all and the ⟨ ⟩ arrows follow what is on screen. (Asked for by .samexit on Discord.)',
+    to: '/datasets?section=images&panel=review',
+  },
+  {
+    id: '2026-08-20-edit-a-custom-shot',
+    date: '2026-08-20',
+    title: 'Edit a custom shot instead of retyping it',
+    blurb:
+      'A ✨ Custom shot is a whole sentence you wrote — outfit, pose, setting, light — and until now the only way to change one word of it was to delete the card and type the other forty again. Worse, the card that came back was a different card: it landed at the end of the row, unselected, so a typo cost you your place in a selection you had spent minutes building. Every custom card now has an ✏️ next to its ✕. Press it and the words come back into the ✨ Custom shot box below, with the framing you picked; change what you want and Save puts the card back exactly where it was, still selected. Cancel leaves it untouched. The one thing that does not carry over is the ✓×N tally on the card, and on purpose: those images were generated from the words you just replaced. (Asked for by .samexit on Discord.)',
+    to: '/datasets?section=add&panel=generate',
+  },
+  {
     id: '2026-08-19-video-burst-triage',
     date: '2026-08-19',
     title: 'Triage a video bank one keystroke per shot',

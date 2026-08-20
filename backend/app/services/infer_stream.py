@@ -30,6 +30,8 @@ import threading
 import time
 from collections import deque
 
+from . import infer_env
+
 logger = logging.getLogger(__name__)
 
 # How long we wait for the child to die after a timeout kill before giving up on
@@ -116,9 +118,14 @@ def run_infer_script(python, script, payload, timeout, on_line=None,
     because nothing has been computed yet.
     """
     proc = subprocess.Popen(
-        [python, script], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        infer_env.worker_argv(python, script),
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
-        env=env, cwd=cwd,
+        # Both sides kept: upstream's no-user-site instruction is layered ON TOP
+        # of the caller's environment rather than replacing it — `base=env` falls
+        # back to os.environ when the caller passed none, so JoyCaption's HF_HOME
+        # (and the peer worker's models_root) still reach the child.
+        env=infer_env.worker_env(python, base=env), cwd=cwd,
         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     lines: deque = deque(maxlen=_TAIL_LINES)
 
