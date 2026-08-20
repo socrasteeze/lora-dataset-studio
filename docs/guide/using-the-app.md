@@ -2168,7 +2168,7 @@ area:
   size, and pixels you did not paint are copied from your file either way.
 
 Both work under a finger, so this is usable from a phone. The brush was
-contributed by JacobArrow on GitHub.
+contributed by OneCodingDude on GitHub.
 
 The 🚩 button next to it opens the same editor from the other intention — you
 spotted a watermark the scan missed. Same screen, same zones; what differs is
@@ -2700,7 +2700,9 @@ can judge; the three hundred shots inside it are.
    order and each simply finds nothing to do and reports success.
 3. **Triage** — the grid is thumbnails, and only thumbnails. Click one to watch
    exactly that shot, `←`/`→` to move, `K` to keep, `R` to reject. Filter by
-   status, or click a file in the **Files** list to see only its shots.
+   status, or click a file in the **Files** list to see only its shots. For a
+   whole bank at speed, **⌨ Burst mode** judges shots straight from the grid,
+   one keystroke each — see *Triage a video bank from the keyboard* below.
 4. **🎬 Build the dataset** encodes what you kept. This is the only step that
    writes video.
 
@@ -2713,6 +2715,60 @@ than a preview.
 independent things: reading files, finding shots, and encoding clips. The app
 says which one is missing and what still works — with no ffmpeg, for example, you
 can scan, cut, watch and triage an entire bank, and only the final build waits.
+
+## Triage a video bank from the keyboard
+
+A rush of two hours becomes three hundred shots, and judging them by clicking a
+tile, clicking ✓ or ✕, then coming back to the grid is three gestures each. **⌨
+Burst mode**, above the gallery, makes it one keystroke.
+
+Turn it on and one tile carries the cursor — an amber ring and a **▸ next**
+marker under the thumbnail. From there:
+
+| Key | What it does |
+| --- | --- |
+| `K` | Keep this shot |
+| `R` | Reject this shot |
+| `P` | Put it back to untriaged |
+| `S` or `→` | Move on without deciding |
+| `←` | Move back one shot |
+| `U` | Undo the last decision, and go to that shot |
+| `Home` | Jump to the first untriaged shot |
+| `?` | Show or hide the shortcut panel |
+| `Esc` | Leave burst mode |
+
+They are the same keys as the image bank's **▶ Review** — `K` keep, `R` reject,
+`S` skip, `←` back, `Esc` out — because a reflex that is right on one screen and
+wrong on the next is worse than no reflex. `P`, `U` and `Home` are this lane's
+own: a video bank has three verdicts where the image review has two.
+
+Four things are worth knowing before you lean on it:
+
+- **The cursor jumps to the next shot you have not judged yet**, not simply the
+  next tile. On a half-triaged bank that is most of the speed. Untick
+  **Auto-advance** and the cursor stays put instead, so `K` then `R` corrects
+  the same shot — useful when you are being careful rather than fast.
+- **It never wraps.** When nothing untriaged is left ahead of the cursor, the
+  bar says so — and says how many are still sitting *behind* it, with `Home` to
+  go back to the first. A run that silently looped back to the top would put
+  your next keystroke on a shot you did not expect.
+- **Undo goes back one step at a time, and shows you what it fixed.** The bar
+  always names the decision it would take back (*"↩ U undoes ✕ Reject on 0:12 –
+  0:15"*) and how many steps are left in the net — ten. Each `U` restores what
+  the shot actually was before, so undoing a reject on a shot you had already
+  kept puts the **keep** back, not a blank. The offer sits in the bar rather
+  than in a toast on purpose: at one keystroke a second a toast is replaced
+  before it can be read.
+- **Your keystrokes never wait for the network.** The tile flips and the cursor
+  moves at once; the decisions are sent behind you, one request at a time, and a
+  run of identical verdicts goes out as a single batch. The bar shows *saving
+  N…* while anything is still unacknowledged — a run that has ended is not the
+  same thing as a run that is saved. If a save does fail, nothing is guessed:
+  the grid is reloaded from the bank and the message says how many decisions did
+  not land.
+
+Shortcuts never fire while you are typing in the search box or a threshold
+field, and the mode and the auto-advance setting are remembered for next time.
 
 ## Measure your shots, and choose your own cuts
 
@@ -2961,6 +3017,144 @@ present. It is also absent from almost everything scraped, and its silence means
 "unknown", never "not AI". This pass reads **the pixels** and infers, so it is
 never proof and it is never silent. The image lane says *AI*; this one says *may
 be*. Neither is evidence for the other.
+
+### 🎥 Camera — what the camera did, as a label rather than a verdict
+
+Every other pass on this page measures whether a shot is **good**. This one
+measures what it **is**, and it never rejects anything. That is not politeness:
+a video LoRA learns camera language along with the subject, and the two people
+training on the same bank want opposite halves of it. One is building a
+locked-off product shot and every wobble is contamination; the other is training
+a handheld look, and the wobble *is* the target. So **🎥 Camera** labels, and you
+decide which half you wanted.
+
+Press it after the shots are cut. It tracks every frame of every shot — about
+fifteen times real time on the CPU, so it can run while a training owns your card
+— and stores the raw rates on each clip. The labels are worked out from those
+rates when the gallery is drawn, so nothing is ever rescanned.
+
+#### The labels
+
+Eight of them are **the video trainer's own words**, not this app's. They come
+from the vocabulary Hunyuan's camera classifier uses, which matters for one
+practical reason: a label here will mean the same thing to the model you train
+as it does to you.
+
+| Label | What it means |
+| --- | --- |
+| **Pan left / right / up / down** | The frame moves across the scene in that direction. |
+| **Zoom in / out** | The framing tightens or widens. |
+| **Static shot** | Nothing moved enough to name — a tripod, a clamp, or very steady hands. |
+| **Handheld** | The movement has a high-frequency part nobody is steering. |
+
+Three more are **this app's own**, and the gallery marks them with a small `ᐩ` so
+you never carry one into a caption expecting the trainer to recognise it:
+
+| Label | What it means |
+| --- | --- |
+| **Rolling** `ᐩ` | The horizon turns — the camera rotates about its own axis. Absent from the trainer's fourteen, and measured here because it is the one movement a language model reading the footage reliably gets wrong. |
+| **Slideshow** `ᐩ` | The whole frame moved as one rigid picture, which is what a photograph panned across does — a Ken Burns move, not a camera. |
+| **Subject moves** `ᐩ` | Something in the shot moved more than the camera did, so no direction could be read at all. |
+
+A shot carries **several** labels where several apply: a handheld pan that also
+zooms is all three, and the filter row lets you pick any one of them.
+
+#### Why there is no "tilt", and no orbit
+
+You will look for **tilt up** and **tilt down**, because the trainer's vocabulary
+has them and this app never shows them. They are missing on purpose. A camera
+that **pivots** and a camera that **slides** put exactly the same movement on the
+sensor — the difference between them is depth, and depth is not in a flat
+picture. Rather than guess at a coin flip, everything in that family is reported
+as **pan**, which is the honest superset.
+
+**Around left / around right** are missing for the same reason, harder. An orbit
+is a movement along an arc, and recovering it means reconstructing the scene in
+three dimensions. The published benchmark for this (CameraBench, 2025) puts the
+best geometric system at roughly **half** the answers correct, at *minutes* per
+clip. So the choice is not between cheap and accurate — it is between fast and
+expensive-but-still-a-coin-flip. Not offered.
+
+#### When the reading cannot be trusted
+
+The measurement finds the **dominant** motion in the frame. When a subject fills
+enough of it, the dominant motion *is* the subject, and the result is a confident
+description of a camera move that never happened — measured on a test clip whose
+camera was a tripod and whose subject crossed a third of the frame, the raw fit
+reported a brisk pan *and* a zoom.
+
+So the pass checks how much of the frame its answer actually explains, and when
+that falls too low it reports **Subject moves** and **no direction at all**. A
+shot labelled that way is not a failure; it means the camera reading would have
+been fiction, and the app would rather say nothing.
+
+**One more honest limit.** *Slideshow* is detected by the frame moving as one
+perfectly rigid picture, which is what a photograph does. A real pan across a
+scene with **no depth** — a flat wall, a horizon, a distant skyline — has no
+parallax either, and can land in the same bucket. If a shot you filmed yourself
+is labelled a slideshow, that is why.
+
+#### Filtering, and the one cut
+
+The labels appear on each thumbnail (slate, bottom right — never amber, because
+amber in this gallery means *a cut flagged this* and a pan is not a fault) and as
+a **🎥 Camera** row of filters above the grid. It composes with the ⚑ flag chips,
+so *"shaky shots that also pan right"* is one click each.
+
+If you do want to **cut** on camera movement, 🎚 Quality cuts gains
+**`camera_shake_max`**. It is empty by default like every other cut, and it is
+deliberately **not** the same threshold as the *Handheld* label: the label fires
+at a fixed internal floor and describes, the cut fires wherever you put it and
+rejects. A shot can be labelled handheld without being flagged, or the reverse,
+and both are correct.
+
+### 🔗 Does each shot hold one scene — the cut the detector missed
+
+Shot detection cuts on a change big enough to see. The ones it misses are the
+soft changes — a dissolve, a match cut, a new angle inside the same room — and
+what they leave behind is a "shot" that is really two. That clip is the worst
+kind of training example: it teaches the model a transition nobody asked for, and
+you cannot spot it by scrolling, because its thumbnail is one of its two halves
+and looks perfectly fine.
+
+**It runs by itself, at the end of 🔎 Find scenes, and costs nothing.** That pass
+already embedded three frames of every shot. Comparing a shot's first frame to
+its last is a handful of multiplications over numbers that are already on disk —
+no decoding, no model, no button. A bank you embedded before this existed gets
+its reading by clicking **🔎 Find scenes** again, and that click costs nothing for
+the shots already embedded.
+
+Each shot gains a **scene coherence** number: **1.00** means its first and last
+frames are the same picture, and lower means the picture changed across the shot.
+🎚 Quality cuts gains a **Scene coherence floor**, empty by default, that flags
+anything below it as **Cut inside the shot**. The remedy is the next section:
+open the shot and **✂ Split here**.
+
+**How much to trust it — read this before you set the cut.** This is a *ranking*,
+not a verdict. Measured on real footage, against shots of the same length, a cut
+at **0.80** catches about a third of the genuinely double shots while flagging
+about one honest shot in seven; **0.75** catches a fifth for one in ten. Use it to
+decide which shots to *look* at first, and expect to keep some of what it flags.
+
+**Why a long shot scores lower.** The number falls with elapsed time whether or
+not anything was cut — a twenty-second locked-off take can read 0.84 with no cut
+in it at all, simply because the light moved and people walked about. Short shots
+score high for the opposite non-reason. If your bank is mostly long takes, set
+the floor lower than the figures above suggest.
+
+**What it is not.** A shot whose reading is near 1.00 is *not* flagged as still,
+and this pass deliberately says nothing about stillness. The obvious other half
+of the idea — "nothing changed, so nothing moved" — was measured against this
+app's own motion readings and does not hold: the number tracks how *long* a shot
+is far more than whether anything moves in it, and genuinely motionless shots
+read no higher than ordinary ones. Stillness stays with **Barely moves**, which
+reads the codec's own motion vectors, and with the **Slideshow** camera label,
+which reads how rigidly the frame moves. Two measurements that look at the real
+thing.
+
+Shots with no vectors (you have not run 🔎 Find scenes) and shots **under a
+second** — too short for the embed pass to take more than one frame — carry no
+reading at all and are never flagged.
 
 ## Retouch a cut: trim, split, or draw a shot by hand
 

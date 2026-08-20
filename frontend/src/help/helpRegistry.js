@@ -830,6 +830,18 @@ const TOPICS = [
      'why is my bank empty', 'next step', 'cancel a pass', 'stop', 'busy',
      'already running', 'rescan folder', 'new videos'],
     '/video-bank', 'using-the-app', 'the-video-bank-turn-a-folder-of-rushes-into-shots'),
+  // Nobody searches "burst mode" until they have seen it. They search the
+  // SYMPTOM of not having it — "triage faster", "too many clicks" — or the
+  // thing they just pressed and nothing happened ("K does nothing").
+  action('video-burst-triage', 'Triage shots from the keyboard (burst mode)',
+    ['burst', 'burst mode', 'keyboard', 'keyboard shortcuts', 'shortcuts',
+     'hotkeys', 'keys', 'triage faster', 'faster triage', 'too many clicks',
+     'one key per shot', 'k keep', 'r reject', 'keep reject keyboard',
+     'auto-advance', 'auto advance', 'next untriaged', 'skip a shot',
+     'undo', 'undo a decision', 'i rejected the wrong shot', 'take it back',
+     'p untriaged', 'reset a shot', 'cursor', 'which shot is selected',
+     'k does nothing', 'shortcuts do not work', 'shortcut while typing'],
+    '/video-bank', 'using-the-app', 'triage-a-video-bank-from-the-keyboard'),
   action('video-quality-cuts', 'Measure shots and set quality cuts',
     ['measure quality', 'quality cuts', 'flags', 'flagged shots', 'amber flag',
      'still clip', 'barely moves', 'frozen', 'freeze', 'black frames',
@@ -997,6 +1009,37 @@ const TOPICS = [
      'motion irregularity', 'motion irregularity floor', 'too smooth',
      'suspiciously smooth', 'd3', 'second order', 'how accurate is the ai check',
      'may be ai generated', 'why does the bank say ai and the video says maybe'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  // 🎥 Two things people will search for and one they will complain about. The
+  // complaint is the missing "tilt up" — the trainer's own vocabulary has it and
+  // this pass never emits it — so the keywords carry the words nobody will find
+  // as chips, and the Guide section says why they are absent rather than
+  // leaving someone convinced the detection is broken.
+  action('video-camera-motion', 'Label what the camera did (🎥 Camera)',
+    ['camera motion', 'camera movement', 'camera pass', 'pan', 'pan left',
+     'pan right', 'pan up', 'pan down', 'tilt', 'tilt up', 'tilt down',
+     'zoom in', 'zoom out', 'dolly', 'truck', 'orbit', 'around left',
+     'arc shot', 'roll', 'rolling', 'dutch angle', 'handheld', 'handheld shot',
+     'shaky', 'shaky footage', 'camera shake', 'camera shake max', 'wobble',
+     'tripod', 'static shot', 'locked off', 'slideshow', 'ken burns',
+     'still image panned', 'subject moves', 'subject motion',
+     'why is there no tilt label', 'why is my pan called a slideshow',
+     'motiondirector', 'hunyuan camera', 'filter by camera'],
+    '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
+  // 🔗 Two searches to serve and one misconception to head off. People will look
+  // for this by the SYMPTOM ("two scenes in one clip", "the detector missed a
+  // cut") rather than by the number's name, so those phrases carry the keywords.
+  // The misconception is the one the calibration refuted: someone will assume a
+  // near-1 coherence means "nothing moves" and go looking for a still filter
+  // here — the keywords bring them to a section that says where stillness
+  // actually lives.
+  action('video-temporal-coherence', 'Spot a shot that is really two (🔗 coherence)',
+    ['scene coherence', 'coherence floor', 'temporal coherence', 'missed cut',
+     'cut inside the shot', 'two scenes in one clip', 'shot contains a cut',
+     'detector missed a cut', 'dissolve not cut', 'match cut', 'shot is really two',
+     'scene changes mid shot', 'why is my long take flagged',
+     'coherence says 1 but the shot moves', 'does coherence detect still shots',
+     'split a shot the detector missed'],
     '/video-bank', 'using-the-app', 'measure-your-shots-and-choose-your-own-cuts'),
   action('video-flag-chips', 'Filter the gallery by a quality flag',
     ['flag chips', 'filter by flag', 'flagged shots', 'select flagged',

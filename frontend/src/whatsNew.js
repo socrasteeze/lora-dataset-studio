@@ -50,6 +50,29 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-19-video-burst-triage',
+    date: '2026-08-19',
+    title: 'Triage a video bank one keystroke per shot',
+    blurb:
+      'A two-hour rush becomes three hundred shots, and until now judging them meant three gestures each: click a tile, click ✓ or ✕, come back to the grid. The 🎬 Video bank has a new ⌨ Burst mode above the gallery. Turn it on and one tile carries a cursor — K keeps it, R rejects it, P puts it back to untriaged, S or → moves on without deciding, ← steps back. They are the same keys as the image bank\'s ▶ Review, so the reflex you already have works here. The cursor then jumps to the next shot you have NOT judged yet, which on a half-triaged bank is most of the speed; untick Auto-advance and it stays put so K then R corrects the same shot. It never wraps silently: when nothing untriaged is left ahead, the bar says how many are still behind you and Home goes back to the first. U undoes the last decision and moves the cursor onto that shot so you can see what it fixed, ten steps deep, always restoring what the shot actually was before — undoing a reject on a shot you had kept puts the keep back. The offer sits in the bar rather than in a toast, because at one keystroke a second a toast is replaced before it can be read. Your keys never wait for the network either: the tile flips at once and the decisions are sent behind you, one request at a time, with a run of identical verdicts going out as a single batch and a "saving N…" counter so a run that has ended is never mistaken for a run that is saved. Press ? for the full list, and nothing fires while you are typing in the search box or a threshold field.',
+  },
+  {
+    id: '2026-08-19-video-temporal-coherence',
+    date: '2026-08-19',
+    title: 'Find the shots that are secretly two shots',
+    blurb:
+      'Shot detection cuts on a change big enough to see. The ones it misses are the soft ones — a dissolve, a match cut, a new angle inside the same room — and each one leaves behind a “shot” that is really two scenes. It is the worst kind of training example, because it teaches the model a transition nobody asked for, and you cannot catch it by scrolling: the thumbnail is one of the two halves and looks perfectly fine. The 🎬 Video bank now checks every shot for this by itself, at the end of 🔎 Find scenes, and it costs nothing at all — no decoding, no model, no GPU, no button. It compares a shot’s first frame to its last using vectors that pass already cached, so a bank you embedded weeks ago gets its reading by clicking 🔎 Find scenes again. Each shot gains a scene coherence number (1.00 means its ends are the same picture), and 🎚 Quality cuts gains a Scene coherence floor that flags anything below it as “Cut inside the shot” — then ✂ Split here does the repair. Empty by default, and the Guide is blunt about why: this is a ranking, not a verdict. Measured against shots of the same length, a cut at 0.80 catches about a third of the double shots and flags about one honest shot in seven, so use it to choose what to look at first. Long takes score lower whether or not anything was cut, which the panel says out loud.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-19-video-camera-motion',
+    date: '2026-08-19',
+    title: 'Sort your shots by what the camera did',
+    blurb:
+      'A video LoRA learns camera language along with everything else, and until now there was no way to see any of it: a bank of a thousand shots gave you no answer to “which of these are locked off” or “where are the handheld ones”. The 🎬 Video bank has a new 🎥 Camera pass. It tracks every frame of every shot and labels what the camera did — pan left, pan right, pan up, pan down, zoom in, zoom out, static shot, handheld shot — using the same words the video trainer itself uses, so a label here means the same thing there. Three more are ours: rolling, slideshow (a photograph panned across rather than filmed) and subject moves. The labels appear on each thumbnail and as a new 🎥 Camera row of filters above the gallery, which composes with the ⚑ flag chips — “shaky shots that also pan right” is one click each. Nothing is ever rejected: these are descriptions, not faults, because the wobble one person is filtering out is exactly what the next person is training on. If you do want to cut on it, 🎚 Quality cuts gains a Camera shake threshold, empty by default like the rest. The pass runs on the CPU at about fifteen times real time and needs only the video decode extra, which now installs OpenCV alongside PyAV — press Install on the video row in Setup if it shows a ✗. Honest limits, stated in the app too: a pivot and a slide look identical in a flat picture so both are called a pan, orbits are not detected at all, and a real pan across a wall or a horizon can read as a slideshow because it has no depth either.',
+    to: '/video-bank',
+  },
+  {
     id: '2026-08-18-microcopy',
     date: '2026-08-18',
     title: 'Screens say less of what you can already see',
@@ -189,7 +212,7 @@ export const WHATS_NEW = [
     date: '2026-08-18',
     title: 'Paint over what should go, instead of boxing it',
     blurb:
-      'A rectangle is the wrong shape for a necklace, a pair of glasses or a bra strap — it hands the model a square full of face it was never asked to touch. ✦ Repair now has a 🖌 Brush next to its ▭ Box: paint over the thing, say what should be there, and the whole picture goes to Klein with your painted mask, so it reconstructs while actually seeing the face around it. The box is still there and still the default — it is quicker, and better for a mark in a corner. Everything outside what you painted keeps its original bytes, exactly as before. (Contributed by JacobArrow on GitHub.)',
+      'A rectangle is the wrong shape for a necklace, a pair of glasses or a bra strap — it hands the model a square full of face it was never asked to touch. ✦ Repair now has a 🖌 Brush next to its ▭ Box: paint over the thing, say what should be there, and the whole picture goes to Klein with your painted mask, so it reconstructs while actually seeing the face around it. The box is still there and still the default — it is quicker, and better for a mark in a corner. Everything outside what you painted keeps its original bytes, exactly as before. (Contributed by OneCodingDude on GitHub.)',
     to: '/datasets',
   },
   {

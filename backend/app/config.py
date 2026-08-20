@@ -554,6 +554,40 @@ DEFAULTS = {
                    'dup_frames_max': None,
                    'block_max': None,
                    'blur_max': None,
+                   # 🎥 The camera pass's only cut: flag shots whose camera
+                   # wobbles more than you want. Empty, and here for a reason
+                   # none of the above have — the number IS comparable between
+                   # banks (it is a percentage of the frame width, so it does
+                   # not move with resolution, content or encoder), but WHICH
+                   # SIDE of it you want is the whole question. Someone training
+                   # a locked-off product shot wants every wobble gone; someone
+                   # training a handheld look wants exactly those clips and
+                   # would set this cut to find them and keep them. A default
+                   # would pick a side, and this app does not have one.
+                   #
+                   # For scale: a shot with no wobble at all measures under
+                   # 0.10, and strong handheld tremor measures about 1.16.
+                   'camera_shake_max': None,
+                   # 🔗 Does one shot hold ONE scene: flag shots whose first and
+                   # last embedded frames have drifted far enough apart that the
+                   # shot probably holds a cut the detector missed. Empty, and
+                   # for a reason that is neither "it is your footage" nor "there
+                   # is no published number" — it is that the measured accuracy
+                   # does not earn a default. Duration-matched, over 362 forged
+                   # missed cuts against 337 real shots of this app's own
+                   # encoder: AUC 0.719, and a cut at 0.80 catches 34 % of the
+                   # missed cuts while flagging 14.6 % of honest shots. That is
+                   # worth SORTING a bank by and not worth deciding anything on,
+                   # so the number rides in the panel hint and the user chooses
+                   # whether to switch it on at all.
+                   #
+                   # Panda-70M's own 1.0 does NOT convert into a default here:
+                   # it is a Euclidean distance over ImageBind features, which
+                   # is cosine 0.5 on unit vectors, and 0.5 sits below the first
+                   # percentile of even completely unrelated CLIP ViT-L/14 frame
+                   # pairs (measured: p1 0.501, median 0.720). It would flag
+                   # nothing, ever. See video_temporal_coherence.
+                   'coherence_floor': None,
                    'duplicate_threshold': 0.96},
     # consistency_strength: the dx8152 LoRA anchors STRUCTURE (composition/
     # background), not the face — its own guide says start at 0.5 and that
