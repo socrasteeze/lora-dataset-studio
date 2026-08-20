@@ -66,6 +66,27 @@ export const FLAG_LABELS = {
   // a C2PA mark — which is proof when it is there. Different method, different
   // certainty, so a different word: the image lane says AI, this one says may be.
   maybe_generated: 'May be AI-generated',
+  // 🎥 The camera pass's ONE flag, and the only one of its eleven readings that
+  // belongs in this amber list. The other ten are descriptions and live in the
+  // camera facet — a shot that pans is not defective, and the wobble one user
+  // is cutting is the very thing the next user is training on. This one is here
+  // because a wobble nobody asked for IS a quality problem, and because the
+  // measurement separates cleanly enough to cut on.
+  //
+  // "Camera shake" and not "Handheld": handheld is the camera LABEL, fires at a
+  // fixed internal floor, and describes. This flag fires wherever the user put
+  // the cut and rejects. Same measurement, two jobs, so two words.
+  shaky: 'Camera shake',
+  // 🔗 Named for the REMEDY rather than for the measurement, and it is the only
+  // chip here that can be acted on with one gesture: this shot holds a cut, so
+  // re-cut it. "Low coherence" would have been the number's name and would have
+  // told the user nothing about what to do with the clip.
+  //
+  // It must not read like "Barely moves": those two chips sit at OPPOSITE ends
+  // of the same similarity, and only one of them is on this scale at all —
+  // stillness is measured from motion vectors by the metrics pass, never from
+  // this number, which was measured and found to track shot length instead.
+  missed_cut: 'Cut inside the shot',
   unmeasured: 'Not measured yet',
 }
 
@@ -287,6 +308,49 @@ export function thresholdFields() {
         + 'calibrated scale — so preview against your own bank. Needs the '
         + '🤖 AI check pass; a shot it has not measured, or one too short for '
         + 'its two-second window, is never flagged.' },
+    // 🎥 Camera motion's only cut. Its hint carries two things no other hint
+    // here needs: the scale (because this number IS comparable between banks,
+    // unlike block_score, so real figures help) and the warning that it is not
+    // the same threshold as the handheld LABEL — a user who assumes they are
+    // one number will set this and wonder why the labels did not move.
+    { key: 'camera_shake_max', flag: 'shaky', direction: 'above',
+      label: 'Camera shake',
+      hint: 'Flags shots whose camera wobbles more than you want — the '
+        + 'high-frequency part of the movement, as a percentage of the frame '
+        + 'width. Unlike the cuts above, this number IS comparable between '
+        + 'banks: it does not move with resolution, content or encoder. For '
+        + 'scale, a smoothly-moved or locked-off shot measures under 0.10 and '
+        + 'strong handheld tremor measures about 1.16, so a cut around 0.3 '
+        + 'separates them. NO DEFAULT on purpose, because which side you want '
+        + 'is the whole question: filtering FOR the wobble is exactly how you '
+        + 'build a handheld-look training set. This is NOT the same threshold '
+        + 'as the "handheld shot" camera label, which fires at a fixed internal '
+        + 'floor — the label says what the shot is, this cut says what you '
+        + 'reject. Needs the 🎥 Camera pass; a shot it has not read is never '
+        + 'flagged.' },
+    // 🔗 Temporal coherence. Empty like the rest, and its hint is the only one
+    // here that has to spend its length on ACCURACY rather than on scale: the
+    // measurement is a genuine 0.72, so a user who reads a flag as a verdict
+    // re-cuts footage that was never broken. It also has to say out loud that a
+    // low reading can simply mean a long shot, because that is the confound the
+    // calibration found and the user will meet it on their first long take.
+    { key: 'coherence_floor', flag: 'missed_cut', direction: 'below',
+      label: 'Scene coherence floor',
+      hint: 'Flags shots whose first and last frames have drifted so far apart '
+        + 'that the shot probably holds a cut the detector missed — one “shot” '
+        + 'that is really two scenes, which trains a transition nobody asked '
+        + 'for. The number is the CLIP similarity between those two frames, so '
+        + '1.00 is “the same picture” and lower means “the scene changed”. '
+        + 'HOW RELIABLE: a ranking, not a verdict. Measured on real footage '
+        + 'against shots of the same LENGTH, a cut at 0.80 catches about a '
+        + 'third of the missed cuts and flags about one honest shot in seven; '
+        + '0.75 catches a fifth for one in ten. So use it to decide which shots '
+        + 'to LOOK at first, and expect to keep some of what it flags. '
+        + 'WHY A LONG SHOT SCORES LOWER: this falls with elapsed time whether '
+        + 'or not anything was cut — a twenty-second locked-off take can read '
+        + '0.84 with no cut in it at all. Needs 🔎 Find scenes; a shot with no '
+        + 'vectors, or one under a second (too short to hold two embedded '
+        + 'frames), carries no reading and is never flagged.' },
   ]
 }
 

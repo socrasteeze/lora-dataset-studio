@@ -113,7 +113,30 @@ ADVISORY_KEYS = ('duplicate_group', 'duplicate_of',
                  # unlike that one it would also lose the STATE that says why a
                  # shot has no score. Pinned against
                  # video_ai_check.OWNED_KEYS by a test.
-                 'ai_check_state', 'ai_check_frames', 'motion_irregularity')
+                 'ai_check_state', 'ai_check_frames', 'motion_irregularity',
+                 # 🎥 Camera motion. Every frame of every shot decoded and
+                 # tracked — dropping these would send a whole bank back through
+                 # that decode, and it would also lose the STATE that says why a
+                 # shot has no rates. Ten keys and not one summary, because the
+                 # LABELS are derived from the rates at read time: keeping only
+                 # a verdict would freeze the vocabulary into the database and
+                 # make every threshold adjustment a rescan. Pinned against
+                 # video_camera_motion.OWNED_KEYS by a test.
+                 'camera_state', 'camera_steps',
+                 'camera_pan_rate', 'camera_tilt_rate', 'camera_zoom_rate',
+                 'camera_roll_rate', 'camera_travel', 'camera_shake',
+                 'camera_coverage', 'camera_residual',
+                 # 🔗 Temporal coherence. The cheapest reading in this list —
+                 # dot products over vectors 🔎 Find scenes already cached — but
+                 # dropping it would still send a whole bank back through a pass
+                 # AND lose the STATE that says why a shot has no numbers. Four
+                 # numbers and not one verdict, for the reason every advisory
+                 # pass here keeps its rates: the flag is derived at read time,
+                 # so freezing a verdict into the database would make every
+                 # threshold adjustment a rescan. Pinned against
+                 # video_temporal_coherence.OWNED_KEYS by a test.
+                 'coherence_state', 'coherence_frames', 'coherence_span',
+                 'coherence_min', 'coherence_span_s')
 
 
 def merge_advisory(previous, summary):
@@ -308,7 +331,8 @@ THRESHOLD_KEYS = ('min_duration_s', 'motion_floor', 'motion_ceiling',
                   'watermark_max', 'aesthetic_floor',
                   'bars_max', 'text_coverage_max', 'safe_area_min',
                   'dup_frames_max', 'block_max', 'blur_max',
-                  'motion_irregularity_floor')
+                  'motion_irregularity_floor', 'camera_shake_max',
+                  'coherence_floor')
 
 
 def verdicts(scores, thresholds, duration_s=None):
@@ -521,6 +545,47 @@ def verdicts(scores, thresholds, duration_s=None):
     if (smooth is not None and smooth_floor is not None
             and smooth < smooth_floor):
         flags.add('maybe_generated')
+
+    # ── 🎥 Camera motion: the ONE cut of a pass that otherwise only labels ───
+    # The camera pass describes rather than judges, and its eight motion labels
+    # are deliberately not flags: a pan is not a defect, and the shake one
+    # person is filtering OUT is what the next person is training ON. This is
+    # the single exception, and it earns it — an unwanted wobble is the one
+    # camera property that is a quality problem for the user who did not ask for
+    # it, and `camera_shake` separates cleanly enough to cut on (measured:
+    # 1.16 on forged tremor against at most 0.10 on every smoothly-moved clip).
+    #
+    # It is NOT the same number as the `handheld_shot` LABEL, and the panel hint
+    # says so. The label fires at a fixed internal floor because it describes;
+    # this cut fires wherever the user puts it because it rejects. A clip can be
+    # labelled handheld and not flagged, or flagged and not labelled, and both
+    # are correct — one is what the shot IS, the other is what this user wants.
+    shake = scores.get('camera_shake')
+    shake_max = thresholds.get('camera_shake_max')
+    if shake is not None and shake_max is not None and shake > shake_max:
+        flags.add('shaky')
+
+    # ── 🔗 Temporal coherence: the shot that is actually two ─────────────────
+    # A FLOOR, and the polarity is the one the physics gives rather than the one
+    # the note that specified this gave: a LOW similarity between a shot's first
+    # and last embedded frame means the picture CHANGED across the span, which on
+    # material a detector already cut means it changed into another scene. High
+    # similarity is the ordinary case and is not a finding — the "nothing moved"
+    # half of Panda-70M's rule was measured against this bank's own motion
+    # readings and refuted (it tracks shot LENGTH, not motion), so no second flag
+    # exists here and `still` and `slideshow` keep that ground alone. See
+    # video_temporal_coherence's docstring for the numbers.
+    #
+    # An HONEST 0.72 rather than a classifier: duration-matched, a cut at 0.80
+    # catches about a third of the missed cuts for one honest shot in seven. So
+    # it ships in no default, it is a ranking aid rather than a verdict, and a
+    # shot with no vectors — or one too short to hold two embedded frames —
+    # carries no reading and is never flagged, like every cut above.
+    coherence = scores.get('coherence_span')
+    coherence_floor = thresholds.get('coherence_floor')
+    if (coherence is not None and coherence_floor is not None
+            and coherence < coherence_floor):
+        flags.add('missed_cut')
 
     return flags
 
