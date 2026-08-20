@@ -272,7 +272,9 @@ comm -13 <(git ls-files | sort) \
 ```
 
 Every path this prints is a file upstream has and this fork deliberately does
-not. **58 as of 2026-08-05** — roughly 33 in the Divergence-4 cluster
+not. **72 as of 2026-08-20** (58 on 2026-08-05 — the number moves every sync,
+which is why the command is here and the list is not) — roughly 33 in the
+Divergence-4 cluster
 (`dense_*`, `pod_*`, `hub_presence`, `cloud_quantize`, `fp8_local_delivery`,
 `hf_storage`/`hfStorage`, `DenseModelsPanel`, and their tests) and 10 in the
 Divergence-1 cluster (`nanobanana`, `chatgpt*`, `openrouter`, `engine_errors`,
