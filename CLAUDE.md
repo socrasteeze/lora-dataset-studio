@@ -44,6 +44,11 @@ minutes**; run on 8 workers it takes **7**, with the same result — measured, o
 the same tree, same machine. Use the parallel form. Commits accumulate locally
 during a wave, so the full gate belongs at the **push**, not at every commit.
 
+**Every `python` below means `.venv`'s interpreter** — `.venv/Scripts/python.exe`
+on Windows, `.venv/bin/python` on POSIX — never the machine default. See "Run the
+suite through `.venv`" at the end of this section for why, and for the one command
+that provisions it.
+
 - **While coding** — only what can tell you something about what you just
   changed: `python -m pytest -k "<basename of the changed module>"` (test files
   are named after the module or domain they cover: `app/services/foo.py` →
@@ -54,7 +59,7 @@ during a wave, so the full gate belongs at the **push**, not at every commit.
   check invariants across the whole tree. Frontend: `node --test` from
   `frontend/` (~1 min — it carries the help-registry and What's-new contracts).
 - **Before a push** — both suites, whole and green, on that exact tree:
-  `python -m pytest -n 8 --dist loadfile` (system Python) and `node --test` from
+  `python -m pytest -n 8 --dist loadfile` and `node --test` from
   `frontend/`. Non-negotiable. **Do not lean on CI for this**: its push gate is
   size-based (`.github/workflows/ci.yml`) and skips the heavy jobs on a small
   push, so a red can reach `main` with nothing having run.
@@ -73,6 +78,47 @@ Keep it at 8: each worker holds its own app, and `-n auto` (24 workers on a
 24-core box) exhausted memory and killed a worker mid-run. Give `--basetemp` a
 SHORT path: xdist appends `/gwN` per worker, and a long one trips a
 console-wrapping assertion in the Docker launcher test.
+
+**Run the suite through `.venv`, not the machine's Python.**
+`backend/requirements-dev.txt` PINS the collector (`pytest==9.0.3`,
+`pytest-xdist==3.6.1`) precisely so that a local green is evidence about CI — and
+a system interpreter drifts the moment anything else on the box upgrades pytest.
+Measured 2026-08-20: the system Python had wandered to pytest 9.1.1 with
+`pytest-xdist` absent ENTIRELY, so the parallel form above did not merely run
+slower, it refused to start (`unrecognized arguments: -n --dist`). `.venv` is the
+same environment `start.bat` builds, so the suite also runs against the app as a
+user actually gets it. Provision it once — **both** lines:
+
+```
+.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
+.venv/Scripts/python.exe -m pip install --no-cache-dir -r backend/requirements-torch-tests.txt
+```
+
+The Torch overlay is not optional for a PUSH gate, whatever its own header says
+about contributors. Measured 2026-08-20, `requirements-dev.txt` alone ran **7 831
+passed / 30 skipped / 1 failed** where a Torch-carrying interpreter on the same
+tree ran **7 975 / 11 / 0**: ~124 tests silently out of the run, and
+`test_video_ai_check.py::test_batching_never_straddles_two_clips` FAILING rather
+than skipping, because it guards on `numpy` while the `_encode` it drives imports
+`torch` — the same under-guard `requirements-dev.txt`'s own header describes for
+`safetensors`, in a new place. A gate that quietly drops 124 tests is worse than
+no gate, so a venv without the overlay is not one. With both lines installed the
+same tree runs **7 976 passed / 10 skipped / 0 failed** — the full 7 986 collected,
+and one test that a bare system interpreter skips actually executing. Install
+`requirements-dev.txt` FIRST: it pins the audited `setuptools`, which is what
+stops Torch's CPU index resolving an old vulnerable one.
+
+Torch in `.venv` is where the app puts it anyway — `setup_installer.py`'s
+`ml_extras` action installs into "the app's own venv", and the `aitoolkit_torch`
+probe reads a DIFFERENT interpreter (ai-toolkit's training venv), so this does not
+make a capability probe lie.
+
+Call that `python.exe` **directly** — never `activate.bat`. A venv carries
+hardcoded paths, so a copied or moved one (this checkout's `pyvenv.cfg` still
+names the directory it was created in) leaves `activate.bat` shadowing nothing,
+and a bare `python` afterwards silently falls back to the machine default. That
+is `start.bat`'s own rule, written after that fallback picked a Python the ML
+extras publish no wheels for.
 
 ## Bank and Dataset are two surfaces of one product
 
