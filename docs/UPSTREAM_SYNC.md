@@ -292,10 +292,10 @@ hand-written list is not.
 
 A merged upstream test that pins upstream's number is wrong, not evidence.
 
-| Value | Fork's value (2026-08-05) | How to recompute |
+| Value | Fork's value (2026-08-20) | How to recompute |
 |---|---|---|
-| Capability rows | **10** | `grep -n 'rows.length' frontend/tests/capability-destinations-contract.test.mjs` — and derive from `deriveCapabilitySummary`, not from upstream |
-| One-time help tips | **12** (upstream 17) | `cd frontend && node -e "import('./src/help/helpRegistry.js').then(m=>console.log(m.helpTips().length))"` |
+| Capability rows | **17** | `grep -n 'rows.length' frontend/tests/capability-destinations-contract.test.mjs` — and derive from `deriveCapabilitySummary`, not from upstream |
+| One-time help tips | **13** | `cd frontend && node -e "import('./src/help/helpRegistry.js').then(m=>console.log(m.helpTips().length))"` |
 | Local-only contract | **8** frontend + **3** backend | `node --test frontend/tests/local-only-engines-contract.test.mjs`; `python -m pytest backend/tests/test_local_only_engines.py -q` |
 | `DEFAULT_ENGINE` | `'klein'` | `grep -rn "DEFAULT_ENGINE" backend/app frontend/src` |
 
