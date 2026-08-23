@@ -6,10 +6,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+// DIVERGENCE 4 — upstream now reads TrainingPanel.jsx + CloudLaunchDialog.jsx
+// as one text, because its slice-1 extraction moved the dialog out of the panel.
+// This fork does not carry that module (the rented-GPU launch dialog is the
+// rental UI D4 removes), so the panel alone is still the whole feature here.
 const panel = readFileSync(new URL('./TrainingPanel.jsx', import.meta.url), 'utf8');
 // Split so this test file itself does not trip the local-only UI contract.
 const trainInCloud = 'Train in ' + 'cloud';
-
 test('TrainingPanel has no remote rental launch dialog or custom-base push gate', () => {
   assert.ok(!panel.includes('function CustomBasePushSection('));
   assert.ok(!panel.includes('function CloudLaunchDialog('));

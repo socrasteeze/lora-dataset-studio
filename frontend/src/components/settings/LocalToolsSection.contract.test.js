@@ -8,6 +8,10 @@ const primitives = readFileSync(
   new URL('./primitives.jsx', import.meta.url), 'utf8')
 const settingsPage = readFileSync(
   new URL('../../pages/SettingsPage.jsx', import.meta.url), 'utf8')
+// DIVERGENCE 4 — upstream spans TrainingPanel.jsx + CloudLaunchDialog.jsx here,
+// because slice 1 moved the cloud dialog's token notices out of the panel. This
+// fork does not carry that module (it is the rented-GPU launch dialog), so the
+// panel alone is still the whole surface this contract is about.
 const trainingPanel = readFileSync(
   new URL('../dataset/TrainingPanel.jsx', import.meta.url), 'utf8')
 

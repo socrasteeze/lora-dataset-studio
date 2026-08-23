@@ -25,7 +25,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./VariationCatalog.jsx', import.meta.url), 'utf8');
-const helpRegistry = readFileSync(new URL('../../help/helpRegistry.js', import.meta.url), 'utf8');
+// DIVERGENCE 10 — upstream also reads its six ./topics/* modules. This fork
+// keeps the registry whole, so one file carries all the topic data.
+const helpRegistry = readFileSync(
+  new URL('../../help/helpRegistry.js', import.meta.url), 'utf8');
 const ENGINES = readFileSync(
   new URL('../settings/EnginesSection.jsx', import.meta.url), 'utf8');
 

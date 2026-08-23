@@ -20,6 +20,12 @@ import {
 } from './trainingMode.js';
 import { preflightUrl } from '../components/dataset/preflightLane.js';
 
+// DIVERGENCE 4 — upstream reads all three files here (slice 1 split the dense
+// recipe/picker and the cloud dialog out of the panel). Neither module exists on
+// this fork, and the code they hold upstream is still inside the panel here, so
+// one read covers the same text. Note the assertion below that the panel does
+// NOT mention CloudLaunchDialog: on upstream that proves the split happened; here
+// it proves the rental dialog never came back, which is the stronger claim.
 const panel = readFileSync(new URL('../components/dataset/TrainingPanel.jsx', import.meta.url), 'utf8');
 const datasetHook = readFileSync(new URL('../hooks/useDataset.js', import.meta.url), 'utf8');
 

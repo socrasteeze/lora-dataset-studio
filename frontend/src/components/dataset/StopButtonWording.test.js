@@ -13,7 +13,10 @@ const panel = fs.readFileSync(new URL('./TrainingPanel.jsx', import.meta.url), '
 const workspace = fs.readFileSync(new URL('./DatasetWorkspace.jsx', import.meta.url), 'utf8');
 const captionLab = fs.readFileSync(new URL('./CaptionLab.jsx', import.meta.url), 'utf8');
 const hook = fs.readFileSync(new URL('../../hooks/useDataset.js', import.meta.url), 'utf8');
-const registry = fs.readFileSync(new URL('../../help/helpRegistry.js', import.meta.url), 'utf8');
+// DIVERGENCE 10 — upstream also reads its six ./topics/* modules. This fork
+// keeps the registry whole, so one file carries all the topic data.
+const registry = fs.readFileSync(
+  new URL('../../help/helpRegistry.js', import.meta.url), 'utf8');
 
 /** The JSX block of the one button that calls stopTraining(), from the guard
  *  that renders it to its closing tag — so the label assertions below can only
