@@ -196,6 +196,10 @@ test('the button and the amber warning both live in the caption window', () => {
 });
 
 test('re-caption has a help topic pointing at a real guide anchor', () => {
+  // DIVERGENCE 10 — upstream reads its six help/topics/* modules here. This
+  // fork keeps the registry whole, so the topic data is in the one file. The
+  // test's own point stands either way: a topic's section is layout, not
+  // contract.
   const registry = fs.readFileSync(
     new URL('../../help/helpRegistry.js', import.meta.url), 'utf8');
   const i = registry.indexOf("action('bank-recaption'");

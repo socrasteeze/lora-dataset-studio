@@ -140,6 +140,8 @@ test('the advanced block opens by itself when an override is already set', () =>
    Settings ids by scanning for id="…"), so the two must not drift apart. */
 test('every field id is rendered literally in LocalToolsSection and has a help topic', () => {
   const jsx = read('./LocalToolsSection.jsx')
+  // DIVERGENCE 10 — upstream reads ./topics/settingsFields.js. This fork keeps
+  // the registry whole, so the field topics are in the one file.
   const registry = read('../../help/helpRegistry.js')
   for (const f of COMFY_FOLDER_FIELDS) {
     assert.ok(jsx.includes(`id="${f.id}"`), `${f.id} is not rendered literally in the JSX`)

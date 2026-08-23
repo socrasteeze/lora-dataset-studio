@@ -19,6 +19,28 @@
    page topics are therefore listed BEFORE the field / action topics that share
    their anchor (e.g. workspace-images before workspace-add/curation/export). */
 
+/* DIVERGENCE 10 — this fork keeps the registry as ONE file.
+ *
+ * Upstream split these topics into six modules under ./topics/ on 2026-08-24,
+ * moving 309 of them and adding none. Adopting that split here is not the
+ * mechanical re-file it is upstream, because this fork's registry differs from
+ * theirs in 75 places: 38 topics it rejects (D1 API keys and cloud engine
+ * settings; D4 cloud.*, rental, dense recipe, HF storage), 20 it wrote, and
+ * 17 that BOTH carry where the fork reworded a title or stripped cloud-engine
+ * keywords. That last group is the one that matters — it is invisible to any
+ * id-level check, and it is exactly the class that reverted silently when the
+ * What's-new archive split was adopted from upstream's files a sync earlier.
+ *
+ * Since the split adds no topic, adopting it can only ever preserve or lose:
+ * there is nothing to gain. So the file stays whole and the resolved topic list
+ * stays byte-identical to what it was before the merge, by construction.
+ *
+ * The cost is honest and recorded: ./topics/*.js and ./topicBuilders.js join
+ * the re-delete list, and this block re-conflicts whole on every sync — as ONE
+ * region resolved by keeping ours, which is cheap. Revisit if upstream starts
+ * adding topics to the modules rather than only moving them; then the split is
+ * worth taking properly, topic by topic, against the deep-equality invariant.
+ */
 // settings-reference H2 anchor for each Settings section id.
 const SETTINGS_ANCHOR = {
   overview: 'overview',
@@ -2228,8 +2250,7 @@ const TOPICS = [
     ['watermark', 'restore', 'original', 'undo', 'revert', 'clean'],
     '/datasets?section=curation&panel=review-flagged', 'settings-reference', 'captioning-quality',
     { trigger: 'watermark-clean-done',
-      text: 'Not happy with a clean? Restore brings the original back — then try the other engine.' }),
-];
+      text: 'Not happy with a clean? Restore brings the original back — then try the other engine.' }),];
 
 Object.freeze(TOPICS);
 

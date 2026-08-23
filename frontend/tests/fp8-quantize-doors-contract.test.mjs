@@ -75,6 +75,9 @@ test('exactly one component talks to the quantize endpoints', () => {
 })
 
 test('both hosts render the shared component instead of their own controls', () => {
+  // DIVERGENCE 4 — upstream's training-side host is the extracted recipe card
+  // (slice 1). This fork keeps the recipe inside TrainingPanel.jsx, so the panel
+  // is the host that must import and mount the tool.
   for (const rel of ['../src/components/dataset/TrainingPanel.jsx',
     '../src/components/settings/StorageSection.jsx']) {
     const src = read(rel)
