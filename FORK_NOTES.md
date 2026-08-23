@@ -898,6 +898,23 @@ Expect this on EVERY sync that adds an infer worker. The check is one command:
 ```bash
 python -m pytest backend/tests/test_infer_result_channel.py -q
 ```
+
+**An eighth entry, added 2026-08-22 — two extension-arch guard tests isolate
+the guard they own from interpreter readiness.**
+`test_anima_family.py::test_launch_and_enqueue_refuse_anima_when_arch_missing`
+and `test_flux2klein_family.py::test_launch_refuses_flux2klein_when_arch_missing`
+deliberately create a four-byte `venv/Scripts/python.exe` as an installation
+marker. `launch_training` now checks interpreter readiness before it reaches the
+family guard, so an unisolated test tries to execute that marker. On the managed
+Windows runner, process creation can stall before `subprocess.run` installs its
+90-second timeout, leaving the whole suite without a verdict.
+
+Both tests monkeypatch `assert_interpreter_ready` to a no-op. That is the narrow
+boundary: these tests prove the Anima/FLUX.2 extension-arch refusal, while
+`test_training_diagnostics.py` owns interpreter readiness. Do not replace the
+fake marker with a real environment or weaken the production gate. Recheck both
+patches whenever upstream rewrites either family test.
+
 The section previously held the worked example of how these are meant to end:
 
 - ~~`backend/tests/test_face_mask_preview_progress.py` — an autouse
