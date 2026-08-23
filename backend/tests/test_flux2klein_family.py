@@ -78,6 +78,10 @@ def test_launch_refuses_flux2klein_when_arch_missing(app, tmp_path, monkeypatch)
     from app.services import face_dataset_service as svc
     from app.config import LOCAL_USER
     _configure_aitoolkit(tmp_path, app, supports_klein=False)
+    # This test owns the extension-arch refusal.  The fixture's four-byte
+    # python.exe is only an install marker; interpreter readiness has dedicated
+    # coverage, and executing this marker can stall Windows process creation.
+    monkeypatch.setattr(lt, 'assert_interpreter_ready', lambda: None)
     monkeypatch.setattr(lt.shutil, 'disk_usage',
                         lambda p: type('u', (), {'free': 500e9})())
     with app.app_context():
