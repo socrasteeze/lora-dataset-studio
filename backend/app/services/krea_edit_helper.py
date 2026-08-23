@@ -368,7 +368,6 @@ def resolve_krea_unet(selected=None):
         return None
     pick = selected or cfg.get('krea.base_model') or ''
     bare_pick = os.path.basename(str(pick).replace('/', os.sep).replace('\\', os.sep))
-    unmatched = ''
     if bare_pick:
         for sub, names in folders:
             if bare_pick in names:
@@ -687,8 +686,7 @@ def preflight():
 # between two call sites. `variation_output_megapixels` is the shared dial; the
 # no-ratio path here is still the free reference edit's source geometry.
 from .output_geometry import (            # noqa: E402  (module layout: see above)
-    MAX_OUTPUT_MP, _LATENT_MULTIPLE, _aspect_ratio, _requested_canvas,
-    fit_output_size, source_size as _source_size, variation_output_megapixels,
+    MAX_OUTPUT_MP, fit_output_size, source_size as _source_size, variation_output_megapixels,
 )
 
 

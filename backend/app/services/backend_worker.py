@@ -115,7 +115,6 @@ class BackendWorkerManager:
     def _execute(self, job, backend: dict):
         from ..extensions import db
         from ..job_queue import _dispatch_completion
-        from ..models import ImageGenerationQueue
 
         filename, failed, error_detail = None, True, None
         try:

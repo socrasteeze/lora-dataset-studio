@@ -38,34 +38,36 @@ from ..models import (CanvasImageNode, CanvasNodePosition, FaceDataset,
                       FaceDatasetImage, LoraTestImage)
 from .. import config as cfg
 from . import (bank_transfer_metadata, caption_origin, dataset_activity,
-               image_encoding, input_budget, reference_edit_jobs, trash)
+               image_encoding, reference_edit_jobs,
+               scene_captions, trash)
 from .dataset_storage import dataset_path, ensure_dataset_dir
 from .image_provenance import provenance_metrics
 from .image_quality import ANALYSIS_MAX_SIDE, quality_metrics
+from .pass_scopes import normalize_pass_statuses
 from .ollama_control import normalize_ollama_model_ref
 
 # Garde le modèle vision chaud entre les images d'un même batch caption/classify
 # (sinon Ollama le recharge - cold start ~10s - à CHAQUE image). Déchargé en fin
 # de batch pour rendre la VRAM à ComfyUI. ComfyUI est déjà en pause pendant la passe.
 _VISION_BATCH_KEEPALIVE = '5m'
-from .face_variations import (CAPTION_PROMPT, CAPTION_PROMPT_BOORU,
-                              DESCRIPTIVE_CAPTION_PROMPT,
+# Re-exported on purpose (not used here): face_variations.py says so, and
+# `svc.KLEIN_IMAGE_IMPROVE_PROMPT` is what the tests and the improve lane read.
+from .face_variations import KLEIN_IMAGE_IMPROVE_PROMPT  # noqa: F401
+from .face_variations import (DESCRIPTIVE_CAPTION_PROMPT,
                               CAPTION_REFINE_CONCEPT_PROMPT, CAPTION_LEAK_FIX_PROMPT,
                               EXPAND_CONCEPT_TERMS_PROMPT,
                               CLASSIFY_PROMPT, HEAD_BBOX_PROMPT, WATERMARK_BBOX_PROMPT,
-                              JOYCAPTION_PROMPT, caption_prompt_for,
+                              aspect_for_label, caption_prompt_for,
                               caption_prompt_for_style, caption_prompt_for_concept,
                               caption_has_identity_leak, caption_has_concept_leak,
                               appearance_describe_phrases, appearance_omit_shorten_clause,
                               compose_prompt_suffix, concept_lexical_field,
                               drop_identity_sentences, drop_identity_tags,
                               drop_style_lead_in, identity_leak_chips,
-                              is_nsfw_label, prompt_by_label, wrap_variation,
-                              wrap_variation_klein, wrap_variation_krea,
-                              get_identity_prompt, aspect_for_label,
+                              is_nsfw_label, prompt_by_label, wrap_variation_klein, wrap_variation_krea,
+                              get_identity_prompt,
                               normalize_appearance,
-                              normalize_subject_type,
-                              KLEIN_IMAGE_IMPROVE_PROMPT)
+                              normalize_subject_type)
 
 logger = logging.getLogger(__name__)
 
@@ -7206,6 +7208,16 @@ def _enforce_concept_omission(caption, leak_re, image_bytes, concept_desc, descr
     return caption
 
 
+def _caption_write_blocked(img, *, force, spare_asserted, field='caption'):
+    """A caption that appeared on the row while its image sat in inference wins
+    over the machine's answer: the pass planned its work minutes ago, and a
+    human has typed since. Mirror of the bank pass's mid-pass guard — the two
+    surfaces must spare hand-written words the same way."""
+    if not force and (getattr(img, field, None) or '').strip():
+        return True
+    return spare_asserted and caption_origin.is_protected(img, field=field)
+
+
 def _caption_concept(ds, force, backend, token=None, image_ids=None,
                      ollama_model=None, extra_instructions='', report=None,
                      outcome=None):
@@ -7230,8 +7242,15 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     q = FaceDatasetImage.query.filter_by(dataset_id=ds.id, status='keep')
     if image_ids is not None:
         q = q.filter(FaceDatasetImage.id.in_(image_ids))
+    # A forced BATCH spares the captions a human wrote or corrected ('asserted')
+    # — the promise the caption editor's tooltip makes. Naming images is the
+    # explicit opt-out: the leak panel re-captions a leaking caption no matter
+    # who wrote it. Same shape as the bank pass (start_caption).
+    spare_asserted = bool(force) and image_ids is None
     if not force:
         q = q.filter((FaceDatasetImage.caption.is_(None)) | (FaceDatasetImage.caption == ''))
+    elif spare_asserted:
+        q = q.filter(caption_origin.unprotected_clause(FaceDatasetImage))
     # (image_id, path), not (row, path): the loops below commit per image and
     # this pass runs for a long time over a live grid. See _live_image_row.
     todo = [(img.id, _img_path(img)) for img in q.all() if img.filename]
@@ -7243,6 +7262,7 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                               detail=f'Preparing {len(todo)} concept caption(s)…')
     n = 0
     vanished = 0
+    spared = 0           # hand-written ('asserted') captions left untouched
     remaining = list(todo)
     refine_targets = []  # (image_id, p, joycap) -> Joy draft refined by Qwen
     # 1) JoyCaption batch (draft) when the backend allows it.
@@ -7294,6 +7314,9 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
             img = _live_image_row(image_id)
             if img is None:      # deleted while the pass ran
                 vanished += 1
+                continue
+            if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+                spared += 1
                 continue
             try:
                 with open(p, 'rb') as fh:
@@ -7385,6 +7408,9 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                 if img is None:
                     vanished += 1
                     continue
+                if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+                    spared += 1
+                    continue
                 if not _usable_caption(final):
                     # Refine AND direct both unusable → fall back to the Joy draft (clean
                     # prose), scrubbed of any leak; leave blank if even that fails.
@@ -7426,6 +7452,9 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
                 if img is None:
                     vanished += 1
                     continue
+                if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+                    spared += 1
+                    continue
                 if _usable_caption(cap):
                     caption_origin.stamp(img, _cap_caption(cap), caption_origin.OLLAMA)
                     db.session.commit()
@@ -7445,6 +7474,8 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     if vanished:
         logger.info('caption concept: %s image(s) were deleted while the pass ran, '
                     'skipped', vanished)
+    if spared:
+        logger.info('caption concept: %s hand-written caption(s) spared', spared)
     return n
 
 
@@ -7562,8 +7593,15 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     q = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep')
     if ids is not None:
         q = q.filter(FaceDatasetImage.id.in_(ids))
+    # A forced BATCH spares the captions a human wrote or corrected ('asserted')
+    # — the promise the caption editor's tooltip makes. Naming images is the
+    # explicit opt-out: the leak panel re-captions a leaking caption no matter
+    # who wrote it. Same shape as the bank pass (start_caption).
+    spare_asserted = bool(force) and ids is None
     if not force:
         q = q.filter((FaceDatasetImage.caption.is_(None)) | (FaceDatasetImage.caption == ''))
+    elif spare_asserted:
+        q = q.filter(caption_origin.unprotected_clause(FaceDatasetImage))
     rows = q.all()
     # (image_id, path), not (row, path): both loops below commit per image, which
     # expires every row still to come, and this pass runs for minutes-to-hours
@@ -7584,6 +7622,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     try:
         n = 0
         vanished = 0
+        spared = 0           # hand-written ('asserted') captions left untouched
         remaining = todo
         # In 'auto', why JoyCaption didn't contribute (deps missing / crash). Kept so a
         # LATER Ollama failure reports BOTH reasons instead of only the Ollama one —
@@ -7631,6 +7670,11 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
                     img = _live_image_row(image_id)
                     if img is None:      # deleted while the batch ran
                         vanished += 1
+                        dataset_activity.bump(token)
+                        continue
+                    if _caption_write_blocked(img, force=force,
+                                              spare_asserted=spare_asserted):
+                        spared += 1
                         dataset_activity.bump(token)
                         continue
                     cleaned = cleaner(cap) or cap
@@ -7694,6 +7738,11 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
                             vanished += 1
                             dataset_activity.bump(token)
                             continue
+                        if _caption_write_blocked(img, force=force,
+                                                  spare_asserted=spare_asserted):
+                            spared += 1
+                            dataset_activity.bump(token)
+                            continue
                         cleaned = cleaner(cap) or cap
                         # Which engine wrote THIS row, not which backend was asked
                         # for: in 'auto' the two branches both write inside one run.
@@ -7714,8 +7763,9 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
             finally:
                 unload_vision_model()  # libère la VRAM pour ComfyUI en fin de batch
         logger.info('captioning finished: dataset=%s backend=%s captioned=%s '
-                    'deleted_mid_pass=%s elapsed=%.1fs',
-                    dataset_id, backend, n, vanished, time.monotonic() - started)
+                    'deleted_mid_pass=%s spared_asserted=%s elapsed=%.1fs',
+                    dataset_id, backend, n, vanished, spared,
+                    time.monotonic() - started)
         return n
     except Exception:
         logger.exception('captioning failed: dataset=%s backend=%s elapsed=%.1fs',
@@ -8083,8 +8133,14 @@ def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode
             return 0
         q = q.filter(FaceDatasetImage.id.in_(ids))
     rows = [i for i in q.all() if (i.caption or '').strip()]
+    # Same promise as the long pass: a forced batch never rewrites a short a
+    # human typed in the expanded editor; naming images is the explicit opt-out.
+    spare_asserted = bool(force) and image_ids is None
     if not force:
         rows = [i for i in rows if not (i.caption_short or '').strip()]
+    elif spare_asserted:
+        rows = [i for i in rows
+                if not caption_origin.is_protected(i, field='caption_short')]
     if not rows:
         return 0
     if generate is None:
@@ -8133,6 +8189,9 @@ def derive_short_captions(user_id, dataset_id, image_ids=None, force=False, mode
             img = _live_image_row(image_id)
             if img is None:      # deleted DURING its own generation
                 vanished += 1
+                continue
+            if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted,
+                                      field='caption_short'):
                 continue
             # The SHORT gets its own stamp, on its own column: this pass derives it
             # with a text model while the long caption above it may well have been
@@ -8947,7 +9006,10 @@ def _detect_watermarks_detector(dataset_id, row_ids, *, include_dismissed,
 
     token = dataset_activity.begin(dataset_id, 'watermark_detect', total=len(planned))
     try:
-        for path, state, score, regions, _error in watermark_detector.scan(
+        # Six fields, same as the bank's read of this generator. The fingerprint
+        # only feeds the bank's stale-write attestation — a dataset row has no
+        # such column, so it is deliberately dropped here, not missing.
+        for path, state, score, regions, _fingerprint, _error in watermark_detector.scan(
                 [p for _i, p in planned], should_cancel=_cancelled,
                 cancel_file=cancel_file):
             dataset_activity.bump(token)
@@ -10412,6 +10474,19 @@ def _reimprove_image_locked(user_id, image_id):
 # draining the selection in WAVES — it waits for a slot to free instead of hitting
 # the wall — with a cooperative stop checked at every image boundary.
 IMPROVE_SLOT_POLL_SECONDS = 2.0
+# How many of its OWN improvements the bulk drain keeps in flight at once.
+#
+# ComfyUI runs one job at a time and `job_queue`'s worker refuses to claim a
+# second while any row is 'processing' or 'sent_to_comfy', so queueing sixty
+# improvements ahead finishes no sooner than queueing a handful — they wait
+# either way. What the deep queue DID buy was the whole per-dataset fan-out
+# budget, spent on background work: the next thing the user clicked came back
+# "too many generations in flight (60), wait or cancel", which is the second
+# half of GitHub #44, reported by charlesangus (the first half being the UI
+# blanket — see frontend/src/utils/activityLanes.js). A shallow depth keeps the
+# GPU fed across the gap between two jobs and leaves the rest of MAX_FANOUT to
+# the person sitting in front of the app.
+IMPROVE_QUEUE_DEPTH = 4
 # Give up (and say so) if no slot frees for this long. A ComfyUI that died mid-batch
 # would otherwise leave the thread polling a count that never drops, and the dataset
 # stuck behind an "in progress" indicator until the registry TTL expires.
@@ -10430,6 +10505,56 @@ def _improve_in_flight(dataset_id):
     return (FaceDatasetImage.query
             .filter_by(dataset_id=dataset_id, status='pending')
             .filter(FaceDatasetImage.filename.is_(None)).count())
+
+
+def _improve_batch_in_flight(dataset_id):
+    """The improvements THIS lane still has rendering, and only those.
+
+    ``_improve_in_flight`` counts every unfinished generation on the dataset,
+    the user's own ⚡ Generate batch included — so the drain used to wait on
+    work that was never its own, and a big enough interactive batch could park
+    it for the whole slot timeout. The improve lane is identified by its
+    derivation kind (a legacy name: it predates the second engine, so a SeedVR2
+    candidate carries it too — which is right here, both lanes are background
+    work)."""
+    db.session.rollback()
+    return (FaceDatasetImage.query
+            .filter_by(dataset_id=dataset_id, derivation_kind=KLEIN_IMAGE_IMPROVE,
+                       status='pending')
+            .filter(FaceDatasetImage.filename.is_(None)).count())
+
+
+def _queue_held_off_gpu_reason():
+    """Why the image queue is claiming nothing at all, or None if it is free.
+
+    Delegates to the worker rather than re-deriving the conditions here: a copy
+    would drift, and the one that matters most (the in-process vision window) is
+    not even visible in the DB flags. Never raises — a drain must not die because
+    it could not ask.
+    """
+    try:
+        from ..job_queue import queue_manager
+        return queue_manager.held_off_gpu_reason()
+    except Exception:   # noqa: BLE001 — unreadable state is not a reason to stall
+        logger.exception('bulk improve: could not read why the queue is held')
+        return None
+
+
+def _improve_slot_blocked(dataset_id):
+    """Must the bulk drain wait before queueing one more improvement?
+
+    Two independent reasons, and neither may be dropped:
+      * its own depth (``IMPROVE_QUEUE_DEPTH``) — background work does not get
+        to spend the whole shared budget for no throughput in return;
+      * the shared cap itself, which nothing may blow through.
+
+    The depth is clamped to ``MAX_FANOUT`` so lowering the cap (a test, a
+    future setting) below the depth still behaves.
+    """
+    depth = min(IMPROVE_QUEUE_DEPTH, MAX_FANOUT)
+    if _improve_batch_in_flight(dataset_id) >= depth:
+        return True
+    return _improve_in_flight(dataset_id) + 1 > MAX_FANOUT
 
 
 def bulk_improve_eligible_ids(user_id, dataset_id, image_ids):
@@ -10527,11 +10652,17 @@ def start_bulk_improve(app, user_id, dataset_id, image_ids, engine=None):
 
 def _drain_improve_queue(user_id, dataset_id, image_ids, token, sleep=time.sleep,
                          engine=None):
-    """Queue one improvement per id, in WAVES that respect the MAX_FANOUT
-    concurrency cap: when the dataset already has that many generations in flight
-    the worker WAITS for a slot (the count drops as ComfyUI writes the files) rather
-    than firing a request doomed to be refused. Stops at the next image boundary
-    when ⏹ Stop arms the flag. Returns a summary dict (also used by the tests)."""
+    """Queue one improvement per id, in WAVES: the worker WAITS for a slot (the
+    count drops as ComfyUI writes the files) rather than firing a request doomed
+    to be refused. Stops at the next image boundary when ⏹ Stop arms the flag.
+    Returns a summary dict (also used by the tests).
+
+    A wave is bounded by ``IMPROVE_QUEUE_DEPTH`` — the batch's OWN in-flight
+    count — and, on top of that, by the shared ``MAX_FANOUT`` budget. It used to
+    be bounded by MAX_FANOUT alone, measured over every generation on the
+    dataset, which had it both hogging that budget (nothing the user launched
+    next could get in) and waiting on generations that were not its own.
+    """
     total = len(image_ids)
     queued = failed = 0
     waited = 0.0
@@ -10542,18 +10673,30 @@ def _drain_improve_queue(user_id, dataset_id, image_ids, token, sleep=time.sleep
                                                  dataset_activity.IMPROVE_KINDS)
 
     for index, image_id in enumerate(image_ids):
-        while not stopped and not stalled and _improve_in_flight(dataset_id) + 1 > MAX_FANOUT:
+        while not stopped and not stalled and _improve_slot_blocked(dataset_id):
             if _stop_requested():
                 stopped = True
             elif waited >= IMPROVE_SLOT_TIMEOUT_SECONDS:
                 stalled = True
             else:
+                # WHY the wait, before HOW LONG it has lasted. A queue frozen by a
+                # training run or a vision pass is not this batch's fault and no
+                # amount of waiting will free a slot — so that time must not count
+                # against the stall timeout. It used to: lowering the wave depth
+                # from MAX_FANOUT to IMPROVE_QUEUE_DEPTH made the wait loop the
+                # NORMAL path (a 30-image batch never entered it before), so a
+                # training run longer than 15 minutes ended with the batch
+                # declaring itself stalled and dropping every image it had not
+                # queued yet — silently, since 'stalled' breaks out of the loop.
+                held = _queue_held_off_gpu_reason()
+                waiting_for = held or 'a free generation slot'
                 dataset_activity.progress(
                     token,
-                    detail=f'Queuing improvements… {queued}/{total} — waiting for a '
-                           f'free generation slot ({total - index} left)')
+                    detail=f'Queuing improvements… {queued}/{total} — waiting for '
+                           f'{waiting_for} ({total - index} left)')
                 sleep(IMPROVE_SLOT_POLL_SECONDS)
-                waited += IMPROVE_SLOT_POLL_SECONDS
+                if held is None:
+                    waited += IMPROVE_SLOT_POLL_SECONDS
         if stalled:
             break
         if stopped or _stop_requested():
@@ -11156,3 +11299,62 @@ def write_caption_files(user_id, dataset_id) -> dict:
     return {'ok': True, 'written': written,
             'skipped_uncaptioned': skipped_uncaptioned,
             'removed_stale': removed_stale}
+
+
+# --- Scene captions -------------------------------------------------------
+# The dataset side of 🎬 Scenes. A dataset already holds one caption per image,
+# and read in row order those captions are a SEQUENCE exactly like a bank's —
+# the same read, on the images the user curated rather than on a reference pile.
+# Shape, ceiling and labels come from services/scene_captions.py, which
+# image_bank_service reads too: two surfaces, ONE contract.
+# A READ, never a pass — no GPU, no writes, alive while a job runs.
+
+
+def export_scene_captions(user_id, dataset_id, statuses=None):
+    """The dataset's captions as ORDERED scene cards.
+
+    One card per captioned image, in dataset order (row id ascending = the order
+    the images were generated or imported). Order is the point: each card is one
+    beat of a sequence, so a missing framing is NOT a gate — the card rides the
+    row's classified framing when there is one and 'body' otherwise, because
+    refusing an image would silently drop a beat from the middle. Only a missing
+    caption skips a row, and it is COUNTED, never guessed.
+
+    ``statuses`` scopes the read the way a Bank pass does (any of 'keep',
+    'pending', 'reject'); None keeps the default a curated dataset deserves —
+    kept and pending, never the images the user threw away.
+
+    The prompts come out WITHOUT the trigger word, which is how they are stored:
+    the launch prepends the trigger of the LoRA actually being tested
+    (`lora_test_studio._prompt_with_trigger`), so a scene read from dataset A can
+    be replayed against a checkpoint trained on dataset B and still say the right
+    name. ``filename`` lets a UI show the image a scene came from (dataset thumb
+    route); it is display-only and never rides a generation payload.
+    """
+    ds = get_dataset(user_id, dataset_id)
+    if not ds:
+        raise ValueError('dataset not found')
+    want = normalize_pass_statuses(statuses) or ['keep', 'pending']
+    rows = (FaceDatasetImage.query
+            .filter_by(dataset_id=dataset_id)
+            .filter(FaceDatasetImage.status.in_(want))
+            .order_by(FaceDatasetImage.id.asc()).all())
+    scenes = []
+    skipped = {'no_caption': 0}
+    for row in rows:
+        caption = (row.caption or '').strip()
+        if not caption:
+            skipped['no_caption'] += 1
+            continue
+        name = os.path.basename(row.filename or '')
+        scenes.append({'label': scene_captions.scene_label(
+            len(scenes), name or f'image {row.id}'),
+            'framing': scene_captions.scene_framing(row.framing),
+            'prompt': scene_captions.scene_prompt(caption),
+            'image_id': row.id,
+            # None when the file is not written yet (a generation still in
+            # flight): the card is its caption, and the panel simply draws no
+            # thumbnail rather than pointing an <img> at a URL that 404s.
+            'filename': name or None})
+    return {'dataset_id': dataset_id, 'dataset_name': ds.name,
+            'scenes': scenes, 'skipped': skipped}

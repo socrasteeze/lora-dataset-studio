@@ -6,7 +6,6 @@ import { apiFetch, getCsrfToken } from '../../api/fetchClient';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { postJson } from '../../hooks/useDataset';
 import { animeFamilyNote } from './animeFamilyNote.js';
-import { customBasePushView } from './customBasePush.js';
 import { dualCaptionsSupport } from './dualCaptions.js';
 import { loadMergeOpen, saveMergeOpen } from './loraMerge.js';
 import { maskedCarryOverAction, clearLegacyMasked } from './maskedMigration.js';
@@ -25,7 +24,7 @@ import {
   trainFamilyLabel,
 } from '../../utils/checkpointBrowser';
 import { stepsRecipeRefreshDelay } from '../../utils/stepsRecipeRefresh';
-import { confirmableRetryFlag, postWithConfirmations } from '../../utils/trainingRefusals';
+import { confirmableRetryFlag } from '../../utils/trainingRefusals';
 import {
   deployedFilenamesOf,
   orphanImportedCheckpoints,
@@ -46,7 +45,6 @@ import {
 } from '../../utils/trainingPresets';
 import { runConfirmableTrainingRequest } from '../../utils/trainingConfirmations';
 import { continueAttemptOutcome } from '../../utils/continueOutcome';
-import { launchButtonLabel } from '../../utils/launchProgress';
 import { HelpBadge } from '../../help/HelpMode';
 import { requestHelpTip } from '../../help/helpTips';
 import { useToast } from '../common/Toast';
@@ -71,7 +69,6 @@ import {
   MEMORY_KEYS, MEMORY_LABELS, memoryAdviceText, memoryIsOverridden, memoryPatchFor,
   memoryRiskLine, memoryStateLabel,
 } from './memorySavingAdvice';
-import { stopOutcomeMessage } from '../../utils/runSilence';
 import SettingsLink from '../common/SettingsLink';
 import { DatasetVersionChip, RunIdChip } from './RunIdentityBadges';
 import {
@@ -80,12 +77,10 @@ import {
 import {
   TRAINING_MODE_FULL_TRANSFORMER,
   TRAINING_MODE_LORA,
-  cloudTierEstimateView,
   fullTransformerArtifactView,
   fullTransformerUnavailableReason,
   isFullTransformerEligible,
   normalizeTrainingMode,
-  trainingModeLabel,
 } from '../../utils/trainingMode.js';
 
 // Plancher dur / recommandé par famille — miroir de TRAIN_MIN_IMAGES côté serveur
@@ -337,7 +332,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   const [trainType, setTrainType] = useState('zimage');
   const [trainingMode, setTrainingMode] = useState(TRAINING_MODE_LORA);
   const [trainingModeBusy, setTrainingModeBusy] = useState(false);
-  const [trainingModeError, setTrainingModeError] = useState('');
+  const [, setTrainingModeError] = useState('');
   const trainingModeRadioRefs = useRef({});
   const incompatibleModeFallbackRef = useRef('');
   // Navigateur de résultats indépendant : changer la configuration du PROCHAIN
@@ -422,7 +417,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     refreshStatus();
     const id = setInterval(refreshStatus, 10000);
     return () => clearInterval(id);
-  }, [caps.training_visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [caps.training_visible]);
 
   useEffect(() => {
     onNavigationStateChange?.({
@@ -983,7 +978,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     })().finally(() => { if (alive) setTrainingModeBusy(false); });
     return () => { alive = false; };
   }, [baseInfo, fullMode, fullTransformerEligible, fullTransformerReason,
-    trainType, variant, base, ds.setDatasetTrainingMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    trainType, variant, base, ds.setDatasetTrainingMode]);
 
   const toggleSliderMode = async () => {
     const next = !sliderOn;

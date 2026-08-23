@@ -60,11 +60,15 @@ from ..models import BankImage, FaceDataset, FaceDatasetImage, ImageBank
 from ..utils.dbbusy import write_with_retry
 from . import (bank_jobs, bank_queue, bank_semantic_engine,
                bank_transfer_metadata, bank_undo, caption_origin,
-               dataset_activity, image_encoding, input_budget, path_guard,
-               trash)
+               dataset_activity, image_encoding, path_guard, trash)
+# The scope vocabulary is a leaf (pass_scopes.py) so face_dataset_service never
+# imports this module; the three names stay readable as banks.* for every caller.
+from .pass_scopes import PASS_SCOPES, CAPTION_SCOPES, normalize_pass_statuses  # noqa: F401
+# Re-exported on purpose: the promote tests patch `banks._existing_dhash_rows`.
+from .face_dataset_service import _existing_dhash_rows  # noqa: F401
 from .face_dataset_service import (SCRAPE_IMPORT_MAX, _dhash, _download_scrape_item,
                                    _dataset_ingest_lock,
-                                   _existing_dhash_rows, _hamming, _SCRAPE_DL_WORKERS,
+                                   _hamming, _SCRAPE_DL_WORKERS,
                                    _watermark_regions_payload,
                                    _source_metadata_storage, bank_deterministic_analysis,
                                    create_dataset, import_images,
@@ -1955,9 +1959,9 @@ def tag_facets_payload(user_id, bank_id, limit=400) -> dict | None:
                     BankImage.tags_text != '')
             .all())
     counter = Counter()
-    for (text,) in rows:
+    for (tags_text,) in rows:
         # The sentinel commas make an empty split, so filter them back out.
-        counter.update(t for t in (text or '').split(',') if t)
+        counter.update(t for t in (tags_text or '').split(',') if t)
     common = counter.most_common(int(limit) + 1)
     truncated = len(common) > int(limit)
     return {'tags': [{'name': n, 'count': c} for n, c in common[:int(limit)]],
@@ -3832,35 +3836,8 @@ def _scan_one(src_root: str, thumbs: Path, item: tuple) -> dict:
 # pass that reaches it spends real time (GPU, in most cases) on images you
 # decided against. It is never a default, never part of the default, and the
 # dialog that offers it says what it costs.
-PASS_SCOPES = ('keep', 'pending', 'reject')
-
-
-def normalize_pass_statuses(statuses, allowed=PASS_SCOPES):
-    """Validate a per-run scope → a canonical list, or None for "as before".
-
-    None / [] → None, meaning the pass keeps its own historical filter. Anything
-    outside ``allowed`` raises ValueError → 400, exactly like a bad vocabulary."""
-    if statuses is None:
-        return None
-    if isinstance(statuses, str):       # a lone 'keep' is a scope of one
-        statuses = [statuses]
-    if not isinstance(statuses, (list, tuple, set)):
-        raise ValueError('invalid statuses: expected a list of statuses')
-    want = []
-    for s in statuses:
-        if not isinstance(s, str):
-            raise ValueError('invalid status: expected status names')
-        v = s.strip().lower()
-        if not v:
-            continue
-        if v not in allowed:
-            raise ValueError(f'invalid status: {v}')
-        want.append(v)
-    if not want:
-        return None
-    # Canonical order + dedup, so ['pending','keep'] and ['keep','pending'] are
-    # one value and never two code paths.
-    return [s for s in PASS_SCOPES if s in want]
+# PASS_SCOPES itself lives in pass_scopes.py — a leaf both surfaces import, so the
+# dataset side never has to reach into this module for three words.
 
 
 def _unscored_clause():
@@ -6051,7 +6028,6 @@ def select_diverse(user_id, bank_id, n=60, *, typicality=_TYPICALITY_DEFAULT,
     'typicality': w}. Raises ValueError (→400, "run ✨ Score first") when no
     embedding exists yet, so the UI shows the clear hint instead of an empty,
     unexplained selection."""
-    import numpy as np
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -7070,7 +7046,6 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
     A child that emits nothing at all for ``stall_timeout`` seconds is stopped
     and :class:`InferStalled` is raised — see the constant for why a hang here
     used to cost a permanent "GPU busy"."""
-    import json
     import threading
     import time
     cancel_file = str(cache_path) + '.cancel'
@@ -10190,7 +10165,6 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
         # `bank.source_path` inside the loop would re-SELECT it — and autoflush
         # turns that read into a write. See _flush_row_updates.
         source_path = bank.source_path
-        root = os.path.realpath(source_path)
         # PLAIN TUPLES, not ORM rows. Two reasons, both load-bearing: an ORM row
         # is expired by every commit, so the generator's next pull re-SELECTs it
         # and autoflush opens the write transaction (which then stays open
@@ -10749,7 +10723,7 @@ def _medium_job(bank_id, rescan, statuses=None, ids=None):
 # the app enforced on the user rather than a fact about the data, and the launch
 # dialog is where the cost of aiming a GPU pass at the bin can finally be stated
 # instead of assumed.
-CAPTION_SCOPES = PASS_SCOPES
+# CAPTION_SCOPES comes from pass_scopes.py with PASS_SCOPES (same tuple, two names).
 
 
 def _normalize_caption_statuses(statuses):
@@ -10978,19 +10952,18 @@ def _peer_caption_kind(device_id) -> str | None:
 # can run those captions IN ORDER with the user's own LoRA supplying the
 # character. A READ, never a pass — no GPU, no writes, alive while a job runs.
 
-# The dataset shot importer's own prompt ceiling (frontend/src/utils/shotImport.js),
-# restated here so a scene can never carry a line that surface would refuse.
-SCENE_MAX_PROMPT = 500
-_SCENE_FRAMINGS = ('face', 'bust', 'body', 'back')
-
-
-def _scene_prompt(caption: str) -> str:
-    """One import-safe prompt line: collapsed whitespace, word-boundary cut."""
-    text = ' '.join(str(caption or '').split())
-    if len(text) <= SCENE_MAX_PROMPT:
-        return text
-    cut = text.rfind(' ', 0, SCENE_MAX_PROMPT - 1)
-    return text[:cut if cut > 0 else SCENE_MAX_PROMPT - 1] + '…'
+# The shape of a scene card — ceiling, cut, framing fallback, label — lives in
+# services/scene_captions.py, because a DATASET offers the very same cards from
+# its own captions. One definition, so the two surfaces cannot answer differently
+# for the same caption (test_scene_caption_parity.py reads both against it).
+# Re-exported under the historical names: callers and tests already say
+# `banks.SCENE_MAX_PROMPT`.
+from .scene_captions import SCENE_MAX_PROMPT  # noqa: E402,F401  re-exported as banks.SCENE_MAX_PROMPT
+from .scene_captions import (            # noqa: E402  (module-level, grouped with its section)
+    scene_framing as _scene_framing,
+    scene_label as _scene_label,
+    scene_prompt as _scene_prompt,
+)
 
 
 def export_scene_captions(user_id, bank_id, statuses=None):
@@ -11023,12 +10996,10 @@ def export_scene_captions(user_id, bank_id, statuses=None):
             skipped['no_caption'] += 1
             continue
         stem = os.path.basename(row.relpath or '') or f'image {row.id}'
-        label = f'Scene {len(scenes) + 1} — {stem}'
-        if len(label) > 80:
-            label = label[:79] + '…'
+        label = _scene_label(len(scenes), stem)
         nsfw = (row.nsfw_score is not None
                 and row.nsfw_score > th['nsfw_max'])
-        framing = row.framing if row.framing in _SCENE_FRAMINGS else 'body'
+        framing = _scene_framing(row.framing)
         scenes.append({'label': label, 'framing': framing,
                        'prompt': _scene_prompt(caption),
                        'image_id': row.id,
@@ -12947,7 +12918,7 @@ def _dataset_import_job(bank_id, dataset_id, src_dir, image_rows, activity_token
                     values, compatible, cache_bundle = _dataset_row_bank_values(
                         row, dest, preserve_analysis,
                         analysis_cache_dir=analysis_cache_dir)
-                except Exception as exc:  # noqa: BLE001 — any partial transfer aborts
+                except Exception:  # noqa: BLE001 — any partial transfer aborts
                     logger.warning('dataset import: copy %s failed', filename,
                                    exc_info=True)
                     abort('Could not preserve the complete Dataset image and its '
@@ -13611,7 +13582,9 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
         # namespaces keep resolved_image_path and _bank_copy_values working
         # exactly as written (both only read attributes, neither queries), so
         # there is still ONE resolver and no second copy of its rules.
-        src_snap = SimpleNamespace(id=src.id, source_path=src.source_path)
+        # (A bank-level `src_snap` used to sit here too. It has had no reader
+        # since _bank_copy_values moved to the per-ROW snapshot `r` below, and
+        # ruff F841 is what surfaced it.)
         dest_root, dest_name = dest.source_path, dest.name
         # EVERY mapped column, not a hand-picked subset. This snapshot used to
         # carry only the seven fields the code reading it needed on the day it
@@ -13640,7 +13613,7 @@ def _bank_promote_job(user_id, src_bank_id, dest_bank_id, ids):
         # before the first byte is written, including file-vs-directory clashes.
         target_by_id = {}
         target_keys = set()
-        destination_root = os.path.abspath(dest.source_path)
+        destination_root = os.path.abspath(dest_root)
         for row in rows:
             relpath = row.relpath
             if (not isinstance(relpath, str) or not relpath

@@ -22,7 +22,6 @@ import { preflightUrl } from '../components/dataset/preflightLane.js';
 
 const panel = readFileSync(new URL('../components/dataset/TrainingPanel.jsx', import.meta.url), 'utf8');
 const datasetHook = readFileSync(new URL('../hooks/useDataset.js', import.meta.url), 'utf8');
-const runsPage = readFileSync(new URL('../pages/CloudRunsPage.jsx', import.meta.url), 'utf8');
 
 test('training mode enum is exact and every legacy or invalid value falls back to LoRA', () => {
   assert.equal(TRAINING_MODE_LORA, 'lora');

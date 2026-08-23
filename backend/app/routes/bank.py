@@ -12,7 +12,6 @@ from flask import Blueprint, current_app, jsonify, request, send_file
 from ..config import LOCAL_USER
 from ..models import BankImage
 from ..services import bank_groups
-from ..services import bank_jobs
 from ..services import bank_queue
 from ..services import bank_jobs, dataset_activity
 from ._common import _map_error, _require_no_stalled_comfyui

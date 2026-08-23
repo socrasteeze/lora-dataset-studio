@@ -28,7 +28,7 @@ import {
   createCustomShot, editCustomShot, customShotDraft, hasDerivedLabel,
 } from '../../utils/customShots';
 import {
-  ENGINE_ACCENTS, ENGINE_LABELS, billingEngines, canonicalEngines, engineBatches,
+  ENGINE_ACCENTS, ENGINE_LABELS, canonicalEngines, engineBatches,
   estimateCost, generateBlockedReason, localOnly, localQueuesBehindApi, readEngines,
   readMode, totalImages, writeEngines, writeMode,
 } from './engineSelection.js';
@@ -790,7 +790,6 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
   // guard-rail below. `caps.max_fanout` is the SERVER's per-batch cap, published
   // by /api/capabilities — mirrored so the limit is explained before the click,
   // never hardcoded here. A server that doesn't publish it simply keeps it off.
-  const runCost = estimateCost(selected.size, engines, engineMode, { multiplier });
   const blockedReason = generateBlockedReason({
     engines, shotCount: selected.size, mode: engineMode, multiplier,
     maxFanout: Number(caps.max_fanout) || 0,

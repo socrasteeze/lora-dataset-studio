@@ -4,12 +4,17 @@
    WHICH PROMPT(S). "Extra refs (all engines)" is true of the REFERENCES, not of
    the prompt: face_variations.py routes them through two different texts —
    wrap_variation picks `face_multi` for the API engines as soon as ref_count > 1
-   (Nano Banana / ChatGPT), while wrap_variation_klein always uses
-   `klein_identity`, whatever the reference count. A modal editing only
-   `face_multi` would let a Klein user carefully rewrite a text that has ZERO
-   effect on their generations. So both are shown, each labelled with the engine
-   that consumes it, and the one matching the workspace's currently selected
-   engine carries a "used by your current engine" badge.
+   (Nano Banana / ChatGPT), while the LOCAL engines — Klein and Krea 2 Edit,
+   which share one prompt assembly — always use `klein_identity`, whatever the
+   reference count. A modal editing only `face_multi` would let a local-engine
+   user carefully rewrite a text that has ZERO effect on their generations. So
+   both are shown, each labelled with the engine FAMILY that consumes it, and
+   every prompt at least one SELECTED engine consumes carries a "used by your
+   selected engine(s)" badge.
+
+   Divergence 1: this fork ships no API engine, so `API_PROMPT_ENGINES` is empty
+   and the `face_multi` box is never badged as consumed — the local text is the
+   only one any generation here reads.
 
    WHICH SUBJECT. The modal edits the prompts of THIS dataset's subject type and
    says so, loudly. It used to edit one global text whatever the dataset was: a
@@ -147,7 +152,7 @@ export default function IdentityPromptModal({ onClose, subjectType = 'human' }) 
 
         <div className="flex items-center gap-2 flex-wrap pt-1">
           <a href="#/settings/engines" className="text-indigo-300 hover:text-indigo-200 text-xs underline decoration-indigo-300/50">
-            All identity &amp; Klein prompts →
+            All identity, Klein &amp; Krea 2 prompts →
           </a>
           <button type="button" onClick={onClose}
             className="ml-auto px-3 py-1.5 rounded-lg bg-surface text-content text-sm">Cancel</button>

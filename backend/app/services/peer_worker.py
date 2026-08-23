@@ -409,8 +409,7 @@ class PeerWorker:
 
     def _run_comfy(self, job: dict):
         from ..utils import comfy_fs
-        from ..utils.comfyui import (queue_prompt_to_comfyui, get_comfyui_history,
-                                     fetch_output_image_bytes)
+        from ..utils.comfyui import (queue_prompt_to_comfyui, fetch_output_image_bytes)
 
         job_id = job['job_id']
         payload = job.get('payload') or {}

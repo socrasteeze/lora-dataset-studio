@@ -7,7 +7,6 @@ all with the network mocked (the suite stays offline).
 """
 from __future__ import annotations
 
-import json
 from unittest.mock import patch
 
 

@@ -25,7 +25,7 @@ same commit as any change that adds a new divergence.
 
 | Section | Answers |
 |---|---|
-| Divergences 1–8 (below) | what differs, why, and what must never come back |
+| Divergences 1–9 (below) | what differs, why, and what must never come back |
 | Merge diagnostics | how a past sync went wrong, so it does not repeat |
 | Merge routine | the short form of the procedure |
 | Fork changelog (at the end) | what shipped, wave by wave — a record, not a checklist |
@@ -219,6 +219,35 @@ it is the extraction of Klein's four-cause "why can't I pick this" answer out of
 panel was its only caller for one commit; the edit modal is now the second, which
 is the point of the file — one gap must not be explained two different ways two
 clicks apart.
+
+
+### The empty-list principle, and the two lists that joined it 2026-08-22
+
+`API_ENGINES = []` is the model: keep the export, empty it, and let every
+"is this billable / does it queue behind another / does it render elsewhere"
+helper derive from it, so they all answer correctly BY CONSTRUCTION instead of
+by special case. Two more lists were brought under it this sync, both after a
+gate caught them:
+
+- **`frontend/src/components/common/promptOverride.js` -> `API_PROMPT_ENGINES = []`.**
+  It had carried `['nanobanana', 'chatgpt', 'openrouter']` since the removals,
+  a second hand-maintained copy of a concept the fork had already emptied
+  elsewhere. Upstream's new `local-engine-prompt-labels-contract.test.mjs` pins
+  it to `API_ENGINES` — deliberately, so a sync that refilled one and not the
+  other could not hand this fork a paid prompt lane with nothing else noticing.
+  The knock-on is all in the right direction: the two `face_*` locks declare no
+  consumer and are never badged, the shared outfit/expression directives fall
+  back to Klein alone, and `activeExtraRefPromptKey` resolves every id —
+  legacy cloud tags included — to `klein_identity`.
+- **`frontend/src/utils/activityLanes.js` -> `REMOTE_ENGINES = []`.** Arrived
+  this sync as a NEW upstream util hardcoding its two remote engines, and the
+  local-only contract failed it on the spot. Nothing renders elsewhere here, so
+  every queue-lane activity holds the local GPU — which the hardcoded list also
+  produced, but by accident rather than by construction.
+  **Note the second failure it caused:** the reasoning comment NAMED the two
+  engines, and the contract counts cloud identifiers per file including
+  comments. The names are deliberately not written in that file now. A comment
+  is not a free place to explain a removal.
 
 ### Divergence 1b: a SECOND local engine, and a local-only engine catalogue
 
@@ -938,6 +967,35 @@ The section previously held the worked example of how these are meant to end:
   `python -m pytest backend/tests -q` — verified harmless, both here and on
   upstream's own green run.
 
+
+**A ninth entry, added 2026-08-22 -- three carriers, none of them a venv layout.**
+This sync added patches on upstream files for three unrelated reasons; they are
+listed together only because they share the Divergence-5 property of being
+invisible until CI goes red.
+
+- **`backend/requirements-dev.txt`** -- upstream's dependency wave wrote two
+  em-dashes (U+2014) into the ruff pin's comment. Upstream has no ASCII rule;
+  this fork does (`test_windows_scripts_are_ascii.py`, CLAUDE.md item 8),
+  because a BOM-less file read in the system ANSI codepage is how `stop.bat`
+  once became unparseable. Replaced with `--`. Expect this on EVERY sync that
+  edits a `requirements*.txt` or a Windows script: upstream writes prose
+  punctuation freely and nothing on their side objects.
+- **`frontend/src/components/common/promptOverride.test.js`** -- two tests
+  pinned upstream's cloud behaviour: one required every identity field to
+  declare at least one consumer, the other asserted the two cloud ids badge
+  `face_multi`. With `API_PROMPT_ENGINES` empty here (see Divergence 1) neither
+  can hold. Re-pointed at the fork's answer: the two API locks declare NO
+  consumer, and EVERY id -- including a legacy cloud tag on an old row --
+  resolves to `klein_identity`.
+- **`frontend/src/utils/activityLanes.test.js`** -- upstream's
+  `the two remote engines do not hold the local GPU` inverted. Taking it back
+  unchanged would pass here for the wrong reason: it would be asserting against
+  an empty list, which is the D1b always-false trap wearing a green tick.
+- **`backend/tests/test_video_ai_check.py`** --
+  `test_the_encoder_is_a_constant_and_not_a_setting` narrowed from a substring
+  test over the stringified `bank_scoring` defaults to a test over its KEYS. See
+  Divergence 9 for why the substring form was passing on a lie.
+
 ## Divergence 6: upstream's dormant `worker_url` plumbing is now LIVE here
 
 Upstream's `utils/comfyui.py` has carried `worker_url=` parameters on
@@ -1164,6 +1222,93 @@ divergence in this file and the reason a hardcoded `127.0.0.1` open is gone.
 **On the next sync:** expect this whole tail to conflict whenever upstream edits
 the launch lines. Resolve it by re-reading the two lanes above, never by taking
 either side whole.
+## Divergence 9: the lint gates, and the orphan backlog they exposed
+
+Added 2026-08-22, when upstream shipped correctness-class lint for BOTH halves
+(`e3a9591a`) and this fork already had its own narrower frontend gate.
+
+**The collision was a Divergence-2 trap in a new shape.** Upstream's config is
+`frontend/eslint.config.mjs`; the fork's was `frontend/eslint.config.js`. Both
+survive a merge with ZERO conflict markers, and ESLint's flat-config resolution
+prefers `.js` -- so the fork's copy would have silently won, upstream's would
+have been dead code, and neither the build nor 4 100 tests would have said a
+word. Exactly the `KLEIN_OVERRIDE_KEYS` / `overrideBadge` failure mode: two
+definitions, same file, last one wins.
+
+Resolved by **adopting upstream's `.mjs` and deleting the fork's `.js`**, with
+the fork's rationale carried into the adopted file's header. Upstream's config
+is a strict superset for the purpose the fork's existed to serve: it keeps
+`no-undef` and adds `react/jsx-no-undef`, which covers the JSX half of the same
+bare-identifier `ReferenceError` class. Its other rules are correctness-only,
+never style, so they meet the fork's own stated bar for adding one.
+
+**`no-unused-vars` is set to WARN here, and that is the whole divergence.**
+Upstream runs it at ERROR. On this fork it reports **35 pre-existing orphans** --
+imports and bindings whose only callers were deleted by D1 and D4, accumulated
+over months and invisible to the old `no-undef`-only config. They are not merge
+damage, and that was measured rather than assumed: linting the PRE-merge tree
+with upstream's very config reports the same 35.
+
+Clearing them is not a sync's business, and the reason is concrete. Deleting the
+two dead full-model components in `TrainingPanel.jsx` (`FullTransformerArtifactNotice`,
+`onTrainingModeKeyDown`) immediately orphans four more symbols, the next of which
+is a 58-line handler -- a behavioural excavation of D4's leftovers, in a panel a
+test suite cannot mount, inside a merge commit. The ~20 that were provably safe
+(single-occurrence unused imports and bindings, each verified by hand) WERE
+cleared in the sync; the cascading remainder was left, visible as warnings.
+
+**Restore `no-unused-vars` to `"error"` when the orphan wave lands.** Until then
+Gate 1 still does its job: the two rules that catch the leftover class this fork
+has actually shipped four times stay at ERROR, and the gate was green.
+
+**The backend half is upstream's, taken whole.** `ruff.toml` is adopted
+unchanged and CI runs `ruff check .` on every push, unconditionally -- so a red
+ruff is a red `main`, and there is no size gate to hide behind. It found **37**
+here where the pre-merge tree had 188 (upstream's own cleanup fixed the rest),
+and unlike the frontend list it did NOT cascade, so it was taken to zero. Four
+were real defects rather than tidiness, and they are worth naming because none
+of them would ever have failed a test:
+
+- `aitoolkit_remote.py` used `uuid.uuid4()` with **no `import uuid`** -- a live
+  `NameError` on any boundary-less multipart upload, on the remote-worker path
+  D6 activated *on this fork specifically*. Upstream never hit it; their copy of
+  that lane is dormant.
+- `cloud_training.py` called **`_push_resume_checkpoint`, which nothing defines**
+  -- the caller outlived `pod_checkpoint_push.py` when D4 rejected it
+  (diagnostic 19, in its purest form). Replaced with the same explicit refusal
+  the Hugging-Face branch six lines below already gives, rather than re-pointed
+  at `remote.seed_checkpoint`: that would be inventing transport behaviour for a
+  lane with no route to reach it.
+- `config.py` declared **`'bank_scoring'` TWICE in one dict literal**, so Python
+  kept the later one and `bank_scoring.models_root` fell out of `DEFAULTS`
+  entirely. This one is worth reading twice, because it is a fork bug that ate a
+  fork FIX: upstream has a single `bank_scoring` entry and no `models_root`; the
+  fork added its own entry WITH the key in `5e0e7c6a`
+  (*"fix(fork): ... bank_scoring Settings save"*), above upstream's -- so the
+  later upstream literal shadowed it and that bug-fix commit never took effect
+  at all. Meanwhile **nine call sites read `cfg.get('bank_scoring.models_root')`**
+  (both CLIP encoders, video caption/aesthetic/AI-check, the peer worker) and
+  `docs/guide/settings-reference.md` documents it. Merged into one entry.
+  **The tell was a test going red, not the bug being noticed** -- and the test
+  that caught it is itself a Divergence-5 carrier now: upstream's
+  `test_the_encoder_is_a_constant_and_not_a_setting` asserts
+  `'model' not in str(DEFAULTS['bank_scoring'])`, a SUBSTRING check that
+  `models_root` trips. It was green here only while the key was shadowed.
+  Tightened to test the KEYS, which is what its own docstring means. Whenever a
+  fork adds a key to a dict upstream also writes, check for a second literal:
+  Python will not warn, and the later one wins.
+- `image_bank_service.transfer` snapshotted `dest_root` "before anything
+  commits", then read `dest.source_path` back off the ORM object 28 lines later,
+  after `expunge_all()`. It works only because a detached-but-loaded attribute
+  survives; the snapshot is now used, which is what its own comment promised.
+
+**On the next sync:** `ruff check .` and `npm run lint` are Gate 1, both halves,
+and CI runs them unconditionally. A green local run is only evidence about CI if
+the pins match -- `ruff==0.16.4` in `backend/requirements-dev.txt`, the four
+ESLint packages pinned exactly in `frontend/package.json`. The fork had drifted
+to `eslint ^10` by taking "latest" the day it wrote its own config; upstream's
+exact pins were adopted with the config.
+
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
 Lessons from actually doing these merges, aimed at an agent seeing this repo
@@ -1251,7 +1396,8 @@ a decision, and don't miss the parts that merge with zero conflict markers.
    moment the component mounts (three real cases: `isKlein` 2026-07-22,
    `gptViaSub` 2026-07-26, `storage` 2026-07-27 — the last one crashed the
    workspace on every dataset open/create). `npm run lint` (ESLint `no-undef`
-   only, see `frontend/eslint.config.js`) catches this class statically; it is
+   plus `react/jsx-no-undef`, see `frontend/eslint.config.mjs`) catches this
+   class statically; it is
    as REQUIRED a sweep step as the build, and CI runs it on every push.
 7. **Run the test suites BEFORE the merge and diff the results after.** This
    repo has ~50 environment-dependent failures on a Linux container (Windows
@@ -1707,6 +1853,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-08-22 | *(merge)* + dist | **Upstream sync - 54 commits (`5cc00ca3`..`780de445`), 18 conflicted files plus the generated bundle.** The first window in this fork's history with **zero rejected features in it** - every commit message and body was grepped for the cloud-engine and rental vocabulary and returned nothing - so the whole cost was in the two things a clean window still brings: interleaved plumbing, and gates that had never run here before. Adopted: the **generation queue** (see the dock, jump a job, leave it, and the app-wide hold explained in words), **Scenes from a DATASET's captions** beside the existing bank lane, **curation no longer waiting on the queue**, per-checkpoint Canvas grids, the lightbox saying WHY a pixel edit is refused, a base model filed two folders deep being found, the Bank face pass rescuing small heads like the dataset scorer, typed captions surviving a forced pass, and the dataset watermark scan-tuple crash. Reject inventory held at **72** and 23 new upstream files were adopted whole; **no rejected file leaked in**. **The sharp edge was the lint gate (new Divergence 9).** Upstream shipped one for both halves, and its frontend config is `eslint.config.mjs` while the fork's was `eslint.config.js` - both survive a merge with ZERO markers, and flat-config resolution prefers `.js`, so the fork's would have silently won and upstream's would have been dead. Adopted theirs, deleted the fork's, carried the rationale across. `no-unused-vars` is held at WARN here: it reports 35 orphans, and linting the PRE-merge tree with the same config reports the same 35, so none is merge damage - ~20 safe ones cleared, the rest deferred because clearing `TrainingPanel`'s two dead full-model components cascades into a 58-line handler. The BACKEND half went to zero: `ruff check .` (CI runs it unconditionally, no size gate) found 37 where the pre-merge tree had 188, and **four were real defects no test could fail on** - a missing `import uuid` behind a live `NameError` on D6's remote-upload path; a call to `_push_resume_checkpoint` that nothing defines, left behind when D4 rejected `pod_checkpoint_push`; a duplicate `'bank_scoring'` dict literal that had been eating the fork's OWN `models_root` fix (`5e0e7c6a`) while nine call sites read the key; and `image_bank_service.transfer` reading `dest.source_path` back off an expunged ORM row 28 lines after snapshotting it to avoid exactly that. **Caught by gates, not by reading**: the local-only contract failed a NEW upstream util (`activityLanes.js`) hardcoding two cloud engines - then failed again because the comment explaining the removal NAMED them; upstream's new prompt-labels contract failed `API_PROMPT_ENGINES`, still listing three removed engines against the fork's empty `API_ENGINES`; and the ASCII gate failed two em-dashes upstream put in `requirements-dev.txt`. Merge damage found and fixed: a duplicate `"lint"` key auto-merged into `package.json` scripts, and a duplicated `aspect_for_label` import that my own conflict resolution created (ruff F811 caught it; the pre/post ruff diff proved it and one other were the ONLY merge-introduced lint errors). Gates: ruff 0 (from 37), ESLint 0 errors / 38 warnings, build clean, local-only contract 8+3 green against the REBUILT bundle, backend **7979 -> 8036 passed / 0 failed**, frontend **4102 -> 4163 passed / 0 failed**. `APP_VERSION` 2026.08.22F. |
 | 2026-08-20 | *(merge)* + dist | **Upstream sync - 2 commits (`690d955c`, `cb04204e`), ONE source conflict region plus the generated-bundle pair.** A calm, narrow window: the D1 and D4 sweeps returned exactly their pre-merge hit lists, and the derived reject inventory moved **76 -> 72** because all four files upstream added here are adopted (`utils/captionAppearancePolicy.js` + its test, `CaptionOptionsAppearance.test.js`, `test_appearance_policy.py`). Adopted: **omit vs describe, per appearance family** - Character Caption Options gains a fourth axis (hair, makeup/nails, facial hair, glasses) alongside the identity families that stay locked omitted, so what a caption does not name can still bind to the trigger on purpose rather than by accident; and **saving a MOVED policy now nudges for a re-caption**, the same 'future captions' wording a kind or concept change already uses, compared by value so a save of an unrelated field does not cry wolf. Suggested by Sam Exit and Meeseeks (Discord). **The one conflict**: `face_dataset_service.py`'s `face_variations` import - HEAD had added `aspect_for_label` for an unrelated fork feature, upstream added `normalize_appearance` for this one, adjacent lines in the same import block. Kept BOTH; both are genuinely called elsewhere in the file (`aspect_for_label` at four call sites, `normalize_appearance` at two) - a textbook adjacent-import conflict, never a real choice between them. Gates: lint/build clean, local-only contract 8+3 green against the REBUILT bundle, capability-row count unchanged at 17, backend 7976 -> 7991 passed / 0 failed, frontend 4096 -> 4102 passed / 0 failed. |
 | 2026-08-20 | *(merge)* + dist | **Upstream sync - 15 commits (`d8eefeab`...`9cfaf7d1`), ZERO source conflict regions - the whole merge conflicted only in the generated bundle.** The fourth window in a row with **nothing rejected outright**: the D1 and D4 sweeps returned exactly their pre-merge hit lists, and the derived reject inventory moved **82 -> 72** because all ten files upstream added here are adopted (`studio/SceneBankPrompts.jsx`, `studio/scenePrompts.js` + its test, `hooks/useImageZoomPan.js`, `hooks/useMediaQuery.js`, `utils/imageZoomPan.js` + its test, `test_bank_scene_prompts.py`, and the two render/tooltip contracts). Adopted: **🎬 Scenes from a bank** - a bank's captions become ordered prompt passes, picked in bank order, riding the EXISTING 📝 prompt axis through `RunSetupPanel` so the Test Studio and the board's 🎨 Generate cannot drift; the new `GET /bank/<id>/scenes` is read-only, so it answers while a pass is running, and a missing caption skips and is COUNTED rather than guessed. **The render viewer folds and zooms** - ⤢ puts the facts panel away (a 904x750 tablet goes 35% -> 90% of the screen), and pinch/wheel/double-tap magnify with travel clamped to the real overflow and the cap pinned to the file's own resolution, so it can never magnify interpolation and lie about it; Escape gains a rung (Repair, then zoom, then close) rather than changing meaning. **The board's chrome is RANKED** for a phone on three measured thresholds instead of wrapping into four rows, with `useMediaQuery` PLACING each control once - Tailwind can hide a chip at a width, it cannot move one, and two copies drift. Plus the fixes: **a shot card tooltip always shows its prompt** (three render blocks had drifted into three behaviours, the count keeping its badge - reported by .samexit on Discord) and **⇪ Keep no longer takes a card's pencil away**, the edit re-deriving a label only when the label IS the current derivation of the prompt. Gates: lint/build clean, local-only contract 8+3 green against the REBUILT bundle, backend 7975 passed / 0 failed (baseline 7969, +6 upstream's own bank-scene tests), frontend 4096 / 0 failed (baseline 4063). |
 | 2026-08-20 | *(merge)* + dist | **Upstream sync - 10 commits (`aa9bce1b`...`71986f08`), nine source conflict regions plus the generated-bundle pair.** A calm window and the third in a row with **nothing rejected outright**: the D1 and D4 sweeps returned exactly their pre-merge hit lists, and the derived reject inventory moved **78 -> 72** because all six files upstream added in this window are adopted (`services/infer_env.py`, `infer/import_report.py`, `test_infer_env.py`, `test_video_pass_retry_contract.py`, `utils/customShots.js` + its test). Adopted: **a coverage chip is now a button** - `analyse()` takes an optional `ids` positional and each bucket reports its `image_ids` gathered in the SAME pass as the counts, so the panel and the grid cannot disagree about what "profile 3" means; on the front it is a third grid filter, ranked with the decision and tag ones, narrowing by ID rather than re-reading captions in the browser (the Bank keeps plain chips on purpose - a bank pages over SQL, so its equivalent is a server-side facet, not an id list). **Sort gains grouping**: "Shot type" orders on the framing index and "Shot type, then face similarity" ranks inside each run, the ordering spec going from one step to a LIST of steps with "unmeasured sinks to the end" applying per step. **An existing custom shot can be edited** rather than retyped, keeping its id, its position, its selection and its register, with the label derivation moved into `utils/customShots.js` so add and edit cannot disagree. Plus the fixes: **a dead worker now aborts a video pass instead of retiring every shot** (an encoder error is a statement about the interpreter, so it stops the pass with nothing marked; anything else is HELD and retired only once a later shot proves the environment was fine, ten in a row aborting - `test_video_pass_retry_contract` reads all five passes so a sixth cannot be written without it); **every `backend/infer/` worker and the probe that vouches for it now run isolated from the machine's user site-packages** (`services/infer_env`, `-s` on argv plus `PYTHONNOUSERSITE` for grandchildren, applied to a BORROWED interpreter and never to the app's own); and **an import failure says whether the package is absent or present-and-broken** (`infer/import_report`, told apart by `exc.name` rather than by pattern-matching a message). **The one real divergence collision, and it arrived interleaved inside a single hunk** - diagnostic 4's exact shape: upstream's coverage-chip block in `DatasetWorkspace.jsx` ships in the same conflict region as `summarizeGeneration(images)` / `refusalHeadline(outcome)`, whose module `generationOutcome.js` is a Divergence-1 deletion (the removed cloud engines' refusal notice). Kept the chip filter, dropped the tally, and the explanatory comment was reworded off the engine's literal name so the per-file cloud-identifier budget in `local-only-engines-contract` stays where it is rather than being bumped for a comment. **Seven keep-BOTH resolutions in the infer lane**, all the same shape: upstream's `import import_report` landed on the exact lines carrying this fork's `claim_result_stream(__name__)` result-channel claim, so each worker now has both, one `sys.path.insert` between them; `bank_score_infer.py`'s error line took upstream's `import_report.import_failure(e)` while keeping `file=_OUT`. `infer_stream.py` was the one that needed thought rather than concatenation: upstream sets `env=infer_env.worker_env(python)` outright, which would have discarded the fork's carried `env`/`cwd` parameters and with them JoyCaption's `HF_HOME` (the ~8 GB re-download that paragraph exists to prevent) and the peer worker's `models_root`. Resolved as `worker_env(python, base=env)` - the helper's own `base=` argument, which falls back to `os.environ` when the caller passed none - so the no-user-site instruction layers ON TOP of the caller's environment instead of replacing it. **One retired-Divergence-3 residue cleared for free**, exactly as that section says to look for: `VariationCatalog.jsx`'s `addCustomShot` built its label as `hot ? '🔞 …' : p.slice(0, 40)` where the merge-base had `${hot ? '🔞' : '✨'} …` - the `✨` had been deleted outright by the old strip, so the 2026-07-29 restoration had no line to match. Upstream's rewrite replaces the whole expression with `createCustomShot()`, so taking their side cost nothing and put the glyph back. **Checked and unchanged**: `dataset_activity.py`'s `KINDS` and `useDataset.js` were untouched upstream in this window; D5's carriers re-derived rather than read (**13** venv-layout, **15** `**_kw`, both byte-identical before and after); D6's `local_rows_only` untouched. No new What's-new entry was owed - upstream's three arrived with their features and none assumes a lane this fork lacks; the three fixes shipped without one upstream and none was invented here. README needed no edit: its Coverage row still reads "Advice only: nothing is kept or rejected", which the chip filter does not contradict (it changes what is shown, never what an image is). Gates: ESLint clean; production build clean; local-only contract **8 frontend + 3 backend** against the rebuilt dist; `app.create_app()` OK; hygiene 13 passed / 2 skipped; backend **7914 -> 7958 passed** (+44), 22 skipped, **0 failed on both sides**; frontend **4050 -> 4063**, 0 failed. Help tips recomputed from source: **13**. |

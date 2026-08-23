@@ -5,13 +5,12 @@ import { bankTreeSource } from './bankTreeSource.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { defaultPipelineStepKeys, pipelineStepKeys } from './bankSemanticEngine.js';
+import { pipelineStepKeys } from './bankSemanticEngine.js';
 
 import { FALLBACK_ORDER, buildSteps, defaultChecked } from './pipelineSteps.js';
 
 const facets = fs.readFileSync(new URL('./bankFacets.js', import.meta.url), 'utf8');
 const dialog = fs.readFileSync(new URL('./LaunchAllDialog.jsx', import.meta.url), 'utf8');
-const report = fs.readFileSync(new URL('./PipelineReport.jsx', import.meta.url), 'utf8');
 const ws = bankTreeSource();
 
 test('the launch dialog posts the three config keys the backend expects', () => {

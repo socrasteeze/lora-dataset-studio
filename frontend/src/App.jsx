@@ -11,6 +11,7 @@ import ActivityPanel from './components/common/ActivityPanel'
 import ConnectionBanner from './components/common/ConnectionBanner'
 import SetupHealthNotice from './components/setup/SetupHealthNotice'
 import ComfyRecoveryBanner from './components/common/ComfyRecoveryBanner'
+import GenerationQueueDock from './components/common/GenerationQueueDock'
 import DockerUpdateInstructions from './components/common/DockerUpdateInstructions'
 import PinokioUpdateInstructions from './components/common/PinokioUpdateInstructions'
 import DatasetPage from './pages/DatasetPage'
@@ -553,6 +554,10 @@ function Shell() {
         <Outlet />
       </main>
       <TipHost />
+      {/* One ComfyUI, one queue, fed by every surface — so the dock that shows
+          it is mounted once here rather than on the screen that happens to have
+          queued the work. Silent while the queue is empty (GitHub #44). */}
+      <GenerationQueueDock />
     </div>
   )
 }

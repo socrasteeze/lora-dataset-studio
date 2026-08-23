@@ -269,8 +269,6 @@ def run_remote_pass(job, device_id, *, script, by_path, extra_payload,
     Raises RuntimeError with the peer's reason on failure — including, up
     front via ``required_cap`` ('bank_scoring' | 'face_scoring'), when the
     peer's own heartbeat already said it lacks the stack this pass needs."""
-    from ..extensions import db
-    from ..models import ClusterJob
     from . import cluster as cluster_svc
     from . import cluster_remote
 

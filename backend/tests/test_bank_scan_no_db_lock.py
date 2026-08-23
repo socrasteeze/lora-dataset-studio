@@ -270,28 +270,31 @@ def test_the_duplicate_regrouping_lets_other_writers_through(file_db):
     # through afterwards, so a median shrugs at it (measured on the old shape:
     # p50 of 2.4 ms in one run, 147 ms in the next — the median is noise here).
     #
-    # p99 and not max(). Every wait is clipped by the writer's own 0.5 s busy
-    # timeout, so `max` saturates near 500 ms under BOTH shapes and has almost no
-    # room to say anything; the single worst sample is then really a report on
-    # the machine, and it was — a CI runner recorded 498 ms against this 400 ms
-    # ceiling on a phase with ZERO writes refused, one fsync stall out of 1 115
-    # attempts. p99 has the range the max does not. Measured over three runs of
-    # each shape on the same box, ~400 attempts against ~12:
-    #
-    #     healthy   p99  36-38 ms    max 109-147 ms    0 refused
-    #     parked    p99 507-516 ms   max 507-516 ms    4 refused
-    #
-    # 400 ms sits an order of magnitude above the healthy tail and below the
-    # clipped one, so the guard keeps biting: the control test below reproduces
-    # the old shape, and it fails this line by ~110 ms with the timeout in the
-    # way. Raising the timeout to uncap `max` is not the fix — it would buy that
-    # range by weakening the refusal assertion above, which is the stronger one.
-    waits = sorted(pressure.waits)
-    p99 = waits[min(len(waits) - 1, int(len(waits) * 0.99))]
-    assert p99 < 0.4, (
-        f'the slowest 1% of writers waited {p99 * 1000:.0f} ms during the '
-        f'regrouping (worst {max(waits) * 1000:.0f} ms, {elapsed:.1f} s phase, '
-        f'{pressure.attempts} attempts) — the lock is still being parked')
+    # Expressed as a FRACTION of the phase, not in milliseconds. An absolute
+    # budget measures how fast the machine is, not whether the lock is parked:
+    # calibrated here (24 ms of a 0.25 s phase) it failed on a CI runner ~23x
+    # slower, which measured 554 ms of a 5.7 s phase — the very same 0.10 share,
+    # and a green property reported as a regression. The shape this guards
+    # against is not slow, it is PARKED: the old code held the lock for 626 ms
+    # of a 0.9 s phase, a share of 0.70. A 0.25 line sits clear of both by a wide
+    # margin on any hardware. Sensitivity does not rest on this number anyway —
+    # test_the_regrouping_really_did_lock_the_database_before proves the probe
+    # catches the old shape deterministically, with no timing at all.
+    worst = max(pressure.waits)
+    share = worst / elapsed if elapsed > 0 else 0.0
+    assert share < 0.25, (
+        f'a writer waited {worst * 1000:.0f} ms of a {elapsed:.1f} s regrouping '
+        f'({share:.0%} of it, {pressure.attempts} attempts) — the lock is still '
+        'being parked')
+    # There used to be a second, absolute ceiling here (`worst < 2.0`), meant
+    # as a loose "felt by the user" guard. It was the stopwatch this test had
+    # just sworn off: on 2026-08-21 a hosted CI runner stretched the whole
+    # phase to 11.3 s, a writer sat through 2 015 ms of it — a share of 0.18,
+    # comfortably inside the line above — and the ceiling turned that green
+    # property into a red build. An absolute wait measures how slow the runner
+    # is, never whether the lock is parked; the share does, and the sibling
+    # test below proves the probe catches the parked shape with no timing at
+    # all. So the share is the only line, on purpose.
 
 
 def test_the_regrouping_really_did_lock_the_database_before(file_db):

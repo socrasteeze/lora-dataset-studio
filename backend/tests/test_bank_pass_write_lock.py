@@ -275,7 +275,6 @@ def test_a_vision_pass_holds_no_long_write_transaction(tmp_path, monkeypatch):
     a SELECT does not open a write transaction — the UPDATE flushed ahead of it
     does. Same mechanism, different statement in the log.
     """
-    import logging
     from app.services import image_bank_service as svc
     from app.utils import dbtrace
 

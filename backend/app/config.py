@@ -299,7 +299,14 @@ DEFAULTS = {
     # out-of-band by Setup ▸ Install bank scoring into data/envs/bank_scoring;
     # models_root overrides the HF/torch cache for those weights. Empty python
     # = fall back to the app interpreter (probe fails until install).
-    'bank_scoring': {'python': '', 'models_root': ''},
+    # text_search_idle_minutes: how long the 🔤 text-search encoder stays warm
+    #   after its last query. Loading CLIP costs ~8 s; encoding a phrase costs
+    #   ~20 ms — so the worker is kept alive to make a refine-and-retry session
+    #   instant, and reaped afterwards because it holds ~2.4 GB of RAM. 0 means
+    #   "never stay warm": every distinct query pays the ~8 s load, which is the
+    #   right trade on a memory-tight machine.
+    'bank_scoring': {'python': '', 'models_root': '',
+                     'text_search_idle_minutes': 10},
     # 🗃️ Image bank triage thresholds. Raw scores are persisted per image;
     # these thresholds only drive the FLAGS computed at read time — so tuning
     # them re-sorts an already-scanned bank instantly, no rescan needed.
@@ -366,16 +373,6 @@ DEFAULTS = {
     # who already keeps a CPU-ML interpreter and would rather not have a second
     # copy of onnxruntime.
     'video_text': {'python': ''},
-    # Bank ✨ Score pass interpreter (CLIP aesthetic/NSFW stack). Auto-provisioned
-    # by the bank_scoring installer into its own venv — declared here so a
-    # full-config Save round-trips it instead of failing "unknown config section".
-    # text_search_idle_minutes: how long the 🔤 text-search encoder stays warm
-    #   after its last query. Loading CLIP costs ~8 s; encoding a phrase costs
-    #   ~20 ms — so the worker is kept alive to make a refine-and-retry session
-    #   instant, and reaped afterwards because it holds ~2.4 GB of RAM. 0 means
-    #   "never stay warm": every distinct query pays the ~8 s load, which is the
-    #   right trade on a memory-tight machine.
-    'bank_scoring': {'python': '', 'text_search_idle_minutes': 10},
     # 🗣 Which checkpoint writes the video captions. A SETTING rather than a
     # constant because the choice is not a preference: a model that describes
     # what it sees in evasive terms produces captions that are about something
