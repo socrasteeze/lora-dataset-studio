@@ -54,24 +54,28 @@ as hostile until `npm run build` and the local-only contract test pass.
 > prints:
 >
 > ```bash
-> comm -13 <(git ls-tree -r --name-only HEAD | sort) \
->          <(git ls-tree -r --name-only upstream/main | sort) | grep -v '^frontend/dist'
+> git ls-tree -r --name-only upstream/main | grep -v '^frontend/dist' \
+>   | while read -r f; do [ -e "$f" ] || echo "$f"; done
 > ```
 >
-> **100 files as of 2026-08-23** (72 on 2026-08-20, 58 on 2026-08-05, when this
+> **72 files as of 2026-08-24** (92 before this sync adopted twenty of them;
+> 58 on 2026-08-05, when this
 > note was written — the number moves every sync, which is the point) — about 33
 > in the Divergence-4 cluster and 10 in
 > the Divergence-1 cluster below.
 >
-> ⚠️ **Run it on a settled tree, or swap `git ls-files` for
-> `git ls-tree -r --name-only HEAD`.** Mid-merge, `git ls-files` reports the
-> INDEX, which during an unresolved merge holds conflicted paths at stages 1/2/3
-> and not at stage 0 — so the same command answered 80 before the merge and 92
-> after it on 2026-08-23, and both numbers were fiction. The `ls-tree` form
-> answered 100 on both sides, which is the truth: the inventory did not move.
-> The tell is a count that CHANGES across a merge you know adopted no rejected
-> file, and the cheap confirmation is `git diff --name-status <pre-merge-HEAD>`,
-> which lists every file the merge actually added or deleted. The hand-written list that used to live here
+> ⚠️ **Both obvious git forms of this LIE mid-merge — the command above tests the
+> FILES for that reason.** `git ls-files` reports the index, which during an
+> unresolved merge holds conflicted paths at stages 1/2/3 and not at stage 0
+> (measured 2026-08-23: 80 before a merge, 92 after, both fiction). Its
+> replacement `git ls-tree -r --name-only HEAD` — written here after that — is
+> silently worse: mid-merge `HEAD` is still the PRE-merge commit, so it answers
+> as if the merge had not happened. Measured 2026-08-24, it reported the
+> inventory unchanged at 92 while twenty files had just been adopted. The tell
+> for either lie is a count that does not move across a merge you know adopted
+> files, or one that moves across a merge you know adopted none; the cheap
+> confirmation is `git diff --name-status <pre-merge-HEAD>`, which lists every
+> file the merge actually added or deleted. The hand-written list that used to live here
 > named **nine** of them, and had done for several syncs; an agent working from
 > it alone would have re-adopted 45 rejected files. The named entries below are
 > kept only for the *reasoning* attached to each, which the command cannot carry.
@@ -596,8 +600,8 @@ since the start — and D4 is now the *larger* recurrence surface: about 33 of t
 alone. Use the same derivation as D1:
 
 ```bash
-comm -13 <(git ls-tree -r --name-only HEAD | sort) \
-         <(git ls-tree -r --name-only upstream/main | sort) | grep -v '^frontend/dist'
+git ls-tree -r --name-only upstream/main | grep -v '^frontend/dist' \
+  | while read -r f; do [ -e "$f" ] || echo "$f"; done
 ```
 
 The D4 cluster in that output falls into five groups. Knowing the group is what
@@ -1023,6 +1027,23 @@ frontend file: an upstream test pinning an upstream IDENTIFIER, not a behaviour.
   entry: widen what the assertion tolerates, so it still proves the thing it was
   written to prove. Drop the alternation if this fork ever adopts upstream's
   bare button.
+
+**An eleventh entry, added 2026-08-24 — the cloud-reference BUDGET moved file,
+and the number not changing is the whole check.**
+
+- `frontend/tests/local-only-engines-contract.test.mjs` budgeted
+  `whatsNew.js: 21` — historical entries announcing engines this fork removed.
+  Upstream's 2026-08-24 split moved the older tail into `whatsNewArchive.js`, so
+  the entry became stale (the contract fails a budget line whose file has dropped
+  to zero — deliberately, so a budget cannot silently re-authorise a
+  reintroduction). Re-pointed at `whatsNewArchive.js`, **still 21**.
+  That equality is the real assertion. The count went 21 → 37 → 32 → 21 across
+  three attempts at rebuilding those two files, and each drop was a distinct
+  regression the number caught: 37 meant upstream entries this fork had REJECTED
+  were coming back in through the new file, and 32 meant entries it had REWORDED
+  were reverting to upstream's text. Only 21 means the split moved the feed and
+  changed nothing in it. **On any future sync that reshapes this file, compare
+  the budget before and after rather than re-counting it.**
 
 ## Divergence 6: upstream's dormant `worker_url` plumbing is now LIVE here
 
@@ -1865,6 +1886,32 @@ a decision, and don't miss the parts that merge with zero conflict markers.
     counted. Fix the class (count the picture as part of its entry), then pin
     it with a test that exercises both features at once — the one thing the
     repo demonstrably had none of.
+30. **A "moved verbatim" refactor is checked in BOTH directions, or it is not
+    checked.** 2026-08-24, upstream refactored twelve long functions into named
+    helpers across the four most-diverged backend files. The right check is
+    diagnostic 27's — diff the fork's inline code against the extracted helper —
+    and I ran it on `_poll_job_until_terminal` and got a clean answer: of 148
+    statements in the fork's loop, 147 appeared in the 175-statement helper. That
+    reads as "faithful extraction, safe to adopt". It was the wrong question.
+    The helper had **27 statements the fork's loop never had**, and they were the
+    dense local-delivery lane — `_dense_delivers_local`, `_deliver_dense_locally`,
+    `_export_full_transformer_fp8`, each measured at ZERO references in the fork
+    before the merge, each living in a module Divergence 4 deleted. Adopting the
+    helper wrote three undefined names into the monitor's hot path.
+
+    "Every fork statement survives" and "the helper adds nothing the fork
+    rejected" are two different claims, and only the first is what a one-way diff
+    answers. Ask both, every time: `set(fork) - set(helper)` says whether the
+    resolution LOST something, `set(helper) - set(fork)` says whether it GAINED a
+    rejected lane. The second is the one that matters on this fork, because the
+    fork's divergence is overwhelmingly deletions — measured this sync, 3 075
+    deleted lines against 726 added across those four files.
+
+    **What caught it was `ruff`, not the diff** — twelve F821s the moment the
+    gate ran, which is the entire argument for Divergence 9 keeping a linter in
+    front of the suites: a NameError inside a rented-pod monitor is not something
+    8 000 tests reach. Run `ruff check .` immediately after resolving a refactor
+    hunk, before believing any superset claim about it.
 
 ## Merge routine (every upstream sync)
 
@@ -1909,6 +1956,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-08-24 | *(merge)* + dist | **Upstream sync - 64 commits (`91844844`..`6e7f2549`), 13 conflicted source files (27 regions) plus the bundle.** The window arrived MID-SESSION: an IDE auto-fetch advanced `upstream/main` 52 commits past the tip the previous sync had merged, so the "0 behind" it ended on read as 64 behind an hour later. The whole merged window was re-verified as still on upstream's history before anything else - no force-push, no rewrite. Adopted: the **extension loader** (`backend/extensions/`, gitignored and never shipped, guard installed AFTER the network guard), the **netguard hardening** (`LDS_PUBLIC` forces the token gate on a public bind, token generated whenever the gate is on, graceful degrade when the token write fails), the **RunPod deployment guide**, **guest checkpoints** in the Test Studio, **editable preview steps/CFG**, the **frontend code-split** (entry bundle 3.4 MB -> 0.9 MB), twelve **"moved verbatim" refactors**, and the dependency bumps (pytest 9.1.1, xdist 3.8.0, setuptools 84). Reject inventory **92 -> 72**, and every one of the 20 files that left it was checked: extension loader, netguard, preview quality, guest checkpoints, `lazyPage`, `whatsNewArchive`, two new guides. **No rejected file leaked in.** **RunPod is a deployment mode, not the rental lane.** It runs the whole studio on a box you rent, the same category as `docker.md` - so it is in scope, and D4's own rule is 'what SURFACES, not what a commit is named'. Its page still had to be corrected in four places: it told the reader training 'rents a vast.ai instance as it does locally' (there is no such lane here, and no ai-toolkit in the image, so a pod trains NOTHING), and listed three cloud API keys the app does not read. **The local-only contract could not have caught that** - `runpod.md` is not one of the six `?raw` Guide chapters, so it never reaches `frontend/dist`. **The What's-new archive split was the sync's real work, and it was silent damage three times over.** Upstream moved 520 entries into a new `whatsNewArchive.js`; git presented that as 'upstream deleted 4577 lines', so taking their side drops all 98 entries this fork wrote and taking the fork's side duplicates every id. Rebuilding from upstream's two files then produced two further regressions, each caught only by a NUMBER: the cloud-reference budget went 21 -> 37 because 36 upstream entries PAST syncs had rejected (cloud engines, cloud training, the dense recipe, HF storage, vast.ai) came back in through the new file, then 37 -> 32 because 63 entries this fork had REWORDED reverted to upstream's text - 3 of them re-adding cloud mentions. The rule that lands correctly: the base is the FORK's 623 entries in the fork's own words, plus the 7 genuinely new in this window; 630 unique, and the budget back at exactly **21**. **Ruff earned its place in Gate 1 twelve times over.** The twelve refactors landed on the four most-diverged backend files, and adopting `_poll_job_until_terminal` after a superset check that only asked 'did I lose anything' wrote three undefined dense-delivery names into a monitor's hot path. That check has to run in BOTH directions - new merge diagnostic 30. A `fail_kind=` write reintroduced by the importer extraction cost **126 test failures from one line** (D1b removed that column). Both are exactly the class 8 000 tests do not reach and a linter finds in seconds. Also caught: my own DIVERGENCE comments naming the removed engines pushed two files over the backend cloud-identifier budget - reworded, not re-budgeted, per the `activityLanes.js` precedent. And the reject-list derivation was corrected AGAIN: `git ls-tree HEAD`, which I wrote in one sync ago to replace `git ls-files`, is silently worse mid-merge because `HEAD` is still the PRE-merge commit - it reported the inventory unchanged while twenty files were adopted. The command now tests the files. Gates: ruff clean, eslint **0 errors / 38 warnings - the same 38 the pre-merge tree reports**, build clean, both local-only halves green (8 frontend + 3 backend, no budget raised), `create_app()` OK, hygiene green. Backend **8048 -> 8132 passed / 10 skipped / 0 failed**; frontend **4195 -> 4219 passed / 0 failed**. |
 | 2026-08-23 | *(merge)* + dist | **Upstream sync - 12 commits (`780de445`..`91844844`), 7 conflicted source files (18 regions) plus the generated bundle.** The second window in a row with **zero rejected features in it**: every commit message was read and the whole merge diff was grepped for the cloud-engine and rental vocabulary, which returned nothing but false positives on `parent`/`different`. Reject inventory **held at exactly 100** (derived from `ls-tree` on both sides, before and after - see the note under the D1 derivation about what `git ls-files` does mid-merge). Adopted: the **responsive probe** (`scripts/responsiveProbe.mjs` + `layoutGuard.mjs`) and the four marker contracts it is pinned by, the Bank/Datasets/Studio responsive pass it found 684 violations with, the **`image:` field** on a What's-new entry with its tag-pinned release URL, `scripts/seed_showcase.py`, and the first release screenshot. Upstream's three `build(frontend):` bundles were **rejected** and dist rebuilt from fork source, as always. **The header was the one real decision.** Upstream's responsive pass and this fork's own `72d297d9` ("even the triage chrome") had rewritten the Bank header for a phone in two ways that cannot share an element - even grid cells versus one horizontally-scrolling line per row - and each side carried a contract test pinning its own. Upstream's is the measured one (a real device probe; the header was 38 % of the fold at rest, eight counters wrapping to four rows), so the LAYOUT half was adopted whole and the fork's `HEADER_BTN*`/`PATH_BTN` constants, `grid grid-cols-3`, `col-span-3` and the `Stat` pill restyle went with it as orphans (diagnostic 19). The fork's **copy** rule - no idle ellipsis on a control that opens a window - is orthogonal to any layout and was kept, so the merged header is byte-identical to upstream's except three labels. `BankOverviewLayout.contract.test.js` was rewritten to pin what survives and to say why the rest went. **Two things the gates caught that nothing else would have.** Gate 1 found a JSX parse error: taking upstream's side of the action-row region left the fork's extra `</div>` and a `<div className="grid grid-cols-2 gap-2">` fragment behind - a splice, not a conflict, and invisible to a marker count. And a **merge-interaction bug in `releaseNotes.mjs`**: upstream's `image:` markup is pushed AFTER the fork's body-size budget has already admitted the entry on its prose alone, so a release carrying screenshots could go back over GitHub's 125 000-character ceiling - the flat 422, after the ZIP is uploaded, which is the exact failure the fork's trim exists to prevent. The picture is now measured as part of its entry, with a new contract test that renders 400 screenshotted entries and checks both the ceiling and that the pictures are really there. **Divergence 7 lost its second entry:** upstream took PR #33, so `relative` on the three mobile chip rails is their code now (verified by counting `relative -mx-4` on both sides: 2/2, 1/1, 1/1) and only the `_CLAIM_MAX_AGE_S` line is still carried. **One new D5 carrier:** `bankProbeMarkers.test.js` pins the bank opener's `aria-label` as `${b.name}`, upstream's map variable, where this fork's opener lives inside `BankTitle` (the inline rename) and names its prop `bank` - widened to an alternation rather than re-pointed, so it proves the probe's `prime` selector still has something to match either way. D5's two derivable families were re-derived unchanged at 13 and 15. Gates: lint **0 errors / 38 warnings, the same 38 the pre-merge tree reports** (D9's orphan backlog, none of it merge damage), `ruff check .` clean, build clean, both local-only halves green (8 frontend + 3 backend), `create_app()` OK, hygiene green. Backend **8048 -> 8048 passed / 10 skipped / 0 failed**; frontend **4163 -> 4195 passed / 0 failed** (+32, the four new marker contracts and the release-notes additions). |
 | 2026-08-22 | *(merge)* + dist | **Upstream sync - 54 commits (`5cc00ca3`..`780de445`), 18 conflicted files plus the generated bundle.** The first window in this fork's history with **zero rejected features in it** - every commit message and body was grepped for the cloud-engine and rental vocabulary and returned nothing - so the whole cost was in the two things a clean window still brings: interleaved plumbing, and gates that had never run here before. Adopted: the **generation queue** (see the dock, jump a job, leave it, and the app-wide hold explained in words), **Scenes from a DATASET's captions** beside the existing bank lane, **curation no longer waiting on the queue**, per-checkpoint Canvas grids, the lightbox saying WHY a pixel edit is refused, a base model filed two folders deep being found, the Bank face pass rescuing small heads like the dataset scorer, typed captions surviving a forced pass, and the dataset watermark scan-tuple crash. Reject inventory held at **72** and 23 new upstream files were adopted whole; **no rejected file leaked in**. **The sharp edge was the lint gate (new Divergence 9).** Upstream shipped one for both halves, and its frontend config is `eslint.config.mjs` while the fork's was `eslint.config.js` - both survive a merge with ZERO markers, and flat-config resolution prefers `.js`, so the fork's would have silently won and upstream's would have been dead. Adopted theirs, deleted the fork's, carried the rationale across. `no-unused-vars` is held at WARN here: it reports 35 orphans, and linting the PRE-merge tree with the same config reports the same 35, so none is merge damage - ~20 safe ones cleared, the rest deferred because clearing `TrainingPanel`'s two dead full-model components cascades into a 58-line handler. The BACKEND half went to zero: `ruff check .` (CI runs it unconditionally, no size gate) found 37 where the pre-merge tree had 188, and **four were real defects no test could fail on** - a missing `import uuid` behind a live `NameError` on D6's remote-upload path; a call to `_push_resume_checkpoint` that nothing defines, left behind when D4 rejected `pod_checkpoint_push`; a duplicate `'bank_scoring'` dict literal that had been eating the fork's OWN `models_root` fix (`5e0e7c6a`) while nine call sites read the key; and `image_bank_service.transfer` reading `dest.source_path` back off an expunged ORM row 28 lines after snapshotting it to avoid exactly that. **Caught by gates, not by reading**: the local-only contract failed a NEW upstream util (`activityLanes.js`) hardcoding two cloud engines - then failed again because the comment explaining the removal NAMED them; upstream's new prompt-labels contract failed `API_PROMPT_ENGINES`, still listing three removed engines against the fork's empty `API_ENGINES`; and the ASCII gate failed two em-dashes upstream put in `requirements-dev.txt`. Merge damage found and fixed: a duplicate `"lint"` key auto-merged into `package.json` scripts, and a duplicated `aspect_for_label` import that my own conflict resolution created (ruff F811 caught it; the pre/post ruff diff proved it and one other were the ONLY merge-introduced lint errors). Gates: ruff 0 (from 37), ESLint 0 errors / 38 warnings, build clean, local-only contract 8+3 green against the REBUILT bundle, backend **7979 -> 8036 passed / 0 failed**, frontend **4102 -> 4163 passed / 0 failed**. `APP_VERSION` 2026.08.22F. |
 | 2026-08-20 | *(merge)* + dist | **Upstream sync - 2 commits (`690d955c`, `cb04204e`), ONE source conflict region plus the generated-bundle pair.** A calm, narrow window: the D1 and D4 sweeps returned exactly their pre-merge hit lists, and the derived reject inventory moved **76 -> 72** because all four files upstream added here are adopted (`utils/captionAppearancePolicy.js` + its test, `CaptionOptionsAppearance.test.js`, `test_appearance_policy.py`). Adopted: **omit vs describe, per appearance family** - Character Caption Options gains a fourth axis (hair, makeup/nails, facial hair, glasses) alongside the identity families that stay locked omitted, so what a caption does not name can still bind to the trigger on purpose rather than by accident; and **saving a MOVED policy now nudges for a re-caption**, the same 'future captions' wording a kind or concept change already uses, compared by value so a save of an unrelated field does not cry wolf. Suggested by Sam Exit and Meeseeks (Discord). **The one conflict**: `face_dataset_service.py`'s `face_variations` import - HEAD had added `aspect_for_label` for an unrelated fork feature, upstream added `normalize_appearance` for this one, adjacent lines in the same import block. Kept BOTH; both are genuinely called elsewhere in the file (`aspect_for_label` at four call sites, `normalize_appearance` at two) - a textbook adjacent-import conflict, never a real choice between them. Gates: lint/build clean, local-only contract 8+3 green against the REBUILT bundle, capability-row count unchanged at 17, backend 7976 -> 7991 passed / 0 failed, frontend 4096 -> 4102 passed / 0 failed. |

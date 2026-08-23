@@ -1139,68 +1139,40 @@ def probe_scrape_deps() -> dict:
             'detail': 'scrape deps OK' if not missing else f"missing: {', '.join(missing)}"}
 
 
-def _model_files(folder) -> list:
-    try:
-        if not folder.is_dir():
-            return []
-        return sorted(
-            p.name for p in folder.iterdir()
-            if p.is_file() and p.suffix.lower() in _MODEL_SUFFIXES
-        )
-    except OSError:
-        return []
-
-
 def _scan_models() -> dict:
-    # Roots come from the SAME resolver ComfyUI uses (base <models> folders + any
-    # extra_model_paths.yaml roots), so the picker/probe list exactly what a running
-    # ComfyUI would load. With no yaml the roots are the historical [unet,
-    # diffusion_models] / [checkpoints], so the output is byte-for-byte unchanged.
-    from .services import comfy_model_paths
-    result = {'zimage': [], 'sdxl': [], 'krea': [], 'klein': []}
-    try:
-        models_dir = cfg.comfyui_dir('models')
-    except Exception:
-        models_dir = None
-    # krea is historically scanned ONLY from the base <models>/unet folder; track it
-    # so an extra root (treated like diffusion_models) doesn't change that bucket.
-    unet_default = os.path.normpath(str(models_dir / 'unet')) if models_dir else None
+    """Model files per family — by the SAME listers the generate path resolves
+    against, so probe == picker == resolver by construction.
 
-    for root in comfy_model_paths.search_roots('diffusion_models'):
-        root_path = Path(root)
-        try:
-            subfolders = [p for p in root_path.iterdir() if p.is_dir()]
-        except OSError:
-            continue
-        krea_eligible = (os.path.normpath(root) == unet_default)
-        for sub in subfolders:
-            name = sub.name
-            if _ZIMAGE_RE.search(name):
-                result['zimage'].extend(_model_files(sub))
-            # Any 'klein'-named subfolder counts: shared installs keep e.g.
-            # diffusion_models/'Flux2 klein'/ (the KV variant) next to our canonical
-            # unet/klein/ download — hiding it made the picker blind to models the
-            # user already owns.
-            elif 'klein' in name.lower():
-                result['klein'].extend(_model_files(sub))
-            elif krea_eligible and name.lower().startswith('krea'):
-                result['krea'].extend(_model_files(sub))
-        # Flat / Stability-Matrix layouts drop the model straight INTO
-        # diffusion_models/ with no klein/ subfolder — scan the root's own files
-        # too and bucket the 'klein'-named ones. These are bare names (no prefix),
-        # which is exactly what UNETLoader loads for a file at the root of a
-        # registered folder. Mirrors klein_edit_helper._klein_unet_folders so the
-        # picker lists only what the resolver can build.
-        for name in _model_files(root_path):
-            if 'klein' in name.lower():
-                result['klein'].append(name)
+    This function used to be the FIFTH scanner: its own one-level `iterdir`
+    walk with its own family rules, while every resolver had moved to the
+    recursive, extra_model_paths-aware scans in `comfy_model_paths`. The
+    divergence was measurable three ways: a model filed two folders deep was
+    loadable and generated with, but ✗ here; a Krea file at the root of a
+    search folder was accepted by `get_krea_models`' root rule and invisible
+    here; and the SDXL bucket read one flat level of `checkpoints/` when
+    ComfyUI's CheckpointLoader lists that tree recursively. Names are now the
+    RELATIVE paths the loaders actually take, exactly as the resolvers return
+    them.
 
-    result['klein'] = sorted(set(result['klein']))
-    sdxl = []
-    for root in comfy_model_paths.search_roots('checkpoints'):
-        sdxl.extend(_model_files(Path(root)))
-    result['sdxl'] = sdxl
-    return result
+    Kept as a function (rather than inlining the four calls at the probe site)
+    because tests and the probe payload both address the four-bucket dict.
+    """
+    from .services import comfy_model_paths, klein_edit_helper
+    from .utils import comfyui as comfy
+    klein = [os.path.join(prefix, f) if prefix else f
+             for prefix, files in klein_edit_helper._klein_unet_folders()
+             for f in files]
+    return {
+        'zimage': comfy.get_zimage_models(),
+        # `('',)` matches every relative directory: an SDXL checkpoint has no
+        # family token — sitting anywhere under a `checkpoints` root IS the
+        # claim, and ComfyUI lists that tree recursively.
+        'sdxl': comfy_model_paths.scan_family_tree(
+            comfy_model_paths.search_roots('checkpoints'), ('',),
+            root_file_accept=lambda _f: True),
+        'krea': comfy.get_krea_models(),
+        'klein': sorted(set(klein)),
+    }
 
 
 # --- Auto-detection (Setup wizard) -----------------------------------------
@@ -1817,48 +1789,12 @@ def _pipeline_steps() -> tuple:
         return ()
 
 
-def probe(force=False) -> dict:
-    global _cache, _cache_ts
-    now = time.time()
-    if _cache is not None and not force and (now - _cache_ts) < _CACHE_TTL:
-        return copy.deepcopy(_cache)
-
-    comfy = probe_comfyui()
-    ollama = probe_ollama()
-    ollama_installed = probe_ollama_installed()
-    aitoolkit = probe_aitoolkit()
-    # These ELEVEN each shell out a cached-but-possibly-cold subprocess import
-    # (insightface/rembg/torch+open_clip+transformers/SigLIP 2/
-    # simple_lama_inpainting/torch+transformers/onnxruntime/PyAV+ffmpeg/
-    # RapidOCR/the scraping deps/the ai-toolkit venv's captioning deps — see
-    # _cached_import).
-    # Run them concurrently so a cold boot pays the SLOWEST one, not the sum.
-    # Upstream calls these serially and starts with three more probes for its
-    # cloud image engines; those are Divergence 1 and have no probe here.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
-        f_face = pool.submit(probe_face_scoring)
-        f_masks = pool.submit(probe_masks)
-        f_bank = pool.submit(probe_bank_scoring)
-        f_siglip2 = pool.submit(probe_bank_siglip2)
-        f_watermark = pool.submit(probe_watermark_inpaint)
-        f_watermark_detect = pool.submit(probe_watermark_detect)
-        f_wd14 = pool.submit(probe_wd14)
-        f_video = pool.submit(probe_video)
-        f_video_text = pool.submit(probe_video_text)
-        f_scrape = pool.submit(probe_scrape_deps)
-        f_joycaption = pool.submit(probe_joycaption, aitoolkit)
-        face_scoring = f_face.result()
-        masks = f_masks.result()
-        bank_scoring = f_bank.result()
-        bank_siglip2 = f_siglip2.result()
-        watermark_inpaint = f_watermark.result()
-        watermark_detect = f_watermark_detect.result()
-        wd14 = f_wd14.result()
-        video = f_video.result()
-        video_text = f_video_text.result()
-        scrape_deps = f_scrape.result()
-        joycaption = f_joycaption.result()
-    models = _scan_models()
+def _probe_klein(comfy):
+    """The Klein engine's readiness, moved verbatim (2026-08-23): missing
+    assets, present-but-invalid weights, unsupported widget enums, and the
+    single ready verdict klein_edit_helper owns. Returns the helper module
+    too — the payload section calls its override/pin-gap reporters
+    directly."""
     # Klein engine readiness is now honest tri-component: the graph needs the UNET
     # AND the VAE AND the text-encoder. All three gate on the RESOLVER (the exact
     # value the generate would feed each loader node), not the raw scan — so the
@@ -1904,6 +1840,15 @@ def probe(force=False) -> dict:
     klein_ready = _keh.klein_engine_ready(
         comfy['ok'], missing=klein_missing, invalid=klein_invalid,
         unsupported_enums=klein_unsupported_enums)
+    return (_keh, klein_missing, klein_invalid, klein_unsupported_enums,
+            klein_ready)
+
+
+def _probe_krea(comfy):
+    """The Krea 2 Identity Edit engine's readiness, moved verbatim: asset
+    and node-pack gaps kept apart, pack-on-disk detection, invalid-weights
+    verdicts, pinned-but-absent files, the resolved base name, and the
+    four-part ready verdict."""
     # Krea 2 Identity Edit — the second LOCAL engine. Readiness is honest and
     # four-part (base model + identity LoRA + text encoder + VAE) AND depends on
     # a custom-node pack, unlike Klein whose graph is core-nodes-only. Both gaps
@@ -1955,6 +1900,14 @@ def probe(force=False) -> dict:
     krea_base_resolved = _krh.resolve_krea_unet() or ''
     krea_ready = (comfy['ok'] and not krea_missing and not krea_nodes_missing
                   and not krea_blocking_invalid and not krea_pin_gaps)
+    return (krea_missing, krea_nodes_missing, krea_nodes_installed,
+            krea_invalid, krea_pin_gaps, krea_base_resolved, krea_ready)
+
+
+def _probe_seedvr2(comfy):
+    """The SeedVR2 upscaler's readiness, moved verbatim: weights / node
+    pack / loadability gaps, the single ready verdict, and the optional
+    tiling lane with its full-frame megapixel ceiling."""
     # SeedVR2 — the fidelity upscaler (issue #32). Same three-part shape as Krea
     # (weights on disk / node pack present / weights actually loadable), because
     # it has the same three ways to be half-installed. It is NOT a generation
@@ -1977,6 +1930,164 @@ def probe(force=False) -> dict:
     seedvr2_tiling_nodes_missing = _svr.ttp_missing_nodes() if comfy['ok'] else []
     seedvr2_tiling_ready = _svr.tiling_available(comfy['ok'])
     seedvr2_ceiling_mp = _svr.full_frame_ceiling_mp()
+    return (seedvr2_missing, seedvr2_nodes_missing, seedvr2_nodes_installed,
+            seedvr2_invalid, seedvr2_ready, seedvr2_tiling_ready,
+            seedvr2_tiling_nodes_missing, seedvr2_ceiling_mp)
+
+
+def _comfyui_caps_section(comfy, base_dir, comfy_dir, comfy_launcher,
+                          comfy_skipped, models, _keh, klein_missing,
+                          klein_unsupported_enums, klein_invalid,
+                          krea_missing, krea_base_resolved,
+                          krea_nodes_missing, krea_nodes_installed,
+                          krea_invalid, krea_pin_gaps, seedvr2_missing,
+                          seedvr2_nodes_missing, seedvr2_nodes_installed,
+                          seedvr2_invalid, seedvr2_ready,
+                          seedvr2_tiling_ready,
+                          seedvr2_tiling_nodes_missing, seedvr2_ceiling_mp):
+    """The probe payload's ComfyUI card — the largest section of the caps
+    dict, moved verbatim: reachability with its honest hint, directory
+    validity, launcher support, the model scan, and every per-engine gap
+    list the Setup screen turns into a button."""
+    return {
+        'reachable': comfy['ok'],
+        # WHY it isn't reachable, when it isn't: 'ok' | 'slow' | 'unreachable'
+        # | 'unconfigured'. `reachable` alone made every screen say "ComfyUI
+        # isn't running" at a ComfyUI that was running and busy; `hint` is the
+        # matching sentence, so the wording lives in ONE place instead of being
+        # re-invented per card. See probe_comfyui / comfyui_down_message.
+        'status': comfy.get('status', 'ok' if comfy['ok'] else 'unreachable'),
+        'hint': comfy.get('hint', ''),
+        # Read budget currently granted to the heavy /object_info enumeration,
+        # so a screen can quote the number the user would raise.
+        'object_info_timeout_s': _object_info_timeout(),
+        'api_url': cfg.get('comfyui.api_url') or '',
+        'base_dir': base_dir,
+        'dir_configured': bool(base_dir),
+        'dir_valid': comfy_dir['valid'],       # base_dir really is a ComfyUI install
+        'resolved_dir': comfy_dir['resolved'],
+        # The start button is stricter than normal ComfyUI model discovery:
+        # only the saved NVIDIA portable layout and local standard URL qualify.
+        'portable_launcher_supported': comfy_launcher['portable_supported'],
+        'portable_launcher_local_api': comfy_launcher['local_api_safe'],
+        # Effective "continue without ComfyUI" state: the user chose to skip AND no
+        # directory is configured. Only drives the Setup step's neutral "skipped"
+        # display — never the engine/studio gates below, so it cannot hide a real
+        # error of a configured ComfyUI (which always has a base_dir → skipped=False).
+        'skipped': comfy_skipped,
+        'models': models,
+        # setup_installer action names for the Klein assets NOT yet on disk
+        # (subset of klein_model / klein_text_encoder / klein_vae / klein_lora).
+        # Empty required-trio => the Klein engine is asset-ready.
+        'klein_missing': klein_missing,
+        # Widget values the shipped Klein graph needs that THIS ComfyUI doesn't
+        # offer: [{node_id, class_type, input, value, pack, url}]. Empty on a
+        # capable install AND on an unreachable one (fail-open).
+        'klein_unsupported_enums': klein_unsupported_enums,
+        # Krea 2 Edit gaps, kept apart from Klein's: asset KEYS not on disk
+        # (krea_edit_helper.KREA_ASSETS) and the custom-node class_types this
+        # ComfyUI doesn't expose. Empty + empty => the engine is ready.
+        'krea_missing': krea_missing,
+        # The ComfyUI-relative name of the Krea base the next run WILL load
+        # (pin honoured, else the election). '' = none on disk. Published so
+        # the Settings field can name it instead of promising "auto".
+        'krea_base_resolved': krea_base_resolved,
+        'krea_nodes_missing': krea_nodes_missing,
+        'krea_nodes_installed': krea_nodes_installed,
+        # Krea assets PRESENT on disk but not real, loadable weights — same
+        # [{asset, filename, verdict, blocking, reason}] shape as
+        # klein_invalid, so one banner covers both engines.
+        'krea_invalid': krea_invalid,
+        # SeedVR2 gaps, kept apart from the generation engines' for the same
+        # reason theirs are kept apart from each other: "download the
+        # weights" and "install the node pack in ComfyUI" are different
+        # actions with different buttons.
+        'seedvr2_missing': seedvr2_missing,
+        'seedvr2_nodes_missing': seedvr2_nodes_missing,
+        'seedvr2_nodes_installed': seedvr2_nodes_installed,
+        'seedvr2_invalid': seedvr2_invalid,
+        # The single verdict every SeedVR2 surface reads (Settings card,
+        # Setup step, the improve engine picker) so none of them re-derives
+        # readiness from a different subset of the four gaps above.
+        'seedvr2_ready': seedvr2_ready,
+        # Optional tiled lane: ready / which TTP classes are absent / the
+        # full-frame megapixel ceiling this GPU is good for (None = unknown
+        # card, and then the UI says nothing rather than inventing a number).
+        'seedvr2_tiling_ready': seedvr2_tiling_ready,
+        'seedvr2_tiling_nodes_missing': seedvr2_tiling_nodes_missing,
+        'seedvr2_ceiling_mp': seedvr2_ceiling_mp,
+        # Klein assets PRESENT on disk but not real, loadable weights:
+        # [{asset, filename, verdict, blocking, reason}]. Distinct from
+        # klein_missing (the file exists, it just can't load) — drives the Setup
+        # "present but INVALID: <asset> (<reason>)" line and the diagnostic, and
+        # a blocking-invalid required asset also keeps engines.klein dark above.
+        'klein_invalid': klein_invalid,
+        # User-pinned Klein model files (Settings ▸ Image engine), only the
+        # slots that are SET: {slot: {configured, found}}. `found` False means
+        # the pin fell back to auto-detection — drives the honest "not found"
+        # badge next to the Settings field, so a typo is never silent.
+        # Ported from socrasteeze's branch (GitHub #20).
+        'klein_overrides': _keh.klein_override_status(),
+        # Pinned-but-absent model files, per engine:
+        # [{slot, key, configured[, status]}]. Non-empty keeps that engine
+        # dark above, and the engine card reads THIS to say which file the
+        # user chose is missing — never "download the base model", which
+        # would send them to fix something that is already there.
+        'klein_pin_gaps': _keh.klein_pin_gaps(),
+        'krea_pin_gaps': krea_pin_gaps,
+    }
+
+
+def probe(force=False) -> dict:
+    global _cache, _cache_ts
+    now = time.time()
+    if _cache is not None and not force and (now - _cache_ts) < _CACHE_TTL:
+        return copy.deepcopy(_cache)
+
+    comfy = probe_comfyui()
+    ollama = probe_ollama()
+    ollama_installed = probe_ollama_installed()
+    aitoolkit = probe_aitoolkit()
+    # These ELEVEN each shell out a cached-but-possibly-cold subprocess import
+    # (insightface/rembg/torch+open_clip+transformers/SigLIP 2/
+    # simple_lama_inpainting/torch+transformers/onnxruntime/PyAV+ffmpeg/
+    # RapidOCR/the scraping deps/the ai-toolkit venv's captioning deps — see
+    # _cached_import).
+    # Run them concurrently so a cold boot pays the SLOWEST one, not the sum.
+    # Upstream calls these serially and starts with three more probes for its
+    # cloud image engines; those are Divergence 1 and have no probe here.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
+        f_face = pool.submit(probe_face_scoring)
+        f_masks = pool.submit(probe_masks)
+        f_bank = pool.submit(probe_bank_scoring)
+        f_siglip2 = pool.submit(probe_bank_siglip2)
+        f_watermark = pool.submit(probe_watermark_inpaint)
+        f_watermark_detect = pool.submit(probe_watermark_detect)
+        f_wd14 = pool.submit(probe_wd14)
+        f_video = pool.submit(probe_video)
+        f_video_text = pool.submit(probe_video_text)
+        f_scrape = pool.submit(probe_scrape_deps)
+        f_joycaption = pool.submit(probe_joycaption, aitoolkit)
+        face_scoring = f_face.result()
+        masks = f_masks.result()
+        bank_scoring = f_bank.result()
+        bank_siglip2 = f_siglip2.result()
+        watermark_inpaint = f_watermark.result()
+        watermark_detect = f_watermark_detect.result()
+        wd14 = f_wd14.result()
+        video = f_video.result()
+        video_text = f_video_text.result()
+        scrape_deps = f_scrape.result()
+        joycaption = f_joycaption.result()
+    models = _scan_models()
+    (_keh, klein_missing, klein_invalid, klein_unsupported_enums,
+     klein_ready) = _probe_klein(comfy)
+    (krea_missing, krea_nodes_missing, krea_nodes_installed, krea_invalid,
+     krea_pin_gaps, krea_base_resolved, krea_ready) = _probe_krea(comfy)
+    (seedvr2_missing, seedvr2_nodes_missing, seedvr2_nodes_installed,
+     seedvr2_invalid, seedvr2_ready, seedvr2_tiling_ready,
+     seedvr2_tiling_nodes_missing,
+     seedvr2_ceiling_mp) = _probe_seedvr2(comfy)
     base_dir = cfg.get('comfyui.base_dir') or ''
     from .services import comfyui_control
     comfy_launcher = comfyui_control.launcher_status()
@@ -1997,93 +2108,21 @@ def probe(force=False) -> dict:
             'klein': klein_ready,
             'krea': krea_ready,
         },
-        'comfyui': {
-            'reachable': comfy['ok'],
-            # WHY it isn't reachable, when it isn't: 'ok' | 'slow' | 'unreachable'
-            # | 'unconfigured'. `reachable` alone made every screen say "ComfyUI
-            # isn't running" at a ComfyUI that was running and busy; `hint` is the
-            # matching sentence, so the wording lives in ONE place instead of being
-            # re-invented per card. See probe_comfyui / comfyui_down_message.
-            'status': comfy.get('status', 'ok' if comfy['ok'] else 'unreachable'),
-            'hint': comfy.get('hint', ''),
-            # Read budget currently granted to the heavy /object_info enumeration,
-            # so a screen can quote the number the user would raise.
-            'object_info_timeout_s': _object_info_timeout(),
-            'api_url': cfg.get('comfyui.api_url') or '',
-            'base_dir': base_dir,
-            'dir_configured': bool(base_dir),
-            'dir_valid': comfy_dir['valid'],       # base_dir really is a ComfyUI install
-            'resolved_dir': comfy_dir['resolved'],
-            # The start button is stricter than normal ComfyUI model discovery:
-            # only the saved NVIDIA portable layout and local standard URL qualify.
-            'portable_launcher_supported': comfy_launcher['portable_supported'],
-            'portable_launcher_local_api': comfy_launcher['local_api_safe'],
-            # Effective "continue without ComfyUI" state: the user chose to skip AND no
-            # directory is configured. Only drives the Setup step's neutral "skipped"
-            # display — never the engine/studio gates below, so it cannot hide a real
-            # error of a configured ComfyUI (which always has a base_dir → skipped=False).
-            'skipped': comfy_skipped,
-            'models': models,
-            # setup_installer action names for the Klein assets NOT yet on disk
-            # (subset of klein_model / klein_text_encoder / klein_vae / klein_lora).
-            # Empty required-trio => the Klein engine is asset-ready.
-            'klein_missing': klein_missing,
-            # Widget values the shipped Klein graph needs that THIS ComfyUI doesn't
-            # offer: [{node_id, class_type, input, value, pack, url}]. Empty on a
-            # capable install AND on an unreachable one (fail-open).
-            'klein_unsupported_enums': klein_unsupported_enums,
-            # Krea 2 Edit gaps, kept apart from Klein's: asset KEYS not on disk
-            # (krea_edit_helper.KREA_ASSETS) and the custom-node class_types this
-            # ComfyUI doesn't expose. Empty + empty => the engine is ready.
-            'krea_missing': krea_missing,
-            # The ComfyUI-relative name of the Krea base the next run WILL load
-            # (pin honoured, else the election). '' = none on disk. Published so
-            # the Settings field can name it instead of promising "auto".
-            'krea_base_resolved': krea_base_resolved,
-            'krea_nodes_missing': krea_nodes_missing,
-            'krea_nodes_installed': krea_nodes_installed,
-            # Krea assets PRESENT on disk but not real, loadable weights — same
-            # [{asset, filename, verdict, blocking, reason}] shape as
-            # klein_invalid, so one banner covers both engines.
-            'krea_invalid': krea_invalid,
-            # SeedVR2 gaps, kept apart from the generation engines' for the same
-            # reason theirs are kept apart from each other: "download the
-            # weights" and "install the node pack in ComfyUI" are different
-            # actions with different buttons.
-            'seedvr2_missing': seedvr2_missing,
-            'seedvr2_nodes_missing': seedvr2_nodes_missing,
-            'seedvr2_nodes_installed': seedvr2_nodes_installed,
-            'seedvr2_invalid': seedvr2_invalid,
-            # The single verdict every SeedVR2 surface reads (Settings card,
-            # Setup step, the improve engine picker) so none of them re-derives
-            # readiness from a different subset of the four gaps above.
-            'seedvr2_ready': seedvr2_ready,
-            # Optional tiled lane: ready / which TTP classes are absent / the
-            # full-frame megapixel ceiling this GPU is good for (None = unknown
-            # card, and then the UI says nothing rather than inventing a number).
-            'seedvr2_tiling_ready': seedvr2_tiling_ready,
-            'seedvr2_tiling_nodes_missing': seedvr2_tiling_nodes_missing,
-            'seedvr2_ceiling_mp': seedvr2_ceiling_mp,
-            # Klein assets PRESENT on disk but not real, loadable weights:
-            # [{asset, filename, verdict, blocking, reason}]. Distinct from
-            # klein_missing (the file exists, it just can't load) — drives the Setup
-            # "present but INVALID: <asset> (<reason>)" line and the diagnostic, and
-            # a blocking-invalid required asset also keeps engines.klein dark above.
-            'klein_invalid': klein_invalid,
-            # User-pinned Klein model files (Settings ▸ Image engine), only the
-            # slots that are SET: {slot: {configured, found}}. `found` False means
-            # the pin fell back to auto-detection — drives the honest "not found"
-            # badge next to the Settings field, so a typo is never silent.
-            # Ported from socrasteeze's branch (GitHub #20).
-            'klein_overrides': _keh.klein_override_status(),
-            # Pinned-but-absent model files, per engine:
-            # [{slot, key, configured[, status]}]. Non-empty keeps that engine
-            # dark above, and the engine card reads THIS to say which file the
-            # user chose is missing — never "download the base model", which
-            # would send them to fix something that is already there.
-            'klein_pin_gaps': _keh.klein_pin_gaps(),
-            'krea_pin_gaps': krea_pin_gaps,
-        },
+        # DIVERGENCE 1 -- upstream opens this hunk with a subscription-status
+        # block for one of the removed cloud engines (connected / email / plan /
+        # CLI-detected). That engine went end to end; the extraction below is the
+        # legitimate half of the same hunk. The engine is deliberately not named
+        # here: the local-only contract counts cloud identifiers per file,
+        # comments included, and a removal note is not a free place to spend them.
+        'comfyui': _comfyui_caps_section(
+            comfy, base_dir, comfy_dir, comfy_launcher, comfy_skipped,
+            models, _keh, klein_missing, klein_unsupported_enums,
+            klein_invalid, krea_missing, krea_base_resolved,
+            krea_nodes_missing, krea_nodes_installed, krea_invalid,
+            krea_pin_gaps, seedvr2_missing, seedvr2_nodes_missing,
+            seedvr2_nodes_installed, seedvr2_invalid, seedvr2_ready,
+            seedvr2_tiling_ready, seedvr2_tiling_nodes_missing,
+            seedvr2_ceiling_mp),
         'ollama': {
             'reachable': ollama['ok'],
             # Installed = binary on disk, even when the server is stopped. The UI

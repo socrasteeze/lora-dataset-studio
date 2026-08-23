@@ -60,7 +60,14 @@ that provisions it.
   `frontend/` (~1 min — it carries the help-registry and What's-new contracts).
 - **Before the push that LANDS the wave** — both suites, whole and green, on
   that exact tree: `python -m pytest -n 8 --dist loadfile` and
-  `node --test` from `frontend/`. Non-negotiable. **Do not lean on CI for this**:
+  `node --test` from `frontend/`. **Plus both linters**: `ruff check .` from the
+  repo root and `npm run lint` from `frontend/` — CI's Lint job runs OUTSIDE the
+  size gate, so a branch merged with a pre-gate file can turn `main` red on lint
+  alone with every test green (it happened upstream: an F401 in a branch written
+  before the gate existed). Those are the two commands `.github/workflows/ci.yml`
+  itself runs; upstream's copy of this line names a different pair and a system
+  interpreter, and neither is right here — see the `.venv` rule below, which this
+  paragraph does not get to override. Non-negotiable. **Do not lean on CI for this**:
   its push gate is size-based (`.github/workflows/ci.yml`) and skips the heavy
   jobs on a small push, so a red can reach `main` with nothing having run.
 - **Before an intermediate push on a branch** — the targeted tests above, plus
@@ -94,10 +101,15 @@ SHORT path: xdist appends `/gwN` per worker, and a long one trips a
 console-wrapping assertion in the Docker launcher test.
 
 **Run the suite through `.venv`, not the machine's Python.**
-`backend/requirements-dev.txt` PINS the collector (`pytest==9.0.3`,
-`pytest-xdist==3.6.1`) precisely so that a local green is evidence about CI — and
-a system interpreter drifts the moment anything else on the box upgrades pytest.
-Measured 2026-08-20: the system Python had wandered to pytest 9.1.1 with
+`backend/requirements-dev.txt` PINS the collector precisely so that a local green
+is evidence about CI — and a system interpreter drifts the moment anything else
+on the box upgrades pytest. **Read the pins out of that file, never out of this
+paragraph**: it named `pytest==9.0.3` / `pytest-xdist==3.6.1` for exactly as long
+as it took upstream to bump them (2026-08-24: 9.1.1 and 3.8.0), which is the same
+drift this rule is about, one level up. The point is that a version is pinned and
+that `.venv` has THAT one — after any sync touching `requirements*.txt`, re-run
+the provisioning lines below or the parallel form can refuse to start.
+Measured 2026-08-20: the system Python had wandered to a different pytest with
 `pytest-xdist` absent ENTIRELY, so the parallel form above did not merely run
 slower, it refused to start (`unrecognized arguments: -n --dist`). `.venv` is the
 same environment `start.bat` builds, so the suite also runs against the app as a

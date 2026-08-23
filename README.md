@@ -50,7 +50,6 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | **External caption round trip** | Export ordinary image/`.txt` pairs, caption them in any tool, then re-import without duplicating images or overwriting non-empty LDS captions |
 | **Dual long + short captions** | ai-toolkit text-side augmentation for supported local families; both wordings remain editable per image |
 | **Watermark review** | Detect, review and edit masks; choose crop or LaMa/Klein inpaint; every edit keeps an `.orig` backup and **Restore original** supports another attempt |
-
 | Sub-feature | What it gets you |
 | :-- | :-- |
 | **Character / Concept / Style** | One choice at creation rewires captioning, masking and step-scaling — it isn't just a label |
@@ -164,7 +163,6 @@ the target model accepts.
 | **Label what the camera did** | A CPU pass tracks every frame of every shot and names the movement — pan left/right/up/down, zoom in/out, static shot, handheld shot — in the same vocabulary the video trainer itself uses, plus three of this app's own: rolling, slideshow and subject moves. The labels ride on the thumbnails and as a 🎥 Camera filter row that composes with the ⚑ flags. **Nothing is ever rejected on them** — the wobble one person filters out is what the next person is training on. Honest limits: a pivot and a slide look identical in a flat picture so both read as a pan, orbits are not detected at all, and a pan across a blank wall can read as a slideshow |
 | **Find the shots that are secretly two shots** | A dissolve or a match cut leaves behind a "shot" that is really two scenes, and the thumbnail looks fine. Every shot now gets a scene-coherence number at the tail of 🔎 Find scenes — no decode, no model, no GPU, no button, because it reuses vectors that pass already cached. A **ranking, not a verdict**: measured duration-matched, AUC 0.719, so a 0.80 cut catches about a third of the missed cuts and flags about one honest shot in seven. Empty by default, and the panel says so |
 | **Triage a bank one keystroke per shot** | ⌨ Burst mode puts a cursor on the grid: K keeps, R rejects, P puts a shot back to untriaged, S or → moves on, ← steps back, U undoes ten deep. The same keys as the image bank's ▶ Review, so the reflex carries. The cursor jumps to the next shot you have not judged, never wraps silently, and keystrokes never wait on the network |
-
 **What it does NOT do yet**, plainly:
 
 - **"Most varied" selection is still to come.** Shots do carry a look score now
@@ -213,7 +211,6 @@ the target model accepts.
 
 <details>
 <summary>📸 See the curation grid with framing and face-similarity badges</summary>
-
 <p align="center">
   <img src="docs/screenshots/03-curate.png" alt="Curation grid: each tile of the synthetic demo person carries a framing badge (face / bust / body), a numeric face-similarity score badge in green or orange, a caption line, and keep/reject controls" width="820">
 </p>
@@ -854,6 +851,7 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 |---|---|---|
 | **Docker + existing ComfyUI** | Run LDS in Docker while keeping the ComfyUI already installed on the host | The launcher asks for the ComfyUI folder once; training still needs ai-toolkit on the host — this fork has no cloud fallback |
 | **Docker GPU + fresh ComfyUI** | Run LDS and a new isolated ComfyUI together on an NVIDIA GPU | Existing ComfyUI/models stay untouched; training still needs ai-toolkit on the host — this fork has no cloud fallback |
+| **Rented GPU pod (RunPod)** | Reach the studio, Image Bank and ComfyUI generation from any browser, on a GPU you do not own | **No training at all on the pod**: ai-toolkit is not in the image, and this fork has no rented-GPU lane to fall back on — train on your own machine, or point a pod's Generate at it. Large ZIP exports can hit the pod proxy's 100-second timeout. Set `LDS_PUBLIC=1`: a pod hostname is public, and that forces the access-token gate on. See the [RunPod guide](docs/guide/runpod.md) |
 | **Full local** | Local engines, ML helpers, ai-toolkit training, Canvas generation and Test Studio | Install/connect only the tools you need; each capability degrades independently |
 
 This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter API engines (Klein/ComfyUI is the only generation path) and no rented-GPU training. Without a GPU on this machine you get everything except generation and training — see [No local GPU? Then no training here](#no-local-gpu-then-no-training-here).
@@ -1040,6 +1038,8 @@ Under the hood: the app has **no user accounts**, so on `127.0.0.1` (the default
 - **Update check** — on load and once an hour, it asks GitHub whether a newer version exists (a `git fetch` on a checkout, the releases API on a packaged install). It sends nothing about you, and there is currently **no setting to turn it off** — block the process at the firewall if you need it silent.
 - **Model downloads you start** — Setup and the Install buttons stream weights from Hugging Face, Civitai, Ollama and pytorch.org. Two extras also fetch their own weights the first time you use them: the aesthetic head (~13 MB, from GitHub) and the NSFW classifier plus SigLIP 2 (Hugging Face).
 - **The built-in scraper** — the sites you ask it to scan, and nothing else.
+
+When the app is served on an address the public internet can reach — a rented pod's proxy hostname, a tunnel — set `LDS_PUBLIC=1`. That forces the access token on whatever the setting says, so the switch cannot be turned off into an open door, and generates a token at boot if none exists. It applies to non-loopback binds only, and `LDS_ALLOW_UNAUTHENTICATED=1` still overrides it for setups that authenticate elsewhere.
 
 ## Known limitations
 

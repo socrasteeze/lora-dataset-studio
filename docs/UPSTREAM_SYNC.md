@@ -267,23 +267,27 @@ on a documentation line while `frontend/src` passes. Trace from the bundle:
 ### The re-delete list — derived, never recalled
 
 ```bash
-comm -13 <(git ls-tree -r --name-only HEAD | sort) \
-         <(git ls-tree -r --name-only upstream/main | sort) | grep -v '^frontend/dist'
+git ls-tree -r --name-only upstream/main | grep -v '^frontend/dist' \
+  | while read -r f; do [ -e "$f" ] || echo "$f"; done
 ```
 
-**`ls-tree HEAD`, not `ls-files` — this command is run MID-MERGE, and that is
-exactly where `ls-files` lies.** It reports the index, which during an unresolved
-merge holds every conflicted path at stages 1/2/3 and at no stage 0. On
-2026-08-23 the `ls-files` form answered 80 before the merge and 92 after it,
-and neither number was real; the `ls-tree` form answered **100** both times,
-which is the truth — the inventory had not moved. A count that CHANGES across a
-merge you know adopted no rejected file is the tell. Confirm with
-`git diff --name-status <pre-merge-HEAD> -- . ':(exclude)frontend/dist'`, which
-lists every file the merge actually added or deleted and is the check that
-settles it.
+**Neither `git ls-files` NOR `git ls-tree HEAD` — this command is run MID-MERGE,
+and both of those lie there.** `ls-files` reports the index, where an unresolved
+merge holds conflicted paths at stages 1/2/3 and at no stage 0: on 2026-08-23 it
+answered 80 before a merge and 92 after, and neither number was real. `ls-tree
+HEAD` was written here as the fix and is silently worse — mid-merge `HEAD` is
+still the PRE-merge commit, so it answers as if the merge had not happened at
+all, and on 2026-08-24 it reported the inventory unchanged while twenty files
+had just been adopted. Testing the files themselves is true at any moment.
+
+The tell for either lie is a count that does not move across a merge you know
+adopted files, or one that moves across a merge you know adopted none. Confirm
+with `git diff --name-status <pre-merge-HEAD> -- . ':(exclude)frontend/dist'`,
+which lists every file the merge actually added or deleted and is what settles
+it.
 
 Every path this prints is a file upstream has and this fork deliberately does
-not. **100 as of 2026-08-23** (72 on 2026-08-20, 58 on 2026-08-05 — the number
+not. **72 as of 2026-08-24** (92 before this sync adopted twenty, 58 on 2026-08-05 — the number
 moves every sync, which is why the command is here and the list is not) —
 roughly 33 in the Divergence-4 cluster
 (`dense_*`, `pod_*`, `hub_presence`, `cloud_quantize`, `fp8_local_delivery`,

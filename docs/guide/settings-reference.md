@@ -31,6 +31,10 @@ For containerized or scripted setups, a handful of environment variables overrid
 | `LDS_CONSOLE` | Overrides `console.level` for this process (`off` / `events` / `heartbeat` / `all`) — terminal activity stream verbosity without editing `config.json`. |
 | `LDS_DB_TRACE` | Overrides `diagnostics.db_trace_seconds` for this process. Seconds a database write may be held before it is reported to the log; unset or `0` = off. Set it to `2` when the app goes unresponsive while a pass runs — the log then names the thread holding the database and the statement that opened the write. |
 | `LDS_SQLITE_BUSY_TIMEOUT_MS` | How long a click waits for the database before giving up (default `15000`). Only worth changing while hunting a stall: at `500` a misbehaving background pass surfaces in seconds instead of being absorbed by the wait. Leaving it low makes ordinary clicks fail during normal batch saves. |
+| `LDS_PUBLIC` | Set to `1` when the app is served on a URL the public internet can reach (a rented GPU box's proxy hostname, a tunnel). Forces the access-token gate on whatever `server.require_token` says, and makes the launcher generate a token if none exists. Only affects non-loopback binds. |
+| `LDS_ALLOW_UNAUTHENTICATED` | Set to `1` to deliberately opt out of the token gate — for setups that already authenticate the connection themselves (a VPN, a reverse proxy that requires its own login, a trusted Docker network). Overrides `LDS_PUBLIC`: with this set, a public bind is served with no token check at all. |
+| `LDS_EXTENSIONS` | Set to `0` to disable the local extension loader entirely — no package under the extensions directory is imported. See the [Extensions guide](extensions.md). |
+| `LDS_EXTENSIONS_DIR` | Directory the extension loader scans (default `backend/extensions/`, which is gitignored and never ships). Mostly for tests and unusual layouts. |
 | `FLASK_DEBUG` | `1` enables Flask debug mode. |
 
 ## Overview
@@ -717,6 +721,27 @@ could only fail, and points at `face_scoring.python` so you can aim it at a
 separate 3.10–3.12 interpreter.
 
 ### Advanced options (per run)
+
+#### Preview quality — steps and CFG
+
+Adopted from upstream 2026-08-24 (GitHub #46). It is a property of the BASE,
+not of a lane: a distilled checkpoint previews in 8 steps at CFG 1, a
+non-distilled one needs 20–35 at CFG 4–6, and a run on a base the studio does
+not ship gets whichever of those two guesses is wrong. Both boxes live beside
+the preview prompts in a dataset's ⚙️ Advanced options.
+
+| Setting | Key | Default | Notes |
+|---|---|---|---|
+| **Preview quality (steps / CFG)** | `sample_steps` / `sample_guidance` | per base | Empty follows the base: 8 steps at CFG 1 on a distilled one, 20–35 at CFG 4–6 otherwise — the boxes show that default as their placeholder. Set them when you train on a base the studio does not ship and the previews come back as sketches (raise the steps) or cost more time than the training they interrupt (lower them). Preview rendering only, never the weights, which is why **▶ Continue** may change them even on a full-state resume. See *Preview quality — steps and CFG* in the dataset guide. |
+
+> **Divergence 4.** Upstream documents this row inside a *Full-model (dense)
+> recipe* chapter that also covers rented-pod delivery, private Hugging Face
+> storage forecasts and one-click cloud fp8 delivery. This fork trains locally
+> only and ships none of that, so the chapter is not carried — only the
+> setting above, which is neither dense-specific nor cloud-specific. The
+> `cloud.*` keys this fork keeps dormant are documented under
+> *Config-file-only settings*.
+
 These live under **⚙️ Advanced options** in a dataset's training panel — rank, resolution, save/sample cadence, optimizer, scheduler, EMA, LoKr and more. Each carries its own inline **Why/How** note, so they aren't repeated here. Two are worth calling out because of a caveat.
 
 #### Krea 2 Raw · LoKr likeness — a reported community starting point
@@ -888,6 +913,7 @@ How the app binds and who can reach it. **These are the settings that need a res
 - **Port** → `server.port`. The port the app listens on. Default **`5050`**. Change it if something else owns the port (on macOS, port 5000 is taken by AirPlay Receiver).
 - **Available on the local network** — a toggle that flips the bind host between `127.0.0.1` (this machine only, the default) and `0.0.0.0` (reachable from your LAN — phone, tablet, another PC). The token and phone controls below only appear once this is on.
 - **Require an access token** → `server.require_token`. Default **off** — a home LAN is treated as trusted, so LAN access is open and there's no token to type on a phone. Turn it **on** to demand a token from remote devices; requests from localhost never need one.
+  When `LDS_PUBLIC=1` this is **forced on and locked** — the switch is disabled with that reason shown, and a public bind is served with the gate on unless `LDS_ALLOW_UNAUTHENTICATED=1` is set (see the environment variables above).
 - **Access token** → `server.access_token`. Shown only when the token gate is on: a read-only field with **Generate new token** and **Copy**. It's persisted, so it survives restarts. Open `http://<machine>:<port>/?token=<token>` once from the remote device and a signed session cookie takes over.
 - **Open it on your phone** — a card with a scannable **QR code** and copyable URLs built from this machine's real LAN IP (and Tailscale IP, if present). No guessing which address to type.
 - **Open a browser tab on launch** → `server.auto_open_browser`. Default **on** — a tab opens automatically once the server is up. Turn it **off** if you keep a tab pinned: no browser lets an app reuse an already-open tab, so every restart otherwise opens a redundant new one. `LDS_NO_BROWSER=1` still overrides this for a one-off launch (see the environment-variable table above) without needing a Settings change.
@@ -1136,7 +1162,7 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 |---|---|
 | `server.host` | Interface the Flask server binds to (default `127.0.0.1`, local-only). |
 | `server.port` | Port the server listens on (default `5050`). |
-| `server.require_token` | On a non-loopback bind, require remote clients to present an access token (default `false` — a trusted LAN needs none). Toggle and token also live in Settings → Server & access. |
+| `server.require_token` | On a non-loopback bind, require remote clients to present an access token (default `false` — a trusted LAN needs none). Toggle and token also live in Settings → Server & access. Overridden to always-on by `LDS_PUBLIC=1`. |
 | `console.level` | What the start.bat / run.py terminal narrates from the activity log: `off` (silent), `events` (default — one line per state change), `heartbeat` (plus a line per running job every `console.heartbeat_seconds`), `all` (plus progress ticks, throttled to at most one per job per second). Same events the 📋 Activity panel shows. Overridable by `LDS_CONSOLE`. Config.json only — no Settings UI. |
 | `console.heartbeat_seconds` | Interval for heartbeat lines when `console.level` is `heartbeat` or `all` (default `30`, clamped 5–600). |
 | `diagnostics.db_trace_seconds` | Seconds a database write may be held before the log reports which thread is holding it and what opened it. `0` (default) = off. The database allows one writer at a time, so a background pass that holds it too long makes everything else — a ✓ on an image, a second machine's check-in — fail with "the database is busy". This is how you find out which pass. Turn it on only while investigating; it costs nothing when off but adds a log line per slow write when on. Overridable by `LDS_DB_TRACE`. Config.json only — no Settings UI. |
