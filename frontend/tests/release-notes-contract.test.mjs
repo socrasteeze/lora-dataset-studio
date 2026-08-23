@@ -14,6 +14,7 @@ import {
   renderNotes,
   extractCredits,
   emptySignal,
+  screenshotUrl,
   REPO_URL,
   MAX_BODY_CHARS,
 } from '../scripts/releaseNotes.mjs';
@@ -129,6 +130,37 @@ test('a release with news says nothing at all', () => {
   assert.equal(emptySignal({ entries: [CURRENT[0]], tag: 'v1', previousTag: 'v0' }), null);
 });
 
+// A screenshot is only useful on the release page if the URL survives the trip.
+// Two ways it does not: a repo-relative path (the page has no repository root,
+// so it renders broken) and a `main` ref (the picture in a six-month-old release
+// silently becomes the CURRENT screen — a note claiming to show what shipped,
+// showing something else).
+test('a screenshot is linked absolutely, and pinned to the released tag', () => {
+  const url = screenshotUrl('v2026.08.22', 'docs/screenshots/canvas/board.png');
+  assert.ok(url.startsWith('https://'), url);
+  assert.ok(url.includes('/raw/v2026.08.22/'), `pinned to the tag: ${url}`);
+  assert.doesNotMatch(url, /\/raw\/main\//, url);
+  assert.ok(url.endsWith('docs/screenshots/canvas/board.png'), url);
+});
+
+test('an entry with a screenshot renders it under its prose; one without changes nothing', () => {
+  const withShot = renderNotes({
+    tag: 'v1', previousTag: 'v0',
+    entries: [{ id: 'a', date: '2026-01-01', title: 'A change', blurb: 'What it does.',
+      image: 'docs/screenshots/canvas/board.png' }],
+  });
+  // Order matters: the text explains, the picture shows.
+  assert.ok(withShot.indexOf('What it does.') < withShot.indexOf('!['), withShot);
+  assert.match(withShot, /!\[A change\]\(https:\/\/[^)]*\/raw\/v1\/docs\/screenshots\/canvas\/board\.png\)/);
+
+  const without = renderNotes({
+    tag: 'v1', previousTag: 'v0',
+    entries: [{ id: 'a', date: '2026-01-01', title: 'A change', blurb: 'What it does.' }],
+  });
+  assert.doesNotMatch(without, /!\[/, 'an entry with no image must add no markup');
+});
+
+
 // ── The first release, which has nothing to diff against ─────────────────────
 // A repository that has never published one used to be the single case this
 // generator could not serve: release.yml threw before reaching it. A fork is
@@ -174,6 +206,27 @@ test('a trimmed body says how much it dropped rather than looking complete', () 
   assert.ok(kept > 0 && kept < BULK.length, 'some entries kept, some dropped');
   assert.match(body, new RegExp(`and ${BULK.length - kept} earlier entr`));
   assert.match(body, /CHANGELOG\.md/);
+});
+
+// Where the two features above MEET, and where they auto-merged wrong once:
+// `image:` renders ~120 characters of absolute URL per entry, and the trim
+// budgets entries by their prose. Admitted on the prose alone, a body full of
+// screenshots goes back over the ceiling the trim exists to keep it under —
+// which is the flat 422, after the ZIP is uploaded. So the picture is measured
+// as part of its entry.
+test('a screenshot is counted against the body budget, not added after it', () => {
+  const shot = 'docs/screenshots/release/generation-queue-dock.png';
+  const shots = Array.from({ length: 400 }, (_, i) => ({
+    id: `shot-${i}`, title: `Entry number ${i}`, blurb: `${'x'.repeat(600)} ${i}`, image: shot,
+  }));
+  const body = renderNotes({ tag: 'v1', previousTag: null, entries: shots });
+  assert.ok(body.length <= MAX_BODY_CHARS,
+    `body is ${body.length} chars, over GitHub's ${MAX_BODY_CHARS} limit`);
+  // …and the pictures really are in there, so the guard is not passing by
+  // rendering nothing.
+  assert.ok([...body.matchAll(/^!\[/gm)].length > 0, 'no screenshot rendered at all');
+  assert.equal([...body.matchAll(/^### /gm)].length, [...body.matchAll(/^!\[/gm)].length,
+    'every kept entry keeps its picture');
 });
 
 test('a body that already fits is left exactly as it was', () => {

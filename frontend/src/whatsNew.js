@@ -40,6 +40,26 @@
 //    deep-link ('/datasets?section=<id>&panel=<id>'). The section/panel ids are
 //    validated against the LIVE navigation registries by whatsNew.test.js, so a
 //    stale target fails the test the moment a section is renamed.
+//  • `image` is OPTIONAL: a repo-relative path to a screenshot
+//    ('docs/screenshots/canvas/board.png'). It is shown in the GITHUB RELEASE
+//    body only — the in-app panel does not render it — under the prose, pinned
+//    to the released tag so an old release keeps showing what actually shipped.
+//    Three rules, and they are not style preferences:
+//      1. ONE per release, on the headline change. A wall of screenshots reads
+//         as a brochure; one picture reads as evidence.
+//      2. NEVER from a real bank or dataset. The maintainer's own images are
+//         NSFW and are out of bounds for anything public, cropped or not — use
+//         the showcase instance (scripts/seed_showcase.py) whose data is
+//         generated.
+//      3. COMMIT THE PICTURE BEFORE YOU TAG. The URL is pinned to the tag,
+//         so the file has to exist inside it — a screenshot added after the
+//         release is a dead link, and a published release cannot be fixed
+//         by attaching one. Order: shoot, commit, tag, release. (Measured:
+//         v2026.08.22 and v2026.08.18 both carry no docs/screenshots/release/
+//         folder at all, so neither could be retrofitted.)
+//      4. Prefer a screen that shows the CHANGE, not the app. A settings panel,
+//         a toolbar, a queue — those photograph without any dataset image at
+//         all, which is why most entries can carry one cheaply.
 //  • Keep the list tidy: tail entries older than a couple of months can be
 //    pruned once everyone has cycled through an update or two.
 // =====================================================================
@@ -49,6 +69,23 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
+  {
+    id: '2026-08-23-bank-datasets-and-studio-fit-a-phone',
+    date: '2026-08-23',
+    title: 'The Bank, the Datasets and the Test Studio now fit a phone',
+    blurb:
+      'The same measuring pass that fixed the Canvas has been run over the three pages you '
+      + 'actually live in, at five real screen sizes, and what it found is fixed. Every button, '
+      + 'chip and menu item on those pages is finger-sized below desktop widths. The Bank header '
+      + 'gives the screen back on a phone: the counters and the action row scroll on one line '
+      + 'instead of stacking, and a phone held sideways gets a one-row header. The passes panel '
+      + 'no longer opens itself on a phone (it was 1 500 px tall there) and, below desktop '
+      + 'widths, folds everything that is not a pass button so the passes stay one tap away. '
+      + 'In a dataset, the two chip rails no longer touch, and the in-section shortcuts fold on '
+      + 'a phone held sideways — the section buttons still reach every panel. Nothing changes on '
+      + 'a desktop.',
+    to: '/bank',
+  },
   {
     id: '2026-08-22-local-engine-identity-prompt-named-for-both',
     date: '2026-08-22',

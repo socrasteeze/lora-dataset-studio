@@ -54,14 +54,24 @@ as hostile until `npm run build` and the local-only contract test pass.
 > prints:
 >
 > ```bash
-> comm -13 <(git ls-files | sort) \
+> comm -13 <(git ls-tree -r --name-only HEAD | sort) \
 >          <(git ls-tree -r --name-only upstream/main | sort) | grep -v '^frontend/dist'
 > ```
 >
-> **72 files as of 2026-08-20** (58 on 2026-08-05, when this note was written —
-> the number moves every sync, which is the point) — about 33 in the
-> Divergence-4 cluster and 10 in
-> the Divergence-1 cluster below. The hand-written list that used to live here
+> **100 files as of 2026-08-23** (72 on 2026-08-20, 58 on 2026-08-05, when this
+> note was written — the number moves every sync, which is the point) — about 33
+> in the Divergence-4 cluster and 10 in
+> the Divergence-1 cluster below.
+>
+> ⚠️ **Run it on a settled tree, or swap `git ls-files` for
+> `git ls-tree -r --name-only HEAD`.** Mid-merge, `git ls-files` reports the
+> INDEX, which during an unresolved merge holds conflicted paths at stages 1/2/3
+> and not at stage 0 — so the same command answered 80 before the merge and 92
+> after it on 2026-08-23, and both numbers were fiction. The `ls-tree` form
+> answered 100 on both sides, which is the truth: the inventory did not move.
+> The tell is a count that CHANGES across a merge you know adopted no rejected
+> file, and the cheap confirmation is `git diff --name-status <pre-merge-HEAD>`,
+> which lists every file the merge actually added or deleted. The hand-written list that used to live here
 > named **nine** of them, and had done for several syncs; an agent working from
 > it alone would have re-adopted 45 rejected files. The named entries below are
 > kept only for the *reasoning* attached to each, which the command cannot carry.
@@ -586,7 +596,7 @@ since the start — and D4 is now the *larger* recurrence surface: about 33 of t
 alone. Use the same derivation as D1:
 
 ```bash
-comm -13 <(git ls-files | sort) \
+comm -13 <(git ls-tree -r --name-only HEAD | sort) \
          <(git ls-tree -r --name-only upstream/main | sort) | grep -v '^frontend/dist'
 ```
 
@@ -996,6 +1006,24 @@ invisible until CI goes red.
   test over the stringified `bank_scoring` defaults to a test over its KEYS. See
   Divergence 9 for why the substring form was passing on a lie.
 
+**A tenth entry, added 2026-08-23 — and it is the FOURTH-entry shape again, on a
+frontend file: an upstream test pinning an upstream IDENTIFIER, not a behaviour.**
+
+- `frontend/src/components/bank/bankProbeMarkers.test.js` —
+  `'the bank list names its opener, so the probe can prime the workspace'`
+  asserts the literal ``aria-label={`Open the bank ${b.name}`}`` in
+  `BankPage.jsx`. Upstream's opener is a bare `<button>` inside the card's
+  `.map(b => …)`, so it interpolates `b`; this fork wraps the same opener in
+  `BankTitle` (the ✎ inline rename, fork-only), where the button names its prop
+  `bank`. The label itself is REQUIRED here — `responsiveProbe.mjs` primes the
+  Bank workspace with `[aria-label^="Open the bank"]`, and without it the probe
+  measures an empty list and reports it clean — so the fix was to put the label
+  on `BankTitle`'s open button and **widen the assertion to
+  `\$\{(b|bank)\.name\}`**, never to pin either literal. Same rule as the fourth
+  entry: widen what the assertion tolerates, so it still proves the thing it was
+  written to prove. Drop the alternation if this fork ever adopts upstream's
+  bare button.
+
 ## Divergence 6: upstream's dormant `worker_url` plumbing is now LIVE here
 
 Upstream's `utils/comfyui.py` has carried `worker_url=` parameters on
@@ -1126,7 +1154,7 @@ that means *this machine*", not "every one we have seen fail".
 verified to FAIL without the scoping (the barrier installs and the local
 `add_job` raises `ComfyUIRecoveryRequired`).
 
-## Divergence 7: fixes carried AHEAD of upstream — one dropped line, one new fix
+## Divergence 7: fixes carried AHEAD of upstream — down to ONE dropped line
 
 Not a policy divergence and not a permanent one: bugs found here, reported
 upstream, and fixed here because waiting would leave this fork exposed. Upstream
@@ -1167,21 +1195,22 @@ Divergence 7:**
   it against something other than the same deadline), this note is void — take
   their version and delete this bullet.
 
-**Carried ahead as of 2026-08-03; reported upstream 2026-08-07 as PR #33**
-(`fix/mobile-rail-containing-block` — see the 2026-08-07 fork-changelog entry
-below for a branch-history correction found while preparing it):
+**The mobile-rail entry is GONE — upstream took PR #33, and this is the second
+entry to leave this section that way.** `relative` on the three chip rails
+(`DatasetWorkspace.jsx` ×2, `SettingsPage.jsx`, `GuidePage.jsx`) is now
+upstream's own code, verified 2026-08-23 by counting `relative -mx-4` on both
+sides of all three files: 2/2, 1/1, 1/1. `tests/mobile-rail-containing-block.
+test.mjs` is upstream's too, and their responsive wave edited it in place rather
+than dropping it — so the guard travelled with the fix. Nothing is carried here
+any more.
 
-- `relative` on the three mobile chip rails (`DatasetWorkspace.jsx` ×2,
-  `SettingsPage.jsx`, `GuidePage.jsx`). Upstream has the same markup and
-  therefore the same bug: an `overflow-x-auto` rail that is `position: static`
-  is not the containing block for its absolutely positioned descendants, so the
-  `.sr-only` label inside a NavBadge escapes the scroller, keeps its static
-  position out at the far end of a 1123 px rail, and widens the DOCUMENT to
-  ~598 px against a 440 px viewport. Mobile Safari then shrinks the whole page
-  to fit and every bar draws at ~73% of the screen. Measured live at 440 px
-  before and after; pinned by `tests/mobile-rail-containing-block.test.mjs`.
-  **On the next sync, prefer whichever side has `relative`** — this is additive
-  and conflicts only if upstream rewrites the same className.
+**What DID stay is the fork's extension of that test**, and it is not Divergence
+7 — it is an ordinary fork-authored guard on fork-authored markup. The
+`BANK_RAILS` block covers the Bank's two always-on cover strips
+(`BankFilterRail.jsx` ×2, `BankWatermarkPanel.jsx` ×1), which the upstream
+`RAILS` loop cannot see because they carry no `lg:hidden`. It auto-merged
+untouched this sync; upstream edits the file's other half, so expect that shape
+again rather than a conflict.
 
 ## Divergence 8: `start.bat` is a TWO-LANE launcher
 
@@ -1809,6 +1838,33 @@ a decision, and don't miss the parts that merge with zero conflict markers.
     excludes, not a fixed subdirectory list, so a root-level doc is covered
     the same as everything else — recompute the exclude set once the merge's
     changed files are known, don't guess it in advance.
+29. **Two features that auto-merge cleanly can still merge into a BUG, and the
+    place to look is wherever the fork put a LIMIT on something upstream then
+    made bigger.** 2026-08-23, `frontend/scripts/releaseNotes.mjs`. The fork
+    carries a body-size trim (GitHub refuses a release body over 125 000
+    characters with a flat 422 — at the last step, after the ZIP is uploaded,
+    leaving a tag with no release); upstream added an optional `image:` that
+    renders ~120 characters of absolute URL per entry. The two touched
+    neighbouring lines of one function and merged with a conflict only in the
+    docstring. The result compiled, linted, built and passed every test: the
+    budget admitted each entry on the length of its PROSE, then the image line
+    was pushed afterwards, uncounted. A release carrying screenshots goes
+    straight back over the ceiling the trim exists to hold — the exact failure
+    the fork wrote that code to prevent, reintroduced by a feature that never
+    mentioned it.
+
+    Nothing in Gates 1–6 can see this. Both features work; only their
+    ARITHMETIC is wrong together, and no existing test rendered an entry that
+    had both a picture and a budget. **So after resolving, list the fork-only
+    INVARIANTS in each touched file — a cap, a budget, a scope filter, a count,
+    a gate — and ask what the merged-in feature adds to the quantity each one
+    measures.** That is a different question from "did the resolution keep my
+    lines", which was answered yes here. It is diagnostic 27's lesson from the
+    other end: there the adopted refactor quietly did LESS than the fork's
+    version, here the adopted feature quietly makes MORE than the fork's limit
+    counted. Fix the class (count the picture as part of its entry), then pin
+    it with a test that exercises both features at once — the one thing the
+    repo demonstrably had none of.
 
 ## Merge routine (every upstream sync)
 
@@ -1853,6 +1909,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-08-23 | *(merge)* + dist | **Upstream sync - 12 commits (`780de445`..`91844844`), 7 conflicted source files (18 regions) plus the generated bundle.** The second window in a row with **zero rejected features in it**: every commit message was read and the whole merge diff was grepped for the cloud-engine and rental vocabulary, which returned nothing but false positives on `parent`/`different`. Reject inventory **held at exactly 100** (derived from `ls-tree` on both sides, before and after - see the note under the D1 derivation about what `git ls-files` does mid-merge). Adopted: the **responsive probe** (`scripts/responsiveProbe.mjs` + `layoutGuard.mjs`) and the four marker contracts it is pinned by, the Bank/Datasets/Studio responsive pass it found 684 violations with, the **`image:` field** on a What's-new entry with its tag-pinned release URL, `scripts/seed_showcase.py`, and the first release screenshot. Upstream's three `build(frontend):` bundles were **rejected** and dist rebuilt from fork source, as always. **The header was the one real decision.** Upstream's responsive pass and this fork's own `72d297d9` ("even the triage chrome") had rewritten the Bank header for a phone in two ways that cannot share an element - even grid cells versus one horizontally-scrolling line per row - and each side carried a contract test pinning its own. Upstream's is the measured one (a real device probe; the header was 38 % of the fold at rest, eight counters wrapping to four rows), so the LAYOUT half was adopted whole and the fork's `HEADER_BTN*`/`PATH_BTN` constants, `grid grid-cols-3`, `col-span-3` and the `Stat` pill restyle went with it as orphans (diagnostic 19). The fork's **copy** rule - no idle ellipsis on a control that opens a window - is orthogonal to any layout and was kept, so the merged header is byte-identical to upstream's except three labels. `BankOverviewLayout.contract.test.js` was rewritten to pin what survives and to say why the rest went. **Two things the gates caught that nothing else would have.** Gate 1 found a JSX parse error: taking upstream's side of the action-row region left the fork's extra `</div>` and a `<div className="grid grid-cols-2 gap-2">` fragment behind - a splice, not a conflict, and invisible to a marker count. And a **merge-interaction bug in `releaseNotes.mjs`**: upstream's `image:` markup is pushed AFTER the fork's body-size budget has already admitted the entry on its prose alone, so a release carrying screenshots could go back over GitHub's 125 000-character ceiling - the flat 422, after the ZIP is uploaded, which is the exact failure the fork's trim exists to prevent. The picture is now measured as part of its entry, with a new contract test that renders 400 screenshotted entries and checks both the ceiling and that the pictures are really there. **Divergence 7 lost its second entry:** upstream took PR #33, so `relative` on the three mobile chip rails is their code now (verified by counting `relative -mx-4` on both sides: 2/2, 1/1, 1/1) and only the `_CLAIM_MAX_AGE_S` line is still carried. **One new D5 carrier:** `bankProbeMarkers.test.js` pins the bank opener's `aria-label` as `${b.name}`, upstream's map variable, where this fork's opener lives inside `BankTitle` (the inline rename) and names its prop `bank` - widened to an alternation rather than re-pointed, so it proves the probe's `prime` selector still has something to match either way. D5's two derivable families were re-derived unchanged at 13 and 15. Gates: lint **0 errors / 38 warnings, the same 38 the pre-merge tree reports** (D9's orphan backlog, none of it merge damage), `ruff check .` clean, build clean, both local-only halves green (8 frontend + 3 backend), `create_app()` OK, hygiene green. Backend **8048 -> 8048 passed / 10 skipped / 0 failed**; frontend **4163 -> 4195 passed / 0 failed** (+32, the four new marker contracts and the release-notes additions). |
 | 2026-08-22 | *(merge)* + dist | **Upstream sync - 54 commits (`5cc00ca3`..`780de445`), 18 conflicted files plus the generated bundle.** The first window in this fork's history with **zero rejected features in it** - every commit message and body was grepped for the cloud-engine and rental vocabulary and returned nothing - so the whole cost was in the two things a clean window still brings: interleaved plumbing, and gates that had never run here before. Adopted: the **generation queue** (see the dock, jump a job, leave it, and the app-wide hold explained in words), **Scenes from a DATASET's captions** beside the existing bank lane, **curation no longer waiting on the queue**, per-checkpoint Canvas grids, the lightbox saying WHY a pixel edit is refused, a base model filed two folders deep being found, the Bank face pass rescuing small heads like the dataset scorer, typed captions surviving a forced pass, and the dataset watermark scan-tuple crash. Reject inventory held at **72** and 23 new upstream files were adopted whole; **no rejected file leaked in**. **The sharp edge was the lint gate (new Divergence 9).** Upstream shipped one for both halves, and its frontend config is `eslint.config.mjs` while the fork's was `eslint.config.js` - both survive a merge with ZERO markers, and flat-config resolution prefers `.js`, so the fork's would have silently won and upstream's would have been dead. Adopted theirs, deleted the fork's, carried the rationale across. `no-unused-vars` is held at WARN here: it reports 35 orphans, and linting the PRE-merge tree with the same config reports the same 35, so none is merge damage - ~20 safe ones cleared, the rest deferred because clearing `TrainingPanel`'s two dead full-model components cascades into a 58-line handler. The BACKEND half went to zero: `ruff check .` (CI runs it unconditionally, no size gate) found 37 where the pre-merge tree had 188, and **four were real defects no test could fail on** - a missing `import uuid` behind a live `NameError` on D6's remote-upload path; a call to `_push_resume_checkpoint` that nothing defines, left behind when D4 rejected `pod_checkpoint_push`; a duplicate `'bank_scoring'` dict literal that had been eating the fork's OWN `models_root` fix (`5e0e7c6a`) while nine call sites read the key; and `image_bank_service.transfer` reading `dest.source_path` back off an expunged ORM row 28 lines after snapshotting it to avoid exactly that. **Caught by gates, not by reading**: the local-only contract failed a NEW upstream util (`activityLanes.js`) hardcoding two cloud engines - then failed again because the comment explaining the removal NAMED them; upstream's new prompt-labels contract failed `API_PROMPT_ENGINES`, still listing three removed engines against the fork's empty `API_ENGINES`; and the ASCII gate failed two em-dashes upstream put in `requirements-dev.txt`. Merge damage found and fixed: a duplicate `"lint"` key auto-merged into `package.json` scripts, and a duplicated `aspect_for_label` import that my own conflict resolution created (ruff F811 caught it; the pre/post ruff diff proved it and one other were the ONLY merge-introduced lint errors). Gates: ruff 0 (from 37), ESLint 0 errors / 38 warnings, build clean, local-only contract 8+3 green against the REBUILT bundle, backend **7979 -> 8036 passed / 0 failed**, frontend **4102 -> 4163 passed / 0 failed**. `APP_VERSION` 2026.08.22F. |
 | 2026-08-20 | *(merge)* + dist | **Upstream sync - 2 commits (`690d955c`, `cb04204e`), ONE source conflict region plus the generated-bundle pair.** A calm, narrow window: the D1 and D4 sweeps returned exactly their pre-merge hit lists, and the derived reject inventory moved **76 -> 72** because all four files upstream added here are adopted (`utils/captionAppearancePolicy.js` + its test, `CaptionOptionsAppearance.test.js`, `test_appearance_policy.py`). Adopted: **omit vs describe, per appearance family** - Character Caption Options gains a fourth axis (hair, makeup/nails, facial hair, glasses) alongside the identity families that stay locked omitted, so what a caption does not name can still bind to the trigger on purpose rather than by accident; and **saving a MOVED policy now nudges for a re-caption**, the same 'future captions' wording a kind or concept change already uses, compared by value so a save of an unrelated field does not cry wolf. Suggested by Sam Exit and Meeseeks (Discord). **The one conflict**: `face_dataset_service.py`'s `face_variations` import - HEAD had added `aspect_for_label` for an unrelated fork feature, upstream added `normalize_appearance` for this one, adjacent lines in the same import block. Kept BOTH; both are genuinely called elsewhere in the file (`aspect_for_label` at four call sites, `normalize_appearance` at two) - a textbook adjacent-import conflict, never a real choice between them. Gates: lint/build clean, local-only contract 8+3 green against the REBUILT bundle, capability-row count unchanged at 17, backend 7976 -> 7991 passed / 0 failed, frontend 4096 -> 4102 passed / 0 failed. |
 | 2026-08-20 | *(merge)* + dist | **Upstream sync - 15 commits (`d8eefeab`...`9cfaf7d1`), ZERO source conflict regions - the whole merge conflicted only in the generated bundle.** The fourth window in a row with **nothing rejected outright**: the D1 and D4 sweeps returned exactly their pre-merge hit lists, and the derived reject inventory moved **82 -> 72** because all ten files upstream added here are adopted (`studio/SceneBankPrompts.jsx`, `studio/scenePrompts.js` + its test, `hooks/useImageZoomPan.js`, `hooks/useMediaQuery.js`, `utils/imageZoomPan.js` + its test, `test_bank_scene_prompts.py`, and the two render/tooltip contracts). Adopted: **🎬 Scenes from a bank** - a bank's captions become ordered prompt passes, picked in bank order, riding the EXISTING 📝 prompt axis through `RunSetupPanel` so the Test Studio and the board's 🎨 Generate cannot drift; the new `GET /bank/<id>/scenes` is read-only, so it answers while a pass is running, and a missing caption skips and is COUNTED rather than guessed. **The render viewer folds and zooms** - ⤢ puts the facts panel away (a 904x750 tablet goes 35% -> 90% of the screen), and pinch/wheel/double-tap magnify with travel clamped to the real overflow and the cap pinned to the file's own resolution, so it can never magnify interpolation and lie about it; Escape gains a rung (Repair, then zoom, then close) rather than changing meaning. **The board's chrome is RANKED** for a phone on three measured thresholds instead of wrapping into four rows, with `useMediaQuery` PLACING each control once - Tailwind can hide a chip at a width, it cannot move one, and two copies drift. Plus the fixes: **a shot card tooltip always shows its prompt** (three render blocks had drifted into three behaviours, the count keeping its badge - reported by .samexit on Discord) and **⇪ Keep no longer takes a card's pencil away**, the edit re-deriving a label only when the label IS the current derivation of the prompt. Gates: lint/build clean, local-only contract 8+3 green against the REBUILT bundle, backend 7975 passed / 0 failed (baseline 7969, +6 upstream's own bank-scene tests), frontend 4096 / 0 failed (baseline 4063). |
