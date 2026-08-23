@@ -756,6 +756,14 @@ const TOPICS = [
      'detail daemon', 'sdxl pass 2', 'sweep steps', 'try several steps',
      'default steps', 'always 8 steps', 'ignored steps'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  action('studio-guest-checkpoints', 'Compare with other LoRAs',
+    ['studio', 'test studio', 'theirs', 'guest checkpoint', 'external lora',
+     'compare someone elses lora', 'lora not trained here', 'civitai lora',
+     'kohya lora', 'other trainer', 'mine vs theirs', 'add a lora to test',
+     'same prompt and seed', 'guest lora', 'downloaded lora', 'not stacked',
+     'own row', 'checkpoints to test', 'add their lora', 'compare with other loras',
+     'other loras', 'accordion'],
+    '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   // Le lot vit dans le composant d'historique, monté par le Studio de test ET par
   // le panneau « Generate from the board » : un seul sujet d'aide pour les deux.
   action('studio-prompt-batch', '📝 Batch: run several saved prompts in one launch',
@@ -1712,6 +1720,24 @@ const TOPICS = [
       '26 gb', '10 gb', 'checkpoint', 'full model', 'load diffusion model', 'cpu'],
     guide: { chapter: 'settings-reference', anchor: 'storage' },
     app: { route: '/settings/storage', focus: 'storage-fp8-quantize' } },
+  // DIVERGENCE 4 -- upstream continues this block with six more topics:
+  // training.full_model_recipe / _base / _quality / _fp8_export,
+  // training.fp8_deliver, and a SECOND training.fp8_quantize_local. The
+  // first five document the dense full-model recipe and the one-click
+  // Hugging-Face fp8 delivery this fork does not ship; the sixth would
+  // duplicate the id this fork already carries for its LOCAL CPU tool.
+  // Preview steps / CFG (GitHub #46). Its own topic rather than keywords on the
+  // recipe above: the question is not "what may I change?" but "why do my
+  // previews look like sketches?", and the answer is a property of the BASE —
+  // which is also why the searched words are symptoms, not setting names.
+  { id: 'training.preview_quality', kind: 'setting',
+    title: 'Preview quality — steps and CFG',
+    keywords: ['preview', 'previews', 'sample', 'samples', 'sample steps', 'steps',
+      'cfg', 'guidance', 'guidance scale', 'sketch', 'sketchy', 'blurry preview',
+      'unfinished', 'ugly previews', 'slow preview', 'distilled', 'turbo', 'raw',
+      'sample_steps', 'sample_guidance', 'preview quality', 'test images'],
+    guide: { chapter: 'dataset-guide', anchor: '11-preview-quality-steps-and-cfg' },
+    app: { route: '/datasets?section=training' } },
   // Two questions behind one word. The refusal topic keeps its id (in-app help
   // badges and bookmarked links resolve against it), but the title and keywords
   // now cover BOTH answers: a packed export is refused, a plain fp8 cast is

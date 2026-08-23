@@ -160,8 +160,13 @@ const ALLOWED_SRC_CLOUD_REFS = {
   'components/dataset/engineSelection.js': 3,
   'components/dataset/scraperState.js': 1,
   'help/helpRegistry.js': 1,
-  // Historical entries announcing engines this fork later removed.
-  'whatsNew.js': 21,
+  // Historical entries announcing engines this fork later removed. They moved
+  // from whatsNew.js to whatsNewArchive.js on 2026-08-24 when upstream split the
+  // feed — the same 21 references, in a file that is now loaded lazily. The
+  // budget moved with them rather than being re-counted: a number that GREW
+  // across that split would have meant upstream entries this fork had rejected
+  // (or reworded) coming back in through the new file.
+  'whatsNewArchive.js': 21,
 }
 
 async function cloudRefCounts(dir) {

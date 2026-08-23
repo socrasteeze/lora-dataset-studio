@@ -3853,7 +3853,15 @@ def import_backup_zip(user_id: int, archive: bytes | BinaryIO):
             owned.close()
 
 
-def _import_backup_zipfile(user_id: int, z: zipfile.ZipFile):
+def _bkp_validate_archive(z: zipfile.ZipFile):
+    """The whole security battery of a backup import, moved verbatim
+    (2026-08-24): central-directory limits, manifest/version checks, image
+    metadata normalisation and provenance rules, archive-entry filtering
+    with the traversal/collision refusals, the v2 archive<->metadata
+    pairing, and the analysis-cache binding (CRC/SHA validated BEFORE any
+    staging folder or transaction exists). Pure reads: nothing on disk or
+    in the database changes here. Returns (manifest, images_meta,
+    restored_training_mode, infos, validated_cache_payloads)."""
     # Validate the central directory BEFORE inflating JSON.  Previously a tiny
     # compressed manifest/images.json could bypass the image-only size total and
     # consume unbounded RAM during z.read/json.loads.
@@ -4089,6 +4097,19 @@ def _import_backup_zipfile(user_id: int, z: zipfile.ZipFile):
             raise ValueError(
                 'analysis cache sidecar is malformed or has a digest mismatch')
         validated_cache_payloads[cache_ref] = raw
+    return (manifest, images_meta, restored_training_mode, infos,
+            validated_cache_payloads)
+
+
+def _bkp_restore_validated(user_id: int, z: zipfile.ZipFile, manifest,
+                           images_meta, restored_training_mode, infos,
+                           validated_cache_payloads):
+    """The atomic restore of an already-validated backup, moved verbatim:
+    staging-directory extraction (bytes re-validated on the way), dataset
+    row + image rows in one transaction, the within-backup provenance
+    graph, reference rebinding from actual archive files, and the single
+    rename promotion — with the except/finally that can never leave a
+    partial restore behind. Returns the new dataset."""
     name = (manifest.get('name') or 'Restored dataset')[:100]
     trigger = (manifest.get('trigger_word') or 'restored')[:60]
     # Extract first into a sibling directory: it is on the same volume as the final
@@ -4255,6 +4276,14 @@ def _import_backup_zipfile(user_id: int, z: zipfile.ZipFile):
         shutil.rmtree(staging_dir, ignore_errors=True)
     logger.info(f"dataset backup restored: '{name}' -> #{ds.id} ({n_rows} image rows)")
     return ds
+
+
+def _import_backup_zipfile(user_id: int, z: zipfile.ZipFile):
+    (manifest, images_meta, restored_training_mode, infos,
+     validated_cache_payloads) = _bkp_validate_archive(z)
+    return _bkp_restore_validated(
+        user_id, z, manifest, images_meta, restored_training_mode,
+        infos, validated_cache_payloads)
 
 
 @_serialize_dataset_ingest
@@ -5795,76 +5824,17 @@ def face_crop_to_square_webp(image_bytes: bytes, size: int = 1024, pad: float = 
 
 
 # --- Import + classify (Qwen3-VL) ------------------------------------------
-@_serialize_dataset_ingest
-def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, stats=None,
-                  source_metadata=None, captions=None, caption_origins=None,
-                  bank_image_ids=None,
-                  framings=None, bank_analysis_snapshots=None,
-                  watermark_states=None, watermark_bboxes=None,
-                  watermark_regions=None, watermark_sources=None,
-                  watermark_scores=None, statuses=None,
-                  transfer_metadatas=None, dedupe_seen=None,
-                  preserve_exact_bytes=False, created_ids_sink=None,
-                  provenance_changes_sink=None):
-    """Store original static bytes (or head-crop) + create import rows (status=keep).
-    When crop=True, each image is auto head-cropped via Qwen3-VL - the CALLER
-    must then hold the GPU-exclusive window - and is by construction a face,
-    so framing='face' is set directly (no classify pass needed).
-
-    dedupe=True (the /import route) drops perceptual duplicates by dHash — both
-    within the batch and vs the dataset's existing files. The hash is computed on
-    the final stored image, so a re-import of the same photo matches its earlier
-    crop instead of comparing a full frame to a head crop. Skips are counted in
-    stats['duplicates'] when a stats dict is passed.
-    Default stays False: service-level callers (scrape flow dedupes upstream on
-    the ORIGINALS, before paying the crop) keep the historical behavior.
-
-    ``source_metadata`` is an optional list parallel to ``files_bytes``. Only
-    validated Pexels or web-search provenance is stored; existing callers can omit it.
-
-    ``captions`` is an optional list parallel to ``files_bytes`` — a pre-existing
-    caption to carry onto the new row (the image-bank promotion path passes the bank
-    captions here, so a promoted selection starts already captioned). Empty/None entries
-    leave the row uncaptioned. A skipped duplicate simply drops its caption with it.
-
-    ``framings`` is an optional list parallel to ``files_bytes`` — a framing
-    ALREADY known for the blob (the image-bank promotion path passes the framing
-    its own classify pass wrote, so a promoted selection lands counted in the
-    composition instead of sitting at 0 until something re-classifies it). Only
-    the catalog buckets are accepted; anything else lands as None so the dataset
-    classifier can still fill it. Ignored when crop=True (a head crop IS a face).
-
-    ``bank_image_ids`` is an optional list parallel to ``files_bytes`` — the
-    bank_image each blob came from, recorded on the new row. A blob dropped as a
-    perceptual DUPLICATE hands its bank id to the row it matched (when that row
-    carries none yet): the dataset does hold that bank image, just under another
-    row, and the bank's "already promoted here" answer must say so. That link is
-    what lets the bank re-offer an image once the user deletes it here. Bank ids
-    that could NOT be linked (the matched row already belongs to another bank —
-    a scalar column can only credit one) are listed in ``stats['bank_unlinked']``.
-
-    ``bank_analysis_snapshots`` is an internal Bank-promotion marker parallel to
-    ``files_bytes``.  When present, this importer recalculates deterministic
-    quality/provenance from the final Dataset bytes and seals a v3 snapshot with
-    their SHA-256.  A byte-identical Bank capture also retains its complete row
-    analysis plus path-free Score/Face embeddings in a bounded sidecar; a
-    transformed image gets deterministic analysis only.  The regular current
-    Dataset fields stay separate and remain user-owned.
-
-    ``dedupe_seen`` is an optional internal mutable cache of ``(dhash, row_id)``
-    pairs for chunked imports. When omitted, the importer loads the dataset's
-    existing hashes itself, preserving the standalone-call behavior.
-
-    Returns (ids, failed_count)."""
-    ds = get_dataset(user_id, dataset_id)
-    if not ds:
-        return [], 0
-    # Sans head-crop, on préserve le ratio ET les octets source autorisés : l'ancien
-    # chemin « carré padé » ajoutait des bandes noires que le LoRA apprendrait, et
-    # forçait tous les imports personnage en carré — un plan buste/corps importé
-    # doit rester tel quel (ai-toolkit gère le bucketing multi-ratios).
-    seen = (dedupe_seen if dedupe_seen is not None
-            else _existing_dhash_rows(dataset_id)) if dedupe else None
+def _imp_input_accessors(crop, source_metadata, captions, caption_origins,
+                         bank_image_ids, framings, bank_analysis_snapshots,
+                         watermark_states, watermark_bboxes,
+                         watermark_regions, watermark_sources,
+                         watermark_scores, statuses, transfer_metadatas):
+    """The importer's input normalisation, moved verbatim (2026-08-23):
+    every optional list parallel to ``files_bytes`` is copied once, and the
+    per-index accessors validate on the way out (an unknown caption-origin
+    stamp, framing bucket, watermark state/source or status never reaches a
+    row). Returns the two lists the row builder indexes directly plus the
+    eleven accessors, in the order the trunk unpacks them."""
     metadata_by_index = list(source_metadata) if source_metadata is not None else []
     captions_by_index = list(captions) if captions is not None else []
     # Parallel to ``captions`` and travelling WITH it. Without this list a bank
@@ -5955,6 +5925,335 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
         if normalized is None:
             raise RuntimeError('invalid Bank/Dataset transfer metadata')
         return normalized
+    return (metadata_by_index, captions_by_index, bank_id_at,
+            caption_origin_at, framing_at, snapshot_at, watermark_state_at,
+            watermark_bbox_at, watermark_regions_at, watermark_source_at,
+            watermark_score_at, status_at, transfer_metadata_at)
+
+
+def _imp_prepare_seal(snapshot_at, index, stored, dataset_id):
+    """Bank-promotion analysis prep for ONE image, moved verbatim: when a
+    snapshot marker rides with this index, recompute deterministic analysis
+    from the final stored bytes and keep the captured cache bundle only on
+    a byte-identical fingerprint. Returns the ``seal_analysis_snapshot``
+    closure the duplicate-absorb and commit steps call at the last moment
+    (it writes the cache sidecar, so it must run only when a row is about
+    to commit)."""
+    final_analysis = None
+    captured_analysis = None
+    captured_cache_bundle = None
+    if snapshot_at(index) is not None:
+        final_analysis = bank_deterministic_analysis(stored)
+        if final_analysis is None:
+            raise RuntimeError('could not seal Bank analysis for Dataset image')
+        captured_analysis = (
+            snapshot_at(index) if isinstance(snapshot_at(index), dict) else None)
+        captured_matches = (
+            captured_analysis is not None
+            and captured_analysis.get('fingerprint')
+            == bank_transfer_metadata.content_fingerprint_bytes(stored))
+        if captured_matches and captured_analysis.get('caches'):
+            captured_cache_bundle = captured_analysis['caches']
+
+    def seal_analysis_snapshot():
+        """Persist the sidecar only when this candidate is about to commit."""
+        if final_analysis is None:
+            return None, None
+        cache_ref = None
+        try:
+            if captured_cache_bundle:
+                cache_ref = bank_transfer_metadata.write_cache_sidecar(
+                    _bank_analysis_cache_dir(dataset_id), captured_cache_bundle)
+                if cache_ref is None:
+                    raise RuntimeError(
+                        'could not preserve Bank Score/Face cache in Dataset')
+            snapshot = bank_transfer_metadata.snapshot_storage(
+                final_analysis, stored, captured=captured_analysis,
+                cache_ref=cache_ref)
+            if snapshot is None:
+                raise RuntimeError(
+                    'could not seal Bank analysis for Dataset image')
+            return snapshot, cache_ref
+        except Exception:
+            _remove_unreferenced_bank_analysis_cache(dataset_id, cache_ref)
+            raise
+    return seal_analysis_snapshot
+
+
+def _imp_dedupe_match(dedupe, stored, seen, dataset_id,
+                      preserve_exact_bytes):
+    """The perceptual-duplicate scan, moved verbatim: dHash the stored
+    bytes, walk the ``seen`` cache refreshing entries whose row changed on
+    disk and evicting stale ones in place, and refuse a merely-similar
+    match when exact bytes must be preserved. Returns (fp, match) — fp for
+    the trunk to cache on commit, match as the row id this image
+    duplicates (None when it is new or dedupe is off)."""
+    match = None
+    fp = None
+    if dedupe:
+        try:
+            with Image.open(io.BytesIO(stored)) as im:
+                fp = _dhash(im)
+        except (OSError, ValueError):
+            fp = None   # unreadable output would have failed above; belt & braces
+        if fp is not None:
+            match = None
+            stale_ids = set()
+            for cached_hash, mid in tuple(seen):
+                if _hamming(fp, cached_hash) > SCRAPE_DHASH_MAX_DISTANCE:
+                    continue
+                live = (FaceDatasetImage.query
+                        .filter(
+                            FaceDatasetImage.id == mid,
+                            FaceDatasetImage.dataset_id == dataset_id,
+                            FaceDatasetImage.status.in_(('keep', 'pending')))
+                        .first())
+                if live is None or not live.filename:
+                    stale_ids.add(mid)
+                    continue
+                try:
+                    live_path = os.path.join(
+                        _dataset_dir(dataset_id), live.filename)
+                    if (preserve_exact_bytes
+                            and Path(live_path).read_bytes() != stored):
+                        # Perceptually similar is not byte-identical and
+                        # cannot carry this image's exact analysis vault.
+                        continue
+                    with Image.open(live_path) as im:
+                        live_hash = _dhash(im)
+                except (OSError, ValueError):
+                    stale_ids.add(mid)
+                    continue
+                if live_hash != cached_hash:
+                    for cache_index, (_old_hash, cached_id) in enumerate(seen):
+                        if cached_id == mid:
+                            seen[cache_index] = (live_hash, mid)
+                            break
+                if _hamming(fp, live_hash) <= SCRAPE_DHASH_MAX_DISTANCE:
+                    match = mid
+                    break
+            if stale_ids:
+                seen[:] = [
+                    (h, mid) for h, mid in seen if mid not in stale_ids
+                ]
+    return fp, match
+
+
+def _imp_absorb_duplicate(match, index, stats, dataset_id, bank_id_at,
+                          seal_analysis_snapshot, provenance_changes_sink):
+    """What happens to a blob the dataset already holds, moved verbatim:
+    count it, hand its bank provenance to the row that owns the bytes
+    (sealing the analysis sidecar first), report an unlinkable bank id
+    back through stats, and record the provenance flip for the caller's
+    rollback bookkeeping — with the rollback/finally pairing that never
+    leaves the session dirty or the cache sidecar orphaned."""
+    if stats is not None:
+        stats['duplicates'] = stats.get('duplicates', 0) + 1
+    # The dataset already holds this image — hand the provenance to
+    # the row that holds it, so the source can tell it landed. When
+    # that row is already claimed (another bank supplied the same
+    # photo first), report the id back: the caller has no verifiable
+    # trace here and needs to fall back on its own bookkeeping.
+    bid = bank_id_at(index)
+    analysis_snapshot = None
+    analysis_cache_ref = None
+    try:
+        if bid:
+            analysis_snapshot, analysis_cache_ref = (
+                seal_analysis_snapshot())
+        linked_before = db.session.get(FaceDatasetImage, match)
+        previous = ((linked_before.bank_image_id,
+                     linked_before.bank_analysis_snapshot)
+                    if linked_before is not None else None)
+        linked = (bool(bid) and _attach_bank_provenance(
+            match, bid, bank_analysis_snapshot=analysis_snapshot,
+            bank_analysis_cache_dir=_bank_analysis_cache_dir(
+                dataset_id)))
+        linked_after = db.session.get(FaceDatasetImage, match)
+        if (provenance_changes_sink is not None
+                and previous is not None
+                and linked_after is not None
+                and previous != (linked_after.bank_image_id,
+                                linked_after.bank_analysis_snapshot)):
+            provenance_changes_sink.append({
+                'image_id': match,
+                'old_bank_image_id': previous[0],
+                'old_snapshot': previous[1],
+                'new_bank_image_id': linked_after.bank_image_id,
+                'new_snapshot': linked_after.bank_analysis_snapshot,
+            })
+        if bid and not linked and stats is not None:
+            stats.setdefault('bank_unlinked', []).append(bid)
+    except Exception:
+        # `_attach_bank_provenance` commits on success.  A fault
+        # before that commit leaves the session unusable until
+        # rollback; a fault after it is resolved by the durable
+        # ownership proof in `finally` below.
+        db.session.rollback()
+        raise
+    finally:
+        _remove_unreferenced_bank_analysis_cache(
+            dataset_id, analysis_cache_ref)
+    logger.info(f"dataset import: perceptual duplicate skipped (dataset {dataset_id})")
+
+
+def _imp_commit_row(user_id, dataset_id, index, stored, extension, scale,
+                    seal_analysis_snapshot, transfer_metadata_at,
+                    captions_by_index, metadata_by_index, status_at,
+                    framing_at, caption_origin_at, bank_id_at,
+                    watermark_state_at, watermark_bbox_at,
+                    watermark_regions_at, watermark_source_at,
+                    watermark_score_at):
+    """One image's atomic landing, moved verbatim: seal the analysis
+    sidecar, restore transfer-metadata values, write the file atomically,
+    insert the row and commit — and on ANY failure roll back, unlink the
+    uncommitted file and drop the now-unreferenced cache sidecar before
+    re-raising. Returns the committed row."""
+    analysis_snapshot, analysis_cache_ref = seal_analysis_snapshot()
+    transfer_metadata = transfer_metadata_at(index)
+    restored = bank_transfer_metadata.dataset_restore_values(
+        transfer_metadata,
+        bank_transfer_metadata.content_fingerprint_bytes(stored))
+    fn = f"{user_id}_dataset_{uuid.uuid4().hex[:8]}{extension}"
+    stored_path = os.path.join(_dataset_dir(dataset_id), fn)
+    try:
+        write_image_atomic(stored_path, stored)
+        cap = (captions_by_index[index] if index < len(captions_by_index) else None)
+        cap = _cap_caption(cap) if (cap or '').strip() else None
+        restored_short = restored.get('caption_short')
+        restored_short = (_cap_caption(restored_short)
+                          if isinstance(restored_short, str)
+                          and restored_short.strip() else None)
+        restored_short_origin = (restored.get('caption_short_origin')
+                                 if restored_short else None)
+        img = FaceDatasetImage(
+                               dataset_id=dataset_id,
+                               source=restored.get('source') or 'import',
+                               status=status_at(index),
+                               filename=fn, framing=framing_at(index),
+                               variation_label=restored.get('variation_label'),
+                               variation_prompt=restored.get('variation_prompt'),
+                               klein_model=restored.get('klein_model'),
+                               face_score=restored.get('face_score'),
+                               face_state=restored.get('face_state'),
+                               fail_reason=restored.get('fail_reason'),
+                               # No fail_kind here (Divergence 1: only a cloud
+                               # engine can refuse, so the column does not exist
+                               # on this fork's model). Restore is unaffected —
+                               # this reads `restored` by key, so an older backup
+                               # carrying it is simply never asked for it.
+                               upscale_ratio=(restored.get('upscale_ratio')
+                                              if restored.get('upscale_ratio')
+                                              is not None else scale),
+                               caption=cap, caption_short=restored_short,
+                               caption_origin=caption_origin_at(index, cap),
+                               caption_short_origin=restored_short_origin,
+                               bank_image_id=bank_id_at(index),
+                               bank_analysis_snapshot=analysis_snapshot,
+                               transfer_metadata=transfer_metadata,
+                               watermark_state=watermark_state_at(index),
+                               watermark_bbox=watermark_bbox_at(index),
+                               watermark_regions=watermark_regions_at(index),
+                               watermark_source=watermark_source_at(index),
+                               watermark_score=watermark_score_at(index),
+                               source_metadata=_source_metadata_storage(
+                                   metadata_by_index[index]
+                                   if index < len(metadata_by_index) else None))
+        db.session.add(img)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            os.unlink(stored_path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            logger.warning('dataset import: could not remove uncommitted image %s',
+                           stored_path, exc_info=True)
+        _remove_unreferenced_bank_analysis_cache(
+            dataset_id, analysis_cache_ref)
+        raise
+    return img
+
+
+@_serialize_dataset_ingest
+def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, stats=None,
+                  source_metadata=None, captions=None, caption_origins=None,
+                  bank_image_ids=None,
+                  framings=None, bank_analysis_snapshots=None,
+                  watermark_states=None, watermark_bboxes=None,
+                  watermark_regions=None, watermark_sources=None,
+                  watermark_scores=None, statuses=None,
+                  transfer_metadatas=None, dedupe_seen=None,
+                  preserve_exact_bytes=False, created_ids_sink=None,
+                  provenance_changes_sink=None):
+    """Store original static bytes (or head-crop) + create import rows (status=keep).
+    When crop=True, each image is auto head-cropped via Qwen3-VL - the CALLER
+    must then hold the GPU-exclusive window - and is by construction a face,
+    so framing='face' is set directly (no classify pass needed).
+
+    dedupe=True (the /import route) drops perceptual duplicates by dHash — both
+    within the batch and vs the dataset's existing files. The hash is computed on
+    the final stored image, so a re-import of the same photo matches its earlier
+    crop instead of comparing a full frame to a head crop. Skips are counted in
+    stats['duplicates'] when a stats dict is passed.
+    Default stays False: service-level callers (scrape flow dedupes upstream on
+    the ORIGINALS, before paying the crop) keep the historical behavior.
+
+    ``source_metadata`` is an optional list parallel to ``files_bytes``. Only
+    validated Pexels or web-search provenance is stored; existing callers can omit it.
+
+    ``captions`` is an optional list parallel to ``files_bytes`` — a pre-existing
+    caption to carry onto the new row (the image-bank promotion path passes the bank
+    captions here, so a promoted selection starts already captioned). Empty/None entries
+    leave the row uncaptioned. A skipped duplicate simply drops its caption with it.
+
+    ``framings`` is an optional list parallel to ``files_bytes`` — a framing
+    ALREADY known for the blob (the image-bank promotion path passes the framing
+    its own classify pass wrote, so a promoted selection lands counted in the
+    composition instead of sitting at 0 until something re-classifies it). Only
+    the catalog buckets are accepted; anything else lands as None so the dataset
+    classifier can still fill it. Ignored when crop=True (a head crop IS a face).
+
+    ``bank_image_ids`` is an optional list parallel to ``files_bytes`` — the
+    bank_image each blob came from, recorded on the new row. A blob dropped as a
+    perceptual DUPLICATE hands its bank id to the row it matched (when that row
+    carries none yet): the dataset does hold that bank image, just under another
+    row, and the bank's "already promoted here" answer must say so. That link is
+    what lets the bank re-offer an image once the user deletes it here. Bank ids
+    that could NOT be linked (the matched row already belongs to another bank —
+    a scalar column can only credit one) are listed in ``stats['bank_unlinked']``.
+
+    ``bank_analysis_snapshots`` is an internal Bank-promotion marker parallel to
+    ``files_bytes``.  When present, this importer recalculates deterministic
+    quality/provenance from the final Dataset bytes and seals a v3 snapshot with
+    their SHA-256.  A byte-identical Bank capture also retains its complete row
+    analysis plus path-free Score/Face embeddings in a bounded sidecar; a
+    transformed image gets deterministic analysis only.  The regular current
+    Dataset fields stay separate and remain user-owned.
+
+    ``dedupe_seen`` is an optional internal mutable cache of ``(dhash, row_id)``
+    pairs for chunked imports. When omitted, the importer loads the dataset's
+    existing hashes itself, preserving the standalone-call behavior.
+
+    Returns (ids, failed_count)."""
+    ds = get_dataset(user_id, dataset_id)
+    if not ds:
+        return [], 0
+    # Sans head-crop, on préserve le ratio ET les octets source autorisés : l'ancien
+    # chemin « carré padé » ajoutait des bandes noires que le LoRA apprendrait, et
+    # forçait tous les imports personnage en carré — un plan buste/corps importé
+    # doit rester tel quel (ai-toolkit gère le bucketing multi-ratios).
+    seen = (dedupe_seen if dedupe_seen is not None
+            else _existing_dhash_rows(dataset_id)) if dedupe else None
+    (metadata_by_index, captions_by_index, bank_id_at, caption_origin_at,
+     framing_at, snapshot_at, watermark_state_at, watermark_bbox_at,
+     watermark_regions_at, watermark_source_at, watermark_score_at,
+     status_at, transfer_metadata_at) = _imp_input_accessors(
+        crop, source_metadata, captions, caption_origins, bank_image_ids,
+        framings, bank_analysis_snapshots, watermark_states,
+        watermark_bboxes, watermark_regions, watermark_sources,
+        watermark_scores, statuses, transfer_metadatas)
 
     ids = []
     failed = 0
@@ -5991,200 +6290,22 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
             failed += 1
             logger.warning(f"dataset import: image skipped (dataset {dataset_id}): {e}")
             continue
-        final_analysis = None
-        captured_analysis = None
-        captured_cache_bundle = None
-        if snapshot_at(index) is not None:
-            final_analysis = bank_deterministic_analysis(stored)
-            if final_analysis is None:
-                raise RuntimeError('could not seal Bank analysis for Dataset image')
-            captured_analysis = (
-                snapshot_at(index) if isinstance(snapshot_at(index), dict) else None)
-            captured_matches = (
-                captured_analysis is not None
-                and captured_analysis.get('fingerprint')
-                == bank_transfer_metadata.content_fingerprint_bytes(stored))
-            if captured_matches and captured_analysis.get('caches'):
-                captured_cache_bundle = captured_analysis['caches']
-
-        def seal_analysis_snapshot():
-            """Persist the sidecar only when this candidate is about to commit."""
-            if final_analysis is None:
-                return None, None
-            cache_ref = None
-            try:
-                if captured_cache_bundle:
-                    cache_ref = bank_transfer_metadata.write_cache_sidecar(
-                        _bank_analysis_cache_dir(dataset_id), captured_cache_bundle)
-                    if cache_ref is None:
-                        raise RuntimeError(
-                            'could not preserve Bank Score/Face cache in Dataset')
-                snapshot = bank_transfer_metadata.snapshot_storage(
-                    final_analysis, stored, captured=captured_analysis,
-                    cache_ref=cache_ref)
-                if snapshot is None:
-                    raise RuntimeError(
-                        'could not seal Bank analysis for Dataset image')
-                return snapshot, cache_ref
-            except Exception:
-                _remove_unreferenced_bank_analysis_cache(dataset_id, cache_ref)
-                raise
-        fp = None
-        if dedupe:
-            try:
-                with Image.open(io.BytesIO(stored)) as im:
-                    fp = _dhash(im)
-            except (OSError, ValueError):
-                fp = None   # unreadable output would have failed above; belt & braces
-            if fp is not None:
-                match = None
-                stale_ids = set()
-                for cached_hash, mid in tuple(seen):
-                    if _hamming(fp, cached_hash) > SCRAPE_DHASH_MAX_DISTANCE:
-                        continue
-                    live = (FaceDatasetImage.query
-                            .filter(
-                                FaceDatasetImage.id == mid,
-                                FaceDatasetImage.dataset_id == dataset_id,
-                                FaceDatasetImage.status.in_(('keep', 'pending')))
-                            .first())
-                    if live is None or not live.filename:
-                        stale_ids.add(mid)
-                        continue
-                    try:
-                        live_path = os.path.join(
-                            _dataset_dir(dataset_id), live.filename)
-                        if (preserve_exact_bytes
-                                and Path(live_path).read_bytes() != stored):
-                            # Perceptually similar is not byte-identical and
-                            # cannot carry this image's exact analysis vault.
-                            continue
-                        with Image.open(live_path) as im:
-                            live_hash = _dhash(im)
-                    except (OSError, ValueError):
-                        stale_ids.add(mid)
-                        continue
-                    if live_hash != cached_hash:
-                        for cache_index, (_old_hash, cached_id) in enumerate(seen):
-                            if cached_id == mid:
-                                seen[cache_index] = (live_hash, mid)
-                                break
-                    if _hamming(fp, live_hash) <= SCRAPE_DHASH_MAX_DISTANCE:
-                        match = mid
-                        break
-                if stale_ids:
-                    seen[:] = [
-                        (h, mid) for h, mid in seen if mid not in stale_ids
-                    ]
-                if match is not None:
-                    if stats is not None:
-                        stats['duplicates'] = stats.get('duplicates', 0) + 1
-                    # The dataset already holds this image — hand the provenance to
-                    # the row that holds it, so the source can tell it landed. When
-                    # that row is already claimed (another bank supplied the same
-                    # photo first), report the id back: the caller has no verifiable
-                    # trace here and needs to fall back on its own bookkeeping.
-                    bid = bank_id_at(index)
-                    analysis_snapshot = None
-                    analysis_cache_ref = None
-                    try:
-                        if bid:
-                            analysis_snapshot, analysis_cache_ref = (
-                                seal_analysis_snapshot())
-                        linked_before = db.session.get(FaceDatasetImage, match)
-                        previous = ((linked_before.bank_image_id,
-                                     linked_before.bank_analysis_snapshot)
-                                    if linked_before is not None else None)
-                        linked = (bool(bid) and _attach_bank_provenance(
-                            match, bid, bank_analysis_snapshot=analysis_snapshot,
-                            bank_analysis_cache_dir=_bank_analysis_cache_dir(
-                                dataset_id)))
-                        linked_after = db.session.get(FaceDatasetImage, match)
-                        if (provenance_changes_sink is not None
-                                and previous is not None
-                                and linked_after is not None
-                                and previous != (linked_after.bank_image_id,
-                                                linked_after.bank_analysis_snapshot)):
-                            provenance_changes_sink.append({
-                                'image_id': match,
-                                'old_bank_image_id': previous[0],
-                                'old_snapshot': previous[1],
-                                'new_bank_image_id': linked_after.bank_image_id,
-                                'new_snapshot': linked_after.bank_analysis_snapshot,
-                            })
-                        if bid and not linked and stats is not None:
-                            stats.setdefault('bank_unlinked', []).append(bid)
-                    except Exception:
-                        # `_attach_bank_provenance` commits on success.  A fault
-                        # before that commit leaves the session unusable until
-                        # rollback; a fault after it is resolved by the durable
-                        # ownership proof in `finally` below.
-                        db.session.rollback()
-                        raise
-                    finally:
-                        _remove_unreferenced_bank_analysis_cache(
-                            dataset_id, analysis_cache_ref)
-                    logger.info(f"dataset import: perceptual duplicate skipped (dataset {dataset_id})")
-                    continue
-        analysis_snapshot, analysis_cache_ref = seal_analysis_snapshot()
-        transfer_metadata = transfer_metadata_at(index)
-        restored = bank_transfer_metadata.dataset_restore_values(
-            transfer_metadata,
-            bank_transfer_metadata.content_fingerprint_bytes(stored))
-        fn = f"{user_id}_dataset_{uuid.uuid4().hex[:8]}{extension}"
-        stored_path = os.path.join(_dataset_dir(dataset_id), fn)
-        try:
-            write_image_atomic(stored_path, stored)
-            cap = (captions_by_index[index] if index < len(captions_by_index) else None)
-            cap = _cap_caption(cap) if (cap or '').strip() else None
-            restored_short = restored.get('caption_short')
-            restored_short = (_cap_caption(restored_short)
-                              if isinstance(restored_short, str)
-                              and restored_short.strip() else None)
-            restored_short_origin = (restored.get('caption_short_origin')
-                                     if restored_short else None)
-            img = FaceDatasetImage(
-                                   dataset_id=dataset_id,
-                                   source=restored.get('source') or 'import',
-                                   status=status_at(index),
-                                   filename=fn, framing=framing_at(index),
-                                   variation_label=restored.get('variation_label'),
-                                   variation_prompt=restored.get('variation_prompt'),
-                                   klein_model=restored.get('klein_model'),
-                                   face_score=restored.get('face_score'),
-                                   face_state=restored.get('face_state'),
-                                   fail_reason=restored.get('fail_reason'),
-                                   upscale_ratio=(restored.get('upscale_ratio')
-                                                  if restored.get('upscale_ratio')
-                                                  is not None else scale),
-                                   caption=cap, caption_short=restored_short,
-                                   caption_origin=caption_origin_at(index, cap),
-                                   caption_short_origin=restored_short_origin,
-                                   bank_image_id=bank_id_at(index),
-                                   bank_analysis_snapshot=analysis_snapshot,
-                                   transfer_metadata=transfer_metadata,
-                                   watermark_state=watermark_state_at(index),
-                                   watermark_bbox=watermark_bbox_at(index),
-                                   watermark_regions=watermark_regions_at(index),
-                                   watermark_source=watermark_source_at(index),
-                                   watermark_score=watermark_score_at(index),
-                                   source_metadata=_source_metadata_storage(
-                                       metadata_by_index[index]
-                                       if index < len(metadata_by_index) else None))
-            db.session.add(img)
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            try:
-                os.unlink(stored_path)
-            except FileNotFoundError:
-                pass
-            except OSError:
-                logger.warning('dataset import: could not remove uncommitted image %s',
-                               stored_path, exc_info=True)
-            _remove_unreferenced_bank_analysis_cache(
-                dataset_id, analysis_cache_ref)
-            raise
+        seal_analysis_snapshot = _imp_prepare_seal(
+            snapshot_at, index, stored, dataset_id)
+        fp, match = _imp_dedupe_match(
+            dedupe, stored, seen, dataset_id, preserve_exact_bytes)
+        if match is not None:
+            _imp_absorb_duplicate(
+                match, index, stats, dataset_id, bank_id_at,
+                seal_analysis_snapshot, provenance_changes_sink)
+            continue
+        img = _imp_commit_row(
+            user_id, dataset_id, index, stored, extension, scale,
+            seal_analysis_snapshot, transfer_metadata_at,
+            captions_by_index, metadata_by_index, status_at, framing_at,
+            caption_origin_at, bank_id_at, watermark_state_at,
+            watermark_bbox_at, watermark_regions_at, watermark_source_at,
+            watermark_score_at)
         if dedupe and fp is not None:
             seen.append((fp, img.id))
         ids.append(img.id)
@@ -9112,74 +9233,21 @@ def _clean_inpaint_engine(route, method):
     return 'lama' if route == 'lama' else 'review'
 
 
-@_serialize_dataset_ingest
-def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='auto',
-                     allow_crop=None):
-    """Apply the crop/inpaint/review routing to every image marked 'detected'. Returns
-    ({'cropped', 'inpainted', 'inpainted_klein', 'needs_review', 'failed', 'skipped'},
-    error|None) -- same tuple contract as score_dataset_faces: `error` is None unless an
-    inpaint that was ATTEMPTED failed (never a silent swallow). Crop stays in PIL.
-
-    `allow_crop` gates the border-crop route (see _route_watermark). None (the default)
-    resolves the persisted `watermark.allow_crop` preference, so a plain call and the
-    batch Clean button both honour Settings; the review lightbox passes an explicit
-    True/False to force crop or inpaint for ONE image. When False, a border mark is
-    repainted (LaMa/Klein per `method`) instead of cropped -- nothing else changes.
-
-    `method` selects the inpaint engine (the batch UI's LaMa|Klein toggle):
-      - 'auto'/'lama' → LaMa (fast, non-generative) for small off-center marks; on-subject
-        marks stay 'review'. Uses the resolved CPU/GPU `device`; GPU mode is protected by
-        the route's exclusive window.
-      - 'klein' → masked Flux.2 Klein inpaint + pixel-space composite for the off-center
-        AND the on-subject marks (making 'review' actionable). Each image is one serialized
-        ComfyUI round-trip; `device` is irrelevant (ComfyUI owns the GPU).
-
-    LaMa absent (probe False) is NOT an error: LaMa-routed images are counted as
-    `skipped` (crop still runs) so the UI can nudge "install the ML extras". Klein absent
-    is likewise `skipped`.
-
-    image_ids (optional): restrict the pass to this subset -- the review lightbox cleans
-    ONE image at a time. The filter still requires watermark_state='detected' AND
-    dataset ownership, so a stale/foreign id is a no-op (never touches another dataset,
-    never re-edits an already-cleaned image). None = every detected image (bulk button)."""
-    from . import watermark_lama, watermark_klein
-    ds = get_dataset(user_id, dataset_id)
-    if not ds:
-        raise ValueError('dataset not found')
-    # None = "no explicit choice" -> fall back to the persisted preference (default
-    # True), so the batch button follows Settings; the lightbox passes a real bool.
-    if allow_crop is None:
-        allow_crop = bool(cfg.get('watermark.allow_crop'))
-    q = (FaceDatasetImage.query
-         .filter_by(dataset_id=dataset_id, watermark_state='detected')
-         .filter(FaceDatasetImage.filename.isnot(None)))
-    if image_ids is not None:
-        ids = [int(i) for i in (image_ids or [])
-               if isinstance(i, (int, float, str)) and str(i).lstrip('-').isdigit()]
-        q = q.filter(FaceDatasetImage.id.in_(ids or [-1]))   # empty subset -> match nothing
-    rows = q.all()
-    row_ids = [img.id for img in rows]
-    out = {'cropped': 0, 'inpainted': 0, 'inpainted_klein': 0, 'needs_review': 0,
-           'failed': 0, 'skipped': 0}
+def _wm_route_images(user_id, row_ids, token, method, allow_crop, lama_ok,
+                     klein_ok, klein_model, out):
+    """The per-image watermark routing pass, moved verbatim (2026-08-23)
+    together with its two closures — they rebind ``error`` via nonlocal,
+    so every writer of that cell lives in this one scope. Manual regions
+    route to Klein or LaMa staging; a detected bbox routes through
+    _route_watermark to crop, inpaint or review. Returns
+    (lama_pending, error, vanished) — the staged LaMa work, the last
+    attempted-and-failed error, and the rows deleted mid-pass."""
+    from . import watermark_klein
     # NOT a key in `out`: that dict is the route's response shape and existing
     # tests pin it. 'skipped' already means "engine unavailable" and must not be
     # overloaded with "the image no longer exists". Logged at the end instead.
     vanished = 0
     error = None
-    lama_ok = watermark_lama.is_available()
-    klein_ok = method == 'klein' and watermark_klein.is_available()
-    # The Klein model this DATASET runs on — the same pick ✨ improve and Klein
-    # generation use. A watermark clean overwrites the image in place, so running
-    # it on a model the dataset did not choose is the one lane where the swap
-    # cannot be spotted afterwards by comparing to a source.
-    klein_model = dataset_klein_model(ds)
-    if klein_ok and klein_model:
-        # Refuse the WHOLE pass by name, before a single file is touched: every
-        # image would fail identically, and a half-cleaned dataset is worse than
-        # an untouched one. None (never chose) skips this — nothing was promised.
-        from . import klein_edit_helper as keh
-        if not keh.klein_model_on_disk(klein_model):
-            raise keh.KleinModelGone(klein_model)
     # (image_id, live_path, staged_path, bboxes, manual_regions). An ID, not an
     # ORM row: this list is carried across the whole per-image loop AND across
     # the LaMa batch, which runs for minutes -- by the time the tail loop writes,
@@ -9250,6 +9318,269 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
                     error = err
         finally:
             _discard_staged_watermark_edit(staged)
+
+    for i, image_id in enumerate(row_ids):
+        dataset_activity.progress(token, done=i + 1)
+        img = _live_image_row(image_id)
+        if img is None:      # deleted while the pass ran
+            vanished += 1
+            continue
+        path = _img_path(img)
+        if img.watermark_regions is not None:
+            try:
+                regions = normalize_watermark_regions(
+                    _safe_json(img.watermark_regions), allow_null=False,
+                )
+            except ValueError as e:
+                out['failed'] += 1
+                error = {'kind': 'failed',
+                         'detail': f'invalid watermark regions: {e}'}
+                db.session.commit()
+                continue
+            if not regions:
+                out['needs_review'] += 1
+                db.session.commit()
+                continue
+            if not os.path.exists(path):
+                out['failed'] += 1
+                db.session.commit()
+                continue
+            if method == 'klein':
+                _run_klein(img, path, regions, True)
+                db.session.commit()
+                continue
+            if not lama_ok:
+                out['skipped'] += 1
+                db.session.commit()
+                continue
+            staged = _stage_oriented_watermark_edit(path)
+            if not staged:
+                out['failed'] += 1
+                error = {'kind': 'failed',
+                         'detail': 'could not stage image EXIF orientation'}
+                db.session.commit()
+                continue
+            if not _preserve_original(path):
+                _backup_failed(img, staged)
+                db.session.commit()
+                continue
+            lama_pending.append((img.id, path, staged, regions, True))
+            continue
+        bbox = _safe_json(img.watermark_bbox)
+        if not (isinstance(bbox, list) and len(bbox) == 4):
+            # Flagged, position unknown. The detector cascade produces this
+            # legitimately (its locator found nothing) and promotion carries
+            # it in from a bank; stamping 'failed' would DESTROY a correct
+            # flag over a missing coordinate. It goes to manual review, where
+            # a zone can be drawn — the same answer the bank gives.
+            out['needs_review'] += 1
+            db.session.commit()
+            continue
+        if not os.path.exists(path):
+            img.watermark_state = 'failed'
+            out['failed'] += 1
+            db.session.commit()
+            continue
+        try:
+            with Image.open(path) as im:
+                # Stored detection boxes are in the browser/VLM's upright
+                # coordinate space, never the raw camera raster. This branch
+                # may route to review/no-op, so keep it header-only until an
+                # actual crop/staging edit needs the pixels.
+                W, H = image_encoding.visual_size_from_header(im)
+        except (OSError, ValueError):
+            img.watermark_state = 'failed'
+            out['failed'] += 1
+            db.session.commit()
+            continue
+        route, box = _route_watermark(tuple(bbox), W, H, allow_crop=allow_crop)
+        if route == 'crop':
+            if not _preserve_original(path):
+                _backup_failed(img)
+            elif _apply_watermark_crop(path, box):
+                # NOTE dHash: the perceptual hash used for import-dedupe is recomputed
+                # ON THE FLY from the file (_existing_dhashes / _dhash), NOT stored in a
+                # column -- there is no stored dHash to leave untouched. So after a crop
+                # the dedupe compares against the CLEANED pixels; re-importing the same
+                # watermarked visual is NOT guaranteed to dedupe against it (a border
+                # crop shifts the whole hash). Preserving the original-dHash behaviour the
+                # spec asks for would need a new stored column -> deferred (out of V1 scope).
+                img.watermark_state = 'cleaned'
+                out['cropped'] += 1
+            else:
+                img.watermark_state = 'failed'
+                out['failed'] += 1
+        else:
+            engine = _clean_inpaint_engine(route, method)
+            if engine == 'klein':
+                _run_klein(img, path, [bbox], False)
+            elif engine == 'lama':
+                if not lama_ok:
+                    out['skipped'] += 1      # leave state='detected' (crop-only mode)
+                else:
+                    staged = _stage_oriented_watermark_edit(path)
+                    if staged:
+                        if _preserve_original(path):
+                            lama_pending.append((img.id, path, staged, [bbox], False))
+                        else:
+                            _backup_failed(img, staged)
+                    else:
+                        img.watermark_state = 'failed'
+                        out['failed'] += 1
+                        error = {'kind': 'failed',
+                                 'detail': 'could not stage image EXIF orientation'}
+            else:  # 'review' -> stays 'detected' so the badge/count keep flagging it
+                out['needs_review'] += 1
+        db.session.commit()
+    return lama_pending, error, vanished
+
+
+def _wm_lama_tail(dataset_id, lama_pending, device, out, error, vanished):
+    """The LaMa batch tail, moved verbatim: one call for a single staged
+    image (manual regions vs single bbox), one batch otherwise; every
+    result is promoted onto a re-fetched LIVE row (the pass runs for
+    minutes and rows get deleted under it), an engine fault marks the
+    non-manual rows failed, and the finally sweep discards every staged
+    disposable copy. Returns the updated (error, vanished)."""
+    from . import watermark_lama
+    if lama_pending:
+        try:
+            if len(lama_pending) == 1:
+                _pid, live_path, staged_path, boxes, manual = lama_pending[0]
+                if manual:
+                    ok, err = watermark_lama.inpaint_watermarks(
+                        staged_path, boxes,
+                        **({'device': device} if device != 'cpu' else {}))
+                else:
+                    ok, err = watermark_lama.inpaint_watermark(
+                        staged_path, boxes[0],
+                        **({'device': device} if device != 'cpu' else {}))
+                results = {staged_path: (ok, err)}
+            else:
+                results = watermark_lama.inpaint_batch(
+                    [{'image_path': staged_path, 'bboxes': boxes}
+                     for _pid, _live_path, staged_path, boxes, _manual in lama_pending],
+                    device=device,
+                )
+            for pending_id, live_path, staged_path, _boxes, manual in lama_pending:
+                img = _live_image_row(pending_id)
+                if img is None:
+                    # Deleted while the batch ran: there is no row left to
+                    # point at the repainted file, so drop the staged edit
+                    # rather than promote it over a master nobody owns.
+                    _discard_staged_watermark_edit(staged_path)
+                    vanished += 1
+                    continue
+                ok, err = results.get(
+                    staged_path,
+                    (False, {'kind': 'failed', 'detail': 'missing inpaint result'}),
+                )
+                if ok and _promote_staged_watermark_edit(staged_path, live_path):
+                    # Kept, for the reason spelled out in the Klein lane above.
+                    img.watermark_state = 'cleaned'
+                    out['inpainted'] += 1
+                elif ok:
+                    if not manual:
+                        img.watermark_state = 'failed'
+                    out['failed'] += 1
+                    error = {'kind': 'failed',
+                             'detail': 'could not promote staged watermark edit'}
+                elif err and err.get('kind') == 'unavailable':
+                    out['skipped'] += 1
+                else:
+                    # Manual correction regions are user-authored retry metadata. Keep
+                    # the image detected when LaMa fails so Clean can be retried.
+                    if not manual:
+                        img.watermark_state = 'failed'
+                    out['failed'] += 1
+                    if err:
+                        error = err
+                db.session.commit()
+        except Exception as exc:  # engine/process faults must not leak a staged edit
+            logger.exception('watermark: LaMa execution failed for dataset %s', dataset_id)
+            error = {'kind': 'failed', 'detail': f'watermark inpaint failed: {exc}'}
+            for pending_id, _live_path, _staged_path, _boxes, manual in lama_pending:
+                img = _live_image_row(pending_id)
+                if img is None:
+                    vanished += 1
+                    continue
+                if not manual:
+                    img.watermark_state = 'failed'
+                out['failed'] += 1
+                db.session.commit()
+        finally:
+            # The engine can crash before returning a result; in that case its
+            # disposable EXIF-oriented copy still has to disappear, while the
+            # master remains exactly where it was.
+            for _pid, _live_path, staged_path, _boxes, _manual in lama_pending:
+                _discard_staged_watermark_edit(staged_path)
+    return error, vanished
+
+
+@_serialize_dataset_ingest
+def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='auto',
+                     allow_crop=None):
+    """Apply the crop/inpaint/review routing to every image marked 'detected'. Returns
+    ({'cropped', 'inpainted', 'inpainted_klein', 'needs_review', 'failed', 'skipped'},
+    error|None) -- same tuple contract as score_dataset_faces: `error` is None unless an
+    inpaint that was ATTEMPTED failed (never a silent swallow). Crop stays in PIL.
+
+    `allow_crop` gates the border-crop route (see _route_watermark). None (the default)
+    resolves the persisted `watermark.allow_crop` preference, so a plain call and the
+    batch Clean button both honour Settings; the review lightbox passes an explicit
+    True/False to force crop or inpaint for ONE image. When False, a border mark is
+    repainted (LaMa/Klein per `method`) instead of cropped -- nothing else changes.
+
+    `method` selects the inpaint engine (the batch UI's LaMa|Klein toggle):
+      - 'auto'/'lama' → LaMa (fast, non-generative) for small off-center marks; on-subject
+        marks stay 'review'. Uses the resolved CPU/GPU `device`; GPU mode is protected by
+        the route's exclusive window.
+      - 'klein' → masked Flux.2 Klein inpaint + pixel-space composite for the off-center
+        AND the on-subject marks (making 'review' actionable). Each image is one serialized
+        ComfyUI round-trip; `device` is irrelevant (ComfyUI owns the GPU).
+
+    LaMa absent (probe False) is NOT an error: LaMa-routed images are counted as
+    `skipped` (crop still runs) so the UI can nudge "install the ML extras". Klein absent
+    is likewise `skipped`.
+
+    image_ids (optional): restrict the pass to this subset -- the review lightbox cleans
+    ONE image at a time. The filter still requires watermark_state='detected' AND
+    dataset ownership, so a stale/foreign id is a no-op (never touches another dataset,
+    never re-edits an already-cleaned image). None = every detected image (bulk button)."""
+    from . import watermark_lama, watermark_klein
+    ds = get_dataset(user_id, dataset_id)
+    if not ds:
+        raise ValueError('dataset not found')
+    # None = "no explicit choice" -> fall back to the persisted preference (default
+    # True), so the batch button follows Settings; the lightbox passes a real bool.
+    if allow_crop is None:
+        allow_crop = bool(cfg.get('watermark.allow_crop'))
+    q = (FaceDatasetImage.query
+         .filter_by(dataset_id=dataset_id, watermark_state='detected')
+         .filter(FaceDatasetImage.filename.isnot(None)))
+    if image_ids is not None:
+        ids = [int(i) for i in (image_ids or [])
+               if isinstance(i, (int, float, str)) and str(i).lstrip('-').isdigit()]
+        q = q.filter(FaceDatasetImage.id.in_(ids or [-1]))   # empty subset -> match nothing
+    rows = q.all()
+    row_ids = [img.id for img in rows]
+    out = {'cropped': 0, 'inpainted': 0, 'inpainted_klein': 0, 'needs_review': 0,
+           'failed': 0, 'skipped': 0}
+    lama_ok = watermark_lama.is_available()
+    klein_ok = method == 'klein' and watermark_klein.is_available()
+    # The Klein model this DATASET runs on — the same pick ✨ improve and Klein
+    # generation use. A watermark clean overwrites the image in place, so running
+    # it on a model the dataset did not choose is the one lane where the swap
+    # cannot be spotted afterwards by comparing to a source.
+    klein_model = dataset_klein_model(ds)
+    if klein_ok and klein_model:
+        # Refuse the WHOLE pass by name, before a single file is touched: every
+        # image would fail identically, and a half-cleaned dataset is worse than
+        # an untouched one. None (never chose) skips this — nothing was promised.
+        from . import klein_edit_helper as keh
+        if not keh.klein_model_on_disk(klein_model):
+            raise keh.KleinModelGone(klein_model)
+
     # Persistent progress indicator (survives a page reload). The device is included
     # so the UI can honestly state whether ComfyUI is paused for the GPU pass.
     device_label = 'GPU' if device == 'cuda' else 'CPU'
@@ -9257,190 +9588,11 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
         dataset_id, 'watermark_clean', total=len(rows),
         detail=f'Cleaning watermarks on {device_label}…')
     try:
-        for i, image_id in enumerate(row_ids):
-            dataset_activity.progress(token, done=i + 1)
-            img = _live_image_row(image_id)
-            if img is None:      # deleted while the pass ran
-                vanished += 1
-                continue
-            path = _img_path(img)
-            if img.watermark_regions is not None:
-                try:
-                    regions = normalize_watermark_regions(
-                        _safe_json(img.watermark_regions), allow_null=False,
-                    )
-                except ValueError as e:
-                    out['failed'] += 1
-                    error = {'kind': 'failed',
-                             'detail': f'invalid watermark regions: {e}'}
-                    db.session.commit()
-                    continue
-                if not regions:
-                    out['needs_review'] += 1
-                    db.session.commit()
-                    continue
-                if not os.path.exists(path):
-                    out['failed'] += 1
-                    db.session.commit()
-                    continue
-                if method == 'klein':
-                    _run_klein(img, path, regions, True)
-                    db.session.commit()
-                    continue
-                if not lama_ok:
-                    out['skipped'] += 1
-                    db.session.commit()
-                    continue
-                staged = _stage_oriented_watermark_edit(path)
-                if not staged:
-                    out['failed'] += 1
-                    error = {'kind': 'failed',
-                             'detail': 'could not stage image EXIF orientation'}
-                    db.session.commit()
-                    continue
-                if not _preserve_original(path):
-                    _backup_failed(img, staged)
-                    db.session.commit()
-                    continue
-                lama_pending.append((img.id, path, staged, regions, True))
-                continue
-            bbox = _safe_json(img.watermark_bbox)
-            if not (isinstance(bbox, list) and len(bbox) == 4):
-                # Flagged, position unknown. The detector cascade produces this
-                # legitimately (its locator found nothing) and promotion carries
-                # it in from a bank; stamping 'failed' would DESTROY a correct
-                # flag over a missing coordinate. It goes to manual review, where
-                # a zone can be drawn — the same answer the bank gives.
-                out['needs_review'] += 1
-                db.session.commit()
-                continue
-            if not os.path.exists(path):
-                img.watermark_state = 'failed'
-                out['failed'] += 1
-                db.session.commit()
-                continue
-            try:
-                with Image.open(path) as im:
-                    # Stored detection boxes are in the browser/VLM's upright
-                    # coordinate space, never the raw camera raster. This branch
-                    # may route to review/no-op, so keep it header-only until an
-                    # actual crop/staging edit needs the pixels.
-                    W, H = image_encoding.visual_size_from_header(im)
-            except (OSError, ValueError):
-                img.watermark_state = 'failed'
-                out['failed'] += 1
-                db.session.commit()
-                continue
-            route, box = _route_watermark(tuple(bbox), W, H, allow_crop=allow_crop)
-            if route == 'crop':
-                if not _preserve_original(path):
-                    _backup_failed(img)
-                elif _apply_watermark_crop(path, box):
-                    # NOTE dHash: the perceptual hash used for import-dedupe is recomputed
-                    # ON THE FLY from the file (_existing_dhashes / _dhash), NOT stored in a
-                    # column -- there is no stored dHash to leave untouched. So after a crop
-                    # the dedupe compares against the CLEANED pixels; re-importing the same
-                    # watermarked visual is NOT guaranteed to dedupe against it (a border
-                    # crop shifts the whole hash). Preserving the original-dHash behaviour the
-                    # spec asks for would need a new stored column -> deferred (out of V1 scope).
-                    img.watermark_state = 'cleaned'
-                    out['cropped'] += 1
-                else:
-                    img.watermark_state = 'failed'
-                    out['failed'] += 1
-            else:
-                engine = _clean_inpaint_engine(route, method)
-                if engine == 'klein':
-                    _run_klein(img, path, [bbox], False)
-                elif engine == 'lama':
-                    if not lama_ok:
-                        out['skipped'] += 1      # leave state='detected' (crop-only mode)
-                    else:
-                        staged = _stage_oriented_watermark_edit(path)
-                        if staged:
-                            if _preserve_original(path):
-                                lama_pending.append((img.id, path, staged, [bbox], False))
-                            else:
-                                _backup_failed(img, staged)
-                        else:
-                            img.watermark_state = 'failed'
-                            out['failed'] += 1
-                            error = {'kind': 'failed',
-                                     'detail': 'could not stage image EXIF orientation'}
-                else:  # 'review' -> stays 'detected' so the badge/count keep flagging it
-                    out['needs_review'] += 1
-            db.session.commit()
-        if lama_pending:
-            try:
-                if len(lama_pending) == 1:
-                    _pid, live_path, staged_path, boxes, manual = lama_pending[0]
-                    if manual:
-                        ok, err = watermark_lama.inpaint_watermarks(
-                            staged_path, boxes,
-                            **({'device': device} if device != 'cpu' else {}))
-                    else:
-                        ok, err = watermark_lama.inpaint_watermark(
-                            staged_path, boxes[0],
-                            **({'device': device} if device != 'cpu' else {}))
-                    results = {staged_path: (ok, err)}
-                else:
-                    results = watermark_lama.inpaint_batch(
-                        [{'image_path': staged_path, 'bboxes': boxes}
-                         for _pid, _live_path, staged_path, boxes, _manual in lama_pending],
-                        device=device,
-                    )
-                for pending_id, live_path, staged_path, _boxes, manual in lama_pending:
-                    img = _live_image_row(pending_id)
-                    if img is None:
-                        # Deleted while the batch ran: there is no row left to
-                        # point at the repainted file, so drop the staged edit
-                        # rather than promote it over a master nobody owns.
-                        _discard_staged_watermark_edit(staged_path)
-                        vanished += 1
-                        continue
-                    ok, err = results.get(
-                        staged_path,
-                        (False, {'kind': 'failed', 'detail': 'missing inpaint result'}),
-                    )
-                    if ok and _promote_staged_watermark_edit(staged_path, live_path):
-                        # Kept, for the reason spelled out in the Klein lane above.
-                        img.watermark_state = 'cleaned'
-                        out['inpainted'] += 1
-                    elif ok:
-                        if not manual:
-                            img.watermark_state = 'failed'
-                        out['failed'] += 1
-                        error = {'kind': 'failed',
-                                 'detail': 'could not promote staged watermark edit'}
-                    elif err and err.get('kind') == 'unavailable':
-                        out['skipped'] += 1
-                    else:
-                        # Manual correction regions are user-authored retry metadata. Keep
-                        # the image detected when LaMa fails so Clean can be retried.
-                        if not manual:
-                            img.watermark_state = 'failed'
-                        out['failed'] += 1
-                        if err:
-                            error = err
-                    db.session.commit()
-            except Exception as exc:  # engine/process faults must not leak a staged edit
-                logger.exception('watermark: LaMa execution failed for dataset %s', dataset_id)
-                error = {'kind': 'failed', 'detail': f'watermark inpaint failed: {exc}'}
-                for pending_id, _live_path, _staged_path, _boxes, manual in lama_pending:
-                    img = _live_image_row(pending_id)
-                    if img is None:
-                        vanished += 1
-                        continue
-                    if not manual:
-                        img.watermark_state = 'failed'
-                    out['failed'] += 1
-                    db.session.commit()
-            finally:
-                # The engine can crash before returning a result; in that case its
-                # disposable EXIF-oriented copy still has to disappear, while the
-                # master remains exactly where it was.
-                for _pid, _live_path, staged_path, _boxes, _manual in lama_pending:
-                    _discard_staged_watermark_edit(staged_path)
+        lama_pending, error, vanished = _wm_route_images(
+            user_id, row_ids, token, method, allow_crop, lama_ok,
+            klein_ok, klein_model, out)
+        error, vanished = _wm_lama_tail(
+            dataset_id, lama_pending, device, out, error, vanished)
         if vanished:
             logger.info('watermark clean: %s image(s) were deleted while the pass '
                         'ran, skipped', vanished)
@@ -10718,47 +10870,13 @@ def _drain_improve_queue(user_id, dataset_id, image_ids, token, sleep=time.sleep
             'remaining': total - queued - failed}
 
 
-def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=None,
-                     engine=None, klein_model=None, generation_lora_preset=None):
-    """Re-enqueue a single generated variation IN PLACE (same row id): cancel any
-    in-flight job, drop the old file, reset the row to pending with the new
-    job_id. Returns the new job_id, or None if the image is not owned / not a
-    generated variation. Raises ValueError if the dataset has no reference or
-    the variation prompt can't be recovered.
-
-    `prompt` (optional) is the user-EDITED core creative prompt from the tile's
-    ✏ bubble. When given it REPLACES and is PERSISTED into `variation_prompt`
-    (so a later plain regenerate / reject-regenerate reuses the edit), then feeds
-    the identity-guard wrapper like any catalog prompt — the face lock is still
-    applied on top, the user only steers the creative half. Empty/None = the
-    current behaviour (recover the prompt from the row or the label).
-
-    `engine` (optional, one of ``KNOWN_ENGINES``) is an EXPLICIT caller
-    override. The ordinary workspace Retry omits it, so it reuses the engine
-    recorded on the row (see the origin resolution below); callers that
-    deliberately pass one can still move a tile to another lane. No NSFW
-    clamp is needed — every engine on this fork is local, and local engines
-    are exactly the ones allowed to receive NSFW shots.
-    `klein_model` (optional) is the workspace's Klein model pick, used when a
-    legacy row born on a removed API engine regenerates via Klein (its
-    klein_model column holds an old engine TAG, not a real model file).
-    `generation_lora_preset` (optional): NAME of the generation-LoRA preset
-    picked in the workspace (Idea by @waltm). Both local engines resolve it —
-    Klein and Krea each from their OWN config list (`klein.generation_lora_presets`
-    / `krea.generation_lora_presets`), so the same name can mean two different
-    chains depending on which engine `target` resolves to below — resolved from
-    the CONFIG only (fail-closed; unknown name degrades to no extra LoRAs)."""
-    img = _owned_image(user_id, image_id)
-    if not img or img.source != 'generated':
-        return None
-    _guard_not_bank_export(img.dataset_id)
-    if img.derivation_kind == KLEIN_SMALL_IMAGE:
-        raise ValueError('small-image rescue candidates cannot be regenerated; re-import the source')
-    if img.derivation_kind == KLEIN_IMAGE_IMPROVE:
-        raise ValueError('upscale & improve candidates cannot be regenerated from the dataset reference')
-    ds = db.session.get(FaceDataset, img.dataset_id)
-    if not ds.ref_filename:
-        raise ValueError('reference image required')
+def _rgn_resolve_target(img, prompt, engine):
+    """The prompt recovery and engine election, moved verbatim
+    (2026-08-23): the user's edited prompt (persisted), else the row's,
+    else the label's; then the requested engine over the row's origin,
+    with the fail-closed NSFW clamp applied BOTH before and after the
+    disabled-engines fallback. Returns (edited, stored_prompt, prompt,
+    target)."""
     edited = (prompt or '').strip()
     stored_prompt = edited[:500] if edited else img.variation_prompt
     prompt = stored_prompt or prompt_by_label(img.variation_label or '')
@@ -10785,10 +10903,26 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
     if enabled and target not in enabled:
         default = cfg.get('engines.default')
         target = default if default in enabled else enabled[0]
+    return edited, stored_prompt, prompt, target
+
+
+def _rgn_prepare_target(user_id, img, ds, target, engine, klein_model,
+                        generation_lora_preset, prompt, lora_strength):
+    """Every fallible target-specific preflight, moved verbatim, BEFORE the
+    row or its file changes: the exact previous row state (for the Trash
+    failure path), then per engine — API reference checks, or the Krea /
+    Klein enqueue (either raises here and the tile keeps its image).
+    Returns (old_state, old_path, new_job_id, model, engine).
+
+    DIVERGENCE 1: upstream's tuple also carries (api_generate, aspect,
+    ref_bytes) -- the three values its API branch produces. This fork has no
+    API branch, so nothing ever assigned them and returning them was a
+    NameError on every regenerate; they are dropped from the contract rather
+    than defaulted to None, which would have kept a shape promising a lane
+    that does not exist."""
     # Complete every fallible target-specific preflight before changing either
     # the row or its current file. Klein enqueue is itself part of preparation:
     # if the later DB transition fails, that exact new job is cancelled below.
-    from ..job_queue import queue_manager
     old_state = {
         field: getattr(img, field) for field in (
             'filename', 'caption', 'status', 'fail_reason', 'job_id',
@@ -10868,7 +11002,17 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
             base_lora_strength=_generation_base_lora_strength(),
             extra_metadata={'is_dataset': True, 'dataset_id': img.dataset_id,
                             'variation_label': img.variation_label})
+    return old_state, old_path, new_job_id, model, engine
 
+
+def _rgn_swap_row(user_id, img, edited, stored_prompt, target, engine,
+                  model, new_job_id, old_state):
+    """The in-place row transition, moved verbatim: cancel the old
+    unstarted job inside the same transaction, clear every per-image
+    verdict with the file, stamp the new engine identity and job — and on
+    ANY failure roll back and cancel the prepared replacement job so
+    nothing runs unlinked."""
+    from ..job_queue import queue_manager
     # Persist the replacement state first. The old file remains in place until
     # this commit succeeds, eliminating rows that reference an already-moved file.
     try:
@@ -10910,6 +11054,14 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
                                  new_job_id)
         raise
 
+
+def _rgn_trash_old(user_id, img, image_id, old_path, old_state,
+                   new_job_id):
+    """The old file's disposal, moved verbatim: Trash it now that no row
+    references it; if Trash itself fails, cancel the replacement job and
+    put the exact previous row state back in one restoration
+    transaction."""
+    from ..job_queue import queue_manager
     # The DB no longer references the old filename. If Trash itself fails, put
     # the exact previous row state back and cancel the prepared Klein job.
     try:
@@ -10932,6 +11084,75 @@ def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=Non
             logger.exception('regenerate: failed to restore row %s after Trash error',
                              image_id)
         raise
+
+# DIVERGENCE 1 -- upstream defines _rgn_run_api here, the cloud API execution
+# lane extracted from regenerate_image. Removed end to end on this fork, and the
+# batch worker it calls does not exist. The engines are not named: the local-only
+# contract budgets cloud identifiers per file and counts comments too.
+
+
+def regenerate_image(user_id, image_id, lora_strength=None, prompt=None, app=None,
+                     engine=None, klein_model=None, generation_lora_preset=None):
+    """Re-enqueue a single generated variation IN PLACE (same row id): cancel any
+    in-flight job, drop the old file, reset the row to pending with the new
+    job_id. Returns the new job_id, or None if the image is not owned / not a
+    generated variation. Raises ValueError if the dataset has no reference or
+    the variation prompt can't be recovered.
+
+    `prompt` (optional) is the user-EDITED core creative prompt from the tile's
+    ✏ bubble. When given it REPLACES and is PERSISTED into `variation_prompt`
+    (so a later plain regenerate / reject-regenerate reuses the edit), then feeds
+    the identity-guard wrapper like any catalog prompt — the face lock is still
+    applied on top, the user only steers the creative half. Empty/None = the
+    current behaviour (recover the prompt from the row or the label).
+
+    `engine` (optional, one of ``KNOWN_ENGINES``) is an EXPLICIT caller
+    override. The ordinary workspace Retry omits it, so it reuses the engine
+    recorded on the row (see the origin resolution below); callers that
+    deliberately pass one can still move a tile to another lane. No NSFW
+    clamp is needed — every engine on this fork is local, and local engines
+    are exactly the ones allowed to receive NSFW shots.
+    `klein_model` (optional) is the workspace's Klein model pick, used when a
+    legacy row born on a removed API engine regenerates via Klein (its
+    klein_model column holds an old engine TAG, not a real model file).
+    `generation_lora_preset` (optional): NAME of the generation-LoRA preset
+    picked in the workspace (Idea by @waltm). Both local engines resolve it —
+    Klein and Krea each from their OWN config list (`klein.generation_lora_presets`
+    / `krea.generation_lora_presets`), so the same name can mean two different
+    chains depending on which engine `target` resolves to below — resolved from
+    the CONFIG only (fail-closed; unknown name degrades to no extra LoRAs)."""
+    img = _owned_image(user_id, image_id)
+    if not img or img.source != 'generated':
+        return None
+    _guard_not_bank_export(img.dataset_id)
+    if img.derivation_kind == KLEIN_SMALL_IMAGE:
+        raise ValueError('small-image rescue candidates cannot be regenerated; re-import the source')
+    if img.derivation_kind == KLEIN_IMAGE_IMPROVE:
+        raise ValueError('upscale & improve candidates cannot be regenerated from the dataset reference')
+    ds = db.session.get(FaceDataset, img.dataset_id)
+    if not ds.ref_filename:
+        raise ValueError('reference image required')
+    edited, stored_prompt, prompt, target = _rgn_resolve_target(
+        img, prompt, engine)
+    # Complete every fallible target-specific preflight before changing either
+    # the row or its current file. Klein enqueue is itself part of preparation:
+    # if the later DB transition fails, that exact new job is cancelled below.
+    (old_state, old_path, new_job_id, model, engine) = _rgn_prepare_target(
+        user_id, img, ds, target, engine, klein_model,
+        generation_lora_preset, prompt, lora_strength)
+
+    _rgn_swap_row(user_id, img, edited, stored_prompt, target, engine,
+                  model, new_job_id, old_state)
+
+    _rgn_trash_old(user_id, img, image_id, old_path, old_state,
+                   new_job_id)
+
+    # DIVERGENCE 1 -- upstream dispatches here to _rgn_run_api for a cloud API
+    # target. API_ENGINES is empty on this fork, so the branch could never be
+    # taken; it is deleted rather than left dead, because it names two functions
+    # nothing here defines (a dead reference to a deleted concept is the trap
+    # pre-detonation). Engine ids omitted on purpose -- see LEGACY_API_ENGINE_TAGS
+    # below, which is where this fork spends its per-file cloud-identifier budget.
 
     # Advertise the in-flight Klein job so a single regenerate takes the same lock
     # as a batch; link_completed_dataset_image clears it on completion.

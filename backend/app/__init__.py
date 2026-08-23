@@ -793,6 +793,13 @@ def create_app(config_object=None):
     from .netguard import install_network_guard
     install_network_guard(app)
 
+    # AFTER the network guard, deliberately: before_request hooks run in
+    # registration order, so an extension's hook can never answer a request the
+    # token gate would have refused. Extensions are trusted local code either
+    # way — this only keeps a public bind's front door in front.
+    from .extension_loader import load_extensions
+    load_extensions(app, csrf)
+
     # Registered last of the write-path guards, so a caller still has to clear CSRF
     # and the access token before we tell them anything about their own body.
     from .routes._common import reject_unparsable_json_body
