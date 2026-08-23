@@ -108,13 +108,33 @@ export const MAX_BODY_CHARS = 125000;
 const BODY_BUDGET = 121000;
 
 /**
+ * A screenshot's absolute URL, pinned to the TAG being released.
+ *
+ * Two things a relative path cannot do. A release body is rendered on a page
+ * that has no repository root, so `docs/screenshots/x.png` resolves to nothing
+ * and shows a broken image. And pinning to `main` would mean the picture in a
+ * six-month-old release silently becomes the CURRENT screen — a note claiming
+ * to show what shipped, showing something else. The tag ref is immutable, so
+ * the image stays the one that was true when it was written.
+ */
+export function screenshotUrl(tag, relPath) {
+  const clean = String(relPath).replace(/^\/+/, '');
+  return `${REPO_URL}/raw/${encodeURIComponent(tag)}/${clean.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+/**
  * The release body. `to:` targets are dropped on purpose: they are in-app router
  * paths ('/settings/engines'), which mean nothing on a GitHub page and would
- * render as dead links.
+ * render as dead links. `image:` is the opposite case — it exists precisely to
+ * be seen here, and is rendered AFTER the prose: the text explains what changed,
+ * the picture shows it.
  *
  * Entries are dropped from the END if the body would exceed what GitHub accepts,
  * and the body SAYS how many were dropped. Silently publishing a shorter list
- * would be worse than the 422: a release that looks complete and is not.
+ * would be worse than the 422: a release that looks complete and is not. A
+ * screenshot is measured as PART of its entry, never after it: an image line is
+ * ~120 characters of absolute URL, and a block admitted on its prose alone would
+ * put the body back over the ceiling the trim exists to keep it under.
  */
 export function renderNotes({ preamble = '', tag, previousTag, entries, budget = BODY_BUDGET }) {
   const out = [];
@@ -125,11 +145,17 @@ export function renderNotes({ preamble = '', tag, previousTag, entries, budget =
   const included = [];
   let dropped = 0;
   for (const e of entries) {
-    const block = `### ${e.title}\n\n${String(e.blurb).trim()}\n`;
+    // The alt text is the entry's own title: a reader on a screen reader, or on
+    // a connection that never loads it, still learns what the picture was meant
+    // to show. Built BEFORE the budget test so its length is counted — see the
+    // docstring: an image admitted on its entry's prose alone reopens the 422.
+    const shot = e.image ? `![${e.title}](${screenshotUrl(tag, e.image)})` : null;
+    const block = `### ${e.title}\n\n${String(e.blurb).trim()}\n${shot ? `${shot}\n` : ''}`;
     if (used + block.length > budget) { dropped += 1; continue; }
     used += block.length;
     included.push(e);
     out.push(`### ${e.title}`, '', String(e.blurb).trim(), '');
+    if (shot) out.push(shot, '');
   }
 
   if (dropped) {

@@ -78,7 +78,10 @@ function BankTitle({ bank, onOpen, onRename }) {
   }
   return (
     <>
-      <button type="button" onClick={onOpen}
+      {/* The responsive probe primes the Bank workspace by clicking the first
+          card's opener ([aria-label^="Open the bank"]). Rename this label and
+          the probe measures an empty list and reports it clean. */}
+      <button type="button" onClick={onOpen} aria-label={`Open the bank ${bank.name}`}
         className="min-w-0 truncate text-left text-base font-semibold text-content hover:underline">
         {bank.name}
       </button>
@@ -799,6 +802,11 @@ export default function BankPage() {
             <li key={row.key}
               className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-4">
               <div className="flex min-w-0 items-center gap-2">
+                {/* Upstream's opener is a bare <button> here; this fork wraps it
+                    in BankTitle, which adds the ✎ inline rename. The probe's
+                    `prime` selector — [aria-label^="Open the bank"] — travels
+                    with the button INTO that component, so the label is on
+                    BankTitle's open button rather than on this line. */}
                 <BankTitle bank={b} onOpen={() => open(b.id)}
                   onRename={(newName) => rename(b, newName)} />
                 {b.activity && !b.activity.finished && (

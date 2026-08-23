@@ -476,7 +476,12 @@ page: they are the step you run once per bank and then leave alone for days, and
 they were taking up the third of the screen the images now use. All eight are
 still there, and each still opens its own window with its own scope and counts —
 only the door changed. On a bank with nothing scanned yet the panel opens by
-itself, because there is nothing else to do first.
+itself, because there is nothing else to do first — **on a desktop-width window
+only**. Measured at 360 px it is about 1 500 px tall, so opening itself there put
+the first image two screens down; below that width ⚙ Passes stays a button you
+press. Below it, the panel also folds everything that is not a pass button — the
+semantic engine, watermarks, edits and the overview each sit behind their own
+named fold, one tap away — because the pass buttons are what you came for.
 
 The funnel itself:
 

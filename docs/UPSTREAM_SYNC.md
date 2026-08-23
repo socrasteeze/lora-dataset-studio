@@ -267,14 +267,25 @@ on a documentation line while `frontend/src` passes. Trace from the bundle:
 ### The re-delete list — derived, never recalled
 
 ```bash
-comm -13 <(git ls-files | sort) \
+comm -13 <(git ls-tree -r --name-only HEAD | sort) \
          <(git ls-tree -r --name-only upstream/main | sort) | grep -v '^frontend/dist'
 ```
 
+**`ls-tree HEAD`, not `ls-files` — this command is run MID-MERGE, and that is
+exactly where `ls-files` lies.** It reports the index, which during an unresolved
+merge holds every conflicted path at stages 1/2/3 and at no stage 0. On
+2026-08-23 the `ls-files` form answered 80 before the merge and 92 after it,
+and neither number was real; the `ls-tree` form answered **100** both times,
+which is the truth — the inventory had not moved. A count that CHANGES across a
+merge you know adopted no rejected file is the tell. Confirm with
+`git diff --name-status <pre-merge-HEAD> -- . ':(exclude)frontend/dist'`, which
+lists every file the merge actually added or deleted and is the check that
+settles it.
+
 Every path this prints is a file upstream has and this fork deliberately does
-not. **72 as of 2026-08-20** (58 on 2026-08-05 — the number moves every sync,
-which is why the command is here and the list is not) — roughly 33 in the
-Divergence-4 cluster
+not. **100 as of 2026-08-23** (72 on 2026-08-20, 58 on 2026-08-05 — the number
+moves every sync, which is why the command is here and the list is not) —
+roughly 33 in the Divergence-4 cluster
 (`dense_*`, `pod_*`, `hub_presence`, `cloud_quantize`, `fp8_local_delivery`,
 `hf_storage`/`hfStorage`, `DenseModelsPanel`, and their tests) and 10 in the
 Divergence-1 cluster (`nanobanana`, `chatgpt*`, `openrouter`, `engine_errors`,
