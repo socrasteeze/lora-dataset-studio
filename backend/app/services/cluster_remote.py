@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 import uuid
-from pathlib import Path
 
 from ..extensions import db
 from ..models import ClusterJob

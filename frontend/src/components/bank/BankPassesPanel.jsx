@@ -27,7 +27,7 @@ import { openerLabel } from './scoringPython.js'
 export default function BankPassesPanel({
   bankId, payload, counts, live, caps, capsLoading,
   semanticState, semanticReady, semanticBlocked, semanticSwitching, semanticOperationBusy,
-  scoreGpuPresent, scoreDevice, scoreNote, visionReady,
+  scoreGpuPresent, scoreDevice, scoreNote,
   selected, captionScope,
   captionVocab, visionModel, visionModelLooksUncensored,
   onPassOpen, onPassRedo, onPickPython, onSemanticEngineChange, onChanged,

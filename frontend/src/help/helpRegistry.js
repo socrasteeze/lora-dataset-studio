@@ -774,7 +774,9 @@ const TOPICS = [
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   // 🎬 Les scènes vivent dans le même rail que le lot d'historique, monté par le
   // Studio de test ET par « Generate from the board » : un seul sujet pour les deux.
-  action('studio-scene-prompts', '🎬 Scenes: run a bank’s captions in order',
+  // Les DEUX sources (banque et dataset) partagent ce sujet : c'est le même
+  // panneau et le même contrat — deux entrées d'aide diraient qu'il y en a deux.
+  action('studio-scene-prompts', '🎬 Scenes: run a bank’s or a dataset’s captions in order',
     ['studio', 'test studio', 'canvas', 'generate from the board', 'scene', 'scenes',
      'scenes from a bank', 'bank captions', 'import captions', 'captions from a bank',
      'use my bank captions', 'reuse a caption', 'staging', 'mise en scene',
@@ -782,7 +784,14 @@ const TOPICS = [
      'pick scenes', 'tick scenes', 'select all scenes', 'load scenes',
      'one pass per scene', 'run captions in order', 'choose a bank',
      'no scenes loaded', 'scene skipped', 'image without a caption',
-     'caption pass', 'thumbnail of the page', 'which page'],
+     'caption pass', 'thumbnail of the page', 'which page',
+     // Ce que quelqu'un tape quand la source qu'il veut rejouer est son dataset
+     // — et ce qu'il cherchait avant que le dataset soit offert : un moyen de ne
+     // PAS réexporter son dataset vers une banque pour atteindre ce panneau.
+     'scenes from a dataset', 'dataset captions', 'captions from a dataset',
+     'use my dataset captions', 'run my dataset captions', 'choose a dataset',
+     'replay my dataset', 'my own captions', 'only banks?', 'no dataset in the list',
+     'rejected images', 'does it use rejected images', 'kept and pending'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('studio-enhance-prompt', '✨ Enhance: enrich the test prompt with the local model',
     ['studio', 'test studio', 'enhance', 'enhance prompt', 'improve prompt', 'better prompt',
@@ -798,6 +807,17 @@ const TOPICS = [
      'dropdown', '▾', 'kept caption', 'nonblank caption', 'test prompt', 'replace prompt',
      'overwrite prompt', 'confirmation'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  // The dock is app-wide (it is mounted in the shell, not on one screen), so the
+  // route here is just somewhere the queue is normally being fed from — the
+  // topic's real destination is the guide section, which is where the ⤒ / ✕
+  // semantics and the two jobs the dock refuses to cancel are explained.
+  action('generation-queue-dock', 'The generation queue',
+    ['queue', 'generation queue', 'waiting', 'line up', 'stack jobs', 'one at a time',
+      'why is it greyed out', 'greyed out', 'disabled button', 'cannot generate',
+      'too many generations in flight', 'run next', 'reorder', 'priority',
+      'cancel one job', 'what is the gpu doing', 'still generating', 'dock',
+      'bottom left', 'improve batch blocks', 'klein batch blocks'],
+    '/datasets', 'using-the-app', 'the-generation-queue'),
   action('studio-recover-paused-batch', 'Recover a paused Test Studio batch',
     ['studio', 'test studio', 'paused', 'pause', 'stalled', 'queue', 'queue error',
       'comfyui stopped', 'comfyui unavailable', 'restart comfyui', 'recover comfyui',
@@ -1506,8 +1526,10 @@ const TOPICS = [
      'blocky', 'posterized', 'macro-blocking', 'identity lora']),
   // No 'identity_prompts.face' topic: the API-engine identity locks are not
   // shown in this fork (Divergence 1) — only the local one below.
-  setting('identity_prompts.klein_identity', 'engines', 'identity-prompts', 'Klein identity prompt',
-    ['identity', 'klein', 'restage', 'face', 'prompt', 'preserve', 'pose']),
+  // Named for the ENGINE FAMILY, not for Klein: Krea 2 Edit reads this very
+  // text, and a Krea user searching "krea identity prompt" found nothing.
+  setting('identity_prompts.klein_identity', 'engines', 'identity-prompts', 'Local engines identity prompt (Klein & Krea 2)',
+    ['identity', 'klein', 'krea', 'krea 2', 'local engines', 'restage', 'face', 'prompt', 'preserve', 'pose']),
   // The words Qeeyana (Reddit) actually used are in here verbatim: she had the
   // symptom ("anime looks realistic after the quality inpaint") and no path to
   // the cause, because the shipped instruction — "add detailed texture, add

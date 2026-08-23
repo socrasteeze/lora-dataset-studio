@@ -54,12 +54,29 @@ export function promptBoxText(value, defaultText) {
    `key` mirrors config identity_prompts.* — NEVER renamed (persisted globally).
    `engines` says which engine family really consumes the prompt, verified in
    face_variations.py: wrap_variation picks face_multi/face_single for the API
-   engines, wrap_variation_klein always uses klein_identity. */
+   engines, and BOTH local engines share `_compose_edit_prompt`, which always
+   reads klein_identity — wrap_variation_klein and wrap_variation_krea alike.
+   Hence "Local engines", not "Klein": the box was named after one of its two
+   consumers, and a user asked on Discord whether it applied to Krea 2 at all.
+   A prompt this file names after one engine is a prompt the other engine's
+   users will leave alone. */
 
 /** The engines whose prompts go through wrap_variation, i.e. every API engine.
  *  Listed once: an engine missing from here would silently be treated as Klein
- *  by activeExtraRefPromptKey and badge the wrong prompt box. */
-export const API_PROMPT_ENGINES = ['nanobanana', 'chatgpt', 'openrouter'];
+ *  by activeExtraRefPromptKey and badge the wrong prompt box.
+ *
+ *  DIVERGENCE 1: EMPTY on this fork, and kept as an empty export rather than
+ *  deleted — the same choice, for the same reason, as `API_ENGINES` in
+ *  dataset/engineSelection.js. Every helper here derives from it, so an empty
+ *  list makes them all answer correctly BY CONSTRUCTION instead of by special
+ *  case: the two `face_*` locks declare no consumer and are never badged, the
+ *  shared outfit/expression directives fall back to Klein alone, and
+ *  activeExtraRefPromptKey resolves every engine to `klein_identity`. Never add
+ *  an id. The two lists are pinned together by
+ *  tests/local-engine-prompt-labels-contract.test.mjs, precisely so a sync that
+ *  refilled one and not the other could not hand this fork a paid prompt lane
+ *  with nothing else noticing. */
+export const API_PROMPT_ENGINES = [];
 
 export const IDENTITY_PROMPT_FIELDS = [
   {
@@ -79,9 +96,9 @@ export const IDENTITY_PROMPT_FIELDS = [
   {
     key: 'klein_identity',
     id: 'identity-prompt-klein-identity',
-    label: 'Klein — restage & face-identity block',
-    engines: ['klein'],
-    desc: 'The instruction block Klein (local) uses to restage the shot while keeping the face identical. Steers pose/framing/outfit changes without altering the person.',
+    label: 'Local engines — restage & face-identity block',
+    engines: ['klein', 'krea'],
+    desc: 'The instruction block BOTH local engines — Klein and Krea 2 Edit — use to restage the shot while keeping the face identical. Steers pose/framing/outfit changes without altering the person.',
   },
 ];
 
@@ -111,12 +128,12 @@ export function identityPromptFields(subjectType) {
   const descs = {
     face_single: `Prepended to every Nano Banana / ChatGPT variation made from ONE reference photo of ${n.one}. Tells the model to preserve its ${n.trait}, and to take the pose and setting from the description, not the reference.`,
     face_multi: `Same, but for variations generated from SEVERAL reference photos of the same ${n.kind} — tells the model they all show one ${n.kind} and to use them together.`,
-    klein_identity: `The instruction block Klein (local) uses to restage the shot while keeping ${n.one} identical. Steers pose/framing/setting changes without altering its ${n.trait}.`,
+    klein_identity: `The instruction block BOTH local engines — Klein and Krea 2 Edit — use to restage the shot while keeping ${n.one} identical. Steers pose/framing/setting changes without altering its ${n.trait}.`,
   };
   const labels = {
     face_single: 'API engine — identity lock (single reference)',
     face_multi: 'API engine — identity lock (multiple references)',
-    klein_identity: `Klein — restage & ${n.kind}-identity block`,
+    klein_identity: `Local engines — restage & ${n.kind}-identity block`,
   };
   return IDENTITY_PROMPT_FIELDS.map((f) => ({
     ...f, label: labels[f.key] || f.label, desc: descs[f.key] || f.desc,

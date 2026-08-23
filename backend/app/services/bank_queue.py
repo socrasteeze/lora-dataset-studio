@@ -129,7 +129,6 @@ def _persist_remove(bank_ids) -> None:
     boot."""
     if not bank_ids:
         return
-    from ..extensions import db
     from ..models import BankQueueEntry
     from ..utils.dbbusy import write_with_retry
     write_with_retry(lambda: BankQueueEntry.query

@@ -8,6 +8,7 @@ overrides applied by the orchestrator)."""
 import logging
 import os
 import posixpath
+import uuid
 from urllib.parse import quote
 
 import requests

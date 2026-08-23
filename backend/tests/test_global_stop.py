@@ -230,7 +230,7 @@ def test_nothing_running_reports_idle_rather_than_pretending_it_stopped_things(a
 
 
 def test_one_broken_target_does_not_skip_the_others(app):
-    from app.services import bank_queue, global_stop
+    from app.services import bank_queue
 
     def _boom():
         raise RuntimeError('queue module exploded')

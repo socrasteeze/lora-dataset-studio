@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import time
 
-import pytest
 
 PEER = '4fa2b7c1-0000-4000-8000-000000000042'
 
@@ -85,7 +84,7 @@ def test_a_local_pass_logs_exactly_as_before(app):
 
 
 def test_the_running_row_says_which_machine(app):
-    from app.services import activity_log, bank_jobs
+    from app.services import bank_jobs
     with app.app_context():
         # A job that has NOT finished, so it is still in the running list.
         bank_jobs.start(app, 4245, 'score',

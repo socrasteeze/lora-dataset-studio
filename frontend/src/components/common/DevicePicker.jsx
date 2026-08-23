@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
 import { devicePartialLabel } from './devicePartialLabel.js'
 import { fetchDeviceList } from './deviceListCache.js'
-import { loadSavedDeviceId, saveDeviceId } from './deviceMemory.js'
+import { saveDeviceId } from './deviceMemory.js'
 
 /* The remembered choice lives in deviceMemory.js — pure, and therefore
  * testable (node --test cannot import a .jsx). Re-exported here so every

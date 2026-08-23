@@ -27,7 +27,7 @@ import {
   RETRY_CONFIRMABLE_REFUSALS,
 } from '../utils/trainingRefusals';
 import { continueAttemptOutcome } from '../utils/continueOutcome';
-import { podBootFailureView, stopButtonLabel, uploadStallFailureView } from '../utils/launchProgress';
+import { stopButtonLabel } from '../utils/launchProgress';
 import { runSilenceWarning, stopOutcomeMessage } from '../utils/runSilence';
 import { runsHubContinueLanes } from '../utils/runsHubContinueLanes';
 import {

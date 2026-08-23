@@ -23,7 +23,6 @@ import os
 import sys
 import types
 
-import pytest
 from PIL import Image
 
 from test_image_bank import _mkbank, photo_like
@@ -258,7 +257,6 @@ def test_the_live_lookup_is_once_per_page_not_once_per_row(client, tmp_path, app
 
 def test_regrouping_gives_back_a_survivor_when_every_member_was_a_duplicate(
         app, client, tmp_path):
-    from app.config import LOCAL_USER
     from app.services import image_bank_service as banks
 
     orig, copy = _dup_pair()

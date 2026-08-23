@@ -15,7 +15,6 @@ tracing it.
 from __future__ import annotations
 
 import json
-import os
 
 from PIL import Image
 
@@ -165,7 +164,7 @@ def test_a_moved_source_folder_fails_instead_of_reporting_success(app, tmp_path)
     """Every isfile() fails, `paths` empties, and the pass used to 'finish'
     having done nothing — while still showing the loading note at 0/0."""
     import shutil
-    from app.services import bank_jobs, image_bank_service as banks
+    from app.services import image_bank_service as banks
     with app.app_context():
         bank = _bank(tmp_path, name='Gone')
         shutil.rmtree(bank.source_path)          # the drive walks away

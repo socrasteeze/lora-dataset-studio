@@ -553,9 +553,11 @@ def test_foreign_container_collision_fails_without_compose_mutation(tmp_path):
     )
 
     assert result.returncode == 1
-    # The xdist worker suffix lengthens the temporary script path enough for
-    # Windows PowerShell to wrap "or folder" across two console lines. Judge
-    # the error text, not that presentation-only whitespace.
+    # Same wrap trap as the unhealthy assertion above: PowerShell folds the
+    # error record at the console width, and the fold lands wherever the path
+    # in the record pushes it — a long --basetemp (xdist adds /gwN) was enough
+    # to split this phrase across two lines and fail a launcher that had said
+    # exactly the right thing. Assert the words, not the spelling of the wrap.
     assert "belongstoanotherprojectorfolder" in re.sub(r"\s+", "", result.stderr)
     assert not _compose_calls(calls, "up", "studio")
     assert not _compose_calls(calls, "stop", "ollama")

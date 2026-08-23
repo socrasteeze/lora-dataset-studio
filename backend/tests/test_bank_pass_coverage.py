@@ -120,7 +120,6 @@ def test_a_bank_with_that_pass_already_done_is_not_eligible(app, tmp_path):
 def test_queue_all_narrows_each_banks_steps_to_what_is_missing(app, tmp_path,
                                                                monkeypatch):
     from app.services import bank_queue
-    from app.services import image_bank_service as banks
 
     seen = {}
     monkeypatch.setattr(bank_queue, 'enqueue',

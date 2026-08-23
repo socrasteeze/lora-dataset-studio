@@ -897,7 +897,6 @@ def _finish_comfy_bridge(job: ClusterJob, *, failed: bool, error: str | None,
 
 def _materialize_comfy_output(job_id: str, src: Path, output_name: str) -> str:
     """Copy peer output where local completion code expects to find it."""
-    from ..utils import comfy_fs
     out_dir = cfg.comfyui_dir('output')
     if out_dir:
         try:

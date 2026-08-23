@@ -61,8 +61,19 @@ test('field metadata keeps the persisted config keys', () => {
   assert.deepEqual(IDENTITY_PROMPT_FIELDS.map((f) => f.key),
     ['face_single', 'face_multi', 'klein_identity']);
   for (const f of IDENTITY_PROMPT_FIELDS) {
-    assert.ok(f.id && f.label && f.desc && Array.isArray(f.engines) && f.engines.length);
+    assert.ok(f.id && f.label && f.desc && Array.isArray(f.engines));
   }
+  // Divergence 1: upstream also requires every field to declare at least one
+  // consumer. The KEYS stay here — they are persisted config, and an install
+  // that already wrote them keeps them readable — but with API_PROMPT_ENGINES
+  // empty the two API locks declare NO consumer, which is the honest answer:
+  // nothing on this fork reads them. Only the local lock names engines, and it
+  // names BOTH of them.
+  for (const key of ['face_single', 'face_multi'])
+    assert.deepEqual(IDENTITY_PROMPT_FIELDS.find((f) => f.key === key).engines, []);
+  assert.deepEqual(
+    IDENTITY_PROMPT_FIELDS.find((f) => f.key === 'klein_identity').engines,
+    ['klein', 'krea']);
 });
 
 test('the Extra-refs modal covers BOTH engine families, not just the API one', () => {
@@ -72,8 +83,13 @@ test('the Extra-refs modal covers BOTH engine families, not just the API one', (
 });
 
 test('the "used by your current engine" badge follows the selected generator', () => {
-  assert.equal(activeExtraRefPromptKey('nanobanana'), 'face_multi');
-  assert.equal(activeExtraRefPromptKey('chatgpt'), 'face_multi');
+  // Divergence 1: upstream maps its two cloud ids to face_multi. Here
+  // API_PROMPT_ENGINES is empty, so EVERY id resolves to the local lock —
+  // including a legacy cloud tag still sitting on an old row. That is the point:
+  // no engine on this fork reads face_multi, so badging it would send a user to
+  // edit a box that cannot change a single one of their images.
+  assert.equal(activeExtraRefPromptKey('nanobanana'), 'klein_identity');
+  assert.equal(activeExtraRefPromptKey('chatgpt'), 'klein_identity');
   assert.equal(activeExtraRefPromptKey('klein'), 'klein_identity');
   assert.equal(activeExtraRefPromptKey('krea'), 'klein_identity');
   // Divergence 1: nothing stored yet MIRRORS this fork's DEFAULT_ENGINE

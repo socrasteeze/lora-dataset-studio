@@ -41,9 +41,8 @@ from . import vast_client
 # step is read through it so the single-file and the paired case cannot drift.
 # The module is pure (no torch, no ffmpeg, no database), so this costs nothing.
 from . import video_run_lineage
-from . import video_targets
 from . import video_training
-from .aitoolkit_remote import RemoteAiToolkit, TransferCancelled
+from .aitoolkit_remote import RemoteAiToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -4835,16 +4834,18 @@ def _seed_resume_checkpoint(run, remote, pod_settings):
     training_folder = pod_settings['TRAINING_FOLDER'].rstrip('/')
     dest_dir = f'{training_folder}/{run.job_name}'
     if sources:
-        _set(run, phase_detail='Seeding checkpoint for resume…')
-        for one in sources:
-            if not os.path.isfile(one):
-                raise RuntimeError(f'resume checkpoint vanished before upload: {one}')
-            _, stage = video_training.split_checkpoint_name(one)
-            name = video_training.restage_checkpoint_name(run.job_name, step, stage)
-            _push_resume_checkpoint(run, remote, pod_settings, one, dest_dir, name)
-        logger.info('run %s: seeded %s resume file(s) -> %s',
-                    run.id, len(sources), dest_dir)
-        return
+        # Divergence 4: upstream pushes each MoE expert with `_push_resume_checkpoint`,
+        # which lives in `pod_checkpoint_push` — part of the rented-pod transport
+        # lane this fork does not carry. The call site survived the rejection with
+        # nothing defining it, so this branch raised NameError instead of the
+        # honest refusal the Hugging Face branch below already gives. Refused the
+        # same way rather than re-pointed at `remote.seed_checkpoint`: that would
+        # be inventing transport behaviour for a lane with no route to reach it,
+        # and the docstring above is explicit that a resume which cannot seed must
+        # fail loudly rather than silently train from scratch.
+        raise RuntimeError('resuming a multi-file (MoE) video checkpoint is not '
+                           'available in this build — it belongs to the rented-pod '
+                           'transport lane, which is not installed')
     if repo_id:
         # Divergence 4: upstream fetches the resume checkpoint straight onto the
         # pod from a private Hugging Face repo (`dense_pod_hub`), which is the
@@ -5631,8 +5632,6 @@ def all_runs(limit: int = 20) -> dict:
                # local rows live only in the registry -> addressed by record id;
                # a cloud row overrides this with 'cloud-<id>' via _run_payload.
                'share_key': f'rec-{rec.id}',
-               # Stable retry target for a LOCAL run (cloud rows retry by run_id).
-               'record_id': rec.id,
                'created_at': rec.created_at.isoformat() if rec.created_at else None}
         if rec.source == 'local' and rec.id == failed_local_id:
             row['status'] = 'error'
@@ -6796,7 +6795,6 @@ def run_lineage(record_id) -> dict:
     BELOW where its parent ended means the parent has saves set aside — flagged
     on the edge (superseded) and on the parent node (has_superseded_tail)."""
     from . import checkpoint_registry as reg
-    from ..models import TrainingRunRecord
     records = reg.resolve_lineage(record_id)
     if not records:
         return {'nodes': [], 'edges': [], 'root_id': None,

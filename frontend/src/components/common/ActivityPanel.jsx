@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../../api/fetchClient'
 import {
-  activityHeadline, eventPrefix, formatAge, formatClock, mergeEvents, nextCursor,
+  activityHeadline, eventPrefix, formatClock, mergeEvents, nextCursor,
   runningWhere, stallState,
 } from '../../utils/activityLog'
 

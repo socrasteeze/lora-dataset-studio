@@ -36,7 +36,7 @@ def test_a_dialog_queued_local_bank_waits_for_the_gpu(app, tmp_path, monkeypatch
     import threading
     import time as _time
 
-    from app.services import bank_jobs, bank_queue
+    from app.services import bank_queue
     from app.services import image_bank_service as banks
     from test_image_bank import _mkbank, flat
 

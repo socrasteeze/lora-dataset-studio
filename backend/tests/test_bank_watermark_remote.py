@@ -111,7 +111,6 @@ def test_remote_klein_job_stages_by_path_not_by_local_folder(app, tmp_path,
 def test_local_klein_job_is_byte_identical_to_before(app, tmp_path, monkeypatch):
     """No worker routing, no path metadata — the local lane must not change."""
     from app.services import watermark_klein as wk
-    from app.utils import comfy_fs
     _mock_resolvers(monkeypatch, wk)
     monkeypatch.setattr(wk.keh, 'klein_missing_assets', lambda *a, **k: [])
     input_dir = tmp_path / 'comfy-in'

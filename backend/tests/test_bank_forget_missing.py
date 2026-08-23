@@ -133,7 +133,6 @@ def test_another_bank_over_the_same_tree_is_unaffected(app, tmp_path):
 # --- the route ---------------------------------------------------------------
 
 def test_the_route_reports_what_it_removed(app, client, tmp_path):
-    from app.services import image_bank_service as banks
 
     with app.app_context():
         bank_id, src = _bank(tmp_path)
