@@ -54,6 +54,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from _harness import _cancel_requested, _log
 
 # Hidden BEFORE anything heavy is imported. onnxruntime's CPU build ignores it,
 # but an install that has replaced it with onnxruntime-gpu (the app never does,
@@ -71,21 +72,8 @@ from infer_io import claim_result_stream  # noqa: E402
 _OUT = claim_result_stream(__name__)
 
 
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
 def _emit(obj):
     print(json.dumps(obj), file=_OUT, flush=True)
-
-
-def _cancel_requested(cancel_file):
-    """The parent drops this sentinel file to ask for a clean stop between
-    frames, rather than killing a process holding a loaded engine — everything
-    read so far is in memory and is lost to a kill."""
-    return bool(cancel_file) and os.path.exists(cancel_file)
-
-
 def _boxes_of(result, width, height, score_min):
     """RapidOCR's [(quad, text, score), ...] as normalised [x0,y0,x1,y1,score].
 

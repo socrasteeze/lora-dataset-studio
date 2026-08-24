@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../api/fetchClient';
 import { postJson } from '../../hooks/useDataset';
+import { fmtGB } from './loraMerge.js';
 
 /** Quantize a model you already have on this machine to the fp8 file ComfyUI loads.
  *
@@ -22,9 +23,6 @@ import { postJson } from '../../hooks/useDataset';
  * refusals, the overwrite guard and the read-back verification have exactly one
  * implementation, so the two doors cannot drift.
  */
-const fmtGB = (bytes) => (
-  typeof bytes === 'number' && bytes > 0 ? `${(bytes / 1e9).toFixed(1)} GB` : '—'
-);
 
 export default function Fp8QuantizeTool({
   suggestedPath = '', disabled = false, framed = true,

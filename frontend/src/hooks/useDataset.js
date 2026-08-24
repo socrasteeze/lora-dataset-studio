@@ -115,7 +115,7 @@ export function faceScoringErrorMessage(scoringError) {
  * `error` is a separate concern (why an attempted inpaint failed) and is
  * surfaced by its own toast.error at the call site.
  */
-export function summarizeClean(d) {
+function summarizeClean(d) {
   const cropped = d.cropped || 0;
   // LaMa and Klein inpaints tally together — both "repainted the mark" from the
   // user's point of view (the batch method toggle picks which engine ran).
@@ -262,7 +262,7 @@ export function useDataset() {
     const goHome = () => setCurrentId(null);
     window.addEventListener('lds:home', goHome);
     return () => window.removeEventListener('lds:home', goHome);
-  }, []);
+  }, [setCurrentId]);   // useCallback stable : toujours mount-only en pratique
 
   // Mirror in-flight dataset generations into the global JobsContext so the
   // floating jobs dock shows (and can cancel) them like other generations.
@@ -337,7 +337,7 @@ export function useDataset() {
     return () => clearInterval(id);
   }, [hasActivity, currentId, refresh]);
 
-  const open = useCallback(async (id) => { setCurrentId(id); await refresh(id); }, [refresh]);
+  const open = useCallback(async (id) => { setCurrentId(id); await refresh(id); }, [refresh, setCurrentId]);
 
   const create = useCallback(async (name, trigger, kind, conceptDesc, trainType, fidelity) => {
     const d = await postJson('/api/dataset/create',

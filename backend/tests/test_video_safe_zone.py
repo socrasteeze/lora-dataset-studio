@@ -810,7 +810,9 @@ def test_the_probe_imports_everything_the_worker_imports():
     # ships alongside the worker by construction. Subtracted rather than added to
     # the expected set, so a THIRD real dependency still fails this test — which
     # is the whole point of reading the imports instead of listing them.
-    imported -= {'infer_io'}
+    # `_harness` is the same shape from upstream: a stdlib-only sibling module
+    # shipped next to the worker, so it can no more be absent than json can.
+    imported -= {'infer_io', '_harness'}
     assert imported == {'rapidocr_onnxruntime', 'cv2'}, \
         f'the worker imports {sorted(imported)} — update the probe to match'
     for module in imported:

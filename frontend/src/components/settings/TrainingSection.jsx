@@ -1,4 +1,6 @@
 import { INPUT_CLASS, Card } from './primitives'
+import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
+import { TRAINING_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
 import { defaultValueAt } from './settingDefaults.js'
 
@@ -69,8 +71,14 @@ function ConceptFaceMaskCard({ config, setField, configDefaults }) {
 
 export default function TrainingSection(props) {
   const { config, setField, configDefaults } = props
+  // Summary + collapsible groups — same shells as Image engines.
+  const [defaultsGroup, peerGroup, maskingGroup] = TRAINING_GROUPS
+  const groupProps = useSettingsGroupProps('training')
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <SettingsGroupsToc sectionId="training" groups={TRAINING_GROUPS} />
+
+      <SettingsGroup {...groupProps(defaultsGroup)}>
       <Card title="Defaults" help="Preselected model family for new training runs — each dataset can still override it.">
         <div>
           <label htmlFor="training-default-family" className="block text-sm font-medium text-content">Default training family</label>
@@ -84,7 +92,9 @@ export default function TrainingSection(props) {
           </select>
         </div>
       </Card>
+      </SettingsGroup>
 
+      <SettingsGroup {...groupProps(peerGroup)}>
       <Card title="Train on another machine"
         help="Set this and a “Train on” picker appears beside Train the LoRA on a dataset's Training panel, listing the OTHER machines your ai-toolkit is configured to use. Pick one and the run happens there: the dataset is sent over, and its log, samples and checkpoints come back here. Point the address at this machine's own ai-toolkit — this app exports the dataset to a folder on this disk and hands over that path. This machine's own GPUs are deliberately not in the picker: “This machine” is the ordinary local run, and it is the only one that tells the rest of the app the GPU is busy. Blank means every run trains here, exactly as before.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -115,8 +125,11 @@ export default function TrainingSection(props) {
           </div>
         </div>
       </Card>
+      </SettingsGroup>
 
+      <SettingsGroup {...groupProps(maskingGroup)}>
       <ConceptFaceMaskCard config={config} setField={setField} configDefaults={configDefaults} />
+      </SettingsGroup>
     </div>
   )
 }

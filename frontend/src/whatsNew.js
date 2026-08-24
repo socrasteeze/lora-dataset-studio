@@ -105,9 +105,67 @@ export const WHATS_NEW = [
       + 'keys, shows everything a picture was made from, and carries the '
       + 'actions you already know: ⬇ Download under its lineage name, ✨ '
       + 'Upscale & improve (result lands at the top of the feed), and a Select '
-      + 'mode to 🗑 delete misses or ⬇ ZIP a pick. Built for the phone as much '
-      + 'as the desktop.',
+      + 'mode to 🗑 delete misses or ⬇ ZIP a pick. The feed loads itself as '
+      + 'you scroll towards its end. Built for the phone as much as the '
+      + 'desktop.',
     to: '/gallery',
+  },
+  {
+    id: '2026-08-24-settings-groups-everywhere',
+    date: '2026-08-24',
+    title: 'The rest of Settings gets the same organised layout',
+    blurb:
+      'Local tools, Captioning & quality, Training and Storage now open on the '
+      + 'same clickable summary of collapsible groups Image engines got — '
+      + 'training on another machine gets its own group away from concept '
+      + 'face masking, the movable folders stand apart from the cleanup '
+      + 'tools, and which groups you keep open is remembered per section. '
+      + 'Every Settings link and search result still lands on its field: a '
+      + 'collapsed group opens itself on the way. Scraping, Server and '
+      + 'Maintenance keep their one or two cards flat — a summary there '
+      + 'would just be noise.',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-08-24-use-these-improve-settings',
+    date: '2026-08-24',
+    title: 'Like a ✨ result? Make the next improves run the same way',
+    blurb:
+      'Open any Upscale & improve result (Gallery, checkpoint gallery, or '
+      + 'pinned on the Canvas) and press ↩ Use these improve settings: the '
+      + 'instruction, LoRA preset, strength, steps, output size and Klein '
+      + 'model this image was made with become the app-wide improve settings '
+      + 'again. New improvements record all of it from now on; older images '
+      + 'restore what they carry (instruction + preset), and the toast names '
+      + 'exactly which halves happened — a preset renamed or deleted since '
+      + 'is said out loud instead of silently dropped. SeedVR2 results have '
+      + 'no settings to restore and show no button.',
+    to: '/gallery',
+  },
+  {
+    id: '2026-08-24-engines-settings-groups',
+    date: '2026-08-24',
+    title: 'Image engines settings, organised into groups',
+    blurb:
+      'The section had grown into a wall of cards — which engines to offer '
+      + 'sat next to Klein pins next to the improve prompt. It now opens on '
+      + 'a clickable summary of six groups (Engines · Klein · Krea 2 · '
+      + 'Generation LoRA presets · SeedVR2 · Prompts & improve tuning), each '
+      + 'collapsible and remembered across visits. Every Settings link and '
+      + 'search result still lands on its field — a collapsed group opens '
+      + 'itself on the way.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-08-24-improve-output-size-in-note',
+    date: '2026-08-24',
+    title: 'Pick the improve output size right under the ✨ button',
+    blurb:
+      'The ✨ Upscale & improve note now carries the Output size (MP) box — '
+      + 'the same 0.5–8 MP value Settings edits (klein.improve_megapixels), '
+      + 'changeable without leaving your images. App-wide, like the '
+      + 'instruction and the LoRA preset beside it.',
+    to: '/datasets?section=images',
   },
   {
     id: '2026-08-24-improve-lora-preset',

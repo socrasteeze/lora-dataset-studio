@@ -247,8 +247,9 @@ I make".
 
 Narrow it from the row above the grid: one dataset, **Renders** or
 **✨ Improved** only, or **👍 Liked** — the images you rated up in the Test
-Studio. The count always names what the grid is actually showing, and **Load
-more** states how many are left.
+Studio. The count always names what the grid is actually showing. The feed
+loads itself as you scroll towards its end; the **Load more** button at the
+bottom states how many are left and still works as a plain button.
 
 Tap any image to open the viewer — the same one the Canvas uses, with
 everything the picture was made from: seed (copyable), checkpoint, base model,
@@ -264,8 +265,15 @@ From the viewer you can also:
   shift) or SeedVR2 (upscales and keeps the look). The result arrives at the
   top of this gallery as its own ✨ image; the original is untouched. The
   amber note under the buttons is where the Klein instruction is edited in
-  place, the Klein model is chosen, and a **LoRA preset** can be chained into
-  every improve — all app-wide, the same values Settings shows.
+  place, the Klein model is chosen, a **LoRA preset** can be chained into
+  every improve and the **output size (MP)** picked — all app-wide, the same
+  values Settings shows.
+- **↩ Use these improve settings** — on a ✨ result you like: the
+  instruction, LoRA preset, strength, steps, output size and model that made
+  THIS image become the app-wide improve settings again, so the next
+  improves run the same way. Every new improvement records what it ran
+  with; older images restore what they carry, and the toast names exactly
+  which parts were applied.
 
 **Select** at the bottom turns on selection mode: tap the misses, then
 **🗑 Delete** (files go to the recycle bin or the app Trash — and the rows

@@ -68,6 +68,7 @@ import hashlib
 import json
 import os
 import sys
+from _harness import _cancel_requested, _log
 
 # Model ids are CONSTANTS, never config: a detector whose weights can be pointed
 # at an arbitrary repo has no calibrated threshold, and the threshold is the
@@ -113,20 +114,8 @@ from infer_io import claim_result_stream  # noqa: E402
 _OUT = claim_result_stream(__name__)
 
 
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
 def _emit(obj):
     print(json.dumps(obj), file=_OUT, flush=True)
-
-
-def _cancel_requested(cancel_file):
-    """The parent drops this sentinel file to ask for a clean stop between
-    images, rather than killing a process holding two loaded models."""
-    return bool(cancel_file) and os.path.exists(cancel_file)
-
-
 def _pick_device(requested):
     import torch
     if requested == 'cpu':

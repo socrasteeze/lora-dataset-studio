@@ -15,6 +15,7 @@ web UI, unused - this app drives the CLI) and the whole ownership subsystem
 dropped - single local user, cf. plan's Global Constraints.
 """
 from __future__ import annotations
+from ..extensions import db
 import filecmp
 import functools
 import hashlib
@@ -334,7 +335,7 @@ def _lora_family_dirs(fam: str) -> list[str]:
     try:
         roots.append(_loras_root())
     except RuntimeError:
-        pass
+        pass   # an unconfigured root is simply not a candidate
     roots += comfy_model_paths.search_roots('loras')
     out, seen = [], set()
     for root in roots:
@@ -436,7 +437,7 @@ def _aitoolkit_supports_krea() -> bool:
                     if pat.search(fh.read()):
                         return True
             except OSError:
-                continue
+                continue   # unreadable log: not the one this grep is looking for
     return False
 
 
@@ -466,7 +467,7 @@ def _aitoolkit_supports_flux2klein() -> bool:
                     if pat.search(fh.read()):
                         return True
             except OSError:
-                continue
+                continue   # unreadable log: not the one this grep is looking for
     return False
 
 
@@ -499,7 +500,7 @@ def _aitoolkit_supports_anima() -> bool:
                     if pat.search(fh.read()):
                         return True
             except OSError:
-                continue
+                continue   # unreadable log: not the one this grep is looking for
     return False
 
 
@@ -578,7 +579,7 @@ def _sdxl_base_choices() -> set:
         for rel, _ab in comfy_model_paths.list_models('checkpoints'):
             out.add(os.path.basename(rel))
     except Exception:
-        pass
+        pass   # ComfyUI absent or unreadable: the fallback name list stands
     return out
 
 
@@ -2069,7 +2070,7 @@ def _aitoolkit_supports_concept_slider() -> bool:
                     if pat.search(fh.read()):
                         return True
             except OSError:
-                continue
+                continue   # unreadable log: not the one this grep is looking for
     return False
 
 
@@ -2863,10 +2864,8 @@ def _ts_apply_sampling_and_saves(patch, cur):
 # trains locally only and has never carried those validators, and they read
 # FULL_TRANSFORMER_* bounds nothing here defines -- so the function is dropped
 # whole rather than left dead, along with its call in update_train_settings.
-def _ts_apply_network_and_optim(patch, cur):
-    """LoRA architecture and optimisation levers (dropout, alpha, LoKr,
-    optimizer, schedules, guidance). Moved verbatim; mutates cur in
-    place, including the automagic3/grad_accum cross-check."""
+def _ts_apply_regularisation(patch, cur):
+    """Dropout / alpha / timestep levers. Moved verbatim; mutates cur in place."""
     if 'dropout' in patch:
         v = patch['dropout']
         if v in (None, 0, 0.0, 'off', ''):
@@ -2891,6 +2890,12 @@ def _ts_apply_network_and_optim(patch, cur):
             cur['timestep_type'] = v
         else:
             raise ValueError(f'timestep_type must be one of {_TIMESTEP_TYPE_CHOICES} (or auto)')
+
+
+def _ts_apply_optim(patch, cur):
+    """Optimizer, schedule, warmup and grad_accum levers - the automagic3/
+    grad_accum cross-check lives here, so this pair must never be split.
+    Moved verbatim; mutates cur in place."""
     if 'optimizer' in patch:
         v = patch['optimizer']
         if v in (None, 'auto', '', 'adamw8bit'):
@@ -2933,6 +2938,11 @@ def _ts_apply_network_and_optim(patch, cur):
             cur['grad_accum'] = v
         else:
             raise ValueError(f'grad_accum must be one of {_GRAD_ACCUM_CHOICES} (or auto)')
+
+
+def _ts_apply_network_arch(patch, cur):
+    """Network architecture (LoKr, conv ranks), EMA, content/style and
+    differential guidance levers. Moved verbatim; mutates cur in place."""
     if 'network_type' in patch:
         v = patch['network_type']
         if v in (None, 'auto', '', 'lora'):
@@ -3007,9 +3017,18 @@ def _ts_apply_network_and_optim(patch, cur):
                 f'differential_guidance_scale must be between {lo:g} and {hi:g} (or auto)')
 
 
-def _ts_apply_levers_memory_quality(patch, cur):
-    """Boolean/tri-state levers, memory-saver keys, quality knobs and the
-    preset step bounds. Moved verbatim; mutates cur in place."""
+def _ts_apply_network_and_optim(patch, cur):
+    """LoRA architecture and optimisation levers (dropout, alpha, LoKr,
+    optimizer, schedules, guidance). Moved verbatim; mutates cur in
+    place, including the automagic3/grad_accum cross-check."""
+    _ts_apply_regularisation(patch, cur)
+    _ts_apply_optim(patch, cur)
+    _ts_apply_network_arch(patch, cur)
+
+
+def _ts_apply_data_and_memory(patch, cur):
+    """Caption/mask data levers plus the boolean memory-setting keys.
+    Moved verbatim; mutates cur in place."""
     if 'dual_captions' in patch:
         # Plain boolean lever: truthy stores True, anything falsy drops the key so OFF is
         # byte-identical to a dataset that never touched it.
@@ -3052,6 +3071,11 @@ def _ts_apply_levers_memory_quality(patch, cur):
             cur.pop(_mk, None)
         else:
             raise ValueError(f'{_mk} must be true, false or auto')
+
+
+def _ts_apply_quality_and_precision(patch, cur):
+    """Learning-rate/decay/loss quality levers plus quantisation, offloading,
+    save dtype and preset-step keys. Moved verbatim; mutates cur in place."""
     if 'learning_rate' in patch:
         # Not a general Advanced-options control: the family-fixed 1e-4 (or the
         # Prodigy lr=1 convention) is the default, and only the ▶ Continue dialog's
@@ -3132,6 +3156,13 @@ def _ts_apply_levers_memory_quality(patch, cur):
             cur[key] = v
         else:
             raise ValueError(f'{key} must be a positive integer (or auto)')
+
+
+def _ts_apply_levers_memory_quality(patch, cur):
+    """Boolean/tri-state levers, memory-saver keys, quality knobs and the
+    preset step bounds. Moved verbatim; mutates cur in place."""
+    _ts_apply_data_and_memory(patch, cur)
+    _ts_apply_quality_and_precision(patch, cur)
 
 
 
@@ -4204,7 +4235,7 @@ def _mask_fields(dataset_folder: str) -> dict:
         if isinstance(meta, dict) and isinstance(meta.get('mask_min_value'), (int, float)):
             min_value = float(meta['mask_min_value'])
     except (OSError, ValueError, TypeError):
-        pass
+        pass   # optional sidecar: absent or corrupt meta keeps the default floor
     return {'mask_path': md, 'mask_min_value': min_value}
 
 
@@ -5542,7 +5573,7 @@ def list_checkpoints(user_id, dataset_id, base_model=_PERSISTED, family=None,
                     'Full-state resume is unavailable for this run: '
                     + '; '.join(bridge_reasons))
     except (OSError, ValueError, TypeError):
-        pass
+        pass   # advisory detail only: resume stays offered without the sentence
     for c in out:
         state = state_by_step.get(int(c['step']))
         if state is not None:
@@ -5911,7 +5942,7 @@ def list_imported_checkpoints(user_id, dataset_id, family=None) -> list[dict]:
             # 2026-07-13: imports succeeded but "in ComfyUI" stayed at 0).
             cloud_prefixes.add(f'lds{r.id}_')
     except Exception:
-        pass
+        pass   # best-effort prefix harvest: one broken row must not hide the others
     subfolder = _FAMILY_SUBDIR.get(fam, 'z image')
     out, seen = [], set()
     for dest_dir, fn in sorted(((d, fn) for d in dirs for fn in os.listdir(d)),
@@ -6141,7 +6172,7 @@ def _dir_size(path) -> int:
             try:
                 total += os.path.getsize(os.path.join(dirpath, f))
             except OSError:
-                pass
+                pass   # vanished mid-walk: a size sum stays best-effort
     return total
 
 
@@ -6155,14 +6186,14 @@ def dataset_disk_usage(user_id, dataset_id, base_model=_PERSISTED, family=None,
         if os.path.isdir(rd):
             out['run_dir_bytes'] = _dir_size(rd)
     except Exception:
-        pass
+        pass   # a disk-usage figure is advisory: what cannot be sized just does not count
     try:
         from ..models import CloudTrainingRun
         for r in CloudTrainingRun.query.filter_by(dataset_id=dataset_id).all():
             if r.staging_dir and os.path.isdir(r.staging_dir):
                 out['cloud_staging_bytes'] += _dir_size(r.staging_dir)
     except Exception:
-        pass
+        pass   # a disk-usage figure is advisory: what cannot be sized just does not count
     try:
         ds = fds.get_dataset(user_id, dataset_id)
         fam = _train_type(ds, family)
@@ -6171,9 +6202,9 @@ def dataset_disk_usage(user_id, dataset_id, base_model=_PERSISTED, family=None,
             try:
                 out['deployed_bytes'] += os.path.getsize(p) if p else 0
             except OSError:
-                pass
+                pass   # vanished or unresolvable: the sum stays best-effort
     except Exception:
-        pass
+        pass   # outer belt over the whole loop: the figure stays advisory either way
     out['total_bytes'] = sum(v for k, v in out.items() if k.endswith('_bytes'))
     return out
 
@@ -6231,7 +6262,7 @@ def purge_training_artifacts(user_id, trigger_safe) -> list[str]:
         try:
             output_datasets_roots.append(str(accessor()))
         except RuntimeError:
-            pass
+            pass   # an unconfigured root is simply not a candidate
     for root in output_datasets_roots:
         if not os.path.isdir(root):
             continue
@@ -6505,7 +6536,7 @@ def recommended_steps(dataset_id, train_type=None, variant=None) -> int:
     lancement en cours plutôt qu'un ancien choix persisté.
     """
     ds = _train_context_view(
-        FaceDataset.query.get(dataset_id), train_type, variant)
+        db.session.get(FaceDataset, dataset_id), train_type, variant)
     n = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep').count()
     if ds is not None and slider_mode_enabled(ds):
         # Slider (mode, Beta) : la direction est définie par les prompts, pas par
@@ -6543,7 +6574,7 @@ def recommended_steps_info(dataset_id, train_type=None, variant=None) -> dict:
     pourquoi, afin que l'app apprenne au débutant au lieu de décider en boîte
     noire. Ne mute rien."""
     ds = _train_context_view(
-        FaceDataset.query.get(dataset_id), train_type, variant)
+        db.session.get(FaceDataset, dataset_id), train_type, variant)
     n = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep').count()
     kind = (ds.kind or 'character') if ds is not None else 'character'
     steps = recommended_steps(dataset_id, train_type=train_type, variant=variant)
@@ -6630,7 +6661,7 @@ def _style_caption_quality_from_rows(ds, rows) -> dict:
 
 def style_caption_quality(dataset_id) -> dict:
     """Public read-only Style quality report used by routes/tests and preflight."""
-    ds = FaceDataset.query.get(dataset_id)
+    ds = db.session.get(FaceDataset, dataset_id)
     if ds is None or not fds.is_style(ds):
         return {'caption_count': 0, 'distinct_caption_count': 0,
                 'trigger_only_count': 0, 'all_identical': False, 'issues': []}
@@ -7054,7 +7085,7 @@ def _pf_vram(ds, ttype, label, _machine_warn, _check):
                    f'{vram} GB' + ('' if _at_1024 else ' (already at 768)'),
                    scope='machine')
     except Exception:
-        pass
+        pass   # an advisory VRAM note must never block the preflight it decorates
 
 
 def _pf_torch_arch(_machine_warn, _check):
@@ -7407,7 +7438,7 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
             payload['hf_gated'] = {k: gated[k] for k in ('status', 'repo', 'url',
                                                          'title', 'message')}
     except Exception:
-        pass
+        pass   # diagnosis enricher: a failed probe leaves its section out
     # A dead fast-download accelerator looks exactly like a network fault, and the
     # app never sets that variable — so saying so is the whole remedy (GitHub #18,
     # bobba84).
@@ -7416,7 +7447,7 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
         if transfer:
             payload['hf_transfer'] = transfer
     except Exception:
-        pass
+        pass   # diagnosis enricher: a failed probe leaves its section out
     # A `ModuleNotFoundError` in the log is a PROVEN interpreter problem, and the
     # one fact the log itself never carries is WHICH Python produced it. The
     # module is read off the log — no subprocess is spawned from the watcher
@@ -7435,7 +7466,7 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
                     'python', 'module', 'windows_store', 'alternative',
                     'title', 'message')}
     except Exception:
-        pass
+        pass   # diagnosis enricher: a failed probe leaves its section out
     try:
         from .. import capabilities
         arch = torch_arch_verdict(capabilities.aitoolkit_torch_info(),
@@ -7443,7 +7474,7 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
         if arch and not arch['supported']:
             payload['gpu_arch'] = {'message': arch['message'], 'command': arch['command']}
     except Exception:
-        pass
+        pass   # diagnosis enricher: a failed probe leaves its section out
     return payload
 
 
@@ -8059,7 +8090,7 @@ def _lt_spawn_transaction(ds, user_id, dataset_id, steps, masked, launch_fam,
                 try:
                     logf.close()
                 except OSError:
-                    pass
+                    pass   # closing the log is courtesy inside an error path already being reported
             try:
                 _clear_training_identity(ttl_seconds=None)
             except Exception:
@@ -8274,7 +8305,7 @@ def _fsync_directory(path) -> None:
     try:
         os.fsync(descriptor)
     except OSError:
-        pass
+        pass   # fsync is belt-and-braces: close() already flushed the bytes
     finally:
         os.close(descriptor)
 
@@ -8484,7 +8515,7 @@ def _copy_verified_exact_checkpoint(source: Path, destination: Path, record) -> 
         try:
             temporary.unlink()
         except FileNotFoundError:
-            pass
+            pass   # already gone: exactly the state the unlink wanted
 
 
 def _archive_and_seed_exact_bundle(
@@ -9025,7 +9056,7 @@ def stop_training(expected_dataset_id=None, expected_run_token=None,
 def _dataset_name(dataset_id):
     if dataset_id is None:
         return None
-    ds = FaceDataset.query.get(int(dataset_id))
+    ds = db.session.get(FaceDataset, int(dataset_id))
     return ds.name if ds else f'#{dataset_id}'
 
 
@@ -9061,7 +9092,7 @@ def assert_trainable(dataset_id, train_type=None, allow_caption_mismatch=False,
     levées par ce flag : 0 image gardée (rien à entraîner) et, en mode slider, la
     paire de prompts absente (aucune direction à apprendre) — ai-toolkit planterait."""
     kept = FaceDatasetImage.query.filter_by(dataset_id=dataset_id, status='keep').count()
-    ds_ = FaceDataset.query.get(dataset_id)
+    ds_ = db.session.get(FaceDataset, dataset_id)
     if ds_ is not None and slider_mode_enabled(ds_):
         # Slider mode (Beta): images are only a denoising substrate — a small
         # varied set is enough — and captions are encoded but IGNORED by the
@@ -9233,7 +9264,7 @@ def training_status(user_id=None) -> dict:
         # id does not name. Answering them from the colliding face row is how the
         # run ends up on the wrong page under the wrong name.
         from ..models import VideoDataset
-        vds = VideoDataset.query.get(int(cur_id))
+        vds = db.session.get(VideoDataset, int(cur_id))
         current = {
             'dataset_id': cur_id,
             'dataset_table': cur_table,
@@ -9251,7 +9282,7 @@ def training_status(user_id=None) -> dict:
             'recipe_warning': None,
         }
     elif in_progress and cur_id is not None:
-        ds = FaceDataset.query.get(int(cur_id))
+        ds = db.session.get(FaceDataset, int(cur_id))
         fam = (queue_manager._get_system_state('training_train_type', None)
                or (_train_type(ds) if ds else None))
         variant = (queue_manager._get_system_state('training_variant', None)
@@ -9466,7 +9497,7 @@ def _parse_training_log(text: str) -> dict:
             try:
                 loss = float(lm.group(1))
             except ValueError:
-                continue
+                continue   # a line that only LOOKS like a loss sample: skip it
             out['loss'] = loss
             if not curve or curve[-1][0] != step:
                 curve.append([step, loss])
@@ -10311,7 +10342,7 @@ def _snapshot_final_checkpoint(dataset_id, step, base_model=_PERSISTED,
         return None
     if step <= 0 or dataset_id is None:
         return None
-    ds = FaceDataset.query.get(int(dataset_id))
+    ds = db.session.get(FaceDataset, int(dataset_id))
     if not ds:
         return None
     trigger = _safe_trigger(ds)

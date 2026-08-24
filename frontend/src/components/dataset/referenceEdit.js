@@ -93,7 +93,7 @@ export function editRefSupport(engine) {
  *  an input whose files are thrown away is worse than none. Mirrors
  *  face_dataset_service.MODAL_EDIT_REF_LIMITS. */
 const MODAL_REF_LIMITS = { modal_one: 1 };
-export function modalRefLimit(engine) {
+function modalRefLimit(engine) {
   return MODAL_REF_LIMITS[editRefSupport(engine)] || 0;
 }
 
@@ -193,7 +193,7 @@ export function editKeepNote() {
  *  stored legacy API tag must come back "no reason" rather than borrow a local
  *  engine's sentence and tell the user to download a weight for an engine this
  *  fork does not ship. Same rule localEngineUnavailableReason follows. */
-export function editEngineBlockedBy(engine, { available = {}, reasonFor = null } = {}) {
+function editEngineBlockedBy(engine, { available = {}, reasonFor = null } = {}) {
   if (!LOCAL_ENGINES.includes(engine)) return null;
   if (available[engine]) return null;
   const reason = typeof reasonFor === 'function' ? reasonFor(engine) : null;

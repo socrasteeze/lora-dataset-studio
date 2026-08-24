@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { Card, INPUT_CLASS } from './primitives'
+import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
+import { STORAGE_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
 import Fp8QuantizeTool from '../dataset/Fp8QuantizeTool'
 import {
@@ -309,8 +311,15 @@ export default function StorageSection({
     config, setField, configDefaults, saveConfigPatch, toast, onChanged: changed,
   })
 
+  // Summary + collapsible groups — same shells as Image engines; deep-links
+  // and search open a collapsed group on their own.
+  const [overviewGroup, locationsGroup, housekeepingGroup, modelsGroup] = STORAGE_GROUPS
+  const groupProps = useSettingsGroupProps('storage')
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <SettingsGroupsToc sectionId="storage" groups={STORAGE_GROUPS} />
+
+      <SettingsGroup {...groupProps(overviewGroup)}>
       <Card title="What lives where"
         help="Every folder this app writes to, with the drive it sits on. Sizes are measured only when you ask — walking a hundred gigabytes of datasets is not something a page should do while you read it.">
         <div className="flex flex-wrap items-center gap-3">
@@ -352,13 +361,22 @@ export default function StorageSection({
         </div>
       </Card>
 
+      </SettingsGroup>
+
+      <SettingsGroup {...groupProps(locationsGroup)}>
       <LocationEditor id="dataset-images-root" storageKey="datasets"
         label="Dataset images root" section="paths" field="dataset_images_root"
         help="Where dataset images live on disk — usually the biggest folder of all."
         {...shared('datasets')} />
 
+      </SettingsGroup>
+
+      <SettingsGroup {...groupProps(housekeepingGroup)}>
       <TrashCard reloadKey={reloadKey} />
       <RunArchiveCard />
+      </SettingsGroup>
+
+      <SettingsGroup {...groupProps(modelsGroup)}>
 
       {/* The SAME component the ordinary Training panel renders — imported, not
           copied, so the refusals (already quantized, LoRA, overwriting the
@@ -372,6 +390,7 @@ export default function StorageSection({
         help="A full-precision model — downloaded from Hugging Face, or a large finetune someone shared — is about 2.5× the size ComfyUI needs to generate with it. Point this at one and it writes the ~10 GB fp8 version next to the original, on this machine, without ever modifying the source.">
         <Fp8QuantizeTool framed={false} />
       </Card>
+      </SettingsGroup>
     </div>
   )
 }

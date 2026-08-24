@@ -65,14 +65,15 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
   // What the selection WEIGHS. Asked once, for the exact set the server would
   // copy — never estimated from an average, because the day a bank holds video
   // that average is wrong by three orders of magnitude.
+  const idsKey = selectedIds.join(',')
   useEffect(() => {
     let live = true
-    const qs = useSelection ? `?ids=${selectedIds.join(',')}` : ''
+    const qs = useSelection ? `?ids=${idsKey}` : ''
     apiFetch(`/api/bank/${bankId}/selection-size${qs}`)
       .then((d) => { if (live) setSize(d) })
       .catch(() => { if (live) setSize(null) })
     return () => { live = false }
-  }, [bankId, useSelection, selectedIds.join(',')])
+  }, [bankId, useSelection, idsKey])
 
   const start = async () => {
     if (!canStartPromote({

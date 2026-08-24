@@ -45,6 +45,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from _harness import _log
 
 # Library banners belong on the progress channel, not the result one: a bare
 # print() from a dependency used to land on stdout ahead of the JSON line and
@@ -60,14 +61,8 @@ MODEL_NAME = 'ViT-L-14'
 PRETRAINED = 'openai'
 
 
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
 def _emit(obj):
     print(json.dumps(obj), flush=True, file=_OUT)
-
-
 def main() -> int:
     raw = sys.stdin.readline()
     try:

@@ -1,5 +1,6 @@
 import json
-from datetime import datetime, timedelta
+from .utils.timestamps import naive_utcnow
+from datetime import timedelta
 from .extensions import db
 from sqlalchemy import Integer, String, Text, DateTime, Float
 
@@ -798,6 +799,15 @@ class LoraTestImage(db.Model):
     # their rows and read NULL everywhere (see _SCHEMA_ADDITIONS).
     parent_image_id = db.Column(Integer, nullable=True, index=True)
     derivation_kind = db.Column(String(32), nullable=True)
+    # ✨ The knobs the improve pass ACTUALLY ran with, as JSON — written by
+    # improve_canvas_image from the very dict handed to the engine, so what is
+    # stored can never drift from what executed. Klein only (a restoration
+    # pass has no knobs to record); NULL on every row that is not an improve
+    # result and on rows that predate the column. Read by ↩ "Use these
+    # improve settings"; keys are published as-is by _gallery_image, so they
+    # are part of the frontend contract (improveSettingsRestore.js) — never
+    # rename one without an alias. Additive column (see _SCHEMA_ADDITIONS).
+    improve_profile = db.Column(Text, nullable=True)
 
     def __repr__(self):
         return f'<LoraTestImage {self.id} ds={self.dataset_id} {self.checkpoint}@{self.strength} {self.status}>'
@@ -827,11 +837,11 @@ class JobQueueMixin:
             self.comfyui_prompt_id = comfyui_prompt_id
 
         if new_status == 'processing':
-            self.started_at = datetime.utcnow()
+            self.started_at = naive_utcnow()
         elif new_status in ('completed', 'failed', 'cancelled'):
-            self.completed_at = datetime.utcnow()
+            self.completed_at = naive_utcnow()
 
-        self.last_heartbeat = datetime.utcnow()
+        self.last_heartbeat = naive_utcnow()
 
     def is_stuck(self, timeout_minutes=10):
         """True if the job is in-progress but heartbeat is missing/stale."""
@@ -839,7 +849,7 @@ class JobQueueMixin:
             return False
         if not self.last_heartbeat:
             return True
-        return datetime.utcnow() - self.last_heartbeat > timedelta(minutes=timeout_minutes)
+        return naive_utcnow() - self.last_heartbeat > timedelta(minutes=timeout_minutes)
 
 
 class ImageGenerationQueue(JobQueueMixin, db.Model):
@@ -934,7 +944,7 @@ class SystemState(db.Model):
     __tablename__ = 'system_state'
     key = db.Column(db.String(64), primary_key=True)
     value = db.Column(db.Text)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=naive_utcnow, onupdate=naive_utcnow)
 
 
 class BankQueueEntry(db.Model):
@@ -971,7 +981,7 @@ class BankQueueEntry(db.Model):
     # across two machines after a restore either.
     group_key = db.Column(db.String(128))
     enqueued_at = db.Column(db.Float)                     # time.time(), as the FIFO stores it
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=naive_utcnow)
 
 
 class PeerTrainingRun(db.Model):
@@ -1036,8 +1046,8 @@ class PeerTrainingRun(db.Model):
     train_params = db.Column(db.Text)             # JSON: steps/variant/train_type/masked
     record_id = db.Column(db.Integer)             # the TrainingRunRecord this launch created
     error = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=naive_utcnow)
+    updated_at = db.Column(db.DateTime, default=naive_utcnow, onupdate=naive_utcnow)
     # Same lesson as the cloud lane, and as the sibling project's
     # `cancel_requested` column: an in-memory threading.Event does not survive a
     # restart and can only be enforced by the monitor thread — which is exactly
@@ -1093,8 +1103,8 @@ class CloudTrainingRun(db.Model):
     checkpoint_local_path = db.Column(db.Text)
     train_params = db.Column(db.Text)             # JSON: steps/variant/train_type/masked
     error = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=naive_utcnow)
+    updated_at = db.Column(db.DateTime, default=naive_utcnow, onupdate=naive_utcnow)
     # When the user asked this run to stop. Durable on purpose: an in-memory
     # threading.Event does not survive a restart and cannot be enforced by
     # anything but the monitor thread — which is exactly what may be dead.
@@ -1153,7 +1163,7 @@ class TrainingRunRecord(db.Model):
     # Kept distinct so a reconstructed edge stays auditable and reversible.
     lineage_origin = db.Column(db.String(16))
     note = db.Column(db.Text)                                # free-form run note (Lab)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=naive_utcnow)
 
 
 class CheckpointNote(db.Model):
@@ -1199,7 +1209,7 @@ class CheckpointPreview(db.Model):
     lora_test_image_id = db.Column(db.Integer, nullable=True)
     prompt = db.Column(db.Text, nullable=False, default='')
     seed = db.Column(db.BigInteger, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=naive_utcnow)
     # No UniqueConstraint on (record_id, step) — see the class docstring. The
     # composite index replaces it: the reads are all "every preview of this
     # checkpoint", which is exactly what the old unique index used to serve.
@@ -1226,7 +1236,7 @@ class TrainingPreset(db.Model):
     dataset_kind = db.Column(db.String(16), nullable=True)
     variants = db.Column(db.Text, nullable=True)
     settings = db.Column(db.Text, nullable=False, default='{}')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=naive_utcnow)
 
 
 class CanvasNodePosition(db.Model):
@@ -1264,8 +1274,8 @@ class CanvasNodePosition(db.Model):
     record_id = db.Column(db.Integer, nullable=False, index=True)
     x = db.Column(Float, nullable=False, default=0.0)
     y = db.Column(Float, nullable=False, default=0.0)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
-                           onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=naive_utcnow,
+                           onupdate=naive_utcnow)
     dataset = db.relationship('FaceDataset')
     __table_args__ = (db.UniqueConstraint('dataset_id', 'record_id',
                                           name='uq_canvas_node_position'),)
@@ -1343,8 +1353,8 @@ class CanvasImageNode(db.Model):
     # predates them reads NULL everywhere and draws the board it always drew.
     group_id = db.Column(db.String(40), nullable=True)
     group_pos = db.Column(db.Integer, nullable=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
-                           onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=naive_utcnow,
+                           onupdate=naive_utcnow)
     dataset = db.relationship('FaceDataset')
     __table_args__ = (db.UniqueConstraint('dataset_id', 'image_id',
                                           name='uq_canvas_image_node'),)
@@ -1384,9 +1394,9 @@ class CanvasLayoutPreset(db.Model):
     user_id = db.Column(String(36), nullable=False, index=True, default='local')
     name = db.Column(db.String(80), nullable=False)
     payload = db.Column(db.Text, nullable=False, default='{}')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
-                           onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=naive_utcnow)
+    updated_at = db.Column(db.DateTime, default=naive_utcnow,
+                           onupdate=naive_utcnow)
     __table_args__ = (db.UniqueConstraint('user_id', 'name',
                                           name='uq_canvas_layout_preset'),)
 
@@ -1404,7 +1414,7 @@ class ClusterDevice(db.Model):
     capabilities = db.Column(Text, nullable=True)  # JSON blob from peer heartbeat
     last_heartbeat = db.Column(DateTime, nullable=True)
     busy = db.Column(Integer, default=0, nullable=False)  # 0/1
-    created_at = db.Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(DateTime, default=naive_utcnow, nullable=False)
     revoked_at = db.Column(DateTime, nullable=True)
 
     def to_dict(self, *, online_ttl_seconds=90):
@@ -1416,7 +1426,7 @@ class ClusterDevice(db.Model):
                 caps = {}
         online = False
         if self.last_heartbeat and not self.revoked_at:
-            online = (datetime.utcnow() - self.last_heartbeat) < timedelta(
+            online = (naive_utcnow() - self.last_heartbeat) < timedelta(
                 seconds=online_ttl_seconds)
         return {
             'id': self.id,
@@ -1437,7 +1447,7 @@ class ClusterJoinToken(db.Model):
     id = db.Column(Integer, primary_key=True)
     token_hash = db.Column(String(128), nullable=False, unique=True)
     label = db.Column(String(120), nullable=True)
-    created_at = db.Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(DateTime, default=naive_utcnow, nullable=False)
     expires_at = db.Column(DateTime, nullable=True)
     redeemed_at = db.Column(DateTime, nullable=True)
     redeemed_device_id = db.Column(String(36), nullable=True)
@@ -1471,7 +1481,7 @@ class ClusterJob(db.Model):
     progress = db.Column(Text, nullable=True)  # JSON
     error_message = db.Column(Text, nullable=True)
     image_job_id = db.Column(String(36), nullable=True, index=True)
-    created_at = db.Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(DateTime, default=naive_utcnow, nullable=False)
     claimed_at = db.Column(DateTime, nullable=True)
     completed_at = db.Column(DateTime, nullable=True)
     last_heartbeat = db.Column(DateTime, nullable=True)

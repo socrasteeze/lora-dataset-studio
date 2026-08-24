@@ -70,6 +70,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from _harness import _cancel_requested, _log
 
 # Library banners belong on the progress channel, not the result one: a bare
 # print() from a dependency used to land on stdout ahead of the JSON line and
@@ -109,20 +110,8 @@ _PROB_DECIMALS = 4
 _INPUT_SIZE = (27, 48, 3)
 
 
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
 def _emit(obj):
     print(json.dumps(obj), file=_OUT, flush=True)
-
-
-def _cancel_requested(cancel_file):
-    """The parent drops this sentinel file to ask for a clean stop between
-    videos, rather than killing a process holding a loaded model."""
-    return bool(cancel_file) and os.path.exists(cancel_file)
-
-
 def _predictions_to_scenes(probs, threshold=0.5):
     """Per-frame transition probabilities -> [start, end] frame-index pairs
     (both inclusive), in playback order.

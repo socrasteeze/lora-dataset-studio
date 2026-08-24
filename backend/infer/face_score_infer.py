@@ -17,6 +17,7 @@ import json, os, sys
 # points at stderr, so anything a library prints is progress output.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from infer_io import claim_result_stream  # noqa: E402
+from _harness import _log  # noqa: E402
 _OUT = claim_result_stream(__name__)
 
 DET_MIN, YAW_MAX = 0.50, 40.0
@@ -52,9 +53,6 @@ ZOOM_RETRY_MIN_SIDE = 1280
 # reason as every constant above it: same question, same answer. Pinned by
 # test_face_score_zoom_rescue.
 DET_SIZE = (640, 640)
-
-
-def _log(m): print(m, file=sys.stderr, flush=True)
 
 
 def _verdict(det, face_px, yaw):
