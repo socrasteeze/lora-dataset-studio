@@ -82,7 +82,65 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
-{
+  {
+    id: '2026-08-24-crop-clears-dataset-framing',
+    date: '2026-08-24',
+    title: 'Crop a shot, and Composition forgets the old framing',
+    blurb:
+      'Cropping a body shot into a face used to leave Composition still counting '
+      + 'it as a body. A crop now clears that shot type — the same way the Bank '
+      + 'already does — so the image drops out of the mix until 📐 Classify framing '
+      + 're-reads just the ones you cut. Untouched images stay as they were.',
+    to: '/datasets?section=add',
+  },
+  {
+    id: '2026-08-24-gallery-page',
+    date: '2026-08-24',
+    title: 'A Gallery of everything you ever generated',
+    blurb:
+      '🖼 Gallery in the top bar is one feed of every image the app made — Test '
+      + 'Studio cells, Canvas previews, comparison runs and ✨ improvements — '
+      + 'across every dataset, newest first, with filters (dataset, renders vs '
+      + 'improved, 👍 liked). The viewer walks the feed with ‹ › or the arrow '
+      + 'keys, shows everything a picture was made from, and carries the '
+      + 'actions you already know: ⬇ Download under its lineage name, ✨ '
+      + 'Upscale & improve (result lands at the top of the feed), and a Select '
+      + 'mode to 🗑 delete misses or ⬇ ZIP a pick. Built for the phone as much '
+      + 'as the desktop.',
+    to: '/gallery',
+  },
+  {
+    id: '2026-08-24-improve-lora-preset',
+    date: '2026-08-24',
+    title: 'Upscale & improve can now chain your LoRA presets',
+    blurb:
+      'The ✨ pass ran with its instruction and nothing else — your generation '
+      + 'LoRA presets (Settings ▸ Engines) never applied to it. The improve '
+      + 'note now has a LoRA preset picker next to the instruction editor: '
+      + 'pick one and every Klein improve chains it after the consistency '
+      + 'LoRA — the single pass, the 🔄 re-run and the batch alike, in every '
+      + 'dataset (it is app-wide, like the instruction, and the panel says '
+      + 'so). SeedVR2 stays a pure restoration. A renamed or deleted preset '
+      + 'quietly runs as None, never a blocked pass — and the result records '
+      + 'which LoRAs actually ran in its details.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-24-bank-forgets-missing-images',
+    date: '2026-08-24',
+    title: 'A bank can now let go of images that are really gone',
+    blurb:
+      'The "no longer in the folder" warning used to have one remedy — Move '
+      + 'folder… — which did not help when the files were really deleted (a '
+      + 'downloader that cleans up after itself, a by-hand tidy): the ghost rows '
+      + 'failed to load for ever and kept counting against the bank\'s ceiling. '
+      + 'The warning now also offers 🧹 Forget missing: after a fresh check and '
+      + 'a confirmation with the exact count, the bank drops just those rows. '
+      + 'Files on disk are never touched, and a disconnected drive is refused '
+      + 'outright — it can never erase your triage.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-23-the-app-opens-lighter',
     date: '2026-08-23',
     title: 'The app opens on a bundle seven times lighter',
@@ -750,8 +808,8 @@ export function markAllSeen(storage, entries = WHATS_NEW) {
 
 // Param-less top-level routes (mirror App.jsx <Routes>).
 const TOP_LEVEL_ROUTES = new Set([
-  '/datasets', '/bank', '/video-bank', '/studio', '/cloud', '/canvas', '/guide',
-  '/help', '/setup',
+  '/datasets', '/bank', '/video-bank', '/studio', '/cloud', '/canvas', '/gallery',
+  '/guide', '/help', '/setup',
 ]);
 
 const SETTINGS_IDS = new Set(SETTINGS_SECTIONS.map((s) => s.id));

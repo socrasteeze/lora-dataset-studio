@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { apiFetch, del, patchJson, postJson } from '../../api/fetchClient'
+import { apiFetch, patchJson, postJson } from '../../api/fetchClient'
+import { useFolderPersons } from './useFolderPersons'
+import { useReviewLightbox } from './useReviewLightbox'
+import { useCaptionOptions } from './useCaptionOptions'
+import { useCurationLanes } from './useCurationLanes'
 import { useToast } from '../common/Toast'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
@@ -12,7 +16,6 @@ import BankDecisionBar from './BankDecisionBar.jsx'
 // move into upstream's new components, so its imports belong here still.
 import { idsFromResponse } from './bankIds.js'
 import { initialFiltersOpen, loadFiltersOpen, saveFiltersOpen } from './bankFilterPanelOpen.js'
-import { forgetMissingConfirm } from './bankSync.js'
 import { scoreGpuHoldNote } from './bankScoreDevice.js'
 import { bankFilterSummary, bankFilterCount } from './bankFilterSummary.js'
 import { showTagFilters, tagsButtonLabel, tagsButtonState } from './wd14Gate.js'
@@ -46,6 +49,7 @@ import ScoringPythonDialog from './ScoringPythonDialog'
 import PipelineReport from './PipelineReport'
 import FolderSyncNote from './FolderSyncNote'
 import RelocateBankDialog from './RelocateBankDialog'
+import ForgetMissingDialog from './ForgetMissingDialog'
 import BankReviewLightbox from './BankReviewLightbox'
 import PersonPreflightDialog from './PersonPreflightDialog'
 import { preflightNeeded, preflightWillSample } from './personPreflight.js'
@@ -59,7 +63,7 @@ import { PICKER_PROFILES } from './scoringPython.js'
 // Reuse the dataset's register list so the Bank lane never drifts from it — and the
 // same ENGINE list, so "which engine" means the same thing on both surfaces.
 import {
-  CAPTION_LENGTH_OPTIONS, ENGINE_OPTIONS, OLLAMA_RELEVANT, VOCABULARY_OPTIONS,
+  CAPTION_LENGTH_OPTIONS, ENGINE_OPTIONS, VOCABULARY_OPTIONS,
 } from '../dataset/CaptionOptionsPopover'
 // Which pile the caption pass is aimed at, and the number the button quotes (pure).
 import {
@@ -77,7 +81,8 @@ import { passScopeOption } from './bankPassScope.js'
 import PassDialog from './PassDialog.jsx'
 import { BANK_PASSES } from './bankPasses.js'
 import {
-  semanticEngineLabel, semanticEnginePatchBody, semanticEngineState, semanticPrerequisite,
+  semanticEngineLabel, semanticEnginePatchBody, semanticEngineState,
+  semanticPayloadMatches, semanticPrerequisite,
 } from './bankSemanticEngine.js'
 // Ordered zone model + the "what's next" accent, both pure/testable.
 // Grid ordering menu (which sorts exist, and which ones have data) — pure/testable.
@@ -88,14 +93,14 @@ import { tagsParam, selectionTagCounts } from './bankTags.js'
 // 🔤 Text search wording — "closest", never "matching" — plus the cold-start and
 // CLIP-limitation copy. Pure/testable (node --test cannot parse this JSX).
 import {
-  PUSH_DOWN_DEFAULT_STRENGTH, PUSH_DOWN_STRENGTHS, pushDownCaveat, pushDownNote,
+  PUSH_DOWN_STRENGTHS, pushDownCaveat, pushDownNote,
   limitsSentence, pendingLabel, readinessHint, suggestPushDown, summarize,
   withoutNegation,
 } from './bankTextSearch.js'
 // ⚖ Balanced pick — the distribution obtained, in words and numbers. Pure logic
 // on purpose: the repartition is what has to be provable (node --test, no JSX).
 import {
-  BALANCE_AXES, BALANCE_DEFAULT_AXIS, balanceNotes, balanceReadiness,
+  BALANCE_AXES, balanceNotes, balanceReadiness,
   balanceRows, summarizeBalance,
 } from './bankBalance.js'
 // 🎨 Medium + ⤢ Angle — buckets, tooltips and, above all, the LIMITS each row
@@ -116,10 +121,6 @@ import { chipCounts, facetDataKey, isFacetFiltered } from './bankFacetCounts.js'
 // address at all. Read-only; it selects, it never un-rejects.
 import { reasonBuckets, reasonHint } from './bankRejectReasons.js'
 
-function semanticPayloadMatches(payload, engine, modelKey = null) {
-  return payload?.engine === engine
-    && (!modelKey || payload?.model_key === modelKey)
-}
 
 const PAGE_SIZE = 120
 /* The Curate row's five buttons, one style. They were the same gray text-xs as
@@ -232,12 +233,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // so without this the row would compute the answer and then delete the question.
   const [tagFreeze, setTagFreeze] = useState(null)
   const [subfolders, setSubfolders] = useState([])
-  // 👤 Folder-level person assertions ("this subfolder is one person").
-  const [folderPersons, setFolderPersons] = useState([])
-  // The whole folder-person payload: assertions PLUS the suggestions the app
-  // probed by itself, and what a scan would cost.
-  const [folderPersonInfo, setFolderPersonInfo] = useState(null)
-  const [folderPersonBusy, setFolderPersonBusy] = useState(false)
   // 👤 The preflight of the person pass: { plan, probing, run } — `run` is the
   // pass (or the whole 🚀 Launch all) the user actually asked for, held until
   // they have answered the folder question.
@@ -267,6 +262,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [pythonPickerFor, setPythonPickerFor] = useState('')
   const [dismissedReportAt, setDismissedReportAt] = useState(null)
   const [relocating, setRelocating] = useState(false)
+  const [forgettingMissing, setForgettingMissing] = useState(false)
   const [openingSourceFolder, setOpeningSourceFolder] = useState(false)
   const [rejectFlags, setRejectFlags] = useState(() => new Set(['blur', 'uniform']))
   const [showAutoReject, setShowAutoReject] = useState(false)
@@ -305,37 +301,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const openRail = useCallback(() => setRail(true), [setRail])
   const closeRail = useCallback(() => setRail(false), [setRail])
   const togglePasses = useCallback(() => setPassesOpen((v) => !v), [])
-  // Curation popovers ('diverse' | 'similar' | null) and their target counts.
-  const [curateOpen, setCurateOpen] = useState(null)
-  const [diverseN, setDiverseN] = useState(60)
-  // Typicality guard for 🎨 Pick diverse. Pure farthest-point sampling maximises
-  // the distance to what is already picked — mathematically the criterion that
-  // prefers ISOLATED images, so the first picks used to be the memes and the
-  // stray photos of someone else. 0 = the historical behaviour, on purpose still
-  // reachable; 0.5 = the default (see BANK_TYPICALITY_DEFAULT rationale in the
-  // service docstring).
-  const [diverseTypicality, setDiverseTypicality] = useState(0.5)
-  const [diverseBusy, setDiverseBusy] = useState(false)
-  // ⚖ Balanced pick — the OTHER question ("does my set cover the framings?").
-  // Axis ids are persisted keys, never renamed (see bankBalance.js).
-  const [balanceN, setBalanceN] = useState(60)
-  const [balanceAxis, setBalanceAxis] = useState(BALANCE_DEFAULT_AXIS)
-  const [balanceBusy, setBalanceBusy] = useState(false)
-  const [balanceResult, setBalanceResult] = useState(null)
-  const [similarN, setSimilarN] = useState(60)
-  const [similarBusy, setSimilarBusy] = useState(false)
-  // 🔤 Text search. `textStatus` is the BEFORE-the-click truth (available? model
-  // already warm? would it download?), `textResult` the AFTER-the-click one that
-  // keeps the ranking legible once the grid has switched to it.
-  const [textQuery, setTextQuery] = useState('')
-  const [textN, setTextN] = useState(60)
-  // 🔤 what to push DOWN the ranking. Not a filter — see bankTextSearch.js.
-  const [textExclude, setTextExclude] = useState('')
-  const [textExcludeW, setTextExcludeW] = useState(PUSH_DOWN_DEFAULT_STRENGTH)
-  const [textStatus, setTextStatus] = useState(null)
-  const [textPending, setTextPending] = useState(false)
-  const [textResult, setTextResult] = useState(null)
-  const semanticOperationBusy = diverseBusy || balanceBusy || similarBusy || textPending
   // "Show selected" VIEW: render ONLY the selected ids, in a chosen order.
   // showSelected flips the grid from the facet page to the selection; selectedOrder
   // holds the order to render them in — the similarity/diversity ranking after a
@@ -352,12 +317,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     viewportWidth: typeof window === 'undefined' ? undefined : window.innerWidth,
   }))
   const toggleFilters = () => setFiltersOpen((v) => { const next = !v; saveFiltersOpen(next); return next })
-  // Caption register for the 🏷️ Caption pass ('' = model's own wording). Explicit is
-  // the NSFW lane — same registers as the dataset caption, passed per-run.
-  const [captionVocab, setCaptionVocab] = useState('')
-  // Caption LENGTH preset, per RUN like the vocabulary register above (a bank has no
-  // caption_options row to persist to). '' = standard: nothing appended to the prompt.
-  const [captionLength, setCaptionLength] = useState('')
   // Which machine runs a pass clicked on its own. Its own remembered value, not
   // the inpaint picker's — both render on this screen and one key for both let
   // a ComfyUI backend picked for Klein decide where a bank pass ran.
@@ -371,17 +330,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       (k) => [k, stepGate(k, { caps, visionReady: !!caps.ollama?.vision_model_ready,
                                device: passDeviceObj })])),
   [caps, passDeviceObj])
-  // WHICH ENGINE and WHICH VISION MODEL write this run's captions. Per RUN, like every
-  // other dial on this row: the global Settings stay the default and are never written
-  // from here, so a user can try a different captioner on one pass without changing what
-  // every dataset does afterwards. '' on either = follow the setting, and the key is then
-  // left OUT of the request — a run that picks nothing is byte-identical to before.
-  const [captionEngine, setCaptionEngine] = useState('')
-  const [captionModel, setCaptionModel] = useState('')
-  // The pulled Ollama models, for the picker. Not in `caps` (which carries only the
-  // configured vision model), so it is its own always-200 fetch — an unreachable Ollama
-  // is an empty list, never an error.
-  const [ollamaModels, setOllamaModels] = useState([])
+  const {
+    captionVocab, setCaptionVocab, captionLength, setCaptionLength,
+    captionEngine, setCaptionEngine, captionModel, setCaptionModel,
+    captionIncludeAsserted, setCaptionIncludeAsserted,
+    visionModel, visionModelLooksUncensored, ollamaPicksApply,
+    captionModelChoices, captionRunOptions,
+  } = useCaptionOptions({ caps })
   /* WHICH PILE each pass runs on, and whether it re-does rows that already have a
      result — kept HERE, not inside the windows, so closing one does not silently
      undo a choice. Keyed by pass id; '' is the historical scope (kept + undecided,
@@ -394,20 +349,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const setPassScope = (id, v) => setPassScopes((p) => ({ ...p, [id]: v }))
   const setPassRedoFor = (id, v) => setPassRedo((p) => ({ ...p, [id]: v }))
   const captionScope = passScopes.caption || ''
-  /* The ESCAPE HATCH, and the reason it is a piece of state and not a request key: it has
-     to be visible, deliberate and re-read in the confirmation. Never persisted, so it
-     resets with the panel — an opt-out of a protection is not a preference. */
-  const [captionIncludeAsserted, setCaptionIncludeAsserted] = useState(false)
   // Coverage advice (idea by @antonp) — a collapsible read-only panel, fetched
   // on demand (and refreshed whenever it's open and the bank changes).
   const [coverageOpen, setCoverageOpen] = useState(false)
   const [coverage, setCoverage] = useState(null)
-  // ▶ Review — the fast-triage lightbox. `review` holds the SNAPSHOT of ids it
-  // walks ({ids, startId}); null when closed. Snapshotting at open is the whole
-  // point: a decision drops the image out of the current filter, so a live list
-  // would reorder under the cursor and make the run skip or loop.
-  const [review, setReview] = useState(null)
-  const [reviewLoading, setReviewLoading] = useState(false)
   // started_at of the last FINISHED activity already announced (toast + grid
   // refresh). `undefined` = no payload seen yet — refreshPayload records the
   // first snapshot silently; the landing effect announces every one after it.
@@ -464,23 +409,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       return null
     }
   }, [bankId, onGone, toast])
-
-  /** Accept that hand-deleted images are gone, so the "N missing" flag clears.
-   *  Rows only — the files are already gone. Never automatic: the folder walk
-   *  stays additive so an unplugged drive cannot wipe a triage, which makes
-   *  accepting the loss the user's explicit call. */
-  const forgetMissing = useCallback(async (missing) => {
-    // eslint-disable-next-line no-alert
-    if (!window.confirm(forgetMissingConfirm(missing))) return
-    try {
-      const out = await postJson(`/api/bank/${bankId}/forget-missing`, {})
-      toast.success(`${out.removed} missing image(s) removed from this bank — no file was touched.`)
-      await refreshPayload({ force: true })
-      refreshImagesRef.current?.()
-    } catch (e) {
-      toast.error(e.message || 'Those rows could not be removed.')
-    }
-  }, [bankId, refreshPayload, toast])
 
   const filterParams = useCallback((f) => {
     const params = {}
@@ -657,26 +585,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       payload?.counts?.captioned, payload?.counts?.scored,
       payload?.counts?.semantic_indexed, payload?.semantic?.engine])
 
-  // 👤 "Single person here" — the folder-level person assertions. Reloaded when
-  // a job LANDS too: the sample check writes its verdict from the background.
-  const loadFolderPersons = useCallback(() => {
-    apiFetch(`/api/bank/${bankId}/folder-persons`)
-      .then((d) => { setFolderPersons(d.assertions || []); setFolderPersonInfo(d) })
-      .catch(() => { setFolderPersons([]); setFolderPersonInfo(null) })
-  }, [bankId])
+  const {
+    folderPersons, folderPersonInfo, folderPersonBusy, loadFolderPersons,
+    assertFolderPerson, revokeFolderPerson, checkFolderPerson,
+    scanFolderPersons,
+  } = useFolderPersons({
+    bankId, live, filter, toast, refreshImages, refreshPayload,
+  })
 
-  useEffect(() => { loadFolderPersons() }, [loadFolderPersons, live])
-
-  // 🏷️ The pulled Ollama models, for the per-run caption model picker. Fetched ONCE per
-  // mount and never blocking: the endpoint always answers 200, and an unreachable Ollama
-  // is an empty list — the picker then offers only "Use the configured model", which is
-  // exactly the truth on that machine.
-  useEffect(() => {
-    let alive = true
-    apiFetch('/api/ollama/models').catch(() => ({ models: [] }))
-      .then((d) => { if (alive) setOllamaModels(d?.models || []) })
-    return () => { alive = false }
-  }, [])
 
   const openSourceFolder = async () => {
     if (openingSourceFolder) return
@@ -690,42 +606,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     }
   }
 
-  const runFolderPerson = async (call, success) => {
-    setFolderPersonBusy(true)
-    try {
-      const d = await call()
-      if (success) toast.success(success(d))
-      // The payload too, not only the grid: an assertion creates (or dissolves)
-      // a person cluster, and the PEOPLE row above would otherwise keep showing
-      // a group that no longer exists until the next poll.
-      loadFolderPersons(); refreshImages(); refreshPayload({ force: true })
-    } catch (e) {
-      toast.error(e?.message || 'That did not work')
-    } finally { setFolderPersonBusy(false) }
-  }
-
-  const assertFolderPerson = () => runFolderPerson(
-    () => postJson(`/api/bank/${bankId}/folder-person`, { subfolder: filter.subfolder }),
-    (d) => `${d.images} image(s) grouped as person #${d.cluster_id} — the face pass `
-      + 'will skip them',
-  )
-
-  const revokeFolderPerson = () => runFolderPerson(
-    () => del(`/api/bank/${bankId}/folder-person`
-      + `?subfolder=${encodeURIComponent(filter.subfolder ?? '')}`),
-    (d) => `${d.cleared} image(s) back to normal clustering`,
-  )
-
-  const checkFolderPerson = () => runFolderPerson(
-    () => postJson(`/api/bank/${bankId}/folder-person/check`,
-      { subfolder: filter.subfolder }),
-    (d) => `Checking ${d.sample_size} images of this folder…`,
-  )
-
-  const scanFolderPersons = () => runFolderPerson(
-    () => postJson(`/api/bank/${bankId}/folder-scan`, {}),
-    () => 'Sampling the folders — nothing is grouped until you confirm',
-  )
 
   // Leaving the selection view: back to the facet grid.
   const exitSelectionView = () => { setShowSelected(false); setSelectedOrder(null) }
@@ -1088,24 +968,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     // remote device — still carries device_id.
     return runPass('faces', {})
   }
-  /* Every option is spread-if-set, so a run that changes nothing posts the SAME body it
-     posted before any of these controls existed — the contract the vocabulary/length
-     pair set and the two new dials join.
-
-     `statuses` is deliberately omitted while a selection is live: the server INTERSECTS
-     the two, so "kept only" plus a selection of undecided images would caption fewer
-     than the button says. The selection wins, the scope select goes inert, and the label
-     switches to the selection count. */
-  // ...(on()) so a peer picked in the Run-on picker still receives the caption
-  // pass through the new scope-window path — passBody spreads `extra` last, so
-  // this rides alongside statuses/image_ids untouched.
-  const captionRunOptions = () => ({
-    ...on(),
-    ...(captionVocab ? { vocabulary: captionVocab } : {}),
-    ...(captionLength ? { length: captionLength } : {}),
-    ...(captionEngine ? { backend: captionEngine } : {}),
-    ...(captionModel ? { ollama_model: captionModel } : {}),
-  })
   const startCaption = (run) => runPass('caption', run, captionRunOptions())
   const cancelJob = () => act(() => postJson(`/api/bank/${bankId}/cancel`, {}), null)
 
@@ -1278,57 +1140,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     }
   }
 
-  // Open ▶ Review over what the user is actually looking at: the whole current
-  // filter (all pages, current sort), or the selection when the "Show selected"
-  // view is on. `startId` (the ▶ on a tile) opens on that image.
-  const openReview = async (startId = null) => {
-    setReviewLoading(true)
-    try {
-      const ids = showSelected
-        ? ((selectedOrder && selectedOrder.length) ? selectedOrder : [...selected])
-        : await fetchAllIds(bankId, filterParams(filter))
-      if (!ids.length) {
-        toast.info('Nothing to review — no image matches the current filter.')
-        return
-      }
-      setReview({ ids, startId })
-    } catch (e) {
-      toast.error(e?.message || 'Could not build the review list.')
-    } finally {
-      setReviewLoading(false)
-    }
-  }
-
-  // One decision landed in the lightbox — refresh the header counters so
-  // kept/rejected/undecided track the run live. The grid is refreshed once, on
-  // close, so its tiles don't shuffle around behind the lightbox.
-  const onReviewDecided = () => { refreshPayload() }
-  // A turn made in ▶ Review must already be right on the tile behind it: the
-  // grid is only refetched on close, and a tile still lying sideways would read
-  // as "it didn't take".
-  const onReviewRotated = (imageId, rotation) => setPage((prev) => ({
-    ...prev,
-    images: prev.images.map((im) => (im.id === imageId
-      ? { ...im, rotation, width: im.height, height: im.width }
-      : im)),
-  }))
-  /* Same rule for a ✂ crop / ↩ revert made in ▶ Review, and it matters MORE here:
-     the tile's thumbnail URL carries the edit generation, so a tile left with the
-     old generation would keep serving the pre-crop image from the browser cache
-     for an hour behind the lightbox. The state comes from the route's own reply
-     rather than being guessed. */
-  const onReviewEdited = (imageId, state) => setPage((prev) => ({
-    ...prev,
-    images: prev.images.map((im) => (im.id === imageId
-      ? { ...im,
-          edit_method: state?.edit_method ?? null,
-          edit_generation: state?.edit_generation ?? 0,
-          rotation: state?.rotation ?? 0,
-          width: state?.width ?? im.width,
-          height: state?.height ?? im.height }
-      : im)),
-  }))
-  const closeReview = () => { setReview(null); refreshPayload(); refreshImages() }
+  const {
+    review, reviewLoading, openReview, onReviewDecided, onReviewRotated,
+    onReviewEdited, closeReview,
+  } = useReviewLightbox({
+    bankId, filter, filterParams, fetchAllIds, showSelected, selected,
+    selectedOrder, setPage, toast, refreshPayload, refreshImages,
+  })
 
   const selectAllCurrent = async () => {
     try {
@@ -1355,172 +1173,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     refreshImages(filter, 0, { on: true, order })
   }
 
-  // The typicality guard reads the whole pool's neighbourhood before sampling, so
-  // on a big bank this click is no longer instant — say so instead of looking dead.
-  const pickDiverse = async () => {
-    const requestEngine = semanticState.engine
-    const requestModelKey = semanticState.modelKey
-    setCurateOpen(null)
-    setDiverseBusy(true)
-    try {
-      const d = await postJson(`/api/bank/${bankId}/select-diverse`,
-        { n: diverseN, typicality: diverseTypicality, ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
-          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
-      if (!d.image_ids?.length) {
-        toast.info(`Nothing to sample — no ${semanticState.label}-indexed images match the current filter.`)
-        return
-      }
-      showCuratedSelection(d.image_ids)
-      toast.info(`Showing the ${d.image_ids.length} most diverse of ${d.pool}. Review, then ✓ Keep or ⬆ Promote — or “Show all” to leave this view.`)
-    } catch (e) {
-      toast.error(e?.message || 'Diversity sampling failed.')
-    } finally {
-      setDiverseBusy(false)
-    }
-  }
-
-  // ⚖ Balanced pick — spread over the framings instead of taking the top of one
-  // ranking. Same embeddings and same typicality guard as 🎨 Pick diverse, applied
-  // INSIDE each bucket. The result is only useful if the user can see its shape,
-  // so the distribution is kept on screen (numbers, aria-live) after the click.
-  const pickBalanced = async () => {
-    const requestEngine = semanticState.engine
-    const requestModelKey = semanticState.modelKey
-    setCurateOpen(null)
-    setBalanceBusy(true)
-    try {
-      const d = await postJson(`/api/bank/${bankId}/select-balanced`,
-        { n: balanceN, axis: balanceAxis, typicality: diverseTypicality,
-          ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
-          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
-      if (!d.image_ids?.length) {
-        toast.info('Nothing to balance — no labelled images match the current filter.')
-        return
-      }
-      setBalanceResult(d)
-      showCuratedSelection(d.image_ids)
-      toast.info(summarizeBalance(d))
-    } catch (e) {
-      // A missing pass is the DEFAULT state of a fresh bank, not a failure: the
-      // backend names the pass, so show that sentence rather than "failed".
-      toast.error(e?.message || 'Balanced selection failed.')
-    } finally {
-      setBalanceBusy(false)
-    }
-  }
-
-  const findSimilar = async () => {
-    const requestEngine = semanticState.engine
-    const requestModelKey = semanticState.modelKey
-    setCurateOpen(null)
-    const ref = [...selected][0]
-    if (ref == null) return
-    setSimilarBusy(true)
-    try {
-      const d = await postJson(`/api/bank/${bankId}/select-similar`,
-        { ref_id: ref, n: similarN, ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
-          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
-      if (!d.image_ids?.length) {
-        toast.info(`No matches — no ${semanticState.label}-indexed images match the current filter.`)
-        return
-      }
-      // Backend returns the ids ranked by similarity (reference first); keep that
-      // order so the view reads closest→farthest instead of by id.
-      showCuratedSelection(d.image_ids)
-      toast.info(`Showing the ${d.image_ids.length} most similar to the reference (of ${d.pool}), closest first. Review, then ✓ Keep or ⬆ Promote — or “Show all” to leave this view.`)
-    } catch (e) {
-      toast.error(e?.message || 'Similarity search failed.')
-    } finally {
-      setSimilarBusy(false)
-    }
-  }
-
-  // 🔤 Text search — same engine as 🎯 Similar, with the reference vector coming
-  // from words instead of a picture. Opening the panel asks the backend what it
-  // is about to cost (model warm? weights present?) so a slow FIRST search is
-  // announced before the click rather than felt as a freeze after it.
-  const openTextSearch = async () => {
-    const next = curateOpen === 'text' ? null : 'text'
-    setCurateOpen(next)
-    if (next !== 'text') {
-      textStatusRequestRef.current += 1
-      releaseTextEncoder()
-      return
-    }
-    const requestId = ++textStatusRequestRef.current
-    const expectedEngine = semanticState.engine
-    if (semanticState.text) setTextStatus(semanticState.text)
-    try {
-      const status = await apiFetch('/api/bank/text-search/status'
-        + `?engine=${encodeURIComponent(expectedEngine)}`)
-      if (requestId === textStatusRequestRef.current
-          && expectedEngine === semanticEngineRef.current
-          && semanticPayloadMatches(status, expectedEngine)) setTextStatus(status)
-    } catch {
-      // The Bank payload already carries an engine-aware status. Keep it when
-      // the optional warm/cold probe cannot be read.
-      if (!semanticState.text) setTextStatus(null)
-    }
-  }
-
-  // Hand the selected text encoder's memory back as soon as the panel closes.
-  // Best effort by design — the backend idle timer remains the guarantee for a
-  // tab that simply vanished.
-  const releaseTextEncoder = (engine = semanticState.engine) => {
-    postJson('/api/bank/text-search/release', semanticEnginePatchBody(engine)).catch(() => {})
-  }
-
-  // Leaving the Bank entirely is the same signal as closing the panel: give the
-  // memory back. The backend idle timer still covers a browser that just died.
-  useEffect(() => () => {
-    postJson('/api/bank/text-search/release',
-      semanticEnginePatchBody(semanticEngineRef.current)).catch(() => {})
-  }, [])
-
-  const runTextSearch = async () => {
-    const q = textQuery.trim()
-    if (!q) return
-    const requestEngine = semanticState.engine
-    const requestModelKey = semanticState.modelKey
-    setTextPending(true)
-    try {
-      const d = await postJson(`/api/bank/${bankId}/search-text`,
-        { query: q, n: textN, push_down: textExclude.trim() || null,
-          push_down_weight: textExcludeW, ...filterParams(filter) })
-      if (semanticEngineRef.current !== requestEngine
-          || !semanticPayloadMatches(d, requestEngine, requestModelKey)) return
-      setTextResult(d)
-      setCurateOpen(null)
-      if (!d.image_ids?.length) {
-        // NOT a silent empty grid: say why nothing could be ranked.
-        toast.info(summarize(d, semanticState.engine))
-        return
-      }
-      showCuratedSelection(d.image_ids)
-      // Refresh the warm flag so the panel now promises "instant" truthfully.
-      apiFetch('/api/bank/text-search/status'
-        + `?engine=${encodeURIComponent(semanticState.engine)}`)
-        .then(setTextStatus).catch(() => {})
-    } catch (e) {
-      // 503 = this install cannot do it at all; 400 = do something first. Both
-      // arrive as a message written for a human — show it as-is.
-      toast.error(e?.message || 'Text search failed.')
-    } finally {
-      setTextPending(false)
-    }
-  }
-
-  const counts = payload?.counts
-  /* A freshly imported dump has nothing measured: the grid is a wall of
-     unscanned images and every useful action is inside the passes panel, so it
-     opens ITSELF once. Guarded on the computed boolean rather than on `counts`,
-     so the first scan flipping it to false never re-runs this — and so a user
-     who closes the panel on such a bank is not fought by the effect. */
-  const passesShouldOpen = passesPanelStartsOpen(counts, viewportWidth())
-  useEffect(() => { if (passesShouldOpen) setPassesOpen(true) }, [passesShouldOpen])
   const semanticState = semanticEngineState(payload, capsLoading ? null : caps)
   semanticEngineRef.current = semanticState.engine
   semanticModelKeyRef.current = semanticState.modelKey
@@ -1530,6 +1182,29 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const semanticBlocked = semanticState.engine === 'siglip2' && capsLoading
     ? 'Checking whether the SigLIP 2 Quality tool is installed…'
     : semanticPrerequisite(semanticState)
+  const {
+    curateOpen, setCurateOpen, diverseN, setDiverseN, diverseTypicality,
+    setDiverseTypicality, diverseBusy, balanceN, setBalanceN, balanceAxis,
+    setBalanceAxis, balanceBusy, balanceResult, setBalanceResult, similarN,
+    setSimilarN, similarBusy, textQuery, setTextQuery, textN, setTextN,
+    textExclude, setTextExclude, textExcludeW, setTextExcludeW, textStatus,
+    setTextStatus, textPending, textResult, setTextResult, pickDiverse,
+    pickBalanced, findSimilar, openTextSearch, releaseTextEncoder,
+    runTextSearch,
+  } = useCurationLanes({
+    bankId, filter, filterParams, selected, toast, showCuratedSelection,
+    semanticState, semanticEngineRef, textStatusRequestRef,
+  })
+  const semanticOperationBusy = diverseBusy || balanceBusy || similarBusy || textPending
+
+  const counts = payload?.counts
+  /* A freshly imported dump has nothing measured: the grid is a wall of
+     unscanned images and every useful action is inside the passes panel, so it
+     opens ITSELF once. Guarded on the computed boolean rather than on `counts`,
+     so the first scan flipping it to false never re-runs this — and so a user
+     who closes the panel on such a bank is not fought by the effect. */
+  const passesShouldOpen = passesPanelStartsOpen(counts, viewportWidth())
+  useEffect(() => { if (passesShouldOpen) setPassesOpen(true) }, [passesShouldOpen])
   // The Sort menu greys an entry out when its pass has measured NOTHING. Face
   // confidence is the one whose progress the payload reports outside `counts`
   // (faces_scanned, a sibling key), so it is folded in here rather than by
@@ -1592,18 +1267,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // model. We can't prove abliteration, but the common builds name themselves — a soft
   // heuristic drives an honest "may soften" hint (never a hard block: a differently
   // named abliterated model still works).
-  // It reads the EFFECTIVE model — this run's override if one was picked, else the
-  // configured one. Warning about the global model while the run uses another is worse
-  // than not warning at all.
-  const visionModel = captionModel || caps.ollama?.vision_model || ''
-  const visionModelLooksUncensored = /abliterat|uncensor|huihui|nsfw/i.test(visionModel)
-  // The Ollama model choice only bites when the resolved engine can reach Ollama.
-  const ollamaPicksApply = OLLAMA_RELEVANT.has(captionEngine)
-  // A model pulled elsewhere (or configured in Settings) stays selectable even when the
-  // live list doesn't carry it — silently dropping the user's choice is worse than
-  // offering a name we can't confirm.
-  const captionModelChoices = captionModel && !ollamaModels.includes(captionModel)
-    ? [captionModel, ...ollamaModels] : ollamaModels
   // 🔄 Re-caption: inert (and why), plus the sentence that names what it destroys.
   const includeAssertedLabel = captionIncludeAssertedLabel(counts, captionScope)
   const recaptionInert = captionRecaptionDisabledReason(
@@ -1964,7 +1627,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       )}
       <FolderSyncNote sync={payload?.folder_sync}
         onRelocate={() => setRelocating(true)}
-        onForget={forgetMissing} />
+        onForget={() => setForgettingMissing(true)} />
 
       <ProgressBar activity={payload?.activity} onCancel={cancelJob} offline={!connection.online} />
 
@@ -2692,6 +2355,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {relocating && (
         <RelocateBankDialog bankId={bankId} bankName={payload?.name || `Bank #${bankId}`}
           sourcePath={payload?.source_path} onClose={() => setRelocating(false)}
+          onDone={() => { refreshPayload({ force: true }); refreshImages() }} />
+      )}
+
+      {forgettingMissing && (
+        <ForgetMissingDialog bankId={bankId} bankName={payload?.name || `Bank #${bankId}`}
+          onClose={() => setForgettingMissing(false)}
           onDone={() => { refreshPayload({ force: true }); refreshImages() }} />
       )}
     </div>

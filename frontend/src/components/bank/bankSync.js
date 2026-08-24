@@ -130,13 +130,13 @@ export function folderSyncNote(sync) {
       tone: 'warn',
       text: `${missing} image(s) listed here are no longer in the folder — their rows `
         + 'are kept (nothing is deleted for you) but they will fail to load. If you '
-        + 'moved the folder, point the bank at its new location. If you deleted them '
-        + 'on purpose, accept it and the count clears.',
+        + 'moved the folder, point the bank at its new location. If the files are '
+        + 'really gone (a downloader cleaned up, you tidied the folder), Forget '
+        + 'missing drops their rows.',
       canRelocate: true,
-      // Only offered when the folder IS reachable. With the drive unplugged
-      // every row looks missing, and "accept" there would delete the whole
-      // triage — the exact disaster the keep-everything rule prevents. The
-      // server refuses it too; this stops the button from being shown at all.
+      // The other honest cause, with its own remedy. Only offered on MISSING —
+      // an unavailable folder means the walk itself failed, and forgetting on
+      // that verdict would erase the whole triage (the server refuses it too).
       canForget: true,
       missing,
     }

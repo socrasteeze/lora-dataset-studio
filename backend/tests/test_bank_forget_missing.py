@@ -1,157 +1,134 @@
-"""🗃️ Image bank — accepting that hand-deleted images are gone.
+"""🧹 Forget missing — drop the rows whose source file is really gone.
 
-`refresh_bank` is strictly ADDITIVE on purpose: an unplugged drive or a renamed
-folder must never wipe a triage built over hours. The cost is that a file deleted
-from the folder by hand is counted as "missing" forever and the count never comes
-down — there was no way to accept the loss.
+The folder-sync warning has TWO honest causes and used to offer one remedy.
+A folder that MOVED keeps its files: 📦 Move folder… repoints the bank and
+loses nothing. But when something deleted files IN PLACE — a downloader that
+cleans up its own intermediates, a sync client, a by-hand tidy — the bank kept
+their rows for ever: failing to load, muddying the counters, and consuming the
+bank's image ceiling, with no button that lets go of them.
 
-`forget_missing` is that accept. The two things it must never do, both pinned
-here: touch a file on disk, and run when the folder is unreachable (where EVERY
-row looks missing and removing them all is exactly the disaster the additive rule
-exists to prevent).
+The dangerous half is the walk: an unplugged drive makes EVERY file read as
+missing, so a forget that trusted that walk would erase a whole triage in one
+click. Hence fail closed — an unavailable folder refuses the whole operation
+and deletes nothing, and the count shown before the click comes from a walk
+done NOW, never from the banner's possibly-stale cache.
 """
 import os
 
-import pytest
 from PIL import Image
 
 
-def _bank(tmp_path, n=3, name='Dump'):
-    from app.services import image_bank_service as banks
-    src = tmp_path / 'src'
-    src.mkdir(parents=True, exist_ok=True)
-    for i in range(n):
-        Image.new('RGB', (64, 64), (10 * i, 90, 160)).save(str(src / f'a{i}.jpg'))
-    bank, _added = banks.create_bank('local', name, str(src))
-    return bank.id, src
+def _save(path, im):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    im.save(path)
 
 
-def test_a_file_deleted_by_hand_is_counted_and_then_accepted(app, tmp_path):
+def photo(size=128, seed=0):
+    """Smooth structure — a stable dHash and non-degenerate quality metrics."""
+    im = Image.new('L', (size, size))
+    c, r2 = size / 2, (size / 3) ** 2
+    im.putdata([min(255, int(150 * x / size + 50 * y / size) + seed
+                    + (80 if (x - c) ** 2 + (y - c) ** 2 < r2 else 0))
+                for y in range(size) for x in range(size)])
+    return im.convert('RGB')
+
+
+def _mkbank(client, root, rels, name='B'):
+    src = root / 'src'
+    for i, rel in enumerate(rels):
+        _save(str(src / rel), photo(seed=i * 7))
+    r = client.post('/api/bank/create', json={'name': name, 'folder': str(src)})
+    assert r.status_code == 200, r.get_json()
+    return r.get_json()['id'], src
+
+
+def _rows(app, bank_id):
     from app.models import BankImage
-    from app.services import image_bank_service as banks
-
     with app.app_context():
-        bank_id, src = _bank(tmp_path)
-        assert BankImage.query.filter_by(bank_id=bank_id).count() == 3
-        os.remove(str(src / 'a1.jpg'))
-
-        # The walk sees it gone and SAYS so — but keeps the row, as designed.
-        sync = banks.refresh_bank('local', bank_id, force=True)
-        assert sync['missing'] == 1
-        assert BankImage.query.filter_by(bank_id=bank_id).count() == 3
-
-        out = banks.forget_missing('local', bank_id)
-        assert out == {'removed': 1, 'checked': 3}
-        assert BankImage.query.filter_by(bank_id=bank_id).count() == 2
-        # …and the flag actually clears, which is the whole point.
-        assert banks.refresh_bank('local', bank_id, force=True)['missing'] == 0
+        return sorted((r.relpath.replace('\\', '/'), r.status)
+                      for r in BankImage.query.filter_by(bank_id=bank_id))
 
 
-def test_nothing_on_disk_is_touched(app, tmp_path):
-    from app.services import image_bank_service as banks
-
+def _set_status(app, bank_id, rel, status):
+    from app.models import BankImage, db
     with app.app_context():
-        bank_id, src = _bank(tmp_path)
-        os.remove(str(src / 'a0.jpg'))
-        before = sorted(p.name for p in src.iterdir())
-        banks.forget_missing('local', bank_id)
-        assert sorted(p.name for p in src.iterdir()) == before, \
-            'this removes ROWS; the files were already gone'
-
-
-def test_present_images_keep_their_rows_and_their_decisions(app, tmp_path):
-    from app.models import BankImage
-    from app.services import image_bank_service as banks
-    from app.extensions import db
-
-    with app.app_context():
-        bank_id, src = _bank(tmp_path)
-        keeper = BankImage.query.filter_by(bank_id=bank_id, relpath='a2.jpg').one()
-        keeper.status = 'keep'
-        keeper.aesthetic_score = 6.5
+        for r in BankImage.query.filter_by(bank_id=bank_id):
+            if r.relpath.replace('\\', '/') == rel:
+                r.status = status
         db.session.commit()
-        os.remove(str(src / 'a0.jpg'))
-
-        banks.forget_missing('local', bank_id)
-        again = BankImage.query.filter_by(bank_id=bank_id, relpath='a2.jpg').one()
-        assert again.status == 'keep' and again.aesthetic_score == 6.5
 
 
-def test_nothing_missing_removes_nothing(app, tmp_path):
-    from app.services import image_bank_service as banks
+def test_preview_counts_missing_without_deleting(client, app, tmp_path):
+    """{} is a report, not an action: fresh missing/present counts plus a
+    recognisable sample, and every row still there afterwards."""
+    rels = ['a.png', 'b.png', 'sub/c.png', 'd.png']
+    bank_id, src = _mkbank(client, tmp_path, rels)
+    os.remove(str(src / 'b.png'))
+    os.remove(str(src / 'sub' / 'c.png'))
 
-    with app.app_context():
-        bank_id, _src = _bank(tmp_path)
-        assert banks.forget_missing('local', bank_id) == {'removed': 0, 'checked': 3}
+    r = client.post(f'/api/bank/{bank_id}/forget-missing', json={})
+    assert r.status_code == 200, r.get_json()
+    d = r.get_json()
+    assert d['applied'] is False
+    assert (d['missing'], d['present']) == (2, 2), d
+    sample = sorted(rel.replace('\\', '/') for rel in d['missing_sample'])
+    assert sample == ['b.png', 'sub/c.png'], d
 
-
-def test_an_unreachable_folder_is_refused_rather_than_emptying_the_bank(app, tmp_path):
-    """The sharpest edge. With the drive unplugged every row looks missing, and
-    an eager forget would delete the entire triage — the exact failure the
-    additive walk was written to prevent."""
-    from app.models import BankImage
-    from app.services import image_bank_service as banks
-
-    with app.app_context():
-        bank_id, src = _bank(tmp_path)
-        for p in src.iterdir():
-            p.unlink()
-        src.rmdir()
-        with pytest.raises(RuntimeError, match='not reachable'):
-            banks.forget_missing('local', bank_id)
-        assert BankImage.query.filter_by(bank_id=bank_id).count() == 3, \
-            'an unplugged drive must never be read as "these files are gone"'
+    assert len(_rows(app, bank_id)) == len(rels)
 
 
-def test_a_running_pass_refuses_it(app, tmp_path):
-    from unittest.mock import patch
+def test_confirm_drops_only_the_missing_rows(client, app, tmp_path):
+    """The forget itself: exactly the rows whose file is gone disappear, the
+    survivors keep their decisions untouched, and the folder-sync note stops
+    reporting the ghosts (its cache is invalidated, not left to a cooldown)."""
+    rels = [f'p{i}.png' for i in range(5)]
+    bank_id, src = _mkbank(client, tmp_path, rels)
+    _set_status(app, bank_id, 'p0.png', 'keep')     # survivor with a decision
+    _set_status(app, bank_id, 'p3.png', 'reject')   # ghost-to-be with one too
+    os.remove(str(src / 'p3.png'))
+    os.remove(str(src / 'p4.png'))
 
-    from app.services import bank_jobs, image_bank_service as banks
+    r = client.post(f'/api/bank/{bank_id}/forget-missing', json={'confirm': True})
+    assert r.status_code == 200, r.get_json()
+    d = r.get_json()
+    assert d['applied'] is True
+    assert (d['removed'], d['remaining']) == (2, 3), d
 
-    with app.app_context():
-        bank_id, _src = _bank(tmp_path)
-        with patch.object(bank_jobs, 'running', lambda bid: True):
-            with pytest.raises(RuntimeError, match='stop it first'):
-                banks.forget_missing('local', bank_id)
+    rows = _rows(app, bank_id)
+    assert [rel for rel, _ in rows] == ['p0.png', 'p1.png', 'p2.png'], rows
+    assert dict(rows)['p0.png'] == 'keep', rows
 
-
-def test_another_bank_over_the_same_tree_is_unaffected(app, tmp_path):
-    """A bank does not own its folder. Forgetting rows is local to ONE bank — it
-    must not reach into the neighbour that still lists the same files."""
-    from app.models import BankImage
-    from app.services import image_bank_service as banks
-
-    with app.app_context():
-        bank_id, src = _bank(tmp_path)
-        other, _added = banks.create_bank('local', 'Second', str(src))
-        os.remove(str(src / 'a0.jpg'))
-        banks.forget_missing('local', bank_id)
-        assert BankImage.query.filter_by(bank_id=bank_id).count() == 2
-        assert BankImage.query.filter_by(bank_id=other.id).count() == 3
+    payload = client.get(f'/api/bank/{bank_id}').get_json()
+    assert (payload.get('folder_sync') or {}).get('missing') == 0, payload.get('folder_sync')
 
 
-# --- the route ---------------------------------------------------------------
+def test_unavailable_folder_refuses_and_deletes_nothing(client, app, tmp_path):
+    """THE guard. A folder that cannot be walked reads as "everything is
+    missing" — confirm must refuse in block instead of erasing the triage."""
+    rels = [f'g{i}.png' for i in range(4)]
+    bank_id, src = _mkbank(client, tmp_path, rels)
+    os.rename(str(src), str(tmp_path / 'elsewhere'))
 
-def test_the_route_reports_what_it_removed(app, client, tmp_path):
+    for body in ({}, {'confirm': True}):
+        r = client.post(f'/api/bank/{bank_id}/forget-missing', json=body)
+        assert r.status_code == 400, r.get_json()
+        assert 'unavailable' in r.get_json()['error'], r.get_json()
 
-    with app.app_context():
-        bank_id, src = _bank(tmp_path)
-        os.remove(str(src / 'a1.jpg'))
-    r = client.post(f'/api/bank/{bank_id}/forget-missing')
-    assert r.status_code == 200
-    assert r.get_json() == {'ok': True, 'removed': 1, 'checked': 3}
-
-
-def test_the_route_refuses_an_unreachable_folder_with_409(app, client, tmp_path):
-    with app.app_context():
-        bank_id, src = _bank(tmp_path)
-        for p in src.iterdir():
-            p.unlink()
-        src.rmdir()
-    r = client.post(f'/api/bank/{bank_id}/forget-missing')
-    assert r.status_code == 409
-    assert 'not reachable' in r.get_json()['error']
+    assert len(_rows(app, bank_id)) == len(rels)
 
 
-def test_the_route_404s_an_unknown_bank(app, client):
-    assert client.post('/api/bank/999999/forget-missing').status_code == 404
+def test_nothing_missing_is_a_calm_zero(client, app, tmp_path):
+    """A folder in sync forgets nothing and says so with numbers, both steps."""
+    bank_id, _src = _mkbank(client, tmp_path, ['x.png', 'y.png'])
+
+    d = client.post(f'/api/bank/{bank_id}/forget-missing', json={}).get_json()
+    assert (d['missing'], d['present']) == (0, 2), d
+    d = client.post(f'/api/bank/{bank_id}/forget-missing',
+                    json={'confirm': True}).get_json()
+    assert (d['removed'], d['remaining']) == (0, 2), d
+    assert len(_rows(app, bank_id)) == 2
+
+
+def test_unknown_bank_is_404(client):
+    r = client.post('/api/bank/424242/forget-missing', json={})
+    assert r.status_code == 404

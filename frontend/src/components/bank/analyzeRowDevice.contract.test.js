@@ -33,9 +33,12 @@ test('every travelling single pass sends the chosen machine', () => {
     'runPass no longer hands the body through passBody() — score/framing would stop carrying on()');
   assert.match(ws, /const passBody[\s\S]{0,600}?\.\.\.on\(\)/,
     'passBody() no longer spreads on() — every dialog-launched pass would run locally');
-  // 🏷 Caption builds its OWN options object (engine/model/vocab/length,
-  // passed as passBody's `extra`) and has to spread on() into that directly.
-  assert.match(ws, /const captionRunOptions = \(\) => \(\{\s*\n\s*\.\.\.on\(\),/);
+  // 🏷 Caption builds its OWN options object (engine/model/vocab/length, from
+  // useCaptionOptions) and hands it to runPass() as `extra` — passBody spreads
+  // ...on() BEFORE `extra`, so the chosen machine already rides the body before
+  // the caption-only keys are added; captionRunOptions does not need its own
+  // copy of on() for that reason.
+  assert.match(ws, /startCaption = \(run\) => runPass\('caption', run, captionRunOptions\(\)\)/);
   // 'local' is folded to nothing rather than sent as a string: bank_queue had
   // to learn that lesson once already.
   assert.match(ws, /passDevice && passDevice !== 'local' \? \{ device_id: passDevice \} : \{\}/);
