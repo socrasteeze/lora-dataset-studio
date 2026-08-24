@@ -14,7 +14,11 @@ import pytest
 
 INFER_DIR = Path(__file__).resolve().parents[1] / 'infer'
 # Support modules, not passes: they answer through their caller.
-NOT_A_PASS = {'bank_image_guard.py', 'infer_io.py',
+# `_harness.py` is the same shape as `infer_io.py` here — its `_emit` prints
+# via `print(json.dumps(...))`, but it is upstream's shared helper, never
+# imported for that call by a fork script (see DIVERGENCE 5 in
+# test_infer_harness_contract.py); every actual caller claims its own stream.
+NOT_A_PASS = {'bank_image_guard.py', 'infer_io.py', '_harness.py',
               'convert_comfy_zimage_to_diffusers.py'}
 
 

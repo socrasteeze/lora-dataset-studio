@@ -2890,7 +2890,7 @@ def delete_dataset(user_id, dataset_id):
         from . import lora_training as lt
         purge_trigger = lt._safe_trigger(ds)
     except ImportError:
-        pass
+        pass   # circular-import escape: the purge works without the trigger name
     imgs = FaceDatasetImage.query.filter_by(dataset_id=dataset_id).all()
     studio_rows = LoraTestImage.query.filter_by(dataset_id=dataset_id).all()
     # ◉ LoRA Canvas card positions. The model declares a relationship() to
@@ -3858,21 +3858,10 @@ def import_backup_zip(user_id: int, archive: bytes | BinaryIO):
             owned.close()
 
 
-def _bkp_validate_archive(z: zipfile.ZipFile):
-    """The whole security battery of a backup import, moved verbatim
-    (2026-08-24): central-directory limits, manifest/version checks, image
-    metadata normalisation and provenance rules, archive-entry filtering
-    with the traversal/collision refusals, the v2 archive<->metadata
-    pairing, and the analysis-cache binding (CRC/SHA validated BEFORE any
-    staging folder or transaction exists). Pure reads: nothing on disk or
-    in the database changes here. Returns (manifest, images_meta,
-    restored_training_mode, infos, validated_cache_payloads)."""
-    # Validate the central directory BEFORE inflating JSON.  Previously a tiny
-    # compressed manifest/images.json could bypass the image-only size total and
-    # consume unbounded RAM during z.read/json.loads.
-    all_infos = z.infolist()
-    _validate_backup_limits(
-        (info.filename, info.file_size) for info in all_infos)
+def _bkp_v_manifest(z, all_infos):
+    """Locate and parse manifest.json/images.json, enforce format/version and
+    normalise both. Moved verbatim from _bkp_validate_archive. Returns
+    (manifest, images_meta, restored_training_mode, version)."""
     metadata = {}
     for info in all_infos:
         if info.filename not in ('manifest.json', 'images.json'):
@@ -3910,6 +3899,13 @@ def _bkp_validate_archive(z: zipfile.ZipFile):
         _normalized_backup_image_meta(meta, version=version)
         for meta in images_meta
     ]
+    return manifest, images_meta, restored_training_mode, version
+
+
+def _bkp_v_rows(images_meta, version):
+    """Per-row identity/provenance validation (filenames, backup ids, Klein
+    rescue lineage). Moved verbatim from _bkp_validate_archive. Returns the
+    casefolded filename -> exact name map the v2 cross-check needs."""
     seen_backup_ids = set()
     metadata_image_names = {}
     rescue_sources = set()
@@ -3956,6 +3952,13 @@ def _bkp_validate_archive(z: zipfile.ZipFile):
                 raise ValueError('multiple Klein rescue candidates for one source')
     if any(parent_id not in rescue_sources for parent_id in rescue_parent_counts):
         raise ValueError('Klein rescue candidate has no valid source')
+    return metadata_image_names
+
+
+def _bkp_v_payload_names(all_infos, version):
+    """Select the restorable payload members and map their casefolded names,
+    refusing ref/images collisions. Moved verbatim from _bkp_validate_archive.
+    Returns (infos, archive_names)."""
     infos = []
     for info in all_infos:
         if info.is_dir() or info.filename in ('manifest.json', 'images.json'):
@@ -3989,6 +3992,13 @@ def _bkp_validate_archive(z: zipfile.ZipFile):
     if collisions:
         collision = archive_names['images'][next(iter(collisions))]
         raise ValueError(f'backup has colliding ref/image filename: {collision}')
+    return infos, archive_names
+
+
+def _bkp_v_crosscheck_v2(version, manifest, archive_names, metadata_image_names):
+    """v2-only cross-checks: archive image set == metadata set (exact case), and
+    every required/allowed reference file present with no orphans. Moved
+    verbatim from _bkp_validate_archive."""
     if version >= 2:
         archive_image_keys = set(archive_names['images'])
         metadata_image_keys = set(metadata_image_names)
@@ -4032,6 +4042,13 @@ def _bkp_validate_archive(z: zipfile.ZipFile):
             raise ValueError(
                 f'unreferenced reference image in backup: '
                 f'{archive_names["ref"][next(iter(orphan_refs))]}')
+
+
+def _bkp_v_caches(z, all_infos, images_meta, version):
+    """Derive analysis-cache ownership from the validated rows, then read and
+    verify every requested sidecar (size, digest, shape) before anything is
+    staged. Moved verbatim from _bkp_validate_archive. Returns the
+    cache_ref -> raw payload map."""
 
     # Derive cache ownership only after the exact set of restorable rows/files
     # has been validated. A crafted skipped row cannot smuggle an otherwise
@@ -4102,6 +4119,30 @@ def _bkp_validate_archive(z: zipfile.ZipFile):
             raise ValueError(
                 'analysis cache sidecar is malformed or has a digest mismatch')
         validated_cache_payloads[cache_ref] = raw
+    return validated_cache_payloads
+
+
+def _bkp_validate_archive(z: zipfile.ZipFile):
+    """The whole security battery of a backup import, moved verbatim
+    (2026-08-24): central-directory limits, manifest/version checks, image
+    metadata normalisation and provenance rules, archive-entry filtering
+    with the traversal/collision refusals, the v2 archive<->metadata
+    pairing, and the analysis-cache binding (CRC/SHA validated BEFORE any
+    staging folder or transaction exists). Pure reads: nothing on disk or
+    in the database changes here. Returns (manifest, images_meta,
+    restored_training_mode, infos, validated_cache_payloads)."""
+    # Validate the central directory BEFORE inflating JSON.  Previously a tiny
+    # compressed manifest/images.json could bypass the image-only size total and
+    # consume unbounded RAM during z.read/json.loads.
+    all_infos = z.infolist()
+    _validate_backup_limits(
+        (info.filename, info.file_size) for info in all_infos)
+    manifest, images_meta, restored_training_mode, version = _bkp_v_manifest(
+        z, all_infos)
+    metadata_image_names = _bkp_v_rows(images_meta, version)
+    infos, archive_names = _bkp_v_payload_names(all_infos, version)
+    _bkp_v_crosscheck_v2(version, manifest, archive_names, metadata_image_names)
+    validated_cache_payloads = _bkp_v_caches(z, all_infos, images_meta, version)
     return (manifest, images_meta, restored_training_mode, infos,
             validated_cache_payloads)
 
@@ -5007,7 +5048,7 @@ def _drop_comfy_output(filename):
     try:
         os.remove(p)
     except OSError:
-        pass
+        pass   # already gone or locked: the trash sweep moves on
 
 
 def keep_reference_edit(user_id, dataset_id, engine=None, batch_id=None):
@@ -5128,7 +5169,7 @@ def _commit_edited_reference_locked(user_id, dataset_id, image_bytes):
             try:
                 os.remove(p)
             except OSError:
-                pass
+                pass   # rollback is best-effort: the pair may never have landed
         raise
     # 2) VERIFY both landed before touching anything the dataset still points at.
     if not (os.path.exists(ref_path) and os.path.exists(orig_path)):
@@ -5136,7 +5177,7 @@ def _commit_edited_reference_locked(user_id, dataset_id, image_bytes):
             try:
                 os.remove(p)
             except OSError:
-                pass
+                pass   # rollback is best-effort: the pair may never have landed
         raise RuntimeError('failed to write edited reference')
     # 3) REPOINT the dataset, then commit.
     ds.ref_filename = new_ref
@@ -5148,7 +5189,7 @@ def _commit_edited_reference_locked(user_id, dataset_id, image_bytes):
             try:
                 os.remove(os.path.join(dsdir, fn))
             except OSError:
-                pass
+                pass   # the replaced file may be gone or locked: the new pair is already in place
     return new_ref
 
 
@@ -6171,7 +6212,7 @@ def _imp_commit_row(user_id, dataset_id, index, stored, extension, scale,
         try:
             os.unlink(stored_path)
         except FileNotFoundError:
-            pass
+            pass   # already gone: exactly what the rollback wanted
         except OSError:
             logger.warning('dataset import: could not remove uncommitted image %s',
                            stored_path, exc_info=True)
@@ -6271,7 +6312,7 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
                 if min(_import_header_dimensions(raw)) < SCRAPE_IMPORT_MIN_SIDE:
                     stats['small'] = stats.get('small', 0) + 1
             except Exception:
-                pass
+                pass   # the counter feeds a toast: an unreadable header must not fail the import
         try:
             if preserve_exact_bytes:
                 if crop:
@@ -6431,7 +6472,7 @@ def _merge_training_images(user_id, dataset_id, entries, captions, stats=None):
                 if min(_import_header_dimensions(raw)) < SCRAPE_IMPORT_MIN_SIDE:
                     stats['small'] = stats.get('small', 0) + 1
             except Exception:
-                pass
+                pass   # the counter feeds a toast: an unreadable header must not fail the import
         try:
             stored, extension = import_store_image(raw)
         except Exception as e:
@@ -6458,7 +6499,7 @@ def _merge_training_images(user_id, dataset_id, entries, captions, stats=None):
                 # overwritten — an import cannot silently rewrite curated work.
                 if stats is not None:
                     stats['duplicates'] = stats.get('duplicates', 0) + 1
-                row = FaceDatasetImage.query.get(match) if incoming else None
+                row = db.session.get(FaceDatasetImage, match) if incoming else None
                 if row is not None:
                     if (row.caption or '').strip():
                         if stats is not None:
@@ -6537,7 +6578,7 @@ def import_dataset_zip(user_id: int, dataset_id: int,
                     except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile,
                             zlib.error, lzma.LZMAError, NotImplementedError,
                             RuntimeError):
-                        pass
+                        pass   # unreadable member: the image imports uncaptioned
             entries = [
                 (os.path.splitext(i.filename)[0], i.filename,
                  lambda i=i: z.read(i))
@@ -6608,7 +6649,7 @@ def import_dataset_folder(user_id, dataset_id, folder, stats=None):
                     captions[os.path.splitext(p)[0]] = \
                         fh.read().decode('utf-8', 'replace').strip()
             except OSError:
-                pass
+                pass   # unreadable caption file: the image imports uncaptioned
 
     def _read(p):
         source_stat = os.lstat(p)
@@ -6658,7 +6699,10 @@ def _dhash(im: Image.Image) -> int:
     au resize/re-encodage, donc stable entre un scrape original et sa version
     normalisée webp déjà importée."""
     g = im.convert('L').resize((9, 8), Image.LANCZOS)
-    px = list(g.getdata())
+    # tobytes(), not getdata(): identical values for mode 'L' (row-major,
+    # no padding) and getdata() is deprecated for removal in Pillow 14 -
+    # same swap video_safe_zone already carries.
+    px = g.tobytes()
     bits = 0
     for row in range(8):
         for col in range(8):
@@ -6769,7 +6813,7 @@ def _existing_dhash_rows(dataset_id) -> list:
             with Image.open(os.path.join(_dataset_dir(dataset_id), r.filename)) as im:
                 out.append((_dhash(im), r.id))
         except (OSError, ValueError):
-            continue
+            continue   # unreadable image: it cannot match a dHash anyway
     return out
 
 
@@ -7388,6 +7432,186 @@ def _caption_write_blocked(img, *, force, spare_asserted, field='caption'):
     return spare_asserted and caption_origin.is_protected(img, field=field)
 
 
+def _cc_store_joy_drafts(ds, refine_targets, remaining, jc_errors, concept_desc,
+                         force, spare_asserted, token, report, outcome):
+    """Forced-JoyCaption store: mechanical scrub of the Joy drafts, refused
+    images counted as handled. Moved verbatim from _caption_concept; returns
+    the (written, vanished, spared) deltas."""
+    n = 0
+    vanished = 0
+    spared = 0
+    if remaining:
+        dataset_activity.bump(token, len(remaining))
+        _record_caption_skips(outcome, remaining, jc_errors)
+        logger.info('caption concept: %d image(s) refused by JoyCaption, first '
+                    'reason: %s', len(remaining),
+                    _first_caption_skip_reason(remaining, jc_errors))
+    leak_re = _concept_terms_re(_fallback_concept_terms(concept_desc))
+    for image_id, p, joycap in refine_targets:
+        if dataset_activity.cancel_requested(ds.id):
+            break   # graceful stop at an image boundary (see caption_images)
+        dataset_activity.bump(token)
+        img = _live_image_row(image_id)
+        if img is None:      # deleted while the pass ran
+            vanished += 1
+            continue
+        if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+            spared += 1
+            continue
+        try:
+            with open(p, 'rb') as fh:
+                data = fh.read()
+        except OSError:
+            data = b''
+        final = _enforce_concept_omission(joycap, leak_re, data, concept_desc) or joycap
+        caption_origin.stamp(img, _cap_caption(final), caption_origin.JOYCAPTION)
+        db.session.commit()
+        n += 1
+        _writer(report, CAPTION_WRITER_JOYCAPTION)
+    return n, vanished, spared
+
+
+def _cc_refine_joy_drafts(ds, refine_targets, describe, leak_re, cap_prompt,
+                          concept_desc, extra_instructions, force,
+                          spare_asserted, token, report):
+    """Qwen refine of each Joy draft with the direct-Qwen and Joy-draft
+    fallbacks and the ban-list enforcement. Moved verbatim from
+    _caption_concept; stops at an image boundary on cancel and returns the
+    (written, vanished, spared) deltas."""
+    n = 0
+    vanished = 0
+    spared = 0
+    for image_id, p, joycap in refine_targets:
+        if dataset_activity.cancel_requested(ds.id):
+            break   # graceful stop at an image boundary (see caption_images)
+        dataset_activity.bump(token)
+        with open(p, 'rb') as fh:
+            data = fh.read()
+        refined = ''
+        # The refine prompt is where the concept-omitting caption is actually
+        # PRODUCED when JoyCaption is available (the dominant path), so the
+        # per-dataset extra instructions — including the NSFW vocabulary preset —
+        # must ride here too. Applied ONLY to cap_prompt before, they never reached
+        # the refine, so an 'explicit' preset silently produced a neutral caption:
+        # the (abliterated) refiner rewrote the crude Joy draft "as a clean caption"
+        # with no register directive. Empty extras keep the prompt byte-identical.
+        refine_prompt = _with_caption_instructions(
+            CAPTION_REFINE_CONCEPT_PROMPT.format(existing=joycap,
+                                                 concept=concept_desc),
+            extra_instructions)
+        try:
+            refined = describe(
+                data, refine_prompt,
+                num_predict=5000,
+                keep_alive=_VISION_BATCH_KEEPALIVE,
+                timeout=(10, 300))
+        except Exception as e:  # noqa: BLE001 - refine best-effort
+            logger.warning('caption concept: Qwen refine failed (%s)', e)
+        refined = (refined or '').strip().strip('"').strip()
+        # Which engine gets the credit follows the text through the three
+        # outcomes below, rather than being decided by the branch we are in:
+        # a Joy draft kept because the refine was unusable is JoyCaption's
+        # sentence, not Qwen's.
+        writer = CAPTION_WRITER_REFINED
+        if _refine_output_ok(refined, joycap):
+            final = refined
+            origin = caption_origin.OLLAMA
+        else:
+            # Unusable refine (reasoning trace / loop) -> direct Qwen caption
+            # (natively omits the concept), else keep the Joy draft.
+            logger.info('caption concept: refine rejected -> direct Qwen (image %s)',
+                        image_id)
+            alt = ''
+            try:
+                alt = describe(data, cap_prompt, num_predict=2000,
+                               keep_alive=_VISION_BATCH_KEEPALIVE,
+                               timeout=(10, 300))
+            except Exception:  # noqa: BLE001
+                alt = ''
+            alt = (alt or '').strip().strip('"').strip()
+            final = alt or joycap
+            writer = CAPTION_WRITER_OLLAMA if alt else CAPTION_WRITER_JOYCAPTION
+            origin = caption_origin.OLLAMA if alt else caption_origin.JOYCAPTION
+        final = _enforce_concept_omission(final, leak_re, data, concept_desc,
+                                          describe=describe) or final
+        # Re-read only now: everything above is model work measured in
+        # seconds per image, and the tile can be deleted during it.
+        img = _live_image_row(image_id)
+        if img is None:
+            vanished += 1
+            continue
+        if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+            spared += 1
+            continue
+        if not _usable_caption(final):
+            # Refine AND direct both unusable → fall back to the Joy draft (clean
+            # prose), scrubbed of any leak; leave blank if even that fails.
+            final = _enforce_concept_omission(joycap, leak_re, data, concept_desc,
+                                              describe=describe) or joycap
+            writer = CAPTION_WRITER_JOYCAPTION
+            origin = caption_origin.JOYCAPTION
+            if not _usable_caption(final):
+                # force=re-do-all: overwrite any stale pre-fix caption with blank
+                # (trigger-only is valid for a concept LoRA) rather than retain it.
+                # The stamp is cleared WITH the text: a blanked row must not keep
+                # an origin describing a sentence that no longer exists.
+                if force and (img.caption or ''):
+                    caption_origin.stamp(img, '', None)
+                    db.session.commit()
+                logger.info('caption concept: no usable caption for image %s '
+                            '-> left blank', image_id)
+                continue
+        caption_origin.stamp(img, _cap_caption(final), origin)
+        db.session.commit()
+        n += 1
+        _writer(report, writer)
+    return n, vanished, spared
+
+
+def _cc_direct_captions(ds, remaining, describe, leak_re, cap_prompt,
+                        concept_desc, force, spare_asserted, token, report):
+    """Direct-Qwen caption of the images JoyCaption never drafted. Moved
+    verbatim from _caption_concept; same cancel/deltas contract as the
+    refine loop."""
+    n = 0
+    vanished = 0
+    spared = 0
+    for image_id, p in remaining:
+        if dataset_activity.cancel_requested(ds.id):
+            break   # graceful stop at an image boundary (see caption_images)
+        dataset_activity.bump(token)
+        with open(p, 'rb') as fh:
+            data = fh.read()
+        cap = describe(
+            data, cap_prompt, num_predict=2000,
+            keep_alive=_VISION_BATCH_KEEPALIVE,
+            auto_start_local=True, timeout=(10, 300))
+        cap = (cap or '').strip().strip('"').strip()
+        if cap:
+            cap = _enforce_concept_omission(cap, leak_re, data, concept_desc,
+                                            describe=describe) or cap
+        # Re-read after the call, for the same reason as the refine loop.
+        img = _live_image_row(image_id)
+        if img is None:
+            vanished += 1
+            continue
+        if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
+            spared += 1
+            continue
+        if _usable_caption(cap):
+            caption_origin.stamp(img, _cap_caption(cap), caption_origin.OLLAMA)
+            db.session.commit()
+            n += 1
+            _writer(report, CAPTION_WRITER_OLLAMA)
+        else:
+            if force and (img.caption or ''):
+                caption_origin.stamp(img, '', None)
+                db.session.commit()
+            logger.info('caption concept: no usable direct caption for image '
+                        '%s -> left blank', image_id)
+    return n, vanished, spared
+
+
 def _caption_concept(ds, force, backend, token=None, image_ids=None,
                      ollama_model=None, extra_instructions='', report=None,
                      outcome=None):
@@ -7470,34 +7694,12 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
         # Ollama pass follows. Counting them here is what keeps the indicator from
         # freezing short of the total on a pass that is actually finished; the same
         # freeze was reported on the main lane and fixed there (see caption_images).
-        if remaining:
-            dataset_activity.bump(token, len(remaining))
-            _record_caption_skips(outcome, remaining, jc_errors)
-            logger.info('caption concept: %d image(s) refused by JoyCaption, first '
-                        'reason: %s', len(remaining),
-                        _first_caption_skip_reason(remaining, jc_errors))
-        leak_re = _concept_terms_re(_fallback_concept_terms(concept_desc))
-        for image_id, p, joycap in refine_targets:
-            if dataset_activity.cancel_requested(ds.id):
-                break   # graceful stop at an image boundary (see caption_images)
-            dataset_activity.bump(token)
-            img = _live_image_row(image_id)
-            if img is None:      # deleted while the pass ran
-                vanished += 1
-                continue
-            if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
-                spared += 1
-                continue
-            try:
-                with open(p, 'rb') as fh:
-                    data = fh.read()
-            except OSError:
-                data = b''
-            final = _enforce_concept_omission(joycap, leak_re, data, concept_desc) or joycap
-            caption_origin.stamp(img, _cap_caption(final), caption_origin.JOYCAPTION)
-            db.session.commit()
-            n += 1
-            _writer(report, CAPTION_WRITER_JOYCAPTION)
+        jn, jv, js = _cc_store_joy_drafts(
+            ds, refine_targets, remaining, jc_errors, concept_desc, force,
+            spare_asserted, token, report, outcome)
+        n += jn
+        vanished += jv
+        spared += js
         return n
     # 2b) Qwen passes ('auto'/'ollama'): refine Joy drafts, direct-caption the rest, all
     #     enforced. One model load -> unload once at the end.
@@ -7519,123 +7721,18 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
         leak_re = _concept_terms_re(_get_concept_terms(ds, image_path=sample,
                                                        describe=describe))
         try:
-            for image_id, p, joycap in refine_targets:
-                if dataset_activity.cancel_requested(ds.id):
-                    break   # graceful stop at an image boundary (see caption_images)
-                dataset_activity.bump(token)
-                with open(p, 'rb') as fh:
-                    data = fh.read()
-                refined = ''
-                # The refine prompt is where the concept-omitting caption is actually
-                # PRODUCED when JoyCaption is available (the dominant path), so the
-                # per-dataset extra instructions — including the NSFW vocabulary preset —
-                # must ride here too. Applied ONLY to cap_prompt before, they never reached
-                # the refine, so an 'explicit' preset silently produced a neutral caption:
-                # the (abliterated) refiner rewrote the crude Joy draft "as a clean caption"
-                # with no register directive. Empty extras keep the prompt byte-identical.
-                refine_prompt = _with_caption_instructions(
-                    CAPTION_REFINE_CONCEPT_PROMPT.format(existing=joycap,
-                                                         concept=concept_desc),
-                    extra_instructions)
-                try:
-                    refined = describe(
-                        data, refine_prompt,
-                        num_predict=5000,
-                        keep_alive=_VISION_BATCH_KEEPALIVE,
-                        timeout=(10, 300))
-                except Exception as e:  # noqa: BLE001 - refine best-effort
-                    logger.warning('caption concept: Qwen refine failed (%s)', e)
-                refined = (refined or '').strip().strip('"').strip()
-                # Which engine gets the credit follows the text through the three
-                # outcomes below, rather than being decided by the branch we are in:
-                # a Joy draft kept because the refine was unusable is JoyCaption's
-                # sentence, not Qwen's.
-                writer = CAPTION_WRITER_REFINED
-                if _refine_output_ok(refined, joycap):
-                    final = refined
-                    origin = caption_origin.OLLAMA
-                else:
-                    # Unusable refine (reasoning trace / loop) -> direct Qwen caption
-                    # (natively omits the concept), else keep the Joy draft.
-                    logger.info('caption concept: refine rejected -> direct Qwen (image %s)',
-                                image_id)
-                    alt = ''
-                    try:
-                        alt = describe(data, cap_prompt, num_predict=2000,
-                                       keep_alive=_VISION_BATCH_KEEPALIVE,
-                                       timeout=(10, 300))
-                    except Exception:  # noqa: BLE001
-                        alt = ''
-                    alt = (alt or '').strip().strip('"').strip()
-                    final = alt or joycap
-                    writer = CAPTION_WRITER_OLLAMA if alt else CAPTION_WRITER_JOYCAPTION
-                    origin = caption_origin.OLLAMA if alt else caption_origin.JOYCAPTION
-                final = _enforce_concept_omission(final, leak_re, data, concept_desc,
-                                                  describe=describe) or final
-                # Re-read only now: everything above is model work measured in
-                # seconds per image, and the tile can be deleted during it.
-                img = _live_image_row(image_id)
-                if img is None:
-                    vanished += 1
-                    continue
-                if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
-                    spared += 1
-                    continue
-                if not _usable_caption(final):
-                    # Refine AND direct both unusable → fall back to the Joy draft (clean
-                    # prose), scrubbed of any leak; leave blank if even that fails.
-                    final = _enforce_concept_omission(joycap, leak_re, data, concept_desc,
-                                                      describe=describe) or joycap
-                    writer = CAPTION_WRITER_JOYCAPTION
-                    origin = caption_origin.JOYCAPTION
-                    if not _usable_caption(final):
-                        # force=re-do-all: overwrite any stale pre-fix caption with blank
-                        # (trigger-only is valid for a concept LoRA) rather than retain it.
-                        # The stamp is cleared WITH the text: a blanked row must not keep
-                        # an origin describing a sentence that no longer exists.
-                        if force and (img.caption or ''):
-                            caption_origin.stamp(img, '', None)
-                            db.session.commit()
-                        logger.info('caption concept: no usable caption for image %s '
-                                    '-> left blank', image_id)
-                        continue
-                caption_origin.stamp(img, _cap_caption(final), origin)
-                db.session.commit()
-                n += 1
-                _writer(report, writer)
-            for image_id, p in remaining:
-                if dataset_activity.cancel_requested(ds.id):
-                    break   # graceful stop at an image boundary (see caption_images)
-                dataset_activity.bump(token)
-                with open(p, 'rb') as fh:
-                    data = fh.read()
-                cap = describe(
-                    data, cap_prompt, num_predict=2000,
-                    keep_alive=_VISION_BATCH_KEEPALIVE,
-                    auto_start_local=True, timeout=(10, 300))
-                cap = (cap or '').strip().strip('"').strip()
-                if cap:
-                    cap = _enforce_concept_omission(cap, leak_re, data, concept_desc,
-                                                    describe=describe) or cap
-                # Re-read after the call, for the same reason as the refine loop.
-                img = _live_image_row(image_id)
-                if img is None:
-                    vanished += 1
-                    continue
-                if _caption_write_blocked(img, force=force, spare_asserted=spare_asserted):
-                    spared += 1
-                    continue
-                if _usable_caption(cap):
-                    caption_origin.stamp(img, _cap_caption(cap), caption_origin.OLLAMA)
-                    db.session.commit()
-                    n += 1
-                    _writer(report, CAPTION_WRITER_OLLAMA)
-                else:
-                    if force and (img.caption or ''):
-                        caption_origin.stamp(img, '', None)
-                        db.session.commit()
-                    logger.info('caption concept: no usable direct caption for image '
-                                '%s -> left blank', image_id)
+            rn, rv, rs = _cc_refine_joy_drafts(
+                ds, refine_targets, describe, leak_re, cap_prompt, concept_desc,
+                extra_instructions, force, spare_asserted, token, report)
+            n += rn
+            vanished += rv
+            spared += rs
+            dn, dv, ds_ = _cc_direct_captions(
+                ds, remaining, describe, leak_re, cap_prompt, concept_desc,
+                force, spare_asserted, token, report)
+            n += dn
+            vanished += dv
+            spared += ds_
         finally:
             if ollama_model:
                 unload_vision_model(model=ollama_model)
@@ -8898,7 +8995,7 @@ def _preserve_original(path) -> bool:
             try:
                 os.unlink(staged_backup)
             except OSError:
-                pass
+                pass   # already gone: the backup owed nothing
 
 
 def _stage_oriented_watermark_edit(path) -> str | None:
@@ -8936,7 +9033,7 @@ def _stage_oriented_watermark_edit(path) -> str | None:
             try:
                 os.unlink(staged)
             except OSError:
-                pass
+                pass   # already gone: the staged copy owed nothing
         return None
 
 
@@ -8959,7 +9056,7 @@ def _discard_staged_watermark_edit(staged_path) -> None:
     try:
         os.unlink(staged_path)
     except OSError:
-        pass
+        pass   # already gone: the staged copy owed nothing
 
 
 def _apply_watermark_crop(path, box) -> bool:
@@ -10353,7 +10450,7 @@ def _improve_preflight(engine):
 
 
 def _enqueue_improve(engine, *, user_id, source, source_path, prompt, label,
-                     dataset, extra_metadata=None):
+                     dataset, extra_metadata=None, profile=None):
     """Hand ONE improve off to the chosen engine and return its job id.
 
     The two engines take deliberately different arguments — Klein needs a prompt,
@@ -10385,10 +10482,14 @@ def _enqueue_improve(engine, *, user_id, source, source_path, prompt, label,
             user_id=str(user_id), source_filename=source_filename,
             source_path=source_path, extra_metadata=meta)
     from . import klein_edit_helper as keh
+    # `profile` lets a caller that RECORDS what ran (improve_canvas_image
+    # stores it on the candidate) hand over the very dict it stored — computed
+    # twice, the two could disagree the moment a setting is saved in between.
     return keh.enqueue_klein_edit(
         user_id=str(user_id), source_filename=source_filename,
         source_path=source_path, edit_prompt=prompt,
-        **_improve_enqueue_profile(dataset), extra_metadata=meta)
+        **(profile if profile is not None else _improve_enqueue_profile(dataset)),
+        extra_metadata=meta)
 
 
 def improve_existing_image(user_id, image_id, engine=None):
@@ -10784,7 +10885,7 @@ def bulk_improve_eligible_ids(user_id, dataset_id, image_ids):
         try:
             image_id = int(raw)
         except (TypeError, ValueError):
-            continue
+            continue   # malformed client id: dropped, the rest of the batch lands
         if image_id not in seen:
             seen.add(image_id)
             wanted.append(image_id)
@@ -11318,7 +11419,7 @@ def link_completed_dataset_image(job_id, filename, failed=False, reason=None):
             try:
                 os.remove(late_output)
             except OSError:
-                pass
+                pass   # already gone or locked: the late output was a leftover either way
         try:
             _sync_generate_activity(img.dataset_id)
         except Exception:
@@ -11521,7 +11622,7 @@ def write_export_zip(user_id: int, dataset_id: int, output: BinaryIO) -> None:
                 zf.writestr(f"{folder}/{safe}_000_ref.png", rpng.getvalue())
                 zf.writestr(f"{folder}/{safe}_000_ref.txt", ds.trigger_word)
             except OSError:
-                pass
+                pass   # the reference is a bonus in this export: a bad file must not sink the zip
         for n, img in enumerate(kept, 1):
             path = _img_path(img) if img.filename else ''
             if not img.filename or not os.path.exists(path):

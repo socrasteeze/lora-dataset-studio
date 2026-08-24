@@ -65,6 +65,7 @@ import hashlib
 import json
 import os
 import sys
+from _harness import _cancel_requested, _log, _write_count
 
 CACHE_EVERY = 50
 # Detection confidence and head-turn gates — the same values face_score_infer
@@ -114,31 +115,6 @@ import npz_atomic  # noqa: E402
 # points at stderr, so anything a library prints is progress output.
 from infer_io import claim_result_stream  # noqa: E402
 _OUT = claim_result_stream(__name__)
-
-
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
-def _cancel_requested(cancel_file):
-    """The parent drops this sentinel file to ask for a clean stop, so the pass
-    flushes its cache and exits between images instead of being SIGKILLed
-    mid-compute (which would lose up to CACHE_EVERY images)."""
-    return bool(cancel_file) and os.path.exists(cancel_file)
-
-
-def _write_count(cache_path, n):
-    """Plain-text sidecar (``<cache>.count``) with how many images are cached so
-    far. The Flask parent has no numpy to read the .npz, so this is how a stopped
-    pass can still report an honest "N cached (M remaining)" — even in the rare
-    case it had to be hard-killed before it could print its own cancel line."""
-    if not cache_path:
-        return
-    try:
-        with open(cache_path + '.count', 'w', encoding='utf-8') as f:
-            f.write(str(int(n)))
-    except OSError:
-        pass
 
 
 def _file_sig(path):

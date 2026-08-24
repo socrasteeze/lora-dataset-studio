@@ -10,13 +10,13 @@ lazy-imports the owning service (routing on job metadata) so this module never
 imports the services that create jobs (avoids import cycles).
 """
 from __future__ import annotations
+from .utils.timestamps import naive_utcnow
 import json
 import logging
 import os
 import threading
 import time
 import uuid
-from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -361,8 +361,8 @@ def _claim(job_id) -> bool:
         claimed = (ImageGenerationQueue.query
                    .filter_by(job_id=job_id, status='pending')
                    .update({'status': 'processing',
-                            'started_at': datetime.utcnow(),
-                            'last_heartbeat': datetime.utcnow()}))
+                            'started_at': naive_utcnow(),
+                            'last_heartbeat': naive_utcnow()}))
         db.session.commit()
         return bool(claimed)
 
@@ -500,7 +500,7 @@ def _poll_outputs(prompt_id, timeout=POLL_TIMEOUT_SECONDS):
                     return None, True
                 if job.status in ('stalled', 'cancel_requested'):
                     return None, POLL_STALLED
-                job.last_heartbeat = datetime.utcnow()
+                job.last_heartbeat = naive_utcnow()
                 db.session.commit()
 
             if time.monotonic() >= deadline:
@@ -781,7 +781,7 @@ class JobQueueManager:
                 'comfyui_prompt_id': str(prompt_id),
                 'completed_at': None,
                 'error_message': COMFYUI_STALLED_MESSAGE,
-                'last_heartbeat': datetime.utcnow(),
+                'last_heartbeat': naive_utcnow(),
             }, synchronize_session=False)
             if changed != 1:
                 return False
@@ -823,7 +823,7 @@ class JobQueueManager:
                        .filter(ImageGenerationQueue.comfyui_prompt_id.is_(None))
                        .update({'status': 'stalled', 'completed_at': None,
                                 'error_message': COMFYUI_UNKNOWN_SUBMIT_MESSAGE,
-                                'last_heartbeat': datetime.utcnow()},
+                                'last_heartbeat': naive_utcnow()},
                                synchronize_session=False))
             if changed != 1:
                 return False
@@ -889,7 +889,7 @@ class JobQueueManager:
             if (not current_valid or current_raw != raw
                     or not self._same_barrier_owner(current_owner, owner)):
                 return False
-            now = datetime.utcnow()
+            now = naive_utcnow()
             changed = (ImageGenerationQueue.query
                        .filter_by(job_id=str(job_id), status='stalled',
                                   comfyui_prompt_id=owner['prompt_id'])
@@ -953,7 +953,7 @@ class JobQueueManager:
                     or not self._same_barrier_owner(current_owner, owner)):
                 return False
 
-            now = datetime.utcnow()
+            now = naive_utcnow()
             changed = (ImageGenerationQueue.query
                        .filter_by(job_id=str(job_id), status='stalled')
                        .filter(ImageGenerationQueue.comfyui_prompt_id.is_(None)))
@@ -1628,7 +1628,7 @@ class JobQueueManager:
                 # this while the shared lock is held. Persist intent without
                 # claiming a remote cancellation; process_one pins its returned id.
                 job.status = 'cancel_requested'
-                job.last_heartbeat = datetime.utcnow()
+                job.last_heartbeat = naive_utcnow()
                 db.session.commit()
                 return 'retry'
             prompt_id = job.comfyui_prompt_id

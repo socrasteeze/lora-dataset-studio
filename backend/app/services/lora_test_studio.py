@@ -38,7 +38,9 @@ log to save into or hide from (`saved_to_gallery` isn't a column on our
 `LoraTestImage`).
 """
 from __future__ import annotations
+from ..utils.timestamps import naive_utcnow
 
+from dataclasses import dataclass
 import itertools
 import json
 import logging
@@ -48,7 +50,6 @@ import random
 import re
 import shutil
 import uuid
-from datetime import datetime
 
 from .. import config as cfg
 from ..extensions import db
@@ -427,7 +428,7 @@ def _filter_rows_by_family(rows, family, default='zimage'):
         if r_fam is None:
             dsid = getattr(r, 'dataset_id', None)
             if dsid not in known_by_ds:
-                ds = FaceDataset.query.get(dsid) if dsid else None
+                ds = db.session.get(FaceDataset, dsid) if dsid else None
                 known_by_ds[dsid] = _known_checkpoints(ds)
             if getattr(r, 'checkpoint', None) not in known_by_ds[dsid]:
                 out.append(r)
@@ -2303,7 +2304,7 @@ def stack_of_row(row) -> list | None:
     combined = _combined_lora_labels(row)
     if not combined:
         return None
-    ds = FaceDataset.query.get(row.dataset_id)
+    ds = db.session.get(FaceDataset, row.dataset_id)
     head = {'label': (format_trained_lora_label(row.checkpoint)
                       or _basename(row.checkpoint or '').rsplit('.', 1)[0]),
             'weight': row.strength, 'filename': row.checkpoint,
@@ -2405,7 +2406,79 @@ def stack_variants(run_id, rows, limit=8) -> list:
     return out
 
 
-def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=None, z_model=None, z_models=None, aspects=None, cfgs=None, steps_list=None, steps2_list=None, count=1, family=None, permanent_loras=None, batch_loras=None, rebalance=None, rebalance_strength=None, negative=None, sampler=None, scheduler=None, weight_dtype=None, enhancer=None, enhancer_strength=None, detail_amount=None, resolution_tier=None, resolution_multiplier=None, init_image=None, denoise=None, origins=None, prompts=None) -> dict:
+@dataclass(frozen=True)
+class StudioGenSettings:
+    """The generation settings a Studio run carries, one object instead of
+    a 24-keyword tail on every signature (the audit's 31-parameter debt).
+
+    Axes (checkpoints, strengths) and per-entry-point extras (family,
+    origins, prompts, combine) stay explicit parameters on purpose: they
+    are what each call is ABOUT. Everything here is the shared "how" -
+    validated downstream by _sanitize_gen_knobs exactly as before, so a
+    None keeps meaning "the family default".
+
+    Frozen: a run's settings are decided at the door; nothing downstream
+    may quietly edit them for one cell."""
+    seed: object = None
+    prompt: object = None
+    z_model: object = None
+    z_models: object = None
+    aspects: object = None
+    cfgs: object = None
+    steps_list: object = None
+    steps2_list: object = None
+    count: object = 1
+    permanent_loras: object = None
+    batch_loras: object = None
+    rebalance: object = None
+    rebalance_strength: object = None
+    negative: object = None
+    sampler: object = None
+    scheduler: object = None
+    weight_dtype: object = None
+    enhancer: object = None
+    enhancer_strength: object = None
+    detail_amount: object = None
+    resolution_tier: object = None
+    resolution_multiplier: object = None
+    init_image: object = None
+    denoise: object = None
+
+    @classmethod
+    def from_payload(cls, d):
+        """Build from a request JSON dict, using the exact wire names the
+        routes have always read (steps/steps2 are the wire names of
+        steps_list/steps2_list). Only known keys are read - a payload
+        typo cannot smuggle a setting in."""
+        return cls(
+            seed=d.get('seed'),
+            prompt=d.get('prompt'),
+            z_model=d.get('z_model'),
+            z_models=d.get('z_models'),
+            aspects=d.get('aspects'),
+            cfgs=d.get('cfgs'),
+            steps_list=d.get('steps'),
+            steps2_list=d.get('steps2'),
+            count=d.get('count'),
+            permanent_loras=d.get('permanent_loras'),
+            batch_loras=d.get('batch_loras'),
+            rebalance=d.get('rebalance'),
+            rebalance_strength=d.get('rebalance_strength'),
+            negative=d.get('negative'),
+            sampler=d.get('sampler'),
+            scheduler=d.get('scheduler'),
+            weight_dtype=d.get('weight_dtype'),
+            enhancer=d.get('enhancer'),
+            enhancer_strength=d.get('enhancer_strength'),
+            detail_amount=d.get('detail_amount'),
+            resolution_tier=d.get('resolution_tier'),
+            resolution_multiplier=d.get('resolution_multiplier'),
+            init_image=d.get('init_image'),
+            denoise=d.get('denoise'))
+
+
+def create_run(user_id, dataset_id, checkpoints, strengths, settings=None, *,
+               family=None, origins=None, prompts=None) -> dict:
     """Validate + materialize the grid and enqueue every cell.
 
     `prompts` (📝 lot) est un AXE : chaque configuration est rendue une fois par
@@ -2422,6 +2495,33 @@ def create_run(user_id, dataset_id, checkpoints, strengths, seed=None, prompt=No
     an enqueue failure marks that row 'failed' and re-raises - already-enqueued cells
     keep their rows AND their jobs. Returns
     {'created', 'seed', 'count', 'run_id', 'ids'}."""
+    # One object at the door; the body below is verbatim from the flat-
+    # signature era, so it reads the same locals it always has.
+    settings = settings or StudioGenSettings()
+    seed = settings.seed
+    prompt = settings.prompt
+    z_model = settings.z_model
+    z_models = settings.z_models
+    aspects = settings.aspects
+    cfgs = settings.cfgs
+    steps_list = settings.steps_list
+    steps2_list = settings.steps2_list
+    count = settings.count
+    permanent_loras = settings.permanent_loras
+    batch_loras = settings.batch_loras
+    rebalance = settings.rebalance
+    rebalance_strength = settings.rebalance_strength
+    negative = settings.negative
+    sampler = settings.sampler
+    scheduler = settings.scheduler
+    weight_dtype = settings.weight_dtype
+    enhancer = settings.enhancer
+    enhancer_strength = settings.enhancer_strength
+    detail_amount = settings.detail_amount
+    resolution_tier = settings.resolution_tier
+    resolution_multiplier = settings.resolution_multiplier
+    init_image = settings.init_image
+    denoise = settings.denoise
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
@@ -3634,10 +3734,16 @@ def improve_canvas_image(user_id, image_id, engine=None):
     engine = fds.resolve_improve_engine(engine)
     fds._improve_preflight(engine)          # same refusals, same actionable 409s
     prompt = fds._improve_prompt() if engine == 'klein' else ''
-    # The preset the pass will chain (klein.improve_lora_preset) — read through
-    # the SAME resolver the enqueue profile uses, so what is stored below is
-    # what actually runs. [] for SeedVR2 and for "none picked".
-    preset_rows = fds.improve_lora_preset_rows() if engine == 'klein' else []
+    # The knobs this pass will run with, computed ONCE: the same dict is stored
+    # on the candidate (improve_profile) and handed to the engine, so stored
+    # can never drift from executed. SeedVR2 has no knobs to record.
+    profile = fds._improve_enqueue_profile(ds) if engine == 'klein' else None
+    preset_rows = (profile or {}).get('generation_loras') or []
+    # The preset NAME the rows came from — recorded only when it actually
+    # resolved: a stale name ran as "none", and storing it would restore a
+    # pick that did not decide this picture.
+    preset_name = ((cfg.get('klein.improve_lora_preset') or '')
+                   if preset_rows else '')
 
     candidate = LoraTestImage(
         dataset_id=row.dataset_id,
@@ -3668,6 +3774,17 @@ def improve_canvas_image(user_id, image_id, engine=None):
         extra_loras=(json.dumps(
             [{'filename': r['file'], 'strength': r['strength']}
              for r in preset_rows]) if preset_rows else None),
+        # Everything else the pass ran with, for ↩ "Use these improve
+        # settings" — keys are a frontend contract (improveSettingsRestore.js).
+        improve_profile=(json.dumps({
+            'engine': 'klein',
+            'klein_model': profile['klein_model'],          # None = the auto pin
+            'consistency_strength': profile['lora_strength'],
+            'steps': profile['sampler_steps'],
+            'base_lora_strength': profile['base_lora_strength'],
+            'megapixels': profile['output_megapixels'],
+            'lora_preset': preset_name,
+        }) if profile is not None else None),
     )
     db.session.add(candidate)
     db.session.commit()                      # row BEFORE enqueue: no orphan job
@@ -3676,7 +3793,7 @@ def improve_canvas_image(user_id, image_id, engine=None):
     try:
         job_id = fds._enqueue_improve(
             engine, user_id=user_id, source=row, source_path=source_path,
-            prompt=prompt, label='', dataset=ds,
+            prompt=prompt, label='', dataset=ds, profile=profile,
             # `is_lora_test` is what routes the finished job back to
             # link_completed_test_image (job_queue._dispatch_completion checks it
             # FIRST, before the model_name branch), so the result lands in THIS
@@ -3851,7 +3968,7 @@ def checkpoint_model_breakdown(dataset_id, scores=None) -> list[dict]:
 
     `scores` partageable (cf. best_cell)."""
     scores = cell_scores(dataset_id) if scores is None else scores
-    known = _known_checkpoints(FaceDataset.query.get(dataset_id))
+    known = _known_checkpoints(db.session.get(FaceDataset, dataset_id))
     acc = {}
     for e in scores:
         key = (e['checkpoint'], e['z_model'])
@@ -3916,7 +4033,7 @@ def best_preset(dataset_id, scores=None) -> dict | None:
         **bc,
         'label': _checkpoint_display_label(bc['checkpoint'],
                                            _known_checkpoints(
-                                               FaceDataset.query.get(dataset_id))),
+                                               db.session.get(FaceDataset, dataset_id))),
         'prompt': getattr(img, 'prompt', None) if img else None,
         'seed': img.seed if img else None,
         'filename': img.filename if img else None,
@@ -3955,7 +4072,7 @@ def best_per_checkpoint(dataset_id, scores=None) -> list[dict]:
         out.append({**bc,
                     'label': _checkpoint_display_label(bc['checkpoint'],
                                                        _known_checkpoints(
-                                                           FaceDataset.query.get(dataset_id))),
+                                                           db.session.get(FaceDataset, dataset_id))),
                     'prompt': getattr(img, 'prompt', None) if img else None,
                     'seed': img.seed if img else None,
                     'filename': img.filename if img else None})
@@ -4090,7 +4207,7 @@ def set_best_settings(user_id, dataset_id, checkpoint, strength,
         'steps2': steps2,
         'aspect': aspect,
         'family': family,
-        'decided_at': datetime.utcnow().isoformat(),
+        'decided_at': naive_utcnow().isoformat(),
         # Absent (et non `[]`) quand ce n'est pas une pile : un réglage mono-LoRA
         # d'avant cette vue et un réglage mono-LoRA d'aujourd'hui restent identiques.
         **({'stack': stack_out} if stack_out else {}),
@@ -4185,7 +4302,7 @@ def face_ranking(dataset_id, family) -> list:
         a = agg.setdefault(r.checkpoint, [0.0, 0])
         a[0] += float(r.face_score)
         a[1] += 1
-    known = _known_checkpoints(FaceDataset.query.get(dataset_id), family)
+    known = _known_checkpoints(db.session.get(FaceDataset, dataset_id), family)
     out = [{'checkpoint': cp,
             'label': _checkpoint_display_label(cp, known),
             'avg': round(s / n, 4), 'n': n}
@@ -4397,7 +4514,7 @@ def lora_net_scores(run_id) -> list[dict]:
     for a in agg.values():
         a['net'] = a['likes'] - a['dislikes']
         a['wilson'] = _wilson_lower_bound(a['likes'], a['voted'])
-        ds = FaceDataset.query.get(a['dataset_id'])
+        ds = db.session.get(FaceDataset, a['dataset_id'])
         a['dataset_name'] = ds.name if ds else f"#{a['dataset_id']}"
     return sorted(agg.values(), key=lambda a: (a['net'], a['likes']), reverse=True)
 
@@ -4418,7 +4535,7 @@ def studio_payload_run(user_id, run_id) -> dict | None:
     def _lbl(d):
         return next((_basename(r.checkpoint).rsplit('.', 1)[0] for r in rows if r.dataset_id == d), str(d))
     def _name(d):
-        ds = FaceDataset.query.get(d); return ds.name if ds else str(d)
+        ds = db.session.get(FaceDataset, d); return ds.name if ds else str(d)
     return {
         'run_id': run_id,
         'loras': [{'dataset_id': d, 'lora_label': _lbl(d), 'dataset_name': _name(d)}

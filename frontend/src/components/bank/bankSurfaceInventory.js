@@ -13,52 +13,6 @@
  * make a red test go green defeats its purpose: a surface that legitimately
  * disappears is edited out here in the SAME commit that removes it, with the
  * reason in the commit message. */
-
-/* FORK: three cloud-training surfaces ("↻ Retry", "▶ Train further",
- * "☁ Train in the cloud") are edited out — Divergence 4 removed the rented-GPU
- * lane, so they have never existed here and upstream's freeze captured them from
- * its own tree. The two rotate tooltips are shortened to the wording of
- * BankDecisionBar, which owns those controls on this fork instead of the inline
- * row upstream keeps. */
-export const BANK_SURFACE_FILES = [
-  "src/components/bank/BankOverview.jsx",
-  "src/components/bank/BankReviewLightbox.jsx",
-  "src/components/bank/BankScrapePanel.jsx",
-  "src/components/bank/BankSemanticEngine.jsx",
-  "src/components/bank/BankThresholdsPanel.jsx",
-  "src/components/bank/BankWatermarkMaskDialog.jsx",
-  "src/components/bank/BankWatermarkPanel.jsx",
-  "src/components/bank/BankWorkspace.jsx",
-  "src/components/bank/DeleteRejectedDialog.jsx",
-  "src/components/bank/DescribeFilterBar.jsx",
-  "src/components/bank/DupGroupsPanel.jsx",
-  "src/components/bank/FolderCheckLine.jsx",
-  "src/components/bank/FolderSyncNote.jsx",
-  "src/components/bank/LaunchAllDialog.jsx",
-  "src/components/bank/PassDialog.jsx",
-  "src/components/bank/PersonPreflightDialog.jsx",
-  "src/components/bank/PipelineReport.jsx",
-  "src/components/bank/PromoteDialog.jsx",
-  "src/components/bank/RelocateBankDialog.jsx",
-  "src/components/bank/ScoringPythonDialog.jsx",
-  "src/components/bank/SubfolderPersonPanel.jsx",
-  "src/components/videobank/BankLaneTabs.jsx",
-  "src/components/videobank/PromoteVideoDialog.jsx",
-  "src/components/videobank/VideoBankWorkspace.jsx",
-  "src/components/videobank/VideoCapabilityStrip.jsx",
-  "src/components/videobank/VideoClipGrid.jsx",
-  "src/components/videobank/VideoClipLightbox.jsx",
-  "src/components/videobank/VideoClipSearchBox.jsx",
-  "src/components/videobank/VideoClipTrimTools.jsx",
-  "src/components/videobank/VideoDatasetCloudPanel.jsx",
-  "src/components/videobank/VideoDatasetsPanel.jsx",
-  "src/components/videobank/VideoSourceList.jsx",
-  "src/components/videobank/VideoTargetPicker.jsx",
-  "src/components/videobank/VideoThresholdsPanel.jsx",
-  "src/pages/BankPage.jsx",
-  "src/pages/VideoBankPage.jsx"
-]
-
 export const BANK_SURFACES = [
   [
     "— what the chips above count as blurry, small, duplicate…",

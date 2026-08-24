@@ -108,6 +108,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from _harness import _log
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import import_report  # noqa: E402
@@ -144,14 +145,8 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 CLIPS_PER_FORWARD = 4
 
 
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
 def _emit(obj):
     print(json.dumps(obj), file=_OUT, flush=True)
-
-
 def _preprocess(paths):
     """[T, 3, H, W] float32, the reference's own pipeline.
 

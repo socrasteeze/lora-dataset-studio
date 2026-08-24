@@ -55,6 +55,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from _harness import _log
 
 # Library banners belong on the progress channel, not the result one: a bare
 # print() from a dependency used to land on stdout ahead of the JSON line and
@@ -78,14 +79,8 @@ import import_report  # noqa: E402
 MODEL_ID = 'Qwen/Qwen3-VL-4B-Instruct'
 
 
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
 def _emit(obj):
     print(json.dumps(obj), file=_OUT, flush=True)
-
-
 def main() -> int:
     raw = sys.stdin.readline()
     try:

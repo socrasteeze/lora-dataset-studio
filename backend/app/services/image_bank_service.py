@@ -424,9 +424,9 @@ def _prune_rotated_generations(destination: Path, image_id) -> None:
                 try:
                     stale.unlink()
                 except OSError:
-                    pass
+                    pass   # already gone or locked: a stale sibling owes nothing
     except OSError:
-        pass
+        pass   # already gone or locked: a stale thumb owes nothing
 
 
 def _edited_dir(bank_id) -> Path:
@@ -457,9 +457,9 @@ def _prune_edited_generations(bank_id, image_id, keep: Path | None) -> None:
             try:
                 stale.unlink()
             except OSError:
-                pass
+                pass   # already gone or locked: a stale thumb owes nothing
     except OSError:
-        pass
+        pass   # already gone or locked: a stale thumb owes nothing
 
 
 def _drop_edited_blob(bank_id, row) -> None:
@@ -523,7 +523,7 @@ def _ensure_rotated(bank_id, row: BankImage, source: str) -> str:
                 try:
                     tmp.unlink()
                 except OSError:
-                    pass
+                    pass   # already gone: the temp owed nothing
         if (bank_transfer_metadata.content_fingerprint_path(source)
                 == source_fingerprint):
             _prune_rotated_generations(dst, row.id)
@@ -2658,7 +2658,7 @@ def flag_preview(user_id, bank_id, overrides=None) -> dict | None:
         try:
             th[key] = float(val)
         except (TypeError, ValueError):
-            continue
+            continue   # a malformed override falls back to the shipped threshold
     th['dup_distance'] = int(th['dup_distance'])
     th['min_side'] = int(th['min_side'])
     base = BankImage.query.filter_by(bank_id=bank_id)
@@ -3533,9 +3533,9 @@ def drop_derived(bank_id, image_id) -> None:
                 try:
                     stale.unlink()
                 except OSError:
-                    pass
+                    pass   # already gone or locked: a stale thumb owes nothing
         except OSError:
-            pass
+            pass   # already gone or locked: a stale thumb owes nothing
 
 
 def _drop_analysis_thumbnails(bank_id, image_id) -> None:
@@ -3545,9 +3545,9 @@ def _drop_analysis_thumbnails(bank_id, image_id) -> None:
             try:
                 stale.unlink()
             except OSError:
-                pass
+                pass   # already gone or locked: a stale thumb owes nothing
     except OSError:
-        pass
+        pass   # already gone or locked: a stale thumb owes nothing
 
 
 #: Historical alias — external callers/tests may still name the narrow version.
@@ -3575,7 +3575,7 @@ def _clear_bank_pixel_analysis(
         try:
             (_thumbs_dir(row.bank_id) / f'{row.id}.webp').unlink(missing_ok=True)
         except OSError:
-            pass
+            pass   # already gone or locked: dropping a thumb is best-effort
 
 
 def _clear_bank_watermark_analysis(
@@ -3601,7 +3601,7 @@ def _clear_bank_watermark_analysis(
         try:
             clean_image_path(row.bank_id, row.id).unlink(missing_ok=True)
         except OSError:
-            pass
+            pass   # already gone: the derived copy owed nothing
         drop_derived(row.bank_id, row.id)
 
 
@@ -4717,7 +4717,7 @@ def _load_score_embeddings(bank: ImageBank) -> dict:
                 if f'{st.st_size}:{st.st_mtime_ns}' != sig:
                     continue
             except OSError:
-                continue
+                continue   # vanished mid-check: treated like a signature mismatch
         digest = hashes[i].tobytes()
         if (digest == b'\0' * 32
                 or bank_transfer_metadata.content_fingerprint_path(p)
@@ -4800,7 +4800,7 @@ def _semantic_eligible_paths(bank: ImageBank) -> tuple[int, tuple[str, ...]]:
                     if prefix.isdigit():
                         rotated.setdefault(int(prefix), []).append(candidate)
         except OSError:
-            pass
+            pass   # unreadable entry: the rotation scan skips it
     base, resolved = _poll_path_memo(bank)
     paths = []
     for image_id, relpath, rotation, clean_method in rows:
@@ -4968,61 +4968,11 @@ def _semantic_dup_threshold(engine, threshold=None) -> float:
     return value
 
 
-def rebuild_semantic_dup_groups(bank_id, threshold=None, *,
-                                _bank_lease=None, on_phase=None) -> int | None:
-    """Stage-2 near-duplicate grouping in the Bank's selected semantic space.
-
-    CLIP preserves the historical Score-cache/style-blocking path byte for byte;
-    SigLIP2 reads its independent semantic cache and always compares globally,
-    because ``style_cluster`` remains an explicitly CLIP-owned product.
-
-    Cost: a semantic near-dup (cosine ≥ threshold) is necessarily inside one style
-    union-find component (that clustering uses style_threshold ≤ threshold), so we
-    BLOCK by style_cluster and only compare within a block — Σ block² dot-products,
-    not the full n². A config with style_threshold > threshold would break that
-    guarantee, so we fall back to a single global block then. Re-running at another
-    threshold is CPU-only and near-instant: it re-reads the cached embeddings — no
-    GPU, no re-scan."""
-    if _bank_lease is None:
-        with bank_jobs.mutation_lease(bank_id, 'semantic_dedup') as lease:
-            return rebuild_semantic_dup_groups(
-                bank_id, threshold=threshold, _bank_lease=lease, on_phase=on_phase)
-    # The pass used to announce itself once and then work in silence — on a big
-    # bank that is minutes of an empty bar, and the quietest phase is the
-    # slowest one (proving nothing moved re-hashes every file). Each phase now
-    # says what it is doing and fills the bar as it goes.
-    def _phase(done, total, detail):
-        if on_phase:
-            on_phase(done, total, detail)
-    bank_jobs.require_reservation(_bank_lease, bank_id)
-    import numpy as np
-    bank = db.session.get(ImageBank, bank_id)
-    if not bank:
-        return None
-    engine = _selected_semantic_engine(bank)
-    semantic_lane = _semantic_dup_lane(engine)
-    cache_path = (_score_cache_path(bank_id) if engine == 'clip'
-                  else _semantic_cache_path(bank_id))
-    try:
-        cache_stat = cache_path.stat()
-        cache_generation = (cache_stat.st_size, cache_stat.st_mtime_ns)
-    except OSError:
-        return None
-    emb_by_path = _load_semantic_embeddings(bank)
-    if not emb_by_path:
-        return None
-    th = thresholds()
-    t = _semantic_dup_threshold(engine, threshold)
-    block_by_style = engine == 'clip' and th['style_threshold'] <= t
-    rows = (BankImage.query.filter_by(bank_id=bank_id)
-            .order_by(BankImage.id.asc()).all())
-    path_by_id = {row.id: analysis_image_path(bank, row) for row in rows}
-    preserved_siglip2_groups = (
-        _preserved_siglip2_groups(
-            bank_id, {path: row.id for row in rows
-                      if (path := path_by_id.get(row.id)) is not None})
-        if engine == 'clip' else {})
-    # (image_id, block_key, embedding, path, fingerprint, style_cluster)
+def _sdg_collect_items(bank, rows, path_by_id, emb_by_path, engine,
+                       block_by_style, preserved_siglip2_groups):
+    """Pair every live row with its cached embedding and block key. Moved
+    verbatim from rebuild_semantic_dup_groups; skips rows whose analysis
+    write cannot be prepared and restores proven SigLIP2 groups en route."""
     items = []
     for r in rows:
         p = path_by_id.get(r.id)
@@ -5041,14 +4991,14 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None, *,
         block = (r.style_cluster if r.style_cluster is not None else -1) \
             if block_by_style else 0
         items.append((r.id, block, emb, p, fingerprint, r.style_cluster))
-    if not items:
-        BankImage.query.filter_by(bank_id=bank_id).update(
-            {BankImage.semantic_dup_group: None, semantic_lane: None},
-            synchronize_session=False)
-        db.session.commit()
-        return 0
-    # Do not retain a SQLite read/write transaction across the O(n²) CPU phase.
-    _release_db_before_inference()
+    return items
+
+
+def _sdg_group_by_similarity(items, t, _phase):
+    """Union-find same-shot grouping over the style blocks (tiled exact
+    cosine, bounded memory). Moved verbatim from rebuild_semantic_dup_groups;
+    raises ValueError when the exact-pair budget is exceeded."""
+    import numpy as np
     blocks: dict = {}
     for idx, (_id, block, _emb, _path, _fp, _style) in enumerate(items):
         blocks.setdefault(block, []).append(idx)
@@ -5115,9 +5065,16 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None, *,
         comps.setdefault(find(i), []).append(i)
     groups = sorted((m for m in comps.values() if len(m) >= 2),
                     key=lambda m: (-len(m), items[m[0]][0]))
-    # The cache, every effective payload, and (when used for blocking) every
-    # style id are one generation.  Refuse the whole semantic partition if any
-    # member moved while the CPU comparison ran.
+    return groups
+
+
+def _sdg_partition_still_valid(bank, bank_id, items, engine, block_by_style,
+                               cache_path, cache_generation, _phase):
+    """Re-hash every member to prove nothing moved during the CPU phase.
+    Moved verbatim from rebuild_semantic_dup_groups; repairs a stale CLIP
+    analysis fingerprint en route. Returns (partition_valid,
+    cache_still_current) - the whole partition is refused if any member
+    changed or the cache rolled a generation."""
     try:
         cache_stat = cache_path.stat()
         cache_still_current = (
@@ -5155,6 +5112,77 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None, *,
                     and current_fp != expected_fp):
                 _invalidate_effective_analysis(row)
                 row.analysis_fingerprint = current_fp
+    return partition_valid, cache_still_current
+
+
+def rebuild_semantic_dup_groups(bank_id, threshold=None, *,
+                                _bank_lease=None, on_phase=None) -> int | None:
+    """Stage-2 near-duplicate grouping in the Bank's selected semantic space.
+
+    CLIP preserves the historical Score-cache/style-blocking path byte for byte;
+    SigLIP2 reads its independent semantic cache and always compares globally,
+    because ``style_cluster`` remains an explicitly CLIP-owned product.
+
+    Cost: a semantic near-dup (cosine ≥ threshold) is necessarily inside one style
+    union-find component (that clustering uses style_threshold ≤ threshold), so we
+    BLOCK by style_cluster and only compare within a block — Σ block² dot-products,
+    not the full n². A config with style_threshold > threshold would break that
+    guarantee, so we fall back to a single global block then. Re-running at another
+    threshold is CPU-only and near-instant: it re-reads the cached embeddings — no
+    GPU, no re-scan."""
+    if _bank_lease is None:
+        with bank_jobs.mutation_lease(bank_id, 'semantic_dedup') as lease:
+            return rebuild_semantic_dup_groups(
+                bank_id, threshold=threshold, _bank_lease=lease, on_phase=on_phase)
+    # The pass used to announce itself once and then work in silence — on a big
+    # bank that is minutes of an empty bar, and the quietest phase is the
+    # slowest one (proving nothing moved re-hashes every file). Each phase now
+    # says what it is doing and fills the bar as it goes.
+    def _phase(done, total, detail):
+        if on_phase:
+            on_phase(done, total, detail)
+    bank_jobs.require_reservation(_bank_lease, bank_id)
+    bank = db.session.get(ImageBank, bank_id)
+    if not bank:
+        return None
+    engine = _selected_semantic_engine(bank)
+    semantic_lane = _semantic_dup_lane(engine)
+    cache_path = (_score_cache_path(bank_id) if engine == 'clip'
+                  else _semantic_cache_path(bank_id))
+    try:
+        cache_stat = cache_path.stat()
+        cache_generation = (cache_stat.st_size, cache_stat.st_mtime_ns)
+    except OSError:
+        return None
+    emb_by_path = _load_semantic_embeddings(bank)
+    if not emb_by_path:
+        return None
+    th = thresholds()
+    t = _semantic_dup_threshold(engine, threshold)
+    block_by_style = engine == 'clip' and th['style_threshold'] <= t
+    rows = (BankImage.query.filter_by(bank_id=bank_id)
+            .order_by(BankImage.id.asc()).all())
+    path_by_id = {row.id: analysis_image_path(bank, row) for row in rows}
+    preserved_siglip2_groups = (
+        _preserved_siglip2_groups(
+            bank_id, {path: row.id for row in rows
+                      if (path := path_by_id.get(row.id)) is not None})
+        if engine == 'clip' else {})
+    # (image_id, block_key, embedding, path, fingerprint, style_cluster)
+    items = _sdg_collect_items(bank, rows, path_by_id, emb_by_path, engine,
+                               block_by_style, preserved_siglip2_groups)
+    if not items:
+        BankImage.query.filter_by(bank_id=bank_id).update(
+            {BankImage.semantic_dup_group: None, semantic_lane: None},
+            synchronize_session=False)
+        db.session.commit()
+        return 0
+    # Do not retain a SQLite read/write transaction across the O(n²) CPU phase.
+    _release_db_before_inference()
+    groups = _sdg_group_by_similarity(items, t, _phase)
+    partition_valid, cache_still_current = _sdg_partition_still_valid(
+        bank, bank_id, items, engine, block_by_style, cache_path,
+        cache_generation, _phase)
     if not partition_valid:
         BankImage.query.filter_by(bank_id=bank_id).update(
             {BankImage.semantic_dup_group: None, semantic_lane: None},
@@ -5541,7 +5569,7 @@ def _measure_edited_blob(row: BankImage, blob: Path) -> None:
             row.width, row.height = image_encoding.visual_size_from_header(im)
     except (OSError, ValueError, MemoryError, Image.DecompressionBombError,
             Image.DecompressionBombWarning):
-        pass
+        pass   # an unreadable edit keeps the stored dimensions: size is a fact, not a guess
 
 
 @_serialized_bank_mutation('crop')
@@ -5598,7 +5626,7 @@ def crop_image(user_id, bank_id, image_id, x, y, w, h, *,
         try:
             dst.unlink(missing_ok=True)
         except OSError:
-            pass
+            pass   # rollback is best-effort: the crop target may never have landed
         raise ValueError('invalid crop box')
     row.edit_method = 'crop'
     row.edit_generation = generation
@@ -6660,7 +6688,7 @@ def _bank_folders(user_id, exclude_id=None) -> list:
         try:
             out.append((b, os.path.normcase(os.path.realpath(b.source_path))))
         except (OSError, ValueError):
-            continue
+            continue   # an unresolvable source path cannot collide with anything
     return out
 
 
@@ -6750,7 +6778,7 @@ def rejected_delete_preview(user_id, bank_id) -> dict | None:
                 full = os.path.normcase(os.path.realpath(
                     os.path.join(os.path.realpath(ob.source_path), rel)))
             except (OSError, ValueError):
-                continue
+                continue   # an unresolvable path cannot be the duplicate we are looking for
             if full in mine:
                 n += 1
         if n:
@@ -7153,7 +7181,7 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
                 with open(cancel_file, 'w', encoding='utf-8') as f:
                     f.write('1')
             except OSError:
-                pass
+                pass   # if the sentinel cannot be written the grace-kill timer still fires
             t = threading.Timer(_INFER_CANCEL_GRACE, _safe_kill, args=(proc,))
             t.daemon = True
             t.start()
@@ -7246,7 +7274,7 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
     try:
         os.remove(cancel_file)
     except OSError:
-        pass
+        pass   # the sentinel may be gone already: the pass is over either way
     if alive['stalled']:
         raise InferStalled(
             f'the {stall_label} helper produced no output for '
@@ -9038,7 +9066,7 @@ def _drop_clean_blob_by_id(bank_id, image_id) -> None:
     try:
         clean_image_path(bank_id, image_id).unlink()
     except OSError:
-        pass
+        pass   # already gone: the staged copy owed nothing
     drop_derived(bank_id, image_id)
 
 
@@ -9214,7 +9242,7 @@ def _stage_upright_webp(dst: Path, src_path, *, label: str) -> Path:
         try:
             tmp.unlink()
         except OSError:
-            pass
+            pass   # rollback is best-effort: the temp may never have landed
         raise
     return dst
 
@@ -9481,7 +9509,7 @@ def _publish_edited_bytes(bank_id, row, generation, data: bytes) -> Path:
         try:
             tmp.unlink()
         except OSError:
-            pass
+            pass   # rollback is best-effort: the temp may never have landed
         raise
     return dst
 

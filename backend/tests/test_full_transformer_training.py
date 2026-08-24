@@ -1,5 +1,6 @@
 """Focused contract tests for the Krea 2 dense-training MVP."""
 import json
+from app.extensions import db
 
 import pytest
 from sqlalchemy import text
@@ -82,7 +83,7 @@ def test_settings_persists_and_base_info_serializes_training_mode(
     assert response.get_json()['training_mode'] == 'full_transformer'
 
     with app.app_context():
-        assert FaceDataset.query.get(dataset_id).training_mode == 'full_transformer'
+        assert db.session.get(FaceDataset, dataset_id).training_mode == 'full_transformer'
 
     info = client.get(f'/api/dataset/{dataset_id}/train/base-info')
     assert info.status_code == 200
@@ -252,7 +253,7 @@ def test_full_transformer_krea_config_is_dense_and_conservative(app, tmp_path):
     images = tmp_path / 'images'
     images.mkdir()
     with app.app_context():
-        ds = FaceDataset.query.get(dataset_id)
+        ds = db.session.get(FaceDataset, dataset_id)
         ds.training_mode = 'full_transformer'
         ds.train_variant = 'base'
         # Poison every hidden LoRA cadence/resolution lever.  Dense training has
@@ -306,7 +307,7 @@ def test_full_transformer_snapshot_matches_emitted_dense_recipe(app):
 
     dataset_id = _dataset(app)
     with app.app_context():
-        ds = FaceDataset.query.get(dataset_id)
+        ds = db.session.get(FaceDataset, dataset_id)
         ds.training_mode = 'full_transformer'
         ds.train_variant = 'base'
         ds.train_settings = json.dumps({
@@ -345,7 +346,7 @@ def test_full_transformer_rejects_non_krea_turbo_custom_and_slider(app, tmp_path
 
     dataset_id = _dataset(app)
     with app.app_context():
-        ds = FaceDataset.query.get(dataset_id)
+        ds = db.session.get(FaceDataset, dataset_id)
         ds.training_mode = 'full_transformer'
         ds.train_type = 'zimage'
         with pytest.raises(ValueError, match='only for Krea 2'):
@@ -374,7 +375,7 @@ def test_legacy_and_explicit_lora_configs_are_identical(app, tmp_path):
 
     dataset_id = _dataset(app)
     with app.app_context():
-        ds = FaceDataset.query.get(dataset_id)
+        ds = db.session.get(FaceDataset, dataset_id)
         ds.train_variant = 'base'
         ds.training_mode = 'lora'
         explicit = lt.build_job_config(

@@ -41,6 +41,7 @@ import GeneratedImageLightbox from '../shared/GeneratedImageLightbox';
 import { clampPopoverToViewport, POPOVER_H, POPOVER_W } from '../dataset/checkpointPopover.js';
 import { useCheckpointActions } from '../../hooks/useCheckpointActions';
 import { useCanvasImageImprove } from '../../hooks/useCanvasImageImprove';
+import { useRestoreImproveSettings } from '../../hooks/useRestoreImproveSettings';
 import { useCanvasRun } from '../../hooks/useCanvasRun';
 import {
   canvasRunDatasetIds, describeCanvasRun, readyImageCount, runPinCandidates,
@@ -1056,6 +1057,9 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
       }
     }
     frameRef.current?.classList.add('is-grabbing');
+    // localPoint lit des refs via frameRect() : identite neuve a chaque
+    // rendu, la lister recreerait ce handler en boucle pour rien.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beginDrag, beginImage, refreshRect]);
 
   const onPointerMove = useCallback((e) => {
@@ -1151,6 +1155,8 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
     const p = localPoint(e);
     applyView(panBy({ ...viewRef.current, tx: pan.current.tx, ty: pan.current.ty },
       p.x - pan.current.x, p.y - pan.current.y));
+    // Meme raison : localPoint est volontairement hors deps (refs vivantes).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyView]);
 
   const endPointer = useCallback((e) => {
@@ -1733,6 +1739,7 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
      resolves a `face_dataset_image`, so a second copy that reached for the wrong
      one would improve an unrelated picture and report success. */
   const handleImproveCanvasImage = useCanvasImageImprove();
+  const restoreImproveSettings = useRestoreImproveSettings();
 
   /* 📌 Pin ALL of a finished run's images, in one click.
      A lot spanning four checkpoints used to mean opening four galleries and
@@ -2646,6 +2653,9 @@ export default function LineageCanvas({ entries, positions, imageNodes, allImage
         /* ✨ only where it means something: a picture with a library row that is
            not itself an improvement (canvasImprove.js states both reasons). */
         onImprove={canImproveCanvasImage(pinnedZoom) ? handleImproveCanvasImage : undefined}
+        /* ↩ A pinned ✨ result can hand its recorded settings back to the
+           global improve knobs — same ONE handler as the other hosts. */
+        onUseImproveSettings={restoreImproveSettings}
         /* ✦ Fix ONE part of a render instead of regenerating it (.samexit,
            Discord). Offered on the same pictures ✨ is: a board image with a
            library row behind it — that row's id is what the route addresses. */

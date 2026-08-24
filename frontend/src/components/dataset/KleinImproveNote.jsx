@@ -42,6 +42,7 @@ import PromptOverrideField from '../common/PromptOverrideField';
 import KleinModelSetting from '../shared/KleinModelSetting';
 import { improveInstructionLine, improveAnimeCaution } from './kleinImproveHint';
 import {
+  IMPROVE_MEGAPIXELS_MAX, IMPROVE_MEGAPIXELS_MIN, IMPROVE_MEGAPIXELS_STEP,
   IMPROVE_OFF_NOTE, IMPROVE_SCOPE_NOTE, createImproveSaver, effectiveImprovePrompt,
   improveEditorState, improveSettingsPatch,
 } from './kleinImproveEditor';
@@ -74,8 +75,13 @@ function loadSettings() {
 
 /** Hand a freshly saved settings payload to the cache AND to every mounted note.
  *  Invalidating alone would only fix the NEXT mount; the copies already on
- *  screen are the ones showing the replaced text. */
-function publishSettings(payload) {
+ *  screen are the ones showing the replaced text.
+ *
+ *  Exported (as publishKleinImproveSettings) for the OTHER writer of these
+ *  values: ↩ "Use these improve settings" saves through its own PUT, and a
+ *  note left quoting the replaced instruction for 15 s is the exact staleness
+ *  this publish exists to prevent. */
+export function publishSettings(payload) {
   if (!payload || typeof payload !== 'object') return;
   cache = { at: Date.now(), promise: Promise.resolve(payload), value: payload };
   // A listener that throws must not stop the ones after it — the whole point is
@@ -156,6 +162,7 @@ export default function KleinImproveNote({
   const stored = draft?.stored ?? server.stored;
   const enabled = draft?.enabled ?? server.enabled;
   const loraPreset = draft?.loraPreset ?? server.loraPreset;
+  const megapixels = draft?.megapixels ?? server.megapixels;
   const state = {
     loaded: server.loaded,
     enabled,
@@ -182,6 +189,12 @@ export default function KleinImproveNote({
     // sentence for the same reason.
     saver.current.schedule('loraPreset', v);
     saver.current.flush();
+  };
+  const setMegapixels = (v) => {
+    setDraft((d) => ({ ...(d || {}), megapixels: v }));
+    // Typed, like the prompt: coalesced, so "2.5" is one write, not a write at
+    // "2" — improveSettingsPatch drops a half-typed value on its own.
+    saver.current.schedule('megapixels', v);
   };
 
   return (
@@ -239,6 +252,26 @@ export default function KleinImproveNote({
           </select>
         </label>
       )}
+      {/* The output budget (klein.improve_megapixels) — the size the result
+          comes back at, and the knob people left this panel for (reported the
+          day the rest of the improve controls arrived here). Same single truth
+          as the Settings card: same key, same 0.5–8 bounds, said app-wide. */}
+      <label className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+        <span className="text-content-muted">Output size, MP (app-wide)</span>
+        <input
+          type="number"
+          data-testid="klein-improve-megapixels"
+          aria-label="Output size of every Klein improve, in megapixels"
+          min={IMPROVE_MEGAPIXELS_MIN} max={IMPROVE_MEGAPIXELS_MAX}
+          step={IMPROVE_MEGAPIXELS_STEP}
+          disabled={saving || !server.loaded}
+          value={megapixels}
+          onChange={(e) => setMegapixels(e.target.value)}
+          className="w-20 bg-white/[0.03] border border-white/10 rounded-md
+                     px-2 py-1 text-[0.6875rem] text-content focus:outline-none
+                     focus:border-primary/60 disabled:opacity-50"
+        />
+      </label>
       {/* Two targets because they are two different problems: the WORDS
           (why it turned realistic) and the AMOUNT (how far it moved).
           flex-wrap so they stack rather than overflow on a phone. */}

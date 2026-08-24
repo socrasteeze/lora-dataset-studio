@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from _harness import _log
 
 # Hidden BEFORE torch is imported — the only thing that actually keeps this off
 # a card a training run is using. Same two-locks-on-one-door reflex as the frame
@@ -68,14 +69,8 @@ STORE_ARRAYS = ('clip_ids', 'vecs')
 BLOCK = 2048
 
 
-def _log(m):
-    print(m, file=sys.stderr, flush=True)
-
-
 def _emit(obj):
     print(json.dumps(obj), file=_OUT, flush=True)
-
-
 def main() -> int:
     raw = sys.stdin.readline()
     try:
