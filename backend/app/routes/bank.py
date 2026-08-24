@@ -353,6 +353,33 @@ def bank_relocate(bank_id):
     return jsonify({'ok': True, **out})
 
 
+@bp.post('/bank/<int:bank_id>/forget-missing')
+def bank_forget_missing(bank_id):
+    """Drop the rows whose source file is no longer in the bank's folder — the
+    folder-sync warning's OTHER remedy: not a folder that moved (that is 📦
+    Move folder…), but files really deleted from it (a downloader that cleans
+    up its own intermediates, a sync client, a by-hand tidy). Two-step ON
+    PURPOSE: {} only REPORTS a freshly-walked count, {confirm: true} deletes
+    those rows. Files on disk are never touched, and an unavailable or
+    unreadable folder is refused outright — an unplugged drive must never be
+    able to erase a triage. The preview stays readable while a pass runs; only
+    a confirmed write returns 409."""
+    data = request.get_json(silent=True) or {}
+    try:
+        if data.get('confirm'):
+            out = {**banks.forget_missing(LOCAL_USER, bank_id), 'applied': True}
+        else:
+            out = {**banks.forget_missing_preview(LOCAL_USER, bank_id),
+                   'applied': False}
+    except bank_jobs.BankJobBusy as e:
+        return _busy(e)
+    except banks.BankFolderUnavailable as e:
+        return jsonify({'error': str(e)}), 400
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    return jsonify({'ok': True, **out})
+
+
 @bp.get('/bank/<int:bank_id>/images')
 def bank_images(bank_id):
     args = request.args
@@ -1543,29 +1570,6 @@ def bank_delete_rejected(bank_id):
     # progress bar like it does for every other pass.
     return jsonify({'ok': True, 'total': res['total'],
                     **(res['job'].get('result') or {})}), 202
-
-
-@bp.post('/bank/<int:bank_id>/forget-missing')
-def bank_forget_missing(bank_id):
-    """Accept that images deleted from the folder by hand are gone: drop their
-    ROWS so the "N missing" flag can finally clear.
-
-    Nothing on disk is touched — the files are already gone. What is lost with
-    each row is its triage decision and its scores, which is why this is never
-    automatic: the folder walk stays strictly additive (an unplugged drive must
-    not wipe a triage), and accepting the loss is the user's call."""
-    try:
-        out = banks.forget_missing(LOCAL_USER, bank_id)
-    except ValueError:
-        return jsonify({'error': 'not found'}), 404
-    except RuntimeError as e:
-        # Two shapes ride this: a bank a pass owns (409, same envelope as every
-        # other occupied-bank refusal), and an unreachable folder — where every
-        # row would LOOK missing, so refusing is the whole safety of the feature.
-        snap = bank_jobs.get(bank_id)
-        return jsonify({'error': str(e),
-                        'busy_kind': (snap or {}).get('kind')}), 409
-    return jsonify({'ok': True, **out})
 
 
 def _row_or_404(bank_id, image_id):

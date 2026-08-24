@@ -99,27 +99,25 @@ test('folderSyncNote: unavailable wins over a stale missing count', () => {
     /unavailable/);
 });
 
-/* ── accepting the loss, so the count can finally clear ────────────────────── */
-
-test('missing files offer the ACCEPT route alongside the relocate one', () => {
-  // The count never came down before: the walk is additive on purpose, so a file
-  // deleted by hand was reported forever with nothing the user could do.
-  const n = folderSyncNote({ missing: 4 });
+test('folderSyncNote: missing files also offer to FORGET them, count attached', () => {
+  // The warning's second honest cause — the files were really deleted (a
+  // downloader cleaning up its own intermediates, a by-hand tidy) — gets its
+  // own remedy, and the button needs the number to say what it would drop.
+  const n = folderSyncNote({ ...clean, missing: 8175 });
   assert.equal(n.canForget, true);
-  assert.equal(n.missing, 4);
-  assert.match(n.text, /deleted them on purpose/);
-  assert.equal(n.canRelocate, true, 'the moved-folder fix stays the first offer');
+  assert.equal(n.missing, 8175);
+  assert.match(n.text, /really gone/);
 });
 
-test('an UNAVAILABLE folder is never offered the accept — every row looks missing', () => {
-  // The sharpest edge in the feature: with the drive unplugged, accepting would
-  // delete the whole triage. The server refuses it too; this hides the button.
-  const n = folderSyncNote({ unavailable: true });
-  assert.equal(n.canForget, undefined);
-  assert.equal(n.canRelocate, true);
+test('folderSyncNote: an unavailable folder never offers to forget', () => {
+  // There the walk itself failed: EVERY file reads as missing, and a forget
+  // trusting that verdict would erase the whole triage. The server refuses the
+  // call too — this pins that the UI does not even dangle the button.
+  const n = folderSyncNote({ ...clean, unavailable: true, missing: 900 });
+  assert.ok(!n.canForget);
 });
 
-test('the confirm names what is lost AND what is not touched', () => {
+test('forgetMissingConfirm: the confirm names what is lost AND what is not touched', () => {
   const c = forgetMissingConfirm(4);
   assert.match(c, /Remove 4 missing/);
   assert.match(c, /decisions and scores are lost/);
@@ -127,7 +125,7 @@ test('the confirm names what is lost AND what is not touched', () => {
   assert.match(c, /Move folder/, 'the non-destructive alternative is named');
 });
 
-/* ── folderCheckNote: the price of not walking on every page load ────────── */
+// --- folderCheckNote: the price of not walking on every page load ------------
 // The bank list stopped re-inventorying every source folder before rendering
 // (690-1 190 ms on a real 86 493-image library, on a page people pass through).
 // The counts can therefore lag, and the ONLY thing that makes that acceptable

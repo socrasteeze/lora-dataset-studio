@@ -11,10 +11,13 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { bankTreeSource } from '../src/components/bank/bankTreeSource.js'
 
-const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')
-const BANK = read('../src/components/bank/BankWorkspace.jsx')
+// Reads the bank TREE, not just BankWorkspace.jsx — the review-list caller
+// this test's third assertion pins (▶ Review) moved into useReviewLightbox.js
+// when the Encre redesign extracted it, and a test still scoped to one file
+// went red for the one reason that is not a regression: the code moved.
+const BANK = bankTreeSource()
 
 test('fetchAllIds reads the response through the guard, not inline', () => {
   assert.match(BANK, /import \{ idsFromResponse \} from '\.\/bankIds\.js'/,

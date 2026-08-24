@@ -8,16 +8,12 @@ import { folderSyncNote } from './bankSync'
  * the bank keeps every row and every decision, because a disconnected drive
  * must not be able to erase a triage.
  *
- * Both cases also share the same usual cause — the folder moved — so when the
- * caller passes ``onRelocate`` the note carries the FIX and not only the
- * diagnosis: the user is already reading this line, which is where the button
- * belongs.
- *
- * ``onForget`` is the OTHER fix, for the other cause: the files really were
- * deleted, on purpose, and the count would otherwise be reported forever. It is
- * offered only alongside a reachable folder (folderSyncNote decides), because
- * with the drive unplugged every row looks missing and accepting would wipe the
- * triage. */
+ * The note carries the FIX and not only the diagnosis — the user is already
+ * reading this line, which is where the buttons belong. There are TWO honest
+ * fixes because there are two honest causes: the folder MOVED (``onRelocate``
+ * repoints the bank, losing nothing) or the files are REALLY GONE — a
+ * downloader that cleans up its own intermediates, a sync client, a by-hand
+ * tidy — and ``onForget`` lets the bank drop those rows. */
 export default function FolderSyncNote({ sync, onRelocate, onForget }) {
   const note = folderSyncNote(sync)
   if (!note) return null
@@ -26,19 +22,19 @@ export default function FolderSyncNote({ sync, onRelocate, onForget }) {
     : 'border-amber-400/40 bg-amber-500/10 text-amber-200'
   return (
     <div className={`rounded-md border px-2 py-1 text-xs ${tone}`}>
-      <p>{note.tone === 'error' ? '⚠ ' : 'ℹ '}{note.text}</p>
-      <div className="flex flex-wrap gap-1">
+      <p>{note.tone === 'error' ? '⚠️ ' : 'ℹ️ '}{note.text}</p>
+      <div className="mt-1 flex flex-wrap gap-2">
         {note.canRelocate && onRelocate && (
           <button type="button" onClick={onRelocate}
-            className="mt-1 rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
-            📦 Move folder
+            className="rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
+            📦 Move folder…
           </button>
         )}
         {note.canForget && onForget && (
-          <button type="button" onClick={() => onForget(note.missing)}
-            title="Drop the rows of images that are no longer in the folder. Nothing on disk is touched."
-            className="mt-1 rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
-            Accept — remove {note.missing} from this bank
+          <button type="button" onClick={onForget}
+            title="Drop the rows whose file is no longer in the folder. Rows only — nothing on disk is touched. Asks first, with a fresh count."
+            className="rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
+            🧹 Forget missing ({note.missing.toLocaleString('en-US')})…
           </button>
         )}
       </div>
