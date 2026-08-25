@@ -191,7 +191,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "📊 Bank overview",
+    "Bank overview",
     1
   ],
   [
@@ -231,7 +231,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🚩 Watermarks",
+    "Watermarks",
     1
   ],
   [
@@ -403,7 +403,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Draw the watermark zones on this image (M) — decides nothing. Works even when the scan found nothing: what you draw becomes the flag, and 🧽 Inpaint then repaints exactly that.",
+    "Draw the watermark zones on this image (M) — decides nothing. Works even when the scan found nothing: what you draw becomes the flag, and Inpaint then repaints exactly that.",
     1
   ],
   [
@@ -431,7 +431,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "How captions name nude or sexual content. Explicit needs an uncensored (abliterated) Ollama vision model. Richer, more explicit captions also make the 🔍 search find more.",
+    "How captions name nude or sexual content. Explicit needs an uncensored (abliterated) Ollama vision model. Richer, more explicit captions also make the search find more.",
     1
   ],
   [

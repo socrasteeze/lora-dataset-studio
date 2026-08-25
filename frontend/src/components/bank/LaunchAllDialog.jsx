@@ -32,7 +32,7 @@ import { flagCandidateLabel, launchRejectNote } from './autoRejectReadiness.js'
 const QUALITY_FLAGS = [
   { key: 'blur', label: 'Blurry' },
   { key: 'noise', label: 'Noisy' },
-  { key: 'uniform', label: '⬜ Flat' },
+  { key: 'uniform', label: 'Flat' },
   { key: 'small', label: 'Small' },
 ]
 

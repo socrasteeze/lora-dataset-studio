@@ -15,12 +15,12 @@
 import { ORIGIN_CHIPS, PROVENANCE_FLAG_LABEL } from './bankProvenance.js'
 
 export const FLAG_LABEL = {
-  blur: '🌫 Blurry', noise: '📺 Noisy', uniform: '⬜ Flat',
-  small: '📐 Small', unreadable: '❌ Unreadable',
+  blur: 'Blurry', noise: 'Noisy', uniform: 'Flat',
+  small: 'Small', unreadable: 'Unreadable',
   // Provenance pass — same CPU scan, no extras needed.
   ...PROVENANCE_FLAG_LABEL,
   // V2 scoring flags (aesthetic · NSFW · watermark passes).
-  low_aesthetic: '💔 Low aesthetic', nsfw: '🔞 NSFW', watermark: '🚩 Watermark',
+  low_aesthetic: 'Low aesthetic', nsfw: 'NSFW', watermark: 'Watermark',
 }
 
 export const FLAG_HINT = {
@@ -59,7 +59,7 @@ export const ORIGIN_BUCKETS = ORIGIN_CHIPS
 // are the character composition axes; 'unknown' is a parseable-but-unclassed shot.
 export const FRAMING_BUCKETS = [
   { id: 'face', label: '😀 Face' },
-  { id: 'bust', label: '👤 Bust' },
+  { id: 'bust', label: 'Bust' },
   { id: 'body', label: '🧍 Body' },
   { id: 'back', label: '🔙 Back' },
   { id: 'unknown', label: '❔ Unknown' },
@@ -73,14 +73,15 @@ export const STATUS_RING = {
 
 // Short pass names for the progress bar's pipeline readout.
 export const STEP_SHORT = {
-  scan: '🔎 Scan', auto_reject: '🧹 Auto-reject', score: '✨ Score',
-  semantic_index: '🧠 Semantic index',
-  semantic_dedup: '✂ Crops', watermark: '🚩 Watermarks', faces: '👥 Person',
-  // 🔖 and not 🏷️ for the tag pass: 🏷️ Caption already carries that glyph
-  // everywhere (README, the panel, What's new) and this app uses emoji AS
-  // controls, so two passes wearing the same one is a real collision. Renaming
-  // the older, documented label to free it up would be the more expensive fix.
-  framing: '📐 Framing', tags: '🔖 Tags', caption: '🏷️ Caption',
-  medium: '🎨 Medium',
+  scan: 'Scan', auto_reject: '🧹 Auto-reject', score: 'Score',
+  semantic_index: 'Semantic index',
+  semantic_dedup: '✂ Crops', watermark: 'Watermarks', faces: 'Person',
+  // 🔖 stays on the tag pass while upstream's own passes lose their glyphs to
+  // the icon set: 🔖 Tags is fork-only (wd14Gate, bankPassCoverage and their
+  // tests all spell it that way), and no icon has been assigned to it, so
+  // stripping the glyph here alone would leave the button and the progress
+  // readout disagreeing about the same pass.
+  framing: 'Framing', tags: '🔖 Tags', caption: 'Caption',
+  medium: 'Medium',
   angles: '⤢ Angles',
 }

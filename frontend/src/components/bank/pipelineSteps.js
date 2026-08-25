@@ -32,7 +32,7 @@ export const STEP_COPY = {
     label: 'Auto-reject flagged',
   },
   score: {
-    label: '✨ Score', needs: 'Bank scoring extra',
+    label: 'Score', needs: 'Bank scoring extra',
     desc: 'Aesthetic 1–10, NSFW, style groups (GPU).',
   },
   // Only present in the step list when the bank's semantic engine is SigLIP 2
