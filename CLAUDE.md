@@ -235,11 +235,27 @@ the same reason. In that week 96 commits reached `main` and 7 went through a PR.
   above). This bullet used to demand the full gate "before any push, to `main`
   or to a branch", which contradicted its own first sentence.
 - Small, obvious fixes may still go straight to `main`.
-- **Delete the branch once it lands.** A stale remote branch claims work is in
-  progress when it is finished — the same lie, reversed.
-- **On this fork, a push is still asked for first** — branch or `main`, and
-  never to `upstream`. The rule above is about where work LIVES, not about
-  permission to publish it; see "Fork sync" below and `docs/UPSTREAM_SYNC.md`.
+- **Delete the branch once it lands, without being asked.** A stale remote
+  branch claims work is in progress when it is finished — the same lie,
+  reversed. The test is containment, not the name or the age: delete any branch
+  whose commits are all in `main` (`git branch -r --merged main`), including the
+  one you just worked on. A branch that still carries unmerged commits is NOT
+  stale — leave it and say what it holds, even when its feature reached `main`
+  by another route.
+- **Pushing to `origin` no longer waits for permission — branch or `main`.**
+  Finish the job: run the four `clean` passes, push to `origin/main`, delete the
+  branches that landed. This is standing authorization, granted 2026-08-25 and
+  written here because the previous rule ("a push is still asked for first")
+  stranded a validated sync in an ephemeral container waiting for an answer
+  nobody was there to give. It changes WHO decides, not WHAT must be true first:
+  every gate in "Tests" still has to be green on that exact tree, and a red gate
+  or a failure the pre-merge baseline did not have still stops the push and gets
+  reported instead.
+- **`upstream` stays read-only, always.** Never push to it, never open a PR
+  against it, and disable its push URL in any fresh clone
+  (`git remote set-url --push upstream DISABLED_NO_PUSH`). Contributing back is
+  a separate, deliberate act — see "Sending a PR UPSTREAM" below and
+  `docs/UPSTREAM_SYNC.md`.
 
 ## Shipping checklist — the tail of EVERY user-visible wave
 
