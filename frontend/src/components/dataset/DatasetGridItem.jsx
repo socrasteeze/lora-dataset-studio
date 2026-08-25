@@ -1,5 +1,7 @@
 /** One curation tile: image + keep/reject + source/framing badges + caption + crop. */
 import { improvementBadge } from './improveCandidates.js';
+import SelectionMark from '../shared/SelectionMark';
+import { Eye, Flag, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { displayLabel } from '../../utils/labels';
 // WHO wrote this tile's caption — the per-image half of the provenance the pass
@@ -48,7 +50,7 @@ const GREY_LABEL = { no_face: 'no face detected', low_det: 'low detection',
 function faceBadge(img, thresholds) {
   if (img.face_state == null) return null;
   if (img.face_state !== 'scorable' || img.face_score == null) {
-    return { border: 'border-2 border-dashed border-gray-500', icon: '👁', cls: 'text-gray-300',
+    return { border: 'border-2 border-dashed border-gray-500', icon: Eye, cls: 'text-gray-300',
       label: GREY_LABEL[img.face_state] || 'not scored' };
   }
   const green = thresholds?.green ?? DEFAULT_FACE_VALID;
@@ -72,11 +74,11 @@ const WATERMARK_ROUTE_HINT = {
   review: 'Watermark on the subject — Clean flags it for manual review (auto crop/inpaint would damage the photo); reject or crop manually',
 };
 const WATERMARK_BADGE = {
-  detected: { icon: '🚩', cls: 'text-amber-300', text: 'watermark',
+  detected: { icon: Flag, cls: 'text-amber-300', text: 'watermark',
     label: 'Overlaid watermark detected — Clean will crop the border, inpaint a small mark, or flag it for manual review (V2 handles on-subject watermarks)' },
   dismissed: { icon: '⊘', cls: 'text-content-subtle', text: 'not a watermark',
     label: 'You marked this “not a watermark” — future 🧽 Find passes skip it' },
-  cleaned: { icon: '✨', cls: 'text-emerald-300', text: 'watermark', label: 'Watermark removed (original kept as a .orig backup)' },
+  cleaned: { icon: Sparkles, cls: 'text-emerald-300', text: 'watermark', label: 'Watermark removed (original kept as a .orig backup)' },
   failed: { icon: '⚠', cls: 'text-red-300', text: 'watermark', label: 'Watermark removal failed' },
 };
 
@@ -201,8 +203,9 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
 
   return (
     <div tabIndex={0} aria-label={`${displayLabel(img.variation_label) || 'Dataset image'} card`}
-      className={`dataset-grid-item rounded-lg ${borderCls} ${selected ? 'ring-2 ring-indigo-400' : ''} bg-app/40 overflow-hidden flex flex-col`}>
+      className={`dataset-grid-item rounded-lg ${borderCls} ${selected ? 'ring-2 ring-primary' : ''} bg-app/40 overflow-hidden flex flex-col`}>
       <div className="relative aspect-square bg-black">
+        {selected && <SelectionMark />}
         {onToggleSelect && img.filename && (
           <label
             className="dataset-grid-item__actions absolute bottom-1 left-1 z-10 flex items-center justify-center w-6 h-6 rounded bg-black/60 cursor-pointer"
@@ -279,7 +282,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
           {wb && (
             <span className={`${WATERMARK_BADGE_CLASS} bg-black/70 ${wb.cls}`}
               title={(img.watermark_state === 'detected' && WATERMARK_ROUTE_HINT[img.watermark_route]) || wb.label}>
-              {wb.icon} {wb.text}
+              {typeof wb.icon === 'string' ? wb.icon : <wb.icon aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />}{wb.text}
             </span>
           )}
           {/* Last child = closest to the bottom edge, and the engine pill names
@@ -300,7 +303,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
         {fb && (
           <span className={`${FACE_BADGE_CLASS} px-1.5 py-0.5 rounded bg-black/70 ${fb.cls}`}
             title={`Resemblance to the reference face — ${fb.label}`}>
-            {fb.icon} 🎭 {fb.label}
+            {typeof fb.icon === 'string' ? fb.icon : <fb.icon aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />} {fb.label}
           </span>
         )}
         <div className="dataset-grid-item__actions absolute top-1 right-1 flex max-w-[calc(100%_-_0.5rem)] flex-wrap justify-end gap-1">

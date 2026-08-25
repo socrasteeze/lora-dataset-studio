@@ -76,10 +76,10 @@ test('Curate chips share even columns; Coverage advice is a full-width row', () 
   assert.match(curate, /\$\{CURATE_BTN\} col-span-2/);
   // Idle labels: the trailing ellipsis was a "opens a panel" hint that made
   // every chip a different width. Progress suffixes ("sampling…") stay.
-  assert.match(curate, /🎨 Pick diverse\{/);
+  assert.match(curate, /Pick diverse\{/);
   assert.match(curate, /⚖️ Balanced pick\{/);
-  assert.match(curate, /🎯 Similar to selected\{/);
-  assert.match(curate, /🔤 Find by text\{/);
-  assert.doesNotMatch(curate, /🎨 Pick diverse…/);
-  assert.doesNotMatch(src, /🧹 Auto-reject…/);
+  assert.match(curate, /Similar to selected\{/);
+  assert.match(curate, /Find by text\{/);
+  assert.doesNotMatch(curate, /Pick diverse…/);
+  assert.doesNotMatch(src, /Auto-reject…/);
 });

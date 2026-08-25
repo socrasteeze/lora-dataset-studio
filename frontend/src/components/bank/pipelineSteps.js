@@ -25,11 +25,11 @@
 /** Label, prerequisite name and description, per step. Copy only. */
 export const STEP_COPY = {
   scan: {
-    label: '🔎 Scan quality',
+    label: 'Scan quality',
     desc: 'Sharpness, noise, flatness, size + near-duplicate groups (CPU).',
   },
   auto_reject: {
-    label: '🧹 Auto-reject flagged',
+    label: 'Auto-reject flagged',
   },
   score: {
     label: '✨ Score', needs: 'Bank scoring extra',
@@ -39,7 +39,7 @@ export const STEP_COPY = {
   // (backend _SIGLIP2_PIPELINE_STEPS). The server decides that; this file only
   // has to know the words, which is the whole point of one registry.
   semantic_index: {
-    label: '🧠 Build SigLIP 2 semantic index', needs: 'SigLIP 2 Quality tool',
+    label: 'Build SigLIP 2 semantic index', needs: 'SigLIP 2 Quality tool',
     desc: 'SigLIP 2 cache. CLIP data is kept.',
   },
   semantic_dedup: {
@@ -47,15 +47,15 @@ export const STEP_COPY = {
     desc: 'Crops/variants of the same shot. Needs the index first.',
   },
   watermark: {
-    label: '🚩 Find watermarks', needs: 'Vision model',
+    label: 'Find watermarks', needs: 'Vision model',
     desc: 'GPU · watermarks and logos.',
   },
   faces: {
-    label: '👥 Group by person', needs: 'Quality tools',
+    label: 'Group by person', needs: 'Quality tools',
     desc: 'Person clusters, no reference photo.',
   },
   framing: {
-    label: '📐 Classify framing', needs: 'Vision model',
+    label: 'Classify framing', needs: 'Vision model',
     desc: 'GPU · face / bust / body / back.',
   },
   tags: {
@@ -63,7 +63,7 @@ export const STEP_COPY = {
     desc: 'CPU · never writes captions. Runs here only.',
   },
   caption: {
-    label: '🏷️ Caption', needs: 'Caption engine',
+    label: 'Caption', needs: 'Caption engine',
     desc: 'GPU · searchable, rides to the dataset.',
     // The only step that does NOT start ticked. It is the slowest by a wide
     // margin and the one people most often want to run separately, so an

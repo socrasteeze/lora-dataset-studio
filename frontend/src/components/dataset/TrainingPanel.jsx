@@ -1,5 +1,6 @@
 // react-frontend/src/components/dataset/TrainingPanel.jsx
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Dna, Drama, Eraser, FolderOpen, GraduationCap, Microscope, Package, Rocket, Save, SlidersHorizontal, Trash2, Trophy } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { apiFetch, fetchWithCsrfRetry, getCsrfToken } from '../../api/fetchClient';
@@ -1637,7 +1638,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
   if (!caps.training_visible) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-3 text-content-muted text-sm">
-        <span aria-hidden>🎓</span>
+        <GraduationCap aria-hidden="true" className="h-4 w-4 shrink-0" />
         Training needs ai-toolkit (local GPU) — set its directory in Settings → Local tools.
       </div>
     );
@@ -1647,7 +1648,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
     <div className="flex flex-col gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-content font-semibold text-sm">
-          <span aria-hidden>🎓</span> {fullMode ? 'Full-model training' : 'LoRA Training'} ({typeLabel})
+          <GraduationCap aria-hidden="true" className="h-4 w-4" /> {fullMode ? 'Full-model training' : 'LoRA Training'} ({typeLabel})
         </span>
         {!status.installed && (
           <span className="text-amber-300 text-[0.6875rem]">ai-toolkit not ready — point to its Python (its venv/Scripts/python.exe) in Settings › Local tools</span>
@@ -1752,7 +1753,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {view.excerpt}
             </pre>
           )}
-          {/* One click to the log, right here. The other "📂 Run folder" button
+          {/* One click to the log, right here. The other "<FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Run folder" button
               lives inside a collapsed disclosure further down — nobody looks for
               a log under "checkpoints" (reported by wannadecryptor on Discord).
               NO run selection is sent on purpose: the persisted base/family/
@@ -1764,7 +1765,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 { target: 'run' })}
               title="Open the folder of the run that just failed — training.log is in it"
               className="shrink-0 px-2 py-1 rounded-lg bg-red-500/20 border border-red-400/40 text-red-100 text-[0.6875rem] font-semibold">
-              📂 Open run folder
+              <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Open run folder
             </button>
             <span className="min-w-0 text-red-300/80">{view.note}</span>
           </div>
@@ -1879,8 +1880,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             await trainWithConfirms({ ...common, fresh: mode === 'fresh' });
             refreshStatus();
           }}
-          className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
-          <span aria-hidden>🚀</span> Train the LoRA
+          className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+          <Rocket aria-hidden="true" className="h-4 w-4" /> Train the LoRA
         </button>}
         {!fullMode && <HelpBadge topic="action-training-launch" />}
         {status.in_progress && (
@@ -1917,7 +1918,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {fullMode ? (
             <>Full model · official Krea 2 Raw · cloud · {stepsOverride.trim() ? `${stepsN} steps` : 'adaptive steps'}</>
           ) : (<>
-          {sliderOn ? '🎚 slider (Beta) · ' : ''}base “{zimageRecipe?.baseLabel || baseLabel}”{zimageRecipe ? ` · ${zimageRecipe.adapterActive ? 'Turbo adapter v2 ON' : 'no training adapter'}` : ''} · {sliderOn ? 'unmasked (slider)' : maskedRembgMissing ? 'unmasked (rembg missing)' : masked ? 'masked' : 'unmasked'} · {advResLabel} · {stepsOverride.trim() ? `${stepsN} steps` : sliderOn ? `${stepsInfo?.steps ?? 1000} steps (slider policy)` : 'adaptive steps'}{advNetworkType === 'lokr' ? ` · LoKr${advLokrFactor ? ` factor ${advLokrFactor}` : ''}` : ''}{advEma ? ` · EMA ${advEma}` : ''}
+          {sliderOn ? 'slider (Beta) · ' : ''}base “{zimageRecipe?.baseLabel || baseLabel}”{zimageRecipe ? ` · ${zimageRecipe.adapterActive ? 'Turbo adapter v2 ON' : 'no training adapter'}` : ''} · {sliderOn ? 'unmasked (slider)' : maskedRembgMissing ? 'unmasked (rembg missing)' : masked ? 'masked' : 'unmasked'} · {advResLabel} · {stepsOverride.trim() ? `${stepsN} steps` : sliderOn ? `${stepsInfo?.steps ?? 1000} steps (slider policy)` : 'adaptive steps'}{advNetworkType === 'lokr' ? ` · LoKr${advLokrFactor ? ` factor ${advLokrFactor}` : ''}` : ''}{advEma ? ` · EMA ${advEma}` : ''}
           </>)}
         </span>
       </div>
@@ -1945,7 +1946,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       {!fullMode && (<div id="ds-training-slider" className={`rounded-lg border px-3 py-2 flex flex-col gap-2 ${
         sliderOn ? 'border-purple-400/50 bg-purple-500/5' : 'border-border bg-surface'}`}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-content"><span aria-hidden>🎚</span> Slider LoRA</span>
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-content"><SlidersHorizontal aria-hidden="true" className="h-4 w-4" /> Slider LoRA</span>
           <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.625rem] font-semibold uppercase tracking-wide">Beta</span>
           <button type="button" role="switch" aria-checked={sliderOn}
             disabled={sliderBusy || status.in_progress}
@@ -2150,7 +2151,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             <button type="button" onClick={savePreset} disabled={presetBusy || trainTypeBusy}
               title="Save this dataset's current advanced settings as a named preset"
               className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-[0.75rem] disabled:opacity-40">
-              💾 Save current…
+              <Save aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Save current…
             </button>
             <button type="button" onClick={() => presetFileRef.current?.click()}
               disabled={presetBusy || trainTypeBusy}
@@ -2166,7 +2167,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             <button type="button" onClick={deletePreset} disabled={!selPreset || selPreset.builtin || presetBusy}
               title={selPreset?.builtin ? 'Built-in presets ship with the app and cannot be deleted' : 'Delete the selected preset'}
               className="px-2 py-1 rounded-lg bg-red-500/15 border border-red-500/40 text-red-300 text-[0.75rem] disabled:opacity-40">
-              🗑
+              <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
             </button>
             <input ref={presetFileRef} type="file" accept=".json,application/json" className="hidden"
               onChange={(e) => {
@@ -2575,7 +2576,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {!fullMode && (<details className="group rounded-lg border border-indigo-400/40 border-l-[3px] border-l-indigo-400 bg-indigo-500/[0.14] transition-colors hover:bg-indigo-500/20">
             <summary className="flex items-center gap-2 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden px-2.5 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-indigo-100 hover:text-white">
               <span aria-hidden className="text-indigo-300 transition-transform group-open:rotate-90">▸</span>
-              <span aria-hidden>🔬</span>
+              <Microscope aria-hidden="true" className="h-3.5 w-3.5" />
               <span>Expert — last-mile levers</span>
               <span className="ml-auto hidden sm:inline normal-case font-normal tracking-normal text-indigo-300/50">network · alpha · memory{advTimestepSupported ? ' · timestep' : ''} · optimizer · schedule · EMA</span>
             </summary>
@@ -2912,7 +2913,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               onChange={(e) => setMasked(e.target.checked)}
               aria-label="Masked training (background at 10%)"
               className="accent-primary w-3.5 h-3.5 disabled:opacity-50" />
-            <span className={masked && !sliderOn && !maskedRembgMissing ? 'text-emerald-300' : ''}>🎭 Masked (bg 10%)</span>
+            <span className={masked && !sliderOn && !maskedRembgMissing ? 'text-emerald-300' : ''}><Drama aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Masked (bg 10%)</span>
             {sliderOn && (
               <span className="text-content-subtle" title="The slider loss ignores masks — the server forces unmasked training in slider mode.">
                 off in slider mode
@@ -2939,7 +2940,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {maskedCarryOver && (
             <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 flex flex-col gap-2 text-[0.6875rem]">
               <span className="text-content leading-relaxed">
-                🎭 <b>Masked training is now a dataset setting</b>, shared across your
+                <b>Masked training is now a dataset setting</b>, shared across your
                 browsers and devices instead of living in this one. This browser had it
                 turned <b>off</b>; datasets default to <b>on</b>. Which do you want here?
               </span>
@@ -3012,7 +3013,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 Base “{baseLabel}” — if another training is running at that time, it waits in the queue.
               </span>
               <button type="button" onClick={schedule} disabled={!schedAt}
-                className="ml-auto px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold disabled:opacity-40">
+                className="ml-auto px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
                 Schedule
               </button>
             </div>
@@ -3086,7 +3087,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             ? (event) => event.preventDefault()
             : togglePanel('checkpoints', checkpointsOpen, setCheckpointsOpen)}
           className="cursor-pointer select-none px-3 py-2 text-sm text-content font-semibold">
-          📦 Checkpoints &amp; trained LoRAs
+          <Package aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Checkpoints &amp; trained LoRAs
           <span className="ml-2 font-normal text-content-subtle text-[0.6875rem]">
             {ckLoaded
               ? `${checkpoints.length} checkpoint(s) · ${imported.length} in ComfyUI${diskUsage?.total_bytes ? ` · ${fmtBytes(diskUsage.total_bytes)} on disk` : ''}`
@@ -3164,7 +3165,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             className="rounded-lg border border-border bg-surface-raised px-3 py-2">
             <summary onClick={toggleMerge}
               className="cursor-pointer text-content text-xs font-semibold">
-              🧬 Merge a LoRA into a base checkpoint
+              <Dna aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Merge a LoRA into a base checkpoint
             </summary>
             <p className="m-0 mt-1 text-content-subtle text-[0.625rem] leading-relaxed">
               Folds one or more LoRAs into a full-precision checkpoint and writes a new
@@ -3194,7 +3195,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 title="See this dataset's runs and their checkpoints as a graph — continuations shown, import / generate / download / continue from any checkpoint"
                 className={'px-3 py-1 rounded-md text-xs font-semibold transition-colors '
                   + (checkpointsView === 'graph'
-                    ? 'bg-indigo-500 text-white shadow-sm '
+                    ? 'bg-indigo-500 text-gray-950 shadow-sm '
                     : 'text-content-muted hover:text-content ')}>
                 ◉ Graph
               </button>
@@ -3215,7 +3216,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 { target: 'loras', ...trainingRunSelection(undefined, checkpointTrainType, checkpointVariant) })}
               title={`Open the ComfyUI folder where imported ${checkpointTypeLabel} LoRAs live`}
               className="px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold">
-              📂 LoRA folder
+              <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />LoRA folder
             </button>
             <button type="button"
               onClick={() => postTrain(`/api/dataset/${ds.currentId}/train/open-folder`,
@@ -3305,7 +3306,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   onClick={findBestEpoch}
                   title="Scores every training sample vs the reference photo (face similarity, CPU) and recommends the checkpoint that holds the identity best — needs the Quality tools (ML extras)."
                   className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-[0.6875rem] font-semibold disabled:opacity-40">
-                  {bestEpochBusy ? '🏆 Scoring samples…' : '🏆 Find best epoch'}
+                  <Trophy aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{bestEpochBusy ? 'Scoring samples…' : 'Find best epoch'}
                 </button>
                 {/* A local training in flight no longer locks this button: the
                     dialog offers the cloud lane, and closes the local one with its
@@ -3341,11 +3342,11 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 </p>
               )}
               {bestEpoch && !bestEpoch.available && (
-                <p className="m-0 text-amber-300 text-[0.625rem]">🏆 {bestEpoch.reason}</p>
+                <p className="m-0 text-amber-300 text-[0.625rem]"><Trophy aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />{bestEpoch.reason}</p>
               )}
               {bestEpoch?.available && (
                 <p className="m-0 text-amber-200 text-[0.625rem]">
-                  🏆 Best identity at <span className="font-semibold">step {bestEpoch.best_step}</span>
+                  <Trophy aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />Best identity at <span className="font-semibold">step {bestEpoch.best_step}</span>
                   {' '}({(bestEpoch.steps.find((s) => s.step === bestEpoch.best_step)?.mean_sim ?? 0).toFixed(2)} mean similarity)
                   {' '}— per step: {bestEpoch.steps.map((s) => `${s.step}:${s.mean_sim.toFixed(2)}`).join(' · ')}
                 </p>
@@ -3364,7 +3365,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   {bestEpoch?.available && bestEpoch.checkpoint === c.filename && (
                     <span className="px-1.5 py-px rounded border border-amber-400/50 bg-amber-400/15 text-amber-200 font-semibold"
                       title={`Closest checkpoint to the best-scoring step (${bestEpoch.best_step})`}>
-                      🏆 recommended
+                      <Trophy aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />recommended
                     </span>
                   )}
                   {renderDeployControl(c, {
@@ -3388,7 +3389,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     }}
                     title="Move this checkpoint to the trash (recoverable until the trash is emptied in Settings)"
                     className="px-2 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-300">
-
+                    <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ))}
@@ -3411,12 +3412,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     if (d.ok === false) toastTrainError(d, 'Cleanup failed');
                     loadCheckpoints(checkpointBase, checkpointTrainType, checkpointVariant);
                   }}
-                  title="Keep the final (+ the 🏆 best-epoch pick if scored) and move every other checkpoint of this run to the trash"
+                  title="Keep the final (+ the best-epoch pick if scored) and move every other checkpoint of this run to the trash"
                   className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-[0.6875rem] font-semibold">
-                  🧹 Clean up this run
+                  <Eraser aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Clean up this run
                 </button>
                 <span className="text-content-subtle text-[0.625rem]">
-                  keeps final{bestEpoch?.available ? ' + 🏆 best' : ''} — the rest goes to the trash
+                  keeps final{bestEpoch?.available ? ' + best' : ''} — the rest goes to the trash
                 </span>
               </div>
             </div>
@@ -3497,7 +3498,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                           }}
                           title="Move this cloud save to the trash"
                           className="px-2 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-300">
-
+                          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
@@ -3595,7 +3596,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               <button type="button" onClick={() => resolveResume('fresh')}
-                className="px-3 py-1.5 rounded-lg bg-gradient-primary text-white text-sm font-semibold">
+                className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold">
                 ↺ Start fresh
               </button>
               <button type="button" onClick={() => resolveResume('continue')}

@@ -83,6 +83,68 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-25-selection-stops-tinting',
+    date: '2026-08-25',
+    title: 'Selecting an image no longer puts a colour film over it',
+    blurb:
+      'A selected image in the Bank used to be covered by a coloured overlay — '
+      + 'which is a problem when the thing you are deciding on is the colour of '
+      + 'the photo. Selection is now marked the way an editor marks a contact '
+      + 'sheet: a pencil stroke in the corner and a ring around the frame, with '
+      + 'the picture left alone. Same mark in the dataset grid, so the gesture '
+      + 'reads the same on both.',
+  },
+  {
+    id: '2026-08-25-review-resumes-where-you-clicked',
+    date: '2026-08-25',
+    title: 'Review picks up where you left off',
+    blurb:
+      'Starting ▶ Review from a tile halfway down a bank used to review that '
+      + 'one shot and then jump back to image #1, so the only way to resume a '
+      + 'triage was to decide on everything in between. It now continues from '
+      + 'the shot you clicked, and the counter says where you actually are — '
+      + '← still steps back over what you passed. Reported by nofaceman.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-25-safelight-icons',
+    date: '2026-08-25',
+    title: 'Real icons everywhere, instead of emoji',
+    blurb:
+      'Buttons, the navigation, the settings and workspace rails, the review '
+      + 'lightboxes and the tile badges now use one drawn icon set instead of '
+      + 'emoji. They look the same on every machine — emoji were rendered by '
+      + 'your operating system, so the app never looked twice alike — and they '
+      + 'stay legible at small sizes. Nothing moved: same buttons, same words, '
+      + 'same places.',
+  },
+  {
+    id: '2026-08-25-safelight-look',
+    date: '2026-08-25',
+    title: 'A new look: neutral darkroom greys, one amber accent',
+    blurb:
+      'The whole app moves to "Safelight": neutral, opaque greys inspired by '
+      + 'photo-editing darkrooms — so the interface never tints the images you '
+      + 'are judging — with a single amber accent replacing the old purple '
+      + 'gradient, and a crisper typeface (Archivo). Same layout, same '
+      + 'controls, calmer room.',
+    image: 'docs/screenshots/release/2026-08-25-safelight.png',
+  },
+  {
+    id: '2026-08-25-comfyui-submit-patience',
+    date: '2026-08-25',
+    title: 'Far fewer false "paused ComfyUI job" banners',
+    blurb:
+      'Sending a job to a busy ComfyUI used to give up after 10 seconds — and '
+      + 'because the app could no longer tell whether the job had been accepted, '
+      + 'it raised the paused-job banner that asks you to restart ComfyUI, often '
+      + 'again on the very next try (reported by charlesangus on GitHub). The app '
+      + 'now waits up to two minutes for a busy server to answer, and a ComfyUI '
+      + 'that is simply not running fails the job cleanly so you can just retry — '
+      + 'the banner is reserved for jobs whose outcome is genuinely unknown.',
+    to: '/datasets',
+  },
+  {
     id: '2026-08-25-repair-lanpaint',
     date: '2026-08-25',
     title: '✦ Repair stops smearing — a real inpainting sampler under the mask',

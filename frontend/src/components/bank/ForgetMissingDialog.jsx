@@ -5,7 +5,7 @@ import { useToast } from '../common/Toast'
 /** 🧹 Forget the rows whose source file is no longer in the folder.
  *
  * The folder-sync warning has TWO honest causes and used to offer one remedy.
- * A folder that MOVED is 📦 Move folder…'s job — repoint the bank, lose
+ * A folder that MOVED is Move folder's job — repoint the bank, lose
  * nothing. This dialog is for the other cause: files really deleted from the
  * folder (a downloader that cleans up its own intermediates, a sync client, a
  * by-hand tidy). Their rows failed to load for ever and kept counting against
