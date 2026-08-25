@@ -8,10 +8,10 @@ import { shownBuckets } from './bankMedium.js';
 
 // The real table, as BankWorkspace passes it in.
 const FLAG_LABEL = {
-  blur: 'Blurry', noise: 'Noisy', uniform: '⬜ Flat',
-  small: '📐 Small', unreadable: '❌ Unreadable',
-  soft_detail: '🔬 Soft detail', bars: '⬛ Bars',
-  low_aesthetic: 'Low aesthetic', nsfw: '🔞 NSFW', watermark: 'Watermark',
+  blur: 'Blurry', noise: 'Noisy', uniform: 'Flat',
+  small: 'Small', unreadable: 'Unreadable',
+  soft_detail: 'Soft detail', bars: 'Black bars',
+  low_aesthetic: 'Low aesthetic', nsfw: 'NSFW', watermark: 'Watermark',
 };
 
 test('every reason the backend can write has a label', () => {
@@ -30,7 +30,7 @@ test('every reason the backend can write has a label', () => {
 test('flag-derived reasons reuse FLAG_LABEL instead of a second copy', () => {
   // A chip relabelled in one place is relabelled everywhere that reads it.
   assert.equal(reasonLabel('blur', FLAG_LABEL), 'Blurry');
-  assert.equal(reasonLabel('nsfw', FLAG_LABEL), '🔞 NSFW');
+  assert.equal(reasonLabel('nsfw', FLAG_LABEL), 'NSFW');
   assert.equal(reasonLabel('blur', { ...FLAG_LABEL, blur: 'Out of focus' }),
     'Out of focus');
 });

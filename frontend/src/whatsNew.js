@@ -83,6 +83,19 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-25-icons-reach-the-bank',
+    date: '2026-08-25',
+    title: 'The Bank and the board now match the rest of the app',
+    blurb:
+      'The icon sweep had reached the shell, the settings and the dataset '
+      + 'grid, but the Bank had been left on emoji: its quality chips, pass '
+      + 'buttons, panel headings and watermark dialogs, plus the Canvas '
+      + 'toolbar, the library group headers and the sort menus. They now read '
+      + 'the same as everywhere else, at the same size, on every machine. Same '
+      + 'buttons in the same places — only the glyph changed.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-25-selection-stops-tinting',
     date: '2026-08-25',
     title: 'Selecting an image no longer puts a colour film over it',

@@ -80,12 +80,19 @@ test('the Setup tile explains WHICH half of the install is missing', () => {
   assert.match(setup, /caps\[c\.detailKey\]/);
 });
 
-test('the tag pass wears its own glyph, not the caption one', () => {
-  // This app uses emoji AS controls, so two passes sharing 🏷️ is a real
-  // collision; 🏷️ Caption is the older, documented owner of that glyph.
+test('the tag pass keeps its own glyph, and no other step wears it', () => {
+  // The collision this used to guard was 🏷️: Caption owned that glyph and the
+  // tag pass had to take a different one. Upstream's icon sweep (2026-08-25)
+  // took the glyphs off ITS passes and gave them lucide icons, so Caption is
+  // now plain text — but 🔖 Tags is fork-only, has no icon assigned, and is
+  // spelled that way in wd14Gate, bankPassCoverage and their tests. So the rule
+  // that survives is the narrower one: 🔖 belongs to the tag pass alone, and
+  // stripping it here would leave the button and this readout disagreeing.
   // STEP_SHORT moved out of BankWorkspace and into bankFacets.js with the Encre
   // redesign; the glyph rule travels with the map, not with the file.
   const facets = fs.readFileSync(new URL('./bankFacets.js', import.meta.url), 'utf8');
   assert.match(facets, /tags: '🔖 Tags'/);
-  assert.match(facets, /caption: '🏷️ Caption'/);
+  const stepShort = facets.slice(facets.indexOf('export const STEP_SHORT'));
+  const owners = [...stepShort.matchAll(/(\w+): '🔖[^']*'/g)].map((m) => m[1]);
+  assert.deepEqual(owners, ['tags']);
 });
