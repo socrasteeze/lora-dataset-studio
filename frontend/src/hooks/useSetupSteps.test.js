@@ -430,7 +430,7 @@ test('installCatalog lists every app-installable component, present + available'
       'shot_detect', 'video_text', 'ollama_model',
       'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
       'krea_nodes', 'krea_model', 'krea_text_encoder', 'krea_vae',
-      'krea_identity_lora'],
+      'krea_identity_lora', 'lanpaint_nodes'],
   );
   // Everything installed in fullCaps -> every tile present, and available to REINSTALL.
   for (const c of Object.values(cat)) {
@@ -441,13 +441,13 @@ test('installCatalog lists every app-installable component, present + available'
 
 test('installCatalog stays fully available for reinstall when all is green', () => {
   // The menu must never collapse once installed — each item can always be repaired.
-  // 16, recomputed from the deepEqual list just above (not copied): face_scoring,
-  // masks, watermark_inpaint, wd14, video, shot_detect, ollama_model, the four
-  // klein_* rows, krea_nodes and the four krea_* rows.
+  // 18, not upstream's 17: this fork's catalog carries the 🔖 WD14 tagger row on
+  // top of upstream's list. Recomputed from the deepEqual list just above, never
+  // copied from upstream's literal — upstream's number moved 16 -> 17 this sync
+  // (LanPaint), which is the same value the fork's count already held for a
+  // DIFFERENT reason, so taking their side reads as "unchanged" and is wrong.
   const cat = installCatalog(fullCaps());
-  // 17, not upstream's 16: this fork's catalog carries the 🔖 WD14 tagger row on
-  // top of upstream's list. Recomputed from installCatalog, never copied.
-  assert.ok(cat.length === 17 && cat.every((c) => c.available));
+  assert.ok(cat.length === 18 && cat.every((c) => c.available));
 });
 
 test('installCatalog marks missing ML extras not-present but still available', () => {
