@@ -615,6 +615,16 @@ def get_comfyui_history_probe(prompt_id, worker_url=None) -> ComfyHistoryProbe:
                                  detail=str(exc)[:200])
 
 
+def get_comfyui_history(prompt_id, worker_url=None):
+    """Untyped accessor kept for this fork's remote lanes.
+
+    Upstream removed it as dead code — it has no callers there — but
+    backend_worker and peer_worker are fork-only and both read it, so its
+    liveness is invisible to an upstream-side sweep (Divergence 6)."""
+    probe = get_comfyui_history_probe(prompt_id, worker_url)
+    return probe.history if probe.health is ComfyHistoryHealth.READY else None
+
+
 def _queue_entry_identity(entry):
     """Return ``(prompt_id, client_id)`` from a ComfyUI ``/queue`` entry.
 

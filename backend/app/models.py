@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from .utils.timestamps import naive_utcnow
 from .extensions import db
 from sqlalchemy import Integer, String, Text, DateTime, Float
@@ -841,6 +842,7 @@ class JobQueueMixin:
             self.completed_at = naive_utcnow()
 
         self.last_heartbeat = naive_utcnow()
+
 
 class ImageGenerationQueue(JobQueueMixin, db.Model):
     """Modèle pour la file d'attente de génération d'images"""
