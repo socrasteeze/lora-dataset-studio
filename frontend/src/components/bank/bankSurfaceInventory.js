@@ -31,10 +31,10 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    // FORK: this fork's 🚀 Launch all button names how many passes it will run
+    // FORK: this fork's Launch all button names how many passes it will run
     // ("Launch 3 of 5 passes"), so the extracted surface carries the count
     // expression upstream's simpler label does not.
-    "{busy ? 'Starting…' : `🚀 Launch${nRun ? ` $",
+    "{busy ? 'Starting…' : `Launch${nRun ? ` $",
     1
   ],
   [
@@ -167,19 +167,11 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🎚",
-    1
-  ],
-  [
     "🎞",
     1
   ],
   [
-    "🎨",
-    1
-  ],
-  [
-    "🎨 Pick diverse",
+    "Pick diverse",
     1
   ],
   [
@@ -187,11 +179,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🎯 Similar to selected",
-    1
-  ],
-  [
-    "🏷️",
+    "Similar to selected",
     1
   ],
   [
@@ -207,20 +195,12 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "📊 Coverage advice",
+    "Coverage advice",
     1
   ],
   [
-    "📦",
-    1
-  ],
-  [
-    "📦 Move folder",
-    1
-  ],
-  [
-    "📦 Move folder…",
-    1
+    "Move folder",
+    2
   ],
   [
     "🔍",
@@ -231,7 +211,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🔤 Find by text",
+    "Find by text",
     1
   ],
   [
@@ -239,19 +219,15 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "🗑 Delete rejected from disk",
+    "Delete rejected from disk",
     1
   ],
   [
-    "🧹 Auto-reject",
+    "Auto-reject",
     1
   ],
   [
-    "🚀 Launch all",
-    1
-  ],
-  [
-    "🚩",
+    "Launch all",
     1
   ],
   [

@@ -159,11 +159,11 @@ test('the overview has an explicit unavailable state before bank data arrives', 
  */
 test('the header actions carry no idle ellipses', () => {
   const ws = readFileSync(new URL('./BankWorkspace.jsx', import.meta.url), 'utf8')
-  assert.match(ws, /🚀 Launch all/)
+  assert.match(ws, /Launch all/)
   assert.match(ws, /⬆ Promote/)
-  assert.match(ws, /📦 Move folder/)
-  assert.doesNotMatch(ws, /🚀 Launch all…/)
+  assert.match(ws, /Move folder/)
+  assert.doesNotMatch(ws, /Launch all…/)
   assert.doesNotMatch(ws, /⬆ Promote…/)
-  assert.doesNotMatch(ws, /📦 Move folder…/)
-  assert.doesNotMatch(ws, /🧹 Auto-reject…/)
+  assert.doesNotMatch(ws, /Move folder…/)
+  assert.doesNotMatch(ws, /Auto-reject…/)
 })

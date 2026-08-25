@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { HashRouter, Routes, Route, Navigate, Outlet, NavLink, useLocation } from 'react-router'
+import { Archive, ArrowUp, Dumbbell, Images, Loader2, Menu, Settings, X } from 'lucide-react'
 import { apiFetch, postJson } from './api/fetchClient'
 import { JobsProvider } from './context/JobsContext'
 import { ToastProvider, useToast } from './components/common/Toast'
@@ -140,7 +141,9 @@ function CheckUpdatesButton() {
       className={`${NAV_ITEM_BASE} relative ${available
         ? 'text-emerald-300 hover:text-emerald-200'
         : 'text-content-muted hover:text-content'} hover:bg-surface-raised disabled:opacity-50`}>
-      <span aria-hidden>{busy ? '…' : '↻'}</span>
+      {busy
+        ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+        : <ArrowUp aria-hidden="true" className="h-4 w-4" />}
       {available && (
         <span aria-hidden className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400" />
       )}
@@ -251,11 +254,11 @@ function NavBar() {
       <NavLink to="/bank" className={navItemClass} onClick={() => setOpen(false)}>
         {/* The Beta chip moved from here to the LoRA Canvas: the Bank has been
             in daily use for weeks, the canvas is the newest surface. */}
-        <span className="inline-flex items-center gap-1 leading-none">Bank</span>
+        <span className="inline-flex items-center gap-1"><Archive aria-hidden="true" className="h-3.5 w-3.5" /> Bank</span>
       </NavLink>
       {caps.training_visible && (
         <NavLink to="/cloud" className={navItemClass} onClick={() => setOpen(false)}>
-          <span className="inline-flex items-center gap-1">Runs
+          <span className="inline-flex items-center gap-1"><Dumbbell aria-hidden="true" className="h-3.5 w-3.5" /> Runs
             {activity.running && (
               /* Presence IS the message, so it must not be colour-only: the
                  label is read out and shown on hover/long-press. */
@@ -297,7 +300,7 @@ function NavBar() {
           it reachable even while the studio gate is down. */}
       {(caps.studio_visible || caps.cloud_training || caps.training_visible) && (
         <NavLink to="/gallery" className={navItemClass} onClick={() => setOpen(false)}>
-          <span className="inline-flex items-center gap-1"><span aria-hidden>🖼</span> Gallery</span>
+          <span className="inline-flex items-center gap-1"><Images aria-hidden="true" className="h-3.5 w-3.5" /> Gallery</span>
         </NavLink>
       )}
     </>
@@ -354,7 +357,7 @@ function NavBar() {
                 </>
               )}
             </HeaderMenu>
-            <HeaderMenu triggerLabel={<span aria-hidden>⚙</span>}
+            <HeaderMenu triggerLabel={<Settings aria-hidden="true" className="h-4 w-4" />}
               triggerTitle="Setup & settings" active={settingsMenuActive} dot={setupNeedsAttention}>
               {(close) => (
                 <>
@@ -383,7 +386,9 @@ function NavBar() {
           <button type="button" onClick={() => setOpen((v) => !v)}
             aria-expanded={open} aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
             className="rounded-md p-2 text-content-muted hover:text-content hover:bg-surface-raised">
-            <span aria-hidden className="block text-lg leading-none">{open ? '✕' : '☰'}</span>
+            {open
+            ? <X aria-hidden="true" className="h-5 w-5" />
+            : <Menu aria-hidden="true" className="h-5 w-5" />}
           </button>
         </div>
       </div>
@@ -491,7 +496,7 @@ function UpdateBanner() {
             ) : (
               <>
                 <button type="button" onClick={apply}
-                  className="rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-white transition-transform hover:-translate-y-px">
+                  className="rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 transition-transform hover:-translate-y-px">
                   Update &amp; restart
                 </button>
                 {/* Download link only for packaged builds (a git checkout updates in

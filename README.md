@@ -358,6 +358,17 @@ A LoRA that's *trained* isn't necessarily a LoRA that's *good*. Compare them on 
 
 *Details: [8. Pick the best checkpoint](#8-pick-the-best-checkpoint)*
 
+### 🖼 Gallery — everything you have ever generated, in one feed
+
+Every image the app has made — Test Studio cells, Canvas previews, comparison
+runs, ✨ improvements — across every dataset, newest first.
+
+| Sub-feature | What it gets you |
+| :-- | :-- |
+| **One feed, every dataset** | Filter by dataset, by renders vs improved, or by 👍 liked; the feed loads itself as you approach its end, on a phone as well as a desktop |
+| **Where a picture came from** | The viewer walks the feed with the arrow keys and shows everything the image was made from; ⬇ downloads keep the lineage name |
+| **Act from the feed** | ✨ Upscale & improve runs straight from here and the result lands at the top; Select mode deletes the misses or ZIPs a pick |
+
 ### 📦 Take it with you
 
 Nothing here locks your data in — every stage has an exit.

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Archive, Ban, FolderInput, Plus, X } from 'lucide-react'
 import { apiFetch, del, postJson } from '../api/fetchClient'
 import { useToast } from '../components/common/Toast'
 import { useCapabilities } from '../context/CapabilitiesContext'
@@ -603,7 +604,7 @@ export default function BankPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center gap-2">
         {/* Beta chip retired here — it now marks the LoRA Canvas instead. */}
-        <h1 className="text-xl font-bold text-content">🗃️ Image bank</h1>
+        <h1 className="flex items-center gap-2 text-xl font-bold text-content"><Archive aria-hidden="true" className="h-5 w-5" /> Image bank</h1>
         <HelpBadge topic="page-bank" />
         {/* The kind of bank you are making, said WHERE you make one. Until now a
             .mp4 dropped in this folder was skipped in silence — this is the only
@@ -628,8 +629,11 @@ export default function BankPage() {
           </div>
           <button type="submit" disabled={creating || !!folderNotice}
             title={folderNotice ? 'That folder belongs to a dataset' : undefined}
-            className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-            {creating ? 'Inventorying…' : (splitMode ? '➕ Create banks' : '➕ Create bank')}
+            className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-50">
+            {creating ? 'Inventorying…' : (
+              <span className="inline-flex items-center gap-1.5"><Plus aria-hidden="true" className="h-4 w-4" />
+                {splitMode ? 'Create banks' : 'Create bank'}</span>
+            )}
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -691,10 +695,12 @@ export default function BankPage() {
             )}
           </div>
         )}
+        {/* basis-full: its own row inside the wrapping flex form, so the sentence
+            never squeezes the fields — including at 400 px. */}
         {folderNotice && (
           <p role="alert"
             className="basis-full rounded-md border border-rose-500/70 bg-rose-500/15 p-3 text-sm text-rose-100">
-            ⛔ {folderNotice.text}
+            <Ban aria-hidden="true" className="mr-1 inline h-4 w-4 align-[-2px]" />{folderNotice.text}
           </p>
         )}
       </form>
@@ -808,9 +814,9 @@ export default function BankPage() {
                 <button type="button" onClick={() => setRelocating(b)}
                   aria-label={`Move the folder of bank ${b.name}`}
                   title="Moved this folder to another disk? Point the bank at its new location."
-                  className="ml-auto px-1.5 text-content-subtle hover:text-content">📦</button>
+                  className="ml-auto px-1.5 text-content-subtle hover:text-content"><FolderInput aria-hidden="true" className="h-4 w-4" /></button>
                 <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
-                  className="px-1.5 text-content-subtle hover:text-rose-300">✕</button>
+                  className="px-1.5 text-content-subtle hover:text-rose-300"><X aria-hidden="true" className="h-4 w-4" /></button>
               </div>
               <p className="truncate font-mono text-xs text-content-subtle" title={b.source_path}>
                 {b.source_path}

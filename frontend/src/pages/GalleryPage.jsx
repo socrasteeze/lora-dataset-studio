@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Images, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import { apiFetch, postJson } from '../api/fetchClient';
 import GeneratedImageLightbox from '../components/shared/GeneratedImageLightbox';
 import { useCanvasImageImprove } from '../hooks/useCanvasImageImprove';
@@ -225,7 +226,7 @@ export default function GalleryPage() {
   return (
     <div className="space-y-3">
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h1 className="m-0 text-lg font-bold text-content"><span aria-hidden>🖼</span> Gallery</h1>
+        <h1 className="m-0 flex items-center gap-2 text-lg font-bold text-content"><Images aria-hidden="true" className="h-4 w-4" /> Gallery</h1>
         <p className="m-0 text-content-muted text-[0.75rem]">
           {status === 'ready'
             ? gallerySummaryLine({ count: feed.count, shown: images.length })
@@ -267,9 +268,9 @@ export default function GalleryPage() {
         </div>
         <button type="button" aria-pressed={filters.liked}
           onClick={() => setFilter({ liked: !filters.liked })}
-          title="Only the images you rated 👍"
+          title="Only the images you liked"
           className={kindBtnClass(filters.liked)}>
-          <span aria-hidden>👍</span> Liked
+          <ThumbsUp aria-hidden="true" className="h-3.5 w-3.5" /> Liked
         </button>
       </div>
 
@@ -314,12 +315,18 @@ export default function GalleryPage() {
                   title={picking
                     ? (isPicked ? 'Selected — tap to unselect' : 'Tap to select')
                     : imageFactsLine(img)}
-                  className={`block aspect-square w-full overflow-hidden rounded-md border ${isPicked
+                  className={`block aspect-square w-full overflow-hidden rounded-md border bg-black/40 ${isPicked
                     ? 'border-rose-400 ring-2 ring-rose-400/70'
                     : 'border-border hover:border-indigo-400/60'}`}>
+                  {/* object-CONTAIN, not cover: the cell stays square (row
+                      order, ‹ › navigation and the selection grid all read
+                      row-major), but the picture inside is never cropped — a
+                      9:16 render used to lose its head and feet to the cell.
+                      The dark cell background is what makes the letterbox
+                      read as a mat, not a broken thumbnail. */}
                   <img src={img.url} alt={imageFactsLine(img) || 'Generated image'}
                     loading="lazy"
-                    className={`h-full w-full object-cover ${isPicked ? 'opacity-60' : ''}`} />
+                    className={`h-full w-full object-contain ${isPicked ? 'opacity-60' : ''}`} />
                 </button>
                 {picking && (
                   <span aria-hidden
@@ -328,10 +335,10 @@ export default function GalleryPage() {
                       : 'border-white/60 bg-black/50 text-transparent'}`}>✓</span>
                 )}
                 {img.rating === 1 && (
-                  <span aria-hidden className="pointer-events-none absolute right-0.5 top-0.5 text-[0.625rem]">👍</span>
+                  <ThumbsUp aria-hidden="true" className="pointer-events-none absolute right-0.5 top-0.5 h-3 w-3 text-emerald-300" />
                 )}
                 {img.rating === -1 && (
-                  <span aria-hidden className="pointer-events-none absolute right-0.5 top-0.5 text-[0.625rem]">👎</span>
+                  <ThumbsDown aria-hidden="true" className="pointer-events-none absolute right-0.5 top-0.5 h-3 w-3 text-rose-300" />
                 )}
                 {img.derivation_kind && (
                   /* BOTTOM-left: top-right is the verdict's corner and the
@@ -393,7 +400,7 @@ export default function GalleryPage() {
                 disabled={bar.deleteDisabled}
                 onClick={() => setConfirming(true)}
                 className="ml-auto min-h-10 lg:min-h-0 rounded-md border border-rose-500/50 px-3 py-1.5 text-[0.75rem] text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
-                🗑 Delete{selected.size ? ` (${selected.size})` : ''}
+                <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete{selected.size ? ` (${selected.size})` : ''}
               </button>
             </>
           )}

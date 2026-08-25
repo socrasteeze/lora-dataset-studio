@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Rocket } from 'lucide-react';
 import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
 import { stepGate } from './passDeviceGate.js'
 import { buildSteps, defaultChecked } from './pipelineSteps.js'
@@ -29,10 +30,10 @@ import { flagCandidateLabel, launchRejectNote } from './autoRejectReadiness.js'
  * still starts on blurry + flat, because it has no duplicates control.
  */
 const QUALITY_FLAGS = [
-  { key: 'blur', label: '🌫 Blurry' },
-  { key: 'noise', label: '📺 Noisy' },
+  { key: 'blur', label: 'Blurry' },
+  { key: 'noise', label: 'Noisy' },
   { key: 'uniform', label: '⬜ Flat' },
-  { key: 'small', label: '📐 Small' },
+  { key: 'small', label: 'Small' },
 ]
 
 export default function LaunchAllDialog({
@@ -171,7 +172,14 @@ export default function LaunchAllDialog({
       onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss() }}>
       <div ref={cardRef}
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl space-y-4">
-        <h2 className="text-base font-bold text-content">🚀 Launch all</h2>
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-bold text-content"><Rocket aria-hidden="true" className="h-4 w-4" /> Launch all</h2>
+          <p className="mt-1 text-sm text-content-muted">
+            Chain the whole triage in one go — start it, walk away, come back to a
+            cleaned bank. Each pass runs in order; you can Stop it any time, and a
+            pass whose tool isn't installed is skipped (never fails the run).
+          </p>
+        </div>
 
         {blockedSteps.length > 0 && (
           <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
@@ -249,7 +257,7 @@ export default function LaunchAllDialog({
           ))}
         </ul>
 
-        <div className="rounded-md border border-indigo-400/40 bg-indigo-500/10 p-3 text-sm">
+        <div className="rounded-md border border-border bg-surface-raised p-3 text-sm">
           <p className="font-semibold text-content">What will run</p>
           {manyBanks && (
             <label className="mt-1 flex items-start gap-1.5 text-sm text-content">
@@ -331,9 +339,9 @@ export default function LaunchAllDialog({
             </button>
           )}
           <button type="button" onClick={launch} disabled={busy || nRun === 0}
-            className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? 'Starting…'
-              : `🚀 Launch${nRun ? ` ${nRun === nSent ? nRun : `${nRun} of ${nSent}`} pass${nSent > 1 ? 'es' : ''}` : ''}`}
+            className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
+            <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{busy ? 'Starting…'
+              : `Launch${nRun ? ` ${nRun === nSent ? nRun : `${nRun} of ${nSent}`} pass${nSent > 1 ? 'es' : ''}` : ''}`}
           </button>
         </div>
       </div>

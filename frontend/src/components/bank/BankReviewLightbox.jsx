@@ -3,7 +3,7 @@
  *
  * One full-size image at a time with ✓ Keep / ✕ Reject / ⏭ Skip; every button
  * (and its keyboard shortcut) decides AND moves on, so a 3 000-image dump is
- * worked through without ever going back to the grid. "🎲 Random order"
+ * worked through without ever going back to the grid. "Random order"
  * shuffles what's left instead of walking the folder sequentially — on a dump
  * that means a representative sample straight away rather than 200 near-
  * identical frames in a row.
@@ -17,6 +17,7 @@
  * cursor with the error visible, so a decision is never silently dropped.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Flag as FlagIcon, PartyPopper, Shuffle } from 'lucide-react';
 import { apiFetch, postJson } from '../../api/fetchClient'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import {
@@ -40,9 +41,9 @@ import ShortcutKey from '../shared/ShortcutKey'
 const META_WINDOW = 40
 
 const FLAG_TEXT = {
-  blur: '🌫 Blurry', noise: '📺 Noisy', uniform: '⬜ Flat', small: '📐 Small',
-  unreadable: '❌ Unreadable', low_aesthetic: '💔 Low aesthetic', nsfw: '🔞 NSFW',
-  watermark: '🚩 Watermark', ...PROVENANCE_FLAG_LABEL,
+  blur: 'Blurry', noise: 'Noisy', uniform: 'Flat', small: 'Small',
+  unreadable: 'Unreadable', low_aesthetic: 'Low aesthetic', nsfw: 'NSFW',
+  watermark: 'Watermark', ...PROVENANCE_FLAG_LABEL,
 }
 
 // Origin chip colours, one per state. 'unknown' is deliberately the quiet grey
@@ -90,7 +91,7 @@ function Facts({ img }) {
           : null)}
       {img.face_yaw != null && chip('yaw',
         `⤢ ${Math.round(Math.abs(img.face_yaw))}°`, 'bg-white/10 text-cyan-200',
-        'How far the head is turned, measured by the 🎭 Faces pass.')}
+        'How far the head is turned, measured by the Faces pass.')}
       {/* Kept even once the group is resolved, unlike the grid tile — there is
           room here to SAY "resolved" rather than leave a bare id implying the
           image is still an undecided duplicate. */}
@@ -339,7 +340,7 @@ export default function BankReviewLightbox({
         <label className="flex items-center gap-1.5 text-xs text-white/80"
           title="Walk what's left in random order instead of folder order — on a big dump that shows you a representative sample straight away instead of 200 near-identical shots. Nothing you have already seen comes back.">
           <input type="checkbox" checked={session.shuffle} onChange={toggleShuffle} />
-          🎲 Random order
+          <Shuffle aria-hidden="true" className="h-3.5 w-3.5" /> Random order
         </label>
         <button type="button" onClick={onClose} title="Close (Esc)" aria-label="Close review"
           className="ml-auto h-10 w-10 lg:h-9 lg:w-9 rounded-full bg-white/10 text-lg leading-none text-white hover:bg-white/20">✕</button>
@@ -347,7 +348,7 @@ export default function BankReviewLightbox({
 
       {done ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-          <p className="text-2xl font-bold text-white">🎉 All {p.total.toLocaleString()} image{p.total === 1 ? '' : 's'} reviewed</p>
+          <p className="text-2xl font-bold text-white"><PartyPopper aria-hidden="true" className="mr-2 inline h-6 w-6 align-[-3px]" />All {p.total.toLocaleString()} image{p.total === 1 ? '' : 's'} reviewed</p>
           <p className="text-sm text-white/70">
             {p.kept} kept · {p.rejected} rejected
             {p.skipped ? ` · ${p.skipped} skipped (still undecided)` : ''}
@@ -360,7 +361,7 @@ export default function BankReviewLightbox({
               </button>
             )}
             <button type="button" onClick={onClose}
-              className="rounded-lg bg-gradient-primary px-5 py-2 text-sm font-semibold text-white">
+              className="rounded-lg bg-gradient-primary px-5 py-2 text-sm font-semibold text-gray-950">
               Back to the grid
             </button>
           </div>
@@ -410,36 +411,36 @@ export default function BankReviewLightbox({
                 of the decisions CHANGES THE IMAGE and advances nothing. */}
             <button type="button" onClick={() => setCropId(id)} disabled={busy || id == null}
               title="Crop this image (C) — decides nothing. Nothing is resampled: a Bank sits upstream of the training resolution, so the cut keeps its pixels and a dataset decides the size when it imports. Your own file is never modified, and ↩ Revert brings the original framing back."
-              className="rounded-lg border border-sky-400/60 bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-100 disabled:opacity-50 hover:bg-sky-500/30">
+              className="min-h-10 lg:min-h-0 rounded-lg border border-sky-400/60 bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-100 disabled:opacity-50 hover:bg-sky-500/30">
               ✂ Crop{shortcut('C')}
             </button>
             {img?.edit_method && (
               <button type="button" onClick={revertCurrent} disabled={busy}
                 title="Throw away the ✂ crop / ✨ upscale made in this bank and go back to the image it started from. Only a copy made by the app is deleted — your own file was never modified."
-                className="rounded-lg border border-white/25 px-4 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
+                className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-4 py-2 text-sm text-white disabled:opacity-50 hover:bg-white/10">
                 ↩ Revert edit
               </button>
             )}
             {canEditMask(img) && (
               <button type="button" onClick={() => setMaskId(id)} disabled={busy}
                 title="Draw the watermark zones on this image (M) — decides nothing. Works even when the scan found nothing: what you draw becomes the flag, and 🧽 Inpaint then repaints exactly that."
-                className="rounded-lg border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50 hover:bg-amber-500/30">
-                🚩 {maskButtonLabel(img)}{shortcut('M')}
+                className="min-h-10 lg:min-h-0 rounded-lg border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 disabled:opacity-50 hover:bg-amber-500/30">
+                <FlagIcon aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{maskButtonLabel(img)}{shortcut('M')}
               </button>
             )}
             <button type="button" onClick={() => sendDecision('keep')} disabled={busy}
               title="Keep this image and move on (K)"
-              className="rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-5 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30">
+              className="min-h-10 lg:min-h-0 rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-5 py-2 text-sm font-semibold text-emerald-100 disabled:opacity-50 hover:bg-emerald-500/30">
               ✓ Keep{shortcut('K')}
             </button>
             <button type="button" onClick={() => sendDecision('reject')} disabled={busy}
               title="Reject this image and move on (R) — reversible, nothing is deleted from disk"
-              className="rounded-lg border border-rose-400/60 bg-rose-500/20 px-5 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30">
+              className="min-h-10 lg:min-h-0 rounded-lg border border-rose-400/60 bg-rose-500/20 px-5 py-2 text-sm font-semibold text-rose-100 disabled:opacity-50 hover:bg-rose-500/30">
               ✕ Reject{shortcut('R')}
             </button>
             <button type="button" onClick={doSkip}
               title="Decide later (S) — stays undecided and is not shown again in this review"
-              className="rounded-lg border border-white/25 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-white/10">
+              className="min-h-10 lg:min-h-0 rounded-lg border border-white/25 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-white/10">
               ⏭ Skip{shortcut('S')}
             </button>
           </div>

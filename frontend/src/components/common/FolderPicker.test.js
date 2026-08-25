@@ -11,8 +11,8 @@ test('the field opens the in-app folder browser, not the desktop explorer', () =
   const field = picker.slice(picker.indexOf('export default function FolderPickerField'));
   assert.match(field, /setBrowsing\(true\)/);
   assert.match(field, /<FolderBrowserModal/);
-  assert.match(field, /📂 Browse/);
-  assert.doesNotMatch(field, /📂 Browse…/);
+  assert.match(field, /> Browse</);
+  assert.doesNotMatch(field, /Browse…/);
   // Native pick-folder stays exported for other callers; the field itself
   // must not post it or the Create-bank Browse button opens Explorer.
   assert.doesNotMatch(field, /pickNativeFolder/);

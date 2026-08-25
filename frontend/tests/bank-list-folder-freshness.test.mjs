@@ -63,5 +63,5 @@ test('the bank page itself still renders (no ReferenceError on the way in)', () 
     MemoryRouter, null,
     createElement(ToastProvider, null,
       createElement(CapabilitiesProvider, null, createElement(BankPage)))))
-  assert.match(html, /🗃️ Image bank/)
+  assert.match(html, /Image bank/)
 })

@@ -18,7 +18,7 @@ import { FALLBACK_ORDER, buildSteps, defaultChecked } from './pipelineSteps.js';
 test('the order comes from the server, not from this file', () => {
   const steps = buildSteps(['caption', 'scan']);
   assert.deepEqual(steps.map((s) => s.key), ['caption', 'scan']);
-  assert.equal(steps[0].label, '🏷️ Caption');
+  assert.equal(steps[0].label, 'Caption');
 });
 
 test('a step the server does not publish is not offered', () => {
