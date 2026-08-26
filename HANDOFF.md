@@ -1,23 +1,24 @@
 # HANDOFF
 
-**Updated:** 2026-08-26 · **Branch:** main · **Base:** 995f96a · **Tree:** clean
+**Updated:** 2026-08-26 · **Branch:** claude/magical-tesla-39qhpa · **Base:** 578c7bf · **Tree:** clean
 
 ## State
-Fork is level with `perfectgf/lora-dataset-studio` at `07ad2fd` — 0 behind. This
-session merged a 4-commit window (Test Studio family plumbing). It started with
-`main` 115 commits behind its own feature branch, because two earlier syncs were
-pushed to the branch and never merged down; a concurrent session delivered that
-backlog to `origin/main` mid-run, so this push is a clean 7-commit fast-forward
-on top of it. All gates green; nothing is in flight.
+Fork is level with `perfectgf/lora-dataset-studio` at `aeebd45` — 0 behind. This
+session merged a 10-commit window (📷 Camera angles reaching dataset images and
+Setup). All gates green, nothing in flight; the delivery is a fast-forward over
+`origin/main` at `578c7bf` (a concurrent session pushed the earlier branch
+backlog to `main` mid-run — that base is this merge's own first parent).
 
 ## Done this session
-- Merged upstream `07ad2fd` — 1 source conflict (`whatsNew.js` prepend-vs-prepend)
-- Adopted GitHub #52/#53 whole (lunchingfriar): Klein/FLUX.1/Anima LoRAs are found
-  where deployed, and FLUX.2 Klein gains a real generation lane
-- Corrected two now-false Studio-family claims — `README.md`,
-  `docs/guide/known-limitations.md`
-- Recorded the wave — `FORK_NOTES.md`
-- Rebuilt `frontend/dist` from this fork's `src` in its own `build(frontend):` commit
+- Merged upstream `aeebd45` — 3 source conflicts, 84 dist, 0 rejected features:
+  camera angles on dataset images, its Setup install/repair/count card, ⬇ Files,
+  the picker's 12-view cap deleted, a picker tap fix
+- Resolved `models.py` per hunk: took `camera_pose`, refused `fail_kind` (D1)
+- Recomputed both counted lists — capabilities 17→18, `installCatalog` 18→23 —
+  and fixed a THIRD stale copy in `frontend/src/utils/kreaInstall.test.js`
+- D10 ports into the one registry: 2 new topics + 1 reworded topic; 294→296
+- Corrected three now-false camera claims — `README.md`,
+  `docs/guide/settings-reference.md`; recorded the wave in `FORK_NOTES.md`
 
 ## Open
 1. Fork-only controls still carry emoji while upstream's now use icons
@@ -25,28 +26,31 @@ on top of it. All gates green; nothing is in flight.
    the `COVERAGE_PASSES` marks). De-emojifying `🔖 Tags` alone touches
    `wd14Gate.js`, `bankPassCoverage.js`, `bankFacets.js`, `pipelineSteps.js` and
    the tests asserting the literal — a wave of its own. See `FORK_NOTES.md`, D3.
+2. `no-unused-vars` is at `warn` (D9): 20 warnings, all pre-existing orphans of
+   D1/D4 deletions. Restore to `error` when that orphan wave lands.
 
 ## Decisions
-- Kept upstream's two What's-new entries on top and re-closed the fork's own top
-  entry by hand — the shared trailing brace sits outside both conflict markers as
-  context, so keep-both alone leaves the fork entry unclosed (diagnostic 24)
-- Fixed README/known-limitations over leaving them to upstream — both said Studio
-  covers only Z-Image/SDXL/Krea 2, which the merged lane made false, and no gate
-  reads prose
-- Delivered by fast-forward over a squash — the window is two upstream merges plus
-  a dist rebuild, and squashing would erase their merge ancestry
+- Recomputed every counted list from `deriveCapabilitySummary` / the `deepEqual`
+  list rather than taking upstream's literal — upstream's numbers moved for
+  different arithmetic than the fork's, so "unchanged" would have been wrong
+- Kept `kreaInstall.test.js`'s exact pin over relaxing it to upstream's `>= 12`
+  floor — an exact count is what catches a dropped row; added a comment naming
+  its sibling instead, since that line can never conflict
+- Fixed README/settings-reference over leaving them — the 12-view cap and the
+  "Setup ▸ ComfyUI installs it" path are both false now, and no gate reads prose
 
 ## Traps
-- `main` can silently fall behind a pushed feature branch. Check
-  `git rev-list --left-right --count main...<branch>` before reading "N behind
-  upstream" off `main` — this session's window looked like 102 commits and was 4.
+- **A count that does not change across a sync is not evidence it was right.**
+  Three files hold the capability number; upstream pins a FLOOR in one of them,
+  so it never conflicts and goes stale silently. Only the full suite catches it.
 - `frontend/dist` is what Flask serves. Never take upstream's `build(frontend):`
   commit — rebuild from this fork's `src` or the removed cloud UI returns.
-- On Linux the backend suite has a large path-separator failure floor (71 here,
-  and it moves by one between runs). CI's backend job is `windows-latest` and is
-  green. Diff against a pre-merge baseline; never triage the floor.
+- `docs/guide/**.md` compiles into the bundle: a doc edit needs a dist rebuild.
+- On Linux the backend suite has a large path-separator failure floor (71 here);
+  CI's backend job is `windows-latest` and green. Diff a pre-merge baseline.
 - `download.pytorch.org` is blocked in the container lane, so the Torch overlay
   installs from PyPI as a CUDA build. Same version, no GPU, gate numbers hold.
+  Installing it is not optional — without it ~124 tests silently skip.
 
 ## Verify
 ```bash
