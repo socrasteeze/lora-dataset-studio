@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Camera, X } from 'lucide-react';
 import { requestHelpTip } from '../../help/helpTips';
 import {
-  AZIMUTHS, CAMERA_INTRO, DISTANCES, DISTANCE_CAVEAT, ELEVATIONS, MAX_VIEWS,
-  REFERENCE_POSE, costSentence, posePrompt, posesFor, selectionRefusal,
+  AZIMUTHS, CAMERA_INTRO, DISTANCES, DISTANCE_CAVEAT, ELEVATIONS,
+  REFERENCE_POSE, costSentence, isLongRun, posePrompt, posesFor, selectionRefusal,
 } from '../../utils/cameraAngles';
 
 /* 📷 Pick where the camera stands.
@@ -113,7 +113,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
   const poses = useMemo(() => posesFor(selection),
     [azimuths, elevations, distances]);   // eslint-disable-line react-hooks/exhaustive-deps
   const refusal = selectionRefusal(selection);
-  const tooMany = poses.length > MAX_VIEWS;
+  const long = isLongRun(poses.length, { modelResident });
   const active = sending || busy;
 
   const run = async () => {
@@ -139,7 +139,16 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
   return (
     <div data-probe-layer className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/80 p-3 sm:p-6"
       role="dialog" aria-modal="true" aria-label="Choose camera positions"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      /* stopPropagation ALWAYS, then the backdrop test. This picker mounts in
+         two hosts, and one of them (the dataset lightbox) closes ITSELF on any
+         click that reaches its root — without the stop, every tap on a dial
+         dot bubbled up and quit the whole viewer, picker included. Found on a
+         phone, not by the probe: the probe opens the picker on the Gallery,
+         where the picker is a sibling and nothing bubbles. */
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onClose?.();
+      }}>
       {/* `bg-surface-overlay`, not `bg-surface`: the latter is 4 % alpha and the
           page would read through the card. The contract test enforces it. */}
       <div className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-white/10 bg-surface-overlay shadow-2xl">
@@ -203,27 +212,36 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
               <h3 className="mb-2 font-mono text-[0.66rem] uppercase tracking-[0.14em] text-gray-400">
                 What gets sent
               </h3>
+              {/* Every prompt, scrollable. It used to stop at the old cap and
+                  say "narrow the selection", which was the cap talking; the list
+                  is a preview of what leaves the app, and truncating it hid
+                  exactly the poses a long run most needs to be checked on. */}
               <ul className="max-h-28 space-y-0.5 overflow-y-auto rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[0.68rem] leading-relaxed text-gray-400">
                 {poses.length === 0 && <li className="text-gray-600">nothing picked yet</li>}
-                {poses.slice(0, MAX_VIEWS).map((p) => {
+                {poses.map((p) => {
                   const [a, e, d] = p.split('/');
                   return <li key={p} className="truncate">{posePrompt(a, e, d)}</li>;
                 })}
-                {poses.length > MAX_VIEWS && (
-                  <li className="text-amber-300/80">
-                    …and {poses.length - MAX_VIEWS} more — narrow the selection
-                  </li>
-                )}
               </ul>
             </div>
           </section>
         </div>
 
         <footer className="flex flex-wrap items-center gap-3 border-t border-white/10 px-4 py-3">
-          <p className={`min-w-0 flex-1 text-[0.78rem] ${tooMany ? 'text-amber-300' : 'text-gray-400'}`}>
+          {/* The cost, never a barrier. Nothing here refuses a long run — it
+              says what it will take, and turns amber past five minutes so the
+              number is read rather than skimmed. Each queued view can be
+              dropped one at a time from the system queue, which is what makes
+              a long run a decision instead of a one-way door. */}
+          <p className={`min-w-0 flex-1 text-[0.78rem] ${long ? 'text-amber-300' : 'text-gray-400'}`}>
             {refusal
               ? refusal.charAt(0).toUpperCase() + refusal.slice(1)
               : costSentence(poses.length, { modelResident })}
+            {long && !refusal && (
+              <span className="block text-[0.7rem] text-amber-300/70">
+                Long run — you can drop queued views from the system queue.
+              </span>
+            )}
           </p>
           <button type="button" onClick={onClose}
             className="min-h-10 lg:min-h-0 rounded-lg border border-white/10 px-3 py-1.5 text-[0.78rem] text-gray-300 hover:border-white/25">

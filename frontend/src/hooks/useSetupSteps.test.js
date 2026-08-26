@@ -429,8 +429,13 @@ test('installCatalog lists every app-installable component, present + available'
     ['face_scoring', 'masks', 'watermark_inpaint', 'wd14', 'video',
       'shot_detect', 'video_text', 'ollama_model',
       'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
+      'klein_enhancement_lora',
       'krea_nodes', 'krea_model', 'krea_text_encoder', 'krea_vae',
-      'krea_identity_lora', 'lanpaint_nodes'],
+      'krea_identity_lora',
+      // 📷 Camera angles — four rows, not five: its VAE is the krea_vae row
+      // above (one file, one button).
+      'camera_model', 'camera_lora', 'camera_speed_lora', 'camera_text_encoder',
+      'lanpaint_nodes'],
   );
   // Everything installed in fullCaps -> every tile present, and available to REINSTALL.
   for (const c of Object.values(cat)) {
@@ -441,13 +446,14 @@ test('installCatalog lists every app-installable component, present + available'
 
 test('installCatalog stays fully available for reinstall when all is green', () => {
   // The menu must never collapse once installed — each item can always be repaired.
-  // 18, not upstream's 17: this fork's catalog carries the 🔖 WD14 tagger row on
+  // 23, not upstream's 22: this fork's catalog carries the 🔖 WD14 tagger row on
   // top of upstream's list. Recomputed from the deepEqual list just above, never
-  // copied from upstream's literal — upstream's number moved 16 -> 17 this sync
-  // (LanPaint), which is the same value the fork's count already held for a
-  // DIFFERENT reason, so taking their side reads as "unchanged" and is wrong.
+  // copied from upstream's literal — upstream's number moved 17 -> 22 this sync
+  // (the Klein enhancement LoRA plus four 📷 camera rows), and the fork's own
+  // count has to move by the same five for a DIFFERENT total. The one time this
+  // reads as "unchanged" is the one time it is wrong.
   const cat = installCatalog(fullCaps());
-  assert.ok(cat.length === 18 && cat.every((c) => c.available));
+  assert.ok(cat.length === 23 && cat.every((c) => c.available));
 });
 
 test('installCatalog marks missing ML extras not-present but still available', () => {

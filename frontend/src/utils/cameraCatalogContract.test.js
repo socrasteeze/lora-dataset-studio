@@ -63,8 +63,11 @@ for (const [name, js] of PAIRS) {
 test('the trigger, the ceiling and the reference pose agree', () => {
   assert.ok(source.includes(`TRIGGER = '${TRIGGER}'`),
     `camera_angles.py must define TRIGGER = '${TRIGGER}'`);
-  assert.ok(source.includes(`MAX_VIEWS_PER_RUN = ${MAX_VIEWS}`),
-    `camera_angles.py must define MAX_VIEWS_PER_RUN = ${MAX_VIEWS}`);
+  // The ceiling is the vocabulary itself on both sides — Python spells it
+  // `= POSE_COUNT`, and POSE_COUNT is pinned to 8*4*3 a few lines up.
+  assert.ok(source.includes('MAX_VIEWS_PER_RUN = POSE_COUNT'),
+    'camera_angles.py must define MAX_VIEWS_PER_RUN = POSE_COUNT');
+  assert.equal(MAX_VIEWS, 96, 'the JS ceiling must equal the vocabulary size');
   const [az, el, di] = REFERENCE_POSE.split('/');
   assert.ok(source.includes(`REFERENCE_POSE = ('${az}', '${el}', '${di}')`),
     `camera_angles.py must define REFERENCE_POSE = ('${az}', '${el}', '${di}')`);
@@ -77,9 +80,27 @@ test('the pose id separator is the same on both sides', () => {
 });
 
 test('the derivation kind the tile reads is the one the row stores', () => {
-  const studio = fs.readFileSync(
-    path.join(process.cwd(), '..', 'backend', 'app', 'services', 'lora_test_studio.py'),
+  // BOTH tables, one word: the gallery's and the dataset's rows must file a
+  // camera view under the same kind, or one surface's badge lies about the
+  // other's rows the day an image is promoted between them.
+  for (const mod of ['lora_test_studio.py', 'face_dataset_service.py']) {
+    const src = fs.readFileSync(
+      path.join(process.cwd(), '..', 'backend', 'app', 'services', mod), 'utf8');
+    assert.ok(src.includes("CAMERA_ANGLE = 'camera_angle'"),
+      `${mod} must store derivation_kind = camera_angle`);
+  }
+});
+
+test('the caption phrase never leaks a prompt token', () => {
+  // The phrase goes into TRAINING captions; `<sks>` or the LoRA's shot tokens
+  // there would teach the trigger to expect them.
+  const py = fs.readFileSync(
+    path.join(process.cwd(), '..', 'backend', 'app', 'services', 'camera_angles.py'),
     'utf8');
-  assert.ok(studio.includes("CAMERA_ANGLE = 'camera_angle'"),
-    'lora_test_studio must store derivation_kind = camera_angle');
+  const block = py.slice(py.indexOf('def pose_caption_phrase'),
+    py.indexOf('def pose_label'));
+  assert.ok(block.length > 100, 'pose_caption_phrase not found');
+  assert.ok(!block.includes('<sks>'), 'the caption phrase must not carry the trigger');
+  assert.ok(!/'[^']*shot[^']*'/.test(block.replace(/#[^\n]*/g, '')),
+    'the caption phrase must not reuse the LoRA\'s "shot" tokens');
 });

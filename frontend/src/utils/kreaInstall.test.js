@@ -117,13 +117,19 @@ test('Krea is a counted capability, never quietly dropped from the total', () =>
   assert.ok(krea, 'Krea must appear in the capability summary');
   assert.equal(krea.ok, false);
   assert.equal(!!krea.pending, false, 'a real disk gap is not a "waiting" state');
-  // It counts against the total instead of disappearing from it. 17, not
-  // upstream's 19: the three cloud API engines are not capabilities on this
-  // fork (Divergence 1) — see capability-destinations-contract.test.mjs. The
-  // WD14 tagger joined the list for the same reason this test exists, and the
-  // video/SigLIP2/watermark-detector/scraping rows joined with this sync.
-  // Run deriveCapabilitySummary with this fixture and count — never copy.
-  assert.equal(rows.length, 17);
+  // It counts against the total instead of disappearing from it. 18, not
+  // upstream's 20: the three cloud API engines are not capabilities on this
+  // fork (Divergence 1), and the 🔖 WD14 tagger is one — see
+  // capability-destinations-contract.test.mjs, which pins the SAME number and
+  // carries the arithmetic. 📷 Camera angles joined the list on 2026-08-26.
+  //
+  // ⚠️ THIS IS THE SECOND HOME OF THAT NUMBER, and upstream's copy of this file
+  // asserts a FLOOR (`>= 12`), so their syncs never touch the line and it can
+  // never conflict. It went stale exactly that way once: the capability count
+  // moved and this literal auto-merged untouched, red only at the full suite.
+  // When one of the two moves, move both — and run
+  // deriveCapabilitySummary with this fixture and count, never copy.
+  assert.equal(rows.length, 18);
   assert.ok(rows.filter((r) => r.ok).length < rows.length);
 });
 
