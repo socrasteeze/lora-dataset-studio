@@ -2065,6 +2065,39 @@ const TOPICS = [
      // (klein.improve_lora_preset) — one panel, all three improve knobs.
      'lora preset', 'improve preset', 'chain lora', 'preset', 'extra loras'],
     '/datasets?section=images', 'settings-reference', 'image-engines'),
+  // ↩ On a ✨ result in the generated-image viewer (Gallery, checkpoint
+  // galleries, Canvas): make future improves run the way THIS one did.
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js. It
+  // arrived with the improve run-profile wave and was lost when that sync
+  // `git rm`-ed the split module, while the FEATURE it documents shipped here:
+  // the quiet half diagnostic 10 warns about, caught by diffing this fork's
+  // topic ids against upstream's rather than by any gate.
+  action('action-use-improve-settings', 'Reuse the settings a ✨ result was made with',
+    ['use these improve settings', 'reuse settings', 'restore settings', 'same settings',
+     'copy settings', 'apply settings', 'like this result', 'run again like this',
+     'improve settings back', 'previous settings', 'settings from image',
+     'which settings made this', 'recorded settings', 'improve profile'],
+    '/gallery', 'using-the-app', 'the-gallery-every-image-you-generated'),
+  /* 📷 Its own topic rather than a line under the Gallery's, because the
+     question people arrive with is not "what can the Gallery do" — it is
+     either "how do I get the back of this character" or, more often, "why did
+     it turn the person instead of moving the camera". Both vocabularies are in
+     the keywords, including the shot-catalog words, so someone who tried
+     "profile view" first lands here.
+     DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js. Its tip
+     is not optional: CameraAnglePicker calls requestHelpTip('camera-angles-picker')
+     and contract (6) fails on a trigger with no tip behind it. */
+  action('action-camera-angles', 'Re-shoot a picture from another camera position',
+    ['camera', 'camera angle', 'angles', 'multi-angle', 'multiple angles', 'around',
+     'orbit', 'rotate camera', 'move camera', 'viewpoint', 'point of view',
+     'other side', 'back of', 'behind', 'from behind', 'back view', 'profile',
+     'side view', 'three-quarter', 'low angle', 'high angle', 'from below',
+     'from above', 'turntable', 'coverage', 'sks', 'qwen', 'why did it turn the person',
+     'background did not move', 'same scene different angle'],
+    '/gallery', 'using-the-app', 'the-gallery-every-image-you-generated',
+    { trigger: 'camera-angles-picker',
+      text: 'Pick axes, not pictures: the sides you tick times the heights times '
+        + 'the distances is the run — the count under the button is what it will cost.' }),
   action('action-reimprove-tile', 'Re-run Upscale & improve after changing its settings',
     ['improve', 'upscale', 'reimprove', 're-improve', 'rerun', 're-run', 'redo', 'again',
      'regenerate', 'no regenerate button', 'missing button', 'klein improve', 'candidate',

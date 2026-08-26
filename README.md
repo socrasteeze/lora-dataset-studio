@@ -358,7 +358,7 @@ A LoRA that's *trained* isn't necessarily a LoRA that's *good*. Compare them on 
 
 *Details: [8. Pick the best checkpoint](#8-pick-the-best-checkpoint)*
 
-### 🖼 Gallery — everything you have ever generated, in one feed
+### 🖼 Gallery *(Beta)* — everything you have ever generated, in one feed
 
 Every image the app has made — Test Studio cells, Canvas previews, comparison
 runs, ✨ improvements — across every dataset, newest first.
@@ -368,6 +368,17 @@ runs, ✨ improvements — across every dataset, newest first.
 | **One feed, every dataset** | Filter by dataset, by renders vs improved, or by 👍 liked; the feed loads itself as you approach its end, on a phone as well as a desktop |
 | **Where a picture came from** | The viewer walks the feed with the arrow keys and shows everything the image was made from; ⬇ downloads keep the lineage name |
 | **Act from the feed** | ✨ Upscale & improve runs straight from here and the result lands at the top; Select mode deletes the misses or ZIPs a pick |
+| **📷 Camera angles** | Re-shoot a picture from another camera position — the subject stays put and the background moves with it, so what was behind them comes into view. This is not the catalog's "profile view" shot, which turns the *person* and leaves the room where it was. Pick sides, heights and distances; the count under the button is the run |
+
+**📷 Camera angles runs on a second local engine, and the limits are real.** It
+needs Qwen-Image-Edit 2511 plus a Multiple-Angles LoRA — about **21.5 GB**, which
+the Setup ▸ ComfyUI screen downloads for you the first time you press the button;
+nothing is fetched behind your back. Distance (close-up / medium / wide) is a hint
+the model mostly honours rather than a setting it obeys. Whatever the original
+photo never showed is **plausible, not real** — fine for a character dataset,
+wrong for anything that has to be a faithful record of a place. And a camera view
+cannot itself be re-shot from another angle: the second pass would re-invent what
+the first already invented, so the button is refused there and says why.
 
 ### 📦 Take it with you
 
