@@ -58,6 +58,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | **📥 Import your own** | Drag photos in — full frame for Concept/Style, optional auto head-crop for Character |
 | **🌐 Scrape the web** | Reddit keyword search, Pexels via its official API, or a supported gallery / album / direct-media URL — into the open dataset, or straight into an **Image bank**. The dataset route filters on the way in (under 768 px, wider than 3:1, near-duplicates are dropped before you see them); the bank route stores what it downloaded and lets the bank's own passes judge it |
 | **✏️ Edit the prompt, regenerate** | Every generated tile reopens its exact prompt inline and re-renders through the same engine, identity guard included |
+| **📷 Cover a subject from more angles** | Open a kept image and re-shoot it from other camera positions — the views arrive as ordinary pending candidates you keep or reject. Each is **born with its angle already written into the caption** ("seen from behind, low camera angle") and the captioner re-injects that phrase on every later pass, because an angle left undescribed is what binds "back-facing" to your trigger word. The Image bank deliberately does *not* carry the button: it holds real material, and a re-shot view is a plausible one — promote to a dataset first |
 
 *Details: [1. Decide what you're teaching](#1-decide-what-youre-teaching) · [2. Fill it with images](#2-fill-it-with-images)*
 
@@ -367,13 +368,16 @@ runs, ✨ improvements — across every dataset, newest first.
 | :-- | :-- |
 | **One feed, every dataset** | Filter by dataset, by renders vs improved, or by 👍 liked; the feed loads itself as you approach its end, on a phone as well as a desktop |
 | **Where a picture came from** | The viewer walks the feed with the arrow keys and shows everything the image was made from; ⬇ downloads keep the lineage name |
-| **Act from the feed** | ✨ Upscale & improve runs straight from here and the result lands at the top; Select mode deletes the misses or ZIPs a pick |
+| **Act from the feed** | ✨ Upscale & improve runs straight from here and the result lands at the top; Select mode deletes the misses, ZIPs a pick, or saves it as ⬇ plain files under the same lineage names — one at a time, so the browser does not treat the burst as an attack |
 | **📷 Camera angles** | Re-shoot a picture from another camera position — the subject stays put and the background moves with it, so what was behind them comes into view. This is not the catalog's "profile view" shot, which turns the *person* and leaves the room where it was. Pick sides, heights and distances; the count under the button is the run |
 
 **📷 Camera angles runs on a second local engine, and the limits are real.** It
-needs Qwen-Image-Edit 2511 plus a Multiple-Angles LoRA — about **21.5 GB**, which
-the Setup ▸ ComfyUI screen downloads for you the first time you press the button;
-nothing is fetched behind your back. Distance (close-up / medium / wide) is a hint
+needs Qwen-Image-Edit 2511 plus a Multiple-Angles LoRA — about **21.6 GB**, and
+Setup ▸ Install has a one-click card for it, a repair row per weight, and counts
+the lane on the readiness screen, so a machine without it reads *not ready* rather
+than certifying "all set" by leaving it out. Pressing 📷 with the weights missing
+still starts the same download; nothing is fetched behind your back. Distance
+(close-up / medium / wide) is a hint
 the model mostly honours rather than a setting it obeys. Whatever the original
 photo never showed is **plausible, not real** — fine for a character dataset,
 wrong for anything that has to be a faithful record of a place. And a camera view

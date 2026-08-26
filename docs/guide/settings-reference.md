@@ -169,18 +169,20 @@ Without the pack nothing breaks: upscales still run, they are just capped by the
 
 ### Camera angles (local)
 
-📷 **Camera angles** re-photographs an existing picture from another camera position: open it in the 🖼 Gallery, press **Camera angles**, pick where the camera stands on the dial, how high it is and how close. The subject stays where it is and **the background moves with the camera**, so what was behind them comes into view.
+📷 **Camera angles** re-photographs an existing picture from another camera position: open it in the 🖼 Gallery **or in a dataset**, press **Camera angles**, pick where the camera stands on the dial, how high it is and how close. The subject stays where it is and **the background moves with the camera**, so what was behind them comes into view.
+
+**In a dataset the verb answers a different question**, so it behaves differently in one way worth knowing: the views arrive as ordinary **pending candidates** you keep or reject, and each is born with its angle phrase already in the caption ("seen from behind, low camera angle"), which the captioner completes and then re-injects on every later pass. That is deliberate — what a caption does not describe binds to the trigger word, so a back view left undescribed teaches the LoRA that the character *is* back-facing. The **Image bank does not carry the button at all**: it holds real material, and a re-shot view is plausible rather than real. Promote to a dataset first.
 
 **This is not the shot catalog's "profile view".** That one asks an edit model for another angle and the model answers by turning the *person* — measured on this app's own Klein lane, the room behind never moved, whatever the wording. Moving the viewpoint needs a model trained on real viewpoint changes, which is why this lane runs on **Qwen-Image-Edit 2511** with fal.ai's Multiple-Angles LoRA (trained on gaussian-splatting renders, Apache-2.0) rather than on the Klein weights you already have.
 
-**What it costs.** The base model is **~20.5 GB**, plus 295 MB for the angles LoRA and 850 MB for the optional 4-step speed LoRA. The text encoder and VAE are shared with lanes you may already have installed. Pressing 📷 with the weights absent starts those downloads and tells you so — nothing is fetched behind your back. Once the model is resident a view takes **12–16 s**; the first one of a session also pays for loading the model (~1 min).
+**What it costs.** The base model is **~20.5 GB**, plus 295 MB for the angles LoRA and 850 MB for the optional 4-step speed LoRA. The text encoder and VAE are shared with lanes you may already have installed. **Setup ▸ Install** carries the lane properly: a one-click card (~21.6 GB all told, shared parts skipped), a repair row per weight so one broken download can be fixed alone, and a counted row on the readiness screen — a machine missing the lane reads *not ready* instead of certifying "all set" by leaving it out. Pressing 📷 with the weights absent still starts the same downloads and tells you so — nothing is fetched behind your back. Once the model is resident a view takes **12–16 s**; the first one of a session also pays for loading the model (~1 min).
 
 **The limits, stated up front:**
 
 - **Distance is approximate.** Close-up / medium / wide are hints the model mostly honours; several poses asked at *medium* come back tighter than the source.
 - **Off-camera detail is invented.** The part of the scene the original photo never showed is plausible, not real. Fine for a character dataset, wrong for anything that has to be a faithful record of a place.
 - **A camera view cannot be re-shot from another angle.** The second pass would re-invent what the first already invented and present it as the original scene, so the button is refused there and says why.
-- **12 views per run.** The count under the button is the product of the axes you ticked; it says what the run will cost before you spend it.
+- **No cap on views per run.** The count under the button is the product of the axes you ticked, with the estimated minutes beside it and an amber warning past five — what the button owes you is the *cost*, not a decision about it (eight sides at two distances is 16, which the old 12-view cap refused). The only ceiling left is the vocabulary itself, 96 positions.
 
 **Model files (optional).** Same contract as the Klein pins below — empty means auto-detect (canonical download filename first, then a narrow token scan), a value pins one file.
 
