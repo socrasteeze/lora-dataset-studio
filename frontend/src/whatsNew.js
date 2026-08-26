@@ -83,6 +83,71 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-26-klein-enhancement-repair-row',
+    date: '2026-08-26',
+    title: 'The Klein enhancement LoRA can finally be repaired from Setup',
+    blurb:
+      'The detail LoRA behind ✨ Upscale & improve installed itself on demand '
+      + 'but appeared nowhere on Setup — so a broken or deleted file could '
+      + 'only be fixed by triggering an improve and hoping. It now has its own '
+      + 'row in the Install screen\'s repair menu, like every other weight. '
+      + 'Found by a new internal guard that walks every install the app can '
+      + 'run and fails when one is offered on no screen — so the next engine '
+      + 'cannot ship half-visible the way three lanes did before it.',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-26-camera-angles-dataset',
+    date: '2026-08-26',
+    title: 'Camera angles inside a dataset — with the angle already captioned',
+    blurb:
+      'Open any kept image of a dataset and press 📷 Camera angles: the views '
+      + 'arrive as pending candidates in the ordinary keep/reject cycle, and '
+      + 'each one is born knowing its own caption fragment — "seen from '
+      + 'behind, low camera angle" — which the captioner then completes and '
+      + 're-injects on every later pass. That phrase is the point: an angle '
+      + 'left undescribed binds to the trigger word, and the angle is the one '
+      + 'fact a vision model cannot reliably see while the app knows it '
+      + 'exactly, because you asked for it. Imports and ✨ results are valid '
+      + 'sources; camera views are not re-shot from camera views. The Bank '
+      + 'deliberately does not carry the button — it is the reservoir of real '
+      + 'photos; promote to a dataset first, and the views are born as '
+      + 'candidates, never filed as real.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-26-camera-setup-card',
+    date: '2026-08-26',
+    title: 'Install 📷 Camera angles from Setup, before the first click',
+    blurb:
+      'The camera weights used to install only when you pressed 📷 with them '
+      + 'missing. Setup now shows the lane properly: a one-click install card '
+      + 'on the Install screen (~21.6 GB, shared parts skipped when another '
+      + 'engine already brought them), a row per weight in the repair menu so '
+      + 'a broken download can be fixed alone, and Camera angles is counted on '
+      + 'the readiness screen — a machine without it reads "not ready, here is '
+      + 'the install", never a shorter list that certifies completeness by '
+      + 'leaving it out.',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-26-gallery-download-files',
+    date: '2026-08-26',
+    title: 'Download a Gallery selection as plain files — no ZIP to unpack',
+    blurb:
+      'Select images in the Gallery and press ⬇ Files: each one saves to your '
+      + 'Downloads as its own file, under the same lineage name the ZIP would '
+      + 'have used — dataset, run, step and seed. Built for the places an '
+      + 'archive is a chore: grabbing three pictures, a phone, or a training '
+      + 'tool watching a folder. Files save one at a time (your browser may ask '
+      + 'once to allow multiple downloads), a picture whose file was cleaned '
+      + 'off the disk is skipped and counted rather than stopping the rest, '
+      + 'and leaving Select mode stops the run. The camera picker also lost '
+      + 'its 12-view cap: pick as many angles as you want — the button states '
+      + 'the cost, and long runs warn instead of being blocked.',
+    to: '/gallery',
+  },
+  {
     id: '2026-08-26-camera-angles',
     date: '2026-08-26',
     title: 'Walk around your subject: re-shoot any picture from another camera position',

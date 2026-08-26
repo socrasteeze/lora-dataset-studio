@@ -53,6 +53,10 @@ const STATUS_META = {
 const CAPABILITY_STEP_ID = {
   'Klein (local)': 'comfyui',
   'Krea 2 Edit (local)': 'install',
+  // Same screen as Krea, for the same reason: its one-click installer
+  // (CameraInstallCard) lives on the install screen, and the comfyui step
+  // carries Klein's weights only — mapping there would land on nothing to press.
+  '📷 Camera angles (local)': 'install',
   'Captioning': 'ollama',
   'Auto-framing & head-crop': 'ollama',
   'Face-similarity scoring': 'quality',

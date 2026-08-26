@@ -731,6 +731,15 @@ const TOPICS = [
      'colour shift', 'color shift', 'changes the image', 'node pack',
      'ComfyUI-SeedVR2_VideoUpscaler', 'comfyui-manager', 'dit', 'vae', 'models/SEEDVR2',
      '3b', '7b', 'fp8', 'blocks to swap', 'target resolution', 'install seedvr2']),
+  /* DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js. The
+     capability row names this id as its topic (deriveCapabilitySummary), so a
+     missing one is a readiness row that leads nowhere. */
+  setupStep('setup-camera-install', 'install', 'Install 📷 Camera angles',
+    ['camera angles', 'camera', 'angles', 'multi-angle', 'multiple angles', 're-shoot',
+     'reshoot', 'other side', 'back view', 'viewpoint', 'qwen image edit', 'qwen 2511',
+     'sks', 'camera lora', 'lightning', 'speed lora', 'install camera',
+     'camera weights', 'camera model missing', '20 gb', 'gallery camera button',
+     'models/diffusion_models/qwen', 'models/loras/qwen']),
   setupStep('setup-ollama', 'ollama', 'Set up Ollama & pull the vision model',
     ['ollama', 'vision model', 'pull model', 'captioning', 'caption', 'auto-framing',
      'framing', 'head-crop', 'head crop', 'qwen', 'install ollama']),
@@ -1308,14 +1317,20 @@ const TOPICS = [
      'pinned image is soft', 'canvas image quality', 'image looks compressed',
      'thumbnail instead of the real image', 'show the full resolution image'],
     '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
-  action('canvas-download-images', '⬇ Download images (one, or a gallery as ZIP)',
+  action('canvas-download-images', '⬇ Download images (one, a selection as files, or a ZIP)',
     ['download an image', 'download image', 'save an image', 'save the picture',
      'export generated images', 'download all images', 'download the gallery',
      'zip', 'download as zip', 'download a run', 'get my images out',
      'save to disk', 'keep this render', 'file name', 'which checkpoint made this',
      'rename downloaded images', 'download selected images', 'download 500',
      'why only 500', 'zip is smaller than the gallery', 'missing from the zip',
-     'image no longer on disk', 'download does nothing'],
+     'image no longer on disk', 'download does nothing',
+     // 🖼 Gallery's ⬇ Files — the un-ZIP. Asked about in both directions:
+     // people who want it, and people whose browser just prompted about it.
+     'without zip', 'no zip', 'individual files', 'separate files',
+     'download each file', 'files not archive', 'plain files',
+     'allow multiple downloads', 'browser asked to download multiple files',
+     'downloads one by one'],
     '/canvas', 'using-the-app', 'the-lora-canvas-every-run-on-one-board'),
   // 🖼🖼 A gesture nobody can guess: it earns a topic of its own, not a clause
   // buried in the one above. Half these keywords are how someone who has
@@ -2098,6 +2113,18 @@ const TOPICS = [
     { trigger: 'camera-angles-picker',
       text: 'Pick axes, not pictures: the sides you tick times the heights times '
         + 'the distances is the run — the count under the button is what it will cost.' }),
+  /* 📷 In a dataset the same verb answers a different question — "how do I get
+     training coverage of the back of my character" — and adds the captioning
+     angle, so it earns its own topic with the dataset vocabulary.
+     DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js. */
+  action('action-dataset-camera-angles', 'Cover a dataset subject from more angles',
+    ['camera angles dataset', 'multi-angle dataset', 'coverage', 'training coverage',
+     'back of my character', 'more angles', 'angle caption', 'seen from behind',
+     'caption angle', 'pending candidates', 'camera view candidate',
+     'why is the caption pre-filled', 'bank camera', 'why not in the bank',
+     'promote then camera', 're-shoot dataset image'],
+    '/datasets?section=images', 'using-the-app',
+    'the-character-walkthrough-reference-photo-trained-lora'),
   action('action-reimprove-tile', 'Re-run Upscale & improve after changing its settings',
     ['improve', 'upscale', 'reimprove', 're-improve', 'rerun', 're-run', 'redo', 'again',
      'regenerate', 'no regenerate button', 'missing button', 'klein improve', 'candidate',
