@@ -260,6 +260,29 @@ callback *and* its slot in the returned object), the consuming component's
 button/modal wiring, `backend/app/services/dataset_activity.py` `KINDS`, and
 `docs/guide/**.md`.
 
+**The help registry gets a diff, not a glance (Divergence 10).** Upstream keeps
+its topics in `help/topics/*`, which this fork re-deletes every sync — so a real
+topic EDIT or ADD inside a deleted module is lost with a green `git rm` and no
+gate says a word. Two checks, both cheap:
+
+```bash
+# 1. Did upstream change the deleted modules at all this window?
+git log --oneline HEAD..upstream/main -- frontend/src/help/topics/ frontend/src/help/topicBuilders.js
+
+# 2. Looking BACKWARDS: which topics does upstream have that this fork lacks?
+git worktree add /tmp/up-wt upstream/main
+ln -s "$PWD/frontend/node_modules" /tmp/up-wt/frontend/node_modules
+(cd /tmp/up-wt/frontend && node -e "import('./src/help/helpRegistry.js').then(m=>console.log(m.helpTopics.map(t=>t.id).sort().join('\n')))") > /tmp/up-ids.txt
+(cd frontend && node -e "import('./src/help/helpRegistry.js').then(m=>console.log(m.helpTopics.map(t=>t.id).sort().join('\n')))") > /tmp/fork-ids.txt
+comm -23 /tmp/up-ids.txt /tmp/fork-ids.txt
+```
+
+Check 1 only sees the sync where the edit lands; check 2 sees every sync that
+ever skipped it. Every line check 2 prints is a deliberate D1/D4 rejection you
+can name, or a bug. On 2026-08-26 it printed 40 and two were bugs — one of them
+`action-use-improve-settings`, missing for two windows behind a feature that had
+shipped. Remove the worktree afterwards (`git worktree remove /tmp/up-wt`).
+
 `docs/guide/**.md` compiles into `frontend/dist`, so a contract test can go red
 on a documentation line while `frontend/src` passes. Trace from the bundle:
 `grep -o '.\{0,200\}<phrase>.\{0,200\}' frontend/dist/assets/*.js`.
