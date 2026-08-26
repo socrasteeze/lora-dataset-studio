@@ -789,7 +789,7 @@ A LoRA that's *trained* isn't necessarily a LoRA that's *good*. Test Studio uses
 - **Export the grid** — when a run reads well, export it as a single labeled image (title banner with model/CFG/steps/seed, checkpoint rows, strength columns) ready to post on Civitai or Reddit; the composer works even with **ComfyUI offline**.
 - **Flip in place** — opened results flip without leaving the grid: swipe on touch, **‹ ›** buttons or **arrow keys** on desktop, with an *i / n* counter and wrap-around, and strength variants of the same render sit adjacent so comparing strengths is one keypress.
 
-Studio currently supports **Z-Image, SDXL and Krea 2**; FLUX.1 and FLUX.2 Klein can be trained and managed but don't yet have Studio workflows. Before launch the selected family is preflighted: a missing ComfyUI model or node gives you one actionable message instead of an empty grid.
+Studio currently supports **Z-Image, SDXL, Krea 2 and FLUX.2 Klein**; FLUX.1 and Anima can be trained, deployed and managed but don't yet have Studio workflows, and asking to generate with one now refuses by name instead of sending you after a Z-Image model you never picked. Before launch the selected family is preflighted: a missing ComfyUI model or node gives you one actionable message instead of an empty grid.
 
 ---
 
