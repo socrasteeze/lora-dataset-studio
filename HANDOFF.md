@@ -1,22 +1,22 @@
 # HANDOFF
 
-**Updated:** 2026-08-25 · **Branch:** main · **Base:** 081e519 · **Tree:** clean
+**Updated:** 2026-08-26 · **Branch:** main · **Base:** 995f96a · **Tree:** clean
 
 ## State
-Second upstream sync of the day landed: the fork is level with
-`perfectgf/lora-dataset-studio` at `87365f5` (3 commits — the icon sweep finished
-on the Bank/Canvas surface, plus eleven retaken documentation screenshots). All
-gates green; nothing is in flight.
+Fork is level with `perfectgf/lora-dataset-studio` at `07ad2fd` — 0 behind. This
+session merged a 4-commit window (Test Studio family plumbing). It started with
+`main` 115 commits behind its own feature branch, because two earlier syncs were
+pushed to the branch and never merged down; a concurrent session delivered that
+backlog to `origin/main` mid-run, so this push is a clean 7-commit fast-forward
+on top of it. All gates green; nothing is in flight.
 
 ## Done this session
-- Merged upstream `87365f5` — 7 source conflicts, all one shape, resolved per hunk
-- Ported the label sweep into the fork's extracted copy — `frontend/src/components/bank/pipelineSteps.js`
-- Refreshed a stale hand-copied label mirror — `frontend/src/components/bank/bankRejectReasons.test.js`
-- Re-pointed the tag-glyph guard after upstream freed `🏷️` — `frontend/src/components/bank/tags-ui.test.js`
-- Fixed a caption promising a badge the retaken screenshot no longer shows — `README.md`
-- Deleted three screenshots of the removed cloud engine cards — `docs/screenshots/generate/`
-- Added the wave's entry — `frontend/src/whatsNew.js`
-- Recorded the wave and the screenshot class — `FORK_NOTES.md`
+- Merged upstream `07ad2fd` — 1 source conflict (`whatsNew.js` prepend-vs-prepend)
+- Adopted GitHub #52/#53 whole (lunchingfriar): Klein/FLUX.1/Anima LoRAs are found
+  where deployed, and FLUX.2 Klein gains a real generation lane
+- Corrected two now-false Studio-family claims — `README.md`,
+  `docs/guide/known-limitations.md`
+- Recorded the wave — `FORK_NOTES.md`
 - Rebuilt `frontend/dist` from this fork's `src` in its own `build(frontend):` commit
 
 ## Open
@@ -27,21 +27,22 @@ gates green; nothing is in flight.
    the tests asserting the literal — a wave of its own. See `FORK_NOTES.md`, D3.
 
 ## Decisions
-- Kept `🔖 Tags` over sweeping it with upstream's labels — it is fork-authored, has
-  no icon assigned, and stripping it in one file alone would leave the button and
-  the progress readout naming the same pass differently
-- Deleted `docs/screenshots/generate/` over keeping the fork's older copies — all
-  three picture Nano Banana Pro / ChatGPT / OpenRouter cards, nothing references
-  them, and the README states twice that those engines do not exist here
-- Rewrote the tag-glyph test's premise over deleting it — the collision it guarded
-  (`🏷️` owned by Caption) is gone, but "🔖 belongs to the tag pass alone" still holds
+- Kept upstream's two What's-new entries on top and re-closed the fork's own top
+  entry by hand — the shared trailing brace sits outside both conflict markers as
+  context, so keep-both alone leaves the fork entry unclosed (diagnostic 24)
+- Fixed README/known-limitations over leaving them to upstream — both said Studio
+  covers only Z-Image/SDXL/Krea 2, which the merged lane made false, and no gate
+  reads prose
+- Delivered by fast-forward over a squash — the window is two upstream merges plus
+  a dist rebuild, and squashing would erase their merge ancestry
 
 ## Traps
+- `main` can silently fall behind a pushed feature branch. Check
+  `git rev-list --left-right --count main...<branch>` before reading "N behind
+  upstream" off `main` — this session's window looked like 102 commits and was 4.
 - `frontend/dist` is what Flask serves. Never take upstream's `build(frontend):`
   commit — rebuild from this fork's `src` or the removed cloud UI returns.
-- A screenshot is a binary: no sweep, grep or test reads one. When a sync touches
-  `docs/screenshots/**`, open the picture — that is how the three above surfaced.
-- On Linux the backend suite has a large path-separator failure floor (71–72 here,
+- On Linux the backend suite has a large path-separator failure floor (71 here,
   and it moves by one between runs). CI's backend job is `windows-latest` and is
   green. Diff against a pre-merge baseline; never triage the floor.
 - `download.pytorch.org` is blocked in the container lane, so the Torch overlay
