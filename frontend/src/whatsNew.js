@@ -83,6 +83,22 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-28-text-fill-outline-safe',
+    date: '2026-08-28',
+    title: 'Text cleaning stops breaking speech bubbles',
+    blurb:
+      'Repainting a 🔤 text zone used to hand the WHOLE rectangle to the '
+      + 'repaint model, which kept eating balloon outlines and cartouche '
+      + 'borders. Zones found by Find text now go through an outline-safe '
+      + 'filler first: the letters are emptied with the bubble’s own '
+      + 'background (instant, on the CPU), anything drawn across the zone '
+      + 'edge — the outline, the art — is untouched by '
+      + 'construction, and the repaint model only ever sees the leftover '
+      + 'lettering on busy art. Both surfaces; ↩ Undo then Clean again '
+      + 'upgrades pages you already cleaned.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-27-civitai-prompt-browser',
     date: '2026-08-27',
     title: 'Borrow a prompt from Civitai’s top images',
@@ -100,12 +116,13 @@ export const WHATS_NEW = [
     date: '2026-08-27',
     title: 'Find text: try a sample, tune the sensitivity, then commit',
     blurb:
-      'The 🔤 Find text launch window now carries two dials. “Try on a sample '
-      + 'first” reads only the first N pages of the scope — judge the zones in '
-      + '▶ Review, then launch the rest, or re-read the SAME sample after '
-      + 'moving the new Sensitivity slider (lower catches fainter lettering, '
-      + 'at the cost of false zones — stored once, the dataset scan reads it '
-      + 'too). No more committing a 9 000-page bank to find out.',
+      'The 🔤 Find text launch window now carries two dials — on BOTH '
+      + 'surfaces. “Try on a sample first” reads only the first N pages — '
+      + 'judge the zones in the flagged review, then launch the rest, or '
+      + 're-read the SAME sample after moving the new Sensitivity slider '
+      + '(lower catches fainter lettering, at the cost of false zones — one '
+      + 'stored value, moved from either side). No more committing a '
+      + '9 000-page bank to find out.',
     to: '/bank',
   },
   {
@@ -167,6 +184,7 @@ export const WHATS_NEW = [
       + 'photos; promote to a dataset first, and the views are born as '
       + 'candidates, never filed as real.',
     to: '/datasets?section=images',
+    image: 'docs/screenshots/release/camera-angles-picker.png',
   },
   {
     id: '2026-08-26-camera-setup-card',

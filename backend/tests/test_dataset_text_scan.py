@@ -197,6 +197,143 @@ class TestDetectText:
         assert _row(app, broken)['text_state'] == 'detected'
 
 
+class TestSampleParity:
+    """The dataset's launch-window dials — full parity with the bank's."""
+
+    def test_sample_counts_pages_that_need_reading_not_the_kept_pile(
+            self, app, client, monkeypatch):
+        from app.services import face_dataset_service as svc
+        ds = _create(client)
+        with app.app_context():
+            done1 = _kept_image(svc, ds, 'a.webp', text_state='none')
+            done2 = _kept_image(svc, ds, 'b.webp', text_state='none')
+            fresh1 = _kept_image(svc, ds, 'c.webp')
+            fresh2 = _kept_image(svc, ds, 'd.webp')
+        _ocr_ready(monkeypatch)
+        _fake_reader(monkeypatch, {'c.webp': TWO_LINES, 'd.webp': TWO_LINES})
+        # limit=1 must read ONE page that needs reading (c), not stop on a/b.
+        r = client.post(f'/api/dataset/{ds}/text/detect', json={'limit': 1})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['checked'] == 1
+        assert _row(app, fresh1)['text_state'] == 'detected'
+        assert _row(app, fresh2)['text_state'] is None
+        assert _row(app, done1)['text_state'] == 'none'
+        assert _row(app, done2)['text_state'] == 'none'
+        # The plain follow-up finishes exactly what the sample left.
+        assert client.post(f'/api/dataset/{ds}/text/detect',
+                           json={}).get_json()['checked'] == 1
+        assert _row(app, fresh2)['text_state'] == 'detected'
+
+    def test_sample_with_redo_rereads_the_same_first_images(
+            self, app, client, monkeypatch):
+        from app.services import face_dataset_service as svc
+        ds = _create(client)
+        with app.app_context():
+            first = _kept_image(svc, ds, 'a.webp', text_state='none')
+            second = _kept_image(svc, ds, 'b.webp', text_state='none')
+        _ocr_ready(monkeypatch)
+        _fake_reader(monkeypatch, {'a.webp': TWO_LINES, 'b.webp': TWO_LINES})
+        assert client.post(f'/api/dataset/{ds}/text/detect',
+                           json={'limit': 1, 'rescan': True}).status_code == 200
+        assert _row(app, first)['text_state'] == 'detected'
+        assert _row(app, second)['text_state'] == 'none'   # beyond the sample
+
+    def test_bad_limit_is_a_400(self, client, monkeypatch):
+        ds = _create(client)
+        _ocr_ready(monkeypatch)
+        assert client.post(f'/api/dataset/{ds}/text/detect',
+                           json={'limit': 0}).status_code == 400
+        assert client.post(f'/api/dataset/{ds}/text/detect',
+                           json={'limit': 'many'}).status_code == 400
+
+    def test_image_payload_carries_text_state(self, app, client, monkeypatch):
+        from app.services import face_dataset_service as svc
+        ds = _create(client)
+        with app.app_context():
+            _kept_image(svc, ds, 'a.webp', text_state='detected')
+        detail = client.get(f'/api/dataset/{ds}').get_json()
+        imgs = detail.get('images') or []
+        assert imgs and imgs[0].get('text_state') == 'detected'
+
+
+class TestTextCleanDataset:
+    """Same graft, dataset surface: filler first on text rows, promotion on a
+    full fill, LaMa leftovers, rectangle fallback when the filler is gone."""
+
+    def _text_row(self, app, client, monkeypatch):
+        from app.services import face_dataset_service as svc
+        ds = _create(client)
+        with app.app_context():
+            image_id = _kept_image(svc, ds, 'page.webp', state='detected',
+                                   regions=[[0.3, 0.3, 0.6, 0.4]],
+                                   text_state='detected')
+        _ocr_ready(monkeypatch)
+        return ds, image_id
+
+    def _arm(self, monkeypatch, fill_result, lama_calls=None):
+        from app.services import text_fill, watermark_lama
+
+        def fake_fill(items, **kwargs):
+            return {i['image_path']: dict(fill_result) for i in items}
+        monkeypatch.setattr(text_fill, 'fill_batch', fake_fill)
+        monkeypatch.setattr(watermark_lama, 'is_available', lambda: True)
+        monkeypatch.setattr(
+            watermark_lama, 'inpaint_watermarks',
+            lambda path, bboxes, timeout=300, **k:
+                ((lama_calls.append((path, bboxes)) if lama_calls is not None
+                  else None) or (True, None)))
+        monkeypatch.setattr(
+            watermark_lama, 'inpaint_batch',
+            lambda items, device='cpu':
+                {i['image_path']: (True, None) for i in items})
+
+    def test_full_fill_promotes_and_counts_text_filled(
+            self, app, client, monkeypatch):
+        from app.services import face_dataset_service as svc
+        ds, image_id = self._text_row(app, client, monkeypatch)
+        self._arm(monkeypatch, {'ok': True, 'filled': 1, 'busy_boxes': []})
+        with app.app_context():
+            counts, err = svc.clean_watermarks('local', ds,
+                                               image_ids=[image_id])
+        assert err is None
+        assert counts['text_filled'] == 1 and counts['inpainted'] == 0
+        assert _row(app, image_id)['watermark_state'] == 'cleaned'
+
+    def test_busy_leftovers_reach_lama_with_glyph_boxes(
+            self, app, client, monkeypatch):
+        from app.services import face_dataset_service as svc
+        ds, image_id = self._text_row(app, client, monkeypatch)
+        busy = [[0.31, 0.31, 0.35, 0.36]]
+        lama_calls = []
+        self._arm(monkeypatch,
+                  {'ok': True, 'filled': 1, 'busy_boxes': busy}, lama_calls)
+        with app.app_context():
+            counts, err = svc.clean_watermarks('local', ds,
+                                               image_ids=[image_id])
+        assert err is None
+        assert counts['inpainted'] == 1 and counts['text_filled'] == 0
+        assert len(lama_calls) == 1 and lama_calls[0][1] == busy
+        assert _row(app, image_id)['watermark_state'] == 'cleaned'
+
+    def test_filler_down_falls_back_to_rectangles(
+            self, app, client, monkeypatch):
+        from app.services import face_dataset_service as svc
+        from app.services import text_fill
+        ds, image_id = self._text_row(app, client, monkeypatch)
+        lama_calls = []
+        self._arm(monkeypatch, {'ok': True}, lama_calls)
+
+        def boom(items, **kwargs):
+            raise RuntimeError('filler gone')
+        monkeypatch.setattr(text_fill, 'fill_batch', boom)
+        with app.app_context():
+            counts, err = svc.clean_watermarks('local', ds,
+                                               image_ids=[image_id])
+        assert err is None
+        assert counts['inpainted'] == 1
+        assert lama_calls and lama_calls[0][1] == [[0.3, 0.3, 0.6, 0.4]]
+
+
 class TestWatermarkScanGuards:
     """A watermark scan runs AFTER a text scan: the text zones must survive it.
     Before these guards the vision pass reset watermark_regions on every row it
