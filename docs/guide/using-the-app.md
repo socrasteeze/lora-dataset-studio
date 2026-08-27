@@ -2395,6 +2395,18 @@ drawn more than written, and the detector can miss it entirely (measured on a
 real page — no threshold recovers it). Those get the hand mask in **🚩 Edit
 mask**, like any zone the machine missed.
 
+**How the repaint treats these zones.** A text zone is not handed to the
+repaint model as a rectangle any more — that is what used to eat balloon
+outlines. The clean now runs an outline-safe filler first: every letter is a
+small closed ink shape *inside* the zone, so anything drawn **across** the
+zone's edge (the balloon outline, the art) is preserved by construction; the
+letters are then erased with the bubble's own background colour —
+including the faint JPEG haze around them — or rebuilt by a local
+inpaint when the background is graded. Only lettering sitting on busy art
+still goes to the repaint model, and it gets letter-sized boxes, never the
+whole rectangle. Pages cleaned before this shipped can be upgraded:
+**↩ Undo cleaning**, then Clean again.
+
 What it does *not* do, said plainly:
 
 - it reads **positions, not words** — no transcript of your images is stored
@@ -2418,11 +2430,12 @@ become a zone — lower catches fainter or more stylised lettering at the cost
 of false zones. It is stored (one value, both surfaces), and the zones are
 always yours to edit afterwards in **🚩 Edit mask**.
 
-It works on both surfaces — a bank's Watermarks panel carries the **🔤 Find
-text** card next to 🚩 Find, and a dataset's curation row carries the same
-button next to its watermark scan (the dataset scan reads the same stored
-sensitivity; the sample dial is the bank's — a dataset is small enough to
-just scan).
+It works on both surfaces, at full parity — a bank's Watermarks panel
+carries the **🔤 Find text** card next to 🚩 Find, and a dataset's curation
+row carries the same button next to its watermark scan. Both open the same
+launch window: the sample dial, the Sensitivity slider (one stored value,
+whichever side you move it from), and the measured count of what the run
+will actually read.
 
 
 ## Fix a watermark mask — or mark one the scan missed

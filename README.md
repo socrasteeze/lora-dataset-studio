@@ -49,7 +49,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 | **Caption Lab and recovery** | Find/replace, tag frequencies, expanded editing, targeted re-captioning, stoppable batches and reload-proof recovery |
 | **External caption round trip** | Export ordinary image/`.txt` pairs, caption them in any tool, then re-import without duplicating images or overwriting non-empty LDS captions |
 | **Dual long + short captions** | ai-toolkit text-side augmentation for supported local families; both wordings remain editable per image |
-| **Watermark review** | Detect, review and edit masks; choose crop or LaMa/Klein inpaint; every edit keeps an `.orig` backup and **Restore original** supports another attempt |
+| **Watermark review** | Detect, review and edit masks; choose crop or LaMa/Klein inpaint; every edit keeps an `.orig` backup and **Restore original** supports another attempt. 🔤 Find text feeds the same funnel with burned-in lettering (speech bubbles, subtitles), on datasets as on banks |
 | Sub-feature | What it gets you |
 | :-- | :-- |
 | **Character / Concept / Style** | One choice at creation rewires captioning, masking and step-scaling — it isn't just a label |
@@ -137,7 +137,12 @@ Point it at a messy dump of thousands of images and triage it in place. Nothing 
 
 *Details: [The Image bank](#the-image-bank--triage-a-giant-folder-in-place)*
 
-### Video Bank *(first release — read the limits)*
+<p align="center">
+  <a href="docs/screenshots/bank/find-text-launch.png"><img src="docs/screenshots/bank/find-text-launch.png" alt="The Find text launch window: scope choices with live counts, a try-on-a-sample-first dial, and the Scan button — over the bank's Watermarks panel" width="680"></a><br>
+  <sub><strong>🔤 Find text</strong> — burned-in lettering becomes mask zones the same 🧽 Repaint erases. In a bank's Watermarks panel (datasets carry it too); try a sample first, then commit the pile.</sub>
+</p>
+
+### Video Bank *(Beta — first release, read the limits)*
 
 Turns long source videos into a **video training set**: a flat folder of `.mp4`
 clips with matching `.txt` captions, cut to the exact frame count and frame rate
@@ -387,6 +392,21 @@ wrong for anything that has to be a faithful record of a place. And a camera vie
 cannot itself be re-shot from another angle: the second pass would re-invent what
 the first already invented, so the button is refused there and says why.
 
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/release/camera-angles-picker.png"><img src="docs/screenshots/release/camera-angles-picker.png" alt="The Camera angles dialog: an azimuth dial, camera height and distance choices, the exact prompts that will be sent and the cost of the run" width="100%"></a>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/studio/civitai-prompt-browser.png"><img src="docs/screenshots/studio/civitai-prompt-browser.png" alt="The Civitai top prompts browser: most-reacted images of the week, each next to the generation prompt it was posted with, with Copy and Use prompt buttons" width="100%"></a>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top"><sub><strong>📷 Camera angles</strong> — pick positions on the dial, read the exact prompts and the cost <em>before</em> you shoot. Lives in the Gallery viewer and on every kept dataset image.</sub></td>
+    <td valign="top"><sub><strong>🌐 Civitai top prompts</strong> — the most-reacted images next to the prompt they were posted with; ⤵ drops one into your prompt field. Next to the prompt box on every generation surface.</sub></td>
+  </tr>
+</table>
+
 ### 📦 Take it with you
 
 Nothing here locks your data in — every stage has an exit.
@@ -474,9 +494,9 @@ Much of the above came from people reporting things in public: **wannadecryptor*
 
 Directions, not dates. These are discussed openly on the project's Discord, and the most-requested ideas move up the list.
 
-- **🧬 Merge Lab** *(partly shipped)* — baking your LoRAs into a standalone checkpoint has landed. What is left is the *lab* part: **model ↔ model** merges with guided recipes, judged side by side in the Test Studio (same seeds, A/B grids). Full-model (dense) training is **not** part of this fork at all — see the backend matrix below.
-- **🎬 Video LoRAs** *(landed, locally)* — *the dataset half exists and training now launches from the app* (see **Video Bank** above): shot detection, quality measures (motion, exposure, freeze, audio), captions that describe the action, keyword search across shots, target-aware cutting into a trainable folder, and a ▶ Train button that runs the set through your local ai-toolkit. What remains is proving the targets beyond Wan 2.2 with a finished run each, and testing the resulting LoRAs in-app. Community-driven.
-- **🧠 Watermark cleaning during import** — cleaning that happens **during import** instead of as a separate errand, and automation you can trust unattended. *(Detection has caught up: a dedicated detector that needs no vision model now ships alongside the Ollama path, and manual two-pass cleaning already works in datasets and in the Image Bank.)*
+- **🧬 Merge Lab** *(its first bricks are live)* — baking your LoRAs into a standalone checkpoint has landed. What the Lab adds is the workshop part: per-block merge ratios, producing several variants of one merge and **comparing them side by side** in the Test Studio on fixed seeds, merging two checkpoints with each other, and a one-click "Turbo transplant". Full-model (dense) training is **not** part of this fork at all — see the backend matrix below.
+- **🎬 Video LoRAs** *(landed, locally)* — *the dataset half exists and training now launches from the app* (see **Video Bank** above): shot detection, quality measures (motion, exposure, freeze, audio), captions that describe the action, keyword search across shots, target-aware cutting into a trainable folder, and a ▶ Train button that runs the set through your local ai-toolkit. What remains is proving the targets beyond Wan 2.2 with a finished run each, and testing the resulting video LoRAs in-app. Community-driven.
+- **🧠 Watermark cleaning during import** — cleaning that happens **during import** instead of as a separate errand, and automation you can trust unattended. *(Detection keeps catching up: a dedicated detector that needs no vision model ships alongside the Ollama path, manual two-pass cleaning works in datasets and in the Image Bank — and 🔤 Find text now reads burned-in lettering, speech bubbles and subtitles into the same mask funnel.)*
 - **🧩 More base models** — additional Flux-family bases (Chroma, Qwen-Image…) with the same one-click flow as Krea 2.
 
 ### Table of contents
@@ -864,6 +884,12 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | Video Bank — cutting clips into a dataset | An ffmpeg binary: `imageio-ffmpeg` ships one, or any ffmpeg on PATH. Needed **only to promote** — without it you can still scan, detect shots, watch and triage a whole bank |
 | Video Bank — shot captions and scene search | The Bank scoring extra's environment (torch + `transformers` ≥ 4.57) plus a Qwen3-VL checkpoint downloaded at first use; the model is a setting, and the same environment serves ✨ Score, SigLIP 2 and the watermark detector |
 | Civitai scanning | `backend/requirements-scrape.txt`; without `CIVITAI_API_KEY` the scan runs but returns SFW results only |
+| 🌐 Civitai top prompts (Studio/Canvas) | Browsing needs nothing; reading the prompts needs `CIVITAI_API_KEY` (free account) — the same key Civitai scanning uses |
+| 📷 Camera angles | ComfyUI reachable + the Qwen-Image-Edit stack Setup's Camera card downloads (the VAE is shared with Krea 2 Edit) |
+| 🔤 Find text (bank & dataset) | The same small CPU OCR package the Video Bank's text pass uses, installed from Setup |
+| 🌐 Civitai top prompts (Studio/Canvas) | Browsing needs nothing; reading the prompts needs `CIVITAI_API_KEY` (free account) — the same key Civitai scanning uses |
+| 📷 Camera angles | ComfyUI reachable + the Qwen-Image-Edit stack Setup's Camera card downloads (the VAE is shared with Krea 2 Edit) |
+| 🔤 Find text (bank & dataset) | The same small CPU OCR package the Video Bank's text pass uses, installed from Setup |
 | Local LoRA training: Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein / Anima | ai-toolkit; no ComfyUI is needed for official Hugging Face bases. Krea 2 can start from any Krea 2 checkpoint already on your disk instead — including one a full-model run delivered — discovered through ComfyUI's model tree; an ordinary fp8 build trains (the trainer up-casts it, and the app says with numbers how much precision that cast dropped), while a packed ComfyUI export is refused because it carries decompression tables a trainer cannot load |
 | Local SDXL training | ai-toolkit + a base checkpoint discoverable in ComfyUI's model tree |
 | Cloud / rented-GPU training | **Not available in this fork.** Training always runs on this machine's own GPU; the Devices lane covers generation and analysis passes, not training |
