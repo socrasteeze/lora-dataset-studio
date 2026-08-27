@@ -819,6 +819,18 @@ const TOPICS = [
      'how long will this take', 'estimated time', 'duration', 'at your current pace',
      'this run will queue', 'confirmation before a long run', 'seconds per image'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js.
+  // 🌐 Un seul composant (bouton + navigateur) monté par les TROIS surfaces de
+  // génération — Studio du dataset, comparaison multi-LoRA, « Generate from the
+  // board » : un seul sujet d'aide pour les trois.
+  action('studio-civitai-browser', '🌐 Civitai: browse top images and reuse their prompts',
+    ['studio', 'test studio', 'canvas', 'generate from the board', 'civitai',
+     'civitai prompts', 'top images', 'browse civitai', 'prompt ideas',
+     'prompt inspiration', 'find a prompt', 'copy a prompt', 'use prompt',
+     'trending images', 'most reactions', 'popular prompts', 'image with prompt',
+     'no prompt published', 'prompts missing', 'civitai api key', 'load more',
+     'safe mature everything', 'content level', 'top of the week'],
+    '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   // 🎬 Les scènes vivent dans le même rail que le lot d'historique, monté par le
   // Studio de test ET par « Generate from the board » : un seul sujet pour les deux.
   // Les DEUX sources (banque et dataset) partagent ce sujet : c'est le même
@@ -832,6 +844,12 @@ const TOPICS = [
      'one pass per scene', 'run captions in order', 'choose a bank',
      'no scenes loaded', 'scene skipped', 'image without a caption',
      'caption pass', 'thumbnail of the page', 'which page',
+     // Le champ ✏️ par scène : ce qu'on tape pour le trouver, et ce qu'on
+     // se demande une fois trouvé (où le texte atterrit dans le prompt).
+     'custom prompt', 'custom prompt per scene', 'add to a scene',
+     'extra prompt', 'append to the caption', 'add text to a caption',
+     'edit a scene prompt', 'change one scene', 'modifiers per scene',
+     'per scene text', 'scene input', 'where does the custom text go',
      // Ce que quelqu'un tape quand la source qu'il veut rejouer est son dataset
      // — et ce qu'il cherchait avant que le dataset soit offert : un moyen de ne
      // PAS réexporter son dataset vers une banque pour atteindre ce panneau.
@@ -1977,6 +1995,13 @@ const TOPICS = [
      'watermark source', 'detector', 'vision model', 'why is this flagged',
      'watermark score', 'sensitivity', 'threshold', 'false positive'],
     '/bank', 'using-the-app', 'clean-the-watermarks-a-bank-found'),
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js.
+  action('action-find-text', 'Erase burned-in text (bubbles, subtitles, captions)',
+    ['find text', 'text', 'ocr', 'burned-in', 'burned in', 'speech bubble',
+     'bubble', 'subtitle', 'subtitles', 'caption', 'sound effect', 'sfx',
+     'manga', 'comic', 'webtoon', 'lettering', 'erase text', 'remove text',
+     'clean text', 'rapidocr', 'korean', 'japanese', 'meme'],
+    '/bank', 'using-the-app', 'erase-burned-in-text-bubbles-subtitles-captions'),
   /* ✂ and ✨ share one guide section but get a topic EACH, for the same reason
      🎨 Medium and ⤢ Angle do below: they are two different gestures asked about
      in two different vocabularies ("how do I crop in the bank?" vs "can I

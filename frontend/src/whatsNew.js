@@ -83,6 +83,59 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-27-civitai-prompt-browser',
+    date: '2026-08-27',
+    title: 'Borrow a prompt from Civitai’s top images',
+    blurb:
+      'A new 🌐 Civitai button next to the test-prompt field (Test Studio, '
+      + 'multi-LoRA comparison and the canvas alike) browses the most-reacted '
+      + 'images of the day, week or month — each one shown right next to the '
+      + 'prompt it was generated with, when the poster published it. One click '
+      + 'copies it or drops it into your prompt field. Reading prompts uses '
+      + 'the free Civitai API key from Settings → Scraping & sources.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-27-find-text-sample',
+    date: '2026-08-27',
+    title: 'Find text: try a sample, tune the sensitivity, then commit',
+    blurb:
+      'The 🔤 Find text launch window now carries two dials. “Try on a sample '
+      + 'first” reads only the first N pages of the scope — judge the zones in '
+      + '▶ Review, then launch the rest, or re-read the SAME sample after '
+      + 'moving the new Sensitivity slider (lower catches fainter lettering, '
+      + 'at the cost of false zones — stored once, the dataset scan reads it '
+      + 'too). No more committing a 9 000-page bank to find out.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-27-find-text-clean',
+    date: '2026-08-27',
+    title: 'Erase burned-in text — speech bubbles, subtitles, captions',
+    blurb:
+      'A comic page carries its dialogue, a screencap its subtitle — and a '
+      + 'LoRA learns the lettering along with the subject. 🔤 Find text reads '
+      + 'the text (Latin or CJK alike) and turns each block into a mask zone, '
+      + 'so the same 🧽 Repaint that clears watermarks erases it — one funnel, '
+      + 'one ↩ Undo, and ✂ Auto-crop never touches a bubble. On banks and '
+      + 'datasets both, CPU-only, powered by the same small offline OCR the '
+      + 'Video bank already uses. Very stylised sound-effect lettering can '
+      + 'still escape the reader — the mask editor covers those.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-27-scene-custom-prompt',
+    date: '2026-08-27',
+    title: 'Scenes take a custom prompt of their own',
+    blurb:
+      'In the Test Studio\'s 🎬 Scenes panel, every picked scene now carries an '
+      + 'optional ✏️ text field. Whatever you type there is appended to that '
+      + 'scene\'s caption at launch — swap an outfit, set the time of day, add '
+      + 'your trigger word — without touching the caption itself or the other '
+      + 'scenes. Leave it empty and the caption runs exactly as before.',
+    to: '/studio',
+  },
+  {
     id: '2026-08-26-klein-enhancement-repair-row',
     date: '2026-08-26',
     title: 'The Klein enhancement LoRA can finally be repaired from Setup',
