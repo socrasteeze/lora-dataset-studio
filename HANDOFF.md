@@ -1,26 +1,24 @@
 # HANDOFF
 
-**Updated:** 2026-08-27 · **Branch:** claude/magical-tesla-zz2qjk · **Base:** 567ead2 · **Tree:** clean
+**Updated:** 2026-08-27 · **Branch:** main · **Base:** 333014d · **Tree:** clean
 
 ## State
-Fork is level with `perfectgf/lora-dataset-studio` at `f7279f8` — 0 behind. All
-gates green, nothing in flight; the delivery is a fast-forward of 15 commits over
-`origin/main` at `567ead2` (a concurrent session pushed the earlier backlog there
-mid-run — that base is this merge's own first parent).
+Fork is level with `perfectgf/lora-dataset-studio` at `2174063` — 0 behind. All
+gates green, nothing in flight; the wave landed as a fast-forward of 2 commits
+onto `origin/main` at `333014d`.
 
 ## Done this session
-- Merged upstream `f7279f8` — 3 source conflicts, 92 dist, 0 rejected features:
-  🔤 Find text (bank + dataset OCR feeding the watermark clean funnel) with its
-  sample/Sensitivity dials and unreadable-file fix, the 0.03→0.04 region merge
-  window, a per-scene ✏️ prompt, the 🌐 Civitai top-prompt browser
-- `image_bank_service.py` per hunk: kept the fork's staged `pending` writes, took
-  upstream's 🔤 guard, reading `text_state`/`_clean_regions` off the live row
-- `video_text_infer.py` keep-BOTH (`_emit` + `_read_bgr`); `test_video_safe_zone.py`
-  kept the `infer_io` subtraction with upstream's widened probe set
-- Re-stated `tags-ui.test.js`'s `onLaunch` guard as its invariant — it went red on
-  Find text's third dispatch branch, not on what it guards
-- D10 ports: 2 topics + 1 reworded (296→298); `civitaiBrowser.contract.test.js` re-pointed at the one registry
-- Docs: `text_scan.score_min`, `CIVITAI_API_KEY` in `.env.example`, 3 README rows, `FORK_NOTES.md`
+- Merged upstream `2174063` — 9 commits, 3 source conflicts, 74 dist orphans,
+  0 rejected features: the outline-safe bubble filler (`services/text_fill.py`,
+  `infer/text_fill_infer.py`) and the dataset 🔤 Find text launch window at full
+  parity (`TextScanDialog.jsx`, `detect_text(limit=N)`)
+- `image_bank_service.py` keep-BOTH: upstream's `text_ok` beside this fork's
+  remote-aware `klein_ok` — taking either side alone loses the other
+- `version.py` recomputed to `2026.08.27F`, fork marker last
+- `README.md`: kept this fork's restructured tables, hand-ported upstream's four
+  increments derived from `merge-base..upstream/main`; D4-stripped the roadmap's
+  full-model-on-Krea-2 claim and its rented-pod training route
+- `FORK_NOTES.md` changelog row for the window
 
 ## Open
 1. Fork-only controls still carry emoji while upstream's now use icons (`🔖 Tags`,
@@ -31,25 +29,27 @@ mid-run — that base is this merge's own first parent).
    D1/D4 deletions. Restore to `error` when that orphan wave lands.
 
 ## Decisions
-- Civitai browser ADOPTED: D1 forbids cloud generation *engines*, and this
-  browses a source on the Civitai credential the scraper already stores
-- Read `row.text_state` off the live ORM row rather than re-plumbing the guard
-  through `pending` — the staged-write rule governs what the loop writes
-- Re-stated the `onLaunch` assertion rather than extending its regex: a chain
-  that grows a branch per dialog-carrying pass breaks on the next one too
+- README resolved by DERIVING upstream's increment rather than reading the
+  conflict: the fork's tables diverged structurally, so the region is two
+  documents, and only the increment distinguishes a new edit from old divergence
+- Roadmap prose is D4 surface: a bullet promising rented-pod training is the
+  rejected feature arriving as documentation, with no code to grep for
+- `docs/screenshots/setup/camera-install-card.png` opened and read before
+  adoption — a Setup screenshot is where the cloud key fields would ride back in,
+  and no grep or test can see inside a PNG
 - `CHANGELOG.md` deliberately NOT updated — it says so itself since 2026-07-31
 
 ## Traps
-- **A guard can fail on an ADDITION, not on its own property** — read what the
-  test is FOR before widening its regex (diagnostic 31, third occurrence).
 - `frontend/dist` is what Flask serves; never take upstream's `build(frontend):`
   commit — rebuild from this fork's `src` or the removed cloud UI returns. And
   `docs/guide/**.md` compiles into it, so a doc edit owes a rebuild too.
-- On Linux the backend suite has a path-separator failure floor (72 here);
+- On Linux the backend suite has a path-separator failure floor (71 here);
   CI's backend job is `windows-latest` and green. Diff a pre-merge baseline.
 - `download.pytorch.org` is blocked in the container lane: install the mandatory
   Torch overlay from PyPI (`torch==2.13.0`, CUDA build, same pinned version).
   Without it ~124 tests silently skip.
+- Give pytest a unique `--basetemp` per run: a second run sharing one deletes the
+  first's temp files, and both failures read as flakes.
 
 ## Verify
 ```bash
