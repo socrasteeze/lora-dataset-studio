@@ -636,6 +636,20 @@ def bank_watermark(bank_id):
                   device_id=data.get('device_id'), **_scope(data))
 
 
+@bp.post('/bank/<int:bank_id>/text')
+def bank_text_scan(bank_id):
+    """🔤 Burned-in text scan (RapidOCR, CPU). Folds the text zones it finds
+    into the watermark mask channel so 🧽 Inpaint can repaint them.
+    {rescan:true} re-reads scanned rows; dismissed rows are never re-examined.
+    {limit:N} is the launch window's "try on a sample first" — only the first
+    N rows of the scope, deterministic, so redo re-reads the same sample.
+    Same {statuses}/{image_ids} scope dials as every other pass. 202/409/400/503."""
+    data = request.get_json(silent=True) or {}
+    return _start(banks.start_text_scan, _app(), LOCAL_USER, bank_id,
+                  rescan=bool(data.get('rescan')), limit=data.get('limit'),
+                  **_scope(data))
+
+
 @bp.get('/bank/<int:bank_id>/watermark/levels')
 def bank_watermark_levels(bank_id):
     """Where each cleaning level stands: flagged / croppable / left to inpaint /

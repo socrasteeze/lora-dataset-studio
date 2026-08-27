@@ -802,7 +802,10 @@ def test_the_probe_imports_everything_the_worker_imports():
     # a probe that under-reports.
     imported = set(re.findall(r'^\s*(?:import|from)\s+([A-Za-z_][\w]*)', src,
                               re.M))
-    imported -= {'__future__', 'json', 'os', 'sys'}   # the stdlib is always there
+    # The stdlib is always there; _harness is the stdlib-only sibling module
+    # shipped NEXT TO the worker (same directory, same repo), so it can no more
+    # be absent from the env than json can — the probe owes it nothing.
+    imported -= {'__future__', 'json', 'os', 'sys', '_harness'}
     # DIVERGENCE 5 — `infer_io` is a SIBLING module in backend/infer, not a
     # dependency anyone installs, so a probe cannot and must not import it. It is
     # here because this fork claims the result stream in every pass
@@ -810,10 +813,8 @@ def test_the_probe_imports_everything_the_worker_imports():
     # ships alongside the worker by construction. Subtracted rather than added to
     # the expected set, so a THIRD real dependency still fails this test — which
     # is the whole point of reading the imports instead of listing them.
-    # `_harness` is the same shape from upstream: a stdlib-only sibling module
-    # shipped next to the worker, so it can no more be absent than json can.
-    imported -= {'infer_io', '_harness'}
-    assert imported == {'rapidocr_onnxruntime', 'cv2'}, \
+    imported -= {'infer_io'}
+    assert imported == {'rapidocr_onnxruntime', 'cv2', 'numpy', 'PIL'}, \
         f'the worker imports {sorted(imported)} — update the probe to match'
     for module in imported:
         assert module in probe, \

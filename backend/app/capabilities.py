@@ -768,16 +768,21 @@ CAPABILITY_IMPORTS = {
     # av: the worker decodes with PyAV in this same environment — a probe that
     # skips it answers "ready" about a detector that cannot open a single file.
     'shot_detect': 'import torch, transnetv2_pytorch, av',
-    # 🔳 Burned-in text, for the video lane's safe-zone pass. BOTH names, because
-    # infer/video_text_infer.py imports both: cv2 is how it reads a frame and
-    # learns its size (the boxes come back normalised, which needs one), and
-    # rapidocr_onnxruntime is the engine. cv2 arrives as a DEPENDENCY of the
-    # engine rather than in its own right, which is exactly the shape that made
-    # issue #24 — a probe importing only the headline module reports ✓ while the
-    # feature dies on the first call. There is nothing else: no torch, no
-    # transformers, and no model download (the 1.4.x wheels carry the PP-OCRv4
-    # ONNX files, ~16 MB, so this works offline the day it is installed).
-    'video_text': 'import rapidocr_onnxruntime, cv2',
+    # 🔳 Burned-in text — the safe-zone pass AND the image lanes' 🔤 Find text.
+    # ALL FOUR names, because infer/video_text_infer.py imports all four:
+    # rapidocr_onnxruntime is the engine; cv2 reads a frame and learns its size
+    # (the boxes come back normalised, which needs one); numpy + PIL back the
+    # reader's fallbacks for paths cv2.imread cannot open on Windows (any
+    # non-ASCII path — measured on a real bank) while keeping the EXIF-upright
+    # geometry. cv2 arrives as a DEPENDENCY of the engine rather than in its
+    # own right, which is exactly the shape that made issue #24 — a probe
+    # importing only the headline module reports ✓ while the feature dies on
+    # the first call; test_video_safe_zone pins this list to the worker's real
+    # imports so a fifth dependency cannot ship unprobed. There is nothing
+    # else: no torch, no transformers, and no model download (the 1.4.x wheels
+    # carry the PP-OCRv4 ONNX files, ~16 MB, so this works offline the day it
+    # is installed).
+    'video_text': 'import rapidocr_onnxruntime, cv2, numpy, PIL',
 }
 
 
@@ -863,6 +868,11 @@ def probe_masks() -> dict:
     python = cfg.get('masks.python') or sys.executable
     ok = _cached_import('masks', python, CAPABILITY_IMPORTS['masks'])
     return {'ok': ok, 'detail': 'rembg import OK' if ok else 'import failed'}
+
+
+def _text_scan_score_min_setting() -> float:
+    from .services.video_safe_zone import text_score_min
+    return text_score_min()
 
 
 def probe_video_text() -> dict:
@@ -2254,6 +2264,10 @@ def probe(force=False) -> dict:
         # review lightbox uses it as the per-image crop-vs-inpaint default; when False,
         # auto-routing repaints border marks instead of cropping them.
         'watermark_allow_crop': bool(cfg.get('watermark.allow_crop')),
+        # 🔤 Find text sensitivity — the launch window's slider reads it here
+        # and writes it through PUT /api/settings; both surfaces' passes read
+        # the same stored key (video_safe_zone.text_score_min owns the clamp).
+        'text_scan_score_min': _text_scan_score_min_setting(),
         # What an imported photo will actually be STORED as (Settings ▸ Captioning
         # & quality ▸ Dataset import). Published so the import screens can quote
         # the number instead of keeping their own copy of the default — the whole

@@ -32,10 +32,16 @@ test('the tag pass posts no device — it only runs here', () => {
   // device threading without asking for it individually.
   assert.match(workspace, /const passBody[\s\S]{0,600}?\.\.\.on\(\)/);
   // …and confirm 🖼 Framing actually takes that generic path rather than a
-  // special case: only 'faces' (the preflight gate) and 'caption' (its own
-  // options) are singled out in the dialog's onLaunch dispatch.
-  assert.match(workspace,
-    /onLaunch=\{\(run\) => \(passOpen === 'faces'[\s\S]{0,150}?passOpen === 'caption'[\s\S]{0,150}?: runPass\(passOpen, run\)\)\)\}/);
+  // special case. Stated as the INVARIANT — the dispatch ends in a generic
+  // `runPass(passOpen, run)` and 'framing' is not singled out above it —
+  // rather than as one exact ternary chain. The chain grows a branch whenever
+  // a pass gains its own launch controls (🔤 Find text added the third), and a
+  // regex pinned to the old shape goes red on that addition while saying
+  // nothing about the property it exists to guard.
+  const dispatch =
+    /onLaunch=\{\(run\) => \(([\s\S]{0,800}?): runPass\(passOpen, run\)\)+\}/.exec(workspace);
+  assert.ok(dispatch, 'the pass dialog no longer falls through to runPass(passOpen, run)');
+  assert.doesNotMatch(dispatch[1], /passOpen === 'framing'/);
 });
 
 test('the facet vocabulary is fetched on the tagged count, not on the payload poll', () => {
