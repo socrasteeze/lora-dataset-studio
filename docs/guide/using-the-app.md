@@ -2422,20 +2422,37 @@ What it does *not* do, said plainly:
 **Try it on a sample before paying for the whole bank.** The launch window
 carries two dials. *Try on a sample first* reads only the first N images of
 the scope (deterministic — a re-read hits the same pages), so on a 9 000-page
-bank you can judge the result on twenty before committing to the rest: scan
-the sample, open **▶ Review** on the flagged pages to see every zone drawn on
-the image, then either launch "Read the remaining …" as-is or adjust and
-re-read the same sample. *Sensitivity* is the OCR confidence a line needs to
-become a zone — lower catches fainter or more stylised lettering at the cost
-of false zones. It is stored (one value, both surfaces), and the zones are
-always yours to edit afterwards in **🚩 Edit mask**.
+bank you can judge the result on twenty before committing to the rest.
+*Sensitivity* is the OCR confidence a line needs to become a zone — lower
+catches fainter or more stylised lettering at the cost of false zones. It is
+stored (one value, both surfaces), and the zones are always yours to edit
+afterwards in **🚩 Edit mask**.
+
+**The result shows up in the same window.** Launching does not close it: the
+flagged pages appear below the dials with every zone drawn on them, filling
+in live while the scan runs — on both surfaces (the strip shows the first
+pages and says how many are flagged in total, and each tile opens the
+full-size page).
+Judge the zones, adjust the two dials, re-run — all without leaving the
+window; a zone that landed wrong is fixed by hand in **▶ Review** /
+**🚩 Edit mask** as before. Close it whenever you are done looking.
+
+**Clean text and watermarks separately.** Once Find text has flagged
+something, the repaint level grows a **What to clean** switch — *Both*,
+*🔤 Text*, *🚩 Marks* — next to the LaMa/Klein engine toggle (the bank's
+Watermarks panel and the dataset's Clean row both carry it, and the Clean
+button's count follows the choice). The split is **by page**: a page carrying
+both a watermark and text counts as text and is repainted whole — its zones
+live in one mask, so one page is never split between two runs. With no
+text-flagged page the switch stays hidden, because all three choices would
+mean the same thing.
 
 It works on both surfaces, at full parity — a bank's Watermarks panel
 carries the **🔤 Find text** card next to 🚩 Find, and a dataset's curation
 row carries the same button next to its watermark scan. Both open the same
 launch window: the sample dial, the Sensitivity slider (one stored value,
-whichever side you move it from), and the measured count of what the run
-will actually read.
+whichever side you move it from), the measured count of what the run will
+actually read, and the flagged-pages strip.
 
 
 ## Fix a watermark mask — or mark one the scan missed
@@ -3677,17 +3694,26 @@ badges and hover highlights are not in it — and a picture whose file has been
 cleaned off the disk comes out as a labelled placeholder rather than silently
 missing.
 
-**Machine load.** The right-hand end of the board toolbar carries four small
-numbers for the machine *running LDS* — **CPU**, **GPU**, **VRAM**, **RAM** —
-refreshed every five seconds while the tab is in front. It answers the one
-question the board could not: whether a run that shows no new pictures is
-working or wedged. Every number carries a colour: green below 50 % of its
-resource, amber 50-80 %, red past 80 %; **▾** folds the readout away and stops
-the polling with it, and the choice is remembered. It is a glance, not a
-monitor: there is no history, no graph and
-no per-process breakdown. On a machine with no NVIDIA card (or with `nvidia-smi`
-unavailable, as in some containers) the GPU and VRAM numbers are simply absent
-rather than shown as zeros, and the row is hidden on phone-width screens.
+**Machine load.** The right-hand end of the board toolbar carries five small
+numbers for the machine *running LDS* — **CPU**, **GPU**, **VRAM**, **RAM** and
+the GPU **temperature** — refreshed every five seconds while the tab is in
+front. It answers the one question the board could not: whether a run that
+shows no new pictures is working or wedged. Every number carries a colour:
+green below 50 % of its resource, amber 50-80 %, red past 80 % (for the
+temperature: amber from 70°, red from 85°, the band where a GPU starts
+throttling); **▾** folds the readout away and stops the polling with it, and
+the choice is remembered. It is a glance, not a monitor: there is no history,
+no graph and no per-process breakdown. On a machine with no NVIDIA card (or
+with `nvidia-smi` unavailable, as in some containers) the GPU, VRAM and
+temperature numbers are simply absent rather than shown as zeros. On a phone
+the readout rides in the board's **⋯** shelf rather than the toolbar.
+
+The same readout is available on *every* page: the **📊** button at the right
+of the top bar (in the menu panel, on a phone) unfolds an identical line next
+to the navigation, so you can watch a training or a generation work from the
+Test Studio, the Bank or a dataset without keeping Task Manager — or a ComfyUI
+resource monitor — open. It starts folded, polls only while it is unfolded and
+the tab is visible, and remembers your choice separately from the board's.
 
 **Deleting a picture from the board.** A pinned image carries **✕** and **🗑**,
 and they are not the same thing. **✕** takes it off the board and remembers where
