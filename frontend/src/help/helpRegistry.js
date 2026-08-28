@@ -2005,7 +2005,17 @@ const TOPICS = [
      'remove watermark', 'logo', 'url', 'undo cleaning', 'before after', 'original',
      // Asked in the panel's own words: "who decided this was a watermark?"
      'watermark source', 'detector', 'vision model', 'why is this flagged',
-     'watermark score', 'sensitivity', 'threshold', 'false positive'],
+     'watermark score', 'sensitivity', 'threshold', 'false positive',
+     // 🚩 Find watermarks opens a launch window on BOTH surfaces now (sample,
+     // detector threshold, flagged pages drawn in place). Its guide chapter is
+     // an H3 UNDER this topic's H2 — and the help contract validates anchors
+     // against H2 only — so the new vocabulary belongs on this topic rather
+     // than on one of its own. Adding it here is also what keeps the D10
+     // invariant honest: the count stays 298 because nothing was added or
+     // dropped, only reworded, which is the half a count never catches.
+     'find watermarks', 'launch window', 'try a sample', 'sample first',
+     'sample run', 'detector threshold', 'tune the threshold', 'too many flags',
+     'not flagging enough'],
     '/bank', 'using-the-app', 'clean-the-watermarks-a-bank-found'),
   // DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js.
   action('action-find-text', 'Erase burned-in text (bubbles, subtitles, captions)',
