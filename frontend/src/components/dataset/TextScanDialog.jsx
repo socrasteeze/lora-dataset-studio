@@ -14,9 +14,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { putJson } from '../../api/fetchClient';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import DatasetTextScanPreview from './DatasetTextScanPreview.jsx';
 
 export default function TextScanDialog({
   onClose, onLaunch, toRead = 0, rereadable = 0, sensitivity = 0.5, live = false,
+  datasetId,
 }) {
   const [redo, setRedo] = useState(false);
   const [sampleOn, setSampleOn] = useState(false);
@@ -24,6 +26,12 @@ export default function TextScanDialog({
   const [level, setLevel] = useState(
     Number.isFinite(Number(sensitivity)) ? Number(sensitivity) : 0.5);
   const [busy, setBusy] = useState(false);
+  /* A run happened FROM THIS WINDOW. The window then stays open showing the
+     flagged pages with their zones (the strip below) — closing on launch would
+     hide exactly what a sample run was started to show. Only relabels the exit
+     and arms the strip's "nothing found" line; every dial keeps working, so
+     adjust-and-rerun needs no reopen. Bank parity: its window does the same. */
+  const [ran, setRan] = useState(false);
   const dialogRef = useRef(null);
   useFocusTrap(dialogRef, true);
 
@@ -56,7 +64,7 @@ export default function TextScanDialog({
           ? { limit: Math.max(1, Math.min(10000, Math.round(Number(sampleSize) || 20))) }
           : {}),
       });
-      onClose();
+      setRan(true);
     } finally {
       setBusy(false);
     }
@@ -123,16 +131,25 @@ export default function TextScanDialog({
             </span>
           </label>
         </div>
+        {/* The run's RESULT, in the window that launched it: the flagged pages
+            with their zones, POLLED while the scan runs so they fill in as
+            text is found (the pass commits per image). It used to read the
+            workspace payload instead, which only refreshes when the run
+            returns — a whole 106-page scan with the strip sitting on
+            "nothing flagged yet" the entire time. Bank parity: same strip,
+            same poll, off this surface's own /text/preview. */}
+        <DatasetTextScanPreview datasetId={datasetId} live={busy || live}
+          emptyLine={ran ? 'No text found on the scanned images.' : null} />
         <div className="flex items-center justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={busy}
             className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content disabled:opacity-40">
-            Cancel
+            {ran ? 'Close' : 'Cancel'}
           </button>
           <button type="button" onClick={launch}
             disabled={busy || live || willRead === 0}
             title={willRead === 0 ? 'Nothing left to read in this scope.' : undefined}
             className="rounded-lg bg-amber-500/90 px-3 py-1.5 text-sm font-bold text-black disabled:opacity-40">
-            {busy ? 'Starting…' : `Scan ${willRead} image${willRead === 1 ? '' : 's'}`}
+            {busy ? 'Scanning…' : `Scan ${willRead} image${willRead === 1 ? '' : 's'}`}
           </button>
         </div>
       </div>

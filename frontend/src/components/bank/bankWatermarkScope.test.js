@@ -170,11 +170,13 @@ test('the two level buttons open the window instead of firing a POST', () => {
 test('the launch spreads statuses/image_ids only when set', () => {
   assert.ok(PANEL.includes('...(statuses ? { statuses } : {})'));
   assert.ok(PANEL.includes("...(imageIds === 'selection' && selectedIds.length"));
-  // The engine rides along on the repaint only — the crop has none. device_id
-  // (Divergence 6) rides beside it: Klein renders on whichever machine the
-  // picker selected, LaMa ignores it, and the crop level has no device to pick.
+  // The engine rides along on the repaint only — the crop has none — and the
+  // What-to-clean target only when narrowed: 'all' posts the SAME body the
+  // button posted before the selector existed. device_id (Divergence 6) rides
+  // beside both: Klein renders on whichever machine the picker selected, LaMa
+  // ignores it, and the crop level has no device to pick at all.
   assert.ok(PANEL.includes(
-    "cleanOpen === 'watermark_inpaint' ? { method, device_id: deviceId } : {}"));
+    "? { method, device_id: deviceId, ...(target !== 'all' ? { target } : {}) } : {}"));
 });
 
 test('the bin figure comes from the payload table, not from a second predicate', () => {

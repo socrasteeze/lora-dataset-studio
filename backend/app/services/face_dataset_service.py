@@ -9390,6 +9390,25 @@ def _stored_mask_regions(img):
     return []
 
 
+def text_preview(user_id, dataset_id, limit=24) -> dict | None:
+    """The 🔤 launch window's own result gallery: the text-flagged pages with
+    their zones, oldest-id first — the SAME deterministic order the sample
+    reads, so "the first 20 of the scope" and "the first 20 shown here" are
+    the same pages. Polled while a scan runs (the pass commits per image), so
+    the window fills in live — the bank's window works exactly this way, off
+    its own twin endpoint. None when the dataset is gone."""
+    if not get_dataset(user_id, dataset_id):
+        return None
+    limit = max(1, min(int(limit or 24), 60))
+    q = (FaceDatasetImage.query
+         .filter_by(dataset_id=dataset_id, text_state='detected')
+         .filter(FaceDatasetImage.status != 'reject'))
+    rows = q.order_by(FaceDatasetImage.id.asc()).limit(limit).all()
+    items = [{'id': r.id, 'filename': r.filename,
+              'regions': _stored_mask_regions(r)} for r in rows]
+    return {'items': items, 'total': q.count()}
+
+
 def detect_text(user_id, dataset_id, *, rescan=False, should_cancel=None,
                 report=None, limit=None):
     """🔤 Read burned-in text on the KEPT images and fold the zones into the
@@ -9501,10 +9520,22 @@ def detect_text(user_id, dataset_id, *, rescan=False, should_cancel=None,
                     img = _live_image_row(image_id)
                     if img is None:
                         continue
+                    line_boxes = boxes_by_key[frame['key']]
+                    if not line_boxes:
+                        # The OCR read NOTHING — verdict before the merge, and
+                        # the stored geometry untouched, or a page already
+                        # carrying a watermark box would be refiled as text
+                        # (same guard as the bank pass, and 'What to clean'
+                        # routes the repaint on text_state).
+                        img.text_state = 'none'
+                        counts['none'] += 1
+                        counts['checked'] += 1
+                        db.session.commit()
+                        continue
                     existing = ([] if img.watermark_state == 'cleaned'
                                 else _stored_mask_regions(img))
                     regions, dropped = text_mask_regions(
-                        boxes_by_key[frame['key']], existing)
+                        line_boxes, existing)
                     if regions:
                         img.watermark_regions = json.dumps(regions)
                         img.watermark_state = 'detected'
@@ -9936,6 +9967,7 @@ def _wm_lama_tail(dataset_id, lama_pending, device, out, error, vanished):
 
 @_serialize_dataset_ingest
 def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='auto',
+                     target='all',
                      allow_crop=None):
     """Apply the crop/inpaint/review routing to every image marked 'detected'. Returns
     ({'cropped', 'inpainted', 'inpainted_klein', 'needs_review', 'failed', 'skipped'},
@@ -9975,6 +10007,19 @@ def clean_watermarks(user_id, dataset_id, image_ids=None, device='cpu', method='
     q = (FaceDatasetImage.query
          .filter_by(dataset_id=dataset_id, watermark_state='detected')
          .filter(FaceDatasetImage.filename.isnot(None)))
+    # 'text' = pages 🔤 flagged, 'watermark' = every other flagged page. The
+    # split is BY IMAGE (zones carry no per-zone origin once merged): a mixed
+    # page counts as text — Find text flagged it — and its clean covers
+    # everything it carries. Same clause as the bank's _clean_target_clause.
+    target = (target or 'all').lower()
+    if target not in ('all', 'text', 'watermark'):
+        raise ValueError("target must be 'all', 'text' or 'watermark'")
+    if target == 'text':
+        q = q.filter(FaceDatasetImage.text_state == 'detected')
+    elif target == 'watermark':
+        from sqlalchemy import or_
+        q = q.filter(or_(FaceDatasetImage.text_state.is_(None),
+                         FaceDatasetImage.text_state != 'detected'))
     if image_ids is not None:
         ids = [int(i) for i in (image_ids or [])
                if isinstance(i, (int, float, str)) and str(i).lstrip('-').isdigit()]

@@ -636,6 +636,20 @@ def bank_watermark(bank_id):
                   device_id=data.get('device_id'), **_scope(data))
 
 
+@bp.get('/bank/<int:bank_id>/text/preview')
+def bank_text_preview(bank_id):
+    """The 🔤 launch window's result gallery: text-flagged pages with their
+    zones, oldest-id first (the sample's own deterministic order)."""
+    try:
+        limit = int(request.args.get('limit') or 24)
+    except (TypeError, ValueError):
+        limit = 24
+    payload = banks.text_preview(LOCAL_USER, bank_id, limit)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
+
+
 @bp.post('/bank/<int:bank_id>/text')
 def bank_text_scan(bank_id):
     """🔤 Burned-in text scan (RapidOCR, CPU). Folds the text zones it finds
@@ -678,7 +692,8 @@ def bank_watermark_crop(bank_id):
 @bp.post('/bank/<int:bank_id>/watermark/inpaint')
 def bank_watermark_inpaint(bank_id):
     """Level 2 — repaint what is still flagged. {method:'auto'|'lama'|'klein',
-    device_id?: 'local'|peer|'api:…' — Klein renders only; LaMa stays local}.
+    device_id?: 'local'|peer|'api:…' — Klein renders only; LaMa stays local,
+    target?: 'all'|'text'|'watermark' — which flagged family to repaint}.
     202/409/400/503 (503 carries the actionable reason: engine missing, GPU busy).
 
     Takes the same {statuses}/{image_ids} scope as the other passes. A body
@@ -686,7 +701,8 @@ def bank_watermark_inpaint(bank_id):
     data = request.get_json(silent=True) or {}
     return _start(banks.start_watermark_inpaint, _app(), LOCAL_USER, bank_id,
                   method=data.get('method') or 'auto',
-                  device_id=data.get('device_id'), **_scope(data))
+                  device_id=data.get('device_id'),
+                  target=data.get('target') or 'all', **_scope(data))
 
 
 @bp.post('/bank/<int:bank_id>/watermark/undo')
