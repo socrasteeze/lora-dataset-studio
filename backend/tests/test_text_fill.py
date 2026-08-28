@@ -115,6 +115,15 @@ def test_probe_covers_everything_the_filler_imports():
     src = _INFER.read_text(encoding='utf-8')
     imported = set(re.findall(r'^\s*(?:import|from)\s+([A-Za-z_][\w]*)', src, re.M))
     imported -= {'__future__', 'json', 'os', 'sys', '_harness'}
+    # DIVERGENCE 5 — `infer_io` is a SIBLING module in backend/infer, not a
+    # dependency anyone installs, so a probe cannot and must not import it. It
+    # is here because this fork claims the result stream in every pass
+    # (tests/test_infer_result_channel.py, which upstream does not carry), and
+    # it ships alongside the worker by construction. Subtracted rather than
+    # added to the expected set, so a genuinely new dependency still fails this
+    # test — the same call `test_video_safe_zone.py` already makes for the OCR
+    # worker next door.
+    imported -= {'infer_io'}
     probe = capabilities.CAPABILITY_IMPORTS['video_text']
     for module in imported:
         assert module in probe, \

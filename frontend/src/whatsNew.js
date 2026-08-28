@@ -83,6 +83,32 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-28-review-plan-truth',
+    date: '2026-08-28',
+    title: 'Watermark review says which clean it is actually about to run',
+    blurb:
+      'The plan line under a zone used to read “one composite LaMa '
+      + 'pass” whatever was really going to happen. On a page 🔤 Find '
+      + 'text has flagged, the outline-safe filler goes first and the '
+      + 'inpaint engine only ever sees the leftovers — so the line now '
+      + 'says that, and on a page the text pass has NOT seen it tells '
+      + 'you the one step that gets you the bubble-safe fill.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-28-similar-add-more',
+    date: '2026-08-28',
+    title: 'Similar to selected: ask for the next batch without starting over',
+    blurb:
+      'After “Select 60 most similar” your selection holds 60 '
+      + 'images — and the one-reference rule used to lock the panel '
+      + 'shut right when you wanted more. It now remembers the last '
+      + 'ranking: reopen Similar to selected and “Add N more” '
+      + 'extends the SAME ranking by the next closest images — no '
+      + 'unselecting, no hunting the reference down again.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-28-text-fill-outline-safe',
     date: '2026-08-28',
     title: 'Text cleaning stops breaking speech bubbles',
