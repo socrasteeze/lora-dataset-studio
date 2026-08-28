@@ -83,6 +83,34 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-28-improve-passes-chain',
+    date: '2026-08-28',
+    title: 'Improve an improved picture again',
+    blurb:
+      '✨ Upscale & improve no longer refuses a picture it already improved: '
+      + 'run Klein detail and then SeedVR2 resolution on the same image, or '
+      + 'simply go a second round. The chain works everywhere the sparkle '
+      + 'does — the gallery, the dataset lightbox and the ◉ Canvas board — '
+      + 'and each result lands next to its source. Still refused: a picture '
+      + 'that is still rendering, and Regenerate on an improve result (that '
+      + 'pass has no prompt of its own to re-run).',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-28-watermark-scan-window',
+    date: '2026-08-28',
+    title: 'Find watermarks gets the Find-text launch window',
+    blurb:
+      '🚩 Find watermarks now opens the same kind of window as 🔤 Find text, '
+      + 'on both surfaces (the dataset button used to fire straight from the '
+      + 'click): try a sample first — deterministic, so a re-run re-judges '
+      + 'the same images — tune the detector threshold where its effect is '
+      + 'judged (one stored value, both surfaces), and watch the flagged '
+      + 'pages appear below the dials with their boxes drawn on them while '
+      + 'the scan runs.',
+    to: '/bank',
+  },
+  {
     id: '2026-08-28-header-machine-load',
     date: '2026-08-28',
     title: 'A resource monitor on every page — now with GPU temperature',

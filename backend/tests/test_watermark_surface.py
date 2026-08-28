@@ -211,14 +211,14 @@ def test_bank_takes_the_route_the_setting_names(client, app, tmp_path, monkeypat
     # upstream's signature does not have — accept and forward it rather than
     # pin the upstream-only shape.
     def spy(bank_id_, rescan, device_id=None, use_detector=False, statuses=None,
-            ids=None, note=''):
+            ids=None, note='', limit=None):
         taken['note'] = note
         taken['scope'] = (statuses, ids)
         if not use_detector:
             taken['route'] = 'vision'
             return lambda job: None
         return real_job(bank_id_, rescan, device_id, use_detector=True,
-                        statuses=statuses, ids=ids, note=note)
+                        statuses=statuses, ids=ids, note=note, limit=limit)
     monkeypatch.setattr(svc, '_watermark_job', spy)
     with app.app_context():
         svc.start_watermark(app, 'local', bank_id, rescan=True)
@@ -437,3 +437,44 @@ def test_rescan_including_dismissed_is_reachable_from_the_route(client, app, mon
     assert body['checked'] == 1 and body['detected'] == 1
     with app.app_context():
         assert svc.db.session.get(FaceDatasetImage, img_id).watermark_state == 'detected'
+
+
+# --- D. the launch window's sample dial --------------------------------------
+
+def test_dataset_sample_judges_the_first_n_kept_by_id(client, app, monkeypatch):
+    """{limit:N} judges the FIRST N kept rows by id — deterministic, so a
+    re-run after moving the threshold re-judges the same images (the 🔤
+    window's dial, now on 🚩 too)."""
+    from app.services import face_dataset_service as svc
+    from app.services import watermark_detector
+    from app.models import FaceDatasetImage
+    _pin_backend(monkeypatch, 'detector')
+    _extra(monkeypatch, ok=True)
+    monkeypatch.setattr(watermark_detector, 'scan',
+                        _fake_scan([('detected', 0.99, [[0.02, 0.02, 0.1, 0.1]])]))
+    ds_id = client.post('/api/dataset/create',
+                        json={'name': 'Sample', 'trigger_word': 's'}).get_json()['id']
+    with app.app_context():
+        ids = [_image(svc, ds_id, n).id for n in ('a.webp', 'b.webp', 'c.webp')]
+    r = client.post(f'/api/dataset/{ds_id}/watermarks/detect', json={'limit': 2})
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['checked'] == 2
+    with app.app_context():
+        states = {i.id: i.watermark_state
+                  for i in FaceDatasetImage.query.filter_by(dataset_id=ds_id)}
+    assert states[ids[0]] == 'detected' and states[ids[1]] == 'detected'
+    assert states[ids[2]] is None            # the sample never reached it
+
+
+def test_dataset_bad_limit_is_a_400(client, app, monkeypatch):
+    from app.services import face_dataset_service as svc
+    _pin_backend(monkeypatch, 'detector')
+    _extra(monkeypatch, ok=True)
+    ds_id = client.post('/api/dataset/create',
+                        json={'name': 'BadLim', 'trigger_word': 'bl'}).get_json()['id']
+    with app.app_context():
+        _image(svc, ds_id, 'a.webp')
+    for bad in ('lots', 0):
+        r = client.post(f'/api/dataset/{ds_id}/watermarks/detect',
+                        json={'limit': bad})
+        assert r.status_code == 400, (bad, r.get_json())
