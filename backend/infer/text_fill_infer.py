@@ -51,7 +51,30 @@ from __future__ import annotations
 import json
 import os
 import sys
-from _harness import _cancel_requested, _emit, _log
+# A ._pth-pinned interpreter (ComfyUI portable's python_embeded) does not put
+# this script's directory on sys.path — restore it or the import below dies
+# there. See _harness.py for the whole story.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from _harness import _cancel_requested, _log
+
+# DIVERGENCE (fork): the result channel carries the result and nothing else.
+# OpenCV and its codecs print on load, and a bare print() from a dependency
+# landing on stdout ahead of the JSON line costs a completed pass its results.
+# _OUT is the REAL stdout; sys.stdout now points at stderr, so anything a
+# library prints is progress output. This is why no worker here imports
+# `_harness._emit` (which prints to plain stdout) — pinned by
+# tests/test_infer_result_channel.py and test_infer_harness_contract.py,
+# neither of which upstream carries.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from infer_io import claim_result_stream  # noqa: E402
+_OUT = claim_result_stream(__name__)
+
+
+def _emit(obj):
+    print(json.dumps(obj), file=_OUT, flush=True)
+
 
 # The measured dials, named so the numbers carry their reasons:
 # ±2 of the dominant ring colour counts as "that colour" (JPEG dither width),

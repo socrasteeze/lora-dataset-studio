@@ -342,6 +342,11 @@ const TOPICS = [
       'curate', 'curation', 'diverse', 'diversity', 'variety', 'coverage',
       'most varied', 'farthest point', 'similar', 'similarity', 'reference',
       'looks like', 'find similar', 'pick diverse', 'subset', 'trim down',
+      // 🎯 Similar to selected can extend its last run (2026-08-28) — the
+      // words people reach for when 60 is not enough and the panel has
+      // already locked itself shut behind the one-reference rule.
+      'add more', 'add n more', 'more like these', 'next batch',
+      'extend the selection', 'wider net', 'not enough images', 'need more',
       'balanced pick', 'balanced selection', 'balance my set', 'even split',
       'spread', 'evenly', 'quota', 'quotas', 'too many close-ups',
       'not enough full body', 'cover my framings', 'framing balance',

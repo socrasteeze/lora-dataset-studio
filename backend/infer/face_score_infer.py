@@ -10,7 +10,12 @@ Logs -> stderr.
 Gating 3-etats + padding rescue (valide empiriquement sur test3) + zoom rescue."""
 from __future__ import annotations
 import json, os, sys
-
+# A ._pth-pinned interpreter (ComfyUI portable's python_embeded) does not put
+# this script's directory on sys.path — restore it or the import below dies
+# there. See _harness.py for the whole story.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
 # Library banners belong on the progress channel, not the result one: a bare
 # print() from a dependency used to land on stdout ahead of the JSON line and
 # cost a completed pass its results. _OUT is the REAL stdout; sys.stdout now
