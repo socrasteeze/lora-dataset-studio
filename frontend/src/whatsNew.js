@@ -83,6 +83,43 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-29-caption-lab-on-a-bank',
+    date: '2026-08-29',
+    title: 'Try caption models on a bank before captioning thousands of images',
+    blurb:
+      'The 🧪 Caption Lab now runs on an image bank too: open the 🏷️ Caption '
+      + 'window, press Caption Lab, pick one image, and line up to four configs — '
+      + 'engine, vision model, vocabulary register and length — side by side. '
+      + 'Nothing is written until you choose, and the winning config loads straight '
+      + 'into the dials the next pass will use. A bank caption can also be edited by '
+      + 'hand for the first time, and what you write is protected from a later '
+      + 're-caption exactly as it is on a dataset.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-29-queue-hold-has-an-answer',
+    date: '2026-08-29',
+    title: 'A queue held by another app now has a way out',
+    blurb:
+      'When something outside LDS is holding a model on your graphics card, '
+      + 'generations wait rather than evict it — and that wait could last as '
+      + 'long as the other app did. The queue dock now tells you how long it '
+      + 'has been waiting and offers Run anyway, which starts generating next '
+      + 'to the other model instead (nothing of yours is unloaded, it can be '
+      + 'slower, and the guard returns after fifteen minutes). An Ollama URL '
+      + 'the app cannot use no longer stops image generation at all.',
+  },
+  // DIVERGENCE 4 — upstream's '2026-08-29-one-run-number' entry is NOT carried.
+  // Its whole subject is a run wearing two ids, and the second one is the CLOUD
+  // run id: there is no rented-GPU lane here, the Runs page filters cloud rows
+  // out, and a local run's record id has always been the only number it has. The
+  // code change IS adopted (record_id threads through the dormant cloud payloads
+  // and RunIdChip takes recordId/cloudId, which keeps the next sync's surface
+  // small) — it simply produces nothing a user of this fork can see, and a
+  // What's-new entry announcing a cloud fix on a build with no cloud runs is the
+  // "claims the fork cannot honour" case FORK_NOTES warns about. Restore it if
+  // the rented-GPU lane is ever adopted.
+  {
     id: '2026-08-29-improve-settings-window',
     date: '2026-08-29',
     title: '✨ Improve now opens its settings in a window — and shows you the result',
