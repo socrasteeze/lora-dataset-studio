@@ -5385,6 +5385,11 @@ def dataset_payload(user_id, dataset_id):
                     # unreadable otherwise), and the surface refuses to re-shoot
                     # a view before the click instead of through a 400 after it.
                     'camera_pose': i.camera_pose,
+                    # ⚙ What a generated row was made with — parsed dict or
+                    # null, one vocabulary with the gallery facts (engine,
+                    # base_model, loras, steps, seed…). The lightbox's Made
+                    # with block reads exactly this.
+                    'generation_meta': parsed_generation_meta(i.generation_meta),
                     'source_metadata': normalize_source_metadata(i.source_metadata),
                     'upscale_ratio': i.upscale_ratio,
                     # Core creative prompt (generated tiles) → seeds the ✏ edit
@@ -6940,6 +6945,13 @@ def _save_small_scrape_pair(user_id, dataset_id, raw, prompt, source_metadata=No
         parent_image_id=source.id, derivation_kind=KLEIN_SMALL_IMAGE,
         variation_label=label, variation_prompt=prompt,
         source_metadata=stored_metadata,
+        # ⚙ Same facts the enqueue below actually sends — this lane was the
+        # sixth generating site, found BY the stamp contract, which is the
+        # contract working.
+        generation_meta=_generation_meta_json(
+            engine='klein',
+            base_model=dataset_klein_model(get_dataset(user_id, dataset_id)),
+            steps=_generation_steps()),
     )
     db.session.add(candidate)
     db.session.commit()
@@ -10425,6 +10437,34 @@ def _sync_generate_activity(dataset_id):
     dataset_activity.sync_pending(dataset_id, 'generate', pending, engine=engine)
 
 
+def _generation_meta_json(**facts):
+    """JSON stamp of what a generated row is ABOUT to be made with.
+
+    Written at enqueue time by every generating lane, with whatever that lane
+    knows — engine always, the rest engine-specific. None/empty values are
+    dropped so the stored dict only claims what was actually known; a dict
+    with nothing left stores NULL, never '{}'. The keys mirror the
+    lora_test_image facts on purpose (base_model, loras, steps, seed…): the
+    gap this column closes was "the dataset knows less about its own
+    generated images than the Gallery does", and one vocabulary across both
+    tables is the closing."""
+    clean = {k: v for k, v in facts.items() if v not in (None, '', [])}
+    return json.dumps(clean, ensure_ascii=False) if clean else None
+
+
+def parsed_generation_meta(raw):
+    """The stored stamp as a dict, or None — never raw JSON for the frontend
+    to re-parse, never a crash on a hand-edited database (same contract as
+    the gallery payload's improve_profile)."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def generate_variations(user_id, dataset_id, variations, multiplier, klein_model=None,
                         lora_strength=None, generation_lora_preset=None, device_id=None):
     """For each (variation x multiplier), enqueue a Klein edit of the reference
@@ -10493,9 +10533,19 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
     try:
         for v in variations:
             for _ in range(mult):
+                aspect = aspect_for_label(v.get('label'), v.get('framing'))
                 img = FaceDatasetImage(dataset_id=dataset_id, source='generated', status='pending',
                                        variation_label=v.get('label'), framing=v.get('framing'),
-                                       variation_prompt=v['prompt'], klein_model=klein_model)
+                                       variation_prompt=v['prompt'], klein_model=klein_model,
+                                       # ⚙ Stamped with what THIS enqueue knows; an
+                                       # empty klein_model (auto) is dropped rather
+                                       # than guessed — the stamp claims, never infers.
+                                       generation_meta=_generation_meta_json(
+                                           engine='klein', base_model=klein_model,
+                                           loras=run_loras or None,
+                                           steps=_generation_steps(),
+                                           reference_strength=lora_strength,
+                                           aspect=aspect))
                 db.session.add(img)
                 db.session.commit()
                 # Captured NOW, while the row certainly exists: ⏹ Stop deletes
@@ -10523,7 +10573,7 @@ def generate_variations(user_id, dataset_id, variations, multiplier, klein_model
                         # Same card ratio the Krea lane asks for, resolved from
                         # the same catalog: the two engines frame a shot alike
                         # or the dataset is not one dataset.
-                        aspect_ratio=aspect_for_label(v.get('label'), v.get('framing')),
+                        aspect_ratio=aspect,
                         lora_strength=lora_strength, extra_ref_paths=extra_paths,
                         generation_loras=run_loras, sampler_steps=_generation_steps(),
                         base_lora_strength=_generation_base_lora_strength(),
@@ -10586,7 +10636,7 @@ def camera_views_for_dataset_image(user_id, image_id, poses):
     # Weights BEFORE rows — the Klein lane's lesson, already paid for once: a
     # preflight that ran too late left a dataset full of failed tiles.
     missing = qch.camera_missing_assets()
-    if any(a in missing for a in qch.CAMERA_REQUIRED):
+    if not qch.camera_ready(missing):
         raise qch.CameraModelsMissing(missing)
 
     # Same anti-DoS shape as generate_variations: the fan-out shares one GPU.
@@ -10596,15 +10646,27 @@ def camera_views_for_dataset_image(user_id, image_id, poses):
     if in_flight + len(wanted) > MAX_FANOUT:
         raise ValueError(f'too many generations in flight ({in_flight}), wait or cancel')
 
+    # ⚙ Resolved ONCE for the whole run, before the loop: every view of one
+    # press renders with the same weights, and the stamp says which. The seed
+    # is drawn HERE and handed to the enqueue, so the row can record the seed
+    # the render actually uses — the one number a "why do these two differ"
+    # question always starts with.
+    stamp_unet = qch.resolve_camera_unet()
+    stamp_angles_lora = qch.resolve_camera_lora()[0]
     views = []
     try:
         for azimuth, elevation, distance in wanted:
             pose = ca.pose_id(azimuth, elevation, distance)
+            view_seed = random.randint(0, 2 ** 64 - 1)
             row = FaceDatasetImage(
                 dataset_id=img.dataset_id, source='generated', status='pending',
                 parent_image_id=img.id,
                 derivation_kind=CAMERA_ANGLE,
                 camera_pose=pose,
+                generation_meta=_generation_meta_json(
+                    engine='camera', base_model=stamp_unet,
+                    loras=[{'filename': stamp_angles_lora, 'strength': 1.0}],
+                    seed=view_seed),
                 # The LoRA's own sentence — what regenerate would re-send, and
                 # what the tile's ✏️ bubble shows as the real prompt.
                 variation_prompt=ca.pose_prompt(azimuth, elevation, distance),
@@ -10622,6 +10684,7 @@ def camera_views_for_dataset_image(user_id, image_id, poses):
                     user_id=str(user_id), source_filename=img.filename,
                     source_path=source_path,
                     pose_prompt=ca.pose_prompt(azimuth, elevation, distance),
+                    seed=view_seed,
                     model_name='qwen_camera_dataset',
                     extra_metadata={'is_dataset': True,
                                     'dataset_id': img.dataset_id,
@@ -10722,11 +10785,20 @@ def generate_variations_krea(user_id, dataset_id, variations, multiplier,
     try:
         for v in variations:
             for _ in range(mult):
+                aspect = aspect_for_label(v.get('label'), v.get('framing'))
                 img = FaceDatasetImage(dataset_id=dataset_id, source='generated',
                                        status='pending', variation_label=v.get('label'),
                                        framing=v.get('framing'),
                                        variation_prompt=v['prompt'],
-                                       klein_model=KREA_ENGINE)
+                                       klein_model=KREA_ENGINE,
+                                       # ⚙ The Krea base is ELECTED inside the
+                                       # enqueue; the stamp claims only what this
+                                       # frame knows (pin, chained LoRAs, ratio).
+                                       generation_meta=_generation_meta_json(
+                                           engine='krea',
+                                           base_model=(cfg.get('krea.base_model') or '').strip() or None,
+                                           loras=run_loras or None,
+                                           aspect=aspect))
                 db.session.add(img)
                 db.session.commit()
                 # Same reason as the Klein path: ⏹ Stop deletes exactly this
@@ -10748,7 +10820,7 @@ def generate_variations_krea(user_id, dataset_id, variations, multiplier,
                             label=v.get('label') or ''),
                         # Krea v1.2 fit geometry accepts the catalog canvas even
                         # when it differs from the dataset reference.
-                        aspect_ratio=aspect_for_label(v.get('label'), v.get('framing')),
+                        aspect_ratio=aspect,
                         generation_loras=run_loras,
                         extra_metadata={'is_dataset': True, 'dataset_id': dataset_id,
                                         'variation_label': v.get('label')},
@@ -10965,6 +11037,20 @@ def _enqueue_improve(engine, *, user_id, source, source_path, prompt, label,
         extra_metadata=meta)
 
 
+def image_render_status(user_id, image_id):
+    """One dataset image's render state — the ✨ modal's heartbeat, the twin of
+    lora_test_studio.image_render_status on THIS table's id space."""
+    img = db.session.get(FaceDatasetImage, image_id)
+    if img is None or not get_dataset(user_id, img.dataset_id):
+        return None
+    return {
+        'id': img.id, 'status': img.status,
+        'url': (f'/api/dataset/{img.dataset_id}/img/{img.filename}'
+                if img.filename else None),
+        'error': img.fail_reason if img.status == 'failed' else None,
+    }
+
+
 def improve_existing_image(user_id, image_id, engine=None):
     """Serialize one source's improve request, including the queue hand-off."""
     image = _owned_image(user_id, image_id)
@@ -11043,8 +11129,24 @@ def _improve_existing_image_locked(user_id, image_id, engine=None):
     stored_prompt = (prompt[:500] if engine == 'klein'
                      else 'SeedVR2 upscale (no prompt — restoration pass)')
     label = _improve_candidate_label(img, engine)
+    # ⚙ The stamp reads the SAME profile the enqueue reads (one source of
+    # truth), at the same moment — a re-run stamps the settings it actually
+    # runs with, never yesterday's.
+    if engine == 'klein':
+        _prof = _improve_enqueue_profile(get_dataset(user_id, img.dataset_id))
+        _gen_meta = _generation_meta_json(
+            engine='klein', base_model=_prof['klein_model'],
+            loras=_prof['generation_loras'] or None,
+            steps=_prof['sampler_steps'],
+            reference_strength=_prof['lora_strength'],
+            output_megapixels=_prof['output_megapixels'])
+    else:
+        _gen_meta = _generation_meta_json(
+            engine='seedvr2',
+            base_model=(cfg.get('seedvr2.model') or '').strip() or None)
     candidate = FaceDatasetImage(
         dataset_id=img.dataset_id, source='generated', status='pending',
+        generation_meta=_gen_meta,
         parent_image_id=img.id, derivation_kind=KLEIN_IMAGE_IMPROVE,
         # The stamp travels with the sentence it describes: a candidate that
         # inherits a hand-written caption inherits the protection on it, or the

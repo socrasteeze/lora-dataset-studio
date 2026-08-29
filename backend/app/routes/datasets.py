@@ -1822,7 +1822,8 @@ def canvas_image_camera_angles(image_id):
             return _camera_missing_response(e)
         return _map_error(e)
     if result is None:
-        return jsonify({'error': 'not found'}), 404
+        from ..services import camera_angles as ca
+        return jsonify({'error': ca.SOURCE_GONE}), 404
     return jsonify({'ok': True, **result})
 
 
@@ -1849,8 +1850,32 @@ def dataset_image_camera_angles(image_id):
             return _camera_missing_response(e)
         return _map_error(e)
     if result is None:
-        return jsonify({'error': 'not found'}), 404
+        from ..services import camera_angles as ca
+        return jsonify({'error': ca.SOURCE_GONE}), 404
     return jsonify({'ok': True, **result})
+
+
+@bp.get('/canvas/image/<int:image_id>/status')
+def canvas_image_render_status(image_id):
+    """Render state of ONE library image — the ✨ modal's 4-second heartbeat.
+
+    {ok, id, status, url, error}: everything "is my improve done yet" needs
+    and nothing more. Its own route per table for the same reason improve has
+    two: the two id spaces are independent, and a wrong-table poll would
+    happily report a REAL but unrelated row forever."""
+    out = lts.image_render_status(LOCAL_USER, image_id)
+    if out is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, **out})
+
+
+@bp.get('/dataset/image/<int:image_id>/status')
+def dataset_image_render_status(image_id):
+    """The dataset twin of the canvas status poll — face_dataset_image ids."""
+    out = svc.image_render_status(LOCAL_USER, image_id)
+    if out is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, **out})
 
 
 @bp.get('/camera/catalog')
@@ -1873,7 +1898,7 @@ def camera_catalog():
     missing = qch.camera_missing_assets()
     effective = qch.resolve_camera_unet()
     return jsonify({**ca.catalog(),
-                    'ready': not any(a in missing for a in qch.CAMERA_REQUIRED),
+                    'ready': qch.camera_ready(missing),
                     'missing': missing,
                     'unet': {'setting': (cfg.get('camera.unet') or '').strip(),
                              'effective': effective,

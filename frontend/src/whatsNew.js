@@ -83,6 +83,59 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-29-improve-settings-window',
+    date: '2026-08-29',
+    title: '✨ Improve now opens its settings in a window — and shows you the result',
+    blurb:
+      'Press ✨ Improve via Klein anywhere — dataset, Gallery, Canvas, a '
+      + 'checkpoint gallery — and a window opens with the instruction '
+      + '(editable in place), model, LoRA preset and output size, then a '
+      + 'Generate button. Stay and the finished picture appears right there; '
+      + 'leave early and it lands where it always did, with a toast saying '
+      + 'where. The image viewers keep their action bars short — the batch '
+      + 'toolbar keeps its inline note, since a batch should show its '
+      + 'instruction before launching a lot.',
+  },
+  {
+    id: '2026-08-29-run-details-from-checkpoints',
+    date: '2026-08-29',
+    title: 'Run details and run-vs-run compare, right on the checkpoint cards',
+    blurb:
+      'Every run card in a dataset’s checkpoints now has ⚙ Details '
+      + '— the full recipe that trained it (rank, learning rate, optimizer, '
+      + 'resolution, notes) — and ⇄ Compare: pick two runs to see exactly '
+      + 'what changed between them, including the frozen dataset (images '
+      + 'added, removed or re-captioned) and the machine. Same panels as the '
+      + 'Lineage graph, one click closer.',
+    to: '/datasets?section=training',
+  },
+  {
+    id: '2026-08-29-dataset-made-with',
+    date: '2026-08-29',
+    title: 'Generated dataset images now remember what made them',
+    blurb:
+      'Every image a dataset generates — variations, ✨ improve, 📷 camera '
+      + 'views, small-image rescues — is stamped with what actually ran: '
+      + 'engine, base model, chained LoRAs, steps, seed. A folded ⚙ Made '
+      + 'with block in the image actions panel shows it, in the same words '
+      + 'as the Gallery viewer. Older images and imports simply show '
+      + 'nothing — the stamp never guesses.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-29-studio-viewer-facts',
+    date: '2026-08-29',
+    title: 'The Test Studio viewer now tells you everything about a render',
+    blurb:
+      'Open an image in the Test Studio — or in a comparison of two training '
+      + 'runs — and you get the same full viewer as the Gallery: prompt, '
+      + 'seed, checkpoint, extra LoRAs, base model, sampler, and the same '
+      + 'verbs (download, improve, repair, camera angles), with the 👍/👎 '
+      + 'vote kept right there. Comparing two runs no longer shows less '
+      + 'about an image than the Gallery knows about the very same file.',
+    to: '/studio',
+  },
+  {
     id: '2026-08-29-same-verbs-every-viewer',
     date: '2026-08-29',
     title: 'Every generated-image viewer now offers the same verbs',
