@@ -83,6 +83,24 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-29-video-licence-asked-not-posted',
+    date: '2026-08-29',
+    title: 'A restrictive video licence now asks, instead of sitting on the card',
+    blurb:
+      'Some video models come with a licence that reaches further than people '
+      + 'expect. MiniMax H3’s grants no rights at all in the EU, the UK, South '
+      + 'Korea or the USA, and the restriction covers what you generate, not '
+      + 'just the model — and until now that note only sat on the card, where it '
+      + 'could be scrolled past. The first ▶ Train on such a target now asks, '
+      + 'once per model and remembered in this browser, before anything is '
+      + 'downloaded or spent. The note also names the way out as well as the '
+      + 'wall: MiniMax grants the excluded territories authorisation on '
+      + 'request. And the card is straighter about what has been proven — H3 '
+      + 'has been trained end to end, but not yet on a local GPU, and it says '
+      + 'so rather than borrowing a proof from another machine.',
+    to: '/datasets',
+  },
+  {
     id: '2026-08-29-krea-preset-sampler',
     date: '2026-08-29',
     title: 'A second way to sample Krea renders, built for its 8-step setting',
