@@ -377,7 +377,7 @@ runs, ✨ improvements — across every dataset, newest first.
 | :-- | :-- |
 | **One feed, every dataset** | Filter by dataset, by renders vs improved, or by 👍 liked; the feed loads itself as you approach its end, on a phone as well as a desktop |
 | **Where a picture came from** | The viewer walks the feed with the arrow keys and shows everything the image was made from; ⬇ downloads keep the lineage name |
-| **Act from the feed** | ✨ Upscale & improve runs straight from here and the result lands at the top; Select mode deletes the misses, ZIPs a pick, or saves it as ⬇ plain files under the same lineage names — one at a time, so the browser does not treat the burst as an attack |
+| **Act from the feed** | ✨ Upscale & improve runs straight from here — Klein opens a small window first (the instruction, model, LoRA preset and output size, then Generate) and shows the finished picture in place; close it early and the result lands at the top as it always did, while SeedVR2 has no dials and fires straight; Select mode deletes the misses, ZIPs a pick, or saves it as ⬇ plain files under the same lineage names — one at a time, so the browser does not treat the burst as an attack |
 | **📷 Camera angles** | Re-shoot a picture from another camera position — the subject stays put and the background moves with it, so what was behind them comes into view. This is not the catalog's "profile view" shot, which turns the *person* and leaves the room where it was. Pick sides, heights and distances; the count under the button is the run |
 
 **📷 Camera angles runs on a second local engine, and the limits are real.** It

@@ -1449,7 +1449,9 @@ const TOPICS = [
   action('lineage-inspect-notes', 'Inspect a run & take notes',
     ['inspect run', 'run settings', 'settings used', 'lineage notes', 'config',
      'compare runs', 'note', 'annotate', 'lab', 'rank', 'learning rate',
-     'which params', 'experiment'],
+     'which params', 'experiment',
+     // Also reachable straight from a checkpoint card's ⚙ Details button.
+     'run details', 'details button', 'from checkpoints', 'checkpoint card'],
     '/cloud', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('lineage-compare-runs', 'Compare two runs side by side',
     ['compare runs', 'compare two runs', 'diff', 'difference', 'what changed',
@@ -1460,7 +1462,9 @@ const TOPICS = [
      'caption changed', 'which captions changed', 'caption diff', 'which images',
      'image added', 'image removed', 'deleted image', 'which image did i delete',
      'dataset changed', 'ai-toolkit version', 'torch version', 'cuda', 'gpu',
-     'base model changed', 'snapshot', 'provenance', 'reproduce a run'],
+     'base model changed', 'snapshot', 'provenance', 'reproduce a run',
+     // Also reachable straight from a checkpoint card's ⇄ Compare picks.
+     'compare from checkpoints', 'compare button', 'checkpoint card'],
     '/cloud', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('lineage-remove-gone-run', 'Remove a gone run from the graph',
     ['remove run', 'delete run', 'gone', 'tidy graph', 'clean up runs',
@@ -2123,14 +2127,16 @@ const TOPICS = [
     ['filter', 'decision', 'undecided', 'awaiting', 'pending', 'kept', 'keep', 'rejected',
      'reject', 'improve', 'candidates', 'klein', 'isolate', 'triage', 'select all', 'grid'],
     '/datasets?section=images', 'dataset-guide', '2-how-many-images-and-which-ones'),
-  // ✎ Edit this instruction here — the improve prompt, editable from the note
-  // under the ✨ button instead of only from Settings. Its own topic because the
-  // question it answers is "how do I change this sentence WITHOUT leaving my
-  // images", and because the panel has a property the Settings card does not:
-  // it writes the app-wide value from a per-dataset-looking screen, which is the
-  // one thing a user must be told before they use it.
+  // ✎ Edit this instruction here — the improve prompt, editable from the
+  // settings window the ✨ button opens (inline note on the bulk toolbar)
+  // instead of only from Settings. Its own topic because the question it
+  // answers is "how do I change this sentence WITHOUT leaving my images", and
+  // because the panel has a property the Settings card does not: it writes the
+  // app-wide value from a per-dataset-looking screen, which is the one thing a
+  // user must be told before they use it.
   action('action-edit-improve-instruction', 'Edit the improve instruction without leaving the images',
     ['improve', 'upscale', 'instruction', 'prompt', 'edit', 'edit here', 'inline', 'in place',
+     'window', 'modal', 'popup', 'settings window', 'generate button',
      'change the prompt', 'turn off', 'disable', 'toggle', 'no prompt', 'upscale only',
      'klein', 'anime', 'drawn', 'realistic', 'texture', 'skin', 'detail', 'lightbox',
      'reset to default', 'built-in default', 'global', 'app-wide', 'every dataset',
@@ -2185,6 +2191,17 @@ const TOPICS = [
      'hyper', 'lcm', '4step', '8step', '4 steps', 'confetti', 'artifacts',
      'texture patches', 'blotchy skin', 'why no speed lora'],
     '/gallery', 'settings-reference', 'image-engines'),
+  /* ⚙ The folded Made-with block in the dataset lightbox's actions panel:
+     what a GENERATED image was made with (engine, base model, LoRAs, steps,
+     seed). Its own topic because the words it is asked with — "which engine
+     made this", "what seed" — appear nowhere else.
+     DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js. */
+  action('action-dataset-made-with', 'See what a generated dataset image was made with',
+    ['made with', 'generated with', 'which engine', 'which model made this',
+     'what settings', 'seed', 'what seed', 'lora used', 'which lora', 'base model',
+     'generation settings', 'provenance', 'metadata', 'stamp'],
+    '/datasets?section=images', 'using-the-app',
+    'the-character-walkthrough-reference-photo-trained-lora'),
   /* 📷 In a dataset the same verb answers a different question — "how do I get
      training coverage of the back of my character" — and adds the captioning
      angle, so it earns its own topic with the dataset vocabulary.
