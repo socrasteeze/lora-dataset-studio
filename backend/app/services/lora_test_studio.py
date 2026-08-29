@@ -1109,11 +1109,13 @@ STUDIO_ENHANCE_PROMPT = (
     "PROMPT TO ENHANCE:\n{prompt}")
 
 
-def enhance_test_prompt(prompt: str) -> str:
-    """Enrich a Studio test prompt with the LOCAL Ollama text model — the same
+def enhance_test_prompt(prompt: str, model: str | None = None) -> str:
+    """Enrich a Studio test prompt with a LOCAL Ollama text model — by default the same
     abliterated model the app captions with (a vanilla model refuses the NSFW prompts
     this app produces), through the SAME client as captioning (`vision_ollama`); no
-    second Ollama seam exists.
+    second Ollama seam exists. `model` is the ⚙️ Enhance-options override: that exact
+    model is then verified and used instead, and the readiness error names IT — not the
+    Settings default the call never touched.
 
     A stopped LOCAL Ollama is started on demand, exactly like Describe. Whether the
     model stays resident afterwards is decided by contention (vision_keepalive), so
@@ -1130,12 +1132,15 @@ def enhance_test_prompt(prompt: str) -> str:
     from .ollama_control import ensure_captioning_ready
     from .vision_keepalive import keep_alive_for_isolated_call
     from .vision_ollama import generate_text_ollama
-    ready = ensure_captioning_ready()
+    ready = ensure_captioning_ready(model)
     if not ready.get('ok'):
         raise RuntimeError(
             (ready.get('error') or 'Ollama is unavailable')
-            + ' — Enhance needs the local Ollama model configured in Settings › Local tools.')
-    text = generate_text_ollama(STUDIO_ENHANCE_PROMPT.format(prompt=p), num_predict=500,
+            + (' — pick another model from the ✨ Enhance ⚙️ options, or pull this one first.'
+               if model else
+               ' — Enhance needs the local Ollama model configured in Settings › Local tools.'))
+    text = generate_text_ollama(STUDIO_ENHANCE_PROMPT.format(prompt=p), model=model,
+                                num_predict=500,
                                 keep_alive=keep_alive_for_isolated_call(), strict=True)
     text = (text or '').strip().strip('"').strip()
     if not text:
@@ -2595,6 +2600,9 @@ class StudioGenSettings:
     resolution_multiplier: object = None
     init_image: object = None
     denoise: object = None
+    # Case « Trigger word » : False = ne pas préfixer le trigger word du dataset
+    # au prompt. None/True = comportement historique (injection au montage).
+    inject_trigger: object = None
 
     @classmethod
     def from_payload(cls, d):
@@ -2626,7 +2634,8 @@ class StudioGenSettings:
             resolution_tier=d.get('resolution_tier'),
             resolution_multiplier=d.get('resolution_multiplier'),
             init_image=d.get('init_image'),
-            denoise=d.get('denoise'))
+            denoise=d.get('denoise'),
+            inject_trigger=d.get('inject_trigger'))
 
 
 def create_run(user_id, dataset_id, checkpoints, strengths, settings=None, *,
@@ -2674,6 +2683,9 @@ def create_run(user_id, dataset_id, checkpoints, strengths, settings=None, *,
     resolution_multiplier = settings.resolution_multiplier
     init_image = settings.init_image
     denoise = settings.denoise
+    # Case « Trigger word » (décochée → False) : le prompt part alors tel quel,
+    # sans le trigger du dataset — persisté par cellule pour un resume fidèle.
+    inject_trigger = settings.inject_trigger is not False
     ds = fds.get_dataset(user_id, dataset_id)
     if not ds:
         raise ValueError('dataset not found')
@@ -2813,7 +2825,8 @@ def create_run(user_id, dataset_id, checkpoints, strengths, settings=None, *,
     # frais reçoit un seul 409 actionnable au lieu d'une grille de tuiles muettes.
     # (Krea/SDXL n'avaient AUCUN preflight ; seul Klein en avait un.)
     _preflight_run(user_id, run_family, cells[0][0], valid_models, allowed,
-                   prompt, seeds[0], dataset_id, ds.trigger_word)
+                   prompt, seeds[0], dataset_id,
+                   ds.trigger_word if inject_trigger else None)
 
     # Classes du ComfyUI cible, lues UNE fois pour toute la grille : le builder s'en
     # sert pour réécrire les nodes à variantes (node 30 Krea) vers le nom réellement
@@ -2860,6 +2873,9 @@ def create_run(user_id, dataset_id, checkpoints, strengths, settings=None, *,
                                 resolution_tier=knobs['resolution_tier'],
                                 resolution_multiplier=knobs['resolution_multiplier'],
                                 init_image=knobs['init_image'], denoise=knobs['denoise'],
+                                # NULL quand la case est cochée (défaut) : la ligne reste
+                                # octet pour octet celle d'avant la colonne.
+                                inject_trigger=None if inject_trigger else False,
                                 record_id=origin_of.get(checkpoint, (None, None))[0],
                                 step=origin_of.get(checkpoint, (None, None))[1])
             _persist_and_enqueue_cell(
@@ -2875,7 +2891,8 @@ def create_run(user_id, dataset_id, checkpoints, strengths, settings=None, *,
                                              scheduler=knobs['scheduler'], weight_dtype=knobs['weight_dtype'],
                                              enhancer_strength=knobs['enhancer_strength'],
                                              detail_amount=knobs['detail_amount'],
-                                             trigger_word=ds.trigger_word,
+                                             trigger_word=(ds.trigger_word
+                                                           if inject_trigger else None),
                                              available_classes=available_classes))
             ids.append(img.id)
     logger.info(f"lora-test: run {run_id} dataset {dataset_id} -> {len(ids)} cellule(s) "
@@ -3083,7 +3100,7 @@ def _cmp_cell_knobs(run_type, batch_loras, rebalance, rebalance_strength,
 
 
 def _cmp_preflight(user_id, run_type, selections, externals, valid_models,
-                   prompt_axis, seeds):
+                   prompt_axis, seeds, inject_trigger=True):
     """Les preflights du run, déplacés tels quels : l'arch réelle de chaque
     checkpoint (externes compris) contre la famille, puis le workflow de la
     famille essayé sur la première sélection valable — un seul 409
@@ -3124,7 +3141,9 @@ def _cmp_preflight(user_id, run_type, selections, externals, valid_models,
         if _pf_cp in _pf_allowed:
             _preflight_run(user_id, run_type, _pf_cp, valid_models, _pf_allowed,
                            prompt_axis[0] or identity_prompt(_pf_ds), seeds[0],
-                           _sel.get('dataset_id'), getattr(_pf_ds, 'trigger_word', None))
+                           _sel.get('dataset_id'),
+                           (getattr(_pf_ds, 'trigger_word', None)
+                            if inject_trigger else None))
             break
     return _dataset_and_checkpoints
 
@@ -3224,7 +3243,8 @@ def _cmp_build_cell_plan(valid_models, selections, combos, strengths,
 def _cmp_enqueue_cells(user_id, cell_plan, members, _dataset_and_checkpoints,
                        knobs, run_type, batch_axis, prompt_axis, seeds, seed,
                        run_id, extra_loras, cell_rebalance, origin_of,
-                       combine, stack_triggers, available_classes):
+                       combine, stack_triggers, available_classes,
+                       inject_trigger=True):
     """La matérialisation du plan, déplacée telle quelle : pour chaque
     cellule planifiée, la pile persistée avec son identité, les dimensions
     de l'aspect, les axes batch/prompt/seed, la ligne LoraTestImage et la
@@ -3273,6 +3293,7 @@ def _cmp_enqueue_cells(user_id, cell_plan, members, _dataset_and_checkpoints,
                                 resolution_tier=knobs['resolution_tier'],
                                 resolution_multiplier=knobs['resolution_multiplier'],
                                 init_image=knobs['init_image'], denoise=knobs['denoise'],
+                                inject_trigger=None if inject_trigger else False,
                                 record_id=origin_of.get(cp, (None, None))[0],
                                 step=origin_of.get(cp, (None, None))[1])
             _persist_and_enqueue_cell(
@@ -3291,9 +3312,11 @@ def _cmp_enqueue_cells(user_id, cell_plan, members, _dataset_and_checkpoints,
                                      enhancer_strength=knobs['enhancer_strength'],
                                      detail_amount=knobs['detail_amount'],
                                      # Pile combinée : TOUS les triggers de la pile,
-                                     # celui du LoRA de tête en premier.
-                                     trigger_word=([ds.trigger_word] + stack_triggers
-                                                   if combine else ds.trigger_word),
+                                     # celui du LoRA de tête en premier. Case
+                                     # « Trigger word » décochée → aucun, pile comprise.
+                                     trigger_word=(([ds.trigger_word] + stack_triggers
+                                                    if combine else ds.trigger_word)
+                                                   if inject_trigger else None),
                                      available_classes=available_classes))
             ids.append(img.id)
     return ids
@@ -3354,6 +3377,8 @@ def create_comparison_run(user_id, selections, strengths, settings=None, *,
     resolution_multiplier = settings.resolution_multiplier
     init_image = settings.init_image
     denoise = settings.denoise
+    # Case « Trigger word » — même contrat que create_run (False = prompt brut).
+    inject_trigger = settings.inject_trigger is not False
     run_type, models = _cmp_resolve_run_family(selections)
     valid_models, seed, count, seeds, prompt_axis = _cmp_seed_and_prompts(
         models, z_model, z_models, seed, count, prompt, prompts)
@@ -3367,7 +3392,7 @@ def create_comparison_run(user_id, selections, strengths, settings=None, *,
 
     _dataset_and_checkpoints = _cmp_preflight(
         user_id, run_type, selections, externals, valid_models,
-        prompt_axis, seeds)
+        prompt_axis, seeds, inject_trigger=inject_trigger)
 
     # Classes du ComfyUI cible, lues UNE fois pour tout le run (cf. create_run) →
     # réécriture des nodes à variantes (node 30 Krea) vers le nom réellement enregistré.
@@ -3392,7 +3417,7 @@ def create_comparison_run(user_id, selections, strengths, settings=None, *,
         user_id, cell_plan, members, _dataset_and_checkpoints, knobs,
         run_type, batch_axis, prompt_axis, seeds, seed, run_id,
         extra_loras, cell_rebalance, origin_of, combine, stack_triggers,
-        available_classes)
+        available_classes, inject_trigger=inject_trigger)
     # `len(members)`, pas `len(stack_extra)` : celui-ci vit maintenant DANS la boucle
     # et vaudrait la dernière combinaison — ou n'existerait pas du tout sur un plan
     # vide. Le nombre de combinaisons est journalisé : c'est le premier chiffre
@@ -3644,7 +3669,11 @@ def resume_run(user_id, dataset_id=None, run_id=None) -> dict:
                                             weight_dtype=getattr(img, 'weight_dtype', None),
                                             enhancer_strength=getattr(img, 'enhancer_strength', None),
                                             detail_amount=getattr(img, 'detail_amount', None),
-                                            trigger_word=getattr(cell_ds, 'trigger_word', None),
+                                            # Case « Trigger word » décochée au lancement
+                                            # (colonne False) → le resume reste fidèle.
+                                            trigger_word=(None
+                                                          if getattr(img, 'inject_trigger', None) is False
+                                                          else getattr(cell_ds, 'trigger_word', None)),
                                             available_classes=available_classes)
             job_id = _enqueue_cell(user_id, img.dataset_id, workflow, prompt,
                                    cell_id=img.id, run_id=img.run_id)
@@ -4798,6 +4827,8 @@ def studio_payload(user_id, dataset_id, family=None) -> dict | None:
                    'cfg': r.cfg, 'steps': r.steps, 'steps2': r.steps2,
                    'batch_lora': _batch_lora_label(r),
                    'combined_loras': _combined_lora_labels(r),
+                   # False = prompt envoyé sans le trigger word (méta de cellule).
+                   'inject_trigger': r.inject_trigger,
                    # Why the tile is empty (failed cells only) → shown on hover (P0-b).
                    'error': r.error if r.status == 'failed' else None,
                    'face_score': r.face_score, 'face_state': r.face_state}
@@ -4881,6 +4912,7 @@ def studio_payload_run(user_id, run_id) -> dict | None:
                    'z_model': r.z_model, 'cfg': r.cfg, 'steps': r.steps, 'steps2': r.steps2,
                    'batch_lora': _batch_lora_label(r),
                    'combined_loras': _combined_lora_labels(r),
+                   'inject_trigger': r.inject_trigger,
                    'error': r.error if r.status == 'failed' else None} for r in rows],
         'lora_ranking': lora_net_scores(run_id),
         # Run PILE (🧬 combine) : sa composition (chaque LoRA, son poids, son trigger)

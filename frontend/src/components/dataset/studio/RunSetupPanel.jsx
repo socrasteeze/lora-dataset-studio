@@ -12,6 +12,7 @@ import StudioGenerationSettings from './StudioGenerationSettings';
 import StudioActionBar from './StudioActionBar';
 import StudioPreflightBanner from './StudioPreflightBanner';
 import { launchSettings, launchText as batchLaunchText, visibleBatch } from './promptBatch';
+import { readInjectTrigger, writeInjectTrigger } from './triggerPref';
 import ScenePromptsPanel from './ScenePromptsPanel';
 import { combinedPromptBatch } from './scenePrompts';
 import { heavyRunConfirm, heavyRunNotice, runCost } from './runCost';
@@ -79,6 +80,18 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
   const allPickedPrompts = combinedPromptBatch(
     pickedPrompts, sceneBatch.scenes, sceneBatch.picked, sceneBatch.extras);
 
+  // 🔤 Case « Trigger word » : préfixer (défaut, comportement historique) ou non le
+  // trigger du dataset au prompt monté. Préférence de navigateur PARTAGÉE entre les
+  // surfaces de lancement — lecture/écriture dans triggerPref (module pur : ce
+  // panneau ne touche pas au stockage lui-même, le contrat du lot de prompts
+  // l'interdit). Décochée → `inject_trigger: false` part dans le POST ; cochée →
+  // champ absent, corps octet pour octet celui d'avant.
+  const [injectTrigger, setInjectTrigger] = useState(readInjectTrigger);
+  const toggleInjectTrigger = (v) => {
+    setInjectTrigger(v);
+    writeInjectTrigger(v);
+  };
+
   // Le nombre de cellules RÉELLEMENT lancées. `cellTotal` n'est fourni que par un
   // mode qui change la formule (🧬 Blend : une pile = une configuration) — sinon
   // c'est le total du formulaire, inchangé.
@@ -110,6 +123,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
     // changer, et le lot arrive identiquement sur les deux routes. Absent quand
     // rien n'est coché : le corps envoyé est alors octet pour octet celui d'avant.
     const settings = launchSettings(genSettings, allPickedPrompts);
+    if (!injectTrigger) settings.inject_trigger = false;
     const res = await studio.launch(
       form.chosenCps, form.selSts, form.nextSeed(), form.effectivePrompt,
       form.effectiveModels, form.effectiveAspects, form.effectiveCfgs, form.effectiveSteps,
@@ -217,6 +231,8 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
             batchPrompts={pickedPrompts}
             onToggleBatchPrompt={toggleBatchPrompt}
             onClearBatchPrompts={() => setBatchPrompts([])}
+            injectTrigger={injectTrigger}
+            onInjectTrigger={toggleInjectTrigger}
           />
 
           {/* 🎬 Les captions d'une banque ou d'un dataset, dans l'ordre, comme
