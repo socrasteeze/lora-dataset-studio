@@ -1,4 +1,5 @@
 import atexit
+import logging
 import sys, os
 import webbrowser
 
@@ -190,6 +191,22 @@ if __name__ == '__main__':
     # clean exit; a crash leaves it behind, where the dead pid reads as stale.
     write_lock(data_dir, host, port)
     atexit.register(release_lock, data_dir)
+    # Refresh the ComfyUI nodes this app ships, for users who already installed
+    # them. "Update & restart" replaces the app's files and nothing else — it has
+    # no business writing into somebody's ComfyUI on its own — so without this a
+    # user would keep the version of the node they first clicked while the app's
+    # graphs moved on. Only STALE copies are touched: an absent one stays absent,
+    # because installing is the user's decision and refreshing what they already
+    # chose is not a new one.
+    #
+    # Here rather than in create_app(): the test suite builds hundreds of apps,
+    # and none of them should be writing into a real ComfyUI folder.
+    try:
+        from app import setup_installer
+        for action, message in setup_installer.refresh_bundled_node_packs().items():
+            print(f"[LDS] {action}: {message} — restart ComfyUI to load it.")
+    except Exception:                       # noqa: BLE001 — never block boot
+        logging.getLogger(__name__).warning('bundled node refresh failed', exc_info=True)
     # Announce the ACTUAL bound address (with token) once the app answers, and
     # open the local browser there — replaces start.bat's hardcoded,
     # fired-too-early 127.0.0.1. The announcement is unconditional: a launcher
