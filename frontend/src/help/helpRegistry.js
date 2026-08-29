@@ -867,6 +867,9 @@ const TOPICS = [
     ['studio', 'test studio', 'enhance', 'enhance prompt', 'improve prompt', 'better prompt',
      'rewrite prompt', 'llm', 'ollama', 'local model', 'prompt magic', 'button greyed out',
      'enhance disabled', 'ollama not running', 'model not downloaded',
+     // The ⚙️ next to the button: pick which pulled Ollama model runs Enhance.
+     'enhance options', 'enhance model', 'choose model', 'which model', 'change model',
+     'different model', 'pick a model', 'gear', '⚙️', 'enhance settings',
      // The fence: the words people type when another tool is holding the model.
      'already in use outside LDS', 'model in use', 'unload it and continue',
      'unload model', 'waiting for the model', 'model busy', 'another app is using ollama'],
@@ -876,6 +879,15 @@ const TOPICS = [
      'dice', '🎲', 'choose dataset', 'caption source', 'change dataset', 'switch dataset',
      'dropdown', '▾', 'kept caption', 'nonblank caption', 'test prompt', 'replace prompt',
      'overwrite prompt', 'confirmation'],
+    '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js.
+  action('studio-inject-trigger', 'Trigger word checkbox: send the prompt as written',
+    ['studio', 'test studio', 'trigger', 'trigger word', 'inject trigger', 'no trigger',
+     'without trigger', 'prompt as written', 'raw prompt', 'verbatim prompt',
+     // The symptom that leads people here: the trigger token rendered INSIDE
+     // the image when the prompt asks for typed text.
+     'trigger in the image', 'trigger in speech bubble', 'text in image', 'speech bubble',
+     'weird word in bubble', 'token in the render', 'why is my trigger word visible'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   // The dock is app-wide (it is mounted in the shell, not on one screen), so the
   // route here is just somewhere the queue is normally being fed from — the
@@ -2160,6 +2172,16 @@ const TOPICS = [
     { trigger: 'camera-angles-picker',
       text: 'Pick axes, not pictures: the sides you tick times the heights times '
         + 'the distances is the run — the count under the button is what it will cost.' }),
+  /* 📷 The picker's Model row — a SETTING (app-wide camera.unet), so it owes a
+     topic, and the words it is asked with ("can I run this on a finetune / an
+     NSFW build") appear in none of the other camera topics.
+     DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js. */
+  action('action-camera-model', 'Run camera angles on another Qwen-Image-Edit build',
+    ['camera model', 'qwen model', 'qwen build', 'qwen edit', '2511', 'swap model',
+     'another model', 'different model', 'change model', 'custom model', 'finetune',
+     'fine-tune', 'merge', 'aio', 'nsfw', 'uncensored', 'rapid', 'which model',
+     'model not found', 'camera.unet', 'model row', 'camera picker model'],
+    '/gallery', 'settings-reference', 'image-engines'),
   /* 📷 In a dataset the same verb answers a different question — "how do I get
      training coverage of the back of my character" — and adds the captioning
      angle, so it earns its own topic with the dataset vocabulary.

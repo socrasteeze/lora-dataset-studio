@@ -83,6 +83,58 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-28-krea-base-pick-saves',
+    date: '2026-08-28',
+    title: 'The Krea 2 base-model pick actually saves now',
+    blurb:
+      'Picking a Krea 2 base model from the variation catalog looked saved '
+      + 'but quietly forgot the choice on the next reload — the save request '
+      + 'was shaped wrong and the server ignored it politely. Fixed; your '
+      + 'pick now survives, and the camera panel’s new Model row uses '
+      + 'the same repaired path.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-08-28-camera-model-choice',
+    date: '2026-08-28',
+    title: 'Camera angles can run on your own Qwen build',
+    blurb:
+      '📷 The camera-angles panel now has a Model row: pick any '
+      + 'Qwen-Image-Edit build on your disk — a finetune, an NSFW merge — '
+      + 'and every camera run uses it, on the Gallery and in datasets alike. '
+      + 'Empty keeps the installed 2511 default. The angle grammar comes from '
+      + 'the LoRA, so a different build changes the look, not the camera.',
+    to: '/gallery',
+  },
+  {
+    id: '2026-08-28-enhance-model-choice',
+    date: '2026-08-28',
+    title: 'Pick which Ollama model runs ✨ Enhance',
+    blurb:
+      'A ⚙️ next to ✨ Enhance — in the Test Studio and in the Canvas run '
+      + 'panel alike — lets you pick which pulled Ollama model enriches your '
+      + 'test prompt, instead of always the captioning model. The pick is '
+      + 'remembered and applies to both surfaces at once; leave it on the '
+      + 'default and nothing changes. A vanilla model can refuse NSFW '
+      + 'prompts — the abliterated captioning default stays the safe choice '
+      + 'there.',
+    to: '/studio',
+  },
+  {
+    id: '2026-08-28-studio-trigger-toggle',
+    date: '2026-08-28',
+    title: 'Test a prompt without the trigger word',
+    blurb:
+      'A new "Trigger word" checkbox next to the Studio test prompt (also in '
+      + 'Compare and the canvas panel) controls whether the dataset\'s trigger '
+      + 'is prefixed to what you type. Untick it to send the prompt exactly as '
+      + 'written — handy when a render keeps typing the trigger back into '
+      + 'speech bubbles or signs, or for pure style and scene tests. Ticked '
+      + 'stays the default, the choice is remembered in this browser, and '
+      + 'images generated without it say "no trigger" in their details.',
+    to: '/studio',
+  },
+  {
     id: '2026-08-28-improve-passes-chain',
     date: '2026-08-28',
     title: 'Improve an improved picture again',
