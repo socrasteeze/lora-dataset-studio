@@ -714,7 +714,11 @@ const TOPICS = [
      'custom nodes', 'custom_nodes', 'identity lora', 'krea2_identity_edit', 'civitai',
      'qwen3-vl', 'restart comfyui', 'second engine', 'local engine', '20 gb',
      'corrupted', 'truncated', 'unreadable', 'cannot be loaded', 'download again',
-     'krea not ready', 'everything is in place']),
+     'krea not ready', 'everything is in place',
+     // DIVERGENCE 10 — hand-ported reword from upstream's help/topics/pages.js.
+     // The optional preset sampler is installed from this same card.
+     'preset sampler', 'krea preset sampler', 'sampler preset', 'install the sampler',
+     'neutral', 'balanced', 'detailed', 'multistep', 'optional sampler']),
   setting('seedvr2.tiling', 'engines', 'seedvr2-tiling', 'High-resolution tiling',
     ['tiling', 'tile', 'tiles', 'seedvr2 tiling', 'TTP', 'Comfyui_TTP_Toolset',
      'high resolution', '4k', 'detail', 'artifacts', 'seam', 'seams', 'vram',
@@ -798,7 +802,13 @@ const TOPICS = [
      'steps with two loras', 'two loras', 'multi lora', 'compare', 'blend',
      'steps in blend', 'steps in comparison', 'render settings', 'second pass',
      'detail daemon', 'sdxl pass 2', 'sweep steps', 'try several steps',
-     'default steps', 'always 8 steps', 'ignored steps'],
+     'default steps', 'always 8 steps', 'ignored steps',
+     // DIVERGENCE 10 — hand-ported reword from upstream's help/topics/pages.js.
+     // Krea's Sampler menu now carries the shipped preset sampler beside the
+     // stock ComfyUI names — someone searching for either should land here.
+     'sampler', 'sampler menu', 'preset sampler', 'krea sampler', 'er_sde',
+     'euler', 'scheduler', 'neutral preset', 'more detail', 'texture',
+     'sampler not in the list', 'preset missing'],
     '/studio', 'dataset-guide', '6-after-training-pick-the-right-checkpoint'),
   action('studio-guest-checkpoints', 'Compare with other LoRAs',
     ['studio', 'test studio', 'theirs', 'guest checkpoint', 'external lora',
