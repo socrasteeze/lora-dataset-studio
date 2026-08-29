@@ -1,11 +1,12 @@
 # HANDOFF
 
-**Updated:** 2026-08-29 · **Branch:** main (mirrored to `claude/magical-tesla-u4hplx`) · **Base:** c8b67cdb · **Tree:** clean
+**Updated:** 2026-08-29 · **Branch:** main (mirrored to `claude/magical-tesla-u4hplx`) · **Base:** da2d3241 · **Tree:** clean
 
 ## State
-Level with `perfectgf/lora-dataset-studio` at `5fc50448` — 0 behind. All gates
+Level with `perfectgf/lora-dataset-studio` at `1ec79862` — 0 behind. All gates
 green on the exact tree pushed. `main` and `claude/magical-tesla-u4hplx` both at
-`52841f3b`.
+`482286c1`. **Two syncs ran back to back in this session** — the Caption Lab /
+queue-hold window, then the preset-sampler window below it.
 
 ## Done this session
 - Merged upstream `5fc50448` — 13 commits, **five source conflicts** (three of
@@ -44,6 +45,42 @@ green on the exact tree pushed. `main` and `claude/magical-tesla-u4hplx` both at
   **303 / 14 tips** now.
 - **D5 gained a fourteenth entry** — see Open #0.
 
+### Second sync, same session — the Krea preset sampler (7 commits, `1ec79862`)
+- Adopted whole: five sampler presets for Krea 2 Turbo's 8-step regime, in the
+  Studio's existing Sampler menu. In scope by **D1b** without argument — own GPU,
+  through ComfyUI, no key, no network call. `neutral` is bit-exact Euler on
+  purpose, so it is the reference column.
+- **A new KIND of artifact:** `backend/comfy_nodes/` is the first ComfyUI node
+  this app installs from its own payload rather than cloning from a third party.
+  It inverts one rule deliberately — somebody else's pack on disk is left alone
+  (they may have pinned it), ours is overwritten whenever its stamp is not this
+  app version.
+- **The one marker region was a keep-BOTH in `run.py` (Divergence 8), and the
+  two failure modes are not symmetric** — the section now carries a subsection
+  on it. Ours-whole silently drops `refresh_bundled_node_packs()` and strands
+  every user on the node version they first installed; theirs-whole reverts
+  `_announce_when_ready` to a **different signature**, double-threads a helper
+  that already threads itself, and restores the `LDS_OPEN_BROWSER=1` force-on D8
+  refuses by name. Spliced: their refresh block, our announce.
+- **D10 inverted its usual shape:** two rewords, ZERO new topics (nine
+  preset-sampler keywords onto `setup-krea-install`, eleven onto
+  `studio-multilora-steps`). Both counts stand still at **303 / 14** *and* the
+  id-list diff prints nothing — every check that section offers except the
+  mandatory diff of the deleted module was blind to this window.
+- **Counted invariants verified unmoved, not assumed:** upstream kept the
+  sampler out of `krea_ready` and the capability rows on purpose, so the
+  contract stays at **18** and `installCatalog` keeps its 23-action list.
+  `models.py` / `__init__.py` gained only `sampler_preset`; `fail_kind` is still
+  absent from both.
+- Both new screenshots opened and read before adopting: the Setup one is the
+  **local** Krea 2 Edit card with the optional row; the other is the Sampler
+  menu. No key field, no cloud engine, no machine path, no dataset name.
+- Gates: eslint 0 errors / 20 warnings, ruff clean, build clean, contract 8/8 +
+  3/3 on the rebuilt dist, `create_app()` OK, hygiene 18/2. Frontend 4 397 →
+  **4 405 / 0 fail**. Backend **8 291 / 71 / 108** against a baseline of
+  **8 265 / 71 / 108** — the failure set is **byte-identical**, zero new, zero
+  vanished.
+
 ## Open
 0. **Nothing owed on the sync itself.** Recorded so the next session does not
    re-derive it: D5's new entry is `datasetProbeMarkers.test.js`, where upstream
@@ -78,11 +115,17 @@ green on the exact tree pushed. `main` and `claude/magical-tesla-u4hplx` both at
    `beautiful-ride-rllujy` (2), `gracious-planck-nykeey` (2),
    `magical-tesla-1c639u` (3, a duplicate sync of an older window). These are
    NOT stale — do not sweep them in with the fourteen above.
-5. The responsive probe was NOT run this wave. `.claude/rules/frontend-contracts.md`
-   is explicit that a layout change is unverified until it has, and this window
-   both touched touch targets and added three probe states. It needs a live
+5. The responsive probe was NOT run in EITHER sync. `.claude/rules/frontend-contracts.md`
+   is explicit that a layout change is unverified until it has, and the first
+   window touched touch targets and added three probe states. It needs a live
    instance holding a bank and a dataset, which this container has not got. The
    three floored links were verified by source assertion only.
+6. **The README capability-requirements table carries three rows VERBATIM
+   TWICE** — 🌐 Civitai top prompts, 📷 Camera angles and 🔤 Find text. It is
+   pre-existing damage from an earlier merge, not from either sync this session,
+   and it was left alone deliberately rather than widen a merge commit with an
+   unrelated fix. It is a one-minute edit for a session that is not mid-sync;
+   `grep -n '^| 🌐 Civitai top prompts' README.md` finds the pair.
 
 ## Decisions
 - **The README earned two edits, and one was a debt rather than a gap.** The
