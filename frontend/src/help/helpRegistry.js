@@ -2180,7 +2180,10 @@ const TOPICS = [
     ['camera model', 'qwen model', 'qwen build', 'qwen edit', '2511', 'swap model',
      'another model', 'different model', 'change model', 'custom model', 'finetune',
      'fine-tune', 'merge', 'aio', 'nsfw', 'uncensored', 'rapid', 'which model',
-     'model not found', 'camera.unet', 'model row', 'camera picker model'],
+     'model not found', 'camera.unet', 'model row', 'camera picker model',
+     'distilled', 'distilled build', 'speed lora skipped', 'lightning', 'turbo',
+     'hyper', 'lcm', '4step', '8step', '4 steps', 'confetti', 'artifacts',
+     'texture patches', 'blotchy skin', 'why no speed lora'],
     '/gallery', 'settings-reference', 'image-engines'),
   /* 📷 In a dataset the same verb answers a different question — "how do I get
      training coverage of the back of my character" — and adds the captioning
