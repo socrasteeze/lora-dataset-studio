@@ -2892,6 +2892,13 @@ def _pick_offer(offers, requested_gpu, strict=False):
     return _best_of(offers)
 
 
+# The video lane's pod disk, in GB, below which a run cannot be provisioned.
+# Not a tuning knob: 42.5 GB of MiniMax H3 weights, pulled through a transfer
+# that holds the chunks AND the reconstructed file at once, against the 60 GB
+# the face lane rents — and the overflow arrives after the rental is paid for.
+_VIDEO_DISK_FLOOR_GB = 120
+
+
 def _disk_gb_for(cloud_cfg, params) -> int:
     """Pod disk size: the configured default, bumped when the run trains on a
     LARGE custom base (stamped remote size). The pod holds the raw download
@@ -2903,6 +2910,17 @@ def _disk_gb_for(cloud_cfg, params) -> int:
         # Safety floor, even when an old/user-edited config carries a smaller
         # number: base + working weights + one ~26 GB save do not fit below it.
         disk_gb = max(200, int(dense.get('disk_gb') or 200))
+    elif params.get('train_type') == 'video':
+        # Same shape as the dense floor above, for the same reason: the video
+        # lane's base does not fit the shared default. Its weights are pulled
+        # file by file from the Comfy repack (42.5 GB for MiniMax H3) and land
+        # beside an unpacked image on ONE vast allocation, and this arch caches
+        # its latents to disk on top. The floor is in code rather than in the
+        # config alone because `config.json` freezes whatever `cloud` block was
+        # saved before the key existed — a user who saved Settings in July would
+        # otherwise still rent 60 GB and lose the run at 58.
+        disk_gb = max(_VIDEO_DISK_FLOOR_GB,
+                      int(cloud_cfg.get('video_disk_gb') or _VIDEO_DISK_FLOOR_GB))
     else:
         disk_gb = int(cloud_cfg.get('disk_gb') or 60)
     try:
@@ -2969,6 +2987,19 @@ def rent_with_fresh_offers(*, search, create, pick=None, on_offer=None,
             sleep(_CREATE_INSTANCE_BACKOFF)
 
 
+def _pod_image_for(run, c):
+    """The image tag THIS run's lane boots. The video lane trains architectures
+    that entered ai-toolkit after the face lane's pinned tag was cut
+    (minimax_h3 landed 2026-08-03; the pin is 2026-07-12) — on the old tag the
+    pod refuses the job only after the rental. The face lane keeps its pin
+    because the dense recipe's supported/refused verdicts were read against
+    that exact commit. A video config without `video_image` falls back to the
+    shared pin: an older trainer beats no trainer, and Wan runs still work on it."""
+    if crd.table_of(run) == crd.VIDEO:
+        return c.get('video_image') or c.get('image')
+    return c.get('image')
+
+
 def _provision(run):
     """Search offers and create the instance, honoring the launch-time GPU
     choice when the picked class is still available.
@@ -3005,7 +3036,16 @@ def _provision(run):
             secure_cloud_only=bool(c.get('secure_cloud_only', False)),
             # Ask only machines that HAVE the disk this pod is about to claim —
             # a dense run asks for 200 GB and the market is full of 60 GB boxes.
-            min_disk_gb=disk_gb)
+            min_disk_gb=disk_gb,
+            # …and machines whose GPU can run the recipe's dtype. Every video
+            # job this app writes trains in bf16, which Turing does not have —
+            # and Turing is exactly where the cheapest offer lives: on
+            # 2026-08-29 the cheapest board clearing this lane's 48 GB and
+            # 120 GB floors was a Quadro RTX 8000 at $0.261/h, compute_cap 750,
+            # against $0.802 for the next one up. Picking by price alone rents
+            # the one card in the list that cannot do the work. Per family and
+            # absent by default: nothing here changes what the face lane sees.
+            min_compute_cap=int((c.get('min_compute_cap') or {}).get(fam, 0)))
 
     def _stamp(offer):
         # Stamp the host identity so a boot failure can blacklist THIS machine —
@@ -3034,7 +3074,7 @@ def _provision(run):
             return vast_client.create_instance(
                 offer['offer_id'], disk_gb=disk_gb,
                 label=run.vast_label, template_hash=template_hash,
-                image=(c.get('image') or None))
+                image=(_pod_image_for(run, c) or None))
         # Raw-image fallback (config escape hatch): direct port publish +
         # our own bearer token on the UI itself.
         token = pysecrets.token_urlsafe(24)
@@ -3045,7 +3085,7 @@ def _provision(run):
             env['HF_TOKEN'] = hf
         return vast_client.create_instance(
             offer['offer_id'], disk_gb=disk_gb,
-            label=run.vast_label, image=c.get('image'), env=env,
+            label=run.vast_label, image=_pod_image_for(run, c), env=env,
             onstart=(c.get('onstart') or None))
 
     instance_id, offer = rent_with_fresh_offers(

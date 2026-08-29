@@ -4,6 +4,7 @@ import { apiFetch, del, postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
 import { HelpBadge } from '../../help/HelpMode'
 import { clipLabel } from './videoClipFragment'
+import { ensureLicenceAck } from './licenceAck'
 
 /** 🎬 Video training sets, in the library, next to the image datasets.
  *
@@ -100,12 +101,24 @@ export default function VideoDatasetsPanel() {
   )
 }
 
-/** Wan 2.2 14B is the only video target a finished local run has been through.
- * Every other one is wired from the installed ai-toolkit's own code and preset —
- * correct as far as reading goes, never yet trained here end to end. The card
- * says which of the two it is, because "it started" and "it works" are different
- * claims and only the user can decide whether to spend a night on the second. */
-const PROVEN_PROFILES = new Set(['wan22_14b'])
+/** How far each video target has actually been taken — which is not the same
+ * question as whether it is wired, and not one answer but two.
+ *
+ * 'local' is a finished run on this machine; 'cloud' is a finished run on a
+ * rented pod. MiniMax H3 is 'cloud' and stays 'cloud': its base is 42 GB and it
+ * trains with the weights resident, which is what the pod is for — claiming
+ * "trained end to end" on the LOCAL card would borrow a proof from the wrong
+ * machine. A target absent from this map is wired from the installed
+ * ai-toolkit's own code and preset — correct as far as reading goes, never yet
+ * trained end to end anywhere. The card says which, because "it started" and
+ * "it works" are different claims and only the user can decide whether to spend
+ * a night on the second.
+ *
+ * DIVERGENCE 4 — upstream's 'cloud' sentence names the rented pod it was proven
+ * on. This build has no rented-pod lane, so naming one on the card advertises a
+ * button that is not there; the fork says "elsewhere" and keeps the only part
+ * that is actionable here, which is that a LOCAL run has not proven it yet. */
+const PROVEN_ON = { wan22_14b: 'local', minimax_h3: 'cloud' }
 
 /** ▶ Train this dataset — the local run, its progress, and its refusals.
  *
@@ -141,6 +154,12 @@ function VideoTrainingSection({ ds }) {
   }, [active, poll])
 
   const start = async (acceptDownload = false) => {
+    // The licence question comes BEFORE anything is spent — not after the
+    // download confirm, whose 43 GB would already be an investment in a run
+    // the licence answer might forbid.
+    if (!ensureLicenceAck(ds, {
+      storage: window.localStorage, confirmFn: window.confirm,
+    })) return undefined
     setBusy(true)
     try {
       const r = await postJson(`/api/video-dataset/${ds.id}/train`,
@@ -212,10 +231,11 @@ function VideoTrainingSection({ ds }) {
               : 'Starting up…'}
         </p>
       )}
-      {!active && !PROVEN_PROFILES.has(ds.target_profile) && (
+      {!active && PROVEN_ON[ds.target_profile] !== 'local' && (
         <p className="text-[0.6875rem] text-content-subtle">
-          {ds.target_label} is wired from ai-toolkit’s own settings but has not been
-          trained end to end here yet.
+          {PROVEN_ON[ds.target_profile] === 'cloud'
+            ? `${ds.target_label} has been trained end to end elsewhere, but not yet on a local GPU.`
+            : `${ds.target_label} is wired from ai-toolkit’s own settings but has not been trained end to end yet.`}
         </p>
       )}
       {/* On the card, not only in the toast after launching: a warning that

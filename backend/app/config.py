@@ -226,6 +226,13 @@ DEFAULTS = {
         'template_hash': '471ed5903d8cdb8e63b0d0e50f6cd519',
         'ui_port': 18675,              # container port the UI is reachable on (Caddy proxy)
         'image': 'vastai/ostris-ai-toolkit:4625406-2026-07-12-cuda-12.9',  # raw-image fallback only
+        # The VIDEO lane's pods override the template with THIS tag instead.
+        # Two pins, deliberately independent: the tag above is the one the face
+        # lane's runs were measured against and must not move casually, while
+        # the video lane needs an ai-toolkit from 2026-08-03 or later — that is
+        # when the `minimax_h3` architecture landed, and a pod on the older tag
+        # refuses the job AFTER the rental.
+        'video_image': 'vastai/ostris-ai-toolkit:da79ebc-2026-08-27-cuda-12.9',
         'max_price_per_hour': 0.80,    # background safety cap on offer price, $/h
         'offer_scan_limit': 100,       # offers fetched when listing GPU speed tiers
         'pod_overhead_minutes': 35,    # boot+model download+quantize (measured ~40 min live), in cost estimates
@@ -273,10 +280,45 @@ DEFAULTS = {
         'unreachable_grace_minutes': 6,  # tolerated mid-run network blackout before giving up on the pod
         'monthly_budget_usd': 0,       # 0 = unlimited; launches blocked past this
         'disk_gb': 60,                 # instance disk (base model + dataset + checkpoints)
+        # The VIDEO lane rents its disk separately, and the number is not a
+        # preference. Its base is an order of magnitude larger than the face
+        # lane's — MiniMax H3's four Comfy repack files measure 42.5 GB, read
+        # off the Hub API — and the way they LAND costs more than they weigh:
+        # the pod pulls them through Xet, which fetches chunks and then
+        # reconstructs the file, so for a while both exist (watched live on run
+        # #166: "downloading bytes 20.7GB" and "reconstructing file 5.97GB /
+        # 21.0GB" on the same file, at the same time). The largest weight
+        # transiently costs about twice itself, on top of everything already
+        # down: the pod read 42 GB with the base in place, and roughly 52 GB at
+        # the peak of the second file. Against 60 GB that is single-digit
+        # headroom for the latent cache this arch writes to disk, the dataset
+        # and the saves — and the dense lane has already lost runs to
+        # "[Errno 28] No space left on device". Floored in code like that
+        # lane's, so a config frozen before this key existed cannot undercut it.
+        'video_disk_gb': 120,
         # min_vram_gb est PAR FAMILLE (pas par variante) : pour flux2klein on prend
         # 32 — le 9B (32-48 GB) est la voie cloud principale de cette famille, et un
         # pod 32 GB entraîne aussi le 4B sans problème (l'inverse serait faux).
-        'min_vram_gb': {'zimage': 24, 'sdxl': 16, 'krea': 24, 'flux2klein': 32},
+        # 'video' covers the whole video-dataset lane, whose pods run with
+        # low_vram OFF (paying cloud prices for the PCIe shuttle is the thing
+        # the lane exists to avoid) — so the weights are RESIDENT: MiniMax H3's
+        # pruned int8 transformer alone is ~21 GB with a ~16 GB nvfp4 text
+        # encoder beside it, and Wan 2.2 A14B holds two experts. The 24 GB
+        # fallback that applied before this entry existed rented pods that
+        # could only OOM after the money was spent.
+        'min_vram_gb': {'zimage': 24, 'sdxl': 16, 'krea': 24, 'flux2klein': 32,
+                        'video': 48},
+        # Compute capability floor, per family, as vast reports it: 750 Turing,
+        # 800 Ampere, 900 Hopper, 1200 Blackwell. Only 'video' has one, and it
+        # is not a performance preference — every video job this app writes
+        # trains in bf16, and on Turing bf16 is not slow, it is missing. The
+        # entry exists because that is precisely where the cheapest offer sits:
+        # a 48 GB Quadro RTX 8000 at $0.261/h undercuts the next board by a
+        # factor of three, so "cheapest above the floors" reaches for the one
+        # card in the list that cannot run the recipe. Families absent from
+        # this map send no predicate at all and keep the offer pool they were
+        # measured against.
+        'min_compute_cap': {'video': 800},
         # Dedicated dense Krea 2 lane.  A full-transformer checkpoint is ~26 GB
         # and training keeps the official base, working weights/caches and the
         # save side by side; it must never inherit the 24 GB / 60 GB LoRA lane.
