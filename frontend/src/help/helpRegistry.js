@@ -898,8 +898,25 @@ const TOPICS = [
       'why is it greyed out', 'greyed out', 'disabled button', 'cannot generate',
       'too many generations in flight', 'run next', 'reorder', 'priority',
       'cancel one job', 'what is the gpu doing', 'still generating', 'dock',
-      'bottom left', 'improve batch blocks', 'klein batch blocks'],
+      'bottom left', 'improve batch blocks', 'klein batch blocks',
+      // The words people type when the queue is held by a model LDS does not
+      // own — and the answer the dock now offers instead of an open wait.
+      'nothing is starting', 'queue stuck', 'queue frozen', 'nothing happens',
+      'run anyway', 'share the gpu', 'generate anyway', 'keep waiting',
+      'a local model outside LDS', 'holding the gpu', 'it has been waiting'],
     '/datasets', 'using-the-app', 'the-generation-queue'),
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js.
+  // The Bank's half of 🧪 Caption Lab. Its own topic rather than keywords bolted
+  // onto the dataset one: the two live on different screens, and a topic carries ONE
+  // route — a user searching from a bank must land on the bank, not be told to open
+  // a dataset they may not have.
+  action('bank-caption-lab', '🧪 Caption Lab on a bank — compare caption configs',
+    ['caption lab', 'bank caption lab', 'bench', 'bench captions', 'compare captions',
+      'a/b', 'ab test', 'side by side', 'which model', 'try a model', 'candidate',
+      'engine', 'joycaption', 'ollama', 'vision model', 'vocabulary', 'register',
+      'explicit', 'clinical', 'length', 'concise', 'detailed',
+      'edit a bank caption', 'fix a caption', 'rewrite one caption'],
+    '/bank', 'using-the-app', 'the-image-bank-triage-a-big-folder'),
   action('studio-recover-paused-batch', 'Recover a paused Test Studio batch',
     ['studio', 'test studio', 'paused', 'pause', 'stalled', 'queue', 'queue error',
       'comfyui stopped', 'comfyui unavailable', 'restart comfyui', 'recover comfyui',
@@ -2357,6 +2374,15 @@ const TOPICS = [
     ['caption', 'options', 'engine', 'model', 'ollama', 'pull', 'instructions', 'prompt',
      'method', 'vocabulary', 'explicit', 'clinical', 'nsfw', 'abliterated', 'uncensored'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/actions.js.
+  // The bench had no topic at all while its keywords sat on the SECTION topic,
+  // which routed to a screen that did not carry it. It has its own address now.
+  action('action-caption-lab', 'Caption Lab — compare caption configs on one image',
+    ['caption lab', 'lab', 'bench', 'compare', 'comparison', 'a/b', 'ab test', 'side by side',
+     'candidate', 'preview', 'try', 'test a model', 'which model', 'engine', 'joycaption',
+     'ollama', 'vision model', 'vocabulary', 'explicit', 'clinical', 'safe',
+     'length', 'concise', 'detailed'],
+    '/datasets?section=captions&panel=lab', 'dataset-guide', '3-captions-the-make-or-break-step'),
   action('action-caption-stop', 'Stop a captioning batch',
     ['caption', 'stop', 'cancel', 'abort', 'interrupt', 'batch', 'graceful', 'halt'],
     '/datasets?section=captions&panel=generate', 'dataset-guide', '3-captions-the-make-or-break-step'),
