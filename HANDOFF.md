@@ -21,8 +21,16 @@ Level with `perfectgf/lora-dataset-studio` at `064482a7` — 0 behind. All gates
   in it. Topics stay **300**, tips **14**
 
 ## Open
-1. Delete the stale branches from `git branch -r --merged main` — see Traps;
-   this container's credential returns HTTP 403 on `git push origin --delete`.
+1. **Delete 12 stale merged branches — attempted this session, blocked.** All of
+   `git branch -r --merged main` (12, now including this session's own
+   `claude/magical-tesla-73gb9f`) were tried one by one; every one returned
+   `HTTP 403` on `send-pack`. Confirmed **GitHub's** refusal, not the egress
+   proxy — the proxy's status endpoint logs no `github.com` denial — and the
+   GitHub MCP server exposes `create_branch`/`list_branches` with **no delete
+   counterpart**, so there is no route from a container like this one. Owed to a
+   session whose credential can delete refs. The list re-derives with
+   `git branch -r --merged main | grep -v 'origin/main$'`; do not work from a
+   copied list, it moves every wave.
 2. Fork-only controls still carry emoji while upstream's use icons (`🔖 Tags`,
    `⚖️ Balanced pick`, `✂ Find crops & variants`, `⬆ Promote`). `🔖 Tags` alone
    touches `wd14Gate.js`, `bankPassCoverage.js`, `bankFacets.js`,
