@@ -83,6 +83,37 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-30-video-steps-sized-to-the-dataset',
+    date: '2026-08-30',
+    title: 'Video training steps now start from your dataset, not a constant',
+    blurb:
+      'A 12-clip set and a 176-clip set used to get the same step count. The '
+      + 'Steps field on a video dataset now starts from a suggestion sized to '
+      + 'the clips it actually holds — about 28 steps per clip, taken from '
+      + 'measured runs, never below the old default and never past what the '
+      + 'measurements support. ▶ Train carries that field on screen, so no run '
+      + 'starts on a number you never saw. Type over it freely: what you enter '
+      + 'is what trains.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-30-h3-trains-the-way-h3-is-trained',
+    date: '2026-08-30',
+    title: 'MiniMax H3 video LoRAs now train the way the model expects',
+    blurb:
+      'H3 ships guidance-distilled, and training a LoRA on it without accounting '
+      + 'for that quietly degrades the result. ai-toolkit answered with a '
+      + 'contrastive guidance loss and a small training adapter, and made the '
+      + 'pair its default for H3 — video training here now uses both, wherever '
+      + 'the ai-toolkit it is driving can actually run them: your installed copy '
+      + 'is read for the capability, so an older checkout quietly skips the '
+      + 'recipe instead of failing on it. '
+      + 'Alongside it, a clip now defaults to 39 frames instead of 107 — the '
+      + 'length the trainer itself trains at, and about a third of the work per '
+      + 'step — with every other length still on the menu, 22 included.',
+    to: '/datasets',
+  },
+  {
     id: '2026-08-29-video-licence-asked-not-posted',
     date: '2026-08-29',
     title: 'A restrictive video licence now asks, instead of sitting on the card',
