@@ -38,10 +38,14 @@ from ..models import VideoBank, VideoClip, VideoSource
 
 logger = logging.getLogger(__name__)
 
-# How many frames the captioner sees. Eight spans a shot densely enough for a
-# gesture to be visible while staying one modest forward pass — a video VLM's
-# cost grows with frames, and this pass runs over a whole bank.
-CAPTION_FRAMES = 8
+# How many frames the captioner sees. Sixteen, per the 2026-08 captioning
+# survey: the payoff of a richer caption is a payoff of MOTION (MiraData
+# Table 4 — caption density doubles the dynamism and tracking scores while
+# image quality stays flat), and motion is read BETWEEN frames, so this count
+# is the ceiling on what any prompt can extract. Sixteen 448px frames keep the
+# 4B model around 13 GB with its KV cache — still fits a 24 GB card. The 0.2 s
+# spacing floor below means SHORT shots still get fewer, never duplicates.
+CAPTION_FRAMES = 16
 
 # Long side of each frame handed to the model. Larger than the embedding pass's
 # 256 px on purpose: CLIP sees 224 and needs a thumbnail, while a captioner is
@@ -179,13 +183,31 @@ def caption_frame_times(start_s, end_s):
 #   * NO PREAMBLE. Every caption beginning "This video shows" teaches the model
 #     that phrase. Stripping it later is a find-and-replace nobody remembers to
 #     run, so it is refused twice — asked for here, and cleaned in clean_caption.
+# WHY A FULL PARAGRAPH AND NOT "one or two sentences" (the shape until 2026-08-30):
+# the 2026-08 captioning survey converged from three independent directions —
+# MiraData's ablation (dense structured captions double motion tracking while
+# image quality stays flat), the VC4VG instruction study (the instruction beats
+# the checkpoint), and the vendors' own caption specs (LTX-2: 150-220 words,
+# WAN: 60-200) — on 150-220 words of flowing prose. The precision clause is
+# Moving Alphabet's measured cliff: an invented detail costs more than a missing
+# one and cannot be trained away afterwards. And the camera is deliberately NOT
+# asked for: VLMs were tested on it twice and failed twice — our homography
+# classifier writes the camera line at export instead, in words it can prove.
 _PROMPT = (
-    'Describe what happens in this video clip, in one or two plain sentences. '
-    'Lead with the ACTION and how it unfolds — who or what moves, and how — then '
-    'the setting and the look. Include camera movement when there is any (pans, '
-    'tilts, push in, handheld). Do not begin with "This video shows" or any '
-    'similar preamble, do not list objects as an inventory, and do not mention '
-    'the frames or the video itself. Write it as a caption, not as a report.'
+    'Describe what happens in this video clip as one flowing paragraph of '
+    'roughly 150 to 200 words. Lead with the ACTION and follow it in order — '
+    'what moves first, what happens next, how it ends. Write the motion '
+    'precisely: which limb or object moves, in which direction, how quickly, '
+    'what it touches or passes. As the paragraph unfolds, weave in who or what '
+    'the subject is (appearance, clothing, distinguishing details), the '
+    'setting and what surrounds the action, and the look and mood of the '
+    'footage (light, palette, texture). Describe only what is clearly '
+    'visible: an invented detail is far more damaging than a missing one, so '
+    'leave out anything you cannot actually see. Do not describe the camera '
+    'work and do not mention sound — both are recorded separately. Do not '
+    'begin with "This video shows" or any similar preamble, do not list '
+    'objects as an inventory, and do not mention the frames or the video '
+    'itself. Write it as one training caption in plain prose.'
 )
 
 # ── The second prompt, and the measurement that produced it ──────────────────
@@ -211,14 +233,23 @@ _PROMPT = (
 # caption that talks around its footage teaches the trained model to look away,
 # and the output reads perfectly well either way.
 _PROMPT_PLAIN = (
-    'Describe what happens in this video clip, in one or two plain sentences. '
-    'Lead with the ACTION and how it unfolds — who or what moves, and how — then '
-    'the setting and the look. Include camera movement when there is any (pans, '
-    'tilts, push in, handheld). When nudity or sexual content is present, name it '
-    'plainly and specifically — state what body parts are visible and what acts '
-    'occur; never euphemize, never write "intimate" or "sensual" in place of what '
-    'is actually shown. Do not begin with any preamble, do not list objects as an '
-    'inventory, and do not mention the frames or the video itself.'
+    'Describe what happens in this video clip as one flowing paragraph of '
+    'roughly 150 to 200 words. Lead with the ACTION and follow it in order — '
+    'what moves first, what happens next, how it ends. Write the motion '
+    'precisely: which limb or object moves, in which direction, how quickly, '
+    'what it touches or passes. As the paragraph unfolds, weave in who or what '
+    'the subject is (appearance, clothing, distinguishing details), the '
+    'setting and what surrounds the action, and the look and mood of the '
+    'footage (light, palette, texture). When nudity or sexual content is '
+    'present, name it plainly and specifically — state what body parts are '
+    'visible and what acts occur; never euphemize, never write "intimate" or '
+    '"sensual" in place of what is actually shown. Describe only what is '
+    'clearly visible: an invented detail is far more damaging than a missing '
+    'one, so leave out anything you cannot actually see. Do not describe the '
+    'camera work and do not mention sound — both are recorded separately. Do '
+    'not begin with any preamble, do not list objects as an inventory, and do '
+    'not mention the frames or the video itself. Write it as one training '
+    'caption in plain prose.'
 )
 
 # The styles a caption run can be asked for. `standard` is first and is the
@@ -228,7 +259,9 @@ _PROMPT_PLAIN = (
 CAPTION_STYLES = {
     'standard': {
         'label': 'Standard',
-        'hint': 'Describes the action, the setting and the camera.',
+        'hint': 'A full-paragraph caption: the action as it unfolds, the '
+                'subject, the setting and the mood. The camera line is added '
+                'from our own motion classifier at export.',
         'prompt': _PROMPT,
     },
     'plain': {
@@ -265,6 +298,60 @@ def caption_prompt(style=None):
     it was written for is this one."""
     key = (style or DEFAULT_STYLE)
     return CAPTION_STYLES.get(key, CAPTION_STYLES[DEFAULT_STYLE])['prompt']
+
+
+# The checkpoints a run can be pointed at FROM THE LAUNCH WINDOW. A short vetted
+# list, not a free field: the config key (`video_caption.model`) already accepts
+# any Hugging Face id for whoever knows what they are doing — the per-run picker
+# exists so switching between the known-good options does not require editing
+# config, and a typo'd id that would launch a download of nothing stays
+# impossible from the UI. Hints carry the two facts that decide the choice
+# (measured/benched in the 2026-08-18 captioning survey): the 4B is the proven
+# default, the 8B writes better MOTION but almost fills a 24 GB card.
+MODEL_CHOICES = {
+    DEFAULT_MODEL: {
+        'label': 'Qwen3-VL 4B (default)',
+        'hint': 'The shipped captioner — fits alongside other GPU work.',
+    },
+    'Qwen/Qwen3-VL-8B-Instruct': {
+        'label': 'Qwen3-VL 8B',
+        'hint': 'Describes motion better, at twice the size — it wants the '
+                '24 GB card almost to itself, so close other GPU apps first.',
+    },
+}
+
+
+def model_choices():
+    """[{key, label, hint, cached}] for the launch window — the configured model
+    first (it is the default of the picker, whatever it is), then the vetted
+    list. A custom-configured checkpoint appears as its own entry rather than
+    being hidden by the curation: the picker must be able to SAY what the pass
+    will otherwise silently use."""
+    configured = configured_model()
+    out = []
+    seen = set()
+    for key in [configured, *MODEL_CHOICES]:
+        if key in seen:
+            continue
+        seen.add(key)
+        meta = MODEL_CHOICES.get(key) or {
+            'label': key,
+            'hint': 'Set in video_caption.model — not one of the vetted picks.',
+        }
+        out.append({'key': key, 'label': meta['label'], 'hint': meta['hint'],
+                    'cached': model_is_cached(key)})
+    return out
+
+
+def resolve_model(model=None):
+    """The checkpoint a run should use: an explicit pick from the vetted list
+    (or the configured one, which is always a legal pick), else the configured
+    default. Unknown values fall back rather than failing — same contract as
+    styles, for the same reason — and never fall back to something LARGER than
+    what was configured."""
+    allowed = {c['key'] for c in model_choices()}
+    chosen = (model or '').strip()
+    return chosen if chosen in allowed else configured_model()
 
 
 # Preambles a VLM reaches for even when told not to. Anchored at the start and
