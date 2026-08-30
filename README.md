@@ -890,9 +890,6 @@ Missing dependencies are shown in Setup/Settings and gated features stay unavail
 | 🌐 Civitai top prompts (Studio/Canvas) | Browsing needs nothing; reading the prompts needs `CIVITAI_API_KEY` (free account) — the same key Civitai scanning uses |
 | 📷 Camera angles | ComfyUI reachable + the Qwen-Image-Edit stack Setup's Camera card downloads (the VAE is shared with Krea 2 Edit) |
 | 🔤 Find text (bank & dataset) | The same small CPU OCR package the Video Bank's text pass uses, installed from Setup |
-| 🌐 Civitai top prompts (Studio/Canvas) | Browsing needs nothing; reading the prompts needs `CIVITAI_API_KEY` (free account) — the same key Civitai scanning uses |
-| 📷 Camera angles | ComfyUI reachable + the Qwen-Image-Edit stack Setup's Camera card downloads (the VAE is shared with Krea 2 Edit) |
-| 🔤 Find text (bank & dataset) | The same small CPU OCR package the Video Bank's text pass uses, installed from Setup |
 | Local LoRA training: Z-Image / Krea 2 / FLUX.1 / FLUX.2 Klein / Anima | ai-toolkit; no ComfyUI is needed for official Hugging Face bases. Krea 2 can start from any Krea 2 checkpoint already on your disk instead — including one a full-model run delivered — discovered through ComfyUI's model tree; an ordinary fp8 build trains (the trainer up-casts it, and the app says with numbers how much precision that cast dropped), while a packed ComfyUI export is refused because it carries decompression tables a trainer cannot load |
 | Local SDXL training | ai-toolkit + a base checkpoint discoverable in ComfyUI's model tree |
 | Cloud / rented-GPU training | **Not available in this fork.** Training always runs on this machine's own GPU; the Devices lane covers generation and analysis passes, not training |
