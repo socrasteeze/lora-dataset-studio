@@ -2568,6 +2568,16 @@ def _build_pod_job_config(run, staging_dataset: str, pod_settings: dict) -> dict
         vds = crd.dataset_row(run)
         if vds is None:
             raise RuntimeError(f'run {run.id} trained a video dataset that is gone')
+        # Reference dirs ride as SIBLING names of the dataset path, because
+        # that is the seam _cloudify already rewrites: its staging->pod text
+        # replacement turns '<staging>_ref1' into '<pod_ds>_ref1', which is
+        # precisely the name the upload gives each dir on the pod — the exact
+        # contract the masks folder has used all along.
+        from . import video_bank_service as _vbs
+        _ref_dirs = _vbs.reference_dirs(vds)
+        control_dirs = ([f'{staging_dataset}_ref{k}'
+                         for k in range(1, len(_ref_dirs) + 1)]
+                        if _ref_dirs else None)
         job_config = video_training.build_job_config(
             vds, staging_dataset, steps=params.get('steps') or 1000,
             training_folder='__POD__', base_model=params.get('base_model') or None,
@@ -2575,10 +2585,17 @@ def _build_pod_job_config(run, staging_dataset: str, pod_settings: dict) -> dict
             # cost 170-185 s a step on 24 GB by shuttling the idle expert over
             # PCIe. Stamped at launch so the pod cannot be re-decided later.
             low_vram=bool(params.get('low_vram', False)),
+            do_i2v=bool(params.get('do_i2v', False)),
             # Asked of the image this pod actually boots, not assumed from ours:
             # the pin is a config value and someone may move it backwards.
-            training_adapter=video_training.image_supports_training_adapter(
-                _pod_image_for(run, cfg.get('cloud') or {})))
+            sample_prompts=params.get('sample_prompts') or None,
+            # The stamped 'off' beats capability: it exists so the SAME dataset
+            # can run with and without the recipe and the previews be compared.
+            training_adapter=(
+                params.get('distillation') != 'off'
+                and video_training.image_supports_training_adapter(
+                    _pod_image_for(run, cfg.get('cloud') or {}))),
+            control_dirs=control_dirs)
     else:
         ds = fds.get_dataset('local', run.dataset_id)
         job_config = lt.build_job_config(
@@ -2630,6 +2647,7 @@ def _assert_pod_can_decode(run, remote, pod_settings):
     None. Deleting it outright would orphan its caller in the monitor and give
     the next sync a conflict for nothing."""
     return None
+
 
 
 def _register_instance(run, instance_id, offer, token):
@@ -4797,6 +4815,17 @@ def _monitor(app, run_id):
                     remote.upload_dataset(
                         run.job_name + '_masks', masks_dir,
                         on_progress=_upload_heartbeat(run, 'Uploading the masks'))
+                # ref2va identity references, one pod folder per reference —
+                # named to match what _build_pod_job_config emitted (see the
+                # control_dirs comment there).
+                if crd.is_video(run):
+                    from . import video_bank_service as _vbs
+                    for k, ref_dir in enumerate(
+                            _vbs.reference_dirs(crd.dataset_row(run)), start=1):
+                        remote.upload_dataset(
+                            f'{run.job_name}_ref{k}', str(ref_dir),
+                            on_progress=_upload_heartbeat(
+                                run, f'Uploading reference {k}'))
 
                 # A rented pod that cannot decode these clips is a job that runs
                 # and yields nothing. Asked here, one command after the bytes

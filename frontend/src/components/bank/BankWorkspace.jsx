@@ -130,6 +130,7 @@ import { chipCounts, facetDataKey, isFacetFiltered } from './bankFacetCounts.js'
 // correctly reads 0, and without this row the images it rejected have no
 // address at all. Read-only; it selects, it never un-rejects.
 import { reasonBuckets, reasonHint } from './bankRejectReasons.js'
+import { activeLocalLlm, localLlmLabel } from '../../utils/localLlm'
 
 
 const PAGE_SIZE = 120
@@ -345,7 +346,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     captionEngine, setCaptionEngine, captionModel, setCaptionModel,
     captionIncludeAsserted, setCaptionIncludeAsserted,
     visionModel, visionModelLooksUncensored, ollamaPicksApply,
-    captionModelChoices, captionRunOptions,
+    captionModelChoices, captionRunOptions, llmPicker,
   } = useCaptionOptions({ caps })
   /* WHICH PILE each pass runs on, and whether it re-does rows that already have a
      result — kept HERE, not inside the windows, so closing one does not silently
@@ -1281,7 +1282,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const reasonCounts = chipPrint.reasons
   const shownReasons = shownBuckets(REASON_BUCKETS, chipWide.reasons, filter.reason)
   const angleState = angleReadiness(payload)
-  const visionReady = !!caps.ollama?.vision_model_ready
+  const visionReady = !!activeLocalLlm(caps).vision_model_ready
   // The explicit lane only spells acts out with an uncensored (abliterated) vision
   // model. We can't prove abliteration, but the common builds name themselves — a soft
   // heuristic drives an honest "may soften" hint (never a hard block: a differently
@@ -1453,6 +1454,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     scopeId: captionScope,
     piles: passScopeOption(captionScope).piles,
     engineId: captionEngine,
+    providerLabel: localLlmLabel(caps),
   })
   /* WHICH images the bench offers. A dataset hands its whole KEPT pile to the picker;
      a bank cannot — it pages over SQL and can hold six figures of rows, so a picker
@@ -1526,17 +1528,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           Vision model
           <select value={captionModel} onChange={(e) => setCaptionModel(e.target.value)}
             disabled={live || !ollamaPicksApply} aria-label="Caption vision model"
-            title={ollamaPicksApply
-              ? 'Which pulled Ollama vision model writes this run. Your Settings model stays the default and is not changed. Which model writes a caption is not a matter of taste: one that describes things in evasive terms produces captions that are about something slightly other than the images.'
-              : 'Only used when the engine can reach Ollama.'}
+            title={ollamaPicksApply ? llmPicker.perRunHint : llmPicker.inertHint}
             className={`${captionSelectClass} sm:max-w-[11rem]`}>
             <option value="">Configured model</option>
             {captionModelChoices.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           {!ollamaPicksApply && (
             <span className="mt-0.5 block text-[11px] leading-snug text-amber-300/90">
-              The engine you picked does not reach Ollama, so this choice would change
-              nothing — disabled rather than quietly ignored.
+              The engine you picked does not reach {llmPicker.label}, so this choice would
+              change nothing — disabled rather than quietly ignored.
             </span>
           )}
         </label>
@@ -1544,7 +1544,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           Register
           <select value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}
             disabled={live} aria-label="Caption vocabulary register"
-            title="How captions name nude or sexual content. Explicit needs an uncensored (abliterated) Ollama vision model. Richer, more explicit captions also make the search find more."
+            title={llmPicker.registerHint}
             className={`${captionSelectClass} sm:max-w-[16rem]`}>
             {VOCABULARY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>

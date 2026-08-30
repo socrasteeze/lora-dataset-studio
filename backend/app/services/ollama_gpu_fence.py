@@ -27,6 +27,22 @@ _lock = threading.RLock()
 # ComfyUI probes before every new prompt: a manual Ollama load between cells
 # must block rather than overlap with ComfyUI.
 _owned_models: dict[str, set[str]] = {}
+# Which driver speaks to each endpoint. `_owned_models` is keyed by ENDPOINT and
+# ensure_released_for_comfy() walks every key, so after a provider switch this map
+# holds both the old Ollama endpoint (with residue from before the switch) and the
+# new LM Studio one. Choosing the driver from the GLOBAL setting would then send
+# one of them an unload in the other's wire format — a release that answers 200
+# and frees nothing, which the fence would read as success. So the driver is
+# resolved per endpoint, recorded at admission.
+_endpoint_driver: dict[str, str] = {}
+# Models LDS is allowed to USE but never to UNLOAD. The two rights were one set,
+# and conflating them handed LDS the right to unload a model the user had loaded
+# by hand — the one rule this module's own docstring says never moves ("Over-
+# adopting is the dangerous direction"). Under LM Studio the user loads the model
+# themselves, deliberately, so using it is right and unloading it is not ours to
+# decide. A model only ever enters `_owned_models` when LDS saw the endpoint EMPTY
+# first, which is the proof that it put it there.
+_borrowed_models: dict[str, set[str]] = {}
 # Endpoint seen with a pre-existing / otherwise unowned model. It may be a
 # user's own Ollama session, so it is never automatically unloaded.
 _foreign_local_endpoints: set[str] = set()
@@ -315,8 +331,8 @@ def _adopt_persisted(endpoint, loaded, expiry) -> set[str]:
     return adopted
 
 
-def mark_before_generate(url, model, keep_alive=None) -> str:
-    """Return ``local``, ``remote`` or ``blocked`` before an Ollama request.
+def mark_before_generate(url, model, keep_alive=None, provider=None) -> str:
+    """Return ``local``, ``remote`` or ``blocked`` before a local LLM request.
 
     A shared Ollama daemon exposes no client owner id. LDS probes before its
     local admission: if another model is already resident, LDS must not
@@ -332,6 +348,12 @@ def mark_before_generate(url, model, keep_alive=None) -> str:
         return 'blocked'
 
     model = model.strip()
+
+    # Pin the driver to the endpoint at admission. Doing it here rather than at
+    # release time is what makes a mid-session provider switch safe: the endpoint
+    # that already holds an LDS model keeps the wire format it was admitted with,
+    # even after the global setting points somewhere else.
+    _remember_driver(endpoint, provider or _driver_for(endpoint))
 
     state, loaded, expiry = _probe(endpoint)
     if state == 'down':
@@ -350,6 +372,35 @@ def mark_before_generate(url, model, keep_alive=None) -> str:
         owned = set(_owned_models.get(endpoint, set()))
         if state == 'unknown':
             return 'blocked'
+        # LM Studio inverts what a resident model MEANS, and reading it the Ollama
+        # way makes the provider unusable. Ollama loads on demand, so a model LDS
+        # did not load is evidence of another app competing for the card. LM Studio
+        # has no JIT loading by default: the user loads the model in its app, on
+        # purpose, precisely so something can use it — and that something is this.
+        # Refusing it as a stranger blocked EVERY call, which is how this was found:
+        # the first real Enhance against a live LM Studio came back 409.
+        # The fence's other half is untouched — ensure_released_for_comfy() still
+        # has to prove the card is free before a ComfyUI hand-off, and now it can
+        # actually free it, because LM Studio's unload really releases the VRAM.
+        # ...and not already OURS: after ensure_model_loaded, the resident model
+        # is LDS's own load. Marking it borrowed too would make the ComfyUI
+        # hand-off refuse to release a model LDS is fully entitled to release.
+        borrowed = (_driver_for(endpoint) == 'lmstudio' and model in loaded
+                    and model not in owned)
+        # ...and the mirror of it. An EMPTY LM Studio is not "the card is free for
+        # the model I am about to load" -- nothing here loads a model on LDS's
+        # behalf, so this call is simply about to fail with "no models loaded".
+        # Claiming the model anyway is what made LDS adopt, and the keep-warm
+        # lease unload, the copy the USER loads by hand minutes later: they load a
+        # model, LDS frees it, the screen says none is loaded, they load it again.
+        # Reported from a real install as "why do I have to keep loading a model?".
+        # The `down` branch above refuses a claim for the same reason, in almost
+        # the same words; this is that refusal, for the state it missed. Ollama is
+        # untouched: it DOES load on demand, so there the claim is about its own
+        # residency-to-be, and dropping it would leak a warm model past a hand-off.
+        never_ours = _driver_for(endpoint) == 'lmstudio' and state == 'empty'
+        if borrowed:
+            _borrowed_models.setdefault(endpoint, set()).add(model)
         if state != 'empty' and not loaded.issubset(owned):
             # Before calling a resident model a stranger's, ask the claims LDS
             # wrote down: after a restart this is its own keep-warm lease.
@@ -357,20 +408,97 @@ def mark_before_generate(url, model, keep_alive=None) -> str:
             if loaded.issubset(owned):
                 _owned_models.setdefault(endpoint, set()).update(owned)
         if state == 'empty' or loaded.issubset(owned):
-            _owned_models.setdefault(endpoint, set()).add(model)
+            if not never_ours:
+                _owned_models.setdefault(endpoint, set()).add(model)
+            # Still not foreign: an empty server holds nobody else's model either.
             _foreign_local_endpoints.discard(endpoint)
+            claim = True
+        elif borrowed:
+            # Borrowing costs the card nothing: LDS loads no second model, it uses
+            # one that is already there. So a CO-TENANT is not a reason to refuse —
+            # and LM Studio routinely holds one (an embedding model for its own
+            # document chat, a chat model beside the VLM). Reading that the Ollama
+            # way blocked every Describe and Enhance AND froze the ComfyUI queue,
+            # telling the user to unload a model they legitimately need.
+            # The endpoint is deliberately NOT marked foreign here: that flag is
+            # about the RELEASE path, which stays strict below.
             claim = True
         else:
             _foreign_local_endpoints.add(endpoint)
             claim = False
     if claim:
-        _record_claim(endpoint, model, keep_alive)
+        # A borrowed model gets no claim: a claim is what lets a restarted LDS
+        # re-adopt — and eventually unload — a model as its own. Writing one for
+        # somebody else's residency is exactly the over-adoption above.
+        if not borrowed and not never_ours:
+            _record_claim(endpoint, model, keep_alive)
         return 'local'
     logger.info('ollama GPU fence: preserving a pre-existing local model; LDS inference is blocked')
     return 'blocked'
 
 
+def _driver_for(endpoint: str) -> str:
+    """'ollama' | 'lmstudio' for this endpoint, without guessing on the wire.
+
+    Recorded at admission wins. Otherwise the endpoint is matched against the
+    ACTIVE provider's configured URL, and anything still unmatched is Ollama —
+    every endpoint this map ever held before there was a second provider was one.
+    """
+    with _lock:
+        known = _endpoint_driver.get(endpoint)
+    if known:
+        return known
+    try:
+        from . import vision_llm
+        if vision_llm.provider() == vision_llm.LMSTUDIO:
+            from . import vision_lmstudio
+            # Compare what _endpoint_scope produced against the SAME normalisation.
+            # It lower-cases the host, so an oddly-cased URL (Localhost:1234) failed
+            # to match its own configured value and the fence spoke Ollama's API to
+            # LM Studio — an unload that answers 200 and frees nothing.
+            _, mine = _endpoint_scope(vision_lmstudio.base_url())
+            if mine and endpoint.rstrip('/') == str(mine).rstrip('/'):
+                return 'lmstudio'
+    except Exception:                      # noqa: BLE001 - fall back to the old world
+        pass
+    return 'ollama'
+
+
+def _remember_driver(endpoint: str, name: str) -> None:
+    with _lock:
+        _endpoint_driver[endpoint] = name
+
+
 def _probe(endpoint):
+    """Dispatch to the driver that speaks this endpoint's API."""
+    if _driver_for(endpoint) == 'lmstudio':
+        return _probe_lmstudio(endpoint)
+    return _probe_ollama(endpoint)
+
+
+def _probe_lmstudio(endpoint):
+    """LM Studio residency, mapped onto the fence's own four states.
+
+    `unknown` is carried through faithfully rather than flattened into `empty`:
+    a server answering only the OpenAI-compatible surface reports no residency at
+    all, and reading "cannot tell" as "nothing is loaded" is how a fail-closed
+    guard hands ComfyUI a card somebody else is holding.
+
+    LM Studio has no per-model expiry (no TTL by default), so the expiry map is
+    empty — which the claim logic already tolerates: a missing value leaves a
+    claim to be judged on its own freshness.
+    """
+    try:
+        from . import vision_lmstudio
+        state, names, _meta = vision_lmstudio.probe_resident(endpoint)
+    except Exception:                      # noqa: BLE001 - same contract as below
+        return 'unknown', set(), {}
+    with _lock:
+        _probe_families.pop(endpoint, None)
+    return state, set(names), {}
+
+
+def _probe_ollama(endpoint):
     """Return (``empty`` | ``down`` | ``models`` | ``unknown``, names, expires_at map).
 
     ``down`` is "nothing is listening on this port" (the connection was refused),
@@ -423,6 +551,15 @@ def _probe(endpoint):
 
 
 def _post_unload(endpoint, model) -> bool:
+    if _driver_for(endpoint) == 'lmstudio':
+        try:
+            from . import vision_lmstudio
+            # Measured: this genuinely frees the VRAM, where Ollama can only be
+            # asked to stop keeping the model warm.
+            return vision_lmstudio.release(endpoint, model)
+        except Exception as exc:           # noqa: BLE001 - reported like the peer below
+            logger.warning('LM Studio fence: unload request failed for %s (%s)', model, exc)
+            return False
     try:
         response = requests.post(f'{endpoint}/api/generate',
                                  json={'model': model, 'keep_alive': 0},
@@ -482,6 +619,16 @@ def _release_endpoint(endpoint, expected_models) -> bool:
         return _refused(endpoint, 'foreign', loaded,
                         'preserving a pre-existing local model; ComfyUI stays blocked')
 
+    with _lock:
+        borrowed = set(_borrowed_models.get(endpoint, set()))
+    still_borrowed = loaded & borrowed
+    if still_borrowed:
+        # LDS may use these, never unload them: the user loaded them. Refusing the
+        # hand-off is the honest answer, and the queue dock already offers the two
+        # consent-gated doors for it (unload it for me / share the GPU anyway).
+        return _refused(endpoint, 'foreign', still_borrowed,
+                        'a model loaded outside LDS is holding the card; ComfyUI stays blocked')
+
     unknown = loaded - expected_models
     if unknown:
         with _lock:
@@ -498,6 +645,7 @@ def _release_endpoint(endpoint, expected_models) -> bool:
                         'runner still holds a model after the unload; ComfyUI stays blocked')
     with _lock:
         _owned_models.pop(endpoint, None)
+        _borrowed_models.pop(endpoint, None)
         _foreign_local_endpoints.discard(endpoint)
     _drop_claims(endpoint)
     return True
@@ -545,8 +693,12 @@ def release_owned_models(*, ollama_url=None, model=None) -> bool | None:
 def _configured_local_endpoint() -> tuple[str, str | None]:
     """Resolve the current local runner without importing Vision request code."""
     try:
-        from .. import config as cfg
-        url = cfg.get('ollama.url') or 'http://127.0.0.1:11434'
+        # The ACTIVE provider's endpoint, not Ollama's by definition: this feeds
+        # ensure_released_for_comfy(), fence_status() and unload_foreign_models(),
+        # and reading ollama.url under an LM Studio install would have the fence
+        # guarding a daemon nobody uses while ignoring the one holding the card.
+        from . import vision_llm
+        url = vision_llm.base_url()
     except Exception:
         return 'unknown', None
     return _endpoint_scope(url)
@@ -664,6 +816,23 @@ def stop_sharing() -> None:
         _share_until, _share_endpoint = 0.0, None
 
 
+def register_lds_load(endpoint_url, model) -> None:
+    """LDS itself just loaded `model` there -- own it, with everything owning means.
+
+    Called by vision_lmstudio.ensure_model_loaded, nowhere else. Ownership is what
+    lets the keep-warm lease unload it later and lets a ComfyUI hand-off actually
+    free the card; without this the auto-loaded model would read as borrowed, and
+    borrowed models are exactly the ones the fence refuses to touch.
+    """
+    scope, endpoint = _endpoint_scope(endpoint_url)
+    if scope != 'local':
+        return
+    with _lock:
+        _owned_models.setdefault(endpoint, set()).add(model)
+        _borrowed_models.get(endpoint, set()).discard(model)
+        _foreign_local_endpoints.discard(endpoint)
+
+
 def ensure_released_for_comfy() -> bool:
     """Prove local Ollama is empty before every new ComfyUI prompt admission.
 
@@ -679,6 +848,14 @@ def ensure_released_for_comfy() -> bool:
         for foreign_endpoint in _foreign_local_endpoints:
             candidates.setdefault(foreign_endpoint, set())
 
+    # Deliberately the ACTIVE provider's endpoint only, not both. Guarding the
+    # other one's DEFAULT url would probe a second port on every ComfyUI job of
+    # every install that never runs it — a behaviour change for everyone, to cover
+    # a case that is already covered: an endpoint LDS has used is in _owned_models
+    # (so it is a candidate above, even after a provider switch), and a model LDS
+    # never admitted is one the fence refuses to touch by doctrine anyway. What is
+    # NOT covered is a second daemon holding the card that LDS has never spoken to
+    # — and the honest answer there is that the app cannot know about it.
     scope, endpoint = _configured_local_endpoint()
     if scope == 'local':
         candidates.setdefault(endpoint, set())
@@ -712,6 +889,25 @@ FENCE_BLOCKED_MESSAGE = (
     'unload it first or configure a dedicated Ollama endpoint for LDS.')
 
 
+def blocked_message(name: str | None = None) -> str:
+    """The same refusal, naming the server the user actually runs.
+
+    Kept alongside the constant rather than replacing it: FENCE_BLOCKED_MESSAGE is
+    matched by name in the suite, and the Ollama wording is still exactly right for
+    an Ollama install. What was wrong was showing it to someone running LM Studio —
+    an accurate refusal about the wrong product is a support ticket, not a fix.
+    """
+    try:
+        from . import vision_llm
+        if (name or vision_llm.provider()) == vision_llm.LMSTUDIO:
+            return ('A model is already loaded in LM Studio outside LDS. LDS will not '
+                    'unload it on its own; unload it in LM Studio, or share the GPU '
+                    'from the queue panel to run anyway.')
+    except Exception:                      # noqa: BLE001 - the default wording is safe
+        pass
+    return FENCE_BLOCKED_MESSAGE
+
+
 def fence_status() -> dict:
     """What the fence would say about the CONFIGURED local endpoint, right now.
 
@@ -722,10 +918,20 @@ def fence_status() -> dict:
     standing in the way so the user is not told to hunt for it.
     """
     scope, endpoint = _configured_local_endpoint()
+    # The banner has to name the server the user actually runs: telling someone on
+    # LM Studio that "another tool is using a model in Ollama" sends them to look at
+    # a daemon that is not holding anything.
+    try:
+        from . import vision_llm
+        _provider = vision_llm.provider()
+    except Exception:                      # noqa: BLE001 - the banner degrades, never fails
+        _provider = 'ollama'
     if scope == 'remote':
-        return {'applies': False, 'blocked': False, 'scope': 'remote', 'models': []}
+        return {'applies': False, 'blocked': False, 'scope': 'remote', 'models': [],
+                'provider': _provider}
     if scope != 'local':
-        return {'applies': False, 'blocked': False, 'scope': scope, 'models': []}
+        return {'applies': False, 'blocked': False, 'scope': scope, 'models': [],
+                'provider': _provider}
 
     state, loaded, expiry = _probe(endpoint)
     if state in ('unknown', 'down'):
@@ -733,7 +939,7 @@ def fence_status() -> dict:
         # story to tell, and reporting "blocked" here would offer an unload
         # button for a daemon nobody can talk to.
         return {'applies': True, 'blocked': False, 'scope': 'local',
-                'reachable': False, 'models': []}
+                'reachable': False, 'models': [], 'provider': _provider}
     with _lock:
         owned = set(_owned_models.get(endpoint, set()))
         if state != 'empty' and not loaded.issubset(owned):
@@ -743,7 +949,7 @@ def fence_status() -> dict:
                 _foreign_local_endpoints.discard(endpoint)
     foreign = sorted(loaded - owned)
     return {'applies': True, 'blocked': bool(foreign), 'scope': 'local',
-            'reachable': True, 'models': foreign}
+            'reachable': True, 'models': foreign, 'provider': _provider}
 
 
 def unload_foreign_models() -> dict:
@@ -792,6 +998,11 @@ def reset_for_tests() -> None:
     global _share_until, _share_endpoint
     with _lock:
         _owned_models.clear()
+        _borrowed_models.clear()
+        # Process state like the rest: a driver pinned by one test leaked into the
+        # next, and it OUTRANKS the setting by design, so a stale entry made the
+        # fence speak the wrong API for the whole run.
+        _endpoint_driver.clear()
         _foreign_local_endpoints.clear()
         _probe_families.clear()
         _last_block = None

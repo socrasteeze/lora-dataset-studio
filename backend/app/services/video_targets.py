@@ -109,6 +109,8 @@ _TARGETS = {
         # files (high-noise / low-noise) and it refuses to load an existing LoRA.
         # Wan 2.1 does neither. One profile cannot describe both.
         'label': 'Wan 2.2 T2V A14B',
+        'picker_hint': ('Proven end to end on a local GPU — the safe first '
+                        'pick for text-to-video.'),
         'aitk_arch': 'wan22_14b',
         # 16, not 24. The "Wan 2.2 is 24 fps" error is everywhere because
         # Alibaba's own A14B card carries 720P@24fps boilerplate whose subject is
@@ -240,12 +242,29 @@ _TARGETS = {
         # round-trip at 16:9 is 1024x576 — offering it is a product decision, not a
         # catalogue fact, and it is filed as one.
         'recommended_sizes': ((1344, 768), (768, 1344), (768, 768)),
+        # OUR claim, not the model's — which is why it is a separate field and
+        # `recommended_sizes` stays untouched: these are the sizes whose
+        # geometric mean is itself a multiple of 32, so ai-toolkit's pixel-cap
+        # re-bucketing returns them unchanged. A test derives each one through
+        # the actual resolution arithmetic; a size that stops holding fails it.
+        'exact_sizes': ((1024, 576), (576, 1024), (768, 768)),
+        # One sentence for someone who does not know which target to pick.
+        # Facts only, each one measured or stated upstream.
+        'picker_hint': ('Highest quality here — trains in the cloud, t2v and '
+                        'first-frame i2v from one checkpoint. Mind the licence.'),
         # 32 kHz stereo, from the audio VAE's own constants. "Keep the audio" is
         # not enough: a 44.1 kHz mono source would ride through untouched.
         'audio': {'muxed': True, 'sample_rate': 32000, 'channels': 2},
         'caption_style': 'paragraph_with_audio',
         'dataset_layout': 'flat',
         'training_verified': True,
+        # "Image datasets (num_frames 1) train as single frames" — ai-toolkit's
+        # own preset notes. A stills set is a real road for this model (a
+        # character LoRA from ~32 photos on a 12 GB card is documented practice)
+        # and the frame RULE must not eat it: 1 is not on the 17n+5 grid, it is
+        # a different mode, so it is a flag here and a special case in
+        # `is_legal_frames`, never a loosening of the rule itself.
+        'stills': True,
         # NOT a footnote. The MiniMax H3 Community Licence grants rights SOLELY
         # within its "Applicable Territory" and names the EU, the UK, South Korea
         # and the USA as Excluded Territories. It reaches the OUTPUTS too.
@@ -253,6 +272,35 @@ _TARGETS = {
         # excluded territories through a (free) authorization form, confirmed by
         # their staff on the model's licence thread. A warning that names no way
         # out reads as "never", and "never" here is simply wrong.
+        'licence_note': 'MiniMax H3 Community License grants NO rights in the EU, '
+                        'UK, South Korea or USA — and the restriction covers the '
+                        'outputs, not just the model. Check your territory first; '
+                        'MiniMax grants authorization on request '
+                        '(platform.minimax.io/h3-license).',
+    },
+    'minimax_h3_ref2va': {
+        'label': 'MiniMax H3 Ref2V',
+        'aitk_arch': 'minimax_h3_ref2va',
+        'fps': 24,
+        'frame_rule': 'mod17plus5',
+        'frame_choices': (22, 39, 56, 73, 90, 107, 124, 141, 158, 175, 192, 209),
+        'frame_default': 39,
+        'size_multiple': 32,
+        'max_pixels': 768 * 1344,
+        'recommended_sizes': ((1344, 768), (768, 1344), (768, 768)),
+        'audio': {'muxed': True, 'sample_rate': 32000, 'channels': 2},
+        'exact_sizes': ((1024, 576), (576, 1024), (768, 768)),
+        'picker_hint': ('Teaches an identity from 1-4 reference photos — '
+                        'attach them on the dataset card after building.'),
+        'caption_style': 'paragraph_with_audio',
+        'dataset_layout': 'flat',
+        'training_verified': True,
+        # NOT optional decoration, a launch precondition. The ref2va trainer
+        # reads its identity references from the dataset's control images and,
+        # finding none, trains UNCONDITIONED without a word — a run that bills
+        # and yields a LoRA that never learned what it was for. Everything that
+        # launches this target checks the flag first.
+        'requires_references': True,
         'licence_note': 'MiniMax H3 Community License grants NO rights in the EU, '
                         'UK, South Korea or USA — and the restriction covers the '
                         'outputs, not just the model. Check your territory first; '
@@ -312,6 +360,8 @@ def is_legal_frames(key, frames):
     profile = _TARGETS.get(key)
     if profile is None:
         return False
+    if frames == 1 and profile.get('stills'):
+        return True
     return _RULES[profile['frame_rule']](frames)
 
 

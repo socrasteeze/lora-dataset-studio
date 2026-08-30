@@ -1081,7 +1081,7 @@ def describe_test_prompt(image_bytes: bytes) -> str:
         raise ValueError('unreadable image — expected a webp, png or jpg file') from e
     # The /describe-image route owns the one GPU-exclusive Vision window. Keep
     # this service callable without recursively claiming it a second time.
-    from .vision_ollama import describe_image_ollama
+    from .vision_llm import describe_image as describe_image_ollama
     from .vision_keepalive import keep_alive_for_isolated_call
     text = describe_image_ollama(
         webp, STUDIO_DESCRIBE_PROMPT, num_predict=500, auto_start_local=True,
@@ -1135,24 +1135,31 @@ def enhance_test_prompt(prompt: str, model: str | None = None) -> str:
         raise ValueError('write a prompt first — there is nothing to enhance')
     if len(p) > STUDIO_ENHANCE_MAX_CHARS:
         raise ValueError(f'prompt too long to enhance (max {STUDIO_ENHANCE_MAX_CHARS} characters)')
-    from .ollama_control import ensure_captioning_ready
     from .vision_keepalive import keep_alive_for_isolated_call
-    from .vision_ollama import generate_text_ollama
-    ready = ensure_captioning_ready(model)
+    from .vision_llm import ensure_ready, generate_text as generate_text_ollama, label
+    ready = ensure_ready(model)
     if not ready.get('ok'):
-        raise RuntimeError(
-            (ready.get('error') or 'Ollama is unavailable')
-            + (' — pick another model from the ✨ Enhance ⚙️ options, or pull this one first.'
-               if model else
-               ' — Enhance needs the local Ollama model configured in Settings › Local tools.'))
+        # The remedy is not the same word for the two providers: an Ollama model is
+        # PULLED, an LM Studio one is LOADED in its app. Saying "load" to an Ollama
+        # user was a regression this wave introduced; saying "pull" to an LM Studio
+        # user names an action their server does not have.
+        if model:
+            fix = (' — pick another model from the ✨ Enhance ⚙️ options, or load this '
+                   'one in LM Studio first.' if label() == 'LM Studio'
+                   else ' — pick another model from the ✨ Enhance ⚙️ options, or pull '
+                        'this one first.')
+        else:
+            fix = (f' — Enhance needs the local {label()} model configured in '
+                   'Settings › Local tools.')
+        raise RuntimeError((ready.get('error') or f'{label()} is unavailable') + fix)
     text = generate_text_ollama(STUDIO_ENHANCE_PROMPT.format(prompt=p), model=model,
                                 num_predict=500,
                                 keep_alive=keep_alive_for_isolated_call(), strict=True)
     text = (text or '').strip().strip('"').strip()
     if not text:
         raise RuntimeError(
-            'The model returned an empty prompt — check the configured Ollama model in '
-            'Settings and the application log.')
+            f'The model returned an empty prompt — check the configured {label()} model '
+            'in Settings and the application log.')
     return text
 
 

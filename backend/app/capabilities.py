@@ -441,6 +441,118 @@ def probe_ollama_connection() -> dict:
     return probe_ollama_model(reachable=True)
 
 
+def probe_lmstudio() -> dict:
+    """Is LM Studio's server answering? Reachability only — see the pair below.
+
+    Deliberately NOT `_http_ok(f'{url}/api/tags')`-shaped: LM Studio has three
+    API surfaces and which one answers decides what the app may conclude, so the
+    driver owns that question and this defers to it rather than guessing from a
+    status code.
+    """
+    from .services import vision_lmstudio
+    url = vision_lmstudio.base_url()
+    listed = vision_lmstudio.list_models()
+    if not listed['reachable']:
+        # A server that ANSWERS and refuses is not a server that is off. Reported
+        # as "unreachable — press Start Server" it sends someone to restart a
+        # process that is already running, while the real cause (a mistyped token,
+        # a proxy, a 500) is thrown away. failure_sentence already words each case.
+        if listed.get('last_status') is not None:
+            return {'ok': False,
+                    'detail': vision_lmstudio.failure_sentence(
+                        listed['last_status'], listed.get('last_body') or '')}
+        return {'ok': False, 'detail': f'unreachable: {url}'}
+    return {'ok': True, 'detail': f'{url} ({listed["surface"]} API)'}
+
+
+def probe_lmstudio_model(reachable=None, model=None) -> dict:
+    """Is a model actually LOADED and usable for captioning?
+
+    LM Studio ships with JIT loading OFF, so "reachable" and "can caption" are
+    much further apart than they are for Ollama: a freshly installed server
+    answers every list call and refuses every generation. Reporting reachability
+    as readiness would put a green tick on an install that cannot caption a
+    single image — the exact defect issue #7 fixed on the Ollama side.
+    """
+    from .services import vision_lmstudio
+    # Told it is unreachable, believe it: the parameter exists precisely to spare
+    # the second round-trip, and paying it anyway is what the Ollama peer's
+    # docstring says not to do (a configured-but-down server would block twice).
+    if reachable is False:
+        return {'ok': False, 'detail': f'LM Studio unreachable: {vision_lmstudio.base_url()}'}
+    listed = vision_lmstudio.list_models()
+    if reachable is None:
+        reachable = listed['reachable']
+    if not reachable:
+        return {'ok': False, 'detail': f'LM Studio unreachable: {vision_lmstudio.base_url()}'}
+    wanted = (model if model is not None else vision_lmstudio.get_vision_model()).strip()
+    # An embeddings model cannot caption, and keeping one resident is routine in
+    # LM Studio. Counted as "a model is loaded" it puts a green tick on an install
+    # that fails on its first image — the same disagreement between the tick and
+    # the driver that issue #7 fixed on the Ollama side.
+    loaded = [m['id'] for m in listed['models']
+              if m.get('loaded') and m.get('type') != 'embeddings']
+    if wanted:
+        # The OpenAI surface reports no residency at all, so `loaded` is empty there
+        # whatever is running. Judged against it, the very remedy the docs give for
+        # that surface — "name a model in Settings" — could never succeed, which
+        # leaves the user with no move. Asked BEFORE the residency test for that
+        # reason.
+        if listed['surface'] == 'openai':
+            if wanted in {m['id'] for m in listed['models']}:
+                return {'ok': True,
+                        'detail': f'{wanted} — this server cannot confirm what is '
+                                  'loaded, so this is taken on trust'}
+            return {'ok': False, 'detail': f'{wanted} is not offered by this server'}
+        ok = wanted in loaded
+        return {'ok': ok,
+                'detail': f'{wanted} loaded' if ok else f'{wanted} is not loaded in LM Studio'}
+    if loaded:
+        return {'ok': True, 'detail': f'{loaded[0]} loaded'}
+    if listed['surface'] == 'openai':
+        # The documented remedy for this surface is "name a model in Settings", and
+        # it has to WORK: naming one and still being told it is not loaded leaves
+        # the user with no move at all. The OpenAI surface cannot report residency,
+        # so a named model that the server LISTS is accepted, with a detail that
+        # says the residency is unverified rather than pretending it was checked.
+        return {'ok': False,
+                'detail': 'this server answers only the OpenAI-compatible API, which '
+                          'cannot report what is loaded — name a model in Settings'}
+    return {'ok': False,
+            'detail': 'no model is loaded — load one in LM Studio (Developer tab)'}
+
+
+def probe_lmstudio_connection() -> dict:
+    """The Settings 'Test' button for the LM Studio card, end to end.
+
+    Same unification as Ollama's: reachable AND able to caption, resolved through
+    the one probe the Setup step and the diagnostic also use, so the three can
+    never disagree on the same machine.
+    """
+    reach = probe_lmstudio()
+    if not reach['ok']:
+        return reach
+    return probe_lmstudio_model(reachable=True)
+
+
+def lmstudio_diagnostic() -> dict:
+    """Paste-safe LM Studio snapshot for /api/diagnostic.
+
+    `surface` is in here because it is the first thing to ask of a confusing
+    report: only the two native APIs carry model type and residency, so a server
+    answering just the OpenAI one explains a whole class of "it says nothing is
+    loaded" without anything being broken.
+    """
+    from .services import vision_lmstudio
+    listed = vision_lmstudio.list_models()
+    return {
+        'vision_model': vision_lmstudio.get_vision_model(),
+        'surface': listed['surface'] or '',
+        'loaded': [m['id'][:80] for m in listed['models'] if m.get('loaded')][:10],
+        'models_seen': [m['id'][:80] for m in listed['models'][:20]],
+    }
+
+
 def ollama_diagnostic() -> dict:
     """Paste-safe Ollama snapshot for /api/diagnostic: the configured vision-model
     string alongside the model tags the probe actually sees at /api/tags. This is the
@@ -2097,6 +2209,29 @@ def probe(force=False) -> dict:
     comfy = probe_comfyui()
     ollama = probe_ollama()
     ollama_installed = probe_ollama_installed()
+    from .services import vision_llm as _vision_llm
+    _llm_provider = _vision_llm.provider()
+    _lmstudio_url = ''
+    # A filesystem stat, not a round-trip, so it runs for the INACTIVE provider
+    # too: "LM Studio is installed on this machine" is worth knowing on the card
+    # you have not switched to yet, and it costs nothing to say.
+    _lmstudio_installed = False
+    lmstudio = {'ok': False, 'detail': 'not the active provider'}
+    lmstudio_model = {'ok': False, 'detail': 'not the active provider'}
+    try:
+        from .services import lmstudio_control as _lms_ctl
+        from .services import vision_lmstudio as _lms
+        _lmstudio_url = _lms.base_url()
+        _lmstudio_installed = _lms_ctl.probe_installed()['ok']
+        if _llm_provider == 'lmstudio':
+            lmstudio = probe_lmstudio()
+            lmstudio_model = probe_lmstudio_model(reachable=lmstudio['ok'])
+    except Exception as _exc:              # noqa: BLE001 - a probe never breaks probe()
+        # This module has no logger on purpose: a probe reports through its own
+        # `detail`, which the Settings card and the pasted diagnostic both show.
+        # Swallowing the reason into a log nobody opens is how a broken provider
+        # reads as "just not configured".
+        lmstudio_model = {'ok': False, 'detail': f'LM Studio probe failed: {_exc}'}
     aitoolkit = probe_aitoolkit()
     # These ELEVEN each shell out a cached-but-possibly-cold subprocess import
     # (insightface/rembg/torch+open_clip+transformers/SigLIP 2/
@@ -2149,6 +2284,21 @@ def probe(force=False) -> dict:
     # on. The engine/studio gates below are computed independently of this and stay
     # the source of truth; `skipped` only lets the Setup step render neutral.
     comfy_skipped = bool(cfg.get('comfyui.setup_skipped')) and not base_dir
+    # Same shape for "continue without Ollama". DERIVED on REACHABILITY rather than on
+    # a configured path, because that is where the two tools differ: ComfyUI is a
+    # directory you either set or don't, Ollama is a daemon that answers or doesn't.
+    # A reachable Ollama annuls the skip on the spot — so a running-but-model-less
+    # install still shows its real "pull the model" state instead of a lying "skipped",
+    # and the flag only ever softens an ABSENCE. Per-feature gates (framing, head-crop,
+    # Describe/Enhance) never read this; they keep reading the live probe.
+    # Derived on the ACTIVE provider, not on Ollama by name. The key keeps its
+    # stored spelling (`ollama.setup_skipped` lives in config.json already and
+    # CLAUDE.md forbids renaming without an alias); what it MEANS is "the user
+    # chose to continue without a local LLM". Keyed on Ollama alone, an LM Studio
+    # install could never settle this step: the flag was written and immediately
+    # derived back to false, so the wizard asked again at every Next.
+    _llm_ok = lmstudio['ok'] if _llm_provider == 'lmstudio' else ollama['ok']
+    ollama_skipped = bool(cfg.get('ollama.setup_skipped')) and not _llm_ok
 
     caps = {
         'configured': cfg.is_configured(),
@@ -2183,6 +2333,37 @@ def probe(force=False) -> dict:
             'url': cfg.get('ollama.url') or '',
             'vision_model': cfg.get('ollama.vision_model') or '',
             'vision_model_ready': probe_ollama_model(reachable=ollama['ok'])['ok'],
+            # Conscious "continue without Ollama" (Setup wizard), derived above.
+            # Presentation only — nothing downstream gates on it.
+            'skipped': ollama_skipped,
+        },
+        # Which local LLM is in charge, and what the other one's card should say.
+        # Only the ACTIVE provider is probed here: probe() is the cached snapshot
+        # every screen reads, and paying three HTTP round-trips for a provider
+        # nobody selected would slow every refresh to report something no code
+        # branches on. The inactive card is honest about that — `probed: False`,
+        # and its Settings Test button does the live check on demand.
+        'local_llm': {'provider': _llm_provider},
+        'lmstudio': {
+            # In a container, 127.0.0.1 is the CONTAINER, and LM Studio runs on the
+            # host — so the default URL is wrong by construction there. The Ollama
+            # lane has a whole deployment-mode mechanism for exactly this; LM Studio
+            # has none, so at minimum the card has to say the right address. The
+            # behaviour is deliberately NOT changed under the user's feet.
+            'docker_runtime': setup_is_docker_runtime(),
+            # Installed = LM Studio's CLI on disk, server up or not. Until it was
+            # found this card had only two states, so a stopped server read as
+            # "not answering" with no way out but another application's menu.
+            # Now (installed, reachable) reads as three, exactly like Ollama's:
+            # absent / installed-but-stopped (→ a Start button) / running.
+            'installed': _lmstudio_installed,
+            'docker_host_url': 'http://host.docker.internal:1234',
+            'probed': _llm_provider == 'lmstudio',
+            'reachable': lmstudio['ok'],
+            'url': _lmstudio_url,
+            'vision_model': cfg.get('lmstudio.vision_model') or '',
+            'model_ready': lmstudio_model['ok'],
+            'detail': lmstudio_model['detail'],
         },
         'aitoolkit': {
             'configured': bool(cfg.get('aitoolkit.dir')),
@@ -2205,6 +2386,18 @@ def probe(force=False) -> dict:
             'joycaption': joycaption['ok'],
             'joycaption_detail': joycaption['detail'],
             'ollama': ollama['ok'],
+            # The ACTIVE provider's readiness, which is the question every screen
+            # was really asking. Keyed on `ollama` alone, a working LM Studio
+            # install counted as two MISSING capabilities on the Setup summary and
+            # lit the Captioning LED off — while it captioned perfectly well.
+            # `ollama` stays beside it: it is still the honest answer about Ollama,
+            # and other code reads it.
+            'local_llm': (lmstudio_model['ok'] if _llm_provider == 'lmstudio'
+                          else ollama['ok']),
+            # Whether the active provider can do the passes only IT can do —
+            # framing, head-crop, the vision watermark route.
+            'local_llm_vision': (lmstudio_model['ok'] if _llm_provider == 'lmstudio'
+                                 else probe_ollama_model(reachable=ollama['ok'])['ok']),
         },
         'face_scoring': face_scoring['ok'],
         'masks': masks['ok'],
