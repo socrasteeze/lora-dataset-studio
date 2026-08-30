@@ -205,14 +205,40 @@ _TARGETS = {
         'aitk_arch': 'minimax_h3',
         'fps': 24,
         'frame_rule': 'mod17plus5',
-        'frame_choices': (39, 56, 73, 90, 107, 124, 141, 158, 175, 192, 209),
-        # 107 is the count ai-toolkit's own preset ships, and it satisfies the
-        # rule — a third independent confirmation of 17n+5.
-        'frame_default': 107,
+        # 22 is on the menu because it is the shortest count anyone trains at in
+        # practice — a clip shorter than the dataset's `num_frames` is simply
+        # skipped, so the floor is a question about the DATA, not the model.
+        # (The model's own floor is lower: ai-toolkit's snapper documents
+        # "minimum 5". We do not encode 22 as a rule, only as a choice.)
+        'frame_choices': (22, 39, 56, 73, 90, 107, 124, 141, 158, 175, 192, 209),
+        # 39, and the number has a history worth stating. ai-toolkit's H3 preset
+        # carries 107 AND 39: `sample.num_frames: 107` is how long a PREVIEW
+        # renders, `datasets[x].num_frames: 39` is how long a training clip is.
+        # This default was read off the first line and belonged to the second.
+        # The difference is not cosmetic — the VAE packs 17n+5 pixel frames into
+        # 5n+2 latent frames, so 107 is 32 latent frames against 39's 12, which
+        # is 2.7x the rows in every single step (measured on a rented A100:
+        # 21 s/step at 107). Longer clips cost TIME, not VRAM, and teach longer
+        # motion; that is a trade the user can make on the promote screen, but it
+        # should not be the one they get by accident.
+        'frame_default': 39,
         'size_multiple': 32,
         # A step alone is not enough here: the packing code caps the canvas area.
         # 1920x1088 satisfies the multiple of 32 and is still out of spec.
         'max_pixels': 768 * 1344,
+        # What the MODEL STATES, and only that — `resolution_note` reads this list
+        # as "the sizes this target claims for itself" and says so to the user, so
+        # a size we worked out ourselves does not belong in it however good it is.
+        # (Learned by putting one here: 1024x576 dropped the note's stated shortest
+        # edge from 768 to 576, and two tests caught it.)
+        #
+        # Worth knowing when choosing among them, though: ai-toolkit reads our
+        # `resolution` scalar as a pixel CAP and re-buckets the clip under it, so a
+        # size whose geometric mean is not itself a multiple of 32 is shrunk after
+        # we cut it. Of the three below only 768x768 survives unchanged; the
+        # maximum canvas comes back as 1312x736, 6.4% smaller. The size that would
+        # round-trip at 16:9 is 1024x576 — offering it is a product decision, not a
+        # catalogue fact, and it is filed as one.
         'recommended_sizes': ((1344, 768), (768, 1344), (768, 768)),
         # 32 kHz stereo, from the audio VAE's own constants. "Keep the audio" is
         # not enough: a 44.1 kHz mono source would ride through untouched.
