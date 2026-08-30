@@ -83,6 +83,131 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-30-lmstudio-loads-itself',
+    date: '2026-08-30',
+    title: 'LM Studio models now load themselves',
+    blurb:
+      'No more opening LM Studio just to load the model: LDS loads it for you — '
+      + 'automatically the first time captioning or framing needs it, or from the '
+      + 'new ⏬ Load button in Setup and Settings ▸ Local tools. A model LDS '
+      + 'loads is also one it can unload later to hand the GPU to ComfyUI; one '
+      + 'YOU loaded is never touched. Downloading new models stays in LM Studio.',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-08-30-promote-window-knows-the-numbers',
+    date: '2026-08-30',
+    title: 'The video promote window now tells you what the numbers mean',
+    blurb:
+      'Building a first video training set means guessing a target, a size and '
+      + 'a clip count — so the window stops making you guess. Each target '
+      + 'carries a one-line hint (which one is proven on a local GPU, which '
+      + 'has only been proven elsewhere, which needs reference photos). The '
+      + 'size menu says which '
+      + 'sizes train exactly as cut and which of the model’s stated sizes get '
+      + 'rescaled a little. And a line under the clip count tells you where '
+      + 'your dataset sits: a dozen clips proves the pipeline, strong LoRAs '
+      + 'are typically trained on 50–200. All of it measured, none of it '
+      + 'blocking — every field stays yours to set.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-start-lm-studio',
+    date: '2026-08-30',
+    title: 'Start LM Studio without leaving the app',
+    blurb:
+      'A stopped LM Studio server now has a ▶ Start button, in Settings ▸ Local '
+      + 'tools and on the Setup step — the one Ollama has always had. Whatever '
+      + 'model you had loaded stays loaded, and the server comes up on the port '
+      + 'your settings name, not whichever one it used last. The button only '
+      + 'appears once LM Studio has been opened at least once on this machine.',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-08-30-lm-studio-provider',
+    date: '2026-08-30',
+    title: 'Use LM Studio instead of Ollama, if that is what you run',
+    blurb:
+      'Captioning, framing, head-crop, Describe and Enhance can now run on '
+      + 'LM Studio. The Setup wizard asks which one you run, and Settings ▸ Local '
+      + 'tools switches it any time — the whole '
+      + 'app follows — both the Dataset and the Bank pickers, and the GPU '
+      + 'arbitration that keeps a vision model and ComfyUI from fighting over '
+      + 'the card. Ollama stays the default and nothing changes unless you '
+      + 'switch. LM Studio only serves a model you have loaded, so the app says '
+      + 'so plainly when none is.',
+    to: '/settings/local-tools',
+  },
+  {
+    id: '2026-08-30-setup-without-ollama',
+    date: '2026-08-30',
+    title: 'Setup no longer stops at Ollama',
+    blurb:
+      'Ollama is optional, and the wizard finally treats it that way. With '
+      + 'JoyCaption installed, captioning already works without it — JoyCaption '
+      + 'writes the same captions the vision model would, prose or booru tags '
+      + 'depending on what you train — so the step is a recommendation, not a '
+      + 'gate. With neither installed you get an explicit "Continue without '
+      + 'Ollama" that lists exactly what turns off first: auto-framing, '
+      + 'head-crop, Describe & Enhance, the bank’s natural-language filter. '
+      + 'Start Ollama later and everything switches back on by itself.',
+    to: '/setup',
+  },
+  {
+    id: '2026-08-30-h3-ref2va-training',
+    date: '2026-08-30',
+    title: 'Train MiniMax H3 Ref2V LoRAs — identity from reference images',
+    blurb:
+      'The Ref2V flavour of H3 generates from reference images of a subject, '
+      + 'and now you can train for it: pick the MiniMax H3 Ref2V target when '
+      + 'promoting clips, attach 1–4 reference images on the dataset card, and '
+      + 'train it on your own GPU with the same recipe H3 uses. The app '
+      + 'refuses to launch without references on purpose — without them the '
+      + 'trainer silently learns nothing of the identity, which is a paid run '
+      + 'wasted. Local training needs an ai-toolkit from 2026-08-13 or newer; '
+      + 'the app checks yours and says so instead of failing mid-run.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-30-video-trigger-word',
+    date: '2026-08-30',
+    title: 'Video datasets get a trigger word',
+    blurb:
+      'Set it once when promoting clips, and it is prepended to every clip’s '
+      + 'caption file at export — exactly once, in one place. Your captions '
+      + 'stay clean on screen, editing one never loses the trigger, and a '
+      + 'caption that already starts with it is left alone: a doubled trigger '
+      + 'measurably hurts prompt adherence, so the app makes doubling '
+      + 'impossible. Optional — a style set legitimately has none.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-h3-i2v-training',
+    date: '2026-08-30',
+    title: 'Train MiniMax H3 LoRAs for image-to-video',
+    blurb:
+      'If you animate still images, train the way you generate: one checkbox '
+      + 'on the video training panels switches an H3 run to first-frame '
+      + 'conditioning, so the LoRA learns under the same setup your i2v '
+      + 'generations use. Works on any ai-toolkit '
+      + 'that trains H3 at all.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-30-h3-stills-training',
+    date: '2026-08-30',
+    title: 'Train an H3 video LoRA from your image datasets — no clips needed',
+    blurb:
+      'MiniMax H3 trains on still images too, and your image datasets already '
+      + 'have everything that needs: curated pictures, edited captions, a '
+      + 'trigger. One button in the Video training sets section turns an image '
+      + 'dataset into a ready-to-train stills set — people have trained H3 '
+      + 'character LoRAs this way on 12 GB cards. The promotion window also '
+      + 'now counts clips coming from 48+ fps sources, which are often '
+      + 'slow-motion footage that teaches floaty movement.',
+    to: '/datasets',
+  },
+  {
     id: '2026-08-30-video-steps-sized-to-the-dataset',
     date: '2026-08-30',
     title: 'Video training steps now start from your dataset, not a constant',

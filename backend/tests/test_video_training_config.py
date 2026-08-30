@@ -707,3 +707,114 @@ def test_suggested_steps_sits_on_the_measured_line_and_never_past_it():
     assert f(300) == 5000                          # cap: the largest evidence
     assert f(None) == 1000 and f('nope') == 1000   # junk answers the floor
 
+
+def test_first_frame_i2v_is_a_flag_on_h3_and_a_refusal_with_directions_on_wan():
+    """H3's one checkpoint trains t2v AND first-frame i2v, switched by the
+    dataset flag `do_i2v` - a field ai-toolkit has carried since before this
+    lane existed, so no version gate. Wan is different on purpose: its i2v
+    variants are SEPARATE architectures with their own catalogue targets, so
+    asking the t2v arch for i2v is refused with directions rather than
+    forwarded and hoped about. Off, the config is byte-identical to before."""
+    h3 = _proc(vtrain.build_job_config(
+        _VideoDS(target_profile='minimax_h3', frames=39, fps=24),
+        '/pod/ds', 100, do_i2v=True))
+    assert h3['datasets'][0]['do_i2v'] is True
+    off = _proc(vtrain.build_job_config(
+        _VideoDS(target_profile='minimax_h3', frames=39, fps=24), '/pod/ds', 100))
+    assert 'do_i2v' not in off['datasets'][0]
+    with pytest.raises(vtrain.VideoTrainingUnsupported) as e:
+        vtrain.build_job_config(
+            _VideoDS(target_profile='wan22_14b', frames=81, fps=16),
+            '/pod/ds', 100, do_i2v=True)
+    assert 'I2V target' in str(e.value)
+
+
+def test_a_stills_set_is_legal_for_h3_and_trains_without_a_soundtrack():
+    """"Image datasets (num_frames 1) train as single frames" is ai-toolkit's
+    own road for H3, and the frame RULE must not eat it: 1 is not on the 17n+5
+    grid, it is a different mode, so it is a per-profile flag and never a
+    loosening of the rule. Wan gets no such flag - nothing states stills for it.
+    A stills config asks for no audio: images have no soundtrack, and an inert
+    do_audio would still be a claim about the data that is false."""
+    assert vt.is_legal_frames('minimax_h3', 1)
+    # Wan needs no flag: 1 satisfies its own 4n+1 arithmetic already. The flag
+    # exists precisely because H3's 17n+5 EXCLUDES 1.
+    assert vt.is_legal_frames('wan22_14b', 1)
+    assert not vt.is_legal_frames('minimax_h3', 2)
+    cfg = _proc(vtrain.build_job_config(
+        _VideoDS(target_profile='minimax_h3', frames=1, fps=24), '/pod/ds', 100))
+    assert cfg['datasets'][0]['num_frames'] == 1
+    assert 'do_audio' not in cfg['datasets'][0]
+    assert 'audio_loss_multiplier' not in cfg['train']
+    on = _proc(vtrain.build_job_config(
+        _VideoDS(target_profile='minimax_h3', frames=39, fps=24), '/pod/ds', 100))
+    assert on['datasets'][0]['do_audio'] is True
+
+
+def test_ref2va_refuses_to_train_without_references_and_emits_them_when_given():
+    """Upstream's ref2va trainer reads identity references from the dataset's
+    control images and, finding NONE, returns no conditioning and trains
+    UNCONDITIONED in silence - a paid run that never learns what it was for.
+    So the builder refuses a reference-less ref2va job outright, and the other
+    direction holds too: control dirs on a target that does not read them would
+    load as generic controls with untested effect, and are refused as well.
+    With refs, `control_path` is a LIST of dirs - ai-toolkit matches each dir's
+    file to the clip by stem, the exact layout the attach route writes."""
+    ref_ds = _VideoDS(target_profile='minimax_h3_ref2va', frames=39, fps=24)
+    with pytest.raises(vtrain.VideoTrainingUnsupported) as e:
+        vtrain.build_job_config(ref_ds, '/pod/ds', 100)
+    assert 'reference' in str(e.value).lower()
+    cfg = _proc(vtrain.build_job_config(
+        ref_ds, '/pod/ds', 100, control_dirs=['/pod/ds_ref1', '/pod/ds_ref2']))
+    assert cfg['datasets'][0]['control_path'] == ['/pod/ds_ref1', '/pod/ds_ref2']
+    assert cfg['model']['arch'] == 'minimax_h3_ref2va'
+    with pytest.raises(vtrain.VideoTrainingUnsupported):
+        vtrain.build_job_config(
+            _VideoDS(target_profile='minimax_h3', frames=39, fps=24),
+            '/pod/ds', 100, control_dirs=['/pod/ds_ref1'])
+
+
+def test_ref2va_carries_its_own_recipe_and_the_shared_exclusion():
+    """The ref2va partition has its OWN training adapter file (the fl2va one is
+    a different partition's weights) with the same guidance target, and the
+    adaln_proj exclusion applies to it the same way."""
+    cfg = _proc(vtrain.build_job_config(
+        _VideoDS(target_profile='minimax_h3_ref2va', frames=39, fps=24),
+        '/pod/ds', 100, training_adapter=True, control_dirs=['/pod/ds_ref1']))
+    assert cfg['model']['assistant_lora_path'].endswith(
+        'minimax_h3_ref2va_training_adapter_v1.safetensors')
+    assert cfg['train']['guidance_loss_target'] == 3.5
+    assert cfg['network']['network_kwargs']['ignore_if_contains'] == ['adaln_proj']
+
+
+def test_the_ref2va_image_gate_uses_the_full_recipe_date():
+    """The arch landed on 2026-08-13, but VIDEO references and its training
+    adapter landed on the 15th-16th - an image cut between the two would run a
+    half-recipe nobody measured, so the gate reads the later date."""
+    assert vtrain.image_supports_ref2va(
+        'vastai/ostris-ai-toolkit:x-2026-08-16-cuda-12.9')
+    assert not vtrain.image_supports_ref2va(
+        'vastai/ostris-ai-toolkit:x-2026-08-15-cuda-12.9')
+    assert vtrain.image_supports_ref2va(
+        'vastai/ostris-ai-toolkit:da79ebc-2026-08-27-cuda-12.9')
+    assert not vtrain.image_supports_ref2va('nope')
+
+
+def test_exact_sizes_are_held_by_the_resolution_arithmetic_itself():
+    """`exact_sizes` is OUR claim — sizes the trainer's re-bucketing returns
+    unchanged — kept separate from `recommended_sizes`, which stays the model's
+    own statement (the resolution note quotes that one back to the user). A
+    claim of exactness is cheap to make and expensive to be wrong about, so
+    every listed size is re-derived here through the real arithmetic: if the
+    derivation ever stops holding, the field fails before a user trusts it."""
+    for key in ('minimax_h3', 'minimax_h3_ref2va'):
+        profile = vt.get(key)
+        sizes = profile.get('exact_sizes')
+        assert sizes, key
+        for width, height in sizes:
+            resolution = vtrain._resolution_for(
+                width, height, profile['size_multiple'], profile['max_pixels'])
+            assert resolution * resolution == width * height, (key, width, height)
+    # And the field is absent where nothing was verified — absence is honest.
+    assert 'exact_sizes' not in vt.get('wan22_14b')
+

@@ -44,7 +44,11 @@ export default function VideoDatasetsPanel() {
     }
   }
 
-  if (!datasets?.length) return null
+  // Loading stays silent; EMPTY no longer does. The old rule (hide the section
+  // until a bank is promoted) predates the stills road: the section now carries
+  // an entry point of its own, and hiding it would hide the only place a user
+  // with zero video datasets can start one from their image datasets.
+  if (datasets === null) return null
 
   return (
     <section className="flex flex-col gap-2">
@@ -54,11 +58,15 @@ export default function VideoDatasetsPanel() {
           <span className="font-normal normal-case tracking-normal"> ({datasets.length})</span>
         </span>
         <HelpBadge topic="video-datasets" />
+        <StillsFromDatasetButton onCreated={refresh} />
       </h2>
       <ul className="grid gap-2 grid-cols-1 sm:grid-cols-2">
         {datasets.map((d) => (
           <li key={d.id}
             className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-surface p-3">
+            {d.requires_references && (
+              <ReferenceAttach ds={d} onChanged={refresh} />
+            )}
             <div className="flex min-w-0 items-center gap-2">
               <button type="button" onClick={() => setOpenId(openId === d.id ? null : d.id)}
                 aria-expanded={openId === d.id}
@@ -94,6 +102,7 @@ export default function VideoDatasetsPanel() {
                 and its videoCloudStatus helper are not carried. */}
             <VideoTrainingSection ds={d} />
             {openId === d.id && <VideoDatasetClips datasetId={d.id} />}
+
           </li>
         ))}
       </ul>
@@ -118,7 +127,117 @@ export default function VideoDatasetsPanel() {
  * on. This build has no rented-pod lane, so naming one on the card advertises a
  * button that is not there; the fork says "elsewhere" and keeps the only part
  * that is actionable here, which is that a LOCAL run has not proven it yet. */
-const PROVEN_ON = { wan22_14b: 'local', minimax_h3: 'cloud' }
+const PROVEN_ON = { wan22_14b: 'local', minimax_h3: 'cloud', minimax_h3_ref2va: 'cloud' }
+
+/** 🖼 Build an H3 stills set from an image dataset the user already curated.
+ *
+ * The image side owns everything a stills set needs — kept images, edited
+ * captions, a trigger — so this is a picker and a POST, not a pipeline. Lazy on
+ * purpose: the dataset list is fetched when the form opens, never on mount. */
+function StillsFromDatasetButton({ onCreated }) {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [choices, setChoices] = useState(null)
+  const [picked, setPicked] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const openForm = async () => {
+    setOpen(true)
+    try {
+      const d = await apiFetch('/api/dataset/list')
+      setChoices((d.datasets || []).filter((x) => x.images_total > 0))
+    } catch (e) {
+      toast.error(e?.message || 'Could not list image datasets.')
+      setOpen(false)
+    }
+  }
+
+  const create = async () => {
+    if (!picked) return
+    setBusy(true)
+    try {
+      const r = await postJson('/api/video-datasets/from-dataset',
+        { dataset_id: Number(picked) })
+      toast.success(`“${r.name}” created — ${r.clips} still(s), ready to train.`)
+      setOpen(false)
+      setPicked('')
+      onCreated?.()
+    } catch (e) {
+      toast.error(e?.message || 'Could not build the stills set.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={openForm}
+        className="rounded border border-border bg-surface-raised px-2 py-0.5 text-[0.6875rem] text-content-muted hover:bg-surface">
+        🖼 Stills set from an image dataset
+      </button>
+    )
+  }
+  return (
+    <span className="flex items-center gap-1.5">
+      <select value={picked} onChange={(e) => setPicked(e.target.value)}
+        className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[0.6875rem] text-content">
+        <option value="">{choices === null ? 'Loading…' : 'Pick an image dataset'}</option>
+        {(choices || []).map((c) => (
+          <option key={c.id} value={c.id}>{c.name} ({c.images_total})</option>
+        ))}
+      </select>
+      <button type="button" disabled={busy || !picked} onClick={create}
+        className="rounded border border-border bg-surface-raised px-2 py-0.5 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-40">
+        {busy ? 'Building…' : 'Create'}
+      </button>
+      <button type="button" onClick={() => setOpen(false)}
+        className="text-[0.6875rem] text-content-subtle hover:underline">cancel</button>
+    </span>
+  )
+}
+
+
+/** 📎 Identity references for a ref2va dataset — the launch precondition.
+ *
+ * The trainer reads these as control images; without them it trains
+ * unconditioned in silence, so the server refuses a reference-less launch and
+ * this control is how the user satisfies it. Replacing is whole-set: refs are
+ * one identity, not an album. */
+function ReferenceAttach({ ds, onChanged }) {
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+
+  const upload = async (fileList) => {
+    const files = Array.from(fileList || [])
+    if (!files.length) return
+    setBusy(true)
+    try {
+      const form = new FormData()
+      files.forEach((f) => form.append('files', f))
+      const r = await apiFetch(`/api/video-dataset/${ds.id}/references`,
+        { method: 'POST', body: form })
+      toast.success(`${r.references} reference(s) attached — every clip covered.`)
+      onChanged?.()
+    } catch (e) {
+      toast.error(e?.message || 'Could not attach the references.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <label className="flex cursor-pointer items-center gap-1 text-[0.6875rem] text-content-muted">
+      <span className={ds.references > 0 ? '' : 'text-amber-300'}>
+        📎 References: {ds.references || 0}{ds.references > 0 ? '' : ' (required)'}
+      </span>
+      <input type="file" multiple accept="image/*" hidden disabled={busy}
+        onChange={(e) => { upload(e.target.files); e.target.value = '' }} />
+      <span className="underline">{busy ? 'attaching…' : 'attach'}</span>
+    </label>
+  )
+}
+
+
 
 /** ▶ Train this dataset — the local run, its progress, and its refusals.
  *
@@ -141,6 +260,7 @@ function VideoTrainingSection({ ds }) {
   // see, let alone change, what they were about to spend a night on. The dial is
   // prefilled from the server's dataset-sized suggestion and stays editable.
   const [steps, setSteps] = useState(ds?.suggested_steps || 2000)
+  const [doI2v, setDoI2v] = useState(false)
 
   const poll = useCallback(async () => {
     try {
@@ -167,7 +287,7 @@ function VideoTrainingSection({ ds }) {
     setBusy(true)
     try {
       const r = await postJson(`/api/video-dataset/${ds.id}/train`,
-        { steps, accept_download: acceptDownload })
+        { steps, do_i2v: doI2v, accept_download: acceptDownload })
       toast.success(`Training started — ${r.clips} clips, ${r.steps} steps.`)
       // Things the run will not fail on but that change what to expect from it.
       ;(r.warnings || []).forEach((w) => toast.warning(w))
@@ -231,6 +351,13 @@ function VideoTrainingSection({ ds }) {
                 suggested for {ds.clips} clips
               </span>
             )}
+            {ds.target_profile === 'minimax_h3' && (
+              <label className="flex items-center gap-1 text-[0.6875rem] text-content-muted">
+                <input type="checkbox" checked={doI2v}
+                  onChange={(e) => setDoI2v(e.target.checked)} />
+                i2v (first-frame)
+              </label>
+            )}
             <button type="button" onClick={() => start(false)} disabled={busy}
               className="rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-50">
               {busy ? 'Starting…' : '▶ Train this dataset'}
@@ -283,6 +410,13 @@ function VideoTrainingSection({ ds }) {
  * while showing the new one. The server does both in one call and tells us
  * whether the disk write landed; a failed sidecar is said out loud.
  */
+const STILL_EXTS = ['.png', '.jpg', '.jpeg', '.webp']
+
+function isStillFile(name) {
+  const n = String(name || '').toLowerCase()
+  return STILL_EXTS.some((ext) => n.endsWith(ext))
+}
+
 function VideoDatasetClips({ datasetId }) {
   const toast = useToast()
   const [items, setItems] = useState(null)
@@ -322,7 +456,7 @@ function VideoDatasetClips({ datasetId }) {
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <button type="button" onClick={() => setPlaying(playing === item.id ? null : item.id)}
               className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[0.625rem] font-semibold text-content hover:bg-surface">
-              {playing === item.id ? '⏹ Close' : '▶ Play'}
+              {playing === item.id ? '⏹ Close' : isStillFile(item.filename) ? '🖼 View' : '▶ Play'}
             </button>
             <span className="min-w-0 truncate font-mono text-[0.625rem] text-content-subtle"
               title={`${item.src_relpath} — ${clipLabel(item.start_s, item.end_s)}`}>
@@ -330,11 +464,21 @@ function VideoDatasetClips({ datasetId }) {
             </span>
           </div>
           {playing === item.id && (
-            <video controls autoPlay preload="metadata"
-              src={`/api/video-dataset/${datasetId}/clip/${item.id}/media`}
-              className="w-full rounded bg-black">
-              <track kind="captions" />
-            </video>
+            isStillFile(item.filename) ? (
+              /* A stills set holds images; wrapping one in a <video> renders a
+                 dead player (found on a phone the day stills shipped). The
+                 server already serves the right mimetype — the tag has to
+                 match the file. */
+              <img src={`/api/video-dataset/${datasetId}/clip/${item.id}/media`}
+                alt={item.caption || item.filename}
+                className="w-full rounded bg-black" />
+            ) : (
+              <video controls autoPlay preload="metadata"
+                src={`/api/video-dataset/${datasetId}/clip/${item.id}/media`}
+                className="w-full rounded bg-black">
+                <track kind="captions" />
+              </video>
+            )
           )}
           <textarea rows={2} value={drafts[item.id] ?? item.caption ?? ''}
             onChange={(e) => setDrafts((m) => ({ ...m, [item.id]: e.target.value }))}

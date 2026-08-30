@@ -8462,7 +8462,7 @@ def start_watermark(app, user_id, bank_id, rescan=False, device_id=None,
         route, never remove the one that has always worked.
 
     Serialized against training/vision (503 when the GPU is held)."""
-    from ..capabilities import probe_ollama_model
+    from .vision_llm import probe_model as probe_ollama_model
     from . import watermark_detector
     bank = get_bank(user_id, bank_id)
     if not bank:
@@ -8543,7 +8543,7 @@ def _watermark_job(bank_id, rescan, device_id=None, use_detector=False,
         import contextlib
         import json as _json
         from .face_dataset_service import WATERMARK_BBOX_PROMPT, _parse_watermark_bbox
-        from .vision_ollama import describe_image_ollama, unload_vision_model
+        from .vision_llm import describe_image as describe_image_ollama, unload_vision_model
         from . import bank_remote
         from .vision_pool import map_vision
         from ..gpu_window import gpu_exclusive_vision_window
@@ -10704,7 +10704,7 @@ def start_framing(app, user_id, bank_id, rescan=False, device_id=None,
     the 📐 Framing filter chips and the coverage advice. Needs the vision model
     pulled; serialized against training/vision like the watermark pass (503 when
     the GPU is held). ``rescan`` re-classifies rows that already have a framing."""
-    from ..capabilities import probe_ollama_model
+    from .vision_llm import probe_model as probe_ollama_model
     bank = get_bank(user_id, bank_id)
     if not bank:
         raise ValueError('bank not found')
@@ -10753,8 +10753,8 @@ def _framing_job(bank_id, rescan, device_id=None, statuses=None, ids=None):
     def run(job):
         import contextlib
         from .face_dataset_service import CLASSIFY_PROMPT, _parse_classify
-        from .vision_ollama import (LocalOllamaFenceError, describe_image_ollama,
-                                    unload_vision_model)
+        from .vision_llm import describe_image as describe_image_ollama, unload_vision_model
+        from .vision_ollama import LocalOllamaFenceError
         from .vision_pool import map_vision
         from . import bank_remote
         from ..gpu_window import gpu_exclusive_vision_window
@@ -11696,7 +11696,12 @@ def export_scene_captions(user_id, bank_id, statuses=None):
 # it did not do. Keys are the stored values (services/caption_origin.py) — frozen.
 _CAPTION_WRITER_NAMES = {
     caption_origin.JOYCAPTION: 'JoyCaption',
-    caption_origin.OLLAMA: 'the Ollama vision model',
+    # Neutral, and deliberately the SAME words the dataset's own writer summary
+    # uses (frontend utils/captionEngines.js). The stored key is still 'ollama' --
+    # it is in every user's database -- but it has meant "the configured local
+    # provider" since LM Studio joined, and a run through LM Studio told the user
+    # Ollama had written its captions. Identical behaviour, recognisable wording.
+    caption_origin.OLLAMA: 'the local LLM vision model',
 }
 
 
@@ -12046,7 +12051,7 @@ def _score_prereq() -> str | None:
 
 
 def _watermark_prereq() -> str | None:
-    from ..capabilities import probe_ollama_model
+    from .vision_llm import probe_model as probe_ollama_model
     if not probe_ollama_model().get('ok'):
         return 'vision model not available (Settings ▸ Local tools)'
     return None
@@ -12060,7 +12065,7 @@ def _faces_prereq() -> str | None:
 
 
 def _framing_prereq() -> str | None:
-    from ..capabilities import probe_ollama_model
+    from .vision_llm import probe_model as probe_ollama_model
     if not probe_ollama_model().get('ok'):
         return 'vision model not available (Settings ▸ Local tools)'
     return None
