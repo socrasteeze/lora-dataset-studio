@@ -32,12 +32,15 @@ import VideoSourceList from './VideoSourceList'
 import VideoClipGrid from './VideoClipGrid'
 import VideoClipLightbox from './VideoClipLightbox'
 import VideoClipSearchBox from './VideoClipSearchBox'
-import { matchLine, captionStyleLabel } from './videoClipSearch'
+import { matchLine } from './videoClipSearch'
 import { filterByFlag, flagChips, flagFilterNote } from './videoMetricsFilter'
 import {
   cameraChips, filterByCamera, CAMERA_HINTS, CAMERA_FACET_NOTE,
 } from './videoCameraMotion'
 import PromoteVideoDialog from './PromoteVideoDialog'
+import DescribeShotsDialog from './DescribeShotsDialog'
+import { GuideInfoDot } from '../common/GuideSectionModal'
+import { VIDEO_PASS_TOPICS } from './videoPassTopics'
 
 const PAGE = 120
 const POLL_MS = 2000
@@ -80,6 +83,9 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
   // re-point every other bank, and the measurement says the prompt matters more
   // than the checkpoint.
   const [captionStyle, setCaptionStyle] = useState(null)
+  // 🗣 The Describe launch window (wording + redo scope). The pass button opens
+  // it; only its own Describe button actually starts the pass.
+  const [describing, setDescribing] = useState(false)
   const [search, setSearch] = useState(null)
   const [searching, setSearching] = useState(false)
   // ⚑ Which verdict the grid is narrowed to, or null. Client-side over the shots
@@ -202,7 +208,10 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
     if (blocked) { toast.warning(blocked.why); return }
     try {
       await postJson(videoPassUrl(bankId, pass),
-        pass === 'caption' ? { ...body, style: captionStyle || undefined } : body)
+        // An explicit style in the body (the launch window's) wins over the
+        // remembered one: setCaptionStyle is async and the remembered value is
+        // one render behind at exactly the moment the window launches.
+        pass === 'caption' ? { style: captionStyle || undefined, ...body } : body)
       loadBank(false)
     } catch (e) {
       // 409 carries busy_kind — name the pass that owns the bank rather than
@@ -623,26 +632,38 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
           const partial = pass === 'safezone' && capability
             && !capability.video_text
           return (
-            <button key={pass} type="button" onClick={() => startPass(pass)}
-              disabled={busy || !!blocked}
-              title={blocked ? blocked.why
-                : partial ? `Bands only — ${capability.video_text_detail
-                    || 'the burned-in text extra is not installed'}`
-                : undefined}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
-                primary
-                  ? 'bg-gradient-primary text-gray-950'
-                  : 'border border-border bg-surface-raised text-content hover:bg-surface'}`}>
-              {primary ? '▶ ' : ''}{PASS_LABELS[pass]}
-            </button>
+            // The ⓘ rides OUTSIDE the pass button (nested buttons are invalid
+            // HTML) but inside one non-wrapping group, so a wrap of the row can
+            // never strand an explanation next to the wrong button.
+            <span key={pass} className="inline-flex items-center gap-1">
+              <button type="button"
+                // 🗣 launches through its window: the wording question belongs at
+                // the moment of the click, not in a dropdown three screens down.
+                onClick={() => (pass === 'caption' ? setDescribing(true) : startPass(pass))}
+                disabled={busy || !!blocked}
+                title={blocked ? blocked.why
+                  : partial ? `Bands only — ${capability.video_text_detail
+                      || 'the burned-in text extra is not installed'}`
+                  : undefined}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${
+                  primary
+                    ? 'bg-gradient-primary text-gray-950'
+                    : 'border border-border bg-surface-raised text-content hover:bg-surface'}`}>
+                {primary ? '▶ ' : ''}{PASS_LABELS[pass]}
+              </button>
+              <GuideInfoDot topic={VIDEO_PASS_TOPICS[pass]} label={PASS_LABELS[pass]} />
+            </span>
           )
         })}
-        <button type="button" onClick={() => setPromoting(true)}
-          disabled={busy || !counts.keep}
-          title={!counts.keep ? 'Keep some shots first' : undefined}
-          className="rounded-md border border-indigo-500/60 bg-indigo-500/15 px-3 py-1.5 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-40">
-          🎬 {PASS_LABELS.promote}
-        </button>
+        <span className="inline-flex items-center gap-1">
+          <button type="button" onClick={() => setPromoting(true)}
+            disabled={busy || !counts.keep}
+            title={!counts.keep ? 'Keep some shots first' : undefined}
+            className="rounded-md border border-indigo-500/60 bg-indigo-500/15 px-3 py-1.5 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-40">
+            🎬 {PASS_LABELS.promote}
+          </button>
+          <GuideInfoDot topic={VIDEO_PASS_TOPICS.promote} label={PASS_LABELS.promote} />
+        </span>
         {busy && (
           <button type="button" onClick={cancel}
             className="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/20">
@@ -694,29 +715,6 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
             onSingleShot={singleShot} onRecut={recutSource} />
         </div>
       </details>
-
-      {/* 🗣 The caption pass's own option, next to the button that runs it.
-          The prompt decides how plainly a caption describes its footage — more
-          than the checkpoint does — so it is a choice, not a constant. */}
-      {(counts.clips || 0) > 0 && (bank?.caption_model?.styles || []).length > 1 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label htmlFor="video-caption-style" className="font-medium text-content">
-            Caption wording
-          </label>
-          <select id="video-caption-style"
-            value={captionStyle || bank?.caption_model?.style || 'standard'}
-            onChange={(e) => setCaptionStyle(e.target.value)}
-            className="rounded-md border border-border bg-surface-raised px-2 py-1 text-content">
-            {(bank?.caption_model?.styles || []).map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </select>
-          <span className="min-w-0 flex-1 text-content-subtle">
-            {captionStyleLabel(bank?.caption_model?.styles,
-              captionStyle || bank?.caption_model?.style || 'standard')}
-          </span>
-        </div>
-      )}
 
       {/* 🔎 Above the gallery, below the passes: it is a way of LOOKING at the
           shots, not a pass — and what it changes is the grid underneath it. */}
@@ -836,6 +834,14 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
           className="rounded-md bg-rose-600/80 px-2.5 py-1 font-semibold text-white hover:bg-rose-600 disabled:opacity-30">
           ✕ Reject
         </button>
+        {/* The third verb of the same endpoint. Without it a mis-kept shot could
+            only move to the OTHER decision, never back to undecided — the image
+            bank has had this exit all along, and a decision you cannot take back
+            is exactly what makes people afraid to triage fast. */}
+        <button type="button" onClick={() => triage(selected, 'pending')} disabled={!selected.length}
+          className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-content hover:bg-surface disabled:opacity-30">
+          ↩ To triage
+        </button>
         <button type="button" onClick={() => setSelected(shownClips.map((c) => c.id))}
           disabled={!shownClips.length}
           className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-content hover:bg-surface disabled:opacity-30">
@@ -915,6 +921,19 @@ export default function VideoBankWorkspace({ bankId, onBack, onGone }) {
           keepCount={counts.keep || 0} selectedIds={selected}
           onClose={() => setPromoting(false)}
           onDone={() => { setSelected([]); loadBank(false) }} />
+      )}
+
+      {describing && (
+        <DescribeShotsDialog captionModel={bank?.caption_model}
+          initialStyle={captionStyle}
+          onClose={() => setDescribing(false)}
+          onLaunch={(opts) => {
+            setDescribing(false)
+            // Remember the wording for the next open; the pass itself reads the
+            // explicit opts, not this state (one render behind by design).
+            setCaptionStyle(opts.style)
+            startPass('caption', opts)
+          }} />
       )}
     </div>
   )

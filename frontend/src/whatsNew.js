@@ -83,6 +83,89 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-30-video-training-block',
+    date: '2026-08-30',
+    title: 'A video set’s training settings sit above the button that spends them',
+    blurb:
+      'The video dataset card asks for the run once — Steps, and i2v where the '
+      + 'target has it — with ▶ Train directly underneath, so nothing starts on '
+      + 'a number that was off screen. The card also stops reporting where a '
+      + 'target was proven: it now says only what you can act on, which is '
+      + 'whether anyone has finished a run with it at all.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-sota-video-captions',
+    date: '2026-08-30',
+    title: 'Video captions grow up: a full paragraph, built like the measurements say',
+    blurb:
+      'Describe shots now writes 150-200 words per shot instead of a sentence '
+      + 'or two — the length the published ablations converge on, where the '
+      + 'whole gain lands on MOTION, exactly what a video LoRA learns. It '
+      + 'watches 16 frames instead of 8 so that motion is actually visible, '
+      + 'and the token budget follows. The camera line is no longer asked of '
+      + 'the caption model (none describes it reliably — that is measured): '
+      + 'the 🎥 Camera pass’s own classifier writes it into the exported '
+      + 'prompt, in words it can prove, labeled the way MiniMax H3’s own '
+      + 'prompts label their blocks. Expect the pass to take longer per shot '
+      + '— it is reading twice the frames and writing four times the words.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-pass-info-dots',
+    date: '2026-08-30',
+    title: 'Every video pass button now explains itself',
+    blurb:
+      'A small ⓘ sits beside each pass of the video bank — Safe zone, Defects, '
+      + 'AI check and the rest. It opens the guide’s own explanation right '
+      + 'there, in a window, without leaving the page or losing your scroll: '
+      + 'what the pass does, what it flags, and what to do with the result. '
+      + 'Same text as the guide, so it can never drift out of date.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-describe-shots-window',
+    date: '2026-08-30',
+    title: 'Describe shots now asks its questions before it runs',
+    blurb:
+      'The video bank’s 🗣 Describe button opens a launch window instead of '
+      + 'firing blind. Pick the wording there — Standard, or Plain, which '
+      + 'names explicit content instead of describing around it (measured on '
+      + 'real adult footage: the prompt matters more than the model). Pick '
+      + 'the model too: the proven 4B default, or Qwen3-VL 8B for better '
+      + 'motion writing — each saying whether it is already on your machine '
+      + 'or downloads first. And choose what it covers: only the shots still '
+      + 'missing a caption, or a rewrite of the whole bank in the new wording '
+      + '— captions you edited by hand are never touched unless you '
+      + 'explicitly say so.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-video-triage-exits',
+    date: '2026-08-30',
+    title: 'Un-decide video shots, and always reach the ✕',
+    blurb:
+      'Two dead ends gone from the video bank. Selected shots can now go '
+      + '↩ back to triage — until now a mis-kept shot could only switch to the '
+      + 'other verdict, never to “undecided”. And the shot player’s header '
+      + 'stays pinned while you scroll, so the ✕ is always on screen — on a '
+      + 'phone, where Esc does not exist, it was possible to scroll the only '
+      + 'way out off the top of the page.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-lmstudio-download',
+    date: '2026-08-30',
+    title: 'Download LM Studio models without leaving the app',
+    blurb:
+      'The LM Studio card in Settings ▸ Local tools (and the Setup step) now '
+      + 'downloads models — give it a model id like qwen/qwen3-vl-4b, or paste a '
+      + 'huggingface.co model URL, and watch the progress. The download runs '
+      + 'inside LM Studio itself, so reloading the page or restarting LDS does '
+      + 'not stop it. The same parity Ollama has always had with its pull.',
+    to: '/settings/local-tools',
+  },
+  {
     id: '2026-08-30-lmstudio-loads-itself',
     date: '2026-08-30',
     title: 'LM Studio models now load themselves',
@@ -91,7 +174,7 @@ export const WHATS_NEW = [
       + 'automatically the first time captioning or framing needs it, or from the '
       + 'new ⏬ Load button in Setup and Settings ▸ Local tools. A model LDS '
       + 'loads is also one it can unload later to hand the GPU to ComfyUI; one '
-      + 'YOU loaded is never touched. Downloading new models stays in LM Studio.',
+      + 'YOU loaded is never touched.',
     to: '/settings/local-tools',
   },
   {

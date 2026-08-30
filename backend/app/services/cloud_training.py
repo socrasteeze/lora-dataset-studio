@@ -42,6 +42,10 @@ from . import vast_client
 # step is read through it so the single-file and the paired case cannot drift.
 # The module is pure (no torch, no ffmpeg, no database), so this costs nothing.
 from . import video_run_lineage
+# _run_payload names a video run's TARGET model rather than the face lane's base
+# chip. Pure catalogue lookup, same cost as the line above; the import arrived
+# with upstream's use of it and nothing else here needs it.
+from . import video_targets
 from . import video_training
 from .aitoolkit_remote import RemoteAiToolkit
 
@@ -5759,6 +5763,13 @@ def _run_payload(run) -> dict:
                  for c in _run_staging_checkpoints(run)]
                 if run.status == 'done' else []),
             'train_type': family, 'variant': variant,
+            # Video runs: the thing a person recognises is the TARGET MODEL
+            # ("MiniMax H3"), not the family word 'video' and certainly not the
+            # face lane's default base chip (a video run wore "Z-Image" on the
+            # hub — the maintainer's screenshot, not a hypothesis).
+            'target_label': ((video_targets.get(
+                _run_param(run, 'target_profile')) or {}).get('label')
+                if crd.is_video(run) else None),
             'training_mode': training_mode,
             'artifact_kind': (_run_param(run, 'artifact_kind')
                               or ('full_transformer' if full_transformer else 'lora')),
