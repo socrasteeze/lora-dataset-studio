@@ -26,14 +26,17 @@ was a 212-line rented-pod region whose HEAD side was empty.
   changelog row, D5/D4/D10 edits — `FORK_NOTES.md`
 
 ## Open
-1. Responsive probe still NOT run, owed a third time: `DupCompareLightbox.jsx`
+1. **Two merged branches still need deleting** — `claude/magical-tesla-ekn21b`
+   and `claude/magical-tesla-tydc3z`, both fully contained in `main`. This
+   sandbox gets **HTTP 403** on a ref delete (push works, delete does not, and
+   the GitHub MCP server has no delete-branch tool). Owed from a machine with
+   full push rights; third session running.
+2. Responsive probe still NOT run, owed a third time: `DupCompareLightbox.jsx`
    is a new full-screen layer. Needs a live instance holding a bank.
-2. Fork-only controls still carry emoji while upstream's use icons (`🔖 Tags`,
-   `⚖️ Balanced pick`, `⬆ Promote`) — a wave of its own (D3).
-3. `no-unused-vars` is at `warn` (D9): **20 warnings, baseline-identical** —
-   pre-existing D1/D4 orphans. Restore to `error` when that wave lands —
-   `frontend/eslint.config.mjs` L64.
-4. `training/runs-hub.png` and `advanced-options.png` still photograph the
+3. Fork-only controls still carry emoji while upstream's use icons (D3 wave).
+4. `no-unused-vars` is at `warn` (D9): **20 warnings, baseline-identical** —
+   pre-existing D1/D4 orphans — `frontend/eslint.config.mjs` L64.
+5. `training/runs-hub.png` and `advanced-options.png` still photograph the
    rental lane; referenced by `docs/guide/workflow.md`, so they need a
    re-shoot rather than a delete. Carried from three syncs.
 
