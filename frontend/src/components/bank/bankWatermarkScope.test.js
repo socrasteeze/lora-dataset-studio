@@ -170,13 +170,21 @@ test('the two level buttons open the window instead of firing a POST', () => {
 test('the launch spreads statuses/image_ids only when set', () => {
   assert.ok(PANEL.includes('...(statuses ? { statuses } : {})'));
   assert.ok(PANEL.includes("...(imageIds === 'selection' && selectedIds.length"));
-  // The engine rides along on the repaint only — the crop has none — and the
-  // What-to-clean target only when narrowed: 'all' posts the SAME body the
-  // button posted before the selector existed. device_id (Divergence 6) rides
-  // beside both: Klein renders on whichever machine the picker selected, LaMa
+  // The engine rides along on the repaint only — the crop has none — the
+  // What-to-clean target only when narrowed, and the ⚖ dialog's per-run Klein
+  // model only when armed: unarmed, 'all', the body is byte-identical to the
+  // one the button posted before either control existed.
+  //
+  // device_id (Divergence 6) rides beside all of them and is asserted
+  // SEPARATELY on purpose: it used to be pinned inside one whole-body literal
+  // together with the target spread, so upstream adding a third key broke the
+  // assertion on its formatting rather than on anything it was written to
+  // guard. Klein renders on whichever machine the picker selected, LaMa
   // ignores it, and the crop level has no device to pick at all.
-  assert.ok(PANEL.includes(
-    "? { method, device_id: deviceId, ...(target !== 'all' ? { target } : {}) } : {}"));
+  assert.ok(PANEL.includes('? { method, device_id: deviceId,'));
+  assert.ok(PANEL.includes("...(target !== 'all' ? { target } : {})"));
+  assert.ok(PANEL.includes("...(method === 'klein' && kleinRunModel"));
+  assert.ok(PANEL.includes("? { klein_model: kleinRunModel } : {})"));
 });
 
 test('the bin figure comes from the payload table, not from a second predicate', () => {

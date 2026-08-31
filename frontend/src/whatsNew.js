@@ -83,6 +83,133 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-08-31-deep-zone-hunt',
+    date: '2026-08-31',
+    title: 'Watermark zones: the detector now finds the small and repeated marks',
+    blurb:
+      'The zone hunt sweeps each flagged image at up to three scales (full '
+      + 'frame plus tiles), so a logo stamped seven times across a large photo '
+      + 'comes back with all seven zones instead of four — and a stock-style '
+      + 'tiled watermark now shows the dozen zones it pinned instead of none. '
+      + 'Every zone is double-checked before it is kept, so rocks and icicles '
+      + 'stop being boxed as logos. Slower per flagged image (a few seconds), '
+      + 'unchanged on clean ones.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-31-not-duplicates',
+    date: '2026-08-31',
+    title: 'Tell the bank a group is NOT duplicates — once, and for good',
+    blurb:
+      'A burst, a tripod series, two crops a threshold called one picture: the '
+      + 'duplicate panel could only be answered by rejecting a photo you wanted '
+      + 'to keep, and Skip wrote nothing so the group came back on every run. '
+      + '≠ Not duplicates (N in ⤢ Compare) keeps every copy, rejects nothing, '
+      + 'and stops proposing the group. It is remembered as the pairs you ruled '
+      + 'on, so it survives the renumbering each pass does — and a group that '
+      + 'later gains a new copy asks you again, because that copy is a new '
+      + 'question. One line above the list puts them all back.',
+    to: '/bank',
+  },
+  {
+    id: '2026-08-30-every-watermark-zone-survives',
+    date: '2026-08-30',
+    title: 'Multi-logo watermarks: every zone survives the scan',
+    blurb:
+      'An image stamped with several logos used to come out of Find watermarks '
+      + 'with a single box — Clean repainted one logo and left the rest. The '
+      + 'detector now keeps every zone it finds (Review shows them all, Clean '
+      + 'repaints them all), on datasets and banks alike. Single-mark images '
+      + 'behave exactly as before, so border marks stay croppable.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-30-watermark-scan-honesty',
+    date: '2026-08-30',
+    title: 'Watermark scans stop hiding their misses',
+    blurb:
+      'Three fixes from one real test session. A vision scan whose model never '
+      + 'answered used to show a green "0 found (of 0)" — it now says plainly '
+      + 'that nothing was scanned and names the server to check. Marks tiled '
+      + 'across the WHOLE image no longer shrink to one corner box: the image '
+      + 'is flagged for 🔍 Review instead, where you can judge it honestly. And '
+      + 'when nothing crosses the detector threshold, the toast tells you the '
+      + 'highest score it saw — so "lower the threshold" stops being a guess.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-30-compare-duplicate-copies',
+    date: '2026-08-30',
+    title: 'See which duplicate you are keeping, before you keep it',
+    blurb:
+      'Duplicate and "same shot" groups get a ⤢ Compare button that opens their '
+      + 'copies full screen — side by side, or one at a time in the same frame '
+      + 'so ← → flips between them and the difference lands on the same pixels. '
+      + 'Resolution, sharpness, score and weight sit under each copy with the '
+      + "group's best value lit, byte-identical copies are marked as such, and "
+      + 'K keeps the one you are looking at while R throws out just that one. '
+      + 'Keep best and keep first are still one click away — now you can check '
+      + 'them first.',
+    to: '/bank',
+  },
+  {
+    // DIVERGENCE 4 — upstream's entry leads on a 🗑 that deletes one harvested
+    // run. That button lives on the rented-pod checkpoint groups, which this
+    // build does not carry, so the claim is reworded off it rather than shipped
+    // as an advert for a control the card has no room for. The Beta chip and the
+    // foldable section are both real here. The id is upstream's and unchanged.
+    id: '2026-08-30-delete-video-runs',
+    date: '2026-08-30',
+    title: 'The video training block says it is Beta — and the section folds away',
+    blurb:
+      'The training block now wears a Beta chip — the rail is proven end to '
+      + 'end, but it is days old, and the label says exactly that rather than '
+      + 'letting you assume a settled feature. The whole Video training sets '
+      + 'section also folds away now, like the two dataset sections above it.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-30-watermark-engine-choice',
+    date: '2026-08-30',
+    title: 'Choose which engine finds your watermarks',
+    blurb:
+      'Both Find-watermarks windows now carry a Detection engine selector: the '
+      + 'dedicated detector (SigLIP2 + Grounding DINO, ~10x faster, scored '
+      + 'threshold) or your local vision model — with a line naming exactly '
+      + 'what the next scan will run. The choice was always honoured by the '
+      + "backend; now there's a control for it, stored once for both surfaces. "
+      + 'Pair it with "Try on a sample first" to judge the two engines on the '
+      + 'same images.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-08-30-caption-budget-and-audio',
+    date: '2026-08-30',
+    title: 'The video export counts your words, and tells the truth about sound',
+    blurb:
+      'Two silent failures now speak up at Build the dataset. If captions run '
+      + 'past the target model’s own published prompt budget (Wan caps at '
+      + '200 words, 100 for I2V), the export says how many and how long the '
+      + 'longest is — because the trainer would cut them mid-sentence without '
+      + 'a word. And for targets that keep their audio (MiniMax H3), each '
+      + 'clip’s prompt gains a measured Audio line when the numbers prove one '
+      + '— a missing track, or near-total silence. Audible audio gets no '
+      + 'invented description: only what was measured gets written.',
+    to: '/video-bank',
+  },
+  {
+    id: '2026-08-30-klein-clean-compare',
+    date: '2026-08-30',
+    title: 'Try your Klein models before the clean commits',
+    blurb:
+      'Watermark clean, Klein engine: a new ⚖ Compare models window runs each '
+      + 'of your Klein checkpoints on the same flagged image — same zones, same '
+      + 'seed — so the only difference between the results is the model. Pick '
+      + "the winner: on a dataset it becomes the dataset's Klein model, on a "
+      + 'bank it applies to that run. The original image is never touched.',
+    to: '/datasets',
+  },
+  {
     id: '2026-08-30-video-training-block',
     date: '2026-08-30',
     title: 'A video set’s training settings sit above the button that spends them',

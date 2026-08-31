@@ -525,6 +525,35 @@ const TOPICS = [
      'random', 'random order', 'shuffle', 'shuffled', 'sample', 'representative',
      'keyboard', 'shortcut', 'shortcuts', 'hotkey', 'bank', 'triage'],
     '/bank', 'using-the-app', 'review-a-bank-one-image-at-a-time'),
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js.
+  action('bank-compare-duplicates', 'Compare the copies of a duplicate group',
+    ['duplicate', 'duplicates', 'dup', 'dups', 'same shot', 'near-duplicate',
+     'crop', 'crops', 'variant', 'variants', 'copies', 'copy', 'twin',
+     'compare', 'compare duplicates', 'side by side', 'side-by-side',
+     'full screen', 'fullscreen', 'big', 'bigger', 'too small', 'thumbnail',
+     'cannot see', "can't tell", 'which one to keep', 'pick the best',
+     'keep best', 'keep first', 'is best right', 'wrong one kept',
+     'resolve group', 'resolve duplicates', 'group card', 'identical file',
+     'same file', 'byte identical', 'sharpness', 'resolution', 'file size',
+     'keyboard', 'shortcut', 'shortcuts', 'hotkey', 'keep reject',
+     'bank', 'triage'],
+    '/bank', 'using-the-app', 'compare-the-copies-of-a-duplicate-group'),
+  // DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js. The words
+  // people actually type for this are complaints about the app being WRONG
+  // ("these are not duplicates", "it keeps grouping my burst"), so they lead —
+  // the feature name is the last thing they would search for.
+  action('bank-not-duplicates', 'Say “these are not duplicates”',
+    ['not duplicates', 'not a duplicate', 'these are different', 'different shots',
+     'false positive', 'wrongly grouped', 'wrong group', 'bad grouping',
+     'grouped by mistake', 'not the same shot', 'not the same photo',
+     'keep both', 'keep all', 'keep every copy', 'dismiss group', 'ignore group',
+     'stop asking', 'keeps coming back', 'comes back every time', 'again and again',
+     'burst', 'burst of frames', 'tripod', 'series', 'sequence', 'similar poses',
+     'skip does nothing', 'skip is not enough', 'reject one i want',
+     'undo not duplicates', 'put them back', 'restore group', 'too many pairs',
+     'group too big', 'refused', 'duplicate', 'duplicates', 'same shot',
+     'bank', 'triage'],
+    '/bank', 'using-the-app', 'say-these-are-not-duplicates'),
   // The id is a stable handle (stored in user state) — kept even though the
   // topic now covers three destinations and the guide heading was renamed.
   action('bank-promote-to-new-bank', 'Promote a shortlist out of a bank',
@@ -1219,7 +1248,12 @@ const TOPICS = [
      'run folder', 'resume', 'different target', 'checkpoints', 'not proven',
      'wired but not trained', 'steps', 'not enough disk', 'free space',
      'no room', 'move the models folder', 'short edge', 'too small',
-     'low resolution', 'below the training size'],
+     'low resolution', 'below the training size',
+     // DIVERGENCE 10 + 4 — upstream added these to its 'video-cloud-training'
+     // topic, which this fork does not carry. The Beta chip they describe is on
+     // the LOCAL block here, so the terms land on this topic instead; upstream's
+     // delete-a-run keywords went with the 🗑 that has no host on this build.
+     'beta', 'video training beta'],
     '/datasets', 'using-the-app', 'video-training-sets-and-the-two-things-to-check-before-you-cut-one'),
   action('video-promote-target', 'Pick a target model and a clip length',
     ['target model', 'target profile', 'wan', 'wan 2.2', 'wan22', 'ltx', 'ltx 2.3',

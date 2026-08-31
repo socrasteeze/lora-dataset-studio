@@ -150,6 +150,14 @@ export default function VideoTrainingBlock({ ds }) {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            {/* BETA, and honestly so (maintainer's call, 2026-08-30): the rail
+                is proven end to end but days old, and a label that says "expect
+                rough edges" costs less than a user who assumed a settled
+                feature. Upstream words this "same chip both destinations"; this
+                build has only the local one, and the beta is still the RAIL. */}
+            <span className="rounded border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-amber-200">
+              Beta
+            </span>
             {/* Upstream reads "▶ Train on this PC" because it has a second
                 button beside it. There is only one destination here, so naming
                 the machine would advertise a lane this build does not offer. */}
