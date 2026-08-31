@@ -40,21 +40,24 @@ const RIGS = [
 test('every capability row carries a destination, in every rig', () => {
   for (const [name, caps] of RIGS) {
     const rows = deriveCapabilitySummary(caps)
-    // 20 upstream, not 18: the three cloud API engines (Nano Banana, ChatGPT,
+    // 21 upstream, not 19: the three cloud API engines (Nano Banana, ChatGPT,
     // OpenRouter) are not capabilities on this fork (Divergence 1) — see
     // deriveCapabilitySummary. Upstream's own count moved 12 (Krea 2 Edit) ->
     // 14 (the two video pieces) -> 18 (bank scoring/SigLIP2/watermark
     // detector/scraping extras) -> 19 (clip encoding, counted apart from
     // decode/detect because they fail apart — ffmpeg can be absent on a
     // machine that decodes fine, and that machine cannot export a single
-    // clip) -> 20 (📷 Camera angles, counted for the reason every row above it
-    // is: a machine missing the lane must read "not ready, here is the
-    // install", never a shorter list that certifies completeness by omission).
+    // clip) -> 20 (📷 Camera angles) -> 21 (🎬 the Video Test Studio, whose
+    // four required weights are 39.5 GB), each counted for the reason every
+    // row above it is: a machine missing the lane must read "not ready, here
+    // is the install", never a shorter list that certifies completeness by
+    // omission. An absent capability must be visible and counted, never
+    // dropped from the denominator.
     // This fork's count follows every one of those bumps and adds its own WD14
     // tagger row, recomputed here from the array deriveCapabilitySummary
     // actually returns rather than copied from either side's prose —
-    // 20 - 3 cloud + 1 WD14 = 18.
-    assert.equal(rows.length, 18, `${name}: expected 18 capabilities`)
+    // 21 - 3 cloud + 1 WD14 = 19.
+    assert.equal(rows.length, 19, `${name}: expected 19 capabilities`)
     for (const row of rows) {
       const dest = capabilityDestination(row)
       assert.ok(dest, `${name}: "${row.label}" has no destination`)
@@ -109,8 +112,9 @@ test('a pending row is not a missing one: own destination, own wording', () => {
   // lane is asset-only, so with the weights on disk and only the process down
   // the honest state is "waiting for ComfyUI", never "install something".
   assert.deepEqual(pending.map((r) => r.label),
-    ['Klein (local)', '📷 Camera angles (local)', 'Test Studio'],
-    'ComfyUI down should leave exactly Klein + Camera angles + Test Studio pending')
+    ['Klein (local)', '📷 Camera angles (local)', '🎬 Video Test Studio (beta)',
+      'Test Studio'],
+    'ComfyUI down leaves Klein + Camera angles + Video Test Studio + Test Studio pending')
   for (const row of pending) {
     assert.ok(row.note, `${row.label}: pending row must explain itself`)
     const waiting = capabilityDestination(row)

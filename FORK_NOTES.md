@@ -1409,7 +1409,27 @@ Found by Gate 6's frontend half, as the only failure in 4 397 (baseline 4 371,
 0 failed) — a literal-count divergence is invisible to lint, the build and both
 local-only halves.
 
-### The `_video_extra` fixture is the newest carrier, added 2026-08-30
+### The `_video_extra` fixture — carrier RETIRED 2026-08-31, upstream took it
+
+**Dropped this sync, the way this section says to drop one.** Upstream's
+`7bb5f2e` (the `v2026.08.31.1` release) adds the import on their side, for the
+identical reason recorded below: their `v2026.08.31` release job went red on
+this one test out of 8919, because the CI runner has no PyAV. So the carried
+hunk retired on contact — the merge took upstream's two-line comment and their
+import, and the file now carries the line **once**, which was checked rather
+than assumed (a fork-carried import and an upstream one landing in the same
+file is how you get a duplicate that nothing fails on).
+
+Upstream also shipped the guard this fork did not have to write:
+`test_video_extra_gate_contract.py` pins, as text, that every test file posting
+to a machine-gated video-bank route neutralises the gate — so the third
+occurrence fails in seconds instead of thirty-five minutes into a release job.
+Adopted with the rest of the window.
+
+The reasoning is kept below because the SHAPE recurs, and the next carrier of
+this family will be diagnosed against it.
+
+### The `_video_extra` fixture as a carrier, added 2026-08-30 (historical)
 
 `backend/tests/test_video_caption_model.py` gained upstream's
 `test_the_route_takes_a_model_for_one_run_without_changing_the_setting` — the
@@ -1488,6 +1508,38 @@ against `backend_worker.py` before resolving anything, and keep the fork's
 `api:` id namespace and the "backends work in ANY role" behaviour. Meanwhile
 do NOT strip the "unused" `worker_url` params during any cleanup pass —
 they are upstream surface AND fork load-bearing now.
+
+### An upstream REFACTOR strands `device_id` in the signature (2026-08-31)
+
+The sharpest instance of this divergence yet, and the one gate that would have
+caught it is the full backend suite — no marker, no lint error, no build error.
+
+Upstream's *"Klein erases the zones, then cleans the whole photo"* (`7a43701`)
+split `inpaint_watermark_klein`'s body into **two new helpers**,
+`_clean_full_frame` and `_repair_boxes_crop_and_stitch`. The fork's `device_id`
+lives on the ENTRY POINT, so the conflict git reported was only the signature
+and the docstring — resolve those, and the merge is "clean". What auto-merged
+below it was upstream's new dispatch, calling two helpers that **do not take
+`device_id`**, from a function that still accepts it:
+
+- The clean lane silently rendered on the LOCAL ComfyUI whatever machine the
+  picker named — D6's whole point, reverted, with nothing red.
+- The box-repair lane was worse: the fork's `_run_klein_job(..., device_id=device_id)`
+  call survived INSIDE the new helper (it moved with the body), while the
+  helper's own signature never gained the parameter. That is a
+  `NameError` on every prompted ✦ repair — the Python spelling of the bare-
+  identifier `ReferenceError` class this file's diagnostics are mostly about,
+  and proof the class is not frontend-only.
+
+Fixed by threading `device_id` through both helpers and both call sites, and by
+re-homing the `device_id` paragraph into upstream's rewritten docstring rather
+than keeping the fork's superseded one.
+
+**The rule this yields:** when an upstream commit REFACTORS a function whose
+signature carries a fork-only parameter, resolving the signature is the smaller
+half of the job. Grep the parameter across the file afterwards — every new
+callee needs it, and the one that already *uses* it without declaring it is the
+one no gate will show you until something calls it.
 
 ### An upstream dead-code sweep is structurally blind to this (2026-08-25)
 
@@ -1963,6 +2015,31 @@ keywords describe on a surface upstream does not have. A reword arriving on a
 rejected topic is not automatically rejected — ask what the words are FOR, and
 whether this build answers them somewhere else.
 
+**315 topics / 14 tips as of 2026-08-31** (the Video Test Studio + Klein-clean
+dials window) — **five** ported, no reword lost, and the count is the reason one
+of them was found at all. Upstream edited all four carried topic modules:
+`pages.js` added `setup-video-studio`, `videoLane.js` added `page-video-studio`,
+`settingsFields.js` added the three `watermark_clean.*` dials, and `actions.js`
+carried the window's only two rewords — the clean-engine sentence on
+`action-dataset-batch-clean` (LaMa repaints the marked zones, Klein re-renders
+the whole photo) and six vision-model keywords on the detector topic. All five
+new rows and both rewords are hand-ported.
+
+**`setup-video-studio` is the one that could not have been missed silently, and
+that is worth naming.** It is not merely a help topic: `deriveCapabilitySummary`
+names it as the new capability row's `topic`, and `capabilityDestination` reads
+the route back OUT of the registry. So re-deleting `pages.js` without porting it
+does not produce a missing help article — it produces a **readiness row whose ⓘ
+leads nowhere**, and `capability-destinations-contract.test.mjs` fails with
+`Cannot read properties of null` rather than anything that says "help". The
+contract earns its keep precisely here: D10's cost is normally invisible to
+gates, and this is the one wiring that makes it visible.
+
+**A SIXTH upstream test joined the re-pointed family** (Divergence 5 shape):
+`components/shared/kleinCleanSurfaces.test.js` is new this window and reads
+`help/topics/settingsFields.js` directly to assert the three dials have topics.
+Re-pointed at `help/helpRegistry.js`; what the assertion is FOR is unchanged.
+
 **The cost, stated plainly.** `help/topics/*.js` and `help/topicBuilders.js`
 join the re-delete list (seven files), and this block re-conflicts whole on every
 sync — as ONE region resolved by keeping ours, which is cheap and safe. FIVE
@@ -2038,6 +2115,57 @@ the only one that looks backwards as well as forwards.
 moving them.** At that point the split earns its keep, and it should be taken
 properly — topic by topic, against the deep-equality invariant above, never by
 adopting upstream's files wholesale.
+
+## Divergence 11: upstream's `nightly` branch flow is NOT this fork's
+
+Added 2026-08-31, when upstream's `fb3b21e` ("development lands on nightly; main
+pays the full suite once") rewrote the top of `CLAUDE.md`.
+
+**Upstream now runs two branches**: development lands on `nightly` under a
+reduced gate (targeted tests, invariants, linters, frontend suite — no full
+backend suite), and `main` receives `nightly` once a wave is done, paying the
+full suite on the merged tree. Their reasoning is sound for them and their
+maintainer's test instance is checked out on `nightly`.
+
+**This fork has no `nightly` branch.** `git ls-remote --heads origin` shows
+`main` and working branches, nothing else, and there is no fork instance
+following a nightly ref. So adopting that section would have shipped a
+`CLAUDE.md` instructing every future agent to land work on a branch that does
+not exist, and — the part that actually costs something — to skip the full
+backend suite before `main`, which is the fork's one real gate.
+
+Rejected in three places, and the shape matters because only ONE of them
+announced itself:
+
+- The **gate-commands bullet** conflicted honestly. Upstream's names
+  `ruff check backend scripts packaging`, `npx eslint .` and a **system Python**;
+  this fork's names the two commands its own `ci.yml` runs and the `.venv`
+  interpreter. The fork's CLAUDE.md had already predicted this conflict in its
+  own text ("upstream's copy of this line names a different pair and a system
+  interpreter, and neither is right here"), which is why it was trivial.
+- The whole **`## Where work lands: nightly first`** section auto-merged with
+  **zero conflict markers** — 30-odd lines of new doctrine, in a file no test
+  reads and no linter parses. Removed.
+- Two further `nightly` references had auto-merged into sections further down
+  (the intermediate-push bullet, and a "a finished branch merges into `nightly`"
+  bullet in the branch section). Found by grepping the word after removing the
+  section, not by reading the diff.
+
+A **fourth** hit was in a different file, and it is the one that proves the rule
+below needs the whole directory rather than the one file:
+`.claude/rules/release-mechanics.md` had auto-merged to *"always from `main` —
+never from `nightly` … (see CLAUDE.md, \"Where work lands\")"* — upstream's
+doctrine **plus a cross-reference to the section that had just been deleted from
+this fork's CLAUDE.md**. Reverted to the fork's two lines. It was caught by Gate
+7's own grep output, incidentally, not by looking for it.
+
+**The rule:** `CLAUDE.md` and everything under `.claude/rules/` are diverged
+files like any other, and they are the ones where a bad merge changes what every
+future agent DOES rather than what the app does. No gate covers them; no test
+reads them; no linter parses them. After any sync that touches either, grep the
+merged tree for the vocabulary of upstream's process (`nightly`, branch names,
+CI job names) and confirm each hit is true of THIS repo — and check that any
+cross-reference still points at a section this fork actually has.
 
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
@@ -2671,6 +2799,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-08-31 | *(merge)* + dist | **Upstream sync — 27 commits (`4d21222`..`7bb5f2e`), thirteen content-conflict regions across twelve files plus four `modify/delete`, and the window's real damage carried no marker at all.** An entirely local-lane window — nothing cloud, nothing rented, no rejected file to re-delete beyond D10's four. **Adopted whole:** the 🎬 **Video Test Studio** (play a trained video LoRA back as a clip — new `video_studio` routes, `video_test_studio` service, eleven components, the MiniMax H3 i2v workflow and its weights-only Setup installer), **Klein cleans the WHOLE photo** (the detected zones are erased first, then the entire frame is re-rendered, so tiled and on-subject marks the scan missed go too), the **three Klein-clean dials** (prompt / processing megapixels / output size), **whole-mark watermark zones** and located stock thumbnails, the **deep sweep reporting every zone it found**, the **vision-model picker** in the scan window, the Bank's finger-sized folder-person buttons, and *a ComfyUI restart is not a ComfyUI error*. **The one that mattered, and no gate would have shown it (D6):** upstream's `7a43701` split `inpaint_watermark_klein` into `_clean_full_frame` and `_repair_boxes_crop_and_stitch`. Git conflicted only on the signature; the new dispatch auto-merged **below** it, calling two helpers that do not take `device_id` from a function that still accepts it. Two distinct breaks: the clean lane would have rendered on the LOCAL ComfyUI whatever machine the picker named — D6 silently reverted, nothing red — and the repair lane kept the fork's `_run_klein_job(..., device_id=device_id)` call INSIDE the new helper while that helper never declared the parameter, which is a `NameError` on every prompted ✦ repair. Threaded through both helpers and both call sites; recorded as D6's newest subsection. **The second silent one is doctrinal and is now Divergence 11:** upstream's `fb3b21e` moves development to a `nightly` branch, and its whole *"Where work lands"* section auto-merged into `CLAUDE.md` with zero markers — thirty lines instructing every future agent to land on a branch this fork does not have (`git ls-remote` confirms: `main` and working branches only) and to skip the full backend suite before `main`, which is this fork's one real gate. Removed, plus two stragglers found by grepping the word afterwards, plus **a fourth hit in `.claude/rules/release-mechanics.md`** which had taken the same doctrine AND a cross-reference to the section just deleted. The gate-commands bullet conflicted honestly and kept the fork's side — the fork's own CLAUDE.md had predicted that conflict in its text. **A carrier RETIRED:** upstream's `7bb5f2e` adds the `_video_extra` import to `test_video_caption_model.py` themselves (their `v2026.08.31` release job went red on that one test out of 8919), so D5's newest hunk dropped on contact — and the merged file was checked to carry the import **once**, a fork-carried and an upstream import landing in one file being how you get a duplicate nothing fails on. Their new `test_video_extra_gate_contract.py` was adopted with it. **Three counted values recomputed, never copied, and the second is why that rule exists:** capability rows **18 → 19** (upstream's 21 − 3 cloud + 1 WD14), derived by running `deriveCapabilitySummary` rather than trusting the arithmetic; `installCatalog` **23 → 28**; and `kreaInstall.test.js` — **the second home of the capability count**, which upstream asserts as a floor so their syncs never touch the line — auto-merged with the stale `18` and was caught only by the full frontend suite, exactly as its own comment warns. **D10: 310 → 315 topics / 14 tips.** All four carried topic modules were edited upstream: `setup-video-studio`, `page-video-studio` and the three `watermark_clean.*` dials ported, plus both rewords in `actions.js`. `setup-video-studio` is not merely an article — `deriveCapabilitySummary` names it as the new row's `topic` and `capabilityDestination` reads the route back out of the registry, so omitting it yields a readiness row whose ⓘ leads nowhere, which is how the contract test found it. A **sixth** upstream test joined the re-pointed family: the new `kleinCleanSurfaces.test.js` reads `help/topics/settingsFields.js` directly. **README corrected for three claims the merge made untrue** — it still called the Klein clean an *inpaint* in the capability row, the pipeline row and the chapter index, where it now re-renders the whole photo and does not preserve untouched pixels. **Gates.** ruff **All checks passed**; ESLint **0 errors / 20 warnings**, baseline-identical (D9's orphan backlog, no new orphan); `vite build` clean; local-only contract green both halves against the REBUILT dist (frontend 8/8, backend 3/3); `create_app()` OK; hygiene **16 passed / 2 skipped** (the names half skips without `.privacy-names`, as designed). Frontend **4512 → 4550 passed / 0 failed** (+38). Backend baseline **71 failed / 8492 passed / 122 skipped** → post-merge **73 / 8603 / 122** (+111 passing). The sorted failure diff is **two new, zero cleared, and both in `test_peer_training_over_http.py`** — the xdist flake this ledger has now named in FIVE consecutive syncs. Settled by the three checks, not by assertion: the file is untouched by the merge, one of the two passes on its own immediately, and the whole file replays **20/20 green three times running**. The stable 71 are this Linux container's floor (Windows drive-letter fixtures, no ComfyUI on `127.0.0.1:8188`, no `xdg-open`); CI's backend job is `windows-latest`. ⚠️ **Container notes, ninth sync running.** `download.pytorch.org` is **still 403 at CONNECT** under this environment's egress policy, so the mandatory Torch overlay came from PyPI as **`2.13.0+cu130`** rather than the pinned `2.13.0+cpu` (same version, CUDA build, no GPU present); without it ~124 tests silently skip. The **vendor git identity** trap fired for the fourth recorded sync running — the fresh container's global config authored as an agent vendor, reset to the project identity before the first commit. |
 | 2026-08-31 | *(merge)* + dist | **Upstream sync — 30 commits (`261f60a`..`4d21222`), ten content-conflict regions across ten files plus four `modify/delete`.** Adopted whole, all local-lane: **the watermark zone hunt** (each flagged image swept at up to three scales, every zone double-checked before it is kept), **every zone surviving the scan** (a multi-logo image no longer collapses to one box on either surface), **the scan-honesty wave** (a vision scan that never answered stops reading "0 found (of 0)", whole-image tiling goes to 🔍 Review instead of a corner box, and a sub-threshold scan reports the highest score it saw), **the Detection engine selector** on both Find-watermarks windows, **⚖ Compare Klein models** on one flagged image before the batch, **the Bank's ⤢ Compare lightbox** for duplicate groups and its refill fix, **≠ "not duplicates"** (stored as PAIRS, so it survives each pass's renumbering), **C12-B caption word budgets and the measured Audio line**, the **foldable Video training sets section**, the **Describe window naming its engine**, and the **LM Studio day-one fixes**. **Resolved apart, not taken whole:** upstream's rented-pod video lane came back into `routes/video_datasets.py` as a 212-line region whose HEAD side was EMPTY (the shape D4 warns about) — re-deleted, and the inline cut comment now names the new seventh route (`DELETE /train/cloud/run/<id>`); `VideoTrainingBlock.jsx` took the **Beta chip** and left the 🗑 delete-run button, which has no host here (this build renders a checkpoint COUNT, not upstream's harvested-run groups), and its orphaned `del` import went with it (diagnostic 19); `image_bank_service.py`'s six regions kept **both** D6's `device_id` and upstream's `klein_model` throughout, and — the one that mattered — the fork's batched `by_group` read was kept while upstream's `unresolved_dup_group_ids(...)` replaced the unscoped query in the `else`, because half-adopting ≠ would have let "Resolve ALL" reject the very copies a user had just asked to keep; `DupGroupsPanel.jsx` took upstream's `distinctPath`/`compareTitle`/⤢ hints and kept the fork's `empty:` text (which says where the already-rejected ones WENT) and its `aspect-[3/4]` tiles over upstream's `h-28`; `using-the-app.md` took both new chapters but kept the fork's `## Promote a shortlist out of a bank` heading, which `helpRegistry`'s anchor points at. **D10:** 308 → **310 topics / 14 tips** — `bank-compare-duplicates` and `bank-not-duplicates` hand-ported, plus the window's silent third edit (upstream's new keywords landed on its `video-cloud-training` topic, which this fork does not carry; the two Beta terms were re-homed onto `video-train-local`, where the chip actually ships). **D5 gained a carrier:** upstream's new `test_klein_compare.py` fakes `start_watermark_inpaint` with a signature blind to D6's `device_id`, so it raised `TypeError` before its own assertion — widened with `**_kw`. **Gates:** ruff clean, eslint 0 errors / 20 warnings (identical to the pre-merge tree), build clean, both local-only halves green, `create_app()` OK, frontend **4466 → 4512, 0 failed**, backend **8288 → 8335 passed** with the sorted failure list diffing to the pre-merge baseline as **zero merge-attributable new failures**. The 71 are this container's Linux path-separator floor, not accepted failures — CI's backend job is `windows-latest`. **`test_peer_training_over_http.py` flaked again, for the fourth consecutive sync, and was settled by the three checks rather than by assertion:** the first landing-tree run reported two of its tests red, the re-run reported **one** — a different subset, which is already the answer — the file is **untouched by this merge** (`git diff <pre-merge-HEAD> HEAD` empty for it and for `peer_worker.py`/`cluster.py`), it replays **20/20 green on its own**, and the single named test passes **4/4** alone. A worker dying mid-run is what `CLAUDE.md` predicts and what this is; a red from a parallel run is not a verdict. Gate 1 earned its keep independently: `ruff` caught a welded `else:` that this session's own conflict-resolution script had produced — invalid syntax, in a file where 8 000 tests would simply have failed to collect. |
 | 2026-08-30 | *(merge)* + dist | **Upstream sync — 12 commits (`bdea2e4`..`261f60a`), FIVE content-conflict regions in source (four in one file) and no `modify/delete` at all. A small, almost entirely local window — and the one thing that could have shipped broken carried no marker and no grep hit.** Adopted whole, all local-lane: **the C12 caption calibration** — `CAPTION_FRAMES` 8 → 16 (motion is read BETWEEN frames, so the old count was the ceiling on what any prompt could extract), `max_new_tokens` 96 → 400 in both the worker and the infer fallback, both prompts rewritten to one 150–200-word paragraph, and **the camera taken away from the caption model entirely** — `compose_sidecar_text()` appends `Camera: <measured phrase>.` from the 🎥 pass's homography classifier instead, silent when it has nothing honest to say, which finally gives B9's `camera_phrase()` a consumer; **the 🗣 Describe launch window** (wording, scope, hand-edited captions out of reach unless asked for) **with its Model section** (the proven 4B default, Qwen3-VL 8B, a custom `video_caption.model` id appearing as its own entry and staying the picker's default — per-run resolution mirrors the style contract, an unknown pick falling back to the CONFIGURED model rather than the shipped one); **an always-visible ⓘ on every pass button**, opening the guide's own H2 in `GuideSectionModal` via `guideSection.js`/`markdownHeadingId` so there is one text and no copy to rot, with `videoPassTopics.js` pinned by a node test because ids in a plain object escape the help contract's source scan; **the three phone-triage dead ends** (↩ To triage for the endpoint's third status, a sticky shot-player header so the ✕ cannot scroll off the top, and the page-bottom wording dropdown retired into the window); **LM Studio model downloads from LDS** — `lmstudio_download.py` against a measured 0.4.23, progress as real bytes-on-disk under LM Studio's models folder and honestly `None` when it is elsewhere, provider-ROUTED through `POST/GET /api/local-llm/pull` beside Ollama's pull, one component on two mounts; and **✨ Enhance's gate loading the model instead of refusing it** (`vision_llm.ensure_ready` now recovers under LM Studio what it has always recovered under Ollama, leaving one honest refusal — nothing on disk). **Adopted with the cut this fork always makes: `VideoTrainingBlock.jsx`.** Upstream folded its local `VideoTrainingSection` and the long-rejected `VideoDatasetCloudPanel` into one block — one dial set, the destination being just the button pressed. The restructuring's whole point is local (the dials belong above the button that spends them), so the file is carried in upstream's name and shape **minus** the ☁ button, the GPU-tier picker, the cost line, the cloud retry/continue buttons and the harvested-checkpoint groups — which is why it imports no `videoCloudStatus`, a module that stays deleted. Two sub-decisions inside it, both resolved apart: upstream's ternary opening the clip list from a SECOND button is not taken (this card has its own ⌄ toggle above and would have grown a duplicate), and the button keeps *"▶ Train this dataset"* rather than *"▶ Train on this PC"*, which only reads correctly beside a second destination. Upstream's edit to the existing steps What's-new entry — *"training on this PC or on a rented GPU is just the button you press"* — was the window's only prose reject; the fork's wording stands and a fork entry covers what actually changed here. **The one marker-less leftover, and it is the class this file keeps re-learning:** `cloud_training._run_payload` gained `'target_label': ((video_targets.get(...)` so a video run stops wearing the face lane's *"Z-Image"* chip — auto-merged into a file where **the fork has no `video_targets` import at all**, because upstream added theirs at line 44 in a hunk that did not conflict. A `NameError` on every video run's payload build, invisible to `create_app()` (the name is inside a function) and to the sweeps (no rejected vocabulary anywhere in it). **`ruff` caught it the moment the gate ran**, exactly as Divergence 9 says it should; the import is added with a note. **A second red, and this one is Divergence 5's newest carrier:** upstream's new `test_the_route_takes_a_model_for_one_run_without_changing_the_setting` is the only test in `test_video_caption_model.py` that POSTs to `/api/video-bank/<id>/caption`, and it arrived WITHOUT `from _video_extra import video_extra_ready` — the line the sibling its own docstring names has carried since it was written. 503 where it asserts 202. Not an environment failure: `av` lives in `requirements-ml.txt` and `ci.yml`'s backend job installs `requirements-dev.txt` plus the torch overlay and nothing else, so it is red on CI for the same reason it is red here — the trap `_video_extra.py`'s own header was written about. One import hunk, carried. **A divergence LEFT the file:** upstream replaced `PROVEN_ON`'s `local`/`cloud` split with a plain `PROVEN_TARGETS` set and deleted the sentence naming where a target was proven, so the fork's *"trained end to end elsewhere"* reword is retired rather than re-applied — a user cannot act on WHERE, only on whether. **Divergence 1b's LM Studio note is half stale and now says so:** the "no install action" call still stands (a download is not an install), but the reasoning that models can only be fetched inside LM Studio expired with this window. **Divergence 10 was idle and proved so both ways:** zero upstream commits touched `help/topics/` or `topicBuilders.js`, and the backwards id-diff printed **38** lines, every one a nameable D1/D4 rejection — no dropped topic. Registry measures **308 topics / 14 tips**, unmoved, and the new ⓘ map reuses topics that already existed. Reject inventory derives to **86**; `videoCloudStatus.js` (+ its test), `cloud_video_training.py` and its two suites all confirmed still absent, and `VideoDatasetCloudPanel.jsx` left the list because upstream deleted it themselves. No new config key, so no settings-reference addition is owed — upstream's own prose edits to settings-reference, troubleshooting and using-the-app were taken as they came. README's LM Studio row was corrected: it still said *"LDS cannot start it for you"*, which the PREVIOUS sync's ▶ Start button had already falsified and this one makes worse. **Gates.** `ruff` **clean**; ESLint **0 errors / 20 warnings** (the D9 orphan backlog, baseline-identical); `vite build` clean; local-only contract **8 frontend + 3 backend**; `create_app()` OK; hygiene **13 passed / 2 skipped**. Frontend **4 460 → 4 466 passed, 0 failed** (+6, upstream's `guideSection` and `videoPassTopics` tests). Backend baseline **73 failed / 8 420 passed / 122 skipped**; the first post-merge run **73 / 8 442 / 122**, whose sorted list diffed to the baseline as **exactly one new** — the caption-model 503 — and one cleared. That one was fixed rather than classified away (diagnostic 13: "not merge damage" is not "not ours to fix"), and the **final run on the exact landing tree is 71 failed / 8 444 passed / 122 skipped, with ZERO new failures against the baseline** and two cleared, both in `test_peer_training_over_http.py` — the xdist flake this ledger has now named in three consecutive syncs, cleared this time rather than appearing. The 71 are this container's Linux path-separator floor, not accepted failures — CI's backend job is `windows-latest`. ⚠️ **Container notes, eighth sync running.** `download.pytorch.org` is **still 403 on CONNECT** under this environment's egress policy, so the mandatory Torch overlay again came from PyPI as **`2.13.0+cu130`** rather than the pinned `2.13.0+cpu` (same version, CUDA build, no GPU present; without it ~124 tests silently skip). The **vendor git identity** trap fired for the third recorded sync running — a fresh clone carrying an agent-vendor `user.name`/`user.email` plus `commit.gpgsign`, all reset to the `CLAUDE.md` identity before the first commit. And the **stale-ref** trap fired again in the same shape as last time: local `main` sat on `3db8b72`, 404 ahead / 214 behind a tracking ref that `git fetch` then force-updated to `d743f5c`. `git ls-remote` named the real head before any of that; read it, not the tracking ref, in a fresh container. |
 | 2026-08-30 | *(merge)* + dist | **Upstream sync — 59 commits (`71a37552`..`db4ce6b8`), ten content-conflict regions in source and five standing `modify/delete`s. Two waves arrived interleaved and split on the line every window splits on.** Adopted: **LM Studio joins Ollama as a second LOCAL LLM provider** — the `vision_llm` provider seam, the `vision_lmstudio` driver (measured against a live 0.4.23, not read off the docs), `lmstudio_control`'s ▶ Start button and self-loading model, the `local_llm` routes, the GPU fence's second adapter, and `localLlm.js` with every surface following the ACTIVE provider. It is in scope for exactly the reason Krea 2 was (Divergence 1b): D1 forbids CLOUD engines, and this one answers on `127.0.0.1:1234` with no key and no network call. **Setup stops treating Ollama as a prerequisite** — `ollamaGateReason` plus the skip panel, a ready JoyCaption lifting the gate outright. And the whole **local video-training lane**: H3 **Ref2V** (references first, or no launch), **first-frame i2v**, **H3 stills** from an image dataset, a video dataset's **trigger word**, the 48+ fps promote counting, and the encoder/VAE finders seeing into subfolders. Rejected: the rented-pod video lane in all its forms — `cloud_video_training.py`, its two suites, `VideoDatasetCloudPanel.jsx` and its card slot, the GPU-tier picker and its What's-new entry. **Three leftovers merged with ZERO conflict markers and none was found by the phrase sweep:** (1) `cloud_training._maybe_auto_retry` grew an `if crd.is_video(run)` branch that does `from . import cloud_video_training` — an ImportError waiting for a retry, in a file whose HEAD had a divergence comment 1 100 lines above saying that module is not carried; (2) `useSetupSteps.OLLAMA_SKIP_KEPT` shipped a rented-GPU training line and a line naming the three removed image engines, in a KEPT column — the advert-for-a-missing-button shape D4 names; (3) rejecting the cloud routes orphaned `from ..extensions import db` in `video_datasets.py` (diagnostic 19, caught by `ruff`, not by the sweep). Three merged What's-new blurbs promised training "in the cloud" and were reworded (the D1c rule: the contract does not read prose). Gates: ESLint 0 errors / 20 warnings and `ruff` clean, both unchanged from the pre-merge baseline; frontend 4 411 → **4 460 pass, 0 fail**. |

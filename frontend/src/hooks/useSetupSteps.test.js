@@ -436,6 +436,11 @@ test('installCatalog lists every app-installable component, present + available'
       // 📷 Camera angles — four rows, not five: its VAE is the krea_vae row
       // above (one file, one button).
       'camera_model', 'camera_lora', 'camera_speed_lora', 'camera_text_encoder',
+      // 🎬 Video Test Studio — five weights and NO pack row. The lane's three
+      // optional node packs are linked from its card, never installed by the
+      // app: it downloads model files and does not add code to a ComfyUI.
+      'h3_base', 'h3_text_encoder', 'h3_video_vae', 'h3_audio_vae',
+      'h3_turbo_lora',
       'lanpaint_nodes'],
   );
   // Everything installed in fullCaps -> every tile present, and available to REINSTALL.
@@ -454,7 +459,7 @@ test('installCatalog stays fully available for reinstall when all is green', () 
   // count has to move by the same five for a DIFFERENT total. The one time this
   // reads as "unchanged" is the one time it is wrong.
   const cat = installCatalog(fullCaps());
-  assert.ok(cat.length === 23 && cat.every((c) => c.available));
+  assert.ok(cat.length === 28 && cat.every((c) => c.available));
 });
 
 test('installCatalog marks missing ML extras not-present but still available', () => {

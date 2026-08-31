@@ -1200,6 +1200,20 @@ def _watermark_detect_threshold() -> float:
     return watermark_detector.threshold()
 
 
+def _watermark_clean_options() -> dict:
+    """The 🧽 Klein clean's three dials, RESOLVED — not the raw config values.
+
+    Published so the bank panel and the dataset Clean bar can show, and edit, the
+    exact prompt / cap / write-back the next run will use. Reading the raw config
+    instead would let a screen quote a hand-edited `klein_max_mp: 12` that the pass
+    silently clamps to 4, which is the failure mode `watermark_detect_threshold`
+    above exists to avoid."""
+    from .services import watermark_klein
+    return {'prompt': watermark_klein.clean_prompt(),
+            'max_mp': watermark_klein.clean_max_mp(),
+            'output': watermark_klein.clean_output_mode()}
+
+
 def watermark_detect_weights_present() -> bool:
     """True when BOTH model repos are cached under the detector's models_root.
     A cheap directory check — huggingface_hub names its cache folders
@@ -2082,6 +2096,19 @@ def _comfyui_caps_section(comfy, base_dir, comfy_dir, comfy_launcher,
     # surface reads, so the picker and the Setup card cannot disagree about
     # whether a view can be rendered.
     camera_missing = _qch.camera_missing_assets()
+    # The Video Test Studio, on the same terms as the camera lane: a list of
+    # setup_installer action names the Setup screen turns into buttons, and ONE
+    # readiness verdict every surface reads.
+    #
+    # Two things are deliberately different here. The list carries dicts, not
+    # bare action names, because two of this lane's files have NO action — the
+    # latent upscaler has no verifiable source and the third-party base is
+    # opt-in — and a machine that is missing them must be told where to put them
+    # rather than shown a button that cannot exist. And readiness counts the
+    # REQUIRED weights only: the options degrade one checkbox each, never the
+    # lane.
+    from .services import video_test_studio as _vts
+    _vstudio_missing = _vts.missing_weights()
     return {
         'reachable': comfy['ok'],
         # WHY it isn't reachable, when it isn't: 'ok' | 'slow' | 'unreachable'
@@ -2178,6 +2205,22 @@ def _comfyui_caps_section(comfy, base_dir, comfy_dir, comfy_launcher,
         # The speed LoRA missing does NOT make the lane un-ready: it renders at
         # 20 steps instead of 4. Only the four REQUIRED assets gate it.
         'camera_ready': _qch.camera_ready(camera_missing),
+        'video_studio_missing': _vstudio_missing,
+        'video_studio_ready': _vts.studio_ready(_vstudio_missing),
+        # Per-option node availability: {option: {available, action, nodes}}.
+        # `available: null` means /object_info could not be read — the panel
+        # keeps offering the option, because a probe that could not run is not
+        # a verdict. Costs nothing extra: the class set is already fetched here
+        # for the other engines.
+        'video_studio_options': (_vts.option_availability()
+                                 if comfy['ok'] else {}),
+        # SageAttention is not an option and has no checkbox — it is a speed
+        # patch the graph keeps when present and drops when absent. The pack is
+        # published here so the install card can link it rather than leave a
+        # user wondering why their clips are slower than the notes say.
+        'video_studio_sage': {**_vts.SAGE_PACK,
+                              'present': _vts.sage_available()
+                              if comfy['ok'] else None},
         # Klein assets PRESENT on disk but not real, loadable weights:
         # [{asset, filename, verdict, blocking, reason}]. Distinct from
         # klein_missing (the file exists, it just can't load) — drives the Setup
@@ -2211,6 +2254,7 @@ def probe(force=False) -> dict:
     ollama_installed = probe_ollama_installed()
     from .services import vision_llm as _vision_llm
     _llm_provider = _vision_llm.provider()
+    _wm_clean = _watermark_clean_options()
     _lmstudio_url = ''
     # A filesystem stat, not a round-trip, so it runs for the INACTIVE provider
     # too: "LM Studio is installed on this machine" is worth knowing on the card
@@ -2453,6 +2497,16 @@ def probe(force=False) -> dict:
         # The measured flag threshold, published so the panel and the Settings
         # field quote the SAME number the pass will actually use.
         'watermark_detect_threshold': _watermark_detect_threshold(),
+        # The 🧽 CLEAN's three dials, same doctrine as the threshold above: the
+        # screens that offer them must quote what the pass will really do, and
+        # both surfaces write them back through PUT /api/settings so one stored
+        # choice rules the bank, the dataset and the review lightbox alike.
+        # The prompt in particular was invisible until now — it was a constant in
+        # the source, which is not a place a user can look ("we can't see what is
+        # sent?"). None of the three is a secret and none carries a path.
+        'watermark_clean_prompt': _wm_clean['prompt'],
+        'watermark_clean_max_mp': _wm_clean['max_mp'],
+        'watermark_clean_output': _wm_clean['output'],
         # The video lane, reported as its three independent pieces. A single
         # boolean would be a lie here: decoding, shot detection and encoding come
         # from three different installs and fail apart. The front uses the parts to

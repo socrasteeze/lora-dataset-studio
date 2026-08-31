@@ -70,10 +70,10 @@ that provisions it.
   paragraph does not get to override. Non-negotiable. **Do not lean on CI for this**:
   its push gate is size-based (`.github/workflows/ci.yml`) and skips the heavy
   jobs on a small push, so a red can reach `main` with nothing having run.
-- **Before an intermediate push on a branch** — the targeted tests above, plus
-  the two families no filename leads to (`test_no_personal_data.py` and
-  `test_*contract*.py`, 8 s together). And MEASURE what the diff touches before
-  choosing, rather than judging it:
+- **Before an intermediate push on a branch** — the
+  targeted tests above, plus the two families no filename leads to
+  (`test_no_personal_data.py` and `test_*contract*.py`, 8 s together). And
+  MEASURE what the diff touches before choosing, rather than judging it:
   `git diff --name-only <base>...HEAD | grep -c '^backend/'` — zero means the
   backend suite is not owed at all, because a frontend-only diff can reach the
   backend through nothing but those invariants.

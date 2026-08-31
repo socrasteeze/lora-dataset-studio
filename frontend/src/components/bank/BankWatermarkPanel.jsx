@@ -30,9 +30,13 @@ import { apiFetch, postJson } from '../../api/fetchClient'
 import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
 import PassDialog from './PassDialog.jsx'
 import KleinModelSetting from '../shared/KleinModelSetting'
+import KleinCleanOptions from '../shared/KleinCleanOptions'
 import KleinCompareDialog from '../shared/KleinCompareDialog'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useToast } from '../common/Toast'
+import {
+  CLEAN_ENGINES_BLURB, KLEIN_CLEAN_SHORT, kleinCleanTitle,
+} from '../../utils/watermarkCleanEngine.js'
 import {
   cropLevelState, findLevelState, hasCleanedImages, inpaintLevelState,
   levelCounts, maskNote, progressSummary, rescanNote, sourceNote,
@@ -72,7 +76,7 @@ export default function BankWatermarkPanel({
   bankId, live, onFind, onFindText = null, onChanged, payload = null,
   selectedIds = [], gpuPresent = true, onPickPython = null,
 }) {
-  const { caps } = useCapabilities()
+  const { caps, refresh: refreshCaps } = useCapabilities()
   const toast = useToast()
   const [levels, setLevels] = useState(null)
   const [method, setMethod] = useState('auto')
@@ -244,7 +248,7 @@ export default function BankWatermarkPanel({
           blurb="Cuts the border strip holding the mark. No model, no GPU, and no invented pixel — try this one first."
           onRun={() => setCleanOpen('watermark_crop')} />
         <LevelCard index={3} title="Repaint what's left" state={inpaint}
-          blurb="Repaints the marks a crop can't remove. LaMa is fast; Klein is slower but also clears marks on the subject."
+          blurb={`Repaints the marks a crop can't remove. ${CLEAN_ENGINES_BLURB}`}
           onRun={() => setCleanOpen('watermark_inpaint')} />
       </div>
       {/* Level 1 is a bank vision pass and travels like the others; levels 2-3
@@ -301,7 +305,7 @@ export default function BankWatermarkPanel({
           <button type="button" aria-pressed={method === 'klein'} onClick={() => setMethod('klein')}
             disabled={!caps.watermark_klein && deviceId === 'local'}
             title={caps.watermark_klein
-              ? 'Klein: masked Flux.2 inpaint through ComfyUI. Slower, and the only engine that clears a mark ON the subject.'
+              ? kleinCleanTitle(caps)
               : deviceId !== 'local'
                 ? 'Klein renders on the selected machine — its own ComfyUI checks the models when the job runs.'
                 : (kleinReason || 'Klein inpainting needs ComfyUI running + the Klein models (Setup ▸ ComfyUI).')}
@@ -321,6 +325,7 @@ export default function BankWatermarkPanel({
             w-full: this drops onto its own line rather than squeezing the
             toggle at 400 px. */}
         {method === 'klein' && (
+          <>
           <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1">
             <KleinModelSetting className="min-w-0 flex-1" />
             <button type="button"
@@ -341,6 +346,15 @@ export default function BankWatermarkPanel({
               </span>
             )}
           </div>
+          {/* WHAT the clean will actually do, and the three dials that change it: the
+              prompt Klein is sent, the size the photo travels at, and whether the file
+              keeps its dimensions. Stored, so the dataset side reads the same values —
+              the shared feature rule (CLAUDE.md), applied to the dials and not just to
+              the pass. `refreshCaps` re-reads the resolved values so the engine tooltip
+              beside it quotes the prompt the user just typed. */}
+          <KleinCleanOptions caps={caps} disabled={live} className="w-full"
+            onChanged={() => refreshCaps(true, { background: true })} />
+          </>
         )}
         {/* 🔤/🚩 WHAT to clean — only offered once Find text flagged something,
             because with no text-flagged page the three choices collapse into
@@ -463,7 +477,7 @@ export default function BankWatermarkPanel({
               Engine: <span className="font-semibold text-content">
                 {method === 'klein' ? 'Klein' : 'LaMa'}
               </span>{method === 'klein'
-                ? ' — slower, and the only one that clears a mark ON the subject.'
+                ? KLEIN_CLEAN_SHORT
                 : ' — fast; a mark on the subject stays flagged instead of being smeared.'}
               {target !== 'all' && (
                 <>

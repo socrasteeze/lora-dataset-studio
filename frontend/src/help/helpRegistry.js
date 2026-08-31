@@ -772,6 +772,14 @@ const TOPICS = [
   /* DIVERGENCE 10 — hand-ported from upstream's help/topics/pages.js. The
      capability row names this id as its topic (deriveCapabilitySummary), so a
      missing one is a readiness row that leads nowhere. */
+  setupStep('setup-video-studio', 'install', 'Install 🎬 Video Test Studio',
+    ['video studio', 'video test studio', 'install video', 'video weights',
+     'minimax', 'h3', 'minimax h3', 'video model missing', '39 gb', '40 gb',
+     'i2v', 'image to video', 'text to video', 'video lora', 'test a video lora',
+     'turbo lora', '4 step', 'sparse attention', 'latent upscale', 'node pack',
+     'restart comfyui', 'models/diffusion_models', 'models/text_encoders',
+     'latent_upscale_models', '10eros', 'video tab greyed out',
+     'video options disabled', 'cannot render a clip']),
   setupStep('setup-camera-install', 'install', 'Install 📷 Camera angles',
     ['camera angles', 'camera', 'angles', 'multi-angle', 'multiple angles', 're-shoot',
      'reshoot', 'other side', 'back view', 'viewpoint', 'qwen image edit', 'qwen 2511',
@@ -979,6 +987,24 @@ const TOPICS = [
       'video unavailable', 'video extra', 'which piece is missing'],
     guide: { chapter: 'using-the-app', anchor: 'the-video-bank-turn-a-folder-of-rushes-into-shots' },
     app: { route: '/video-bank' } },
+  // 🎬 The Video tab of the Test Studio. Its own PAGE topic rather than keywords
+  // on page-studio: the two lanes share a screen but nothing else — different
+  // tables, different pipeline, one clip instead of a grid — and someone whose
+  // video LoRA renders nothing is not helped by the Z-Image troubleshooting the
+  // image topic carries.
+  { id: 'page-video-studio', kind: 'page', title: 'Video Test Studio',
+    keywords: ['video studio', 'test a video lora', 'video lora', 'try my video lora',
+      'i2v', 'image to video', 'image-to-video', 'animate', 'animate an image',
+      't2v', 'text to video', 'text-to-video', 'minimax', 'h3', 'minimax h3',
+      'generate a clip', 'render a video', 'make a video', 'motion prompt',
+      'turbo', '4 step', '4-step', 'distillation', 'sparse', 'sparse attention',
+      'latent upscale', 'upscale a clip', '10eros', 'eros', 'base model',
+      'deploy a video lora', 'copy lora into comfyui', 'lora not listed',
+      'seed', 'same seed', 'compare two clips', 'strength', 'clip length',
+      'frames', 'how many frames', 'megapixels', 'prompt not respected',
+      'slow generation', 'takes forever', 'missing node', 'node pack'],
+    guide: { chapter: 'using-the-app', anchor: 'test-a-video-lora-before-you-trust-it' },
+    app: { route: '/studio?lane=video' } },
   // Searched for by what people TRIED and could not do: they pasted a RedGifs or
   // TikTok link into the image scraper and got "no images found", or they
   // downloaded clips by hand into a folder because nothing else was on offer.
@@ -2007,6 +2033,39 @@ const TOPICS = [
       'watermark', 'watermark clean', 'inpaint', 'klein inpaint', 'bank'],
     guide: { chapter: 'settings-reference', anchor: 'image-engines' },
     app: { route: '/datasets' } },
+  // The 🧽 Klein clean's three dials (2026-08-31). They are NOT on the Settings screen:
+  // they live next to the Klein model choice in the bank's Level 3 panel and the
+  // dataset's Clean bar, because that is where the result is judged — so like
+  // dataset.klein_model above these are hand-built topics pointing at the workspace,
+  // not `setting()` entries pointing at a Settings field that does not exist. The
+  // guide chapter is the one that documents them (Captioning & quality ▸ Watermark
+  // inpainting).
+  { id: 'watermark_clean.klein_prompt', kind: 'setting',
+    title: 'Prompt sent to Klein (watermark clean)',
+    keywords: ['klein', 'prompt', 'instruction', 'remove watermark', 'what is sent',
+      'sent to klein', 'wording', 'text', 'edit prompt', 'custom prompt', 'clean',
+      'watermark', 'inpaint', 'bank', 'dataset',
+      // The words somebody writes when the pass did not remove their mark and they are
+      // looking for something — anything — to turn.
+      'still there', 'not removed', 'survived', 'did not work', 'logo remains',
+      'signature', 'tiled', 'reset to default', 'default prompt'],
+    guide: { chapter: 'settings-reference', anchor: 'captioning-quality' },
+    app: { route: '/datasets' } },
+  { id: 'watermark_clean.klein_max_mp', kind: 'setting',
+    title: 'Processing size for the Klein clean (megapixels)',
+    keywords: ['klein', 'megapixel', 'megapixels', 'mp', 'processing size', 'resolution',
+      'quality', 'detail', 'sharper', 'blurry', 'soft', 'downscaled', '2 mp', '4 mp',
+      'clean', 'watermark', 'vram', 'out of memory', 'oom', 'slow', 'faster', 'time',
+      'bank', 'dataset'],
+    guide: { chapter: 'settings-reference', anchor: 'captioning-quality' },
+    app: { route: '/datasets' } },
+  { id: 'watermark_clean.klein_output', kind: 'setting',
+    title: 'What size the cleaned file is written at',
+    keywords: ['klein', 'output', 'write back', 'dimensions', 'size', 'resized',
+      'smaller', 'shrunk', 'my images got smaller', 'changed size', 'render size',
+      'original dimensions', 'resample', 'clean', 'watermark', 'bank', 'dataset'],
+    guide: { chapter: 'settings-reference', anchor: 'captioning-quality' },
+    app: { route: '/datasets' } },
   // Concept face masking (issue #15) is a per-DATASET Advanced training option,
   // so like Dual captions it points at the dataset guide rather than
   // settings-reference. Its two tuning knobs live in Settings > Training and are
@@ -2078,7 +2137,7 @@ const TOPICS = [
     ['watermark', 'clean', 'find', 'lama', 'klein', 'crop', 'remove'],
     '/datasets?section=curation&panel=watermarks', 'settings-reference', 'captioning-quality',
     { trigger: 'watermark-batch-clean',
-      text: 'Clean has two engines — LaMa (fast) and Klein (quality) — and auto-crop can be turned off.' }),
+      text: 'Clean has two engines — LaMa repaints the marked zones, Klein re-renders the whole photo — and auto-crop can be turned off.' }),
   action('action-dataset-reject-flagged', 'Reject every flagged image at once',
     ['reject all', 'reject flagged', 'bulk reject', 'watermark', 'flagged', 'shortcut',
      'undo reject', 'bring back', 'rejected', 'false positive', 'stop watermark scan',
@@ -2089,7 +2148,8 @@ const TOPICS = [
     'Which engine finds watermarks',
     ['watermark backend', 'watermark detection', 'detector', 'vision model', 'ollama',
      'siglip', 'auto', 'which detector', 'why is this flagged', 'watermark source',
-     'not installed', 'fallback', 'extra']),
+     'not installed', 'fallback', 'extra', 'choose vision model', 'change vision model',
+     'which vision model', 'pull model', 'download model', 'lm studio']),
   action('action-bank-watermark-clean', 'Clean a bank\'s watermarks (2 levels)',
     ['watermark', 'bank', 'clean', 'crop', 'auto-crop', 'inpaint', 'lama', 'klein',
      'remove watermark', 'logo', 'url', 'undo cleaning', 'before after', 'original',

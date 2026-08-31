@@ -2434,10 +2434,43 @@ launch by hand** — cheapest and safest first:
    GPU, no invented pixel: it simply trims the band up to the mark, and only
    when the image stays big enough to train on. Anything it can't crop that way
    is left flagged, on purpose.
-2. **🧽 Inpaint** repaints what's left. **LaMa** (fast, non-generative) handles
-   small off-centre marks and leaves marks *on the subject* flagged; **Klein**
-   (slower, via ComfyUI) also clears those. Each engine says what to install
-   when it isn't ready, and the button stays off rather than failing mid-pass.
+2. **🧽 Inpaint** repaints what's left. **LaMa** (fast, non-generative) repaints
+   the marked zones and leaves marks *on the subject* flagged. **Klein** (slower,
+   via ComfyUI) works in two steps: the zones the scan found are **erased** on the
+   photo, and then the **whole photo** is re-rendered with the instruction to
+   remove the watermarks. The erasing is what stops the model handing the mark
+   back; the whole-photo pass is what also clears the marks the scan *missed* — a
+   mark tiled across the picture, one on the subject, one the detector boxed in
+   the wrong place. The price is an image whose every pixel is regenerated. Each
+   engine says what to install when it isn't ready, and the button stays off
+   rather than failing mid-pass.
+
+   **It is a generative pass, not a mask, so read the result.** Measured on the
+   shipped settings: a photo tiled wall-to-wall with a mark came back with all
+   twelve zones gone and looking clean — the case that was hopeless before,
+   because there was no unmarked area to copy from. A photo carrying seven
+   distinct logos came back with all seven gone. What can still survive is a mark
+   **nobody found**: nothing erased that one, so the model is free to keep it.
+
+   **Why the erasing matters, in one measured example.** Run without it, the same
+   photo came back with a round logo *redrawn* as a plausible **moon in the sky**
+   — the model reinterpreting a mark it could still see rather than deleting it.
+   A re-run of 🚩 Find watermarks sees nothing wrong with an image like that (a
+   moon is not a watermark), so it would stay marked *cleaned* and no later step
+   would catch it. Erasing the zones first removed every trace of that. It is
+   still worth a look at the picture.
+
+   **Three dials, right there under the engine.** Picking Klein reveals the
+   **prompt it is actually sent** (`remove watermark` by default, editable, with
+   *Reset to default* to get it back), the **processing size** the photo travels
+   at (1 – 4 MP, default 2 — higher means finer regenerated detail and more VRAM
+   and time, and a photo already smaller than the setting is never enlarged), and
+   **what size the cleaned file is written at**: back at your file's own
+   dimensions, as before, or at the render's size — in which case **the file
+   changes dimensions**. The dataset's Clean bar offers exactly the same three,
+   and they are one stored choice, so setting them on either side arms both.
+   Every clean also writes the prompt, size and write-back mode it used to
+   🪵 Server log, so you can tell afterwards what actually ran.
 
 Each step shows how many images it still has to work on and how many it has
 already handled, so you can see where the funnel stands. **Your source files are
@@ -2616,8 +2649,14 @@ exists; use **↩ Undo cleaning** first.
 
 What the two cleaning steps then do with your mask:
 
-- **🧽 Inpaint repaints exactly the zones you drew** — all of them, including a
-  zone sitting on the subject, which is precisely what a hand mask is for.
+- **🧽 Inpaint acts on the zones you drew** — all of them, including a zone
+  sitting on the subject, which is precisely what a hand mask is for. **On
+  LaMa** they are exactly what gets repainted, and nothing else is touched. **On
+  Klein** they are erased from the photo first and then the whole picture is
+  re-rendered, so your zones decide what is guaranteed to go, while the pass also
+  clears marks you did not draw — and everything else is re-rendered with them.
+  Drawing zones therefore buys precision on LaMa, and on Klein it buys certainty
+  about the marks you pointed at.
 - **✂ Auto-crop skips a hand-masked image.** A crop can only cut one border
   band; it cannot express several zones or a mark on the subject, so cropping
   the old box would remove pixels you did not point at.
@@ -3747,6 +3786,68 @@ Two labels sit next to every target, and both are there to save a wasted week:
 Deleting a video dataset deletes the encoded clips and nothing else: the bank
 keeps every shot and every decision, so you can re-cut at another length or for
 another target without triaging again.
+
+## Test a video LoRA before you trust it
+
+Training a video LoRA gives you a `.safetensors` and a loss curve. Neither of
+them tells you whether it learned the thing you wanted, so the **Video** tab of
+the Test Studio renders a clip with it — the same MiniMax H3 pipeline the app
+uses everywhere else, driven from one panel.
+
+**What it needs, once.** The engine is MiniMax H3 and its four required files
+are about **39.5 GB** — Setup ▸ **🎬 Video Test Studio** downloads them into
+ComfyUI's own folders. A plain clip needs *nothing else*: no custom node, no
+add-on, deliberately, so that a fresh install can render something the moment
+the weights land. The optional 4-step **turbo LoRA** is downloaded there too
+(0.7 GB, and it is the difference between a clip in minutes and one in tens of
+minutes).
+
+The three accelerator options — turbo, sparse attention and the latent upscale —
+need ComfyUI **custom node packs**, and the app does not install those: it names
+each pack, links it and gives you its ComfyUI-Manager search term, and you add
+it on the ComfyUI side. A weight is an inert file in a folder; a custom node is
+code your ComfyUI imports at startup, and one bad import takes the whole server
+down for every other thing you use it for. That is not a risk this app takes on
+your behalf. An option whose pack is absent is shown greyed out with the pack
+named, never as a button that fails. Two more files — the latent upscaler's
+model and the third-party 10Eros base — are yours to place by hand if you want
+them; the Setup card says where.
+
+**Pick the LoRA, then say what moves.** A checkpoint that came out of a training
+run is not visible to ComfyUI until it is copied into its `loras` folder; the
+picker does that for you the first time you select one (a 300 MB copy, once).
+LoRAs you dropped into `models/loras/h3` yourself are listed too. **No LoRA** is
+the first choice on the list on purpose: the only way to know what yours changed
+is to have seen the same seed without it.
+
+**A start frame, or none.** Image-to-video animates a picture — uploaded, taken
+from a bank, or lifted from the first frame of a clip in a training set (that
+last one is the honest baseline, since it is material the LoRA actually saw).
+Text-only skips the picture entirely and composes the shot from the prompt.
+Either way, describe the *movement*: the start frame already says what the scene
+looks like.
+
+**The four options are not free, and the panel says what each one costs.**
+⚡ Turbo swaps in a 4-step distillation LoRA and its double-clock sampler —
+minutes instead of tens of minutes, and a different model rather than merely a
+faster one; it is on by default because an undistilled first clip is long enough
+to look like a hang. 🔬 Latent upscale enlarges before anything is decoded, so
+the audio track survives untouched — and it is where most of the time goes.
+Sparse attention buys speed by attending to less, which costs prompt adherence;
+with the upscale on, the first pass deliberately stays dense so the prompt keeps
+its grip on the composition, and only **Max** accelerates both passes. 🔥 The
+10Eros base replaces the official model with a third-party finetune that brings
+its own faces — which is exactly what you do not want while testing whether
+*your* LoRA reproduces an identity.
+
+**One clip at a time, and a history.** A clip is minutes, so there is no grid
+here. Every clip keeps the settings that made it, and **Reuse** loads them back —
+seed included. Changing one dial on the same seed is the only comparison that
+says anything about that dial.
+
+If the panel refuses to launch, it is telling you the graph cannot run on this
+install: the message names the missing weights and the ComfyUI node packs to
+install, rather than letting the job fail silently a minute later.
 
 ## Stopping Score, and what a relaunch costs
 
