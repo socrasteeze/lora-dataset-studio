@@ -131,6 +131,8 @@ import { chipCounts, facetDataKey, isFacetFiltered } from './bankFacetCounts.js'
 // address at all. Read-only; it selects, it never un-rejects.
 import { reasonBuckets, reasonHint } from './bankRejectReasons.js'
 import { activeLocalLlm, localLlmLabel } from '../../utils/localLlm'
+import WatermarkEngineChoice from '../shared/WatermarkEngineChoice'
+import { watermarkEngineStatus } from '../../utils/watermarkEngine.js'
 
 
 const PAGE_SIZE = 120
@@ -1342,6 +1344,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const storedWmThreshold = Number.isFinite(Number(caps.watermark_detect_threshold))
     ? Number(caps.watermark_detect_threshold) : 0.94
   const [wmThreshold, setWmThreshold] = useState(null)
+  // Engine of the 🚩 scan — local echo of the stored watermark_detect.backend,
+  // so the threshold row can follow the RESOLVED route without a caps refresh.
+  const [wmEngine, setWmEngine] = useState(caps.watermark_detect_backend || 'auto')
   const effectiveWmThreshold = wmThreshold ?? storedWmThreshold
   const saveWmThreshold = async (value) => {
     try {
@@ -1371,7 +1376,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {'another threshold.'}
         </span>
       </label>
-      {caps.watermark_detect ? (
+      <WatermarkEngineChoice caps={caps} disabled={live}
+        onChanged={(engine) => setWmEngine(engine)} />
+      {watermarkEngineStatus(wmEngine, caps).runs === 'detector' ? (
         <label className="block text-[11px] text-content-subtle">
           <span className="font-medium text-content">Detector threshold</span>
           {' — the score an image needs to be flagged as watermarked. Lower '}
@@ -1392,10 +1399,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         </label>
       ) : (
         <p className="m-0 text-[11px] leading-snug text-content-subtle">
-          This run takes the vision route (the dedicated detector is not
-          installed), which answers yes/no with no score — so there is no
-          threshold to tune here. Install “Watermark detector” from Setup for
-          the ~10× faster scored route.
+          The vision route answers yes/no with no score — so there is no
+          threshold to tune here.
         </p>
       )}
       {/* The run's RESULT: the 🚩-family flagged pages (text-flagged ones live
@@ -2455,10 +2460,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
 
           {filter.flag === 'dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="exact"
+              notDuplicates={payload?.dup?.not_duplicates ?? 0}
               onChanged={async () => { await refreshPayload(); await refreshImages() }} />
           ) : filter.flag === 'semantic_dups' ? (
             <DupGroupsPanel bankId={bankId} live={live} kind="semantic"
               semanticLabel={semanticState.label}
+              notDuplicates={payload?.semantic_dup?.not_duplicates ?? 0}
               onChanged={async () => { await refreshPayload(); await refreshImages() }} />
           ) : (
             <>

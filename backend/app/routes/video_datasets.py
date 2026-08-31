@@ -257,6 +257,7 @@ def video_dataset_train_stop(dataset_id):
 # DIVERGENCE 4 — upstream continues here with the rented-pod video lane:
 # POST /train/cloud, GET /train/cloud/progress, GET /train/cloud/checkpoints,
 # GET /train/cloud/checkpoint, POST /train/cloud/retry, POST /train/cloud/continue,
+# DELETE /train/cloud/run/<id> (2026-08-31: the 🗑 that clears one finished run),
 # plus their `_video_run` / `_relaunch` helpers. This fork trains video LOCALLY
 # only, so none of it is carried and `cloud_video_training` is not a module here.
 # The local lane above (/train, /train/progress, /train/stop) is the whole
