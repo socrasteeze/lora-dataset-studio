@@ -28,15 +28,8 @@ No model is ever loaded here: the worker is a seam and is monkeypatched.
 
 from app.services import video_caption as vc
 
-# The video-extra gate answers for the MACHINE, so without this the ONE route
-# test below passes where PyAV/ffmpeg are installed and 503s where they are not.
-# Imported for its autouse effect; see _video_extra.py for why not importorskip.
-# DIVERGENCE 5 — carried patch on an upstream test file. The sibling this module
-# says it mirrors (test_video_caption_style.py) has had this line since it was
-# written; the model file arrived without it, so its per-run-model route test is
-# red anywhere `av` is absent — which is every CI run, because ci.yml installs
-# requirements-dev.txt plus the torch overlay and `av` is declared in
-# requirements-ml.txt. Drop this hunk if upstream adds the import their side.
+# The video-extra gate answers for the MACHINE: without this the route test passes
+# where PyAV/ffmpeg are installed and 503s on CI. Imported for its autouse effect.
 from _video_extra import video_extra_ready  # noqa: F401
 
 DEFAULT_MODEL = 'Qwen/Qwen3-VL-4B-Instruct'

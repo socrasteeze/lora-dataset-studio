@@ -2253,6 +2253,46 @@ STUDIO_NODE_PACKS = {
         'url': 'https://github.com/Jonseed/ComfyUI-Detail-Daemon',
         'search': 'Detail Daemon',
     },
+    # ── The Video Test Studio's MiniMax H3 graph ──────────────────────────────
+    # Four packs, and only the first is needed for a plain clip: the others come
+    # with an option the user ticked. Naming them separately is the difference
+    # between "install this pack to use ⚡ Turbo" and a bare class name for a
+    # node the user never asked for by name.
+    'PathchSageAttentionKJ': {
+        'pack': 'ComfyUI-KJNodes',
+        'url': 'https://github.com/kijai/ComfyUI-KJNodes',
+        'search': 'KJNodes',
+    },
+    'MiniMaxH3TurboLoRA': {
+        'pack': 'ComfyUI-MiniMax-H3-Turbo',
+        'url': 'https://github.com/Larryvrh/ComfyUI-MiniMax-H3-Turbo',
+        'search': 'MiniMax H3 Turbo',
+    },
+    'MiniMaxH3TurboSampler': {
+        'pack': 'ComfyUI-MiniMax-H3-Turbo',
+        'url': 'https://github.com/Larryvrh/ComfyUI-MiniMax-H3-Turbo',
+        'search': 'MiniMax H3 Turbo',
+    },
+    'H3SparseAttentionAdvanced': {
+        'pack': 'H3-Optimizations',
+        'url': 'https://github.com/Zironic/H3-Optimizations',
+        'search': 'H3 Optimizations',
+    },
+    'MMH3UltimateUpscale': {
+        'pack': 'Comfyui-MMH3-UltimateUpscale',
+        'url': 'https://github.com/bbaudio-2025/Comfyui-MMH3-UltimateUpscale',
+        'search': 'MMH3 Ultimate Upscale',
+    },
+    'MMH3LatentUpscaleWithModelParams': {
+        'pack': 'Comfyui-MMH3-UltimateUpscale',
+        'url': 'https://github.com/bbaudio-2025/Comfyui-MMH3-UltimateUpscale',
+        'search': 'MMH3 Ultimate Upscale',
+    },
+    'MMH3TemporalSplitParams': {
+        'pack': 'Comfyui-MMH3-UltimateUpscale',
+        'url': 'https://github.com/bbaudio-2025/Comfyui-MMH3-UltimateUpscale',
+        'search': 'MMH3 Ultimate Upscale',
+    },
 }
 
 
@@ -3966,7 +4006,9 @@ def repair_generated_image(user_id, image_id, boxes, prompt, *,
     fds.take_repair_snapshot(path)
     try:
         # A brush stroke goes through the full frame (Klein sees the whole
-        # picture); a drawn box keeps the cheaper crop-and-stitch lane.
+        # picture); a drawn box keeps the cheaper crop-and-stitch lane, which
+        # the free `text` is what selects — the same call with NO prompt is the
+        # 🧽 clean, and that one re-renders the entire photo (2026-08-31).
         if pil_mask is not None:
             ok, err = watermark_klein.inpaint_mask_klein(
                 user_id, staged, mask=pil_mask, seed=seed,
