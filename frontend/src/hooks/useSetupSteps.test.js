@@ -452,11 +452,11 @@ test('installCatalog lists every app-installable component, present + available'
 
 test('installCatalog stays fully available for reinstall when all is green', () => {
   // The menu must never collapse once installed — each item can always be repaired.
-  // 23, not upstream's 22: this fork's catalog carries the 🔖 WD14 tagger row on
+  // 28, not upstream's 27: this fork's catalog carries the 🔖 WD14 tagger row on
   // top of upstream's list. Recomputed from the deepEqual list just above, never
-  // copied from upstream's literal — upstream's number moved 17 -> 22 this sync
-  // (the Klein enhancement LoRA plus four 📷 camera rows), and the fork's own
-  // count has to move by the same five for a DIFFERENT total. The one time this
+  // copied from upstream's literal — upstream's number moved 22 -> 27 on the
+  // 2026-09-01 sync (the five 🎬 Video Test Studio weight rows), and the fork's
+  // own count moved by the same five for a DIFFERENT total. The one time this
   // reads as "unchanged" is the one time it is wrong.
   const cat = installCatalog(fullCaps());
   assert.ok(cat.length === 28 && cat.every((c) => c.available));
