@@ -1,58 +1,77 @@
 # HANDOFF
 
-**Updated:** 2026-08-31 · **Branch:** main · **Base:** 1cefafc · **Tree:** clean
+**Updated:** 2026-09-01 · **Branch:** main · **Base:** 8576753 · **Tree:** clean
 
 ## State
-Synced with `perfectgf/lora-dataset-studio` at `7bb5f2e` (v2026.08.31.1) — 27
-commits, an entirely local-lane window, 0 behind after this push. All gates green
-on the exact tree pushed, full backend suite included.
+Synced with `perfectgf/lora-dataset-studio` at `7bb5f2e` (v2026.08.31.1) — **0
+behind, 57 ahead**. The 27-commit window and its dist are **on `main`**; the
+feature branch that carried them is gone from `origin`. Nothing is in flight.
 
 ## Done this session
-- Merged `4d21222..7bb5f2e` — thirteen conflict regions across twelve files, four
-  `modify/delete` — `d2c4fb5`; dist `a715e6a`
-- **Adopted, all local:** 🎬 Video Test Studio (+ weights-only Setup installer),
-  Klein cleaning the WHOLE photo after erasing zones, the three Klein-clean dials,
-  whole-mark zones, the deep sweep reporting every zone, the vision-model picker,
-  finger-sized Bank buttons, "a restart is not a ComfyUI error".
-- **The one that mattered (D6):** upstream split `inpaint_watermark_klein` into two
-  helpers. Git conflicted on the signature only; the new dispatch auto-merged below
-  it calling helpers that take no `device_id` — reverting D6 on the clean lane
-  silently, and leaving the repair lane calling `_run_klein_job(device_id=device_id)`
-  inside a helper that never declared it (a `NameError` on every ✦ repair).
-- **Divergence 11 added:** upstream's `nightly` doctrine auto-merged into `CLAUDE.md`
-  with zero markers — removed there, in two stragglers, and in `.claude/rules/`.
-- D5's `_video_extra` carrier retired (upstream added it). Counts recomputed:
-  capabilities 18→**19**, installCatalog 23→**28**, plus `kreaInstall.test.js` (the
-  count's second home, auto-merged stale). D10: 310 → **315 topics / 14 tips**.
+A scheduled sync run that found **nothing to sync** — recorded because "no
+window" is a result, and the previous handoff no longer described the remote.
+
+- **No merge performed.** `upstream/main` was already an ancestor of the fork's
+  own tip, so the incoming window was empty. The first `git log HEAD..upstream/main`
+  looked like 27 incoming commits purely because local `main` was 31 behind
+  `origin/main` — the skill's stale-ref trap, in its "local ref is stale" form.
+- **The sync had already landed on `origin/main`** (`9538414..8576753`) between
+  this container's clone and its first fetch. Local `main` fast-forwarded to it.
+- **Re-verified the landed tree on Linux, with the Torch overlay present** —
+  every gate below green. This is the first full-suite confirmation of that tree
+  from a second machine.
+
+## Verified 2026-09-01 (all green on `8576753`)
+| Gate | Result |
+|---|---|
+| ESLint `npm run lint` | 0 errors / **20 warnings — D9 baseline exactly** |
+| `npm run build` | committed `frontend/dist` is **byte-identical** to a fresh build |
+| local-only engines, frontend | 8/8 |
+| local-only engines, backend | 3/3 |
+| `create_app()` | OK |
+| personal-data + ASCII-scripts | 13 passed, 2 skipped (no `.privacy-names` list) |
+| `ruff check .` | All checks passed |
+| `node --test` | **4550 passed, 0 failed** |
+| backend `-n 8 --dist loadfile` | **8605 passed, 71 failed, 122 skipped** (11m51s) |
+| identity / attribution | one author across all 31 commits, no trailers |
 
 ## Open
-1. **Three stale remote branches need deleting** — `claude/magical-tesla-ekn21b`,
-   `juc4nk`, `tydc3z`, all contained in `main`. This sandbox has had **HTTP 403** on
-   ref delete for five sessions (push works, delete does not; no delete-branch tool
-   on the GitHub MCP server). Owed from a machine with full push rights.
-2. **Responsive probe not run, owed a fourth time** — and the surface grew: the Video
-   Test Studio is a new lane (`/studio?lane=video`). Needs a live instance with LoRAs.
+1. **Three stale remote branches still need deleting** — `claude/magical-tesla-ekn21b`,
+   `juc4nk`, `tydc3z`. All three confirmed **fully contained in `origin/main`, zero
+   unmerged commits**, so they are safe to delete. **Sixth session blocked.**
+   **Newly diagnosed this session:** the 403 is *not* the sandbox egress proxy —
+   its status endpoint reported `recentRelayFailures: []` for the attempts, so the
+   connection was allowed and **GitHub itself refused the ref delete**. The GitHub
+   MCP server offers `create_branch` but no delete-branch/delete-ref tool, so there
+   is no route around it from here. Owed from a checkout with full push rights;
+   stop re-attempting it from a sandbox.
+2. **Responsive probe not run, owed a fifth time** — surface still includes the
+   Video Test Studio lane (`/studio?lane=video`). Needs a live instance with LoRAs.
 3. `training/runs-hub.png` and `advanced-options.png` still photograph the rental
    lane; referenced by `docs/guide/workflow.md`, so a re-shoot, not a delete.
 4. Fork-only controls still carry emoji while upstream's use `lucide-react` icons.
 5. `no-unused-vars` at `warn` (D9): **20 warnings, baseline-identical**.
 
-## Decisions
-- **`CHANGELOG.md` deliberately NOT updated** — frozen since 2026-07-31; release
-  notes generate from `whatsNew.js`, which carries all five entries.
-- **README kept the fork's heading structure** over upstream's capability table.
-- **`video_test_studio.py`'s `cloud_training` import is fine** — that module IS
-  carried (dormant, D4 server/client split). Only `cloud_video_training` is not.
-
 ## Traps
-- **`test_peer_training_over_http.py` flakes under xdist — FIFTH sync running.** Two
-  reds post-merge; one passed alone, the whole file replays **20/20 green ×3**.
-- Linux floor here is **71 backend failures**; CI runs backend on `windows-latest`.
-  Diff the failure LIST against a baseline, never the total.
-- **The Torch overlay cannot come from its pinned index** — `download.pytorch.org` is
-  403 at CONNECT here. PyPI works: `pip install torch==2.13.0`; ~124 tests skip without it.
-- A fresh container authors commits as its agent vendor — reset the git identity to
-  the `CLAUDE.md` one before the first commit. Fired again this session.
+- **The Linux backend floor is 71 failures and it reproduced exactly.** Sampled
+  and classified: Windows-only path expectations (`venv/Scripts/python.exe`,
+  `WindowsPath` instantiation), and a mimetype-registry difference on `.js`/`.mjs`
+  (`text/javascript` vs `application/javascript`). CI runs backend on
+  `windows-latest`, so none of these is CI-visible. Diff the failure **list**,
+  never the total.
+- **`test_peer_training_over_http.py` did NOT flake this run** — first clean run
+  in six syncs. Do not pre-emptively treat it as expected-red.
+- **The Torch overlay still cannot come from its pinned index** —
+  `download.pytorch.org` is 403 at CONNECT here. PyPI works:
+  `pip install torch==2.13.0` (resolved to `2.13.0+cu130`, ~1.6 GB of deps).
+  Without it ~122 tests skip and one fails rather than skipping.
+- **A fresh container authors commits as its agent vendor — fired again.** This
+  one also arrived with `commit.gpgsign=true` pointing at a vendor SSH signing
+  key, which the repo's own history does not use (every commit is unsigned).
+  Reset identity *and* disable that signing before the first commit.
+- **A local ref can be many commits behind `origin` at container start.** Fetch
+  and compare against `origin/main`, not local `main`, before believing an
+  incoming-commit count.
 
 ## Verify
 ```bash
