@@ -36,6 +36,19 @@ window" is a result, and the previous handoff no longer described the remote.
 | identity / attribution | one author across all 31 commits, no trailers |
 
 ## Open
+0. **`main` IS RED ON CI and was already red before this session** — CI run #160
+   on `8576753`, the "Backend tests" job (`windows-latest`). Gate, Lint, Docker
+   smoke and Frontend all passed; backend ran **1 failed / 8784 passed / 13
+   skipped** on the single test
+   `test_bank_scan_no_db_lock.py::test_the_duplicate_regrouping_lets_other_writers_through`,
+   which missed its wall-clock budget at **0.2634 vs a 0.25 line**. Not a
+   regression and not a dropped divergence — see the SUPERSEDED block under D5's
+   sixth entry in `FORK_NOTES.md`, which this session rewrote after nearly
+   misreading it as one. **Deliberately not "fixed" here:** the number is a real
+   concurrency guard, widening it is the maintainer's call, and no local run can
+   reproduce it (Linux replays the file 4 passed ×3; CI backend is Windows-only).
+   Decide whether 0.25 moves, then push any commit WITHOUT `[skip ci]` to prove
+   it green.
 1. **Three stale remote branches still need deleting** — `claude/magical-tesla-ekn21b`,
    `juc4nk`, `tydc3z`. All three confirmed **fully contained in `origin/main`, zero
    unmerged commits**, so they are safe to delete. **Sixth session blocked.**
