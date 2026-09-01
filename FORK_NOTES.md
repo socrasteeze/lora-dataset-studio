@@ -1159,6 +1159,27 @@ p99 block unless upstream adopts an equivalent tail statistic. The deterministic
 control immediately below it remains unchanged and still proves the probe can
 see the legacy parked-lock shape.
 
+> **SUPERSEDED 2026-08-22 by `7260a4d4` — do not restore the p99 block.** This
+> entry stayed on the page for ten days after the fork itself moved off it, and
+> read cold on 2026-09-01 it looks exactly like a D5 patch a merge had dropped:
+> the file now carries `max(waits) / phase < 0.25`, which is the shape the
+> paragraph above says was "deliberately not taken". It was taken, on purpose.
+> `7260a4d4` ("stop three tests from measuring the runner instead of the code")
+> settled on the share-of-the-phase assertion as the ONLY line in that test and
+> removed the absolute `worst < 2.0 s` ceiling beside it, after six red runs
+> reached `main` in three days with no regression behind any of them. So the
+> current code is correct and this entry is history — restoring p99 would undo
+> a measured decision.
+>
+> **The 0.25 line is nonetheless not yet wide enough for a hosted runner.** CI
+> run #160 (2026-08-31, `8576753`, `windows-latest`) failed it at **0.2634** —
+> a writer waiting 1 463 ms of a 5.6 s regrouping, 910 attempts. That is the
+> same class of green-property-reported-as-regression `7260a4d4` was written to
+> end, one notch further out; the commit's own claim that 0.25 "sits clear on
+> any hardware" is now measured false. Left as-is rather than widened here: the
+> number is a real concurrency guard and moving it is the maintainer's call.
+> On Linux the same file replays 4 passed ×3, so a local run cannot see this.
+
 **A seventh entry, added 2026-08-18 — and this one is a fork CONTRACT breaking
 an upstream file, not an upstream bug.** `backend/tests/test_infer_result_channel.py`
 is fork-only (upstream carries no copy): it requires every script in
