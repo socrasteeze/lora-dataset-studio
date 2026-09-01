@@ -200,6 +200,22 @@ const PAGES = {
         '[aria-label^="Bench captions on image"]:visible'] },
     ],
   },
+  '#/video-bank': {
+    label: 'Video bank',
+    prime: ['[aria-label^="Open the video bank"]:visible'],
+    states: [
+      { name: 'resting', open: [] },
+      // ☰ exists only where the rail cannot sit beside the grid — this state
+      // measures the DRAWER on a phone and is skipped on a desktop.
+      { name: 'rail', open: ['[aria-controls="video-filter-rail"]'] },
+      { name: 'passes', open: ['[aria-controls="video-passes-panel"]'] },
+      // The two launch windows, measured as layers — the image lane measures
+      // its dialogs the same way (auto-reject, curate, caption lab).
+      { name: 'describe', open: ['[aria-controls="video-passes-panel"]',
+        '#video-passes-panel >> button:has-text("Describe shots")'] },
+      { name: 'promote', open: ['button:has-text("Build the dataset")'] },
+    ],
+  },
   '#/datasets': {
     label: 'Datasets',
     prime: ['[aria-label^="Open the dataset"]:visible'],

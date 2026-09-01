@@ -83,6 +83,64 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-01-video-bank-wears-the-bank-shell',
+    date: '2026-09-01',
+    title: 'The video bank now looks and works like the image bank',
+    blurb:
+      'Same shell, same gestures: filters live in a rail beside the shot grid '
+      + '(a drawer on a phone), the analysis passes open on demand from the ⚙ '
+      + 'button, the two decisive actions — ▶ run the pipeline and 🎬 build a '
+      + 'training set — sit in the top bar next to the same stats strip, and '
+      + 'every chip and button is the one the image bank already taught you. '
+      + 'Nothing moved in what the passes do — only where you reach them.',
+  },
+  {
+    id: '2026-09-01-video-captions-follow-what-you-installed',
+    date: '2026-09-01',
+    title: 'Video captions now run on what your machine has — Ollama and LM Studio included',
+    blurb:
+      'No torch Python? If Ollama or LM Studio is running, 🗣 Describe shots '
+      + 'captions through it — the same local server and vision model your image '
+      + 'passes already use — instead of showing a dead ✗. LDS\u2019s own '
+      + 'transformers worker stays the default when available (it feeds the '
+      + 'model real frame timestamps and measures captions in the encoder\u2019s '
+      + 'own tokens), the launch window says which engine will run, and every '
+      + 'caption records which engine wrote it.',
+  },
+  {
+    id: '2026-09-01-captions-never-swap-the-scene',
+    date: '2026-09-01',
+    title: 'NSFW captions can no longer be quietly swapped for an invented scene',
+    blurb:
+      'A measured failure, not a theory: asked politely, caption models do not '
+      + 'soften explicit footage — they replace it with a harmless invented one. '
+      + 'The Plain wording now forbids sanitizing, softening or replacing the '
+      + 'scene outright, and the standard wording gains the neutral half: '
+      + 'describe the scene that is shown, never a substitute for it.',
+  },
+  {
+    id: '2026-09-01-video-captions-fit-the-encoder',
+    date: '2026-09-01',
+    title: 'Video captions that fit the model — measured in its own tokens',
+    blurb:
+      '🗣 Describe shots now ends each caption with a short structured tail '
+      + '(Subject, Motion, Setting, Style) and, when umT5\'s tokenizer is on your '
+      + 'machine, counts the caption in the Wan encoder\'s own tokens instead of '
+      + 'guessing from words. Building a training set uses both: a prompt that '
+      + 'would overrun the encoder window (512 tokens on Wan, which cuts in '
+      + 'silence) is written in its short form instead of being truncated '
+      + 'mid-sentence, and the export tells you how many.',
+  },
+  {
+    id: '2026-09-01-video-captions-work-under-transformers-5',
+    date: '2026-09-01',
+    title: 'Describe shots works again on machines whose Python carries transformers 5',
+    blurb:
+      'Every shot of a caption pass was failing there — with no reason shown '
+      + 'anywhere. The pass now runs on transformers 4 and 5 alike, and when a '
+      + 'shot is refused the reason lands in the log instead of vanishing.',
+  },
+  {
     id: '2026-08-31-watermark-zones-whole-mark',
     date: '2026-08-31',
     title: 'Watermark zones that cover the whole mark — thumbnails included',
