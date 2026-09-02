@@ -129,11 +129,20 @@ documented with-Torch baseline exactly. Cost ~12 min of the run. **Worth it.**
 4. **FIVE stale remote branches still need deleting — eleventh confirmation.**
    `claude/magical-tesla-ekn21b` / `juc4nk` / `tydc3z`,
    `claude/pensive-lovelace-l7yash` and `claude/pensive-lovelace-ue0g3o`. All
-   five **0 unmerged commits** against `origin/main`. `git push origin --delete`
-   returns `HTTP 403` on the ref while an ordinary push to `main` succeeds in the
-   same session — the token can write refs but not delete them. The GitHub MCP
-   server exposes `create_branch` with **no delete-ref counterpart**. **Owed from
-   a checkout with full push rights; stop re-attempting it here.**
+   five **0 unmerged commits** against `origin/main`, re-verified this session.
+   `git push origin --delete` fails while an ordinary push to `main` succeeds in
+   the same session — the token can write refs but not delete them. **The symptom
+   changed shape this run and the diagnosis did not:** instead of a clean
+   `HTTP 403` on the ref it now reports `send-pack: unexpected disconnect while
+   reading sideband packet` / `the remote end hung up unexpectedly`, then
+   `Everything up-to-date`, on all five. That wording invites a "network flake,
+   retry it" reading, so rule that out the cheap way — `curl -sS
+   "$HTTPS_PROXY/__agentproxy/status"` listed **zero github.com entries** in
+   `recentRelayFailures` (only unrelated `huggingface.co` and `console.vast.ai`
+   403s from the suite), and the push to `main` had just succeeded over the same
+   connection. The GitHub MCP server exposes `create_branch` with **no delete-ref
+   counterpart**. **Owed from a checkout with full push rights; stop
+   re-attempting it here.**
 5. **Responsive probe not run, owed a tenth time** — needs a live instance.
 6. `training/runs-hub.png` and `advanced-options.png` still photograph the
    rental lane; referenced by `docs/guide/workflow.md`, so a re-shoot.
