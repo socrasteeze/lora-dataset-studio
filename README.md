@@ -6,6 +6,17 @@
 
 No account, paid tier, API key or telemetry. **This fork runs entirely on hardware you control**: generation is local (Klein/ComfyUI — no Nano Banana, ChatGPT or OpenRouter), and training runs on your own GPU — there is no rented-GPU lane. Generation, the analysis passes and training can each be sent to another machine on your network. Everything else works with no GPU at all.
 
+<h3 align="center">☕ Keep the project in development</h3>
+
+<p align="center">
+  <a href="https://ko-fi.com/perfectgf"><img src="https://storage.ko-fi.com/cdn/kofi3.png?v=3" alt="Support LoRA Dataset Studio on Ko-fi" height="44"></a>
+</p>
+
+<p align="center">
+  <strong><a href="https://ko-fi.com/perfectgf">ko-fi.com/perfectgf</a></strong> — one-off, no account needed, from the price of a coffee.<br>
+  No paid tier, now or ever, so this is what funds the work: upstream's own API credits and rented GPUs, which is how the lanes this fork keeps are verified before they reach it, and the hours that go into the next release. <a href="#support-the-project">What it pays for →</a>
+</p>
+
 > New here? Start with [Setup & install](#setup--install), then follow the [end-to-end workflow](docs/guide/workflow.md). The [documentation index](docs/README.md) links every guide. Project news and current development live on [Discord](https://discord.gg/j6hnJBFtXE).
 
 ### 📖 [The complete guide — every feature, screen by screen →](docs/guide/using-the-app.md)
@@ -501,6 +512,8 @@ Directions, not dates. These are discussed openly on the project's Discord, and 
 - **🎬 Video LoRAs** *(landed, locally)* — *the dataset half exists and training now launches from the app* (see **Video Bank** above): shot detection, quality measures (motion, exposure, freeze, audio), captions that describe the action, keyword search across shots, target-aware cutting into a trainable folder, and a ▶ Train button that runs the set through your local ai-toolkit. What remains is proving the targets beyond Wan 2.2 with a finished run each, and testing the resulting video LoRAs in-app. Community-driven.
 - **🧠 Watermark cleaning during import** — cleaning that happens **during import** instead of as a separate errand, and automation you can trust unattended. *(Detection keeps catching up: a dedicated detector that needs no vision model ships alongside the Ollama path, manual two-pass cleaning works in datasets and in the Image Bank — and 🔤 Find text now reads burned-in lettering, speech bubbles and subtitles into the same mask funnel.)*
 - **🧩 More base models** — additional Flux-family bases (Chroma, Qwen-Image…) with the same one-click flow as Krea 2.
+
+These are built on personal time, and how fast they arrive depends on how much of it there is. [**Support the project on Ko-fi ☕**](https://ko-fi.com/perfectgf) if you want to see them sooner.
 
 ### Table of contents
 
@@ -1135,6 +1148,10 @@ Everything that touches the GPU is gated on two flags the app keeps, and a proce
 Still stuck? Open the app's **Guide → Getting help** for the one-click **diagnostic report** (version, capability status, log tail — no keys, no paths), then post it on [Discord](https://discord.gg/j6hnJBFtXE) or in a [GitHub issue](https://github.com/perfectgf/lora-dataset-studio/issues). If your browser refuses the copy — which it does on any address that is not HTTPS or `localhost`, so on the LAN address you use from a laptop or phone — the report is shown in a selected box to copy by hand instead of being lost.
 
 ## Support the project
+
+<p align="center">
+  <a href="https://ko-fi.com/perfectgf"><img src="https://storage.ko-fi.com/cdn/kofi3.png?v=3" alt="Support LoRA Dataset Studio on Ko-fi" height="44"></a>
+</p>
 
 LoRA Dataset Studio is free, open source, and has no paid tier, no telemetry and
 no upsell. It is built and maintained by one person, on personal time — every
