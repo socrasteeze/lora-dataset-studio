@@ -118,10 +118,15 @@ be discarded (it was, this session).
    `git push origin --delete` returns `error: RPC failed; HTTP 403` on the ref,
    then the sideband disconnect, then `Everything up-to-date`. The 403 is back
    in the first line, which settles the "network flake" reading the previous run
-   had to rule out via the proxy status page. The token writes refs but cannot
-   delete them; the GitHub MCP server exposes `create_branch` with no delete-ref
-   counterpart. **Owed from a checkout with full push rights; stop re-attempting
-   it here.**
+   had to rule out via the proxy status page. **This run also settles it the
+   other way, and that is new evidence rather than a twelfth repeat:** the
+   working branch `claude/pensive-lovelace-rqqiyh`, **created and pushed by this
+   very token seconds earlier**, returns the identical 403 on delete. So it is
+   not staleness, not ownership, and not any property of those five branches —
+   the token can create and update refs and cannot delete any ref at all. The
+   GitHub MCP server exposes `create_branch` with no delete-ref counterpart.
+   **Owed from a checkout with full push rights; stop re-attempting it here.**
+   That working branch is therefore also left behind, fully merged into `main`.
 5. **Responsive probe not run, owed an eleventh time** — needs a live instance.
 6. `training/runs-hub.png` and `advanced-options.png` still photograph the
    rental lane; referenced by `docs/guide/workflow.md`, so a re-shoot.
