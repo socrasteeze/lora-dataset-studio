@@ -16,9 +16,32 @@ export const VIDEO_STUDIO_BASE = '/api/video-studio';
 export const optionsUrl = () => `${VIDEO_STUDIO_BASE}/options`;
 export const lorasUrl = () => `${VIDEO_STUDIO_BASE}/loras`;
 export const deployUrl = () => `${VIDEO_STUDIO_BASE}/deploy`;
+
+/** Where a LoRA the user already has is brought into the picker. */
+export const loraImportUrl = () => '/api/video-studio/lora/import';
+
+/** ↗ Smooth a finished clip — RIFE interpolation, as a new clip. */
+export const clipVfiUrl = (id) => `/api/video-studio/clip/${id}/vfi`;
+
+/** ✨ Neural render a finished clip — DLSS 5 Neural Rendering, as a new clip. */
+export const clipNeuralRenderUrl = (id) => `/api/video-studio/clip/${id}/neural-render`;
+
+/** ✨ The Motion field's two helpers: propose from the start frame, or enrich
+ * what is already written. Both answer with a prompt the user can still edit —
+ * neither is a launch. */
+export const motionSuggestUrl = () => '/api/video-studio/motion/suggest';
+export const motionEnhanceUrl = () => '/api/video-studio/motion/enhance';
+
+/** ⚙ The model that writes the motion — listed, and chosen. */
+export const motionModelsUrl = () => '/api/video-studio/motion/models';
+export const motionModelUrl = () => '/api/video-studio/motion/model';
 export const sourceUrl = () => `${VIDEO_STUDIO_BASE}/source`;
 export const generateUrl = () => `${VIDEO_STUDIO_BASE}/generate`;
-export const clipsUrl = (limit = 24) => `${VIDEO_STUDIO_BASE}/clips?limit=${limit}`;
+/** The history, newest first: one page of `limit`, `before` (a clip id) for the
+ * page after it. The server appends the SOURCE of every listed render, so the
+ * pair a comparison needs is always on screen together. */
+export const clipsUrl = (limit = 24, before = null) =>
+  `${VIDEO_STUDIO_BASE}/clips?limit=${limit}${before ? `&before=${before}` : ''}`;
 export const clipUrl = (id) => `${VIDEO_STUDIO_BASE}/clip/${id}`;
 export const clipVideoUrl = (id) => `${VIDEO_STUDIO_BASE}/clip/${id}/video`;
 export const clipRateUrl = (id) => `${VIDEO_STUDIO_BASE}/clip/${id}/rate`;
@@ -75,6 +98,9 @@ export function buildGeneratePayload(state) {
     body.seed = Number(s.seed);
   }
   if (s.steps) body.steps = Number(s.steps);
+  // ✨ Enrich at launch: the SERVER rewrites the motion and records what ran,
+  // so a clip never claims a prompt that is not the one it was made from.
+  if (s.enhance) body.enhance = true;
   if (s.turbo) body.turbo = true;
   if (s.eros) body.eros = true;
   if (s.sparse) body.sparse = s.sparse;
@@ -114,4 +140,66 @@ export function clipSummary(clip) {
   bits.push(`${clip.steps} steps`);
   if (clip.seed !== null && clip.seed !== undefined) bits.push(`seed ${clip.seed}`);
   return bits.join(' · ');
+}
+
+/** Every legal clip length the STUDIO may generate, not the ones training uses.
+ *
+ * The dropdown was built from `frame_choices` — the TRAINING catalogue, which
+ * stops at 209 frames because that is where training clip lengths stop being
+ * useful. The model renders to about 15 s, the server has always accepted it
+ * (FRAMES_MIN/FRAMES_MAX = 22/362, and its own comment says capping the studio
+ * at 8.7 s would be "a reason that has nothing to do with the studio") — the
+ * list on screen was simply the wrong table. Generated from the bounds and the
+ * VAE's own rule (≡ 5 mod 17), so there is one source of truth and no third
+ * copy of the ladder.
+ */
+export function studioFrameChoices(options) {
+  const min = Number(options?.frames_min) || 22;
+  const max = Number(options?.frames_max) || 362;
+  const out = [];
+  for (let f = min - ((min - 5) % 17 || 0); f <= max; f += 17) {
+    if (f >= min && f % 17 === 5 % 17) out.push(f);
+  }
+  // The floor the catalogue offers is 22 (5 mod 17) and stays first even when
+  // the arithmetic above starts one rung higher.
+  if (out[0] !== min && min % 17 === 5) out.unshift(min);
+  return out.length ? out : (options?.frame_choices || [39, 56, 107]);
+}
+
+// ⏱ The launch advice, as two sentences. The server decides WHETHER to speak
+// (video_test_studio.launch_advice: the flag missing, a ComfyUI that knows it,
+// a machine whose RAM cannot hold the weights); this only phrases what it
+// sent, and never spells a flag of its own — every name comes from the payload,
+// so a second flag on the server side needs no change here.
+export function launchAdviceLines(advice) {
+  if (!advice || !advice.flag) return null;
+  const { flag, add, remove } = advice;
+  const title = remove
+    ? `ComfyUI is running with ${remove}, which switches off the loader ${flag} relies on`
+    : `ComfyUI is running without ${flag}`;
+  let change;
+  if (remove && add) change = `Remove ${remove} and add ${flag}`;
+  else if (remove) change = `Remove ${remove} (${flag} is already on the command line)`;
+  else change = `Add ${flag}`;
+  return {
+    title,
+    action: `${change} on the command that starts ComfyUI, then start it again.`,
+  };
+}
+
+// ⏱ Render time as a person reads it: "24 s", "5 min 48 s", "2 min", "1 h 12 min".
+// The number is the queue's own measurement (claim → settled, model loading
+// included); null for anything that is not a positive number, so a card never
+// prints "rendered in null" for a clip the queue could not time. A measured
+// fraction of a second reads "1 s" — a real measurement is rounded, never hidden.
+export function renderTimeLabel(seconds) {
+  const s = Number(seconds);
+  if (!Number.isFinite(s) || s <= 0) return null;
+  const t = Math.max(1, Math.round(s));
+  if (t < 60) return `${t} s`;
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const r = t % 60;
+  if (h) return m ? `${h} h ${m} min` : `${h} h`;
+  return r ? `${m} min ${r} s` : `${m} min`;
 }

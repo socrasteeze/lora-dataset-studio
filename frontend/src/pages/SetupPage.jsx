@@ -81,6 +81,11 @@ const CAPABILITY_STEP_ID = {
   'SigLIP2 Bank semantics (optional)': 'quality',
   'Watermark detector (optional)': 'quality',
   'Scraping extras (optional)': 'quality',
+  // DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream maps its
+  // '📤 Civitai publishing' row to an 'image' step. There is no 'image' step
+  // here (SETUP_STEP_IDS is comfyui -> ollama -> quality -> training), and the
+  // field that would turn it on lives on the cloud-key screen D1 removed, so
+  // the row and its destination are both absent rather than half-wired.
   'LoRA training': 'training',
   'Test Studio': 'comfyui',
 }

@@ -164,14 +164,16 @@ test('Escape peels one layer, not two', () => {
   assert.match(dialog, /if \(e\.key === 'Escape' && !busy\) onClose\(\)/);
   assert.match(review, /if \(repairOpen\) return;/);
   assert.match(lightbox, /if \(repairOpen\) return;/);
-  /* The generated-image viewer now has FOUR rungs, not three, and the order is
-     the order the layers were put on: the ✦ Repair dialog stands the viewer's
-     listener down entirely (FIRST — before the ‹ › arrows too, or the keys
-     would walk the feed under an open zone editor), then the 📷 picker peels
-     on Escape and freezes the arrows (the row under the open dial must not
-     change), then a magnified picture is put back, then the viewer closes.
-     Escape must never throw away the render you were in the middle of
-     inspecting to get you out of a viewer you did not ask to leave. */
+  /* The generated-image viewer has FOUR rungs, and the order is the order the
+     layers were put on: the ✦ Repair dialog stands the viewer's listener down
+     entirely (FIRST — before the ‹ › arrows too, or the keys would walk the
+     feed under an open zone editor), then the 📷 picker peels on Escape and
+     freezes the arrows (the row under the open dial must not change), then a
+     magnified picture is put back, then the viewer closes. Escape must never
+     throw away the render you were in the middle of inspecting to get you out
+     of a viewer you did not ask to leave.
+     DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream's rung list also holds
+     `civitaiOpen`, the publisher's own layer. That layer is not carried here. */
   assert.match(generated, /if \(repairOpen \|\| improveOpen\) return;/);
   assert.match(generated,
     /if \(repairOpen \|\| improveOpen\) return;[^]{0,700}if \(cameraOpen\) \{[^]{0,300}if \(e\.key === 'ArrowLeft' && onPrev\)/);
@@ -183,5 +185,6 @@ test('the guards are re-read when the dialog opens, not captured stale', () => {
   // A listener registered once with repairOpen=false would keep closing forever.
   assert.match(review, /doDismiss, doReject, repairOpen\]\);/);
   assert.match(lightbox, /panelOpen, closePanel,\s*\n\s*repairOpen, cameraOpen, improveOpen, patchImageState\]\);/);
+  // DIVERGENCE 1 (Civitai note) — upstream's dep list also carries `civitaiOpen`.
   assert.match(generated, /\}, \[img, onClose, repairOpen, cameraOpen, improveOpen, zoom, onPrev, onNext\]\);/);
 });

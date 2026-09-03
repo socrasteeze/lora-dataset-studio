@@ -30,6 +30,10 @@ _TEST_TARGETS = {
     'face_scoring': capabilities.probe_face_scoring,
     'masks': capabilities.probe_masks,
     'vast': capabilities.probe_vast,
+    # DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream tests the Civitai key
+    # against the site here, for its publisher. The publisher is not carried,
+    # and the key this fork holds is a scraping credential whose validity the
+    # scan itself reports; there is no probe behind this target.
 }
 
 
