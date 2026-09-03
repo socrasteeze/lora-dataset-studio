@@ -1,168 +1,93 @@
 # HANDOFF
 
-**Updated:** 2026-09-02 · **Branch:** main · **Base:** `fe6a58c` · **Tree:** clean
+**Updated:** 2026-09-03 · **Branch:** `claude/pensive-lovelace-64tfir` (= `main`) · **Base:** `9ef0f13` · **Tree:** clean
 
 ## State
-`upstream/main` is `53ca495` and a **strict ancestor of `HEAD`** — fork **100
-ahead / 0 behind**. **74 behind `upstream/nightly`**, intentionally (D11).
-Nothing is in flight.
+The **126-commit v2026.09.03.1 sync is merged, gated and pushed**. `upstream/main`
+is `75da453` and is now an ancestor of `HEAD`. Two commits landed: the merge
+(`ff1b24a`) and its bundle (`7481022`). Nothing is in flight.
 
 ## Done this session
-**A scheduled sync that found an empty window for the fourth run running, and
-one open question eight times bigger than it was yesterday.** Nothing merged,
-deliberately. Two findings.
+**The largest window this fork has taken — upstream drained its whole `nightly`
+into `main` — and the Civitai question two previous runs escalated arrived with
+it and had to be answered inside the merge.**
 
-**1. Diagnostic 32 fired again, and it was worth 62 commits this time.** The
-container's `origin/main` arrived at `9538414` with the working branch reading
-**62 ahead** of it. That divergence does not exist: one `git fetch origin
---prune` moved the tracking ref to `fe6a58c` — the branch's own tip — and the
-62 became 0. The 2026-09-01 row recorded the same trap at 56, so the size is
-not the lesson. **No count in this repo is readable before a fetch of both
-remotes**, and acting on the unfetched one would have re-landed 62 commits'
-worth of work to close a gap that was a stale ref.
+**Adopted whole:** the ✨ DLSS 5 **neural render** lane over finished clips, the
+**video dataset workspace** as a page of its own (six sections), the
+**Checkpoints & LoRAs** section's local verbs, the **start-frame picker** and its
+batch, the **motion writers**, **saved prompts** with pictures and search, the
+**multi-LoRA comparison prompt batch**, the 🧹 **free-memory broom**, **Krea
+hi-res second pass** + the app-side **finishing pass**, **slider locks**,
+**canvas lane placement**, and the 🌐 **Civitai browser feeding the prompt batch**.
 
-**2. The Civitai lane is now threaded through Setup — new diagnostic 35.**
-Yesterday's row flagged `48b473c` (publish a checkpoint to Civitai as a model
-page) as the first upstream feature in months **no divergence answers**, and
-refused to pre-decide it. Correct call; this is what deferring it cost. One
-commit is now **eight** (`44c661f`, `eaadb72`, `b868a7c`, `35d546c` + three
-dist/merge), with a `feat/civitai-prompt-batch` branch (`d47c0a1`) stacked on
-top. **Verified against both trees, not read off a commit message:** `eaadb72`
-appends the Civitai key to `SetupPage.jsx`'s **`KEY_FIELDS`** — whose other
-three entries are `nanobanana`, `chatgpt`, `openrouter` — extends
-`KEY_TEST_TARGET` beside them, and maps its capability row with
-`CAPABILITY_STEP_ID['📤 Civitai publishing'] = 'image'`. **This fork has none of
-the three**: D1 deleted both arrays and `SETUP_STEP_IDS` is `comfyui → ollama →
-quality → training`, no `'image'`. Adopting the hunk either rebuilds the cloud
-key screen or leaves a row pointing at a Setup step that does not exist.
-`35d546c` also records the lane has been holding upstream's **own** full backend
-suite red since the publisher landed.
+**Rejected:** the **Civitai publisher** and the **video cloud launch window** (D4).
+`779aee6` was split per hunk as the previous row predicted.
 
-**A third catch, per-hunk rather than whole-commit:** `779aee6` (video
-Checkpoints & LoRAs, **+2118 lines**, the delta's largest) reads as pure
-local-lane parity and is **mixed** — 162 cloud/pod references, `videoCloudStatus.js`
-touched, and two of its six verbs are D4 (▶ Continue **on a fresh pod**,
-ⓘ Details of a **cloud run** with GPU and **price**). The ⬇ / 📦 / ⏏ / 🗑 halves
-are wanted. Carries `help/topics/videoLane.js` + `whatsNew.js`.
+### The Civitai decision — read this first if it comes up again
+It is **not** "no cloud". This fork already carries `CIVITAI_API_KEY` in
+`SECRET_KEYS`, `civitai_browser.py`, `scrape/sources/civitai.py` and the 🌐
+browser — 38 files — and this sync *adopted* the browser→batch feature. What was
+refused is the **upload** direction, and the reason is structural: `eaadb72`
+appends the key to `SetupPage.jsx`'s `KEY_FIELDS` (whose other three entries are
+`nanobanana`, `chatgpt`, `openrouter`), extends `KEY_TEST_TARGET` beside them,
+and maps `CAPABILITY_STEP_ID['📤 Civitai publishing'] = 'image'` — and this fork
+has **none** of those three. Refused on the **D1c precedent** (rejected inside a
+sync, adoptable later as its own wave) and left as the maintainer's call.
+**If the answer is yes**, FORK_NOTES' new "Divergence 1's Civitai note" gives the
+whole recipe: restore five files, put the key's Setup row on the **Scraping &
+sources** card rather than in `KEY_FIELDS`, recompute the capability count
+(19 → 20, two suites assert it), re-add the guide chapter.
 
-**Adoptable and screened clean:** `aa7ba58` (free-memory broom beside the
-machine-load numbers) and `4590827` (watermark auto-crop cuts the band in one
-encode, not the frame twice — **reported by nofaceman on Discord**; that credit
-ships with the commit).
-
-**`frontend/dist` rebuilt byte-identical**, so no `build(frontend):` commit.
-
-## Verified 2026-09-02 (all green on the shipped tree)
+## Verified 2026-09-03 (all on the exact pushed tree)
 | Gate | Result |
 |---|---|
 | `ruff check .` | All checks passed |
-| ESLint `npm run lint` | 0 errors / **20 warnings — D9 baseline exactly** |
-| `npm run build` | clean, and **byte-identical to the committed `frontend/dist`** |
-| local-only contract (frontend) | **8 / 8** |
-| local-only + hygiene (backend) | **16 passed / 2 skipped** |
-| `create_app()` | OK |
-| `node --test` | **4557 passed, 0 failed** |
-| backend full suite | **8658 passed / 71 failed / 122 skipped**, 17m54s, `-n 4`, Torch overlay — **floor list matches by name and count** |
-| identity / attribution | project identity, no trailers, `commit.gpgsign` off |
+| ESLint `npm run lint` | **0 errors / 20 warnings — D9 baseline exactly** |
+| `npm run build` | clean; bundle committed separately |
+| local-only contract | **8/8** frontend · **3** backend |
+| `create_app()` | OK — 498 routes |
+| hygiene (`test_no_personal_data`, ASCII scripts) | 13 passed / 2 skipped |
+| `node --test` | **4866 passed / 0 failed** (baseline 4557 — 309 adopted tests) |
+| backend full suite | **71 failed / 9031 passed / 122 skipped**, 10m10s, `-n 4`, Torch — **zero new failures vs the 72 / 8657 baseline taken on the pre-merge tree** |
+| identity / attribution | project identity on both commits, no trailers |
 
-**No code changed this session** — the diff is `FORK_NOTES.md` + `HANDOFF.md`,
-zero backend files — so pre- and post-trees are the same tree and every backend
-failure is pre-existing by construction. Per CLAUDE.md's measure-first rule the
-full suite was not owed; it was run because the scheduled task asked for it.
-
-**The Linux floor has its LIST recorded — do not diff totals.** The total moves
-on its own with the Torch overlay present or absent; the names do not. A failure
-in a file **not** on this list is a regression:
-
-| Count | File |
-|---|---|
-| 12 | `test_comfyui_utils.py` |
-| 10 | `test_krea_training_bases.py` |
-| 6 | `test_studio_service.py` |
-| 6 | `test_capabilities.py` |
-| 4 | `test_canvas_external_loras.py` |
-| 4 | `test_bank_sort_exclude.py` |
-| 3 | `test_image_bank.py` |
-| 2 | `test_train_base_family_scope.py`, `test_image_bank_text_search.py`, `test_docker_launcher_fake_e2e.py`, `test_data_integrity_trash.py`, `test_comfy_folder_overrides.py`, `test_cloud_custom_base.py` |
-| 1 | `test_studio_routes.py`, `test_studio_guest_checkpoints.py`, `test_static_mime_types.py`, `test_score_stop_over_the_sql_variable_ceiling.py`, `test_scene_caption_parity.py`, `test_run_folder_log.py`, `test_infer_env.py`, `test_image_bank_curation.py`, `test_dataset_routes.py`, `test_cloud_hf_gate_preflight.py`, `test_bank_remote_pass.py`, `test_bank_promote_performance.py`, `test_bank_medium_angle.py`, `test_anima_family.py` |
-
-27 files, 71 tests — Windows path expectations, the `mimetypes` table
-difference, ComfyUI path parsing and the Docker launcher. CI runs backend on
-`windows-latest`, where these pass.
-
-**Torch, again:** `download.pytorch.org` is still `403` at CONNECT here, but
-`pip install torch==2.13.0` from PyPI resolves to `2.13.0+cu130` — same pinned
-version, different build variant, imported and run on CPU. ~10 min, venv lands
-at **5.0 GB**. **Install it before starting the suite, not alongside**: a torch
-that lands mid-run changes what later workers can collect, and that run has to
-be discarded (it was, this session).
+**The Linux floor is unchanged: 27 files, and the names match.** A failure in a
+file NOT on the previous handoff's list is a regression. The baseline's 28th file
+(`test_bank_scan_no_db_lock`, the documented timing flake) passed this run.
 
 ## Open
-1. **Civitai needs a yes/no NOW, not next window.** It is no longer a commit to
-   drop — see diagnostic 35. Deciding it after the wave reaches `upstream/main`
-   means deciding it under merge pressure, against Setup, the capability count
-   and a contract test.
-2. **`main` IS RED ON CI and has been for several sessions** — CI run #160 on
-   `8576753`, "Backend tests" (`windows-latest`), 1 failed / 8784 passed on
-   `test_bank_scan_no_db_lock.py::test_the_duplicate_regrouping_lets_other_`
-   `writers_through`, at **0.2634 vs 0.25**. Not a regression (SUPERSEDED block
-   under D5's sixth entry). Deliberately not "fixed": the number is a real
-   concurrency guard, widening it is the maintainer's call, and no local run
-   reproduces it (Linux replays the file green; CI backend is Windows-only).
-3. **This session's push carries `[skip ci]` by explicit request**, so CI has
-   not run on it. Both suites were run locally on that exact tree (table above).
-4. **FIVE stale remote branches still need deleting — twelfth confirmation.**
-   `claude/magical-tesla-ekn21b` / `juc4nk` / `tydc3z`,
-   `claude/pensive-lovelace-l7yash` and `claude/pensive-lovelace-ue0g3o`. All
-   five **0 unmerged commits** against `origin/main`, re-verified this session.
-   `git push origin --delete` returns `error: RPC failed; HTTP 403` on the ref,
-   then the sideband disconnect, then `Everything up-to-date`. The 403 is back
-   in the first line, which settles the "network flake" reading the previous run
-   had to rule out via the proxy status page. **This run also settles it the
-   other way, and that is new evidence rather than a twelfth repeat:** the
-   working branch `claude/pensive-lovelace-rqqiyh`, **created and pushed by this
-   very token seconds earlier**, returns the identical 403 on delete. So it is
-   not staleness, not ownership, and not any property of those five branches —
-   the token can create and update refs and cannot delete any ref at all. The
-   GitHub MCP server exposes `create_branch` with no delete-ref counterpart.
-   **Owed from a checkout with full push rights; stop re-attempting it here.**
-   That working branch is therefore also left behind, fully merged into `main`.
-5. **Responsive probe not run, owed an eleventh time** — needs a live instance.
-6. `training/runs-hub.png` and `advanced-options.png` still photograph the
-   rental lane; referenced by `docs/guide/workflow.md`, so a re-shoot.
-7. Fork-only controls still carry emoji while upstream's use `lucide-react`.
-8. `no-unused-vars` at `warn` (D9): **20 warnings, baseline-identical**.
+1. **Civitai publisher: still the maintainer's yes/no.** Now recorded properly
+   rather than deferred — the recipe for a yes is written down, so it no longer
+   gets more expensive per window the way diagnostic 35 measured.
+2. **CI has not run on this push** (`[skip ci]` per the standing request). Both
+   suites and both linters were run locally on this exact tree.
+3. **Stale remote branches** — see the note below; the 403 on ref deletion is a
+   token limitation, not staleness.
+4. **Responsive probe not run** — needs a live instance. The new
+   `#/video-dataset/<id>` URL is now in `.claude/rules/frontend-contracts.md`.
+5. `training/runs-hub.png` and `advanced-options.png` still photograph the rental
+   lane; referenced by `docs/guide/workflow.md`, so they need a re-shoot.
+6. Fork-only controls still carry emoji while upstream's use `lucide-react`.
 
-## Traps
-- **A deferred divergence question gets more expensive every run.** Diagnostic
-  35, measured at one day: one droppable commit became a lane through
-  `KEY_FIELDS`, the capability count and a contract test.
-- **A "parity" framing is the one most likely to be waved through.** `bc96c4f`
-  and `779aee6` both arrive as "the video lane gets what the image lane has",
-  and both carry D4 inside. Screen every commit for `pod`, `price`, `rented`,
-  `cloud` before classifying it adoptable — `779aee6` was misread as local-lane
-  on its commit message alone this session, and the file list corrected it.
-- **Fetch BOTH remotes before reading a single count off either** (diagnostic
-  32). Fired twice now: 56 commits, then 62.
-- **Preview `nightly` cumulatively, by SHA** (diagnostic 33). The window does
-  not drain per wave (4 → 12 → 38 → 62 → 74).
-- **A fresh container authors commits as its agent vendor.** Global config
-  carried the vendor name, a `noreply@` vendor address, and
-  `commit.gpgsign=true` on a vendor SSH key. Set the project identity *and*
-  `git config commit.gpgsign false` first, then confirm with
-  `git config --list | grep -E '^user\.|gpgsign'` — the local values must win.
-- **`upstream` was not configured in this container.** Add it, then
-  `git remote set-url --push upstream DISABLED_NO_PUSH`.
-- **No `.venv`, no `frontend/node_modules`.** `python3 -m venv .venv`, then
-  `.venv/bin/python -m pip install -r backend/requirements-dev.txt`, then
-  `pip install torch==2.13.0`, and `npm install` in `frontend/`. ~15 min.
+## Traps (carried forward, all confirmed again this run)
+- **Fetch BOTH remotes before reading any count** (diagnostic 32).
+- **A fresh container has no `upstream` remote, no `.venv`, no `node_modules`.**
+  Re-add upstream with `git remote set-url --push upstream DISABLED_NO_PUSH`.
+- **`requirements-torch-tests.txt` pins `torch==2.13.0+cpu`, which PyPI does not
+  serve here** (`download.pytorch.org` is 403 at CONNECT). `pip install
+  torch==2.13.0` resolves to `2.13.0+cu130` — same pinned version, different
+  build, runs on CPU. Install it BEFORE starting the suite.
 - **Call `.venv/bin/python` by ABSOLUTE path, and never run two commands in
-  parallel when one of them `cd`s.** The working directory persists across tool
-  calls, so a parallel `cd` silently relocates the other command: a `node --test`
-  raced this way reported **4538 tests / 5 failed** where the same suite from
-  `frontend/` reports **4557 / 0**. That looks exactly like a regression and is
-  not one.
+  parallel when one `cd`s.** The working directory persists across tool calls.
 - **This box has 4 cores.** Use `-n 4 --dist loadfile`.
+- **NEW — a `write_text` that raises still TRUNCATES the file.** A Python
+  `unicode_escape` round-trip on `helpRegistry.js` threw `UnicodeEncodeError`
+  mid-write and left the file at **0 bytes**; it survived only because it had
+  already been `git add`ed. Write to a temp file and `os.replace`, and never
+  round-trip a UTF-8 source through `unicode_escape`.
+- **NEW — a ported help topic must be grepped against the registry before
+  insertion.** `canvas-arrange` was upstream's fourth consecutive silent reword,
+  not a new topic; ported blind it becomes a duplicate id.
 
 ## Verify
 ```bash
