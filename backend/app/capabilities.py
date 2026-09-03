@@ -1045,6 +1045,18 @@ def probe_video() -> dict:
     }
 
 
+def probe_dlss5nr() -> dict:
+    """✨ DLSS 5 neural rendering — a FILE probe, on purpose. The bridge's real
+    init loads a 165 MB model onto a D3D12 device; doing that on every poll of
+    the Setup screen is not a probe, it is a workload. What CAN be read cheaply
+    is what Setup can act on: the OS, the driver's NGX files, the two bridge
+    DLLs this app installs and the model file the user supplies. The model's
+    own refusal (an unsupported GPU, a stock build on an older card) surfaces
+    at the first render, in the model's words, on the clip that asked."""
+    from .services import neural_render
+    return neural_render.status()
+
+
 def probe_bank_scoring() -> dict:
     """Bank scoring extra (CLIP aesthetic + NSFW + style). Dedicated interpreter
     key (bank_scoring.python), else the app's own. Same subprocess-import probe as
@@ -2277,15 +2289,16 @@ def probe(force=False) -> dict:
         # reads as "just not configured".
         lmstudio_model = {'ok': False, 'detail': f'LM Studio probe failed: {_exc}'}
     aitoolkit = probe_aitoolkit()
-    # These ELEVEN each shell out a cached-but-possibly-cold subprocess import
+    # These TWELVE each shell out a cached-but-possibly-cold subprocess import
     # (insightface/rembg/torch+open_clip+transformers/SigLIP 2/
     # simple_lama_inpainting/torch+transformers/onnxruntime/PyAV+ffmpeg/
-    # RapidOCR/the scraping deps/the ai-toolkit venv's captioning deps — see
-    # _cached_import).
+    # the DLSS 5 neural-render interpreter/RapidOCR/the scraping deps/the
+    # ai-toolkit venv's captioning deps — see _cached_import).
     # Run them concurrently so a cold boot pays the SLOWEST one, not the sum.
-    # Upstream calls these serially and starts with three more probes for its
-    # cloud image engines; those are Divergence 1 and have no probe here.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
+    # Upstream calls these serially and starts with FOUR more probes — three for
+    # its cloud image engines (Divergence 1) and one for the Civitai publisher
+    # (rejected 2026-09-03, see Divergence 1's Civitai note); none has a probe here.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
         f_face = pool.submit(probe_face_scoring)
         f_masks = pool.submit(probe_masks)
         f_bank = pool.submit(probe_bank_scoring)
@@ -2294,6 +2307,7 @@ def probe(force=False) -> dict:
         f_watermark_detect = pool.submit(probe_watermark_detect)
         f_wd14 = pool.submit(probe_wd14)
         f_video = pool.submit(probe_video)
+        f_dlss5nr = pool.submit(probe_dlss5nr)
         f_video_text = pool.submit(probe_video_text)
         f_scrape = pool.submit(probe_scrape_deps)
         f_joycaption = pool.submit(probe_joycaption, aitoolkit)
@@ -2305,6 +2319,7 @@ def probe(force=False) -> dict:
         watermark_detect = f_watermark_detect.result()
         wd14 = f_wd14.result()
         video = f_video.result()
+        dlss5nr = f_dlss5nr.result()
         video_text = f_video_text.result()
         scrape_deps = f_scrape.result()
         joycaption = f_joycaption.result()
@@ -2513,6 +2528,9 @@ def probe(force=False) -> dict:
         # say WHICH one to fix — never "video unavailable", which is how a user
         # reinstalls the wrong thing.
         'video': video['ok'],
+        # ✨ DLSS 5 neural rendering: the whole status dict (ready + the sentences
+        # naming what is missing), read by the Setup card and both video verbs.
+        'dlss5nr': dlss5nr,
         'video_detail': video['detail'],
         'video_decode': video['decode'],
         'video_detect': video['detect'],
@@ -2543,6 +2561,12 @@ def probe(force=False) -> dict:
         'dataset_import': _dataset_import_policy(),
         'python': python_ml_status(),
         'scrape_deps': scrape_deps['ok'],
+        # DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream reports a
+        # '📤 Civitai publishing' capability row here. The publisher is not
+        # carried on this fork, and the row's own Setup destination is the
+        # cloud-key screen D1 removed, so there is nothing for it to point at.
+        # The Civitai key this fork DOES hold is a scraping credential and is
+        # already covered by `scrape_deps` and the Scraping & sources card.
         # WHICH modules are absent, same convention as joycaption/video/siglip2
         # above. The install banner used to recite a hand-written list of three
         # package names; the probe watches seven, so a machine flagged because

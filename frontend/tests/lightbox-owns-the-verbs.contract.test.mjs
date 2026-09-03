@@ -98,3 +98,4 @@ test('while the picker is open, the viewer stands down its window keys', () => {
   // arrows must not walk the list under the open dial.
   assert.match(viewer, /if \(cameraOpen\) \{\s*if \(e\.key === 'Escape'\) setCameraOpen\(false\);\s*return;/);
 });
+

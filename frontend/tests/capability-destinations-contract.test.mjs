@@ -28,6 +28,7 @@ const CAPS_FULL = {
   comfyui: { dir_valid: true, reachable: true },
   face_scoring: true, masks: true, watermark_inpaint: true,
   training_visible: true, studio_visible: true,
+  civitai: { ok: true },
 }
 const CAPS_COMFY_OFF = { comfyui: { dir_valid: true, reachable: false } }
 
@@ -48,15 +49,19 @@ test('every capability row carries a destination, in every rig', () => {
     // decode/detect because they fail apart — ffmpeg can be absent on a
     // machine that decodes fine, and that machine cannot export a single
     // clip) -> 20 (📷 Camera angles) -> 21 (🎬 the Video Test Studio, whose
-    // four required weights are 39.5 GB), each counted for the reason every
-    // row above it is: a machine missing the lane must read "not ready, here
-    // is the install", never a shorter list that certifies completeness by
-    // omission. An absent capability must be visible and counted, never
+    // four required weights are 39.5 GB) -> 22 (📤 Civitai publishing, a
+    // credential counted like the engine keys), each counted for the reason
+    // every row above it is: a machine missing the lane must read "not ready,
+    // here is the install", never a shorter list that certifies completeness
+    // by omission. An absent capability must be visible and counted, never
     // dropped from the denominator.
-    // This fork's count follows every one of those bumps and adds its own WD14
-    // tagger row, recomputed here from the array deriveCapabilitySummary
-    // actually returns rather than copied from either side's prose —
-    // 21 - 3 cloud + 1 WD14 = 19.
+    // This fork's count follows those bumps EXCEPT the last: the Civitai
+    // publisher is not carried (Divergence 1's Civitai note, 2026-09-03) and
+    // its row's Setup destination is the cloud-key screen D1 removed. ✨ Neural
+    // render bumps nothing — like a node pack it is an installable ROW, not a
+    // capability. Plus this fork's own WD14 tagger row, and recomputed here
+    // from the array deriveCapabilitySummary actually returns rather than
+    // copied from either side's prose — 22 - 3 cloud - 1 Civitai + 1 WD14 = 19.
     assert.equal(rows.length, 19, `${name}: expected 19 capabilities`)
     for (const row of rows) {
       const dest = capabilityDestination(row)

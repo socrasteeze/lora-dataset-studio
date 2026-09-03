@@ -54,7 +54,12 @@ const SCRAPE_SECRETS = [
   {
     key: 'CIVITAI_API_KEY',
     label: 'Civitai API key',
-    help: 'Only needed for adult content: without a key, Civitai scans return SFW results only. '
+    // DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream's wording names a
+    // third use, 📤 publishing, and adds a `testTarget` for the publisher's own
+    // probe. Neither is carried here: this key is a scraping credential and the
+    // 🌐 browser's, which is the whole of what this build does with Civitai.
+    help: 'Two uses: adult content in Civitai scans (without a key they return SFW results only) '
+      + 'and the prompts of the 🌐 Civitai browser. '
       + 'Create one under civitai.com → Account settings → API Keys.',
   },
   {

@@ -21,6 +21,8 @@ from flask import Blueprint, jsonify, request, send_file
 
 from ..config import LOCAL_USER
 from ..services import video_bank_service as svc
+from ..services import bank_jobs
+from ..services import neural_render as nr
 from ..services import video_targets
 
 logger = logging.getLogger(__name__)
@@ -149,6 +151,49 @@ def video_dataset_caption(dataset_id, clip_id):
     return jsonify(out)
 
 
+@bp.post('/video-dataset/<int:dataset_id>/clips/remove')
+def video_dataset_remove_clips(dataset_id):
+    """Body {ids: [...]}. Drop clips out of a built set — the encode, not the triage.
+
+    A POST rather than a DELETE, and not for taste: this deletes a LIST, and a
+    request body on DELETE is unspecified enough that Werkzeug, the dev proxy and
+    the browser's own fetch have each been observed dropping it. The verb that
+    carries a body reliably is the one used here.
+
+    The bank keeps every shot and every decision — the source clips are merely
+    un-promoted, so what was removed can be promoted again without triaging
+    anything. That promise is the reason this is a safe button, so it is stated
+    both here and in the confirmation the user reads.
+
+    Answers {removed, clips, files_missing, files_kept, delete_mode}.
+    ``files_kept`` is the one nobody expects and the one that matters: a clip
+    whose .mp4 is held open (an antivirus scan, a player, a training run reading
+    this very folder) keeps its row and stays in the set, because the folder IS
+    the dataset and a row deleted without its file removes the clip from the app
+    while leaving it in the training run. The caller must not report a plain
+    success when it is non-zero. ``delete_mode`` names where the files went, in
+    the vocabulary of services.trash, so the toast can say it through the
+    app-wide wording rather than a sentence of its own.
+
+    A 500 here means the commit failed — and the files are back in the folder
+    (the service restores them from the trash before re-raising), so "could not
+    remove" is true of the disk as well as of the database.
+    """
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids')
+    if not isinstance(ids, list):
+        return jsonify({'error': 'ids must be a list of clip ids'}), 400
+    # The kept originals of the doomed clips are read BEFORE the rows go: a
+    # backup whose clip left can never be restored and would only accumulate.
+    doomed = svc.dataset_clip_filenames(LOCAL_USER, dataset_id, ids)
+    out = svc.remove_dataset_clips(LOCAL_USER, dataset_id, ids)
+    if out is None:
+        return _missing(dataset_id)
+    if out.get('removed'):
+        nr.forget_backups(dataset_id, doomed)
+    return jsonify({'ok': True, **out})
+
+
 @bp.post('/video-dataset/<int:dataset_id>/references')
 def video_dataset_references(dataset_id):
     """Attach 1-4 identity reference images (multipart field `files`). Replaces
@@ -173,6 +218,7 @@ def video_dataset_delete(dataset_id):
     promoted, so the user can re-cut at a different length without re-triaging."""
     if not svc.delete_video_dataset(LOCAL_USER, dataset_id):
         return _missing(dataset_id)
+    nr.forget_backups(dataset_id)      # the kept originals go with the set
     return jsonify({'ok': True})
 
 
@@ -258,9 +304,199 @@ def video_dataset_train_stop(dataset_id):
 # POST /train/cloud, GET /train/cloud/progress, GET /train/cloud/checkpoints,
 # GET /train/cloud/checkpoint, POST /train/cloud/retry, POST /train/cloud/continue,
 # DELETE /train/cloud/run/<id> (2026-08-31: the 🗑 that clears one finished run),
-# plus their `_video_run` / `_relaunch` helpers. This fork trains video LOCALLY
-# only, so none of it is carried and `cloud_video_training` is not a module here.
+# GET /train/cloud/offers (2026-09-03: the live price/h tier list the launch
+# window shows) and GET /train/cloud/run/<id> (2026-09-03: the ⓘ details card,
+# which reports GPU and price), plus their `_video_run` / `_relaunch` helpers.
+# This fork trains video LOCALLY only, so none of it is carried and
+# `cloud_video_training` is not a module here.
 # The local lane above (/train, /train/progress, /train/stop) is the whole
 # surface. `cloud_run_dataset` IS kept and used above: despite the name it is the
 # face_dataset/video_dataset table disambiguator, not part of the rental lane.
+# The Checkpoints & LoRAs section below arrived in the SAME upstream commit as
+# the two 2026-09-03 rejections (779aee6): its ⬇ / 📦 / ⏏ / 🗑 verbs read the
+# local run's own saves and are kept, resolved per hunk rather than per file.
 
+@bp.get('/video-dataset/<int:dataset_id>/train/preflight')
+def video_dataset_train_preflight(dataset_id):
+    """Pre-launch report — `checks` + `verdict`, the image preflight's shape, so
+    the same readiness card renders it. `?lane=cloud` drops the rows that read
+    THIS machine (ai-toolkit, weights) and adds the account ones (vast key, run
+    limit, budget); absent or `local` is the reverse.
+
+    Its own route and not `/dataset/<id>/train/preflight`, for the reason every
+    video route is: the two dataset tables share one integer space.
+
+    No capability gate in front of it, on purpose. The image route 409s without
+    ai-toolkit, and its caller treats a non-200 as "no objection" — which is the
+    silent no-op this report exists to prevent on the lane where money is about
+    to be spent. A missing tool is a ROW here, not an absence of answer."""
+    from ..services import video_training_local as vtl
+    try:
+        report = vtl.training_preflight(LOCAL_USER, dataset_id,
+                                        lane=request.args.get('lane') or 'local')
+    except ValueError as e:
+        if 'not found' in str(e):
+            return _missing(dataset_id)
+        return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, **report})
+
+
+# ── Checkpoints & LoRAs — the workspace section, both lanes, per STEP ──────
+# The verbs the image workspace's Checkpoints section has, for a video set.
+# `run_id` null on a body means the LOCAL run; a number means one of this
+# dataset's cloud runs, resolved by the (id, table) pair like every run route.
+
+def _checkpoint_verb(call):
+    """deploy / undeploy / delete answer alike: a dataset, run or step that is
+    not there is a 404 (LookupError), a refusal the user can act on — no loras
+    folder, a hand-placed LoRA — a 400 (ValueError), and a lane still writing
+    the files a 409 (RuntimeError)."""
+    try:
+        return jsonify({'ok': True, **call()})
+    except LookupError as e:
+        return jsonify({'error': str(e)}), 404
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 409
+
+
+@bp.get('/video-dataset/<int:dataset_id>/train/checkpoints')
+def video_dataset_checkpoints(dataset_id):
+    """Both lanes' saves of this dataset grouped by STEP, each file with its
+    deployed state — everything the Checkpoints & LoRAs section renders."""
+    from ..services import video_checkpoints as vck
+    try:
+        return jsonify(vck.list_checkpoints(LOCAL_USER, dataset_id))
+    except LookupError:
+        return _missing(dataset_id)
+
+
+@bp.post('/video-dataset/<int:dataset_id>/train/checkpoint/deploy')
+def video_dataset_checkpoint_deploy(dataset_id):
+    """📦 Every file of one step into ComfyUI's loras folder, through the Video
+    Test Studio's own copy — one folder, one naming, for both surfaces."""
+    from ..services import video_checkpoints as vck
+    body = request.get_json(silent=True) or {}
+    return _checkpoint_verb(lambda: vck.deploy_step(
+        LOCAL_USER, dataset_id, body.get('run_id'), body.get('step'),
+        bool(body.get('final'))))
+
+
+@bp.post('/video-dataset/<int:dataset_id>/train/checkpoint/undeploy')
+def video_dataset_checkpoint_undeploy(dataset_id):
+    """⏏ Move one deployed copy out of ComfyUI (to the trash). The training
+    save stays; only a copy the app deployed itself is accepted."""
+    from ..services import video_checkpoints as vck
+    body = request.get_json(silent=True) or {}
+    return _checkpoint_verb(lambda: vck.undeploy(
+        LOCAL_USER, dataset_id, body.get('deployed_as', '')))
+
+
+@bp.post('/video-dataset/<int:dataset_id>/train/checkpoint/delete')
+def video_dataset_checkpoint_delete(dataset_id):
+    """🗑 Every file of one step to the trash — all of a Wan pair, never half.
+    409 while the lane is still writing them (local training running, cloud
+    run on its pod)."""
+    from ..services import video_checkpoints as vck
+    body = request.get_json(silent=True) or {}
+    return _checkpoint_verb(lambda: vck.delete_step(
+        LOCAL_USER, dataset_id, body.get('run_id'), body.get('step'),
+        bool(body.get('final'))))
+
+
+@bp.get('/video-dataset/<int:dataset_id>/train/checkpoint')
+def video_dataset_local_checkpoint(dataset_id):
+    """Download ONE save of this dataset's LOCAL run — the cloud route's twin
+    (`/train/cloud/checkpoint`), resolved through the folder's own listing so
+    the request names a file and never a path."""
+    from flask import abort
+    from ..services import video_checkpoints as vck
+    try:
+        path = vck.local_checkpoint_path(LOCAL_USER, dataset_id,
+                                         request.args.get('filename'))
+    except LookupError:
+        path = None
+    if not path:
+        abort(404)
+    return send_file(path, as_attachment=True)
+
+
+# ── ✨ Neural render (DLSS 5) — in place, original kept ──────────────────────
+
+@bp.get('/video-dataset/<int:dataset_id>/neural-render')
+def video_dataset_neural_render_state(dataset_id):
+    """What the ✨ button needs before it is pressed and while it runs: the
+    capability's own sentences (``ready`` + ``missing``), the job snapshot of
+    the pass on THIS dataset (None when idle), and which clips currently play
+    a render — derived from the backup folder, which is the only state there
+    is. Polled only while a pass runs; the workspace's own 2 s poll never
+    carries this."""
+    if svc.get_video_dataset(LOCAL_USER, dataset_id) is None:
+        return _missing(dataset_id)
+    return jsonify({'ok': True, 'status': nr.status(),
+                    'job': nr.dataset_job(dataset_id),
+                    'rendered_ids': nr.rendered_clip_ids(LOCAL_USER, dataset_id),
+                    # {clip id: the dials that made its render}, for the lightbox.
+                    'rendered_params': nr.rendered_clip_params(LOCAL_USER, dataset_id)})
+
+
+@bp.post('/video-dataset/<int:dataset_id>/neural-render')
+def video_dataset_neural_render_start(dataset_id):
+    """Body {ids: [...] (empty = every clip), tone, structure, automask,
+    temporal, scene_cut}. Renders the clips IN PLACE — the folder is the
+    dataset, so the render must be the file the trainer reads — after copying
+    each original, once, to the backup folder outside the dataset. One job per
+    dataset (409 while one runs, like every bank pass); progress is read from
+    the GET above."""
+    from flask import current_app
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids') or []
+    if not isinstance(ids, list):
+        return jsonify({'error': 'ids must be a list of clip ids'}), 400
+    try:
+        out = nr.start_dataset_render(current_app._get_current_object(), LOCAL_USER,
+                                      dataset_id, ids, data)
+    except nr.NeuralRenderError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except bank_jobs.BankJobBusy:
+        return jsonify({'error': 'a pass is already running on this dataset'}), 409
+    return jsonify({'ok': True, **out})
+
+
+@bp.post('/video-dataset/<int:dataset_id>/neural-render/cancel')
+def video_dataset_neural_render_cancel(dataset_id):
+    """Stop the running pass: the clip being rendered keeps its original (the
+    replacement is a single ``os.replace`` at the very end), the ones already
+    done stay rendered."""
+    if svc.get_video_dataset(LOCAL_USER, dataset_id) is None:
+        return _missing(dataset_id)
+    return jsonify({'ok': True, 'cancelled': nr.cancel_dataset_job(dataset_id)})
+
+
+@bp.get('/video-dataset/<int:dataset_id>/clip/<int:clip_id>/original')
+def video_dataset_clip_original(dataset_id, clip_id):
+    """The ORIGINAL bytes of a neural-rendered clip, for the side-by-side
+    player: the clip's own media route now serves the render, this serves
+    what it replaced. Range-capable like the media route (the player seeks).
+    404 when the clip plays no render — there is nothing to compare with."""
+    path = nr.original_clip_path(LOCAL_USER, dataset_id, clip_id)
+    if path is None:
+        return jsonify({'error': 'this clip plays no render — no original to show'}), 404
+    return send_file(path, mimetype='video/mp4', conditional=True, max_age=0)
+
+
+@bp.post('/video-dataset/<int:dataset_id>/neural-render/restore')
+def video_dataset_neural_render_restore(dataset_id):
+    """🩹 Body {ids: [...] (empty = every rendered clip)}. Moves each original
+    back over its render; a restored clip has no backup left and therefore
+    reports as not rendered — the file and the fact cannot disagree."""
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids') or []
+    if not isinstance(ids, list):
+        return jsonify({'error': 'ids must be a list of clip ids'}), 400
+    try:
+        out = nr.restore_dataset_clips(LOCAL_USER, dataset_id, ids)
+    except nr.NeuralRenderError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify({'ok': True, **out})

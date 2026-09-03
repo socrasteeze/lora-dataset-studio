@@ -4,6 +4,7 @@ The builder has its own file. These are the questions only the route can answer:
 does it refuse before spending anything, does the clip row carry what the graph
 was actually built from, and does a finished job find its way back to the row.
 """
+from pathlib import Path
 import pytest
 
 
@@ -345,3 +346,308 @@ def test_a_clip_with_no_file_is_a_404_not_a_500(client, app):
     with app.app_context():
         cid = _clip(app, job_id='job-nofile')
     assert client.get(f'/api/video-studio/clip/{cid}/video').status_code == 404
+
+
+# --- the Gallery as a start frame (2026-09-01) --------------------------------
+
+class _FakeReq:
+    """The two things _resolve_source reads off a request."""
+
+    def __init__(self, data):
+        self.files = {}
+        self._data = data
+
+    def get_json(self, silent=False):
+        return self._data
+
+
+def test_a_gallery_image_resolves_to_the_picture_the_user_is_looking_at(app, tmp_path):
+    """Asked for from live use: the picture someone wants to animate is very
+    often one this app just generated, and the picker sent them back through
+    disk to use it. Resolved at FULL size from the folder that SERVES it
+    (/api/dataset/<id>/img/<name>) — a thumbnail fed to a 1 MP generation would
+    blame the LoRA for a softness the source never had."""
+    from PIL import Image
+    from app.extensions import db
+    from app.models import FaceDataset, LoraTestImage
+    from app.routes.video_studio import _resolve_source
+    from app.services.dataset_storage import dataset_path
+
+    with app.app_context():
+        ds = FaceDataset(user_id='local', name='Lola', trigger_word='Lola69382')
+        db.session.add(ds)
+        db.session.commit()
+        folder = Path(dataset_path(ds.id))
+        folder.mkdir(parents=True, exist_ok=True)
+        Image.new('RGB', (64, 48), 'red').save(folder / 'gen_0001.png')
+        row = LoraTestImage(dataset_id=ds.id, filename='gen_0001.png',
+                            prompt='a woman', checkpoint='ckpt.safetensors',
+                            strength=1.0)
+        db.session.add(row)
+        db.session.commit()
+
+        path, temp = _resolve_source(_FakeReq({'gallery_image_id': row.id}))
+        assert path == str(folder / 'gen_0001.png')
+        # Not a temp file: it is the user's own picture, and deleting it after
+        # staging would delete what the Gallery is still showing.
+        assert temp is False
+
+        # A row whose file went away, and an id that never existed: both refuse
+        # in words, never with a path that is not there.
+        (folder / 'gen_0001.png').unlink()
+        with pytest.raises(ValueError, match='disk'):
+            _resolve_source(_FakeReq({'gallery_image_id': row.id}))
+        with pytest.raises(ValueError, match='gallery'):
+            _resolve_source(_FakeReq({'gallery_image_id': 999999}))
+
+
+def test_the_refusal_names_every_way_in(client):
+    """Four sources now; the sentence that lists them is what someone reads
+    when they attached none."""
+    r = client.post('/api/video-studio/source', json={})
+    body = r.get_json()['error'].lower()
+    for word in ('image', 'bank', 'clip', 'gallery'):
+        assert word in body
+
+
+def test_a_clip_publishes_the_start_frame_reuse_needs(app):
+    """↻ Reuse restored every dial of an image-to-video clip and left the start
+    frame empty, so Generate stayed blocked on 'Pick a start frame' — every
+    setting back except the one that decides whether the button works. The row
+    had stored the staged file all along; the payload never published it."""
+    from app.routes.video_studio import _clip_dict
+    from app.extensions import db
+    from app.models import VideoTestClip
+
+    with app.app_context():
+        clip = VideoTestClip(prompt='she turns', mode='i2v', status='done',
+                               source_image='lds_vstudio_abc123.png',
+                               frames=56, fps=24, steps=6, seed=7)
+        db.session.add(clip)
+        db.session.commit()
+        row = _clip_dict(clip)
+
+    assert row['source_image'] == 'lds_vstudio_abc123.png'
+    assert row['mode'] == 'i2v'
+
+
+def test_options_carry_the_launch_advice_the_running_comfyui_earns(client, monkeypatch):
+    from app.services import video_test_studio as vts
+    # Started without the flag on a 48 GB machine, on a ComfyUI that knows it: told.
+    monkeypatch.setattr(vts, 'comfyui_launch_facts',
+                        lambda timeout=3: (['main.py', '--listen', '127.0.0.1'], 47.7, '0.30.1'))
+    body = client.get('/api/video-studio/options').get_json()
+    assert body['launch_advice'] == {'flag': '--fast-disk', 'add': True, 'remove': None,
+                                     'ram_total_gb': 47.7, 'weights_gb': vts.H3_HOST_RAM_GB}
+    # Started by LDS's own launcher (which passes the flag): nothing to say.
+    monkeypatch.setattr(vts, 'comfyui_launch_facts',
+                        lambda timeout=3: (['main.py', '--fast-disk'], 47.7, '0.30.1'))
+    assert client.get('/api/video-studio/options').get_json()['launch_advice'] is None
+    # Unreachable, or too old to echo its argv: silence, never a guess.
+    monkeypatch.setattr(vts, 'comfyui_launch_facts', lambda timeout=3: (None, None, None))
+    assert client.get('/api/video-studio/options').get_json()['launch_advice'] is None
+
+
+class _Resp:
+    def __init__(self, payload, status=200, raises=None):
+        self.status_code = status
+        self._payload = payload
+        self._raises = raises
+
+    def json(self):
+        if self._raises:
+            raise self._raises
+        return self._payload
+
+
+def _facts_with(app, monkeypatch, response=None, raising=None):
+    from app.services import video_test_studio as vts
+    import requests
+    seen = {}
+
+    def fake_get(*args, **kwargs):
+        seen.update(kwargs)
+        if raising:
+            raise raising
+        return response
+
+    monkeypatch.setattr(requests, 'get', fake_get)
+    with app.app_context():
+        from app import config as cfg
+        monkeypatch.setattr(cfg, 'get', lambda key, default=None: (
+            'http://127.0.0.1:8188' if key == 'comfyui.api_url' else default))
+        return vts.comfyui_launch_facts(), seen
+
+
+def test_launch_facts_read_argv_ram_and_version_from_system_stats(app, monkeypatch):
+    # A raw, unaligned byte count: the GiB figure is handed on as a float and
+    # rounded ONCE, by the advice, so the seam bytes → GiB is really crossed.
+    payload = {'system': {'argv': ['main.py', '--fast-disk'], 'ram_total': 50465476608,
+                          'comfyui_version': '0.30.1'}}
+    facts, seen = _facts_with(app, monkeypatch, _Resp(payload))
+    assert facts == (['main.py', '--fast-disk'], 50465476608 / 1024 ** 3, '0.30.1')
+    # The call is bounded and never follows a redirect off the configured host:
+    # it sits in the synchronous body of the options route the panel fetches on mount.
+    assert seen['timeout'] == 3
+    assert seen['allow_redirects'] is False
+
+
+def test_launch_facts_keep_the_argv_when_an_older_server_sends_no_ram(app, monkeypatch):
+    facts, _ = _facts_with(app, monkeypatch, _Resp({'system': {'argv': ['main.py']}}))
+    assert facts == (['main.py'], None, None)
+
+
+@pytest.mark.parametrize('response', [
+    _Resp({'system': {}}),                       # a server that echoes nothing useful
+    _Resp({}),                                   # no system block at all
+    _Resp([]),                                   # not even an object
+    _Resp({'system': {'argv': ['main.py']}}, status=500),
+    _Resp(None, raises=ValueError('not json')),
+])
+def test_launch_facts_answer_none_for_every_shape_of_nothing(app, monkeypatch, response):
+    facts, _ = _facts_with(app, monkeypatch, response)
+    assert facts == (None, None, None)
+
+
+def test_launch_facts_never_raise_when_the_request_fails(app, monkeypatch):
+    import requests
+    for exc in (requests.ConnectionError('down'), requests.Timeout('slow')):
+        facts, _ = _facts_with(app, monkeypatch, raising=exc)
+        assert facts == (None, None, None)
+
+
+# --- ⏱ the render time ---------------------------------------------------------
+
+def _job(app, job_id='job-1', started=None, completed=None, status='completed'):
+    from app.extensions import db
+    from app.models import ImageGenerationQueue
+    row = ImageGenerationQueue(job_id=job_id, user_id='local', status=status,
+                               started_at=started, completed_at=completed)
+    db.session.add(row)
+    db.session.commit()
+
+
+def test_a_finished_clip_records_how_long_the_queue_spent_on_it(app, monkeypatch):
+    from datetime import datetime, timedelta
+    from app.extensions import db
+    from app.models import VideoTestClip
+    from app.routes.video_studio import _clip_dict
+    from app.services import video_test_studio as vts
+    with app.app_context():
+        cid = _clip(app)
+        t0 = datetime(2026, 9, 2, 22, 0, 0)
+        _job(app, started=t0, completed=t0 + timedelta(seconds=347.64))
+        monkeypatch.setattr(vts, '_bring_clip_home', lambda fn: None)
+        vts.link_completed_clip('job-1', 'clip_00001.mp4')
+        row = db.session.get(VideoTestClip, cid)
+        assert row.status == 'done'
+        assert row.render_seconds == 347.6           # rounded once, here
+        assert _clip_dict(row)['render_seconds'] == 347.6
+
+
+def test_a_failed_clip_keeps_how_long_it_ran_before_dying(app):
+    from datetime import datetime, timedelta
+    from app.extensions import db
+    from app.models import VideoTestClip
+    from app.services import video_test_studio as vts
+    with app.app_context():
+        cid = _clip(app)
+        t0 = datetime(2026, 9, 2, 22, 0, 0)
+        _job(app, started=t0, completed=t0 + timedelta(seconds=240), status='failed')
+        vts.link_completed_clip('job-1', None, failed=True, reason='ComfyUI KSampler: boom')
+        row = db.session.get(VideoTestClip, cid)
+        assert row.status == 'failed' and row.render_seconds == 240.0
+
+
+def test_render_time_is_null_whenever_the_queue_cannot_say(app, monkeypatch):
+    from datetime import datetime, timedelta
+    from app.extensions import db
+    from app.models import VideoTestClip
+    from app.services import video_test_studio as vts
+    monkeypatch.setattr(vts, '_bring_clip_home', lambda fn: None)
+    t0 = datetime(2026, 9, 2, 22, 0, 0)
+    cases = {
+        'no-row': None,                                    # settled by hand, or a pruned queue
+        'no-start': dict(started=None, completed=t0),
+        'no-end': dict(started=t0, completed=None),
+        'backwards': dict(started=t0, completed=t0 - timedelta(seconds=5)),
+    }
+    with app.app_context():
+        for job_id, stamps in cases.items():
+            cid = _clip(app, job_id=job_id)
+            if stamps is not None:
+                _job(app, job_id=job_id, **stamps)
+            vts.link_completed_clip(job_id, 'clip.mp4')
+            row = db.session.get(VideoTestClip, cid)
+            assert row.status == 'done', job_id          # the clip still lands
+            assert row.render_seconds is None, job_id    # a guess is not a measurement
+
+
+def test_a_job_the_queue_cancelled_gets_no_render_time(app, monkeypatch):
+    # The ComfyUI-restart path: the job stalls with its start kept, the barrier
+    # is reconciled hours later and stamps completed_at THEN. That difference
+    # measures the outage; the card must say nothing rather than "6 h".
+    from datetime import datetime, timedelta
+    from app.extensions import db
+    from app.models import VideoTestClip
+    from app.services import video_test_studio as vts
+    with app.app_context():
+        cid = _clip(app)
+        t0 = datetime(2026, 9, 2, 22, 0, 0)
+        _job(app, started=t0, completed=t0 + timedelta(hours=6), status='cancelled')
+        vts.link_completed_clip('job-1', None, failed=True, reason='ComfyUI restarted')
+        row = db.session.get(VideoTestClip, cid)
+        assert row.status == 'failed' and row.render_seconds is None
+
+
+def test_a_job_settled_within_the_same_tick_measures_zero_not_nothing(app, monkeypatch):
+    from datetime import datetime
+    from app.extensions import db
+    from app.models import VideoTestClip
+    from app.services import video_test_studio as vts
+    with app.app_context():
+        cid = _clip(app)
+        t0 = datetime(2026, 9, 2, 22, 0, 0)
+        _job(app, started=t0, completed=t0)
+        monkeypatch.setattr(vts, '_bring_clip_home', lambda fn: None)
+        vts.link_completed_clip('job-1', 'clip.mp4')
+        assert db.session.get(VideoTestClip, cid).render_seconds == 0.0
+
+
+def test_the_render_time_survives_the_queues_real_completion_path(app, monkeypatch):
+    """Everything above fabricates the stamps. This one lets the queue stamp
+    them the way it does in production — update_status('processing') at the
+    claim, update_status('completed') then commit BEFORE the dispatch — so the
+    test is the one that reddens if that order is ever reversed."""
+    import json
+    import time
+    from app import job_queue
+    from app.extensions import db
+    from app.models import ImageGenerationQueue, VideoTestClip
+    from app.services import video_test_studio as vts
+    monkeypatch.setattr(job_queue, '_drop_staged_inputs', lambda md: None)
+    monkeypatch.setattr(vts, '_bring_clip_home', lambda fn: None)
+    with app.app_context():
+        cid = _clip(app, job_id='job-real')
+        job = ImageGenerationQueue(job_id='job-real', user_id='local', status='pending',
+                                   job_metadata=json.dumps({'is_video_test': True, 'clip_id': cid}))
+        db.session.add(job)
+        db.session.commit()
+        job.update_status('processing')
+        db.session.commit()
+        time.sleep(0.01)
+        job.update_status('completed', result_filename='clip.mp4')
+        db.session.commit()
+        job_queue._dispatch_completion(job, 'clip.mp4', False)
+        row = db.session.get(VideoTestClip, cid)
+        assert row.status == 'done' and row.filename == 'clip.mp4'
+        assert row.render_seconds is not None and row.render_seconds >= 0.0
+
+
+def test_the_render_time_column_is_declared_to_the_additive_migration():
+    # An existing database only gains the column through _SCHEMA_ADDITIONS;
+    # a model column missing there is invisible on every install but a fresh one.
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    src = open(os.path.join(here, '..', 'app', '__init__.py'), encoding='utf-8').read()
+    assert "('video_test_clip', 'render_seconds', 'FLOAT')" in src

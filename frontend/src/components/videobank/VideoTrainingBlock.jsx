@@ -38,7 +38,7 @@ const PROVEN_TARGETS = new Set(['wan22_14b', 'minimax_h3', 'minimax_h3_ref2va'])
  * which names the TABLE as well as the id — a face training of the colliding
  * id must not drive this bar).
  */
-export default function VideoTrainingBlock({ ds }) {
+export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) {
   const toast = useToast()
   // Prefilled with the server's dataset-sized suggestion (steps scale with the
   // clip count — measured, not vibes; see suggested_steps in video_training.py).
@@ -62,6 +62,21 @@ export default function VideoTrainingBlock({ ds }) {
     const t = setInterval(poll, 3000)
     return () => clearInterval(t)
   }, [active, poll])
+
+  // Told, rather than guessed at from outside: this poll is the only thing that
+  // knows when a save lands, and the workspace's Checkpoints & LoRAs section
+  // re-reads on the number it reports.
+  // DIVERGENCE 4 — upstream sums the harvested steps of its rented-pod runs
+  // into this count as well. There is one lane here, so the local run's own
+  // files ARE the count.
+  const saveCount = progress?.checkpoints?.length || 0
+  useEffect(() => { onSaveCount?.(saveCount) }, [saveCount, onSaveCount])
+  // The other direction: that section deleted a save, and this card must not
+  // go on offering what is gone.
+  useEffect(() => {
+    if (!refreshKey) return
+    poll()
+  }, [refreshKey, poll])
 
   const start = async (acceptDownload = false) => {
     // The licence question comes BEFORE anything is spent — not after the
