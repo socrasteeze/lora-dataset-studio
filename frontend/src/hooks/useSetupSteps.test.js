@@ -440,7 +440,7 @@ test('installCatalog lists every app-installable component, present + available'
       // optional node packs are linked from its card, never installed by the
       // app: it downloads model files and does not add code to a ComfyUI.
       'h3_base', 'h3_text_encoder', 'h3_video_vae', 'h3_audio_vae',
-      'h3_turbo_lora',
+      'h3_turbo_lora', 'h3_parasyte_lora', 'h3_dareties_lora',
       'lanpaint_nodes'],
   );
   // Everything installed in fullCaps -> every tile present, and available to REINSTALL.
@@ -452,14 +452,14 @@ test('installCatalog lists every app-installable component, present + available'
 
 test('installCatalog stays fully available for reinstall when all is green', () => {
   // The menu must never collapse once installed — each item can always be repaired.
-  // 28, not upstream's 27: this fork's catalog carries the 🔖 WD14 tagger row on
+  // 30, not upstream's 29: this fork's catalog carries the 🔖 WD14 tagger row on
   // top of upstream's list. Recomputed from the deepEqual list just above, never
-  // copied from upstream's literal — upstream's number moved 22 -> 27 on the
-  // 2026-09-01 sync (the five 🎬 Video Test Studio weight rows), and the fork's
-  // own count moved by the same five for a DIFFERENT total. The one time this
-  // reads as "unchanged" is the one time it is wrong.
+  // copied from upstream's literal — upstream added the two optional arena
+  // accelerations in this sync, and the fork's own count moved by the same two
+  // for a DIFFERENT total. The one time this reads as "unchanged" is the one
+  // time it is wrong.
   const cat = installCatalog(fullCaps());
-  assert.ok(cat.length === 28 && cat.every((c) => c.available));
+  assert.ok(cat.length === 30 && cat.every((c) => c.available));
 });
 
 test('installCatalog marks missing ML extras not-present but still available', () => {
@@ -937,4 +937,3 @@ test('an install that predates the provider setting still gets the Ollama pull',
   }).find((c) => c.action === 'ollama_model');
   assert.equal(row.available, true);
 });
-

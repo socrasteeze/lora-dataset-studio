@@ -17,8 +17,8 @@ import { deleteDestination, isRecoverable } from '../../utils/deletionWording.js
  * DIVERGENCE 4 — upstream keeps this in `videoCloudStatus.js`, the module that
  * describes a rented-pod run's phases. That module is not carried here, and
  * this function has nothing to do with a pod: it names a save, and its own rule
- * below is about a LOCAL run. It lives with its only consumer instead. */
-function stepLabel(step) {
+ * below is about a LOCAL run. It lives with the local checkpoint consumers. */
+export function stepLabel(step) {
   if (!step) return ''
   const n = step.files?.length || 0
   // A LOCAL run's final save carries no number (the lane stamps no step count
@@ -30,8 +30,8 @@ function stepLabel(step) {
 }
 import { videoDatasetCheckpointUrl, videoDatasetLocalCheckpointUrl } from './videoBankApi.js'
 
-export const EMPTY_NOTE = 'No checkpoints yet — train this set on this PC or in the '
-  + 'cloud, and every save comes back here, step by step.'
+export const EMPTY_NOTE = 'No checkpoints yet — train this set on this PC, and every '
+  + 'save appears here, step by step.'
 
 /* Why a LOCAL save offers no ▶ Continue: ai-toolkit resumes from whatever it
    finds in the run folder, so the next local launch continues from the NEWEST
