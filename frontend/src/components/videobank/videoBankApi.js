@@ -187,6 +187,11 @@ export function videoDatasetNeuralRenderUrl(datasetId) {
 export function videoDatasetClipOriginalUrl(datasetId, clipId) {
   return `/api/video-dataset/${datasetId}/clip/${clipId}/original`
 }
+/** ⬇ The two of them as ONE mp4, side by side and labelled — the picture the
+ * comparison shows, in a file. Same 404 as the original route. */
+export function videoDatasetClipComparisonUrl(datasetId, clipId) {
+  return `/api/video-dataset/${datasetId}/clip/${clipId}/comparison`
+}
 export function videoDatasetNeuralRenderCancelUrl(datasetId) {
   return `/api/video-dataset/${datasetId}/neural-render/cancel`
 }
@@ -271,4 +276,15 @@ export function videoDatasetCheckpointDeleteUrl(datasetId) {
 export function videoDatasetLocalCheckpointUrl(datasetId, filename) {
   const p = new URLSearchParams({ filename: String(filename ?? '') })
   return `/api/video-dataset/${datasetId}/train/checkpoint?${p.toString()}`
+}
+
+/** 🌳 Every run of this dataset as one genealogy forest — the shape the image
+ * graph draws (`utils/lineageGraph`), answered by the video lane. */
+export function videoDatasetLineageUrl(datasetId) {
+  return `/api/video-dataset/${datasetId}/train/lineage`
+}
+
+/** The training samples ai-toolkit rendered for the local run. */
+export function videoDatasetSamplesUrl(datasetId) {
+  return `/api/video-dataset/${datasetId}/train/samples`
 }

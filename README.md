@@ -417,7 +417,19 @@ the first already invented, so the button is refused there and says why.
   </tr>
   <tr>
     <td valign="top"><sub><strong>📷 Camera angles</strong> — pick positions on the dial, read the exact prompts and the cost <em>before</em> you shoot. Lives in the Gallery viewer and on every kept dataset image.</sub></td>
-    <td valign="top"><sub><strong>🌐 Civitai top prompts</strong> — the most-reacted images next to the prompt they were posted with; ⤵ drops one into your prompt field. Next to the prompt box on every generation surface.</sub></td>
+    <td valign="top"><sub><strong>🌐 Civitai top prompts</strong> — the most-reacted images next to the prompt they were posted with; ⤵ drops one into your prompt field, ☐ Batch collects several for one run. Next to the prompt box on every generation surface.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/video/dlss5-compare.png"><img src="docs/screenshots/video/dlss5-compare.png" alt="The Compare view: the original clip and its DLSS 5 neural render playing side by side, in step, at 1:1" width="100%"></a>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/screenshots/video/video-studio-clips.png"><img src="docs/screenshots/video/video-studio-clips.png" alt="The Video Test Studio clip history: each clip with its prompt, the dials that ran, the render time, and the Reuse, Smooth, Neural and Compare actions" width="100%"></a>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top"><sub><strong>✨ DLSS 5 Neural Rendering</strong> — ⇔ Compare plays the original and the render together, in step, at 1:1. A neural render is judged in motion, not on a still.</sub></td>
+    <td valign="top"><sub><strong>🎬 Video Test Studio</strong> — every clip keeps the prompt, the dials that produced it and what it cost; ↻ Reuse, ≈ Smooth, ✨ Neural and ⇔ Compare start from there.</sub></td>
   </tr>
 </table>
 

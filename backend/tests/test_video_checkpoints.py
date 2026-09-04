@@ -12,7 +12,6 @@ served — so most tests below are about what a route refuses, not what it does.
 import json
 import os
 
-from app.extensions import db
 from app.services import cloud_run_dataset as crd
 from app.services import cloud_training as ct
 # DIVERGENCE 4 — upstream imports these four fixtures from
