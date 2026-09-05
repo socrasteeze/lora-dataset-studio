@@ -1013,6 +1013,21 @@ const TOPICS = [
       'not installed', 'download the lora', 'lightx2v'],
     guide: { chapter: 'using-the-app', anchor: 'test-a-video-lora-before-you-trust-it' },
     app: { route: '/studio?lane=video' } },
+  // ⏭ Continue: the last frame as the next start frame, the render joined
+  // behind. Searched by the gesture ("continue", "extend", "longer") and by
+  // what the result is ("joined", "one video").
+  { id: 'video-continue', kind: 'action', title: 'Continue a clip from its last frame',
+    keywords: ['continue', 'continue a clip', 'extend', 'extend a clip', 'longer clip', 'chain clips',
+      'last frame', 'last image', 'next clip', 'joined', 'concatenate', 'one video', 'sequence',
+      'not joined', 'recaption', 'new motion', 'next start frame'],
+    guide: { chapter: 'using-the-app', anchor: 'continue-a-clip-from-its-last-frame' },
+    app: { route: '/studio?lane=video' } },
+  // The batch's prompt: one for all, or one written per picture.
+  { id: 'video-batch-prompt', kind: 'setting', title: 'Prompt for a batch of pictures',
+    keywords: ['batch', 'batch prompt', 'same prompt', 'per picture', 'per image', 'written per picture',
+      'one prompt each', 'reprompt', 'each image', 'several pictures', 'auto per image', 'enrich per image'],
+    guide: { chapter: 'using-the-app', anchor: 'test-a-video-lora-before-you-trust-it' },
+    app: { route: '/studio?lane=video' } },
   { id: 'video-smooth-rate', kind: 'action', title: 'Smooth: pick the rate',
     keywords: ['smooth', 'smoothing', 'interpolate', 'interpolation', 'frame interpolation', 'rife',
       'fps', '48 fps', '72 fps', '96 fps', '60 fps', 'why not 60 fps', 'playback rate', 'frame rate',

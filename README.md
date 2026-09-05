@@ -429,7 +429,7 @@ the first already invented, so the button is refused there and says why.
   </tr>
   <tr>
     <td valign="top"><sub><strong>✨ DLSS 5 Neural Rendering</strong> — ⇔ Compare plays the original and the render together, in step, at 1:1. A neural render is judged in motion, not on a still.</sub></td>
-    <td valign="top"><sub><strong>🎬 Video Test Studio</strong> — every clip keeps the prompt, the dials that produced it and what it cost; ↻ Reuse, ≈ Smooth, ✨ Neural and ⇔ Compare start from there.</sub></td>
+    <td valign="top"><sub><strong>🎬 Video Test Studio</strong> — every clip keeps the prompt, the dials that produced it and what it cost; ↻ Reuse, ≈ Smooth, ✨ Neural, ⏭ Continue and ⇔ Compare start from there. <strong>⏭ Continue</strong> takes a finished clip's last frame as the next start frame and joins the render behind it, so a longer shot comes back as one video, not two files. With several start frames, a batch can run one prompt for all of them or <strong>✨ one written per picture</strong> — written in a single pass before anything is queued.</sub></td>
   </tr>
 </table>
 
@@ -892,7 +892,7 @@ Nothing here locks your data in — every stage has an exit.
 
 ## Feature matrix by backend
 
-Missing dependencies are shown in Setup/Settings and gated features stay unavailable until their requirements are satisfied. Setup's closing screen lists the installable capabilities — including bank scoring, the optional SigLIP 2 engine, the watermark detector and the scraping extras — and each row that is not ready leads to the step that installs it. The SeedVR2 upscaler is the exception: it installs from its own Setup ▸ ComfyUI card and is not counted on that screen.
+Missing dependencies are shown in Setup/Settings and gated features stay unavailable until their requirements are satisfied. Setup's closing screen lists the installable capabilities — including bank scoring, the optional SigLIP 2 engine, the watermark detector and the scraping extras — and each row that is not ready leads to the step that installs it. **Each row also says in one line what it unlocks**, and the video lane's three doors are counted separately rather than hidden behind one green row: ✨ DLSS 5 neural rendering, ↗ Smooth (frame interpolation) and the 🔴 Live lane each carry their own install. The SeedVR2 upscaler is the exception: it installs from its own Setup ▸ ComfyUI card and is not counted on that screen.
 
 | Feature | Requires |
 |---|---|

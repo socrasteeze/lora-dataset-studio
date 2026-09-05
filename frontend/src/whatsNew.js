@@ -83,6 +83,114 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-05-zzz-video-reuse-reliability',
+    date: '2026-09-05',
+    title: 'Keep your clip settings when you reuse or finish a video',
+    blurb: 'Reuse keeps the canvas shape of text-to-video clips, and Smooth and Neural rendering preserve the selected accelerator. Last-frame extraction also recovers cleanly if an export is interrupted.',
+    to: '/studio?lane=video',
+  },
+  {
+    id: '2026-09-05-zzz-small-screen-video-controls',
+    date: '2026-09-05',
+    title: 'Reach video graph actions on a small screen',
+    blurb: 'Checkpoint menus stay inside the screen and offer comfortable touch targets. Long render-option labels wrap so you can read the whole setting.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-09-05-zzz-comfyui-input-check',
+    date: '2026-09-05',
+    title: 'Know when ComfyUI cannot see the image you selected',
+    blurb: 'A mismatched input folder is caught before a render starts, with an explanation of which folder needs checking instead of an unexplained generation error.',
+  },
+  {
+    id: '2026-09-05-zzz-cancelled-reads',
+    date: '2026-09-05',
+    title: 'Closing a picker no longer looks like a lost connection',
+    blurb: 'A cancelled read no longer triggers the offline banner or a connection-error notification.',
+  },
+  {
+    id: '2026-09-05-zz-setup-scan-startup',
+    date: '2026-09-05',
+    title: 'Spend less time waiting for the Setup scan',
+    blurb: 'Setup checks your installed tools sooner after an app restart. Opening it reuses the current machine scan; Re-scan still checks again when you need it.',
+    to: '/setup',
+  },
+  {
+    id: '2026-09-04-zzzzzzzz-workspace-header-refresh',
+    date: '2026-09-04',
+    title: 'Find your workspace at a glance',
+    blurb: 'The header now separates workspace navigation from machine readings and tools, with matching icons, a clearer active tab and more readable resource values. Gallery no longer carries a Beta badge.',
+  },
+  {
+    id: '2026-09-04-zzzzz-no-setup-detour-after-a-dropped-request',
+    date: '2026-09-04',
+    title: 'Coming back to the app no longer lands you on Setup when a request dropped on the way',
+    blurb:
+      'Opening the app again on a phone — after a video had rendered, say — '
+      + 'sometimes showed the Setup wizard as if the machine had never been '
+      + 'configured. It had: the first two requests of the page load had been '
+      + 'dropped by a link that was reconnecting, and “I could not ask” was '
+      + 'being read as “never set up”. A dropped request is now retried once '
+      + 'and otherwise ignored; only the server’s own answer can open the '
+      + 'wizard, and an install it has already seen working is never bounced.',
+  },
+  {
+    id: '2026-09-04-per-picture-prompts-in-one-pass',
+    date: '2026-09-04',
+    title: 'Writing a prompt per picture no longer reloads the video model between each one',
+    blurb:
+      '✨ Written per picture asked the vision model once per picture — and every '
+      + 'one of those asks makes ComfyUI let go of its models, so the next clip '
+      + 'reloaded MiniMax H3, tens of gigabytes, once per picture. A twelve-frame '
+      + 'strip paid that eleven times over for nothing. The prompts are now all '
+      + 'written in a single hold of the GPU, before the first clip is queued: '
+      + 'the model comes back once. Same screen, same fallbacks, same notices — '
+      + 'the batch is simply not spending its time swapping weights any more.',
+    to: '/studio',
+  },
+  {
+    // Same-day ids sort the feed (date, then id): an id below the day's
+    // others never reaches the top, and the badge counts nothing new.
+    id: '2026-09-03-what-each-capability-unlocks',
+    date: '2026-09-03',
+    title: 'Capabilities: every row says what it unlocks — and the Video lane’s three doors are counted',
+    blurb:
+      'Settings ▸ Overview (and the wizard’s last screen) put one line under '
+      + 'each capability saying what it does — "Test Studio (images)" is where '
+      + 'test images are generated with a LoRA, "Video Test Studio" tests one '
+      + 'in motion. Three rows join the count: ✨ DLSS 5 neural rendering, '
+      + '↗ Smooth (frame interpolation) and the 🔴 Live lane — each its own '
+      + 'install, each shown not-ready with its door instead of hiding behind '
+      + 'a green video row.',
+    to: '/settings/overview',
+  },
+  {
+    id: '2026-09-03-video-test-studio-prompts-per-picture',
+    date: '2026-09-03',
+    title: 'A batch of pictures, one prompt each',
+    blurb:
+      'With several start frames in the strip, the Video Test Studio now asks '
+      + 'which prompt the batch runs: the same motion for every picture (as '
+      + 'before, the comparison that says something about the LoRA), or one '
+      + 'written by ✨ per picture — your motion enriched with each frame, or '
+      + 'a proposal from the frame alone — written before anything is queued.',
+    to: '/studio?lane=video',
+  },
+  {
+    id: '2026-09-03-video-test-studio-continue-from-last-frame',
+    date: '2026-09-03',
+    title: 'Continue a clip from its last frame — and get one video',
+    blurb:
+      'A ⏭ Continue button on every finished clip of the Video Test Studio: '
+      + 'its last frame becomes the next start frame, you write the next '
+      + 'motion, and the render lands joined behind the clip it continues — '
+      + 'one video, that clip then the new one, the cut frame dropped and the '
+      + 'sound kept in step (a smoothed clip has none: its side is padded with '
+      + 'silence, the new part keeps its own). Continue the result again and '
+      + 'the chain grows.',
+    to: '/studio?lane=video',
+  },
+  {
     id: '2026-09-03-video-accelerations',
     date: '2026-09-03',
     title: 'Pick your video acceleration among the arena’s top three',

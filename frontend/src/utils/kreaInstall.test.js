@@ -117,12 +117,14 @@ test('Krea is a counted capability, never quietly dropped from the total', () =>
   assert.ok(krea, 'Krea must appear in the capability summary');
   assert.equal(krea.ok, false);
   assert.equal(!!krea.pending, false, 'a real disk gap is not a "waiting" state');
-  // It counts against the total instead of disappearing from it. 19, not
-  // upstream's 21: the three cloud API engines are not capabilities on this
-  // fork (Divergence 1), and the 🔖 WD14 tagger is one — see
+  // It counts against the total instead of disappearing from it. 22, not
+  // upstream's 25: the three cloud API engines and the 📤 Civitai publisher
+  // are not capabilities on this fork (Divergence 1), and the 🔖 WD14 tagger
+  // is one — see
   // capability-destinations-contract.test.mjs, which pins the SAME number and
   // carries the arithmetic. 📷 Camera angles joined the list on 2026-08-26,
-  // 🎬 the Video Test Studio on 2026-08-31.
+  // 🎬 the Video Test Studio on 2026-08-31, and the Video lane's three doors
+  // (✨ DLSS 5, ↗ Smooth, 🔴 Live) on 2026-09-04.
   //
   // ⚠️ THIS IS THE SECOND HOME OF THAT NUMBER, and upstream's copy of this file
   // asserts a FLOOR (`>= 12`), so their syncs never touch the line and it can
@@ -130,7 +132,7 @@ test('Krea is a counted capability, never quietly dropped from the total', () =>
   // moved and this literal auto-merged untouched, red only at the full suite.
   // When one of the two moves, move both — and run
   // deriveCapabilitySummary with this fixture and count, never copy.
-  assert.equal(rows.length, 19);
+  assert.equal(rows.length, 22);
   assert.ok(rows.filter((r) => r.ok).length < rows.length);
 });
 
