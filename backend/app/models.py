@@ -2022,6 +2022,7 @@ class VideoTestClip(db.Model):
 
     prompt = db.Column(Text, nullable=True)
     mode = db.Column(String(8), nullable=False, default='i2v')  # i2v|t2v
+    aspect = db.Column(String(16), nullable=True, default='auto', server_default='auto')
     source_image = db.Column(String(255), nullable=True)  # the file handed to LoadImage
     seed = db.Column(db.BigInteger, nullable=True)
     steps = db.Column(Integer, nullable=True)
@@ -2040,6 +2041,7 @@ class VideoTestClip(db.Model):
     # new artefact with its own frame rate — never an edit of the original,
     # which would destroy the comparison the studio exists for.
     vfi_of = db.Column(Integer, nullable=True, index=True)
+    continues_of = db.Column(Integer, nullable=True, index=True)   # ⏭ the clip this one is joined behind
     # ✨ The clip this one was neural-rendered FROM (DLSS 5), or NULL — the same
     # rule: a new artefact next to the original, never an edit of it.
     nr_of = db.Column(Integer, nullable=True, index=True)
