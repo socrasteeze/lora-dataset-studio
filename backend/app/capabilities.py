@@ -1741,7 +1741,7 @@ def classify_comfyui_dir(path: str) -> dict:
     the folder itself otherwise). Never raises — a filesystem hiccup degrades
     to 'not_comfyui' rather than throwing into the request.
 
-    Every verdict also carries `input_check` = {path, ok, problem}: "this IS a
+    Every verdict also carries `input_check` = {path, ok, problem, suggestion}: "this IS a
     ComfyUI install" was only ever half the question, and the wizard used to
     certify the half it could see. The other half is whether the app can actually
     HAND FILES to that install — every local engine copies its source into
@@ -1788,11 +1788,12 @@ def _input_check(base_dir: str) -> dict:
     the folder the app would really use rather than a layout assumption.
     {'path','ok','problem'}; ok=None = nothing probed. Never raises."""
     if not base_dir:
-        return {'path': '', 'ok': None, 'problem': ''}
+        return {'path': '', 'ok': None, 'problem': '', 'suggestion': ''}
     try:
         override = cfg.get('comfyui.input_dir') or ''
     except Exception:
         override = ''
+    suggestion = ''
     try:
         target = cfg.resolve_comfyui_dir('input', base_dir, override)
         path = str(target) if target else ''
@@ -1806,10 +1807,37 @@ def _input_check(base_dir: str) -> dict:
             invisible = comfy_fs.input_visibility_problem(path)
             if invisible:
                 verdict = {'ok': False, 'problem': invisible}
+                # ComfyUI has just proved it reads somewhere else. If it also SAYS
+                # where, offer that folder for one click right here: the very same
+                # suggestion already existed, but only inside the Advanced fold of
+                # Settings that nobody opens unless told to — which is how a Comfy
+                # Desktop user with its shared folder ended up on GitHub (#64,
+                # mikemil828). Asked only after the probe failed: an override
+                # nobody needs is a field to explain.
+                suggestion = _reported_input_folder(path)
     except Exception:
-        return {'path': '', 'ok': None, 'problem': ''}
+        return {'path': '', 'ok': None, 'problem': '', 'suggestion': ''}
     return {'path': comfy_fs.safe_path(path), 'ok': verdict['ok'],
-            'problem': verdict['problem']}
+            'problem': verdict['problem'], 'suggestion': suggestion}
+
+
+def _reported_input_folder(current: str) -> str:
+    """The input folder the RUNNING ComfyUI says it uses, when that is not the one
+    the app just probed — '' otherwise. Reported (an absolute `--input-directory`
+    in the argv ComfyUI echoes), never inferred: the same rule
+    `parse_comfy_argv_dirs` applies, for the same reason. Never raises."""
+    try:
+        reported = detect_comfyui_folders().get('input_dir') or ''
+    except Exception:
+        return ''
+    if not reported or not current:
+        return reported
+    try:
+        same = (comfy_fs.path_flavour(reported).normpath(reported).lower()
+                == comfy_fs.path_flavour(current).normpath(current).lower())
+    except Exception:
+        same = False
+    return '' if same else reported
 
 
 def classify_comfyui_folders(base_dir: str, overrides: dict | None = None) -> dict:
@@ -1893,14 +1921,23 @@ _COMFY_ARGV_FLAGS = {'--output-directory': 'output_dir', '--input-directory': 'i
 
 
 def parse_comfy_argv_dirs(argv) -> dict:
-    """Extract the folder overrides ComfyUI was launched with from its own argv.
+    r"""Extract the folder overrides ComfyUI was launched with from its own argv.
 
     Both argparse spellings are accepted (`--input-directory X` and
     `--input-directory=X`). RELATIVE paths are deliberately DROPPED: they resolve
     against ComfyUI's working directory, which we do not know, and this app never
     guesses a path by convention. `--base-directory` is likewise not turned into
     input/output suggestions — the install-directory field already derives those, and
-    inventing them here would be a layout assumption, not an answer. Never raises."""
+    inventing them here would be a layout assumption, not an answer.
+
+    "Absolute" is judged under BOTH conventions, and the path is normalised under
+    its OWN. ComfyUI may be answering from WSL or a container, so a Windows reader
+    routinely gets `/workspace/ComfyUI/input` — and `os.path.isabs` calls that
+    RELATIVE on Windows (a leading slash is drive-relative there; Python 3.13 made
+    the rule explicit), which silently dropped the container case, the one these
+    fields exist for. `os.path.normpath` made it worse where it did pass: it
+    rewrote `/mnt/shared/input` as `\mnt\shared\input`, a path correct on neither
+    side. Never raises."""
     out = {}
     if not isinstance(argv, (list, tuple)):
         return out
@@ -1915,12 +1952,9 @@ def parse_comfy_argv_dirs(argv) -> dict:
         # A following token that is itself a flag means the value was missing.
         if not value or (not inline and value.startswith('-')):
             continue
-        try:
-            if not os.path.isabs(value):
-                continue
-        except (OSError, ValueError):
+        if not comfy_fs.is_absolute_anywhere(value):
             continue
-        out[key] = os.path.normpath(value)
+        out[key] = comfy_fs.path_flavour(value).normpath(value)
     return out
 
 
