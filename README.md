@@ -1166,8 +1166,11 @@ Still stuck? Open the app's **Guide → Getting help** for the one-click **diagn
 </p>
 
 LoRA Dataset Studio is free, open source, and has no paid tier, no telemetry and
-no upsell. It is built and maintained by one person, on personal time — every
-feature in the list above came out of somebody's evenings.
+no upsell — nothing in the app is gated, and nothing you use costs more because
+of it. This fork carries no referral or affiliate links of any kind: upstream
+tags its vast.ai links, and since the rented-GPU lane is removed here there is
+nothing for them to tag. It is built and maintained by one person, on personal
+time — every feature in the list above came out of somebody's evenings.
 
 If the app saves you an afternoon of sorting, captioning and re-running failed
 trainings, consider giving a little of that time back:

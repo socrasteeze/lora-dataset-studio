@@ -1082,6 +1082,56 @@ local verbs remain the ones already carried in Checkpoints & LoRAs: download,
 deploy, undeploy and recoverable delete; no fresh-pod Continue or run-price
 Details action can be produced by the server.
 
+### D4 grew a MONETISATION facet on 2026-09-06, and it is rejected whole
+
+Upstream's five-commit vast.ai referral wave (`284a8eeb5`, `a990ee250`,
+`149e4978e`, `0e8d092a2`, `c523d978e`) puts a referral id on every vast.ai URL
+the app, the README and the guides contain, so that vast.ai pays upstream 3% of
+what a referred account spends. It is a reasonable thing for upstream to do and
+it cannot come here, for two independent reasons:
+
+- **There is no account-creation moment on this build.** The wave exists to tag
+  the two places a user is asked to create a vast.ai account: step 1 of
+  `VastKeyGuide` in Settings ▸ Training, and the wizard's *"No GPU? …"* note.
+  D4 deleted the first years ago and the second is already replaced here by
+  *"Training on this fork is local only"*. A tagged link with no lane behind it
+  is the "advert for a missing button" this file already forbids two sections up.
+- **The disclosure would be false.** Upstream's What's-new entry reads
+  *"Creating a vast.ai account through the app now supports the project"*, and
+  the README disclosure says the referral income funds the project. Shipped from
+  a fork, the same sentences would route a reader's spending to a third party
+  while claiming to fund the thing they are reading. That is not a divergence
+  the fork gets to take quietly, and it is not the fork owner's call to make on
+  upstream's id.
+
+**Rejected in full**, with nothing kept as dormant plumbing — unlike the cloud
+ROUTES, a link is a surface by definition, so the "does it SURFACE" test that
+keeps `videoDatasetCloudRunUrl` refuses this one. Deleted:
+`utils/vastReferral.js` (+ test), `components/common/VastLink.jsx`,
+`components/common/VastReferralDisclosure.jsx`,
+`components/setup/CloudSignupNote.jsx`, `tests/vast-key-guide-render.test.mjs`,
+and the two `docs/screenshots/**/*vast*referral*.png` proofs. Reverted:
+`TrainingSection.jsx` (whole diff — every hunk sits inside `VastKeyGuide` or
+`CloudTrainingCard`, both already absent), `TrainingPanel.jsx`,
+`CloudRunsPage.jsx` (2 regions), `SetupPage.jsx` (1 region), `.env.example`,
+`README.md`, `DATASET_GUIDE.md` and five `docs/guide/*.md`, plus the What's-new
+entry.
+
+**Two leftovers merged with ZERO markers**, which is the whole reason for the
+identifier sweep: `README.md`'s *Support the project* paragraph was rewritten
+around *"Its only income is voluntary donations and the vast.ai referral links
+disclosed above"* — a dangling reference here, since nothing above discloses
+anything — and one `cloud.min_reliability` row in `settings-reference.md` grew a
+tagged link 70 lines below the region that conflicted. Neither is named by any
+D1 or D4 grep in `docs/UPSTREAM_SYNC.md`; both were found by grepping
+`ref_id=683073`, the identifier of the feature just rejected. **The finder was
+the rejected feature's own literal, again.** The README paragraph is not simply
+reverted: it keeps upstream's honest new clause and states the fork's position,
+which is that this build carries no referral or affiliate link of any kind.
+
+**The invariant to re-check every sync:** `git grep -n 'ref_id=' -- . ':(exclude)frontend/dist'`
+must print nothing.
+
 ## Divergence 5: patches carried on upstream TEST files
 
 Not a policy divergence — bugs in upstream's own tests that make this fork's CI
@@ -1664,6 +1714,35 @@ behaviour, and both were adapted in place rather than deleted.
 that read fork-editable source with a regex. Those cannot survive a divergence
 by construction, and they fail with a regex-mismatch message that says nothing
 about which side is wrong. Read such a failure here, not as merge damage.
+
+### A carrier arrived with the staged-input AST guard, 2026-09-06
+
+`test_comfy_staged_input_cleanup.py::test_every_staging_call_site_mints_a_collectable_name`
+(upstream `f4efef946`) reads every `stage_input_*` call under `app/` out of the
+AST, renders the destination name it would mint, and asserts the orphan sweep
+would collect it. It is a good guard and it goes red here on arrival, on
+`services/peer_worker.py:_run_comfy`.
+
+**Not damage, and not a leak.** The guard assumes every staging call site mints
+its own name. The fork's Devices lane cannot: a peer RE-stages files the PRIMARY
+already staged, under the names the Primary minted and shipped with the job
+(`job_queue._publish_remote_comfy_job` fills `artifacts` out of
+`metadata['staged_inputs']`), so the name arrives over the wire as a loop
+variable. The minting happened on the other machine, at call sites this very
+walk already checks — which is why the names ARE collectable and the sweep does
+reach them. Upstream has no peer lane, so the assumption costs them nothing.
+
+**Adapted, not deleted, and pinned so it cannot widen.** A call whose name
+argument is a bare loop target the function never assigns is classified as
+re-staged rather than unreadable, and the exact set is asserted:
+`RESTAGED_FROM_THE_WIRE = {'services/peer_worker.py:_run_comfy'}`. A second
+re-stager fails by name, and a real minting call that regresses into an
+unreadable name still lands in `unresolved` exactly as upstream wrote it.
+Mutation-checked both ways: emptying the pinned set goes red, and adding a
+non-loop unreadable name (`job.get('x')`) beside the exempt call goes red.
+
+**Drop this hunk if upstream ever teaches the guard about names that cross a
+process boundary** — nothing else in it is fork-specific.
 
 ## Divergence 6: upstream's dormant `worker_url` plumbing is now LIVE here
 
@@ -2373,6 +2452,17 @@ the only one that looks backwards as well as forwards.
 moving them.** At that point the split earns its keep, and it should be taken
 properly — topic by topic, against the deep-equality invariant above, never by
 adopting upstream's files wholesale.
+
+**2026-09-06 — a reword again, and check 1 was the only thing that saw it.**
+The window's single edit to a deleted module was `topics/settingsFields.js`
+renaming the low-VRAM lever: `low_vram` parks the transformer and text encoder in
+system RAM while they load and quantise, then moves them to the card — it never
+streams blocks during the steps, which four sentences of UI copy had promised.
+The comment and the `memory-saving-advanced` tip text were hand-ported into
+`helpRegistry.js`. **Counts did not move** (341 topics / 14 tips, id list
+byte-identical to pre-merge), exactly as this section predicts for a reword, so
+a sync reading only the numbers would have called this file untouched and
+shipped a label that contradicts the panel beside it.
 
 ## Divergence 11: upstream's `nightly` branch flow is NOT this fork's
 
@@ -3296,6 +3386,7 @@ merge map.
 
 | Date | Commits | Enhancement |
 |---|---|---|
+| 2026-09-06 | *(merge)* + dist | **Upstream sync — 26 commits from `0d0506541` through `c9f3937f5`.** Fork was **501 ahead / 26 behind**; merge base `6c6c719a2`. Adopted: the ComfyUI **input-folder visibility guard** (a staged image ComfyUI cannot see is refused with a named 409 instead of dying on a silent 400 minutes later — GitHub #64, reported by mikemil828), reading a **foreign path by its own rules** (`is_absolute_anywhere` / `path_flavour`, so a WSL or container ComfyUI stops reading as relative on Windows) with an AST guard that makes every staging lane mint a collectable name, **Setup offering the input folder ComfyUI reports** in one click, the diagnostic report **naming the model file each engine would load** (GitHub #60, drago87), the Ollama fence **recognising LDS's own model under the name Ollama prints back** plus a caption pass that now says how many images it did NOT caption and why (reported by @waltm on Discord), **ComfyUI asked to unload before a local training takes the card** (the 3 %-GPU, 300-hour-ETA crawl — reported by acontentsheltie on Discord) with the VRAM read at request and at spawn, and the **low-VRAM lever renamed to what it is**, a loading strategy rather than block streaming. **Conflict accounting:** 22 regions across 15 source files plus 1 modify/delete, resolved per hunk; 93 `frontend/dist` paths reset to the fork's bundle and rebuilt from merged source. **Divergence work:** D4 grew a **monetisation facet** — upstream's five-commit vast.ai referral wave is rejected whole (6 files deleted, 11 reverted, 2 screenshots dropped, 1 What's-new entry removed), and **two of its leftovers merged with zero conflict markers**, found by grepping the rejected feature's own literal. D10 — the window's one edit to a deleted help module was a reword, hand-ported; counts unmoved at 341/14 and the id list byte-identical. D5 — **one new carrier**: upstream's staged-input AST guard cannot read a name that crossed a process boundary, and the fork's peer lane re-stages names the Primary minted, so the guard is taught the difference and the exempt site is pinned by name (mutation-checked both ways). |
 | 2026-09-04 | *(merge)* + dist | **Upstream sync — 9 commits from `1bb3ca8a7` through `6c6c719a2`.** Fork was **498 ahead / 9 behind**; merge base `0d06f7384`. The window adopts ⏭ **Continue a clip** from its last frame (the render joined behind the parent, audio kept, one cadence), **✨ one prompt written per picture** for a batch — written in ONE held vision window rather than one per frame, so a twelve-picture strip stops reloading the video model eleven times — **one line per capability row saying what it unlocks** with the Video lane's three doors (✨ DLSS 5, ↗ Smooth, 🔴 Live) counted separately, upstream's **thread-safe, parallel Setup scan**, the ComfyUI **input-folder visibility check** (GitHub #64), recovery after a dropped capabilities read, the workspace header refresh, mobile checkpoint menus on the video graph, clip **aspect/accel preserved** through Reuse and Smooth, an atomic last-frame write, and a training-pod label fix. **Conflict accounting:** 13 regions across 8 source files plus 3 modify/delete paths, resolved per hunk; 136 `frontend/dist` paths reset to the fork's bundle and rebuilt from merged source. **Divergence work:** D11 — upstream's public repo now carries only `main` (nightly moved private), so their `nightly`-first doctrine was rejected from `CLAUDE.md` in both regions and the file is byte-identical to pre-merge HEAD; the preview lane is closed and D11 records it. D1 — the three cloud-engine probes dropped from the new probe map and the three engine rows from the capability list; the divergence comments were reworded after the local-only contract correctly flagged them for spelling the identifiers. D4 — the '📤 Civitai publishing' row stays out, the LoRA-training what-line reads "on your own GPU" rather than upstream's "or a Vast.ai machine", and the quantization-pod What's-new entry was dropped (no such lane here). D7 — upstream's `_parallel_probes` structure taken whole, its `_PROBE_WORKERS = 4` not: 17, one per map entry, so a cold boot still pays the slowest probe rather than sum/4; fork-only `probe_wd14` added to the map and the fork's on-disk import cache kept through both rewrites. D5 — two new upstream contract tests adapted (`test_capabilities_startup.py`'s dead `GEMINI_API_KEY` → `HF_TOKEN`; `setupHealthNotice.contract.test.js` regex → the fork's `local` override). D10 — `video-continue` and `video-batch-prompt` hand-ported into the one-file registry and `help/topics/videoLane.js` re-deleted (**339 → 341 topics, 14 tips**); the backwards check printed 40 gaps, every one a nameable D1/D4 rejection, no bugs. Capability rows recomputed **19 → 22** (upstream 25 − 3 cloud − 1 Civitai + 1 WD14) in **both** homes, the second caught only by the full suite exactly as its own comment warns. Re-delete inventory **107 → 102**: five files adopted, none newly absent. Version `2026.09.04F`. **And the twelve-run "undeletable `claude/*` branches" finding is now CLOSED, with the opposite answer to the one the ledger had settled on.** Every previous row diagnosed a token that "creates and updates refs and cannot delete any ref at all", and the 2026-09-02 row concluded *"stop re-attempting it here"*. Run from THIS checkout, `git push origin --delete` deleted all seven in two commands, first try, no 403. So the constraint was never the token's permissions in general nor any property of those branches — it was the **ephemeral container's** credential specifically, and twelve confirmations of a 403 from one environment hardened into a claim about the repository. `origin` now carries `main` and nothing else. **The transferable lesson is about the ledger, not the branches: a finding reproduced N times in ONE environment is still a finding about that environment.** Re-test an "impossible" from a different checkout before writing it down as settled. |
 | 2026-09-03 | *(merge)* + dist | **Upstream sync — 31 commits from `75da4532e` through `0d06f7384`, after first fast-forwarding the checkout 129 commits to `origin/main`.** Fork was **496 ahead / 31 behind** upstream at the controlling baseline. The window adopts the side-by-side video export and its refusal/shorter-clip/temp-dir fixes, the local **Live** Studio lane, neural-render layering fix, H3 quick prompts, selectable Smooth rate, clip-history boundary fix, local video run graph and training-sample previews, the arena acceleration selector, immediate ComfyUI queue wake, README corrections and CI test repairs. **Conflict accounting:** 125 unmerged paths — 118 generated `frontend/dist`, restored to the fork before resolution and rebuilt from merged source; seven source paths with eight regions, resolved per hunk. **Divergence work:** the README kept the fork's structure and rejected both the rented-GPU duplicate table and the Civitai publisher claim; the blueprint union added `video_live` beside fork-only `cluster` while keeping `civitai` out; D10 hand-ported `video-acceleration`, `video-smooth-rate`, `page-video-live` and `video-studio-quick-prompts` into the one-file help registry (**335 → 339 topics, 14 tips**) and re-deleted `help/topics/videoLane.js`; the setup catalog was recomputed **28 → 30** (upstream's two accelerator rows plus fork-only WD14). The clean-merge sweep caught the window's expensive D4 interaction: upstream's video graph imported `CloudTrainingRun`, `cloud_video_training` and pod-sample paths and exposed Continue/Details through the shared renderer. It now answers one local node, local checkpoint URLs and local samples only; numbered run ids fail closed. The same sweep caught the reintroduced import of deleted `videoCloudStatus.js`; the neutral `stepLabel` helper is exported from the carried local checkpoint module instead. The Civitai publisher and all 102 derived upstream-only D1/D4/D10 files remain absent. **Gates:** Ruff clean; ESLint **0 errors / 20 baseline warnings**; build clean; local-only contract **8/8 frontend + 3/3 backend** against rebuilt dist; `create_app()` **510 routes**; hygiene **13 passed / 2 skipped**; release guard **11 passed**; frontend **4866 → 4914 passed, zero failed**; backend **9202 → 9287 passed, 22 skipped, zero failed**; staged-tree hash unchanged across both full post-merge suites. |
 | 2026-09-03 | 126 | **The biggest window in this fork's history: upstream drained its whole `nightly` into `main` for v2026.09.03.1, and the Civitai question diagnostic 35 escalated twice arrived with it.** Fork was **93 ahead / 126 behind**; `upstream/nightly` sat 1 commit further on. **109 conflicts, of which 93 were `frontend/dist`** (wiped and restored from the fork's own bundle, then rebuilt in its own commit) and **16 were source.** **Adopted, whole:** the ✨ **Neural render** lane (DLSS 5 over finished clips — `neural_render.py`, `dlss5nr_infer.py`, its Setup card, dialog and probe), the **video dataset workspace** as a page of its own (`VideoDatasetPage`/`VideoDatasetWorkspace` + its six sections), the **Checkpoints & LoRAs** section's local verbs, the **start-frame picker** (four sources, batch, preview-size dial), the **motion writers**, **saved prompts** with pictures and search, the **multi-LoRA comparison prompt batch**, the 🧹 **free-memory broom**, **Krea hi-res second pass** and the app-side **finishing pass**, **slider locks**, **canvas lane placement**, and the 🌐 **Civitai browser feeding the prompt batch** (`b868a7c` — the BROWSER, which this fork carries, not the publisher). **Rejected:** the **Civitai publisher** (`48b473c`, `44c661f`, `eaadb72`, `35d546c`, `4e0a7d2`'s two screenshots) and the **video cloud launch window** (`bc96c4f`, D4). **`779aee6` was split per hunk** exactly as the previous row predicted: its ⬇ / 📦 / ⏏ / 🗑 verbs are in, its ▶ Continue-on-a-fresh-pod and ⓘ cloud-details are out. **The Civitai decision, and why it went this way:** the fork already carries `CIVITAI_API_KEY` in `SECRET_KEYS`, `civitai_browser.py`, `scrape/sources/civitai.py` and the 🌐 browser UI — 38 files — so "does this fork talk to Civitai" was never the question. What could not be adopted is `eaadb72`'s wiring, verified against both trees: it appends the key to `SetupPage.jsx`'s **`KEY_FIELDS`** (whose other three entries are `nanobanana`, `chatgpt`, `openrouter`), extends `KEY_TEST_TARGET` beside them, and maps `CAPABILITY_STEP_ID['📤 Civitai publishing'] = 'image'` — and this fork has **none** of those three structures. Adopting it rebuilds the cloud-key screen D1 removed or leaves a capability row pointing at a Setup step that does not exist. **So the publisher is rejected on the D1c precedent** (reference editing was rejected inside a sync and taken as its own deliberate wave days later — "the sequencing was deliberate, not a change of mind"), and it is left as a maintainer decision rather than pre-empted in either direction: **the browser half is in, the publish half is out, and adopting it later is a small scoped wave** because the key, the service module and the Settings card are already here. **The marker-less leftover class fired hard, and the standing identifier grep is what found it:** 19 hits across 9 files after `git rm`, every one auto-merged with zero conflict markers — `CivitaiPublishModal` imported and mounted in `LineageCanvas.jsx`, `RunLineageGraph.jsx` and `GeneratedImageLightbox.jsx`; a `CivitaiLink` **model** in `models.py` with a delete-cascade in `face_dataset_service.py`; `probe_civitai_test` wired into `routes/settings.py`'s test targets; **two function-local `from .civitai_publish import …` in `cloud_training.py`**, one of them (`detach_links_of_run`) NOT inside a try/except, so it would have raised `ImportError` on the first run deletion — the `_maybe_auto_retry` shape verbatim, one sync later. **Gate 2 caught what Gate 1 could not**, again as designed: the ADOPTED `videoCheckpoints.js` imported `stepLabel` from the REJECTED `videoCloudStatus.js`; the function is purely local (its own comment is about a LOCAL run's final save) and is now inlined where its only consumer lives. **Gate 1 caught a diagnostic-19 orphan** (`postWithConfirmations`, imported by upstream for the rejected `postCloud` helper). **D10 hand-port: 315 → 335 topics, tips unchanged at 14** — 20 new topics ported into the one file, and `canvas-arrange` turned out to be upstream's fourth consecutive **silent reword** rather than an addition, caught by the contract as a duplicate id and merged into the fork's own copy. Two ported topics had their **D4 keywords trimmed** (`video-dataset-training` loses "train in the cloud"; `video-dataset-checkpoints` loses "cloud saves", "run details", "delete a run" and the three "continue from a step" phrasings), and the rented-pod launch window's own topic was not ported at all. **The docs were the fourth recurrence surface as always:** `using-the-app.md` arrived with a whole `## Publish a LoRA and its images to Civitai` chapter and a rented-pod rewrite of the video workspace chapter (both removed/reworded), `settings-reference.md` with a `### Civitai publishing` section and a three-uses key clause (both trimmed). **Capability count recomputed, not copied:** upstream moved 21 → 22 with its Civitai row; this fork stays **19** (22 − 3 cloud − 1 Civitai + 1 WD14), measured off `deriveCapabilitySummary` and green. **Gates:** ruff clean · ESLint **0 errors / 20 warnings — D9 baseline exactly** · `npm run build` clean · local-only contract **8/8** frontend + **3** backend · `create_app()` OK, 498 routes · hygiene **13 passed / 2 skipped** · `node --test` **4866 passed / 0 failed** (baseline 4557 — 309 adopted tests) · backend **71 failed / 9031 passed / 122 skipped** against a **72 / 8657** pre-merge baseline recorded on this exact tree — **zero new failures**, the 27 failing files are the recorded Linux floor by name, +374 tests, and the baseline's one known timing flake (`test_bank_scan_no_db_lock`) passed this run. |
