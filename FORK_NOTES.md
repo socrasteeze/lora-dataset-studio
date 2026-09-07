@@ -1744,6 +1744,43 @@ non-loop unreadable name (`job.get('x')`) beside the exempt call goes red.
 **Drop this hunk if upstream ever teaches the guard about names that cross a
 process boundary** — nothing else in it is fork-specific.
 
+### A RACE, not a platform quirk: `test_neural_render_studio.py`, 2026-09-07
+
+The first D5 carrier that is a genuine flake rather than a platform or fixture
+difference, and it is worth the entry because of how nearly it was written off.
+
+`test_a_render_remembers_its_dials_and_the_mode_it_used` asserts the row twice:
+"as asked" (`'temporal_used' not in asked`) while the render is still in flight,
+then "as used" after `_join_thread`. `start_studio_render` spawns a worker
+thread, and the stand-in `render_video` upstream patches in returns
+*instantly* — so the first assertion is a bet that the thread has not finished
+yet. On this box it loses that bet about **two runs in three**.
+
+**How it presented, which is the part to remember.** The full-suite failure
+LIST moved by exactly one name across the sync while the COUNT stayed at 72:
+this test appeared, and a `test_peer_training_over_http` name left. Read as a
+count, nothing happened. Read as a list, something did — and the reflex
+CLAUDE.md prescribes (replay the named test alone) said **pass**, which would
+have closed the question as a worker flake. It was replaying the whole FILE
+that reproduced it, and then a **pristine pre-merge worktree** that proved the
+sync had not caused it: same file, same command, red on run 1 and green on
+run 2 with no merge in sight.
+
+The rule that generalises: *"passes alone"* does not mean *"not a real
+failure"* — it can mean the isolation removed the timing the bug needs. Replay
+the FILE as well as the test, and settle authorship on a pre-merge worktree
+rather than on the count.
+
+**The hunk:** `render_video` becomes a stand-in gated on two
+`threading.Event`s — it signals `started`, waits for `release`, and the test
+sets `release` only after the "as asked" read. The two halves become ordered
+instead of racing, and neither assertion is weakened. Verified 8 runs green
+where the unpatched file failed 4 of 6.
+
+**Drop this hunk if upstream makes the stand-in blocking themselves** — nothing
+in it is fork-specific, and the bug is equally live on their tree; it simply
+needs a machine fast enough to lose the race.
+
 ## Divergence 6: upstream's dormant `worker_url` plumbing is now LIVE here
 
 Upstream's `utils/comfyui.py` has carried `worker_url=` parameters on

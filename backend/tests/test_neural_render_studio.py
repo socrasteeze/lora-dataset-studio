@@ -169,18 +169,33 @@ def test_a_render_remembers_its_dials_and_the_mode_it_used(app, client, tmp_path
     """The card can say seed and steps; for a render the dials are what
     differed, so they travel with the row — as asked, then as used."""
     import json
+    import threading
     from app.models import VideoTestClip
     monkeypatch.setattr(vts, 'clips_dir', lambda create=True: str(tmp_path))
     (tmp_path / 'clip.mp4').write_bytes(b'ORIGINAL')
     _ready(monkeypatch)
-    monkeypatch.setattr(nr, 'render_video', lambda src, dst, params, **kw: (
-        open(dst, 'wb').write(b'R') and {'frames': 56, 'temporal': True, 'mean_ms': 31.7, 'mode_note': 'temporal mode'}))
+    # The "as asked" half below reads the row while the render is still in
+    # flight, so the worker must not be allowed to finish first: unpatched,
+    # the stand-in returns instantly and the thread wrote `temporal_used`
+    # before the assertion ran on roughly two runs in three here. The gate
+    # makes the two halves ordered instead of racing (Divergence 5).
+    started, release = threading.Event(), threading.Event()
+
+    def _render(src, dst, params, **kw):
+        started.set()
+        release.wait(timeout=10)
+        open(dst, 'wb').write(b'R')
+        return {'frames': 56, 'temporal': True, 'mean_ms': 31.7, 'mode_note': 'temporal mode'}
+
+    monkeypatch.setattr(nr, 'render_video', _render)
     src_id = _clip(app)
     with app.app_context():
         new_id = nr.start_studio_render(app, 'local', src_id, {'strength': 2, 'passes': 1, 'scale': 2, 'tone': 0})['clip_id']
+        assert started.wait(timeout=10), 'the studio render thread never started'
         asked = json.loads(VideoTestClip.query.get(new_id).nr_params)
         assert asked['strength'] == 2.0 and asked['scale'] == 2 and asked['tone'] == 0.0
         assert 'temporal_used' not in asked
+    release.set()
     _join_thread(src_id)
     with app.app_context():
         used = json.loads(VideoTestClip.query.get(new_id).nr_params)
