@@ -83,6 +83,31 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    // Same-day ids sort the feed (date, then id): 'zzzzz' keeps this one above
+    // the day's earlier entries, so the badge counts it (2026-09-06).
+    id: '2026-09-06-zzzzz-comfyui-interrupt-second-press',
+    date: '2026-09-06',
+    title: 'Cancel stops the render, and 🧹 Free memory has a second press instead of a wall',
+    blurb:
+      'Cancelling a clip ComfyUI is already rendering now asks ComfyUI to stop it, '
+      + 'instead of waiting for the render to end on its own — a render that pages '
+      + 'can take a minute or two to notice. Free memory still refuses while a render '
+      + 'of LDS’s own is on the card, but it says so and the same button pressed again '
+      + 'within a minute interrupts that render (it is dropped) and frees the memory. '
+      + 'A training and a job that is not LDS’s keep their protection.',
+    to: '/canvas',
+  },
+  {
+    id: '2026-09-06-zzzz-video-prompt-survives-reload',
+    date: '2026-09-06',
+    title: 'The motion you typed survives a page reload',
+    blurb:
+      'In the video studio, the Motion field comes back as you left it after a '
+      + 'refresh or a trip to another page, in every mode. It is kept in this '
+      + 'browser as you type; clearing the field clears it.',
+    to: '/studio?lane=video',
+  },
+  {
     id: '2026-09-05-zzz-video-reuse-reliability',
     date: '2026-09-05',
     title: 'Keep your clip settings when you reuse or finish a video',

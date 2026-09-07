@@ -4028,6 +4028,11 @@ picture alone when the field is empty — the button counting *Writing prompt 2
 of 3…*; a picture the writer could not answer for launches with the prompt as
 typed, and the notice says which.
 
+The motion you typed is kept in this browser: a reload, or a trip to another
+page and back, gives the field back as it was — in every mode. Clearing the
+field clears what is kept; **↻ Reuse** and the ✨ writers write into the same
+field and are kept the same way.
+
 All of that writing happens in **one pass**, and the reason is worth knowing
 because it is the difference between a batch that takes a minute and one that
 takes twenty. Looking at a picture needs the GPU, and taking it means asking
@@ -4306,7 +4311,17 @@ job (a minute at most), nothing else changes. It is refused, with the reason,
 while ComfyUI's queue is not empty or a training runs — unloading under a job
 would only make that job reload everything — and a model another tool loaded
 into Ollama or LM Studio is never touched (that is the fence's rule; the
-Ollama-fence dialog is where a consented eviction lives).
+Ollama-fence dialog is where a consented eviction lives). When the job on the
+card is a render of LDS's own, the refusal says so and **🧹** pressed again
+within a minute interrupts that render (it is dropped, as a cancel would) and
+frees; a job that is not LDS's, a training and the Live channel keep refusing.
+The second press is bound to the render the refusal named: if another one is
+on the card by then, you are offered again for that one, and a press that
+follows the refusal within half a second is taken for a double-click and
+refused again. **Cancelling** a job that ComfyUI is already rendering now asks
+ComfyUI to stop it — and asks again, from a second Cancel or by itself, when
+the first ask went unanswered under a paging card; a render that pages can
+take a minute or two to notice, and the queue resumes as soon as it lets go.
 
 **Deleting a picture from the board.** A pinned image carries **✕** and **🗑**,
 and they are not the same thing. **✕** takes it off the board and remembers where
