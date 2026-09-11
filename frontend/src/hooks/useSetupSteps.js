@@ -357,13 +357,29 @@ const AITOOLKIT_PYTHON_SETTING = 'Settings ▸ Local tools ▸ ai-toolkit Python
 
 // The install path, before any folder is configured. Same rule: the venv is ONE
 // way to give ai-toolkit a Python, not the definition of a working install.
+// What the old step 2 left to the reader is the step that decides whether
+// training runs on the GPU at all: "create a venv" and a plain `pip install
+// torch` give a CPU-only wheel on Windows, Accelerate then picks the CPU
+// without a word, and the run looks alive for 300 hours (acontentsheltie,
+// Discord, RTX 3090 — he got there with three PowerShell commands from
+// another chatbot, and asked us to point at something that installs the right
+// Python). ai-toolkit ships that something: its own manager reads the driver,
+// picks the matching CUDA build and creates the env beside run.py. We name the
+// INSTALL subcommand, never `run_windows.bat`, which ends in `manager launch`
+// and opens ai-toolkit's own web UI — the component this app never talks to
+// and that already cost a user hours (GitHub #19).
 export const AITOOLKIT_INSTALL_STEPS = [
   { text: 'Clone ai-toolkit, or install it with the script of your choice.',
     command: 'git clone https://github.com/ostris/ai-toolkit' },
-  { text: 'Give it a Python. Its README walks through creating a venv in that '
-      + 'folder — or, if you already run it with a conda or uv environment, the '
-      + 'system Python, or a portable/embedded build, keep that one and name it '
-      + `in ${AITOOLKIT_PYTHON_SETTING}.` },
+  { text: 'Give it a Python that can see your GPU. Run this from that folder: '
+      + "ai-toolkit's own installer reads your NVIDIA driver, installs the "
+      + 'PyTorch build that matches it and creates the venv next to run.py, which '
+      + 'the app then finds on its own. It installs only — it does not start '
+      + "ai-toolkit's web UI, which this app never uses.",
+    command: 'python -m manager install' },
+  { text: 'Already run ai-toolkit with a conda or uv environment, the system '
+      + 'Python, or a portable/embedded build? Keep it — name that interpreter '
+      + `in ${AITOOLKIT_PYTHON_SETTING} instead of the step above.` },
   { text: 'Point the app at the folder that holds run.py, below.' },
 ]
 
@@ -387,11 +403,32 @@ export function aitoolkitVerdict(step, dir) {
     tone: 'warn',
     // The finding, not a diagnosis. True for every install shape.
     headline: `ai-toolkit is here, but no Python interpreter was found in ${path}.`,
-    body: "The app doesn't know which Python to run it with. Two ways forward, "
-      + "both fine: create a venv inside that folder (ai-toolkit's README walks "
-      + 'through it), or keep the Python you already run ai-toolkit with — a conda '
-      + 'or uv environment, your system Python, or the python.exe of a portable / '
-      + 'embedded build (python_embeded) — and tell the app where it is.',
+    // Route A now names the tool instead of the chore. "Create a venv" was true
+    // and useless: the venv is easy, the CUDA torch inside it is the part that
+    // decides whether the run reaches the GPU, and a plain `pip install torch`
+    // on Windows gets a CPU-only wheel that Accelerate then honours in silence.
+    // ai-toolkit's own manager reads the driver and installs the matching build.
+    body: "The app doesn't know which Python to run it with. Two ways forward, both "
+      + 'fine. Create a venv inside that folder: '
+      // `manager/` landed upstream on 2026-07-27. Naming its command on a
+      // checkout that predates it hands over "No module named manager" — and
+      // those are precisely the oldest installs, the ones most likely to have a
+      // half-built venv. So the sentence follows what is ON DISK (has_manager),
+      // and the older checkout is told to update first rather than given a dead
+      // command.
+      + (s.hasManager
+        ? 'running `python -m manager install` from there is '
+          + "ai-toolkit's own installer, and it picks the PyTorch build that "
+          + 'matches your NVIDIA driver instead of the CPU-only wheel a plain pip '
+          + 'install gives on Windows. '
+        : "then install ai-toolkit's requirements into it, following its README. "
+          + 'Worth updating ai-toolkit first: since July 2026 it ships its own '
+          + 'installer, `python -m manager install`, which also picks the PyTorch '
+          + 'build matching your NVIDIA driver — a plain pip install gives a '
+          + 'CPU-only one on Windows, and training then runs on the CPU in silence. ')
+      + 'Or keep the Python you already run ai-toolkit '
+      + 'with — a conda or uv environment, your system Python, or the python.exe of '
+      + 'a portable / embedded build (python_embeded) — and tell the app where it is.',
     action: `Set the interpreter in ${AITOOLKIT_PYTHON_SETTING}`,
     // The action names ONE field, so the link lands on it (SettingsLink focus →
     // SettingsPage's ?focus= deep link). Only this verdict carries an action, so
@@ -525,6 +562,9 @@ function trainingStep(caps) {
     // WHICH of the two problems it hit instead of one blanket sentence.
     dirValid: !!a.dir_valid,
     pythonCandidates: Array.isArray(a.python_candidates) ? a.python_candidates : [],
+    // Read off THIS checkout, never off a date: `manager/` landed upstream on
+    // 2026-07-27 and the verdict below only names its command when it is there.
+    hasManager: !!a.has_manager,
   }
 }
 

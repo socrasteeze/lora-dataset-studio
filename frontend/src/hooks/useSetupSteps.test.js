@@ -671,6 +671,57 @@ test('the first-install steps do not define a working ai-toolkit as "has a venv"
   assert.ok(AITOOLKIT_INSTALL_STEPS.some((s) => s.command), 'the clone command survives');
 });
 
+// The step that decides whether training ever reaches the GPU used to be left to
+// the reader ("its README walks through creating a venv"): a plain pip install
+// torch on Windows is CPU-only, Accelerate honours it without a word, and the
+// run looks alive for 300 hours (acontentsheltie, Discord, RTX 3090). ai-toolkit
+// ships an installer that reads the driver and picks the build; the wizard names
+// it. The INSTALL subcommand, never run_windows.bat, which ends in
+// `manager launch` and opens ai-toolkit's own web UI — the one this app never
+// talks to and that already cost a user hours (GitHub #19).
+test('the first-install steps hand over an installer that picks the right PyTorch', () => {
+  const cmds = AITOOLKIT_INSTALL_STEPS.map((s) => s.command || '');
+  assert.ok(cmds.some((c) => c.includes('manager install')),
+    `no manager install command in: ${cmds.join(' | ')}`);
+  const all = AITOOLKIT_INSTALL_STEPS.map((s) => `${s.text} ${s.command || ''}`).join(' ');
+  // It must say WHY that command and not `pip install torch`.
+  assert.match(all, /driver/i);
+  // ai-toolkit's own UI is not a route this app ever sends anyone to.
+  assert.doesNotMatch(all, /run_windows/i);
+  assert.doesNotMatch(all, /manager launch/i);
+});
+
+test('the no-interpreter verdict names that installer too, both doors still open', () => {
+  const v = aitoolkitVerdict(trainStep({ valid: false, dir_valid: true }), DIR);
+  assert.match(v.body, /manager install/);
+  assert.match(v.body, /driver/i);
+  // The Psyko_2000 lesson holds: the borrowed-interpreter door stays a peer.
+  assert.match(v.body, /already run ai-toolkit with/i);
+});
+
+// `manager/` landed upstream on 2026-07-27. On an older checkout the command is
+// dead ("No module named manager") — and those are the installs most likely to
+// have a half-built venv, so that is the worst possible audience for a dead
+// remedy. The sentence follows what the backend found ON DISK, never a date.
+test('the manager command is presented as live only on a checkout that has it', () => {
+  const withIt = aitoolkitVerdict(
+    trainStep({ valid: false, dir_valid: true, has_manager: true }), DIR);
+  const without = aitoolkitVerdict(
+    trainStep({ valid: false, dir_valid: true, has_manager: false }), DIR);
+  assert.notEqual(withIt.body, without.body, 'the flag must change what is said');
+  // Present: run it. Absent: update first, and never an unqualified "run this".
+  assert.match(withIt.body, /running `python -m manager install` from there/);
+  assert.doesNotMatch(without.body, /running `python -m manager install` from there/);
+  assert.match(without.body, /updating ai-toolkit first/i);
+  assert.match(without.body, /since July 2026/);
+  // Both keep the peer route and the reason the choice matters at all.
+  for (const body of [withIt.body, without.body]) {
+    assert.match(body, /driver/i);
+    assert.match(body, /already run ai-toolkit with/i);
+    assert.match(body, /python_embeded/);
+  }
+});
+
 test('SetupPage renders the verdict instead of hardcoding the old sentence', () => {
   const page = fs.readFileSync(new URL('../pages/SetupPage.jsx', import.meta.url), 'utf8');
   assert.doesNotMatch(page, /set up its Python venv per the README/);

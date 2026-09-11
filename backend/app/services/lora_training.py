@@ -403,17 +403,35 @@ def assert_interpreter_ready() -> None:
     Refuses ONLY on a proven False. An unknown probe (cold-import timeout) lets
     the launch through: blocking a real training run on an answer we do not have
     would be a worse bug than the one this fixes. RuntimeError -> 409 (a backend
-    availability problem, not a bad request)."""
+    availability problem, not a bad request).
+
+    The second question is asked with the same rule: torch imports, but will
+    the run land on the card? ai-toolkit takes its device from Hugging Face
+    Accelerate, not from the job config, and Accelerate falls back to the CPU
+    in silence when torch cannot see a card (CPU-only wheel, CUDA build the
+    driver cannot serve, hidden card) or when its own switches point there —
+    three runs of Krea 2 on an RTX 3090 that never put a byte on the card, ETA
+    300 hours (acontentsheltie, Discord). The probe asks Accelerate itself, in
+    the ai-toolkit folder, with its `.env` loaded, exactly as `run.py` does."""
     from .. import capabilities
-    from .training_diagnostics import interpreter_verdict
+    from .training_diagnostics import fix_line, interpreter_verdict, torch_cuda_verdict
     try:
         report = capabilities.aitoolkit_interpreter_report()
     except Exception:
         return                                   # a broken probe never blocks a run
     verdict = interpreter_verdict(report['python'], report['torch'],
-                                  alternative=report['alternative'])
+                                  alternative=report['alternative'],
+                                  aitoolkit_dir=cfg.aitoolkit_path('dir'))
     if verdict:
         raise RuntimeError(verdict['message'])
+    try:
+        cuda = torch_cuda_verdict(capabilities.aitoolkit_torch_info(),
+                                  venv_python=cfg.aitoolkit_path('venv_python'),
+                                  aitoolkit_dir=cfg.aitoolkit_path('dir'))
+    except Exception:
+        return                                   # a broken probe never blocks a run
+    if cuda and not cuda['available']:
+        raise RuntimeError(cuda['message'] + fix_line(cuda['command']))
 
 
 def _aitoolkit_supports_krea() -> bool:
@@ -1290,6 +1308,12 @@ _OPTIMIZER_CHOICES = (
 _LR_SCHEDULER_CHOICES = ('constant', 'linear', 'cosine', 'cosine_with_restarts', 'constant_with_warmup')
 _WARMUP_CHOICES = (50, 100, 200, 500)          # num_warmup_steps ; UNIQUEMENT avec constant_with_warmup
 _GRAD_ACCUM_CHOICES = (1, 2, 4)
+# Images per optimizer step. 1 is the shipped default everywhere: it is what
+# fits a 12B DiT in 24 GB. A bigger card trains strictly faster per image at 2
+# or 4 — the step costs more but covers more images, and the gradient is less
+# noisy. Kept separate from grad_accum, which fakes a bigger batch WITHOUT the
+# memory (and without the speed).
+_BATCH_SIZE_CHOICES = (1, 2, 4)
 # Network variant + EMA — both VÉRIFIÉS arch-génériques dans ai-toolkit installé :
 #   - network.type='lokr' : LoRASpecialNetwork choisit LokrModule pour TOUTE arch
 #     (toolkit/lora_special.py L384 `elif self.network_type.lower() == "lokr"`) et
@@ -1308,7 +1332,15 @@ _EMA_CHOICES = (0.99, 0.999)
 _CONTENT_OR_STYLE_CHOICES = ('balanced', 'style', 'content')
 _DIFFERENTIAL_GUIDANCE_SCALE_RANGE = (0.1, 10.0)
 _LOSS_TYPE_CHOICES = ('mse',)
-_QTYPE_CHOICES = ('qfloat8', 'float8', 'int8')
+# Quantisation backends ai-toolkit accepts, and what each one COSTS OR SAVES.
+# The first three quantise WEIGHTS ONLY: torchao's Int8/Float8WeightOnlyConfig
+# and quanto's qfloat8 all promote the weight back to the compute dtype before
+# every matmul (optimum-quanto qbytes_mm: `weights = weights.to(scales.dtype)`),
+# so they buy VRAM and cost a little speed. `convrot8` is the one that can be
+# FASTER: rotation + per-token/per-channel symmetric int8 on BOTH weights and
+# activations, running through torch._int_mm on any int8 tensor-core GPU
+# (Ampere and newer) — toolkit/util/convrot_quant.py.
+_QTYPE_CHOICES = ('qfloat8', 'float8', 'int8', 'convrot8')
 _SAVE_DTYPE_CHOICES = ('float16', 'bf16')
 _OFFLOADING_PERCENT_RANGE = (0.0, 1.0)
 
@@ -1404,6 +1436,11 @@ def _model_memory_block(ds, family) -> dict:
                         else 'qfloat8')
     if s.get('qtype_te') in _QTYPE_CHOICES:
         out['qtype_te'] = s['qtype_te']
+    # `compile` is a MODEL-block key upstream (ModelConfig.compile), which is why
+    # it lives here rather than with the train knobs. Emitted only when asked, so
+    # an untouched dataset produces the exact same config as before.
+    if _compile_eff(ds):
+        out['compile'] = True
     if isinstance(s.get('layer_offloading'), bool):
         out['layer_offloading'] = s['layer_offloading']
     if s.get('layer_offloading') is True:
@@ -1794,6 +1831,37 @@ def _timestep_type_eff(ds, default: str) -> str:
     a choisi une valide (gardé à l'enum ai-toolkit ; inconnu → le défaut)."""
     t = _train_settings(ds).get('timestep_type')
     return t if t in _TIMESTEP_TYPE_CHOICES else default
+
+
+def _batch_size_eff(ds) -> int:
+    """Images per step. 1 unless the user picked otherwise — unchanged default."""
+    v = _train_settings(ds).get('batch_size')
+    return v if v in _BATCH_SIZE_CHOICES else 1
+
+
+def _grad_checkpointing_eff(ds) -> bool:
+    """Recompute activations instead of keeping them? True unless switched off.
+
+    On by default in every recipe because it is what makes a 12B model fit; it
+    pays for that memory with extra compute on every backward pass. A card with
+    room can turn it off and get the time back — which is exactly the trade the
+    memory-saving group already offers for quantisation and low-VRAM loading."""
+    v = _train_settings(ds).get('gradient_checkpointing')
+    return v if isinstance(v, bool) else True
+
+
+def _compile_eff(ds) -> bool:
+    """torch.compile the transformer? OFF unless asked — and honestly labelled.
+
+    ai-toolkit takes `compile` in the model block and prints 'Quantized model
+    detected - allowing torch.compile (experimental)'. It is the lever that makes
+    8-bit quantisation pay: an int8 W8A8 path spends its time in kernels the
+    compiler can fuse. But it is genuinely experimental HERE: ai-toolkit dropped
+    the compile decorators from its own Krea 2 model file because they 'fight
+    gradient checkpointing, LoRA module swapping and variable shapes during
+    training' (extensions_built_in/diffusion_models/krea2/src/mmdit.py). So the
+    default stays off and the UI says what it is."""
+    return _train_settings(ds).get('compile') is True
 
 
 def _optimizer_eff(ds) -> str:
@@ -2510,9 +2578,15 @@ def launch_settings_snapshot(ds, family=None, masked=None) -> dict:
     snap['lr_scheduler'] = s.get('lr_scheduler') if s.get('lr_scheduler') in _LR_SCHEDULER_CHOICES else 'constant'
     snap['warmup'] = s.get('warmup') if s.get('warmup') in _WARMUP_CHOICES else 0
     snap['grad_accum'] = _grad_accum(ds)
-    # Fixed at 1 by every family's recipe today. Recorded anyway: the day it stops
-    # being 1, the runs on either side of the change have to be comparable.
-    snap['batch_size'] = 1
+    # This used to read "fixed at 1 by every family's recipe today. Recorded
+    # anyway: the day it stops being 1, the runs on either side of the change
+    # have to be comparable." That day is here — batch size is a lever now, so
+    # the snapshot records what the run ACTUALLY used. Same for the two levers
+    # below: stamped effective, not "stored", because a run that inherited the
+    # default and a run that asked for it are the same run.
+    snap['batch_size'] = _batch_size_eff(ds)
+    snap['gradient_checkpointing'] = _grad_checkpointing_eff(ds)
+    snap['compile'] = _compile_eff(ds)
     # Stamped EFFECTIVE, like `ema` and the memory keys: a recipe that caches text
     # embeddings cannot train a second caption (see _dual_captions_unsupported_reason),
     # so recording the preference there would make the run comparison claim two runs
@@ -2590,6 +2664,12 @@ def effective_train_settings(ds, family=None) -> dict:
             'warmup_choices': list(_WARMUP_CHOICES),
             'grad_accum': _numeric_choice(s.get('grad_accum'), _GRAD_ACCUM_CHOICES),   # None → 1
             'grad_accum_choices': list(_GRAD_ACCUM_CHOICES),
+            # Speed levers — the effective value plus its choices, so the panel
+            # can show what WILL run rather than what was stored.
+            'batch_size': _batch_size_eff(ds),
+            'batch_size_choices': list(_BATCH_SIZE_CHOICES),
+            'gradient_checkpointing': _grad_checkpointing_eff(ds),
+            'compile': _compile_eff(ds),
             'network_type': s.get('network_type') if s.get('network_type') in _NETWORK_TYPE_CHOICES else None,  # None → lora
             'network_type_choices': list(_NETWORK_TYPE_CHOICES),
             # LoKr is arch-generic in ai-toolkit → offered on every family. The flag
@@ -2664,6 +2744,7 @@ def effective_train_settings(ds, family=None) -> dict:
             'loss_type': (s.get('loss_type')
                           if s.get('loss_type') in _LOSS_TYPE_CHOICES else None),
             'qtype': s.get('qtype') if s.get('qtype') in _QTYPE_CHOICES else None,
+            'qtype_choices': list(_QTYPE_CHOICES),
             'qtype_te': (s.get('qtype_te')
                          if s.get('qtype_te') in _QTYPE_CHOICES else None),
             'layer_offloading': (s.get('layer_offloading')
@@ -3084,6 +3165,38 @@ def _ts_apply_data_and_memory(patch, cur):
             cur.pop(_mk, None)
         else:
             raise ValueError(f'{_mk} must be true, false or auto')
+    # --- speed levers ---------------------------------------------------------
+    # What a step COSTS, as opposed to what it costs in memory. Same storage
+    # contract as everything above, chosen per key by what its default is:
+    if 'batch_size' in patch:
+        v = patch['batch_size']
+        if v in (None, 'auto', ''):
+            cur.pop('batch_size', None)
+        elif v in _BATCH_SIZE_CHOICES:
+            cur['batch_size'] = v
+        else:
+            raise ValueError(
+                f'batch_size must be one of {list(_BATCH_SIZE_CHOICES)} or auto')
+    if 'gradient_checkpointing' in patch:
+        # TRI-STATE: the default is ON, so an explicit False is a value that has
+        # to be stored — dropping it would silently switch checkpointing back on
+        # and take the speed away again without saying so.
+        v = patch['gradient_checkpointing']
+        if isinstance(v, bool):
+            cur['gradient_checkpointing'] = v
+        elif v in (None, 'auto', ''):
+            cur.pop('gradient_checkpointing', None)
+        else:
+            raise ValueError('gradient_checkpointing must be true, false or auto')
+    if 'compile' in patch:
+        # Plain boolean: the default is OFF, so falsy drops the key and an
+        # untouched dataset emits no `compile` at all.
+        if patch['compile'] is True:
+            cur['compile'] = True
+        elif patch['compile'] in (False, None, 'auto', ''):
+            cur.pop('compile', None)
+        else:
+            raise ValueError('compile must be true, false or auto')
 
 
 def _ts_apply_quality_and_precision(patch, cur):
@@ -3258,6 +3371,9 @@ TRAIN_SETTING_KEYS = ('rank', 'resolution', 'save_every', 'max_step_saves',
                       'layer_offloading_transformer_percent',
                       'layer_offloading_text_encoder_percent',
                       'cache_text_embeddings', 'save_dtype',
+                      # Speed levers: what a run costs per step, as opposed to
+                      # what it costs in memory. Defaults unchanged.
+                      'batch_size', 'gradient_checkpointing', 'compile',
                       'preset_steps_per_image', 'preset_steps_min',
                       'preset_steps_max', 'preset_steps_fixed',
                       *_MEMORY_SETTING_KEYS)
@@ -4856,12 +4972,12 @@ def build_job_config(ds, dataset_folder: str, steps: int = 3000, training_folder
                     **_mask_fields(dataset_folder),
                 }],
                 'train': {
-                    'batch_size': 1,
+                    'batch_size': _batch_size_eff(ds),
                     'steps': steps,
                     'gradient_accumulation': _grad_accum(ds),
                     'train_unet': True,
                     'train_text_encoder': False,
-                    'gradient_checkpointing': True,
+                    'gradient_checkpointing': _grad_checkpointing_eff(ds),
                     'noise_scheduler': 'flowmatch',
                     # 'sigmoid' = reco runbook pour un LoRA de sujet (l'exemple
                     # ai-toolkit confirme : "for just subject, change to sigmoid").
@@ -4941,13 +5057,13 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
                         **_mask_fields(dataset_folder),
                     }],
                     'train': {
-                        'batch_size': 1,
+                        'batch_size': _batch_size_eff(ds),
                         'steps': steps,
                         'gradient_accumulation': 1,
                         'train_unet': True,
                         'train_text_encoder': False,
                         'unload_text_encoder': True,
-                        'gradient_checkpointing': True,
+                        'gradient_checkpointing': _grad_checkpointing_eff(ds),
                         'noise_scheduler': 'flowmatch',
                         'timestep_type': 'linear',
                         'optimizer': 'adafactor',
@@ -5023,7 +5139,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
                     **_mask_fields(dataset_folder),
                 }],
                 'train': {
-                    'batch_size': 1,
+                    'batch_size': _batch_size_eff(ds),
                     'steps': steps,
                     'gradient_accumulation': _grad_accum(ds),
                     'train_unet': True,
@@ -5031,7 +5147,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
                     **({'unload_text_encoder': True}
                        if _dataset_cache_text_embeddings(
                            ds, default=True)['cache_text_embeddings'] else {}),
-                    'gradient_checkpointing': True,
+                    'gradient_checkpointing': _grad_checkpointing_eff(ds),
                     'noise_scheduler': 'flowmatch',
                     'timestep_type': _timestep_type_eff(ds, 'linear'),  # défaut canonique krea2 (options.ts)
                     'optimizer': _optimizer_eff(ds),
@@ -5106,12 +5222,12 @@ def _build_job_config_flux(ds, dataset_folder: str, steps: int, training_folder=
                     **_mask_fields(dataset_folder),
                 }],
                 'train': {
-                    'batch_size': 1,
+                    'batch_size': _batch_size_eff(ds),
                     'steps': steps,
                     'gradient_accumulation': _grad_accum(ds),
                     'train_unet': True,
                     'train_text_encoder': False,
-                    'gradient_checkpointing': True,
+                    'gradient_checkpointing': _grad_checkpointing_eff(ds),
                     'noise_scheduler': 'flowmatch',
                     # 'sigmoid' = reco LoRA de SUJET pour les modèles flowmatch (l'exemple
                     # flux d'ai-toolkit documente ce choix ; identique à Z-Image).
@@ -5199,12 +5315,12 @@ def _build_job_config_flux2klein(ds, dataset_folder: str, steps: int, training_f
                     **_mask_fields(dataset_folder),
                 }],
                 'train': {
-                    'batch_size': 1,
+                    'batch_size': _batch_size_eff(ds),
                     'steps': steps,
                     'gradient_accumulation': _grad_accum(ds),
                     'train_unet': True,
                     'train_text_encoder': False,
-                    'gradient_checkpointing': True,
+                    'gradient_checkpointing': _grad_checkpointing_eff(ds),
                     'noise_scheduler': 'flowmatch',
                     'timestep_type': _timestep_type_eff(ds, 'weighted'),
                     'optimizer': _optimizer_eff(ds),
@@ -5291,7 +5407,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
                     **_mask_fields(dataset_folder),
                 }],
                 'train': {
-                    'batch_size': 1,
+                    'batch_size': _batch_size_eff(ds),
                     'steps': steps,
                     'gradient_accumulation': _grad_accum(ds),
                     'train_unet': True,
@@ -5299,7 +5415,7 @@ def _build_job_config_anima(ds, dataset_folder: str, steps: int, training_folder
                     **({'unload_text_encoder': True}
                        if _dataset_cache_text_embeddings(
                            ds, default=True)['cache_text_embeddings'] else {}),
-                    'gradient_checkpointing': True,
+                    'gradient_checkpointing': _grad_checkpointing_eff(ds),
                     'noise_scheduler': 'flowmatch',
                     'timestep_type': _timestep_type_eff(ds, 'weighted'),  # défaut canonique anima (options.ts)
                     'optimizer': _optimizer_eff(ds),
@@ -5372,12 +5488,12 @@ def _build_job_config_sdxl(ds, dataset_folder: str, steps: int, training_folder=
                     **_mask_fields(dataset_folder),
                 }],
                 'train': {
-                    'batch_size': 1,
+                    'batch_size': _batch_size_eff(ds),
                     'steps': steps,
                     'gradient_accumulation': _grad_accum(ds),
                     'train_unet': True,
                     'train_text_encoder': False,
-                    'gradient_checkpointing': True,
+                    'gradient_checkpointing': _grad_checkpointing_eff(ds),
                     'noise_scheduler': 'ddpm',   # SDXL = epsilon/DDPM (≠ flowmatch Z-Image)
                     'optimizer': _optimizer_eff(ds),
                     'lr': _lr_eff(ds),
@@ -7119,6 +7235,46 @@ def _pf_vram(ds, ttype, label, _machine_warn, _check):
         pass   # an advisory VRAM note must never block the preflight it decorates
 
 
+def _pf_torch_cuda(lane, _machine_warn, blockers, _check):
+    """7 bis) torch in the ai-toolkit venv cannot see the GPU — the silent-CPU trap.
+
+    A blocker, not a warning, and not a bypassable one: the launch gate
+    (`assert_interpreter_ready`) refuses the same run with the same sentence,
+    because ai-toolkit would not fail — it would train on the CPU for days
+    (acontentsheltie, Discord, RTX 3090: three Krea 2 runs, ETA 300 hours, the
+    card at 0.8 GB throughout). The verdict is a read of the venv's OWN torch
+    answering the exact question ai-toolkit asks (`torch.cuda.is_available()`),
+    and an unknown probe (None) says nothing at all.
+
+    It goes into `blockers`, which is what the launch button reads: a fail row
+    alone travels only with the warning line, and the launch path then opens
+    the amber "Before training… Start anyway" modal for a run the server is
+    about to refuse — the same paragraph twice, first as advice, then as a
+    refusal. A cloud launch skips the whole question (and the torch import):
+    a rented pod brings its own torch."""
+    if (lane or 'local') == 'cloud':
+        return
+    try:
+        from .. import capabilities
+        from .training_diagnostics import fix_line, torch_cuda_verdict
+        cuda = torch_cuda_verdict(capabilities.aitoolkit_torch_info(),
+                                  venv_python=cfg.aitoolkit_path('venv_python'),
+                                  aitoolkit_dir=cfg.aitoolkit_path('dir'))
+        if cuda and not cuda['available']:
+            message = cuda['message'] + fix_line(cuda['command'])
+            blockers.append(message)
+            _machine_warn(message)
+            # Keep the row SHORT (a one-line list, on a phone too); the blocker
+            # carries the full sentence and the pip line.
+            what = (f'torch {cuda["torch"]} in the ai-toolkit venv' if cuda['torch']
+                    else "the ai-toolkit venv's PyTorch")
+            _check('torch_cuda', 'PyTorch can see the GPU', 'fail',
+                   f'{what} cannot see the GPU — the run would train on the CPU',
+                   bypassable=False, scope='machine')
+    except Exception:
+        pass   # a probe failure must never block or fake a diagnosis
+
+
 def _pf_torch_arch(_machine_warn, _check):
     """8) torch wheels vs GPU architecture — the RTX 50 / sm_120 trap."""
     # 8) torch build vs GPU architecture — the RTX 50 (Blackwell) trap. Stable
@@ -7129,12 +7285,11 @@ def _pf_torch_arch(_machine_warn, _check):
     # read of the venv, and an unknown probe (None) says nothing at all.
     try:
         from .. import capabilities
-        from .training_diagnostics import torch_arch_verdict
+        from .training_diagnostics import fix_line, torch_arch_verdict
         arch = torch_arch_verdict(capabilities.aitoolkit_torch_info(),
                                   venv_python=cfg.aitoolkit_path('venv_python'))
         if arch and not arch['supported']:
-            _machine_warn(arch['message']
-                          + (f' Fix: {arch["command"]}' if arch['command'] else ''))
+            _machine_warn(arch['message'] + fix_line(arch['command']))
             # Keep the row SHORT — it sits in a one-line list next to ten other
             # checks, on a phone too. The full explanation + fix is the warning.
             _check('torch_arch', 'PyTorch supports this GPU', 'warn',
@@ -7351,6 +7506,8 @@ def training_preflight(user_id, dataset_id, train_type=None, variant=None,
 
     _pf_vram(ds, ttype, label, _machine_warn, _check)
 
+    _pf_torch_cuda(lane, _machine_warn, blockers, _check)
+
     _pf_torch_arch(_machine_warn, _check)
 
     _pf_face_mask(ds, slider, warnings, _check)
@@ -7491,7 +7648,14 @@ def _crash_payload(log_path, dataset_id, rc) -> dict:
             report = capabilities.aitoolkit_interpreter_report()
             verdict = interpreter_verdict(
                 report['python'] or cfg.aitoolkit_path('venv_python'),
-                False, alternative=report['alternative'], module=module)
+                False, alternative=report['alternative'], module=module,
+                aitoolkit_dir=cfg.aitoolkit_path('dir'),
+                # The evidence was already in hand and thrown away: the report
+                # above ran the cached `import torch` seam, so this costs the
+                # watcher thread nothing. Without it the verdict branched on the
+                # module NAME, and told users torch imported fine in a venv that
+                # had never got as far as trying.
+                torch_imports=report['torch'])
             if verdict:
                 payload['interpreter'] = {k: verdict[k] for k in (
                     'python', 'module', 'windows_store', 'alternative',

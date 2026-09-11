@@ -165,12 +165,12 @@ test('(5) each Settings section and Workspace section has its topic', () => {
 
 test('(6) tips have unique triggers and non-empty text', () => {
   const tips = helpTips()
-  // 14, not upstream's 19: the five extra tips belong to the full-model (dense)
+  // 15, not upstream's 20: the five extra tips belong to the full-model (dense)
   // and one-click fp8-delivery topics this fork rejects (Divergence 4). Counted
-  // from this fork's own registry (helpTips().length), never copied — 13 before
-  // the 📷 camera-angles tip arrived, and upstream moved 18 -> 19 in the same
-  // sync, so the gap of five is unchanged and that is what says the port landed.
-  assert.equal(tips.length, 14, 'expected exactly 14 one-time tips')
+  // from this fork's own registry (helpTips().length), never copied — 14 before
+  // the training-speed-advanced tip arrived, and upstream moved 19 -> 20 in the
+  // same sync, so the gap of five is unchanged and that is what says the port landed.
+  assert.equal(tips.length, 15, 'expected exactly 15 one-time tips')
   const triggers = new Set()
   for (const tip of tips) {
     assert.ok(tip.trigger, 'tip missing trigger')

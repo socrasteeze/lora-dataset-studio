@@ -695,6 +695,34 @@ Defaults for new local training runs.
 
 This fork's Settings → Training keeps **Defaults** and **Train on another machine** — there is no rental-GPU card here (no key field, no cost/budget knobs). Cloud training (vast.ai) still runs underneath for any dataset that already has a cloud run in its history — see **Cloud training (vast.ai)** under [Config-file-only settings](#config-file-only-settings) for the `VAST_API_KEY` secret and the `cloud.*` guard-rails, all of which are edited by hand in `config.json`/`.env` rather than through a Settings card.
 
+### Speed: what a step costs, and what it costs you to make it cheaper
+
+*Advanced options ▸ Speed.* The recipes are calibrated so a 12 billion parameter
+model fits in 24 GB. Fitting is not free, and until now the price was not yours
+to refuse. Four controls, all of them defaulting exactly where they were:
+
+- **Batch size** — images per optimizer step. Default **1**, which is what fits.
+  2 or 4 trains more images per step and is strictly faster per image when the
+  card has the room. It is not the same as *gradient accumulation*, which fakes a
+  bigger batch without the memory and without the speed.
+- **Quantisation backend** — only meaningful while quantisation is on above.
+  `qfloat8` (the default), `float8` and `int8` quantise the **weights only**: the
+  weight is promoted back to the compute type before every matrix multiply, so
+  they buy memory and cost a little speed. **`convrot8`** quantises the
+  activations too and performs the multiply in int8 on the tensor cores, which is
+  the one that can be genuinely faster. It needs an Ampere card or newer.
+- **Gradient checkpointing** — on by default. It recomputes activations instead of
+  keeping them: that is what makes a 12B model fit, and it costs compute on every
+  backward pass. Switching it off gives the time back and spends VRAM.
+- **Compile the model (experimental)** — passes `compile` to ai-toolkit. It is what
+  makes an 8-bit path pay, because the compiler can fuse those kernels. Treat it as
+  experimental here: ai-toolkit removed compilation from its own Krea 2 model file
+  because it fights gradient checkpointing and adapter swapping. If a run dies at
+  the first step, this is the first thing to turn off.
+
+A run records which of these it used, so two runs of the same dataset that differ
+only by speed settings stay comparable afterwards.
+
 ### Train on another machine
 
 Two fields, both blank by default. Blank means the feature is off and every run trains here, exactly as before.
