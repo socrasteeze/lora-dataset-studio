@@ -25,9 +25,13 @@ def in_app(app, *, force=False):
         return caps.probe(force=force)
 
 
-def test_independent_probes_overlap_with_at_most_four_workers(app, monkeypatch):
-    """Four blocked probes must start, while the remaining probes wait."""
-    guard, release, four_started = Lock(), Event(), Event()
+def test_independent_probes_overlap_uncapped_by_four(app, monkeypatch):
+    """Six blocked probes must all start together, not queue behind a cap of
+    four. DIVERGENCE 7 — upstream bounds _PROBE_WORKERS at 4; this fork keeps
+    it at 17 (one per map entry) precisely so a cold boot pays the SLOWEST
+    probe, not sum/4. A test pinned to the old bound of 4 would pass on a
+    regression back to upstream's throttle and is worse than no test."""
+    guard, release, all_started = Lock(), Event(), Event()
     active = peak = calls = 0
 
     def blocked_probe():
@@ -37,8 +41,8 @@ def test_independent_probes_overlap_with_at_most_four_workers(app, monkeypatch):
             calls += 1
             active += 1
             peak = max(peak, active)
-            if active == 4:
-                four_started.set()
+            if active == 6:
+                all_started.set()
         try:
             assert release.wait(5), 'test did not release the probe'
             return {'ok': True, 'detail': 'ready', 'model': 'test-model'}
@@ -53,13 +57,13 @@ def test_independent_probes_overlap_with_at_most_four_workers(app, monkeypatch):
     with ThreadPoolExecutor(max_workers=1) as executor:
         pending = executor.submit(in_app, app)
         try:
-            assert four_started.wait(3), 'independent probes still run serially'
+            assert all_started.wait(3), 'independent probes still run serially, or queue behind a cap below 6'
             with guard:
-                assert calls == peak == 4
+                assert calls == peak == 6
         finally:
             release.set()
         result = pending.result(timeout=5)
-    assert calls == 6 and peak == 4
+    assert calls == 6 and peak == 6
     assert all(result[key] is True for key in (
         'face_scoring', 'masks', 'bank_scoring', 'bank_siglip2',
         'watermark_inpaint', 'video_text'))

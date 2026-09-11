@@ -130,6 +130,18 @@ _PEER_ARTIFACT_UPLOAD_ENDPOINTS = frozenset({'cluster.peer_upload_artifact'})
 # the Primary's disk.
 _DEFAULT_PEER_ARTIFACT_MAX_UPLOAD_BYTES = 16 * 1024 * 1024 * 1024
 
+# Photos dropped into a dataset are the same kind of legitimately large upload,
+# and this app is not a public service: the files come off the user's own disk,
+# on their own machine. The generic 64 MiB ceiling is a web default written for
+# a stranger's client, and applying it here refused five to eight body shots
+# with "upload too large" (_nofaceman, Discord). What DOES bound this route is
+# its own rule — 20 files per import, because with auto head-crop each image
+# goes through a vision pass that holds ComfyUI for the whole batch. So the
+# ceiling only has to cover twenty photographs: 512 MiB is 25 MiB each, past
+# any camera master, and the env var is there for someone who shoots bigger.
+_DEFAULT_DATASET_IMPORT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+_DATASET_IMPORT_UPLOAD_ENDPOINTS = frozenset({'datasets.dataset_import'})
+
 
 class ArchiveAwareRequest(Request):
     """Give the archive-upload and peer-artifact endpoints a raised ceiling.
@@ -165,6 +177,8 @@ class ArchiveAwareRequest(Request):
             return archive_max + overhead
         if self.endpoint in _PEER_ARTIFACT_UPLOAD_ENDPOINTS and current_app:
             return int(current_app.config['PEER_ARTIFACT_MAX_UPLOAD_BYTES'])
+        if self.endpoint in _DATASET_IMPORT_UPLOAD_ENDPOINTS and current_app:
+            return int(current_app.config['DATASET_IMPORT_MAX_UPLOAD_BYTES'])
         return super().max_content_length
 
     @max_content_length.setter
@@ -709,6 +723,11 @@ def create_app(config_object=None):
             _DEFAULT_DATASET_ARCHIVE_MAX_UPLOAD_BYTES),
         DATASET_ARCHIVE_MULTIPART_OVERHEAD_BYTES=(
             _DEFAULT_DATASET_ARCHIVE_MULTIPART_OVERHEAD_BYTES),
+        # The photo-import ceiling (see _DEFAULT_DATASET_IMPORT_MAX_UPLOAD_BYTES):
+        # a local drop of twenty photographs, not a stranger's request.
+        DATASET_IMPORT_MAX_UPLOAD_BYTES=_positive_env_int(
+            'LDS_DATASET_IMPORT_MAX_UPLOAD_BYTES',
+            _DEFAULT_DATASET_IMPORT_MAX_UPLOAD_BYTES),
         DATASET_ARCHIVE_SPOOL_MEMORY_BYTES=8 * 1024 * 1024,
         # A compute peer handing back a checkpoint or pulling a dataset zip.
         PEER_ARTIFACT_MAX_UPLOAD_BYTES=_positive_env_int(
@@ -771,7 +790,19 @@ def create_app(config_object=None):
                 'ok': False,
                 'error': f'archive too large (maximum {limit // (1024 * 1024)} MiB)',
             }), 413
-        return jsonify({'ok': False, 'error': 'upload too large'}), 413
+        # Name the numbers: "upload too large" alone sent people resizing
+        # single photos when the whole DROP was the problem — five to eight
+        # high-resolution body shots in one request (_nofaceman, Discord). The
+        # dropzone now batches by these same figures; this is the belt.
+        size, limit = request.content_length, request.max_content_length
+        detail = ''
+        if size and limit:
+            # "the app", not "the server": this runs on the user's own machine,
+            # and calling it a server invites them to look for one (the
+            # maintainer made the same objection about our own wording).
+            detail = (f': this request is {size / (1024 * 1024):.1f} MiB, the app accepts '
+                      f'{limit / (1024 * 1024):.1f} MiB at a time — drop fewer files at once')
+        return jsonify({'ok': False, 'error': 'upload too large' + detail}), 413
 
     from sqlalchemy.exc import OperationalError
     from .utils.dbbusy import DB_BUSY_MESSAGE, is_locked_error
