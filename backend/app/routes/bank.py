@@ -127,6 +127,11 @@ def banks_list():
 @bp.post('/bank/create')
 def bank_create():
     data = request.get_json(silent=True) or {}
+    # Asked BEFORE the create, because create_bank reuses an existing bank on
+    # the same folder and the two outcomes are indistinguishable afterwards.
+    # The user has to be told which one happened: "added" reading 0 on a reuse
+    # is honest but looks like a failed import.
+    reused = banks.bank_for_source(LOCAL_USER, data.get('folder')) is not None
     try:
         bank, added = banks.create_bank(LOCAL_USER, data.get('name'),
                                         data.get('folder'))
@@ -135,7 +140,8 @@ def bank_create():
     # Nested folders mean two banks over the same files: harmless while triaging
     # (statuses are per bank), but 🗑 Delete rejected in one amputates the other.
     # Say it now, once, rather than at the destructive click only.
-    return jsonify({'ok': True, 'id': bank.id, 'added': added,
+    return jsonify({'ok': True, 'id': bank.id, 'added': added, 'reused': reused,
+                    'name': bank.name,
                     'overlaps': banks.overlapping_banks(LOCAL_USER, bank.id)})
 
 

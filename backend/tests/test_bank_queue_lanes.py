@@ -146,8 +146,13 @@ def test_enqueue_records_the_group_from_the_SERVER_not_the_client(app, tmp_path)
 
     with app.app_context():
         client = app.test_client()
-        a, _ = _mkbank(client, tmp_path, {'a.jpg': flat()}, name='Twinned')
-        b, _ = _mkbank(client, tmp_path, {'b.jpg': flat()}, name='Twinned')
+        # SEPARATE folders. _mkbank always roots at ``tmp_path/src``, so calling
+        # it twice on one tmp_path now returns the same bank — one folder is one
+        # bank (test_bank_duplicate_folder.py). This test needs two banks that
+        # merely SHARE A NAME, which is a different thing entirely.
+        a, _ = _mkbank(client, tmp_path / 'a', {'a.jpg': flat()}, name='Twinned')
+        b, _ = _mkbank(client, tmp_path / 'b', {'b.jpg': flat()}, name='Twinned')
+        assert a != b, 'two distinct banks, one shared name'
         from app.services import bank_queue as bq
         bq.reset()
         import unittest.mock as _m

@@ -752,10 +752,47 @@ def _walk_image_relpaths(folder, *, onerror=None, root_only=False):
                 yield (head + os.sep + f) if head else f
 
 
+def bank_for_source(user_id, folder, *, root_only=False) -> ImageBank | None:
+    """The user's existing bank rooted at ``folder``, or None.
+
+    `root_only` is part of the identity, not a detail: the split's loose-files
+    bank and a plain recursive bank can share one source_path and mean different
+    sets (the first owns only the files sitting directly in it). Matching them
+    together would make an ordinary add silently adopt the loose bank.
+
+    Used by create_bank and split_folder_into_banks so a folder that is already
+    a bank is REFRESHED instead of registered twice. Two banks over one folder
+    are not a harmless duplicate: every score, decision, cluster and caption
+    lives on the bank row, so the work done in one is invisible in the other,
+    and whichever one the user stops opening silently strands it.
+
+    Compared through path_guard.relation, which is the module that already owns
+    "are these two folders the same": it resolves junctions and symlinks, folds
+    case and separators where the filesystem does, and drops a trailing one. A
+    second spelling of that comparison here is exactly the kind of hand-copied
+    vocabulary that drifts."""
+    target = path_guard.norm(folder)
+    if not target:
+        return None
+    for bank in ImageBank.query.filter_by(user_id=user_id).all():
+        if bool(bank.root_only) != bool(root_only):
+            continue
+        if path_guard.relation(bank.source_path, folder) == 'same':
+            return bank
+    return None
+
+
 def create_bank(user_id, name, folder):
     """Register a folder as a bank: walk it recursively and create one row per
     image file. Instant (no decode) — scoring is the separate scan pass.
-    Returns (bank, added). ValueError on a missing folder / too many files."""
+    Returns (bank, added). ValueError on a missing folder / too many files.
+
+    A folder that is ALREADY a bank is refreshed and returned instead of
+    registered a second time (see bank_for_source for why a duplicate costs
+    something). The refresh is strictly additive, so re-adding a folder is a
+    safe way to pick up new files and can never reset a triage. The caller can
+    tell the two apart by asking bank_for_source BEFORE this — the return shape
+    is deliberately unchanged, because dozens of callers unpack the pair."""
     name = (name or '').strip()
     # Windows «Copier en tant que chemin» pastes the path quoted — unquote so
     # the direct paste works first try (same nicety as the dataset folder import).
@@ -772,6 +809,13 @@ def create_bank(user_id, name, folder):
     if conflict:
         raise ValueError(conflict['message'])
     folder = os.path.realpath(folder)
+    # Already a bank? Refresh it and hand back the SAME row. Done before the
+    # walk on purpose: the walk below is what makes re-adding a 2 000-image
+    # folder cost anything, and refresh_bank walks it once by itself.
+    existing = bank_for_source(user_id, folder)
+    if existing is not None:
+        res = refresh_bank(user_id, existing.id, force=True) or {}
+        return existing, int(res.get('added') or 0)
     rels = []
     for rel in _walk_image_relpaths(folder):
         rels.append(rel)
@@ -938,7 +982,9 @@ def split_folder_into_banks(user_id, folder, name_prefix=None,
     directly in the parent get their own parent-named bank when ``include_loose``
     (default True), so nothing is ever silently dropped: ``subA/``, ``subB/`` +
     10 loose images -> 3 banks. Falls back to a single create_bank when there is
-    no image-bearing subfolder. Returns [{id, name, added}], newest last.
+    no image-bearing subfolder. Returns [{id, name, added, reused}], newest last
+    — ``reused`` marks a subfolder that was ALREADY a bank and was refreshed
+    rather than registered twice (see bank_for_source).
 
     ``exclude`` names top-level subfolders to leave out of THIS import. It is not
     persisted: the bank's own live re-walk is unaffected, because each bank that
@@ -947,7 +993,17 @@ def split_folder_into_banks(user_id, folder, name_prefix=None,
     Per-bank BANK_MAX_FILES still applies (each subfolder is its own bank)."""
     folder, buckets, loose = _split_walk(folder, exclude=exclude)
     parent_name = os.path.basename(folder.rstrip('/\\')) or 'bank'
-    prefix = name_prefix if name_prefix is not None else f'{parent_name} / '
+    # Bare folder names by default (asked for 2026-09-12): a split of
+    # `_characters` names its banks `akali`, not `_characters / akali`. The
+    # prefix was noise on every card, and the bare name is also what makes two
+    # folders of the same subject under DIFFERENT roots share one card — banks
+    # group on an exact name (services/bank_groups.py), so the prefix was
+    # actively preventing the grouping the feature exists to offer.
+    prefix = name_prefix if name_prefix is not None else ''
+    # …but the loose bank cannot take the bare treatment: '(loose files)' is the
+    # same string for every parent, so unrelated splits would all collapse into
+    # ONE card. It is rooted at the parent, so the parent's name is its own.
+    loose_name = f'{prefix}(loose files)' if prefix else f'{parent_name} (loose files)'
     if not buckets:
         # THE SHARPEST EDGE. The no-subfolder fallback calls create_bank on the
         # PARENT, which recurses the whole tree — so with exclusions it would
@@ -956,30 +1012,59 @@ def split_folder_into_banks(user_id, folder, name_prefix=None,
         # nothing at all.
         if exclude:
             if include_loose and loose:
+                existing = bank_for_source(user_id, folder, root_only=True)
+                if existing is not None:
+                    res = refresh_bank(user_id, existing.id, force=True) or {}
+                    return [{'id': existing.id, 'name': existing.name,
+                             'added': int(res.get('added') or 0), 'reused': True}]
                 bank, added = _register_bank(user_id, parent_name, folder, loose,
                                              root_only=True)
-                return [{'id': bank.id, 'name': bank.name, 'added': added}]
+                return [{'id': bank.id, 'name': bank.name, 'added': added,
+                         'reused': False}]
             raise ValueError('every subfolder was excluded — nothing left to create')
+        # create_bank reuses an existing bank on this folder by itself, so the
+        # fallback inherits the no-duplicate rule without asking twice.
+        reused = bank_for_source(user_id, folder) is not None
         bank, added = create_bank(user_id, parent_name, folder)
-        return [{'id': bank.id, 'name': bank.name, 'added': added}]
+        return [{'id': bank.id, 'name': bank.name, 'added': added,
+                 'reused': reused}]
     created = []
     for sub in sorted(buckets):
         rels = buckets[sub]
+        sub_path = os.path.join(folder, sub)
+        # A subfolder the user already added on its own is REFRESHED, never
+        # registered again. This is the collision that actually happens: banks
+        # are added one character folder at a time, then the parent is split
+        # months later and every one of them comes back as an empty twin.
+        existing = bank_for_source(user_id, sub_path)
+        if existing is not None:
+            res = refresh_bank(user_id, existing.id, force=True) or {}
+            created.append({'id': existing.id, 'name': existing.name,
+                            'added': int(res.get('added') or 0), 'reused': True})
+            continue
         if len(rels) > BANK_MAX_FILES:
             raise ValueError(
                 f'too many images in subfolder "{sub}" (max {BANK_MAX_FILES})')
-        bank, added = _register_bank(user_id, f'{prefix}{sub}',
-                                     os.path.join(folder, sub), rels)
-        created.append({'id': bank.id, 'name': bank.name, 'added': added})
+        bank, added = _register_bank(user_id, f'{prefix}{sub}', sub_path, rels)
+        created.append({'id': bank.id, 'name': bank.name, 'added': added,
+                        'reused': False})
     if include_loose and loose:
-        if len(loose) > BANK_MAX_FILES:
-            raise ValueError(f'too many loose images (max {BANK_MAX_FILES})')
         # root_only: this bank shares the parent folder with the subfolder banks
         # above, so its re-walk must stay at the top level or it would re-import
-        # every image they already own.
-        bank, added = _register_bank(user_id, f'{prefix}(loose files)',
+        # every image they already own. It is also what tells this bank apart
+        # from a plain recursive bank on the same folder — see bank_for_source.
+        existing = bank_for_source(user_id, folder, root_only=True)
+        if existing is not None:
+            res = refresh_bank(user_id, existing.id, force=True) or {}
+            created.append({'id': existing.id, 'name': existing.name,
+                            'added': int(res.get('added') or 0), 'reused': True})
+            return created
+        if len(loose) > BANK_MAX_FILES:
+            raise ValueError(f'too many loose images (max {BANK_MAX_FILES})')
+        bank, added = _register_bank(user_id, loose_name,
                                      folder, loose, root_only=True)
-        created.append({'id': bank.id, 'name': bank.name, 'added': added})
+        created.append({'id': bank.id, 'name': bank.name, 'added': added,
+                        'reused': False})
     return created
 # --- folder sync (incremental re-inventory) ---------------------------------
 # A bank points at a LIVE folder: the user keeps scraping/exporting into it long
