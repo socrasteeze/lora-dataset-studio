@@ -320,12 +320,35 @@ def _scan_folder(folder) -> list:
     return rels
 
 
+def bank_for_source(user_id, folder) -> VideoBank | None:
+    """The user's existing video bank rooted at ``folder``, or None.
+
+    The image lane's rule, stated once per lane rather than once: one folder is
+    one bank. Two banks over one folder are not a harmless duplicate — every
+    clip, decision and caption hangs off the bank row, so the work done in one is
+    invisible in the other. There is no ``root_only`` here because the video lane
+    has no per-subfolder split, so the folder alone IS the identity.
+
+    Compared through path_guard.relation, the module that already owns "are these
+    two folders the same" (junctions, symlinks, case, trailing separators)."""
+    if not path_guard.norm(folder):
+        return None
+    for bank in VideoBank.query.filter_by(user_id=user_id).all():
+        if path_guard.relation(bank.source_path, folder) == 'same':
+            return bank
+    return None
+
+
 def create_bank(user_id, name, folder):
     """Register a folder of rushes as a bank: one row per video file.
 
     Instant — no decode, no detection. Those are the separate passes, because a
     two-hour file costs minutes and an HTTP request must not.
-    Returns (bank, added)."""
+    Returns (bank, added).
+
+    A folder that is ALREADY a bank is refreshed and returned instead of
+    registered twice — see bank_for_source, and the image lane's
+    image_bank_service.create_bank, which this mirrors deliberately."""
     name = (name or '').strip()
     # Windows «Copy as path» pastes quoted; unquote so a direct paste works first
     # try, the same nicety the image bank and the dataset import already have.
@@ -344,6 +367,12 @@ def create_bank(user_id, name, folder):
         if conflict:
             raise ValueError(conflict['message'])
     folder = os.path.realpath(folder)
+    # Already a bank? Refresh it and hand back the SAME row, before the scan —
+    # refresh_bank walks the folder once by itself.
+    existing = bank_for_source(user_id, folder)
+    if existing is not None:
+        res = refresh_bank(user_id, existing.id, force=True) or {}
+        return existing, int(res.get('added') or 0)
     rels = _scan_folder(folder)
     bank = VideoBank(user_id=user_id, name=name, source_path=folder)
     db.session.add(bank)

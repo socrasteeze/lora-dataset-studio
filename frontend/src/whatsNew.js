@@ -83,6 +83,30 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-12-split-names-the-folder',
+    date: '2026-09-12',
+    title: 'One bank per subfolder now names each bank after the folder, with no parent prefix',
+    blurb:
+      'A split used to name every bank “parent / folder”, which filled the card with a word you '
+      + 'already knew and kept two folders of the same subject apart. Now the bank is simply called '
+      + 'the folder — so the same name under two different roots shares one card, combined counts '
+      + 'and one queue action. The loose-files bank still carries its parent, so unrelated ones '
+      + 'never merge. Rename any bank with ✎ to group or ungroup it by hand.',
+    to: '/bank',
+  },
+  {
+    id: '2026-09-12-one-folder-one-bank',
+    date: '2026-09-12',
+    title: 'Add a folder you already banked and it refreshes that bank, instead of making a second one',
+    blurb:
+      'Adding the same folder twice used to build two banks over the same images, and every score '
+      + 'and keep/reject decision lived in only one of them. Now the folder you already banked is '
+      + 'recognised — junction, symlink or a different spelling — and refreshed instead, picking up '
+      + 'whatever appeared since. Splitting a parent per subfolder does the same, so the folders you '
+      + 'added one at a time come back as themselves rather than as empty twins. Video banks too.',
+    to: '/bank',
+  },
+  {
     id: '2026-09-07-training-speed-levers',
     date: '2026-09-07',
     title: 'Trade memory back for time: batch size, quantisation backend, checkpointing and compile',

@@ -12,6 +12,14 @@
 .env.*.local
 config.json
 
+# Editor-generated agent scaffolding. Not project content: an IDE writes a copy
+# of every skill it offers into .agents/skills/.nimbalyst-generated/, and those
+# copies quote the machine they were generated on — a tailnet address and the
+# maintainer's own email addresses were sitting in two of them, one `git add -A`
+# away from a PUBLIC repo. test_no_personal_data.py scans untracked files too,
+# which is what caught it; this is the line that keeps it caught.
+.agents/
+
 # runtime data
 data/
 

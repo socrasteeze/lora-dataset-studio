@@ -52,12 +52,15 @@ def test_split_creates_one_bank_per_subfolder_plus_loose(client, tmp_path):
     # 2 subfolders + 1 loose bank = 3 banks, nothing dropped.
     assert len(created) == 3
     banks = _banks(client)
-    prefix = f'{os.path.basename(str(src))} / '
-    assert banks[f'{prefix}chatA']['total'] == 2
-    assert banks[f'{prefix}chatB']['total'] == 1
-    assert banks[f'{prefix}(loose files)']['total'] == 1
+    # Bare subfolder names — the parent prefix was dropped 2026-09-12 so that two
+    # folders of one subject under different roots can share a card. The loose
+    # bank keeps the parent's name, or every split's would collapse into one.
+    loose_name = f'{os.path.basename(str(src))} (loose files)'
+    assert banks['chatA']['total'] == 2
+    assert banks['chatB']['total'] == 1
+    assert banks[loose_name]['total'] == 1
     # Each subfolder bank is rooted at its own subfolder (files referenced in place).
-    assert banks[f'{prefix}chatA']['source_path'] == os.path.join(
+    assert banks['chatA']['source_path'] == os.path.join(
         os.path.realpath(str(src)), 'chatA')
 
 
@@ -102,17 +105,17 @@ def test_loose_bank_never_absorbs_the_subfolder_banks_images(client, tmp_path):
     src = tmp_path / 'export'
     _tree(src, ['chatA/1.jpg', 'chatA/2.jpg', 'chatB/1.jpg', 'loose1.jpg'])
     assert client.post('/api/bank/split', json={'folder': str(src)}).status_code == 200
-    prefix = f'{os.path.basename(str(src))} / '
+    loose_name = f'{os.path.basename(str(src))} (loose files)'
     # Several list loads = several forced re-walks; the counts must not drift.
     for _ in range(3):
         banks = _banks(client)
-    assert banks[f'{prefix}(loose files)']['total'] == 1
-    assert banks[f'{prefix}chatA']['total'] == 2
+    assert banks[loose_name]['total'] == 1
+    assert banks['chatA']['total'] == 2
     # A NEW loose file is still picked up (the sync stays live, just top-level).
     _save(str(src / 'loose2.jpg'))
     from app.services import image_bank_service as svc
     svc.reset_folder_sync()
-    assert _banks(client, rescan=True)[f'{prefix}(loose files)']['total'] == 2
+    assert _banks(client, rescan=True)[loose_name]['total'] == 2
 
 
 def test_subfolder_bank_still_picks_up_new_files(client, tmp_path):
@@ -120,11 +123,10 @@ def test_subfolder_bank_still_picks_up_new_files(client, tmp_path):
     src = tmp_path / 'export'
     _tree(src, ['chatA/1.jpg', 'loose1.jpg'])
     assert client.post('/api/bank/split', json={'folder': str(src)}).status_code == 200
-    prefix = f'{os.path.basename(str(src))} / '
     _save(str(src / 'chatA' / '2.jpg'))
     from app.services import image_bank_service as svc
     svc.reset_folder_sync()
-    assert _banks(client, rescan=True)[f'{prefix}chatA']['total'] == 2
+    assert _banks(client, rescan=True)['chatA']['total'] == 2
 
 
 def test_split_bad_folder_is_400(client, tmp_path):

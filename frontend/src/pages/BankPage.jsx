@@ -439,12 +439,22 @@ export default function BankPage() {
       if (splitMode) {
         const d = await postJson('/api/bank/split',
           { folder, include_loose: includeLoose, exclude: normalizeExcluded(excluded) })
-        toast.success(`${d.banks.length} bank(s) created from subfolders.`)
+        // A subfolder that was ALREADY a bank is refreshed, not registered
+        // again — say so, or the count reads as "it did less than I asked".
+        const reused = (d.banks || []).filter((b) => b.reused).length
+        const made = (d.banks || []).length - reused
+        toast.success(reused
+          ? `${made} bank(s) created, ${reused} already existed and were refreshed.`
+          : `${made} bank(s) created from subfolders.`)
         setName(''); setFolder(''); setPreview(null)
         refresh()
       } else {
         const d = await postJson('/api/bank/create', { name, folder })
-        toast.success(`Bank created — ${d.added} image(s) inventoried.`)
+        // One folder is one bank. Re-adding it refreshes the bank that already
+        // owns it — `added: 0` alone would read as a failed import.
+        toast.success(d.reused
+          ? `That folder is already the bank “${d.name}” — refreshed, ${d.added} new image(s).`
+          : `Bank created — ${d.added} image(s) inventoried.`)
         // Nested folders mean two banks over the same files. Harmless while
         // triaging, destructive at Delete rejected — said once, up front.
         const overlap = overlapNotice(d.overlaps)
