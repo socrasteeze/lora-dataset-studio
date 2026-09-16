@@ -149,6 +149,32 @@ def _link_file(src, dst):
         return False
 
 
+def _relative_to_root(abs_path, root):
+    """`abs_path` expressed relative to `root`, or None when it isn't inside it.
+
+    Compared BOTH as written and again through `os.path.realpath` on each side,
+    because a model tree is routinely assembled out of links: a stock ComfyUI
+    install symlinks `models/` elsewhere, and people junction individual family
+    folders (`models/diffusion_models/flux` -> another volume) to spread weights
+    across drives. A purely lexical compare calls such a file 'outside_roots'
+    although the loader opens it perfectly well through the link — and on Windows
+    `relpath` does not merely mismatch there, it RAISES (`path is on mount 'F:',
+    start on mount 'E:'`), so the drive-spanning case is the one that looks most
+    like a real failure while being the most ordinary setup.
+
+    Lexical first, so a path that is already inside a root keeps the name the user
+    typed rather than one rewritten through a link they may not know exists."""
+    for a, r in ((os.path.normpath(abs_path), os.path.normpath(root)),
+                 (os.path.realpath(abs_path), os.path.realpath(root))):
+        try:
+            rel = os.path.relpath(a, r)
+        except ValueError:      # different drive (Windows)
+            continue
+        if rel != os.pardir and not rel.startswith(os.pardir + os.sep):
+            return rel
+    return None
+
+
 def _stage_external_model(comfy_type, abs_path):
     """Link an absolute path that sits outside every registered <comfy_type> root
     into <first root>/lds-pinned/ so ComfyUI's stock loaders can open it, and
@@ -257,11 +283,8 @@ def resolve_model_ref(comfy_type, value):
             return None, 'missing'
         ab = os.path.normpath(v)
         for root in comfy_model_paths.search_roots(comfy_type):
-            try:
-                rel = os.path.relpath(ab, os.path.normpath(root))
-            except ValueError:      # different drive (Windows)
-                continue
-            if rel != os.pardir and not rel.startswith(os.pardir + os.sep):
+            rel = _relative_to_root(ab, root)
+            if rel:
                 return rel, 'ok'
         staged = _stage_external_model(comfy_type, ab)
         if staged:
