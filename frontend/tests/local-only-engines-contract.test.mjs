@@ -4,6 +4,11 @@
  * merge that resurrects their Setup/Settings/Runs UI, or a stale frontend/dist,
  * will fail this contract.
  *
+ * Upstream's V2 replatform moved these features into source plugins under
+ * `bundled/`, which this fork does not ship. A directory that exists at all is
+ * the reintroduction — walking it for phrases would pass on an empty tree and
+ * on a plugin whose wording changed, so the guard is the DIRECTORY, by id.
+ *
  * See FORK_NOTES.md § Divergence 1 + 4 and the merge routine's dist rebuild step.
  */
 import assert from 'node:assert/strict'
@@ -15,6 +20,7 @@ import { fileURLToPath } from 'node:url'
 const TEST_DIR = dirname(fileURLToPath(import.meta.url))
 const SRC_DIR = resolve(TEST_DIR, '../src')
 const DIST_DIR = resolve(TEST_DIR, '../dist')
+const BUNDLED_DIR = resolve(TEST_DIR, '../../bundled')
 
 // Strings that mean cloud API generation engines are back in the live UI.
 // Avoid phrases that only appear in historical what's-new removal blurbs.
@@ -203,4 +209,53 @@ test('the cloud-reference budget has no stale entries', async () => {
   const counts = await cloudRefCounts(SRC_DIR)
   const stale = Object.keys(ALLOWED_SRC_CLOUD_REFS).filter((f) => !counts[f])
   assert.deepEqual(stale, [], `remove these from ALLOWED_SRC_CLOUD_REFS: ${stale.join(', ')}`)
+})
+
+/* ── Upstream V2: features moved into source plugins under `bundled/` ───────
+   Reviewed 2026-09-16 against upstream/main (122 commits ahead of this fork's
+   merge base). Upstream's V2 replatform extracts thirteen features into
+   `bundled/<id>/` source plugins, two of which are this fork's removals:
+   `api_engines` (Nano Banana / ChatGPT / OpenRouter — Divergence 1) and
+   `cloud_training` (vast.ai GPU rental — Divergence 4).
+
+   Everything above this line walks `frontend/src` and `frontend/dist`. Neither
+   path reaches `bundled/`, so on the day that merge lands, the engines can sit
+   on disk in full with every contract above still green. That is the gap this
+   closes, BEFORE the port rather than after it.
+
+   The assertion is the DIRECTORY's absence, not its contents: a phrase walk
+   would pass on an empty directory and on any plugin that reworded its UI,
+   while the fork's position is that these two features are not shipped at all.
+   `backend/app/plugins/loader.py` discovers by directory name, and
+   `backend/app/plugins/official.py` pins the ids in OFFICIAL_IDS — so a
+   directory present under either id IS the feature, whatever it contains.
+
+   WHEN THIS FAILS after the V2 merge: delete the two directories and drop
+   their ids from OFFICIAL_IDS. Do not narrow this test to make it pass. */
+const FORBIDDEN_BUNDLED_PLUGIN_IDS = ['api_engines', 'cloud_training']
+
+test('no rejected upstream feature ships as a bundled source plugin', async () => {
+  let entries
+  try {
+    entries = await readdir(BUNDLED_DIR, { withFileTypes: true })
+  } catch (e) {
+    // No bundled/ at all is the fork's steady state, and passes.
+    if (e && e.code === 'ENOENT') return
+    throw e
+  }
+  const present = entries
+    .filter((ent) => ent.isDirectory() && FORBIDDEN_BUNDLED_PLUGIN_IDS.includes(ent.name))
+    .map((ent) => ent.name)
+  assert.deepEqual(present, [], [
+    `Rejected upstream features are present as bundled plugins: ${present.join(', ')}.`,
+    'These are Divergence 1 (api_engines) and Divergence 4 (cloud_training).',
+    'Delete bundled/<id>/ and remove the id from OFFICIAL_IDS in',
+    'backend/app/plugins/official.py. See FORK_NOTES.md.',
+  ].join('\n'))
+})
+
+test('bundled plugins carry no cloud API engine UI', async () => {
+  const hits = await findForbidden(BUNDLED_DIR, [...FORBIDDEN_ENGINE_UI, ...FORBIDDEN_TRAINING_UI])
+  const message = ['Cloud engine / GPU-rental UI reached a bundled plugin:', ...hits].join('\n')
+  assert.deepEqual(hits, [], message)
 })
