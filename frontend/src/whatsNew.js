@@ -83,6 +83,18 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-16-models-across-drives',
+    date: '2026-09-16',
+    title: 'Pinned model files are found when your models live across several drives',
+    blurb:
+      'A collection too big for one disk is usually held together by links — a models folder '
+      + 'pointing somewhere else, or a single family folder sent to another drive. Pick a file '
+      + 'that way and the picker offered it, then the engine card said it was outside your model '
+      + 'folders and quietly copied it somewhere it could reach. Now the same file is recognised '
+      + 'where it already sits, so the pin simply works and nothing is duplicated.',
+    to: '/settings/engines',
+  },
+  {
     id: '2026-09-12-split-names-the-folder',
     date: '2026-09-12',
     title: 'One bank per subfolder now names each bank after the folder, with no parent prefix',
