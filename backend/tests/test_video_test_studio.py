@@ -476,3 +476,42 @@ def test_advice_stays_silent_when_it_cannot_tell():
     assert vts.launch_advice(_ARGV, True, _VERSION) is None          # a bool is not a size
     # Odd argv ELEMENTS never raise: a server that echoes numbers is answered, not crashed on.
     assert vts.launch_advice(['main.py', 1, None], _RAM, _VERSION)['add'] is True
+
+
+def test_a_weight_in_a_subfolder_is_present_not_missing(app, tmp_path, monkeypatch):
+    """A weight one directory down inside a model root is FOUND.
+
+    ComfyUI lists a model root recursively, so `diffusion_models/minimax/x.safetensors`
+    is offered to a loader exactly like a file at the top of the root — and anyone
+    holding several model families keeps them in per-family folders rather than one
+    flat pile of 20 GB files.
+
+    `_weight_present` scanned only each root's top level, so a base model sitting in
+    such a folder read as absent: the Studio reported itself not ready and offered to
+    download a 19 GB file the user already had. Reported from a real install whose
+    H3 base lives in `diffusion_models/minimax/`.
+    """
+    from app import config as cfg
+    from app.services import comfy_model_paths
+
+    base = tmp_path / 'ComfyUI'
+    nested = base / 'models' / 'diffusion_models' / 'minimax'
+    nested.mkdir(parents=True)
+    flat = base / 'models' / 'loras'
+    flat.mkdir(parents=True)
+    (nested / 'deep.safetensors').write_bytes(b'\0' * 2048)
+    (flat / 'top.safetensors').write_bytes(b'\0' * 2048)
+
+    with app.app_context():
+        cfg.save_config({'comfyui': {'base_dir': str(base)}})
+        comfy_model_paths.clear_cache()
+        try:
+            assert vts._weight_present(('diffusion_models',), 'deep.safetensors'), (
+                'a weight in a per-family subfolder is one ComfyUI loads happily; '
+                'calling it missing offers a download the user does not need')
+            # The flat case never regressed — pinned so the recursive lookup
+            # cannot replace it rather than extend it.
+            assert vts._weight_present(('loras',), 'top.safetensors')
+            assert not vts._weight_present(('loras',), 'not-here.safetensors')
+        finally:
+            comfy_model_paths.clear_cache()

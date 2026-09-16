@@ -83,6 +83,18 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-16-video-weights-in-subfolders',
+    date: '2026-09-16',
+    title: 'The Video Studio finds its models when you keep them in folders',
+    blurb:
+      'Anyone holding several model families keeps them in folders rather than one flat pile, '
+      + 'and ComfyUI loads them from there quite happily. The Video Studio only looked at the top '
+      + 'of each model folder, so a base model one directory down read as missing — and it offered '
+      + 'to download a 19 GB file that was already on the disk. It now looks the same way ComfyUI '
+      + 'does, subfolders included.',
+    to: '/settings/engines',
+  },
+  {
     id: '2026-09-16-models-across-drives',
     date: '2026-09-16',
     title: 'Models spread across drives are found where they are, and never copied',
