@@ -11,6 +11,7 @@ Two questions, and the second is the expensive one:
      third-party finetune nobody chose.
 """
 import os
+import subprocess
 
 import pytest
 
@@ -286,3 +287,78 @@ def test_a_bare_name_the_picker_itself_writes_is_not_a_gap(app, comfy):
         # …and the run loads THAT file, prefix restored by the loader.
         assert keh.unet_for_job().replace('/', os.sep) == os.path.join(
             'klein', 'flux-2-klein-9b-fp8.safetensors')
+
+
+def _link_dir(src, dst):
+    """Link `dst` -> `src`, or None when this OS/account can't make one.
+
+    Tries a symlink, then a Windows JUNCTION: an unprivileged Windows account
+    without Developer Mode is refused a directory symlink but may create a
+    junction freely — which is also what the tooling that spreads a model
+    collection over several drives actually uses, so the fallback is the
+    higher-fidelity case rather than a concession.
+    """
+    try:
+        os.symlink(src, dst, target_is_directory=True)
+        return dst
+    except (OSError, NotImplementedError, AttributeError):
+        pass
+    if os.name != 'nt':
+        return None
+    try:
+        completed = subprocess.run(['cmd', '/c', 'mklink', '/J', str(dst), str(src)],
+                                   capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return dst if completed.returncode == 0 and os.path.isdir(dst) else None
+
+
+def test_a_pin_spelled_through_the_real_tree_a_link_points_at_is_not_outside_roots(
+        app, tmp_path):
+    """A pin that names the model tree DIRECTLY, on an install whose ComfyUI
+    reaches that tree through a link.
+
+    The ordinary large-collection setup: the weights live in their own tree
+    (another drive, or just outside the app folder) and `ComfyUI/models` is a
+    link onto it. Every picker, file dialog and config editor then hands over
+    the path as it exists on disk — `<tree>/diffusion_models/flux/x.safetensors`
+    — while the registered search root is spelled through the link. The two are
+    the SAME directory, and the loader opens the file either way.
+
+    Judged lexically the pinned path escapes the root (`../../..`) and the pin
+    came back 'outside_roots', so a file the scanner lists happily (it walks
+    with followlinks=True) was one the resolver called unreachable. That
+    contradiction is what this pins. On Windows a link onto another VOLUME does
+    not merely mismatch, it makes `relpath` RAISE, and the except-continue
+    swallowed it.
+    """
+    from app import config as cfg
+    from app.services import klein_edit_helper as helper
+    from app.services import comfy_model_paths
+
+    tree = tmp_path / 'model_tree'
+    real_family = tree / 'diffusion_models' / 'flux'
+    real_family.mkdir(parents=True)
+    _write(real_family / 'flux-2-klein-9b.safetensors')
+
+    base = tmp_path / 'ComfyUI'
+    base.mkdir()
+    if _link_dir(tree, base / 'models') is None:
+        pytest.skip('this account cannot create a directory symlink or junction')
+
+    with app.app_context():
+        cfg.save_config({'comfyui': {'base_dir': str(base)}})
+    comfy_model_paths.clear_cache()
+    picker.clear_cache()
+    try:
+        pinned = str(real_family / 'flux-2-klein-9b.safetensors')
+        with app.app_context():
+            rel, status = helper.resolve_model_ref('diffusion_models', pinned)
+        assert status == 'ok', (
+            f'a pin naming the real tree reported {status!r}; ComfyUI reaches '
+            'that exact file through its models link, so the resolver must too')
+        assert rel == os.path.join('flux', 'flux-2-klein-9b.safetensors'), (
+            f'the loader name must be relative to the registered root, got {rel!r}')
+    finally:
+        comfy_model_paths.clear_cache()
+        picker.clear_cache()
