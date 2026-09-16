@@ -283,54 +283,43 @@ def test_absolute_paths_resolve_to_loader_names(app, tmp_path):
         cfg.save_config({'klein': {'unet': str(unet_abs)}})
         assert keh.resolve_klein_unet() == os.path.join('my models', 'tune.safetensors')
         assert keh.klein_override_status()['unet']['status'] == 'ok'
-        assert not (base / 'models' / 'unet' / keh._PINNED_SUBDIR).exists()
+        assert not (base / 'models' / 'unet' / 'lds-pinned').exists()
         assert keh.resolve_model_ref('vae', str(tmp_path / 'nope.safetensors')) == \
             (None, 'missing')
         assert keh.resolve_model_ref('vae', '') == (None, 'empty')
 
 
-def test_external_pin_is_staged_into_the_models_tree(app, tmp_path):
-    """A pinned path OUTSIDE every registered root (Downloads, an HF cache) is
-    hardlinked/symlinked into <root>/lds-pinned/ so a stock loader node can open
-    it, and reports 'ok'. Idempotent — resolving twice reuses the one link."""
+def test_a_pin_outside_every_root_is_reported_not_copied(app, tmp_path):
+    """A pinned path genuinely outside every registered root is REPORTED, and
+    nothing is written into the user's ComfyUI tree.
+
+    This replaces the previous decision, deliberately. A pin outside every root
+    used to be hardlinked into <root>/lds-pinned/ and then reported 'ok', so the
+    engine card said Found for weights the app had copied. A hardlink is free
+    only on the same volume; across drives — the setup that produces external
+    pins in the first place — it fell back to a symlink or to a real copy of a
+    multi-GB file. It also mostly ran for the wrong reason: containment was
+    judged lexically, so a tree ComfyUI reaches through a link looked external
+    when it was not (see test_model_file_picker.py).
+
+    Where a file should live is the user's decision. The app names the folder to
+    register and stops."""
     from app import config as cfg
     from app.services import klein_edit_helper as keh
     with app.app_context():
         base = _comfy(tmp_path, cfg, unet=False, te=False)
         unet_ext = _install(tmp_path, 'weights', 'flux-2-klein-9b.safetensors')
-        te_ext = _install(tmp_path, 'weights', 'qwen_3_8b.safetensors')
-        cfg.save_config({'klein': {'unet': str(unet_ext), 'text_encoder': str(te_ext)}})
-        staged_unet = os.path.join(keh._PINNED_SUBDIR, 'flux-2-klein-9b.safetensors')
-        assert keh.resolve_klein_unet() == staged_unet
-        assert keh.resolve_klein_text_encoder() == os.path.join(
-            keh._PINNED_SUBDIR, 'qwen_3_8b.safetensors')
-        link = base / 'models' / 'unet' / keh._PINNED_SUBDIR / 'flux-2-klein-9b.safetensors'
-        assert link.is_file() and os.path.samefile(link, unet_ext)
-        status = keh.klein_override_status()
-        assert status['unet']['found'] and status['text_encoder']['found']
-        assert keh.resolve_klein_unet() == staged_unet          # reuses the link
-        # And the staged file is reachable as a real asset, not just a name.
-        assert 'klein_model' not in keh.klein_missing_assets()
+        cfg.save_config({'klein': {'unet': str(unet_ext)}})
+        assert keh.resolve_model_ref('diffusion_models', str(unet_ext)) ==             (None, 'outside_roots'), (
+                'a file outside every root must say so, not be copied somewhere '
+                'it can be reached')
+        status = keh.klein_override_status()['unet']
+        assert not status['found'] and status['status'] == 'outside_roots'
+        # Nothing was written into the ComfyUI tree on the user's behalf.
+        for folder in ('unet', 'diffusion_models'):
+            staged = base / 'models' / folder / 'lds-pinned'
+            assert not staged.exists(), f'{staged} was created behind the user'
 
-
-def test_external_pin_basename_collision_gets_a_hash_prefix(app, tmp_path):
-    """Two different files with the same basename must not clobber each other in
-    the staging folder."""
-    from app import config as cfg
-    from app.services import klein_edit_helper as keh
-    with app.app_context():
-        base = _comfy(tmp_path, cfg, te=False)
-        squatter = _install(base, 'models', 'text_encoders', keh._PINNED_SUBDIR,
-                            'qwen_3_8b.safetensors', data=_VALID_ST + b'x')
-        ext = _install(tmp_path, 'elsewhere', 'qwen_3_8b.safetensors')
-        cfg.save_config({'klein': {'text_encoder': str(ext)}})
-        rel = keh.resolve_klein_text_encoder()
-        assert rel.startswith(keh._PINNED_SUBDIR + os.sep)
-        assert rel.endswith('qwen_3_8b.safetensors')
-        assert rel != os.path.join(keh._PINNED_SUBDIR, 'qwen_3_8b.safetensors')
-        staged = base / 'models' / 'text_encoders' / rel
-        assert os.path.samefile(staged, ext)
-        assert not os.path.samefile(squatter, ext)              # untouched
 
 
 def test_unet_weight_dtype_follows_the_filename(app, tmp_path, monkeypatch):
@@ -378,14 +367,15 @@ def test_consistency_lora_accepts_an_absolute_path(app, tmp_path):
         assert rel == os.path.join('klein', 'Flux2-Klein-9B-consistency-V2.safetensors')
         assert path == str(lora_abs)
         assert 'klein_lora' not in keh.klein_missing_assets()
-        # A path outside every loras root is staged into lds-pinned/ and loadable.
+        # A path outside every loras root is reported ABSENT (path None) rather
+        # than copied somewhere a loader could reach it: the name is kept so the
+        # card can show what was asked for, but nothing is handed to ComfyUI.
         outside = _install(tmp_path, 'elsewhere', 'lora.safetensors')
         cfg.save_config({'klein': {'consistency_lora': str(outside)}})
         rel, path = keh._consistency_lora()
-        assert rel == os.path.join(keh._PINNED_SUBDIR, 'lora.safetensors')
-        assert path is not None and os.path.samefile(path, outside)
-        assert 'klein_lora' not in keh.klein_missing_assets()
-        assert keh.klein_override_status()['consistency_lora']['status'] == 'ok'
+        assert path is None, 'an unreachable LoRA must not be staged into the tree'
+        assert keh.klein_override_status()['consistency_lora']['status'] == 'outside_roots'
+        assert not (base / 'models' / 'loras' / 'lds-pinned').exists()
 
 
 def test_generation_lora_preset_row_accepts_an_absolute_path(app, tmp_path, monkeypatch):

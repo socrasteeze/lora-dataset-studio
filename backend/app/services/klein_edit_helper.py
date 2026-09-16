@@ -35,7 +35,6 @@ into a hardcoded path), and the hardcoded consistency-LoRA filename/strength are
 now the `klein.consistency_lora` / `klein.consistency_strength` settings.
 """
 from __future__ import annotations
-import hashlib
 import logging
 import os
 import random
@@ -116,39 +115,6 @@ KLEIN_OVERRIDE_KEYS = {
 }
 
 
-# Subfolder created under a ComfyUI model root where a pinned absolute path that
-# lives outside every registered root is hardlinked/symlinked, so stock loader
-# nodes can see it. Deliberately NOT a 'klein'-named folder: the Klein model
-# picker and _klein_unet_folders() bucket by folder name, and a staging area must
-# not start advertising itself as a second copy of the user's models.
-_PINNED_SUBDIR = 'lds-pinned'
-
-
-def _same_file(a, b):
-    """True when both paths exist and are the same file (inode / file id)."""
-    try:
-        return os.path.samefile(a, b)
-    except OSError:
-        return False
-
-
-def _link_file(src, dst):
-    """Create `dst` as a hardlink to `src`, falling back to a symlink. True on
-    success. Hardlinks are tried FIRST on purpose: on Windows a same-volume
-    hardlink needs neither admin rights nor Developer Mode (a symlink needs one of
-    them), and neither costs a second copy of a multi-GB weight."""
-    try:
-        os.link(src, dst)
-        return True
-    except OSError:
-        pass
-    try:
-        os.symlink(src, dst)
-        return True
-    except OSError:
-        return False
-
-
 def _relative_to_root(abs_path, root):
     """`abs_path` expressed relative to `root`, or None when it isn't inside it.
 
@@ -175,70 +141,6 @@ def _relative_to_root(abs_path, root):
     return None
 
 
-def _stage_external_model(comfy_type, abs_path):
-    """Link an absolute path that sits outside every registered <comfy_type> root
-    into <first root>/lds-pinned/ so ComfyUI's stock loaders can open it, and
-    return the relative loader name. None when there is no root, or when linking
-    fails (cross-volume with no symlink privilege, read-only models folder) — the
-    caller then reports 'outside_roots' and the badge names the fix.
-
-    Idempotent: an existing link to the SAME file is reused, so this is safe on
-    the resolve path that runs on every readiness probe. On a basename collision
-    with a DIFFERENT source it disambiguates with a short hash of the source path
-    rather than overwriting someone else's file.
-
-    This is the one place in the module that writes to the user's ComfyUI tree.
-    It is a deliberate consequence of an explicit pin: the user named a file, and
-    a stock loader node can only be handed a name relative to a registered folder.
-    Ported from socrasteeze's branch (GitHub #20)."""
-    roots = comfy_model_paths.search_roots(comfy_type)
-    if not roots:
-        return None
-    stage_root = os.path.normpath(roots[0])
-    src = os.path.normpath(abs_path)
-    base = os.path.basename(src)
-    dest_dir = os.path.join(stage_root, _PINNED_SUBDIR)
-    try:
-        os.makedirs(dest_dir, exist_ok=True)
-    except OSError as e:
-        logger.warning('could not create %s for an external pin: %s', dest_dir, e)
-        return None
-
-    def _rel(name):
-        return os.path.join(_PINNED_SUBDIR, name)
-
-    cand = os.path.join(dest_dir, base)
-    if os.path.lexists(cand):
-        if _same_file(cand, src):
-            return _rel(base)
-        # A different file already owns this basename — disambiguate instead of
-        # replacing it: two pinned 'model.safetensors' from two folders is the
-        # normal case, and silently clobbering one of them is unrecoverable.
-        digest = hashlib.sha1(
-            os.path.normcase(os.path.abspath(src)).encode('utf-8', 'replace')
-        ).hexdigest()[:8]
-        base = f'{digest}_{os.path.basename(src)}'
-        cand = os.path.join(dest_dir, base)
-        if os.path.lexists(cand):
-            if _same_file(cand, src):
-                return _rel(base)
-            # Same source path, different file behind it (the user replaced the
-            # file the pin names) -> the stale link is ours to drop.
-            try:
-                os.remove(cand)
-            except OSError as e:
-                logger.warning('could not replace the staged pin %s: %s', cand, e)
-                return None
-    if not _link_file(src, cand):
-        logger.warning(
-            'could not hardlink or symlink %s into %s — keep the file under a '
-            'ComfyUI model folder, or register its folder in extra_model_paths.yaml',
-            src, dest_dir)
-        return None
-    logger.info('pinned %s staged as %s', src, _rel(base))
-    return _rel(base)
-
-
 def _unet_weight_dtype(unet_ref):
     """`weight_dtype` for the UNETLoader given the resolved Klein UNET name.
 
@@ -263,11 +165,18 @@ def resolve_model_ref(comfy_type, value):
     Stock ComfyUI loader nodes can ONLY load names relative to a registered model
     folder (base models/<type> plus extra_model_paths.yaml roots), so an absolute
     path is CONVERTED to that relative name when the file sits under one of the
-    <comfy_type> search roots. An absolute path outside every root is instead
-    hardlinked/symlinked into <root>/lds-pinned/ so the loader can still open it
-    ('ok'); only when that staging fails does the status stay 'outside_roots',
+    <comfy_type> search roots — through a link as readily as directly, since a
+    collection spread over several drives is held together by them.
+
+    An absolute path that genuinely sits outside every root is 'outside_roots',
     deliberately distinct from 'missing' (no such file at all / relative name not
-    found): one is a permissions/volume problem, the other is a typo here.
+    found): one is a question of WHERE the file is, the other of WHETHER it is.
+    The app used to answer the first by copying or hardlinking the weights into
+    <root>/lds-pinned/ so a stock loader could reach them. That silently
+    duplicated multi-GB files — and mostly ran because containment was judged
+    lexically, so a linked tree looked external when it was not. The honest
+    answer is to say which folder to register; only the user can decide where
+    their weights live.
 
     The single entry point for every user-typed model reference in this module —
     the three Klein pins, the consistency LoRA and the generation-LoRA preset
@@ -286,9 +195,6 @@ def resolve_model_ref(comfy_type, value):
             rel = _relative_to_root(ab, root)
             if rel:
                 return rel, 'ok'
-        staged = _stage_external_model(comfy_type, ab)
-        if staged:
-            return staged, 'ok'
         return None, 'outside_roots'
     if _abs_under_roots(comfy_type, v):
         return v, 'ok'
@@ -609,11 +515,10 @@ def _configured_lora(cfg_key):
         return rel, _lora_abs(rel)
     name = raw.replace('\\', '/').replace('/', os.sep)
     if status == 'outside_roots':
-        # The file EXISTS but no loras root reaches it AND staging into
-        # lds-pinned/ failed (permissions, or a cross-volume link this account
-        # may not create). Report it ABSENT (path None) rather than hand ComfyUI
-        # a name it will fail validation on.
-        logger.warning('%s: %r exists but could not be linked into a ComfyUI loras '
+        # The file EXISTS but no loras root reaches it, directly or through a
+        # link. Report it ABSENT (path None) rather than hand ComfyUI a name it
+        # will fail validation on.
+        logger.warning('%s: %r exists but sits outside every ComfyUI loras '
                        'folder — move it under models/loras, or register its folder '
                        'in extra_model_paths.yaml', cfg_key, raw)
         return name, None
