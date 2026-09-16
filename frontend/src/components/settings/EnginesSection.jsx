@@ -290,7 +290,7 @@ function overrideBadge(st, missText) {
   if (st.found) return { cls: 'text-emerald-400', text: 'Found' }
   if (st.status === 'outside_roots') {
     return { cls: 'text-amber-400',
-             text: "Could not be linked into ComfyUI's model folders — check permissions, or move the file" }
+             text: "Outside ComfyUI's model folders — move it under models/, or add its folder to extra_model_paths.yaml" }
   }
   return { cls: 'text-amber-400', text: missText || 'Not found — the engine will refuse to run until you fix or clear this' }
 }
@@ -330,7 +330,7 @@ function KleinModelFilesCard({ config, setField, caps }) {
     <Card
       id="klein-model-files"
       title="Klein model files (optional)"
-      help="Pin the exact files the Klein graph loads instead of relying on auto-detection (the canonical download names, then a narrow token scan). Each field takes a full absolute path OR a ComfyUI-relative loader name. A path under one of ComfyUI's model folders (extra_model_paths.yaml roots included) is converted automatically to what the loader needs; a path from anywhere else is hardlinked into an lds-pinned/ folder so ComfyUI can load it without you moving a multi-GB file. Each field lists the files actually found in that ComfyUI folder — you can still type a name or a full path for a file that is not there yet. Leave a field empty to keep auto-detection for that slot. A pinned file that cannot be resolved STOPS the engine and says which one: it used to fall back to auto-detection, which meant the graph loaded a different file from the one shown here and nobody found out until the images came back wrong. Clearing the field is how you go back to auto-detection. Contributed by socrasteeze (GitHub)."
+      help="Pin the exact files the Klein graph loads instead of relying on auto-detection (the canonical download names, then a narrow token scan). Each field takes a full absolute path OR a ComfyUI-relative loader name. A path under one of ComfyUI's model folders (extra_model_paths.yaml roots included) is converted automatically to what the loader needs; a path ComfyUI reaches through a link (a models folder pointing elsewhere, or one family folder sent to another drive) is recognised where it sits. A path outside every model folder is reported as such, with the folder to register â nothing is copied or moved on your behalf. Each field lists the files actually found in that ComfyUI folder — you can still type a name or a full path for a file that is not there yet. Leave a field empty to keep auto-detection for that slot. A pinned file that cannot be resolved STOPS the engine and says which one: it used to fall back to auto-detection, which meant the graph loaded a different file from the one shown here and nobody found out until the images came back wrong. Clearing the field is how you go back to auto-detection. Contributed by socrasteeze (GitHub)."
     >
       {KLEIN_MODEL_SLOTS.map((s) => (
         <KleinModelSlotRow key={s.key} spec={s} config={config} setField={setField}

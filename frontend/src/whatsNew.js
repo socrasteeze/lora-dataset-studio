@@ -85,13 +85,16 @@ export const WHATS_NEW = [
   {
     id: '2026-09-16-models-across-drives',
     date: '2026-09-16',
-    title: 'Pinned model files are found when your models live across several drives',
+    title: 'Models spread across drives are found where they are, and never copied',
     blurb:
       'A collection too big for one disk is usually held together by links — a models folder '
       + 'pointing somewhere else, or a single family folder sent to another drive. Pick a file '
-      + 'that way and the picker offered it, then the engine card said it was outside your model '
-      + 'folders and quietly copied it somewhere it could reach. Now the same file is recognised '
-      + 'where it already sits, so the pin simply works and nothing is duplicated.',
+      + 'that way and the picker offered it, then the engine card called it unreachable and '
+      + 'quietly hardlinked the weights into an lds-pinned/ folder to reach them — free on one '
+      + 'drive, a real multi-GB copy across two. Now the file is recognised where it already '
+      + 'sits, so the pin simply works. A file genuinely outside your model folders is named as '
+      + 'such, with the folder to register; nothing is copied or moved on your behalf. Any '
+      + 'lds-pinned/ folder left from before is safe to delete.',
     to: '/settings/engines',
   },
   {
