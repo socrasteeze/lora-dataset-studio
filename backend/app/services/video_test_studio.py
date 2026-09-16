@@ -1630,8 +1630,16 @@ def _weight_present(subfolders, filename) -> bool:
     Case-insensitively, and across EVERY root (the yaml's extra paths included),
     like the loader that will be handed the name — a weight deployed into an
     extra_model_paths root is present, whatever the app would have chosen.
+
+    SUBFOLDERS COUNT. ComfyUI's own loader lists a root recursively, so
+    `diffusion_models/minimax/<file>` is offered exactly like a file at the top
+    of the root — and anyone holding several families keeps them in folders
+    rather than one flat pile. This used to scan only each root's top level, so
+    a 19 GB base model sitting one directory down read as absent and the Studio
+    offered to download it again.
     """
     from . import comfy_model_paths
+    target = filename.lower()
     for sub in subfolders:
         try:
             roots = comfy_model_paths.search_roots(sub)
@@ -1640,12 +1648,12 @@ def _weight_present(subfolders, filename) -> bool:
         for root in roots:
             if os.path.isfile(os.path.join(str(root), filename)):
                 return True
-            try:
-                names = {n.lower() for n in os.listdir(str(root))}
-            except OSError:
-                continue
-            if filename.lower() in names:
-                return True
+        try:
+            models = comfy_model_paths.list_models(sub)
+        except Exception:
+            models = []
+        if any(os.path.basename(rel).lower() == target for rel, _ab in models):
+            return True
     return False
 
 
