@@ -6,6 +6,53 @@ page is the authority on HOW to run the sync and which commands to trust.
 
 Fork: `socrasteeze/lora-dataset-studio` · Upstream: `perfectgf/lora-dataset-studio`
 
+> ## `upstream/main` NO LONGER EXISTS (2026-09-19)
+>
+> Upstream renamed `main` to **`v1`** (frozen) and made **`v2`** the default
+> branch. Every `upstream/main` below is historical: read it as "upstream's
+> default branch", and derive that branch rather than typing one.
+>
+> **A `git fetch upstream --prune` DELETES your local `upstream/main` ref**,
+> because it no longer exists on the remote. Afterwards `HEAD..upstream/main`
+> fails outright, and any script that swallows the error reports "0 incoming" —
+> which is indistinguishable from "already current". This happened on
+> 2026-09-20. Re-fetch explicitly:
+>
+> ```bash
+> git fetch upstream '+refs/heads/v1:refs/remotes/upstream/v1' \
+>                    '+refs/heads/v2:refs/remotes/upstream/v2'
+> git ls-remote --symref upstream HEAD    # derive the default; do not assume
+> ```
+>
+> **`upstream/v1` is fully merged into this fork (0 incoming, measured
+> 2026-09-20). There is no v1 sync left to run.**
+>
+> **`upstream/v2` is NOT a sync — it is a migration.** Its behind-count reads a
+> harmless 13 while the tree gap is 1,990 files, because a September 16
+> `ours`-strategy merge acknowledged 122 V2 commits without adopting their
+> content. Do not run this page's procedure against `v2`. See
+> [V2_MIGRATION_PREP.md](V2_MIGRATION_PREP.md), which records what an ordinary
+> merge actually delivers (a broken partial: the rejected `cloud_training`
+> plugin, no SDK, 995 paths missing).
+
+## Running it
+
+`scripts/upstream_sync.ps1` is the executable half of this page — it derives the
+upstream default branch, checks identity and remotes, flags the ancestry trap,
+runs the sweep and the gates, and removes its own scratch files on exit
+(including on Ctrl-C or a red gate). It never merges, commits or pushes.
+
+```powershell
+pwsh -File scripts/upstream_sync.ps1 -Phase Orient   # remotes, identity, window
+pwsh -File scripts/upstream_sync.ps1 -Phase Baseline # section 1, before any merge
+pwsh -File scripts/upstream_sync.ps1 -Phase Sweep    # section 4
+pwsh -File scripts/upstream_sync.ps1 -Phase Gates    # section 6
+pwsh -File scripts/upstream_sync.ps1 -Phase All -KeepScratch
+```
+
+Resolution, documentation and shipping stay here, with a human or a reviewing
+agent. The script reports; it does not decide.
+
 > **Read this page first, then FORK_NOTES.md's divergence sections.** You do not
 > need to read the FORK_NOTES changelog table to perform a sync — it is a
 > historical record, kept deliberately, and it lives at the bottom of that file
