@@ -47,6 +47,38 @@ paths and 51 generated frontend paths**. This is an object-only preview; no
 working-tree merge was applied. The source conflict inventory is in
 [V2_SOURCE_CONFLICTS.md](V2_SOURCE_CONFLICTS.md).
 
+#### Measured 2026-09-20: what the ordinary merge actually delivers
+
+The paragraph above was predictive. It has now been executed in an isolated
+worktree and aborted, and the result is worse than "insufficient" — an ordinary
+`git merge upstream/v2` produces a **broken partial V2**, not a smaller one:
+
+| Path | After ordinary merge |
+|---|---|
+| `backend/app/plugins` | PRESENT |
+| `scripts/migrate_to_v2.py` | PRESENT |
+| `bundled/` | PRESENT — but **1 of 13** plugins |
+| `frontend/src/sdk` | **ABSENT** (0 of V2's SDK files) |
+| `frontend/src/plugins/bundled.js` | **ABSENT** |
+| `docs/plugins` | **ABSENT** |
+
+The single plugin it delivers is `cloud_training` — the one this fork **rejects
+under D4** — because that is the only bundle the fork's own tree ever touched,
+so it is the only one the merge sees as changed. The twelve it drops include
+every plugin the fork needs to keep: `video`, `canvas`, `model_tools`, `scrape`,
+`camera_angles`, `image_upscale`, `seedvr2`, `live`, `resource_monitor`,
+`hf_publish`, `civitai_publish`, and `api_engines`.
+
+**995 upstream/v2 paths are absent after the merge completes** (excluding
+`frontend/dist`). The result is backend plugin machinery with no SDK to load it
+and no plugins but the rejected one — a tree that can plausibly build and import
+while delivering none of the feature set. That is the failure mode this document
+exists to prevent, and it does not announce itself.
+
+Conflict-path counts for the two strategies, same tree, same day: ordinary merge
+**254**, content-base merge **662**. The lower number is not the cheaper path; it
+is the measure of how much content the ordinary merge never considers.
+
 Use an explicit content-base integration or an equivalent reviewed reconstruction
 that restores the omitted V2 foundation while preserving the current fork tree.
 Do not rewrite history, revert the zero-change merge expecting code to appear,
