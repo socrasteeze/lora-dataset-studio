@@ -811,6 +811,15 @@ export const INSTALL_ALL_ACTION_LABELS = {
   wd14: 'Image tagging (WD14)',
   watermark_detect: 'Watermark detector',
   video_text: 'Burned-in text (shared OCR)',
+  // DIVERGENCE -- upstream labels these two from the video PLUGIN's setup.step
+  // contribution, because its V2 moved the whole video lane into that plugin.
+  // Here they are CORE actions (INSTALL_ACTIONS in setup_installer.py), so they
+  // are in the catalog whatever is enabled and core has to name them: with a
+  // different plugin enabled, installActionLabel() found no contribution and
+  // fell through to the raw action id. The plugin's own labels still win when
+  // it is enabled -- the lookup checks this table first, and the strings agree.
+  video: 'Video decoding (Video bank)',
+  shot_detect: 'Shot detection (Video bank)',
   ollama_model: 'Vision model (captioning)',
   klein_model: 'Klein model (local generation)',
   klein_text_encoder: 'Klein text encoder',
