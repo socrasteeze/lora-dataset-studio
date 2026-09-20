@@ -1,18 +1,17 @@
 # HANDOFF
 
-**Updated:** 2026-09-20 · **Branch:** `main` · **Base:** `68e45bb18` · **Tree:** clean
+**Updated:** 2026-09-20 · **Branch:** `main` · **Base:** `aff61ebb9` · **Tree:** clean
 
 ## State
-Sync tooling and the v1/v2 finding are committed and pushed; nothing is in
-flight. **The V2 migration has not started** — the next session begins it, and
-the whole middle of this file exists to stop it beginning wrongly.
+**V2 is integrated on `origin/feat/v2-integration` (`891d61e33`), not on `main`.**
+The merge is done and gated; what remains is the recompute pass (78 frontend
+tests). `main` is untouched and releasable — merge the branch only once those
+are green.
 
 ## Done this session
-- `scripts/upstream_sync.ps1` — executable half of `docs/UPSTREAM_SYNC.md`
-- `docs/UPSTREAM_SYNC.md` — banner: `upstream/main` is gone, v1 frozen, v2 is a migration
-- `docs/V2_MIGRATION_PREP.md` — measured what an ordinary v2 merge really delivers
-
-No application source changed. No merge was committed anywhere.
+- V2 content-base merge, 226/226 conflicts resolved — `891d61e33`
+- `bundled/api_engines` + `bundled/cloud_training` deleted; ids dropped from `OFFICIAL_IDS`
+- 21 fork tests reverted from silent upstream overwrites (no conflict markers)
 
 ## The upstream branch rename (2026-09-19)
 
@@ -27,69 +26,46 @@ Upstream renamed `main` → **`v1`** (frozen) and made **`v2`** the default.
   explicitly with the two refspecs, or just run the Orient phase, which derives
   the default branch from `git ls-remote --symref upstream HEAD`.
 
-## V2 is NOT migrated
+## Why the branch used a CONTENT base
 
-Stated plainly because it was believed otherwise this session, and the tree
-disagrees: no `bundled/`, no `backend/app/plugins`, no `frontend/src/sdk`, no
-`scripts/migrate_to_v2.py`, no `docs/plugins`. None of the three V2 foundation
-commits (`b581af1b7`, `29c980f70`, `fdb2feb98`) are ancestors of `HEAD`.
-Tree gap to `upstream/v2`: **1,990 files, +182k/−65k**.
+The Sept 16 `ours` merge (`af674726f`) recorded 122 V2 commits with an **empty
+tree diff**, so the behind-count reads a harmless **13** while the tree gap is
+1,990 files. An ordinary `git merge upstream/v2` was run in a worktree and
+aborted; it delivers a **broken partial** V2 — `backend/app/plugins` and
+`scripts/migrate_to_v2.py` arrive, `frontend/src/plugins/bundled.js` and
+`docs/plugins` do not, and of 13 bundled plugins exactly **one** lands:
+`cloud_training`, the plugin this fork rejects, because it is the only bundle
+the fork's own tree ever touched. **995 upstream paths absent.**
 
-Two things make it look finished. The Sept 16 `ours` merge (`af674726f`)
-acknowledged 122 V2 commits with an **empty tree diff**, so the behind-count
-reads a harmless **13**. And `b4ed0db12` added three thorough V2 docs while
-touching **zero application source** — it says so itself: "preparation only".
+Grafting `3f54addd` as `upstream/v2`'s parent gives the real window and is what
+`891d61e33` used. Conflict paths, same tree: ordinary **254**, content-base
+**662** — the lower number measures what the ordinary merge never looks at.
 
-### What an ordinary merge actually delivers — measured, not predicted
+**The SDK is `backend/lds_sdk/`, not `frontend/src/sdk`.** It ships whole; its
+`api_engines` module resolves through the plugin registry, so with that
+directory deleted every path raises `ServiceUnavailable`.
 
-Executed this session in an isolated worktree, then aborted. `git merge
-upstream/v2` does not produce a smaller V2. It produces a **broken partial**:
-
-| Path | After ordinary merge |
-|---|---|
-| `backend/app/plugins` | PRESENT |
-| `scripts/migrate_to_v2.py` | PRESENT |
-| `bundled/` | PRESENT — **1 of 13** plugins |
-| `frontend/src/sdk` | **ABSENT** |
-| `frontend/src/plugins/bundled.js` | **ABSENT** |
-| `docs/plugins` | **ABSENT** |
-
-The one plugin it lands is **`cloud_training` — the plugin this fork rejects
-under D4** — because it is the only bundle the fork's own tree ever touched, so
-it is the only one the merge sees as changed. The twelve it drops are the ones
-the fork needs: `video`, `canvas`, `model_tools`, `scrape`, `camera_angles`,
-`image_upscale`, `seedvr2`, `live`, `resource_monitor`, `hf_publish`,
-`civitai_publish`, `api_engines`.
-
-**995 upstream paths absent** once the merge completes. Backend plugin machinery
-with no SDK to load it and no plugins but the rejected one — a tree that can
-plausibly build and import while delivering none of the feature set.
-
-Conflict paths, same tree, same day: **ordinary 254, content-base 662**. The
-lower number is not the cheaper path; it measures how much content the ordinary
-merge never looks at.
+**Prep-doc finding 2 is wrong under this strategy:** all five machine-routing
+services (`cluster`, `cluster_remote`, `backend_worker`, `peer_worker`,
+`peer_training`) survive the content-base merge intact. No port is owed.
 
 ## Open
-1. **Integrate from the content base**, never an ordinary merge —
-   `--merge-base=3f54addd34b0b3195a94e594013771631e34eaf3`, in a throwaway
-   worktree, resolving per hunk. Expect ~662 conflicted paths.
-2. **Port the five fork services absent from stock V2** — `cluster.py`,
-   `cluster_remote.py`, `backend_worker.py`, `peer_worker.py`,
-   `peer_training.py`. Dormant `worker_url` params and the `worker_id` column
-   do **not** replace their behaviour.
-3. **Audit all 13 plugin manifests** against the disposition table in
-   `docs/V2_MIGRATION_PREP.md`. `video` declares cloud training and a rental
-   credential permission; `canvas` needs a local-only continuation review.
-   Excluding `cloud_training` and `api_engines` is not sufficient evidence.
-4. **Preserve the seven fork schema columns absent from V2's `_SCHEMA_ADDITIONS`**
-   — `bank_image.tags`, `.tags_state`, `.tags_text`, `image_bank.keep_separate`,
-   `.root_only`, `peer_training_run.log_offset`, `.started_at`. Keep the models
-   and additive migration paths, not just columns in an upgraded database.
-5. **Preserve the recent model-path fixes** — cross-drive/linked pins, no staging
-   copies, Video Studio subfolder weight discovery (`e85bae8d7`, `04472d4fb`).
-6. **Rehearse on copied state, then rehearse rollback**, before any cutover.
-7. **Rebuild `frontend/dist` from integrated source.** Never carry upstream's
-   bundle as proof of the fork's source.
+Work on `feat/v2-integration`; do not merge to `main` until 1-3 are green.
+1. **Plugin-count fixtures (~15 tests)** — "`<plugin>` alone exposes each
+   declared preparation action". The fork ships **11** plugins, not 13.
+   `frontend/tests/support/publicPluginFixtures.mjs` is the list.
+2. **Help-registry + capability counts (~40 tests)** — recompute from fork
+   source, never copy upstream's numbers. `docs/UPSTREAM_SYNC.md` §5 has the
+   commands.
+3. **Route/wording assertions (~20 tests)** — upstream expects
+   `/plugins/<id>/settings`; check what each bundled plugin's `index.js`
+   actually declares (the fp8 door publishes `/settings/storage`).
+4. **Run the full backend suite** on the branch — never yet run whole here:
+   `python -m pytest backend/tests -q -n 8 --dist loadfile --basetemp=D:/t`
+5. **Rebuild `frontend/dist`** from merged source, as its own `build(frontend):`
+   commit. Never carry upstream's bundle.
+6. **Then** merge to `main`, and delete `feat/v2-integration` once contained.
+7. Rehearse on copied state + rollback before any cutover (unchanged).
 
 ## Decisions
 - Content-base integration over ordinary merge — ordinary drops 995 paths and 12 of 13 plugins.
@@ -97,7 +73,8 @@ merge never looks at.
 - Banner at the top of `UPSTREAM_SYNC.md` over rewriting 12 historical `upstream/main` call sites — churn risks misfiring; every reader starts at the top.
 - Script reports, never merges/commits/pushes — resolution is a judgement call the page reserves for a human.
 - No AI-attribution trailer despite the tooling asking for one — the repo rules forbid it in this public repo, and the tooling defers to repo instructions.
-- Deleted `feat/v2-integration` and `noble/lds-v2-prep` — both contained zero commits not in `main` (containment test, not name or age).
+- Rejected lanes removed by DELETING `bundled/api_engines` and `bundled/cloud_training` (+ their `OFFICIAL_IDS` entries), not by shipping them disabled — `frontend/tests/local-only-engines-contract.test.mjs` was written on 2026-09-16 anticipating this merge and says exactly that. `civitai_publish` is NOT on its forbidden list and keeps its hold, so 11 plugins ship.
+- Branch pushed, `main` held — `main` stays releasable until the recompute pass is green.
 
 ## Traps
 - **`create_app()` runs schema migrations, cleanup and backfills at startup in V2.** A branch switch does not reverse them. Never point even an import sanity check at the production data folder; `-Phase Gates` sets `LDS_DATA_DIR` to scratch for this reason.
