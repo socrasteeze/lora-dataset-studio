@@ -1,30 +1,21 @@
 # HANDOFF
 
-**Updated:** 2026-09-20 · **Branch:** `main` · **Base:** `aff61ebb9` · **Tree:** clean
+**Updated:** 2026-09-20 · **Branch:** `feat/v2-integration` · **Base:** `9b4a9fea0` · **Tree:** clean
 
 ## State
-**V2 is integrated on `origin/feat/v2-integration` (`891d61e33`), not on `main`.**
-The merge is done and gated; what remains is the recompute pass (78 frontend
-tests). `main` is untouched and releasable — merge the branch only once those
-are green.
+V2 is integrated on `origin/feat/v2-integration` (`3acf8a3e3`); `main` is untouched
+and releasable. The merge is sound - builds, boots, both linters clean - but both
+suites are red, so the branch does not land yet.
+
+**Measured on `3acf8a3e3`:** backend **9,163 pass / 334 fail / 807 error** (was
+8,146 / 2,166 red before the plugin-boot fix). Frontend **5,015 / 5,083, 68 fail**.
 
 ## Done this session
-- V2 content-base merge, 226/226 conflicts resolved — `891d61e33`
-- `bundled/api_engines` + `bundled/cloud_training` deleted; ids dropped from `OFFICIAL_IDS`
-- 21 fork tests reverted from silent upstream overwrites (no conflict markers)
-
-## The upstream branch rename (2026-09-19)
-
-Upstream renamed `main` → **`v1`** (frozen) and made **`v2`** the default.
-
-- **`upstream/v1` is fully merged into this fork: 0 incoming, measured.** There
-  is no v1 sync left to run, now or later.
-- **`git fetch upstream --prune` DELETES your local `upstream/main`**, because
-  it no longer exists on the remote. It happened this session. Afterwards
-  `HEAD..upstream/main` fails outright, and a script that swallows the error
-  reports "0 incoming" — indistinguishable from "already current". Re-fetch
-  explicitly with the two refspecs, or just run the Orient phase, which derives
-  the default branch from `git ls-remote --symref upstream HEAD`.
+- V2 content-base merge, 226/226 conflicts - `891d61e33`
+- `bundled/api_engines` + `bundled/cloud_training` deleted, ids out of `OFFICIAL_IDS`
+- Restored 8 V2 fns in `setup_installer.py` + `register_plugin_defaults` - `feda89e4c`
+- Core install labels for `video` / `shot_detect` - `8f1f284f9`
+- **`APP_VERSION` PEP 440 + duplicate video blueprints - `3acf8a3e3`** (cleared ~1,000 tests)
 
 ## Why the branch used a CONTENT base
 
@@ -50,22 +41,29 @@ services (`cluster`, `cluster_remote`, `backend_worker`, `peer_worker`,
 `peer_training`) survive the content-base merge intact. No port is owed.
 
 ## Open
-Work on `feat/v2-integration`; do not merge to `main` until 1-3 are green.
-1. **Plugin-count fixtures (~15 tests)** — "`<plugin>` alone exposes each
-   declared preparation action". The fork ships **11** plugins, not 13.
-   `frontend/tests/support/publicPluginFixtures.mjs` is the list.
-2. **Help-registry + capability counts (~40 tests)** — recompute from fork
-   source, never copy upstream's numbers. `docs/UPSTREAM_SYNC.md` §5 has the
-   commands.
-3. **Route/wording assertions (~20 tests)** — upstream expects
-   `/plugins/<id>/settings`; check what each bundled plugin's `index.js`
-   actually declares (the fp8 door publishes `/settings/storage`).
-4. **Run the full backend suite** on the branch — never yet run whole here:
-   `python -m pytest backend/tests -q -n 8 --dist loadfile --basetemp=D:/t`
-5. **Rebuild `frontend/dist`** from merged source, as its own `build(frontend):`
+Work on `feat/v2-integration`. Do not merge to `main` until the suites are green.
+
+1. **Deleted-plugin markers - 619 tests across 32 files.** A module-level
+   `pytestmark = pytest.mark.plugins('api_engines'|'cloud_training')` raises
+   `ValueError: Unknown public test plugins` at
+   `backend/tests/public_plugin_fixture.py:32`, erroring EVERY test in the file.
+   - **2 files are pure collateral** - the marker is their only reference to the
+     plugin. Change it to `pytest.mark.plugins()` and they pass as-is:
+     `test_dataset_service.py` (**verified: 66 pass**) and
+     `test_ref_edit_survives_restart.py` (14). Do this first.
+   - The other **30 genuinely test the deleted feature** (`test_cloud_*`,
+     `test_vast_client`, `test_aitoolkit_remote`, ...). Delete them with the
+     feature; do not neuter the fixture to keep them collectable.
+2. **Remaining backend fails (334)** - not yet attributed; the `-q` run was
+   killed before printing its failure section. Re-run and classify before fixing.
+3. **Frontend, 68 fails in 31 files** - 60 are plain assertions (recompute), not
+   breakage. Largest: `ContinueDialog.test.js` (8), `settingDefaults` (5),
+   `useSetupSteps` (5), `runsHubContinueLanes` (4), `whatsNew` (4),
+   `help-registry-contract` (4). Recompute from fork source; never copy
+   upstream's numbers.
+4. **Rebuild `frontend/dist`** from merged source as its own `build(frontend):`
    commit. Never carry upstream's bundle.
-6. **Then** merge to `main`, and delete `feat/v2-integration` once contained.
-7. Rehearse on copied state + rollback before any cutover (unchanged).
+5. **Then** merge to `main` and delete `feat/v2-integration` once contained.
 
 ## Decisions
 - Content-base integration over ordinary merge — ordinary drops 995 paths and 12 of 13 plugins.
@@ -75,6 +73,21 @@ Work on `feat/v2-integration`; do not merge to `main` until 1-3 are green.
 - No AI-attribution trailer despite the tooling asking for one — the repo rules forbid it in this public repo, and the tooling defers to repo instructions.
 - Rejected lanes removed by DELETING `bundled/api_engines` and `bundled/cloud_training` (+ their `OFFICIAL_IDS` entries), not by shipping them disabled — `frontend/tests/local-only-engines-contract.test.mjs` was written on 2026-09-16 anticipating this merge and says exactly that. `civitai_publish` is NOT on its forbidden list and keeps its hold, so 11 plugins ship.
 - Branch pushed, `main` held — `main` stays releasable until the recompute pass is green.
+- Video training stays. Asked about dropping it: it is NOT easy and NOT separable.
+  It lives in the `video` plugin that also ships the Video Bank, and
+  `video_bank_service.py:3129` calls `video_training.suggested_steps()`, so the
+  bank depends on it. Only 3 test files are video *training*; the other ~57
+  `test_video_*` are the bank. Dropping it is a feature amputation, not a delete.
+- `_INSTALL_GROUPS` (`seedvr2`, `camera`) stays in core `setup_installer.py`
+  though `bundled/seedvr2` and `bundled/camera_angles` also declare those actions
+  in their `plugin.json`. The governing contract (`test_camera_angles.py:475`)
+  only requires each member be a real `INSTALL_ACTION` - it is indifferent to
+  owner, and **currently passes** (verified). No action owed; revisit only if
+  weights must install with the plugin disabled.
+- `app/services/cloud_training.py` is CORE and survives - despite the name it is
+  the local training launcher (433 KB). Only `lds_cloud_training` (the plugin
+  package) is gone. 135 test files touch the core service and are unaffected; do
+  not "clean up" references to it.
 
 ## Traps
 - **`create_app()` runs schema migrations, cleanup and backfills at startup in V2.** A branch switch does not reverse them. Never point even an import sanity check at the production data folder; `-Phase Gates` sets `LDS_DATA_DIR` to scratch for this reason.
@@ -83,6 +96,14 @@ Work on `feat/v2-integration`; do not merge to `main` until 1-3 are green.
 - **A parallel backend worker dies about once in five full runs**, a different test each time. Replay a named failure alone before believing it.
 - **Backend CI runs on `windows-latest`** — a Windows backend failure is not "environment". On Linux the suite shows ~67 path-separator artifacts that CI does not have; diff against a baseline, never triage the floor.
 - **Never push to `upstream`** (push URL is `DISABLED_NO_PUSH` — keep it) and never take upstream's `frontend/dist`.
+- **The frontend suite needs its SDK loader.** Run `npm test` from `frontend/`,
+  never bare `node --test` - the real command is
+  `node --import ./scripts/registerSdk.mjs --test && node scripts/testBundled.mjs`.
+  Bare `node --test` cannot resolve `@lds/plugin-sdk` and reports ~109 phantom
+  failures across 55 files. Measured this session; it is not merge damage.
+- **The SDK degrades on purpose.** `backend/lds_sdk/{api_engines,cloud_training}.py`
+  import the deleted packages lazily, behind `is_available()` - absence raises a
+  clean `RuntimeError`, never an ImportError at load. Leave the shims alone.
 
 ## Verify
 ```powershell
