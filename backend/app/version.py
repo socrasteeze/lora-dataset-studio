@@ -6,3 +6,8 @@ update check just compares the latest GitHub release tag (stripped of a leading
 picks it up automatically (backend/ is copied verbatim into the archive).
 """
 APP_VERSION = '2026.09.04F'
+# Release tooling reads this marker from the tagged tree. Adopted from V2:
+# .github/workflows/release.yml greps for it and a missing marker breaks a tag.
+# The VERSION above stays the fork's own (D11) -- upstream's release identity
+# is not this fork's.
+APP_RELEASE_CHANNEL = 'v2'

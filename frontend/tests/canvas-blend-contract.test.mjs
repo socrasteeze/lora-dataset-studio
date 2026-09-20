@@ -15,29 +15,35 @@ import test from 'node:test'
 import { getHelpTopic } from '../src/help/helpRegistry.js'
 import { WHATS_NEW } from '../src/whatsNew.js'
 import { WHATS_NEW_ARCHIVE } from '../src/whatsNewArchive.js'
+import { pluginWhatsNew, resetRegistry, setEnabled, whatsNewEntries } from '../src/plugins/registry.js'
+import { registerBundledDescriptor } from './support/bundledDescriptors.mjs'
+import canvasDescriptor from '../../bundled/canvas/frontend/index.js'
+
+test.beforeEach(() => { resetRegistry(); setEnabled([]) })
+test.afterEach(() => { resetRegistry(); setEnabled([]) })
 
 // The entry under test may have moved to the archive since it shipped
 // (see whatsNew.js, rule "Keep the list tidy") — search the union.
-const ALL_WHATS_NEW = [...WHATS_NEW, ...WHATS_NEW_ARCHIVE]
+const allWhatsNew = () => [...WHATS_NEW, ...WHATS_NEW_ARCHIVE, ...whatsNewEntries()]
 
-const read = (rel) => readSource(`src/${rel}`)
-const BLEND = read('components/canvas/CanvasBlendPanel.jsx')
-const PANEL = read('components/canvas/CanvasGenerationPanel.jsx')
-const HOOK = read('hooks/useCanvasStudio.js')
-const UTIL = read('utils/canvasGeneration.js')
-const SETUP = read('components/dataset/studio/RunSetupPanel.jsx')
-const ROW = read('components/dataset/studio/BlendWeightRow.jsx')
+const read = readSource
+const BLEND = read('../bundled/canvas/frontend/components/canvas/CanvasBlendPanel.jsx')
+const PANEL = read('../bundled/canvas/frontend/components/canvas/CanvasGenerationPanel.jsx')
+const HOOK = read('../bundled/canvas/frontend/hooks/useCanvasStudio.js')
+const UTIL = read('../bundled/canvas/frontend/utils/canvasGeneration.js')
+const SETUP = read('src/components/dataset/studio/RunSetupPanel.jsx')
+const ROW = read('src/components/dataset/studio/BlendWeightRow.jsx')
 
 test('the board imports the Test Studio stack module instead of copying it', () => {
   // A second clamp, a second "one family" rule or a second key shape is a second
   // chance for the two screens to disagree about what a blend is.
-  assert.match(UTIL, /from '\.\.\/components\/dataset\/studio\/loraStack\.js'/)
+  assert.match(UTIL, /from '@lds\/plugin-sdk\/canvas'/)
   assert.match(UTIL, /combineBlocker/)
   assert.match(UTIL, /stackWeight/)
   // Le curseur ET les cases d'un LoRA sont UN composant partagé par les deux
   // surfaces (BlendWeightRow) : deux copies du même contrôle, ce serait deux
   // occasions de diverger sur « aucune case cochée = le curseur gouverne ».
-  assert.match(BLEND, /import BlendWeightRow from '\.\.\/dataset\/studio\/BlendWeightRow'/)
+  assert.match(BLEND, /import \{ BlendWeightRow \} from '@lds\/plugin-sdk\/canvas'/)
   assert.match(ROW, /from '\.\/loraStack'/)
   assert.match(ROW, /BLEND_WEIGHT_CHIPS/)
   assert.doesNotMatch(ROW, /const BLEND_WEIGHT_CHIPS\s*=/)
@@ -107,14 +113,23 @@ test('the honest line about what blending two identities does is on screen', () 
 })
 
 test('the toggle has a help topic and the wave has a What\'s-new entry', () => {
+  assert.equal(getHelpTopic('canvas-blend'), undefined, 'the absent owner contributes no help')
+  assert.ok(!allWhatsNew().some(e => e.id === '2026-08-03-canvas-blend'))
+  assert.deepEqual(pluginWhatsNew('canvas'), [])
+  assert.equal(registerBundledDescriptor(canvasDescriptor), true)
+  setEnabled(['canvas'])
   const topic = getHelpTopic('canvas-blend')
   assert.ok(topic, 'canvas-blend must be a registered help topic')
   assert.equal(topic.app.route, '/canvas')
   assert.ok(topic.keywords.includes('blend'))
   assert.match(BLEND, /topic="canvas-blend"/)
 
-  const entry = ALL_WHATS_NEW.find((e) => e.id === '2026-08-03-canvas-blend')
+  const entry = allWhatsNew().find((e) => e.id === '2026-08-03-canvas-blend')
   assert.ok(entry, 'the blend wave needs a What\'s-new entry')
   // Archived → no in-app target, by doctrine (whatsNew.js, "Keep the list tidy").
   assert.equal(entry.to, undefined)
+  setEnabled([])
+  assert.equal(getHelpTopic('canvas-blend'), undefined, 'a disabled owner contributes no help')
+  assert.ok(!allWhatsNew().some(e => e.id === '2026-08-03-canvas-blend'))
+  assert.ok(pluginWhatsNew('canvas').some(e => e.id === entry.id), 'installed owner history remains readable')
 })

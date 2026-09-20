@@ -83,6 +83,77 @@ import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+      id: '2026-09-14-bank-score-retry-errors',
+      date: '2026-09-14',
+      title: 'Bank scoring recovers from failed images',
+      blurb: 'Run Score again to retry failed images while keeping successful cached work. '
+        + 'A failing aesthetic or NSFW scorer now preserves the CLIP index and the other scores. '
+        + 'Failed images are reported clearly, and an empty semantic index no longer looks like '
+        + 'an incomplete installation. Reported by perv0839 (Discord).',
+      to: '/bank',
+    },
+  {
+      id: '2026-09-14-v2-choose-your-plugins',
+      date: '2026-09-14',
+      title: 'Start with the LDS core and add the plugins you need',
+      image: 'docs/screenshots/plugins/public-store-catalog.png',
+      blurb: 'V2 separates the core setup from optional features. Start importing and organising '
+        + 'datasets, then choose plugins from the Store. Each plugin brings its own screens, '
+        + 'settings and preparation steps, including required ComfyUI custom nodes. '
+        + 'Plugin updates are listed with their plugin; this feed covers the LDS core.',
+      to: '/plugins',
+    },
+  {
+      id: '2026-09-15-bank-python-calculation-check',
+      date: '2026-09-15',
+      title: 'Recover Bank scoring when a detected GPU Python fails',
+      blurb: 'Manage Score and SigLIP 2 Python from Bank ▸ Passes even when CUDA is detected. '
+        + 'See the Python actually used, explicitly select the managed environment after a repair, '
+        + 'and test a small calculation before starting a long pass. CUDA detection no longer '
+        + 'claims that calculations are verified. Reported by perv0839 (Discord).',
+      to: '/bank',
+    },
+  {
+      id: '2026-09-15-git-update-banner',
+      date: '2026-09-15',
+      title: 'Git updates: one consistent answer',
+      blurb: 'The banner, navigation badge and Settings now check the same update source. Git installations follow their configured branch, and checking an up-to-date branch clears an outdated banner.',
+      to: '/settings/maintenance',
+    },
+  {
+      id: '2026-09-15-studio-lower-step-counts',
+      date: '2026-09-15',
+      title: 'Image Studio: try fewer steps with compact controls',
+      blurb: 'Try 1–5 sampling steps alongside the existing presets. Three choices stay visible; use − and + to browse lower or higher values. Your selected step counts stay listed, including in comparison and blend runs.',
+      to: '/studio',
+    },
+  {
+      id: '2026-09-19-caption-lab-dataset-prompt',
+      date: '2026-09-19',
+      title: 'Caption Lab uses your dataset’s caption prompt',
+      blurb: 'The Lab now starts with your saved caption method and uses the same character, style or concept base prompt as the dataset pass, including appearance rules and extra instructions. Expand “Prompt sent” to inspect each result’s instructions. Concept previews show the initial caption; the batch’s later refinement and omission passes are indicated separately. Thanks to adamslowe for reporting the mismatch (#68).',
+      to: '/datasets?section=captions&panel=lab',
+    },
+  {
+      id: '2026-09-19-installed-plugin-compatibility',
+      date: '2026-09-19',
+      title: 'Keep your installed plugins when updating V2',
+      blurb: 'The public V2 now supports the shared interfaces used by newer installed plugins, including Video reference frames. Existing plugin installations and their saved data stay in place.',
+    },
+  {
+      id: '2026-09-19-plugin-installation-unlock',
+      date: '2026-09-19',
+      title: 'A clear way to unlock plugin installation',
+      blurb: 'The plugin store now explains restricted installation and guides you through local access or an admin token for another computer. Locked install buttons lead to the unlock form, and an incorrect token gets a clear explanation. Thanks to lucasofff for reporting the confusing grey buttons.',
+      to: '/plugins',
+    },
+  {
+      id: '2026-09-20-plugin-install-review-focus',
+      date: '2026-09-20',
+      title: 'Plugin installation review stays in view',
+      blurb: 'Installing a plugin from lower in the catalog now brings its review panel into view and moves keyboard focus there, so the confirmation step is easy to find. Thanks to @strichinina for reporting and diagnosing this in #70.',
+    },
+  {
     id: '2026-09-16-video-weights-in-subfolders',
     date: '2026-09-16',
     title: 'The Video Studio finds its models when you keep them in folders',

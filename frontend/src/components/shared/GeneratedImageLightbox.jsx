@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useImageZoomPan } from '../../hooks/useImageZoomPan';
 import RepairDialog from './RepairDialog';
 import ImproveModal from './ImproveModal';
-import CameraAnglePicker from './CameraAnglePicker';
-import { useCameraAngles } from '../../hooks/useCameraAngles';
+import PluginSlot from '../../plugins/PluginSlot.jsx';
+import { contributionKey, createLayerTracker } from '../../plugins/layerTracker.js';
 import { useImageDownload } from '../../hooks/useImageDownload';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { postJson } from '../../api/fetchClient';
-import { cameraRefusal } from '../../utils/cameraAngles';
 import { canImproveCanvasImage } from '../../utils/canvasImprove';
 import { lightboxImproveButtons } from '../../utils/improveEngines';
+import ImprovePreparationLinks from '../common/ImprovePreparationLinks';
 import { canRestoreImproveSettings } from '../../utils/improveSettingsRestore';
 import {
   imageHeadlineFacts, imagePromptBlocks, imageSettingFacts, promptFold,
@@ -32,7 +31,7 @@ import {
    session. Both are the wrong nouns and the wrong verbs. So this is not a
    fourth viewer: it is the third, and it absorbs the inline one that made four.
 
-   ⚠ What was wrong with the old one, because it is the whole reason this file
+   ⚠️ What was wrong with the old one, because it is the whole reason this file
    exists. Under the image sat a single paragraph:
 
      step 2500 · seed 208607443 · strength 0 · <forty lines of prompt>
@@ -166,6 +165,7 @@ function ImproveActions({ img, onImprove, improvePending, improveReady, busy,
           {btn.label}
         </button>
       ))}
+      <ImprovePreparationLinks caps={caps} />
     </>
   );
 }
@@ -223,13 +223,17 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
      early return: an effect depends on it, and a hook may not sit behind a
      conditional return. */
   const [repairOpen, setRepairOpen] = useState(false);
-  // 📷 The picker is a layer of this viewer now, exactly like ✦ — see the
-  // props note: verbs belong to the viewer, hosts supply context.
-  const [cameraOpen, setCameraOpen] = useState(false);
+  // A layer a plugin's verb opened (lightbox.action): the keys stand down
+  // under it like under the viewer's own layers. A ref, not state: nothing
+  // here renders differently, the keydown handler only reads it. Tracked PER
+  // contribution (plugins/layerTracker.js): with one flag for the slot, a
+  // re-render replayed every verb's report and the last one's "closed" erased
+  // the first one's open picker (measured, 2026-09-05).
+  const pluginLayersRef = useRef(null);
+  if (!pluginLayersRef.current) pluginLayersRef.current = createLayerTracker();
   // ✨ The improve modal — settings on demand, result in place. Held HERE like
   // every other layer, so the keydown effect can stand down under it.
   const [improveOpen, setImproveOpen] = useState(false);
-  const shootCameraViews = useCameraAngles();
   /* 🔍 Are the facts on screen? They are what this viewer is FOR, so they open
      with it — but they are not what you want while you are looking. Measured at
      412x780, the panel open, the picture is 35 % of the screen; put away, it is
@@ -269,15 +273,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
     // were in the middle of inspecting.
     const onKey = (e) => {
       if (repairOpen || improveOpen) return;
-      // 📷 The picker is a layer like ✦: while it is open, keys pressed inside
-      // its tree never get here (its root stops them), and a key pressed with
-      // focus elsewhere must not walk or close the viewer UNDER the dial —
-      // Escape peels the picker first, arrows do nothing. The same lesson the
-      // dataset lightbox already carries.
-      if (cameraOpen) {
-        if (e.key === 'Escape') setCameraOpen(false);
-        return;
-      }
+      if (pluginLayersRef.current.any()) return;
       // ← → walk the list even while magnified: the zoom resets with the new
       // picture anyway (resetKey follows img), so making the user un-zoom
       // first would add a step that buys nothing.
@@ -289,7 +285,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [img, onClose, repairOpen, cameraOpen, improveOpen, zoom, onPrev, onNext]);
+  }, [img, onClose, repairOpen, improveOpen, zoom, onPrev, onNext]);
   useEffect(() => { if (img) closeRef.current?.focus(); }, [img]);
   /* Folding the details resizes the frame under a held zoom, and a view that
      was legally at its edge before is a strip of backdrop afterwards. Settle
@@ -339,7 +335,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={label}
       data-testid="generated-image-lightbox" data-probe-layer
       onClick={onClose}
-      // ⚠ /95, not an arbitrary /92: Tailwind only emits the opacities in its
+      // ⚠️ /95, not an arbitrary /92: Tailwind only emits the opacities in its
       // scale, so bg-black/92 compiled to NOTHING and the board behind stayed at
       // full brightness under what was supposed to be a backdrop.
       // The stacked/split shape itself lives in generatedImageLightboxLayout.js.
@@ -473,7 +469,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
 
           {blocks.map((b) => <PromptBlock key={b.key} block={b} />)}
 
-          {/* ⬇ Keep it. In the SAME footer as Pin, because they are the two
+          {/* ⬇ Keep it. In the SAME footer as 📌 Pin, because they are the two
               things you do once you have decided a render is good — and the
               file lands under a name that still says which dataset, run, step
               and seed made it (services/gallery_download.py). Without that name
@@ -526,20 +522,15 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
                 <span aria-hidden>✦</span> Repair
               </button>
             )}
-            {/* 📷 In the same footer, on every host that shows a library row.
-                Shown DISABLED with its reason rather than hidden when the row
-                cannot take it: a button that vanishes teaches nothing, and
-                "why can't I?" is the question this panel exists to answer. */}
-            {hasRow && (
-              <button type="button" data-testid="lightbox-camera-angles"
-                onClick={(e) => { e.stopPropagation(); setCameraOpen(true); }}
-                disabled={busy || !!cameraRefusal(img)}
-                title={cameraRefusal(img) || 'Re-shoot this scene from another camera position'}
-                className="min-h-10 lg:min-h-0 inline-flex items-center gap-2 rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-1.5 text-[0.75rem] font-semibold text-indigo-100 hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-45">
-                <Camera className="size-3.5" aria-hidden />
-                Camera angles
-              </button>
-            )}
+            {/* Verbs the plugins contribute (lightbox.action, gallery surface):
+                📷 camera angles and 📤 publishing live there, on every host that
+                shows a library row, disabled with their reason on a row that
+                cannot take them. */}
+            <span className="contents" data-testid="lightbox-plugin-actions">
+              <PluginSlot slot="lightbox.action" surface="gallery" img={img} datasetId={datasetId}
+                hasRow={hasRow} disabled={busy}
+                itemProps={(item) => ({ onLayer: pluginLayersRef.current.onLayerFor(contributionKey(item)) })} />
+            </span>
             {actions}
           </div>
           {dl.error && (
@@ -568,14 +559,6 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
       {improveOpen && hasRow && (
         <ImproveModal img={img} host="library" datasetId={datasetId}
           subjectType={subjectType} onClose={() => setImproveOpen(false)} />
-      )}
-      {cameraOpen && hasRow && (
-        <CameraAnglePicker
-          onClose={() => setCameraOpen(false)}
-          onShoot={async (poses) => {
-            const ok = await shootCameraViews(img.id, poses);
-            if (ok) setCameraOpen(false);
-          }} />
       )}
     </div>
   );

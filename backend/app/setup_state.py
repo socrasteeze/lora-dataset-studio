@@ -6,7 +6,10 @@ run had happened: the onboarding redirect keyed off a per-tab sessionStorage
 flag, so every new tab / browser session re-offered Setup on a machine that had
 been working for weeks. That is the redundancy this module removes.
 
-Two ideas, kept apart on purpose:
+Three independent signals:
+
+  completed — the user opened the core workspace and its setup state was saved.
+              No plugin or image engine is required for this durable choice.
 
   verified  — this install was once observed working (configured + at least one
               image engine ready). Persisted in the data dir, so it survives a
@@ -14,7 +17,7 @@ Two ideas, kept apart on purpose:
               the LAN. Never expires: an install does not become un-set-up.
 
   checks    — a HIGH-WATER MARK of what this install has proven it can do
-              (`TRACKED` below). A re-check compares the live probe against it
+              (`_STATIC_TRACKED` below). A re-check compares the live probe against it
               and reports what STOPPED working — a regression is a real failure
               worth interrupting for, whereas "not everything is installed" is
               the normal state of almost every install and must never nag.
@@ -22,7 +25,7 @@ Two ideas, kept apart on purpose:
 Only DURABLE signals are tracked. Whether ComfyUI or Ollama happens to be
 running right now is not a setup failure — those are started on demand and go
 dark a dozen times a day; treating them as regressions would turn this into the
-exact nag it exists to remove. See TRACKED / the module docstring of
+exact nag it exists to remove. See _STATIC_TRACKED / the module docstring of
 capabilities.py for the full published surface.
 
 Nothing here is a user SETTING: it is app state the user never edits, so it
@@ -35,20 +38,26 @@ import threading
 from datetime import datetime, timezone
 
 from . import config
+from .engines import registry as _engines
 
 _LOCK = threading.RLock()
 
 # Durable capability checks, keyed by their dotted path in the /api/capabilities
 # payload. The KEYS are persisted (never rename one without an alias — CLAUDE.md
 # rule 7); the labels are read at response time and are free to change.
-TRACKED = (
-    # Divergence 1: upstream tracks its three cloud engines here, and they are
-    # legitimately durable for it — an API key stays valid whether or not
-    # anything is running. This fork's two engines are Klein and Krea 2 Edit,
-    # whose readiness follows ComfyUI being REACHABLE, so tracking them would
-    # report "ComfyUI is not running" as a regression — the exact nag this file
-    # exists to remove. No engine row here; `comfyui.dir_valid` below is the
-    # durable half of the same question.
+# The non-engine checks. The engines' durable checks come from the engine
+# registry AT CALL TIME (an engine that declares `tracked_capability`); the
+# keys are `engines.<id>` and ids never change, so the persisted keys are
+# stable. Structure adopted from V2.
+#
+# Divergence 1: upstream's cloud engines are legitimately durable for it -- an
+# API key stays valid whether or not anything is running. This fork's engines
+# are Klein and Krea 2 Edit, whose readiness follows ComfyUI being REACHABLE,
+# so a tracked row for them would report "ComfyUI is not running" as a
+# regression -- the exact nag this file exists to remove. No fork engine
+# declares `tracked_capability`, so _engines.tracked() is empty here and
+# `comfyui.dir_valid` below stays the durable half of the same question.
+_STATIC_TRACKED = (
     ('comfyui.dir_valid', 'ComfyUI folder'),
     ('ollama.installed', 'Ollama'),
     ('aitoolkit.valid', 'ai-toolkit'),
@@ -59,13 +68,27 @@ TRACKED = (
     ('training_visible', 'LoRA training'),
 )
 
-TRACKED_KEYS = tuple(k for k, _ in TRACKED)
-_LABELS = dict(TRACKED)
 
 # Engines that make an install "known-good". Deliberately the same set the nav
 # rail already calls "recommended" (useSetupSteps.recommendedMet): one working
 # way to generate an image is what separates a set-up machine from a fresh one.
 _RECOMMENDED_ENGINES = ('klein', 'krea')
+
+
+def tracked() -> tuple:
+    """``((key, label), …)`` — the engines' checks first, then the rest."""
+    return (*_engines.tracked(), *_STATIC_TRACKED)
+
+
+def tracked_keys() -> tuple:
+    return tuple(k for k, _ in tracked())
+
+
+def _labels() -> dict:
+    return dict(tracked())
+
+# The legacy verified flag records a proven generator configuration. Core
+# completion is independent: both suppress repeated first-run onboarding.
 
 
 def _state_path():
@@ -88,7 +111,7 @@ def snapshot(caps: dict) -> dict:
     rather than recorded as False — an older/newer payload must not manufacture
     a regression out of a field it simply does not have."""
     out = {}
-    for key in TRACKED_KEYS:
+    for key in tracked_keys():
         val = _dig(caps or {}, key)
         if val is not None:
             out[key] = bool(val)
@@ -101,7 +124,7 @@ def install_works(caps: dict) -> bool:
     if not c.get('configured'):
         return False
     engines = c.get('engines') or {}
-    return any(bool(engines.get(name)) for name in _RECOMMENDED_ENGINES)
+    return any(bool(engines.get(name)) for name in _engines.recommended_ids())
 
 
 def read() -> dict:
@@ -118,16 +141,19 @@ def read() -> dict:
         checks = raw.get('checks')
         if not isinstance(checks, dict):
             checks = {}
-        return {
+        state = {
             'verified': bool(raw.get('verified')),
             'verified_at': raw.get('verified_at') or None,
             # Unknown keys are dropped on read, so a key retired in a later
             # version cannot resurface as a phantom regression.
-            'checks': {k: bool(v) for k, v in checks.items() if k in TRACKED_KEYS},
+            'checks': {k: bool(v) for k, v in checks.items() if k in tracked_keys()},
         }
+        if raw.get('completed') is True:
+            state.update(completed=True, completed_at=raw.get('completed_at'))
+        return state
 
 
-def _write(state: dict) -> dict:
+def _write(state: dict, *, strict: bool = False) -> dict:
     with _LOCK:
         path = _state_path()
         try:
@@ -136,10 +162,25 @@ def _write(state: dict) -> dict:
             tmp.write_text(json.dumps(state, indent=2), encoding='utf-8')
             tmp.replace(path)
         except OSError:
+            if strict:
+                raise
             # A read-only data dir must not break the app: the feature simply
             # stops remembering and the user gets today's first-run behaviour.
             pass
         return state
+
+
+def complete_core() -> dict:
+    """Finish onboarding by proving the workspace can persist its own state.
+
+    Generators, ML helpers and plugins are optional. Explicit completion must
+    survive a new browser session without claiming any of those tools work.
+    A failed write is reported instead of presenting a successful installation.
+    """
+    with _LOCK:
+        state = read()
+        return _write({**state, 'completed': True,
+                       'completed_at': state.get('completed_at') or _now()}, strict=True)
 
 
 def _now() -> str:
@@ -168,6 +209,7 @@ def observe(caps: dict) -> dict:
                 checks.setdefault(key, False)
         verified = bool(state['verified'] or install_works(caps))
         nxt = {
+            **state,
             'verified': verified,
             'verified_at': state['verified_at'] or (_now() if verified else None),
             'checks': checks,
@@ -185,8 +227,9 @@ def compare(caps: dict, state: dict | None = None) -> list:
     skipped (unknown != broken)."""
     stored = (state or read())['checks']
     live = snapshot(caps)
-    return [{'key': k, 'label': _LABELS[k]}
-            for k in TRACKED_KEYS
+    labels = _labels()
+    return [{'key': k, 'label': labels[k]}
+            for k in tracked_keys()
             if stored.get(k) and k in live and not live[k]]
 
 
@@ -199,6 +242,6 @@ def dismiss(keys) -> dict:
         state = read()
         checks = dict(state['checks'])
         for key in keys or ():
-            if key in TRACKED_KEYS:
+            if key in tracked_keys():
                 checks[key] = False
         return _write({**state, 'checks': checks})

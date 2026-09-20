@@ -23,7 +23,7 @@ export default function OverviewSection({ caps }) {
     <div className="space-y-6">
       {!caps.configured && (
         <div role="status" className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm text-content">
-          <p className="font-medium">Let's get you set up.</p>
+          <p className="font-medium">Your dataset workspace is ready.</p>
           <p className="mt-1 text-content-muted">
             Point the{' '}
             <Link to="/setup" className="font-medium text-sky-300 underline hover:text-sky-200">Setup wizard</Link>

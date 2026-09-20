@@ -10,6 +10,8 @@ import json
 from app import setup_state
 
 
+# The core's own working engine (Klein): these tests must hold on a checkout
+# without the API-engines plugin, whose ids a caps payload may or may not carry.
 WORKING = {
     'configured': True,
     # Divergence 1: this fork publishes exactly {klein, krea} — no cloud engine.
@@ -196,5 +198,5 @@ def test_every_tracked_key_exists_in_a_real_capabilities_payload(app):
     from app import capabilities
     with app.app_context():
         caps = capabilities.probe(force=True)
-    missing = [k for k in setup_state.TRACKED_KEYS if setup_state._dig(caps, k) is None]
+    missing = [k for k in setup_state.tracked_keys() if setup_state._dig(caps, k) is None]
     assert missing == []

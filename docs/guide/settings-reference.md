@@ -39,7 +39,7 @@ For containerized or scripted setups, a handful of environment variables overrid
 
 ## Overview
 
-The Overview section has **no settings of its own** — it's the at-a-glance dashboard for the rest of the page. If nothing is configured yet, it opens with a *Let's get you set up* banner. Below that, a **Capabilities** grid marks each feature ✓ or ✗ depending on what the app can currently see (a key, a reachable tool, an installed extra). Under each name, one line says **what the row unlocks** — *Test Studio (images)* is where test images are generated with a LoRA, *Video Test Studio* tests one in motion, *Captioning* writes the text for every picture — so the grid reads without knowing the app's vocabulary. The Video lane's three doors are rows of their own: **✨ DLSS 5 neural rendering** (the bridge and the model file), **↗ Smooth** (two ComfyUI node packs) and the **🔴 Live lane** (the video weights plus ffmpeg) — each shown not-ready with its install rather than hidden behind a green video row.
+The Overview section has **no settings of its own**. Its capabilities grid shows the shared tools that LDS can currently use. Optional product controls and their preparation belong to each plugin under **My plugins**.
 
 Every row is a **link to the control that turns that capability on**, not just to the right screen: picking *Person masks* opens the Setup wizard step that installs it. Use the grid as your first stop to answer "why is this feature greyed out?" — the answer is one click away on the row itself.
 
@@ -49,13 +49,33 @@ If nothing on the grid tells you where to start, the line at the bottom opens th
 
 ## Image engines
 
-This fork generates exclusively on **local** engines, both running through ComfyUI — free, private, NSFW-capable. There are two: **Klein**, the historical one, and **Krea 2 Edit**, which re-stages your reference photo while holding the identity from that one photo alone (no character LoRA needed). The former cloud API engines (Nano Banana / ChatGPT / OpenRouter) were removed: there are no engine API keys and no subscription login. **Which engines to offer** below picks which of the two appear in the generate panel and which one is preselected. ComfyUI itself is configured under **Local tools**; the model weights install from the **Setup** page.
+This section controls the shared local image engines, **Klein** and **Krea 2 Edit**. Configure ComfyUI under **Local tools**. Additional engines appear when their plugin is active; their credentials and provider options live on that plugin's settings page.
 
-### Which engines to offer
+### Engines
 
-- **Default engine** → `engines.default`. The engine preselected in the workspace. Default **`klein`**.
-- **Enabled engines** → `engines.enabled`. Which engines appear as cards in the generate panel. Default **`['klein', 'krea']`**. Both are free local GPU passes, so this is about what you actually have installed — Krea 2 Edit needs its own custom-node pack and four model files, and its card names whatever is still missing.
-- `engines.known` is **not a setting**: it is the ledger of which engines the app was offering the last time you saved this list, and it is what tells "this engine did not exist yet" apart from "I unticked it on purpose". Written automatically; `[]` or absent means the app assumes Klein was the only engine on offer — which is what makes Krea 2 Edit reach installs that had already saved their Settings. Delete it to be re-offered every engine.
+- **Default engine** → `engines.default`. The engine preselected in the workspace. A fresh core installation uses **Klein**; available choices follow the active engine catalog.
+- **Enabled engines** → `engines.enabled`. Choose which available engines appear in generation controls. An inactive plugin's engines are hidden, while stored choices are preserved for when that plugin is enabled again.
+
+#### Using several engines in one batch
+
+In the workspace the engine cards are **checkboxes**, not a one-of-five choice: tick as many as you want. Each engine has its own colour (Klein indigo, Krea 2 Edit violet, Nano Banana amber, ChatGPT sky, OpenRouter fuchsia) and every generated tile is labelled with the engine that made it, so a mixed batch stays readable.
+
+From **two** engines on, a mode appears deciding what "several engines" means:
+
+| Mode | What it does | Images produced |
+|---|---|---|
+| **Split across engines** *(default)* | Each selected shot goes to **one** engine, round-robin. | Same as one engine — 25 shots stay 25 images. |
+| **All engines** | **Every** engine renders **every** shot. | Multiplied — 25 shots on 3 engines = 75 images. |
+
+Split gives you a more varied dataset for the price you already pay; All engines is for **comparing** engines on identical shots before keeping the best. The image count and estimated cost update live as you tick, and the Generate button carries the real total.
+
+Good to know:
+
+- **The cost shown is the whole run's.** The two local engines contribute nothing (it's your GPU) and neither does ChatGPT on the subscription lane.
+- **The local engines run last and in series.** The API batches start immediately in the background; the local GPU handles its own shots one at a time behind them. The Klein and Krea cards say so while a mixed run is being set up.
+- **There is a cap per batch** (60 images in flight on one dataset). A run over it is refused *before* it starts, with the number named — switch to Split, untick an engine, or select fewer shots.
+- **🔞 NSFW shots stay local-only.** The uncensored catalog unlocks only when **every** ticked engine is local (Klein, Krea 2 Edit, or both), because those shots must never reach a third-party API.
+- **Regenerating one tile** (🔄) uses the **first** ticked engine, not all of them.
 
 ### Krea 2 Edit (local)
 
@@ -266,10 +286,6 @@ It is a **rendering** knob, not an anatomy fix: extra limbs, tails or wrong body
 **Enhancement LoRA on edits** → `klein.edit_base_lora_strength` (0–2, default **0**). How much of the detail LoRA (`klein/realistic.safetensors`) Klein mixes into an **edit**: the ✦ reference edit, variations, regenerations and the small-image rescue. The shipped workflow carries that LoRA at **0.8** and nothing on these lanes ever turned it down — which stayed invisible while the file existed on no install (the node was skipped), and became real once Setup started downloading it: from then on every Klein edit ran with a style LoRA at 0.8 pulling the result away from the instruction you typed. The default **0** is the render every install had before that download existed; raise it to let the LoRA add detail on purpose. “Upscale & improve” is unaffected — it has its own `klein.improve_base_lora_strength`.
 
 Separate from **Upscale & improve ▸ Steps** (`klein.improve_steps`), which drives the manual improve pass only.
-
-**Output size (MP)** is also editable from the improve note itself — the panel under the ✨ button — same key, same 0.5–8 bounds, app-wide like the instruction.
-
-**LoRA preset on ✨ Upscale & improve** → `klein.improve_lora_preset` (a preset **name**, default **blank = none**). Which of your **generation LoRA presets** (the named combinations defined on this card) every Klein improve chains after the consistency LoRA. Picked from the improve note itself — the settings window the ✨ button opens (inline on the bulk toolbar), next to the instruction editor — and **app-wide like the instruction**: the single ✨, the 🔄 re-run and the whole batch all follow it, in every dataset. Fail-closed like the rest of the preset chain: a renamed or deleted preset quietly runs as **None**, never a blocked pass. **SeedVR2 is unaffected** — a restoration chains no LoRA. The improved image records the LoRAs that actually ran in its details, so a render never claims a preset it did not use. Once a preset is picked there, the window also lists **its LoRAs with a strength slider each** — the preset's own values, app-wide, so lowering one applies wherever that preset runs; building the preset itself stays on this card.
 
 ### Variation output size (both local engines)
 
@@ -1353,8 +1369,8 @@ A flat cheat-sheet of the main `config.json` keys, for quick lookup or hand-edit
 | Video bank → 🎚 Quality cuts → **Maximum length (s)** | Flags shots LONGER than this (`lengthy`). The mirror of the minimum, and the one that answers "what happens to my fifteen-second shot?": a shot longer than the clip length your target ingests is exported as its **first N frames** and the rest never trains. Stored per bank with the other cuts; it flags and sorts, it never rejects. |
 | `video_caption.backend` | Which engine writes the 🗣 **Describe shots** captions: empty = **auto** — LDS's own local worker (Hugging Face Transformers in the ✨ Score interpreter) when that interpreter can run it, else **the local LLM you already operate** (Ollama or LM Studio, whichever `local_llm.provider` says, with its own configured vision model). `transformers` or `local_llm` forces a side. The transformers worker stays the default when both are possible because it holds what an HTTP server cannot offer — real per-frame timestamps, bf16 weights and the measured umT5 token count; through a local LLM the frame times ride in the prompt as text and the token gauge falls back to its labelled estimate. Every caption records which engine wrote it (`ollama:<tag>` / `lmstudio:<id>`), and the empty-answer guard applies to every engine: an empty response is stored as an error, never as a caption. |
 | `quantize.python` | Python interpreter that runs the **fp8 conversion** and the **LoRA→base merge** (empty = the one ✨ Score uses, then ai-toolkit's, then the app's own). Both need `torch`, which this app deliberately does **not** install — it is gigabytes and nothing else here needs it — so they run in a subprocess, like the scoring and masking passes. One setting governs both on purpose: "the Python on this machine that has torch" is one fact, and saying it twice is how the two drift apart. The chosen interpreter is probed while the *plan* is drawn: one that lacks the packages disables the button with the reason and the `pip install` line, instead of failing after the click (or after a 26 GB download). `torch` is the only module either of them needs: both read and write the safetensors format themselves rather than memory-mapping it, so an environment with torch alone is enough. |
-| `bank_scoring.python` | Python interpreter that runs the ✨ Score pass (empty = the app's own). Auto-filled by Setup with a CPU-only environment; repointable at any CUDA interpreter already on the machine via the bank's **⚡ Use a GPU Python I already have** picker, which verifies every dependency first and never installs into an environment it did not create. |
-| `bank_semantic.python` | Python interpreter that runs SigLIP 2. New installs record the LDS-managed Bank environment here independently of Score; repointable at any CUDA interpreter already on the machine from the Bank's **Semantic engine** panel, verified against SigLIP 2's own (shorter) dependency list and never installed into. Empty falls back to `bank_scoring.python` for older configs, then the app's own interpreter. |
+| `bank_scoring.python` | Python used by ✨ Score. Empty falls back to the app Python. **Bank → ⚙ Passes → Manage Score Python…** shows the effective and managed paths and provides an explicit calculation check. Setup repairs the managed environment while preserving an external choice; select **Use managed environment** to run there. Import detection alone is not a runtime guarantee. |
+| `bank_semantic.python` | Python used by SigLIP 2. **Bank → ⚙ Passes → Semantic engine → Manage SigLIP 2 Python…** remains accessible regardless of CUDA detection. Setup repairs the managed Bank environment and preserves an external choice. Empty inherits `bank_scoring.python`, then the app Python; use **Use managed environment** to select the managed runtime explicitly. |
 | `watermark.python` | Python interpreter used to run the LaMa watermark-inpainting subprocess (empty = reuse `masks.python`, then the current interpreter). |
 | `watermark.device` | LaMa processing device: `auto` (CUDA when available, otherwise CPU), `cuda`, or `cpu`. |
 | `watermark.allow_crop` | When `true` (default), a border watermark is cropped off; when `false`, it is repainted instead. Also editable in the Clean bar. |

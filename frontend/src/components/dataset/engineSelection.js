@@ -251,3 +251,11 @@ export function generateBlockedReason({ engines, shotCount, mode, multiplier = 1
   }
   return null;
 }
+
+// V2 moved the engine catalogue behind functions in ../../engines/catalog.js and
+// re-exports them from this module. This fork keeps its own ENGINES /
+// ENGINE_LABELS / ENGINE_ACCENTS maps above (Divergence 1b) and adds the
+// function forms alongside, so a caller written against either shape resolves.
+// `apiEngineIds()` answers [] here for the same reason API_ENGINES is empty: the
+// contract exists, the lane does not.
+export { apiEngineIds, localEngineIds, engineLabel, engineAccent } from '../../engines/catalog.js';

@@ -6880,8 +6880,16 @@ def _pf_dense_mode(ds, ttype, mode, lane, slider, blockers, _check):
         # the first place an absent token, wrong token type/scope, or unaccepted
         # Krea licence is discovered.
         try:
-            from . import cloud_training as cloud
-            hf_cloud_token_status = cloud.full_transformer_token_preflight()
+            from lds_sdk import cloud_training as cloud
+            with cloud.state_change_lock:
+                if not cloud.is_available('cloud_training'):
+                    hf_cloud_token_status = {
+                        'ok': False, 'configured': False,
+                        'error': 'Install and enable Cloud training in Plugins before preparing a cloud run.',
+                    }
+                else:
+                    hf_cloud_token_status = cloud.full_transformer_token_preflight(
+                        required_base_repo=official_base_repo(ds, ttype))
             if not isinstance(hf_cloud_token_status, dict):
                 raise RuntimeError('invalid token preflight response')
         except Exception:
@@ -6908,7 +6916,7 @@ def _pf_dense_mode(ds, ttype, mode, lane, slider, blockers, _check):
             _check(
                 'hf_cloud_token', 'Hugging Face cloud token', 'fail',
                 detail, 'gf-training', bypassable=False,
-                hint=('Add HF_CLOUD_TOKEN in Settings with read access to '
+                hint=('Open Plugins → Cloud training → Settings and add HF_CLOUD_TOKEN with read access to '
                       'krea/Krea-2-Raw and repository write access. A '
                       'fine-grained token is recommended; global write is '
                       'accepted with a warning.'),
@@ -8957,6 +8965,27 @@ def _seed_continuation_from(user_id, dataset_id, base, family, variant,
     return dest
 
 
+def _expected_resume_record(chosen, expected_record_id, dataset_id, family, base, variant,
+                            *, user_id=None):
+    """A selected history node must own the exact local checkpoint resumed."""
+    if expected_record_id is None:
+        return
+    from . import checkpoint_registry
+    record = checkpoint_registry.record_by_id(expected_record_id)
+    if record is not None and record.source == 'cloud' and user_id is not None:
+        from .cloud_local_continuation import resolve_cloud_checkpoint
+        verified = resolve_cloud_checkpoint(user_id, dataset_id, family, base, variant,
+                                            expected_record_id, chosen.get('step'))
+        if verified is not None and all(chosen.get(key) == verified[key]
+                for key in ('record_id', 'path', '_source_stamp')):
+            return
+    if (chosen.get('record_id') != expected_record_id or record is None
+            or record.dataset_id != dataset_id or record.source != 'local'
+            or record.family != family or (record.base_model or '') != (base or '')
+            or (record.variant or '') != (variant or '')):
+        raise ValueError('The selected checkpoint no longer belongs to this run. Refresh its checkpoints before continuing.')
+
+
 def continue_training(user_id, dataset_id, extra_steps: int = 1000,
                       base_model=_PERSISTED, variant=None, train_type=None,
                       masked=None, allow_unverified_weights=False,
@@ -8964,7 +8993,7 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
                       allow_caption_quality=False, from_step=None, overrides=None,
                       resume_mode='weights_only', state_bundle_id=None,
                       allow_not_ready=False, _allow_dead_predecessor=False,
-                      training_mode='lora') -> dict:
+                      training_mode='lora', expected_record_id=None) -> dict:
     """Reprend l'entraînement d'une base et vise ``step_de_reprise + extra_steps``.
     ai-toolkit auto-resume depuis le training_folder ; il faut donc qu'au moins un
     checkpoint existe POUR CETTE BASE.
@@ -8983,6 +9012,8 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
     # Validate the caller-controlled restore contract before interpreter probes,
     # dataset reads, archives or settings writes.
     resume_mode = _validate_resume_contract(resume_mode, state_bundle_id)
+    if expected_record_id is not None and (type(expected_record_id) is not int or expected_record_id <= 0):
+        raise ValueError('expected_record_id must be a positive integer')
     # Queue advancement calls this while the previous run's flag is still set
     # (so ComfyUI never grabs the GPU between jobs).  Only a *live* PID blocks;
     # a dead predecessor is precisely the normal queued-continue transition.
@@ -9018,8 +9049,13 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
                      allow_caption_quality=allow_caption_quality,
                      allow_not_ready=allow_not_ready,
                      variant=var)
-    cks = list_checkpoints(user_id, dataset_id, base_model=base,
-                           family=fam, variant=var)
+    from .cloud_local_continuation import resolve_cloud_checkpoint
+    cloud_checkpoint = resolve_cloud_checkpoint(
+        user_id, dataset_id, fam, base, var, expected_record_id, from_step)
+    if cloud_checkpoint is not None and resume_mode != 'weights_only':
+        raise ValueError('Harvested cloud checkpoints support weights-only local continuation.')
+    cks = ([cloud_checkpoint] if cloud_checkpoint is not None else
+           list_checkpoints(user_id, dataset_id, base_model=base, family=fam, variant=var))
     if not cks:
         raise ValueError("no checkpoint to resume for this base - run a training first")
     latest = max(c['step'] for c in cks)
@@ -9042,6 +9078,8 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
         # Ties (a numbered save and the bare final at the same step): prefer the
         # numbered file — it carries a clean step and is never the run's live final.
         chosen = min(matches, key=lambda c: bool(c.get('final')))
+    _expected_resume_record(chosen, expected_record_id, dataset_id, fam, base, var,
+                            user_id=user_id)
     # Lineage: the record this continuation resumes FROM is the record that
     # PRODUCED the file being loaded (list_checkpoints stamps `record_id` on every
     # save), NOT merely the newest record of the lane. One lane holds several runs,
@@ -9207,8 +9245,24 @@ def continue_training(user_id, dataset_id, extra_steps: int = 1000,
                         queue_manager._get_system_state('training_pid', None))
                     if not (_allow_dead_predecessor and previous_is_dead):
                         raise ValueError('a training is already in progress')
-                archived = _seed_continuation_from(
-                    user_id, dataset_id, base, fam, var, chosen['filename'])
+                if cloud_checkpoint is not None:
+                    # A harvested cloud file is not permission to replace a
+                    # local lane. Run the normal admission checks before any
+                    # archive/copy, while retaining the final launch checks.
+                    resolved = _lt_refuse_or_resolve(
+                        user_id, dataset_id, fam, var, base, False,
+                        allow_caption_mismatch, allow_uncaptioned,
+                        allow_caption_quality, allow_not_ready,
+                        launch_allow_unverified, training_mode,
+                        _PERSISTED, _PERSISTED, None)
+                    if (resolved[1] or '', resolved[2], resolved[3]) != (base or '', var, fam):
+                        raise ValueError('the cloud checkpoint no longer matches the resolved local training recipe')
+                    from .cloud_local_continuation import seed_cloud_checkpoint
+                    archived = seed_cloud_checkpoint(
+                        user_id, dataset_id, fam, base, var, chosen)
+                else:
+                    archived = _seed_continuation_from(
+                        user_id, dataset_id, base, fam, var, chosen['filename'])
             res = launch_training(
                 user_id, dataset_id, **launch_kwargs)
     res['resumed_from'] = resume_step
@@ -10766,3 +10820,19 @@ def start_training_scheduler(app, interval_seconds=60):
 
     threading.Thread(target=_tick, daemon=True, name='train-scheduler').start()
     logger.info('Training scheduler démarré (tick %ss)', interval_seconds)
+
+
+def validate_resume_record_id(expected_record_id):
+    """An optional provenance fence, never a coercion of a caller's identity."""
+    if expected_record_id is not None and (
+            type(expected_record_id) is not int or expected_record_id < 1):
+        raise ValueError('expected_record_id must be a positive integer')
+    return expected_record_id
+
+
+def assert_resume_checkpoint_record(checkpoint, expected_record_id):
+    """Refuse a changed or ambiguous save before archiving, seeding or renting."""
+    expected_record_id = validate_resume_record_id(expected_record_id)
+    if expected_record_id is not None and checkpoint.get('record_id') != expected_record_id:
+        raise ValueError('The selected checkpoint belongs to another run or its provenance '
+                         'is unavailable. Refresh the run checkpoints before continuing.')

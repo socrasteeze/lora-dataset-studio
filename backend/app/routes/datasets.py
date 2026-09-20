@@ -746,9 +746,11 @@ def _autostart_seedvr2_downloads(missing):
 
 
 def _improve_engine_error(e):
-    """The (body, 409) for an improve preflight miss, whichever engine raised it,
-    or None when `e` is not one of those. Every improve route answers the same
-    three exception types, so the mapping lives once."""
+    """Share restoration provider and legacy preflight errors across improve routes."""
+    from ..plugins.restoration import error_response
+    result = error_response(e)
+    if result is not None:
+        return result
     from ..services.klein_edit_helper import KleinModelsMissing
     from ..services.seedvr2_helper import SeedVR2ModelsMissing
     if isinstance(e, svc.KleinNodesMissing):
@@ -1178,9 +1180,8 @@ def dataset_image_caption_preview(dataset_id, image_id):
         with gpu_exclusive_vision_window(flag_ttl=600):
             result = svc.preview_caption(
                 LOCAL_USER, dataset_id, image_id,
-                backend=data.get('backend'), ollama_model=data.get('ollama_model', ''),
-                vocabulary=data.get('vocabulary'), length=data.get('length'),
-                instructions=data.get('instructions'),
+                **{key: data[key] for key in ('backend', 'ollama_model', 'vocabulary',
+                                             'length', 'instructions') if key in data},
                 should_cancel=lambda: dataset_activity.cancel_requested(dataset_id))
     except Exception as e:
         return _map_error(e)
@@ -1824,7 +1825,6 @@ def _camera_missing_response(e):
                     'camera_required': list(qch.CAMERA_REQUIRED)}), 409
 
 
-@bp.post('/canvas/image/<int:image_id>/camera')
 def canvas_image_camera_angles(image_id):
     """📷 Re-shoot ONE library picture from other CAMERA positions.
 
@@ -1859,7 +1859,6 @@ def canvas_image_camera_angles(image_id):
     return jsonify({'ok': True, **result})
 
 
-@bp.post('/dataset/image/<int:image_id>/camera')
 def dataset_image_camera_angles(image_id):
     """📷 Re-shoot ONE dataset image from other camera positions.
 
@@ -1910,7 +1909,6 @@ def dataset_image_render_status(image_id):
     return jsonify({'ok': True, **out})
 
 
-@bp.get('/camera/catalog')
 def camera_catalog():
     """The camera vocabulary the picker draws, plus whether the lane can run.
 
@@ -2224,7 +2222,6 @@ def dataset_backup_import():
 # Publish to Hugging Face (export a dataset repo to the Hub — export only)
 # ---------------------------------------------------------------------------
 
-@bp.get('/dataset/<int:dataset_id>/publish-hf/whoami')
 def dataset_publish_hf_whoami(dataset_id):
     """Prefill helper for the Publish modal: the token owner's username and the
     suggested `<username>/<slug>` repo id. Best-effort — a missing/invalid token
@@ -2239,7 +2236,6 @@ def dataset_publish_hf_whoami(dataset_id):
                     'licenses': list(hf_publish.LICENSE_CHOICES)})
 
 
-@bp.post('/dataset/<int:dataset_id>/publish-hf')
 def dataset_publish_hf(dataset_id):
     """Kick off the background upload of this dataset to the HF Hub. Server-side
     guards: HF_TOKEN must exist, `consent` MUST be true (not merely a UI checkbox),
@@ -2270,7 +2266,6 @@ def dataset_publish_hf(dataset_id):
     return jsonify({'ok': True, **out})
 
 
-@bp.get('/dataset/<int:dataset_id>/publish-hf/status')
 def dataset_publish_hf_status(dataset_id):
     """Poll: {state: idle|running|done|error, repo_url, error, error_code, count}."""
     from ..services import hf_publish

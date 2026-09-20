@@ -68,6 +68,9 @@ captioning rules and a few guards change with the dataset kind.
 10. **Pick the best checkpoint** — open the **Test Studio** from the dataset:
     grid-test checkpoint × strength, vote, rank by face similarity, and star ★
     the winning settings. The last checkpoint is almost never the best one.
+    The **Steps** picker includes 1–5 alongside the usual presets: three values
+    are visible at a time, with **− / +** to browse. Browsing keeps your selections;
+    **Selected** lists all step counts that will run, including those off-screen.
 11. **Export** — at any point, **Export ZIP** gives you the curated, captioned
     set as a standard ai-toolkit dataset. Nothing is locked in.
 
@@ -130,79 +133,6 @@ One limit worth knowing before you go looking for a button that is not there:
 only as a full model has none, so it cannot open the Studio at all. If you have
 any LoRA of that dataset deployed, pick it and set its **strength to 0** — no
 LoRA node is added at 0, so you generate with the bare model.
-
-## Merge a LoRA into a base checkpoint
-
-This is the step between *"I trained a LoRA"* and *"I have a model to publish"*,
-and it is how most of the community checkpoints you can download were actually
-made. Of the Krea 2 checkpoints whose authors describe their method, the ones
-that explain themselves describe a **merge**, not a training run: train a LoRA on
-Raw, fold it into a base, quantize, upload.
-
-You will find it in **📦 Checkpoints & LoRAs**, as **🧬 Merge a LoRA into a base
-checkpoint**. Inside a full model's card the same tool appears with that model
-already filled in as the base.
-
-**Say what you are merging.** Pick a full-precision base, then add one or more
-LoRAs, each with a weight. `1.0` applies a LoRA exactly as it was trained;
-lower blends it in more gently; a negative weight subtracts it. Several LoRAs
-stack — that is what "baked in LoRAs with balanced weights" means when you read
-it on a model page.
-
-**Nothing starts on the first click.** The plan is computed from the file headers
-alone — no weight is read — and it tells you how many tensors change, exactly how
-big the output is, which drive it lands on, roughly how long it takes, and what
-happens if it fails. On a 26 GB Krea 2 base, a measured merge took **about two
-minutes** and rewrote 256 of 430 tensors.
-
-**Nothing is ever overwritten.** The result is written next to the base under a
-new timestamped name, through a temporary file that is only renamed once the
-merge finishes. A merge that fails, or that you stop, leaves the base, the LoRAs
-and any earlier merge exactly as they were.
-
-### It is a merged model, and it says so
-
-The file's own metadata records that it came from a merge, which base it used,
-which LoRAs at which weights, and when. That matters because **file names lie**,
-and because on the model sites "finetune" is routinely used for exactly this
-object — by authors who describe the merge themselves a sentence later. LDS does
-not copy that vocabulary: what comes out of here is a base with LoRAs folded into
-its weights, not a model that was trained as a whole, and the header keeps saying
-so after the file is renamed or re-uploaded.
-
-### Getting the speed back (the Turbo transplant)
-
-A full-model run in this app targets **Raw**, which is undistilled and therefore
-slow. Krea publishes a re-distillation LoRA for Turbo; merging it at **0.8-1.0**
-into a model trained on Raw is the published route people use to get few-step
-behaviour back, and it is how the same model ends up on the model sites in both a
-Raw and a Turbo flavour.
-
-**We have not tested this ourselves.** It is an approximation, not an identity —
-generate a few comparisons before you publish anything on the strength of it.
-
-### Merge first, quantize after
-
-Merging into an **already quantized** file is refused, on purpose. It would
-dequantize every weight, modify it and re-quantize it: lossy on the way in and
-again on the way out, and the loss compounds each time somebody does it. Merge
-into the full-precision (bf16) model, then quantize the merged result with the
-fp8 tool — which is the order the refusal points you at.
-
-### Two things it will tell you about, rather than hide
-
-- **A LoRA that does not belong to the base** is refused before anything is
-  written, naming the weights it expected to find. A LoRA trained for another
-  model has nothing to merge into.
-- **Tensors that are not part of the model** are reported, not dropped. Not every
-  `.safetensors` contains only a model: one community Krea 2 file circulating
-  today carries about 75 MB of an image in two tensors hiding under a legitimate
-  name. Nothing we do not understand is modified — it is copied through, and the
-  plan names it so you know it is there.
-
-**What the merge needs:** the same Python that quantization uses — one with
-`torch` available. If it is missing, the plan says so with the command to fix it,
-before you click anything.
 
 ## The generation queue
 
@@ -2538,7 +2468,6 @@ Images flagged **without** a position — the detector was sure there is a mark 
 could not place it — stay flagged and are counted separately in the pass's report.
 Draw a zone on them with **🚩 Edit mask** below, or leave them as a filter.
 
-
 ## Erase burned-in text — bubbles, subtitles, captions
 
 A comic page carries its dialogue, a screencap its subtitle, a meme its
@@ -2620,7 +2549,6 @@ launch window: the sample dial, the Sensitivity slider (one stored value,
 whichever side you move it from), the measured count of what the run will
 actually read, and the flagged-pages strip.
 
-
 ## Fix a watermark mask — or mark one the scan missed
 
 The detector draws **one** box, and it is a guess: it can miss a second logo,
@@ -2670,7 +2598,6 @@ everywhere else in a bank, **your own file is never modified**: cleaning writes
 a separate copy. A rotated image is shown unrotated here, because the whole
 watermark lane works on your original file, which the ↻ turn never changed.
 
-
 ## Reject every flagged image at once
 
 In a dataset, **🧽 Find watermarks** flags the kept images that carry an overlaid
@@ -2706,7 +2633,6 @@ says so with the link to install it. Only the detector can flag an image
 you can draw the zone in 🔍 Review flagged. Images you dismissed as false
 positives are skipped by every later scan — **⟲ Rescan incl. dismissed** is the
 only way to have them judged again, which is what you want after changing engine.
-
 
 ## A bank and a dataset never share files
 
@@ -2862,61 +2788,57 @@ warning appears.
 
 ## Make Score use a GPU Python you already have
 
-The **✨ Score** pass (aesthetic · NSFW · style) runs in its own small Python
-environment, and that environment deliberately carries **CPU-only PyTorch**: a
-first install stays a few hundred megabytes instead of pulling ~2.5 GB of CUDA
-wheels onto machines that may have no card at all.
+Open a bank, then **⚙ Passes → Manage Score Python…**. The button stays available
+when packages are missing, the interpreter uses the CPU, or CUDA is detected.
+Changing Python is disabled while a pass is active.
 
-On a machine that *does* have one, that default is expensive — CLIP measures
-about **336 ms per image on the CPU against ~15 ms on a recent card**, so a
-30 000-image bank is the difference between a coffee break and most of an
-afternoon. The bank says so: when Score is about to run on the CPU on a machine
-with an NVIDIA card, an amber note gives you the estimate and a button, **⚡ Use
-a GPU Python I already have**.
+The **✨ Score** pass (aesthetic · NSFW · style) normally uses the dedicated
+environment prepared by Setup. It carries **CPU-only PyTorch** to keep the first
+install small. You can select another Python that already has the required
+packages, such as a ComfyUI, ai-toolkit or conda environment. An environment that
+works for another app can still fail when running Score's calculations.
 
-That button is the point. If you train LoRAs or run ComfyUI, this machine
-*already* has a PyTorch with working CUDA. Score can simply borrow it — no
-download, no third environment to maintain.
+The dialog shows **Python used for Score** and the **Managed environment** as
+separate paths. Check the first one when diagnosing an error: that is the
+interpreter Score actually uses, including any fallback from an empty setting.
 
-The dialog lists the interpreters the app knows about (the environment it built
-for scoring, ai-toolkit's, ComfyUI's, its own) and reports each one **package by
-package**:
+Discovery checks the interpreters the app knows about, package by package:
 
-- **GPU ready** — everything the pass imports is there *and* PyTorch sees the
-  card. Pick it and the next Score run is minutes instead of hours.
-- **Missing packages** — the reason is named. The common one is an interpreter
-  with a perfect CUDA PyTorch but no **OpenCLIP**: Score needs `open_clip` and
-  `transformers`/`timm` too, so CUDA alone is not enough. Such an interpreter is
-  **refused**, on purpose — accepting it would trade slow-but-working scoring for
-  an import error an hour into the pass.
-- **CPU only** — it can run the pass, it just has no usable CUDA.
-- **No answer** — the path is not a working interpreter (moved venv, unplugged
-  drive). Nothing changes.
+- **CUDA detected · calculation not tested** — the required modules import and
+  PyTorch reports CUDA availability. This does not prove that cuDNN, attention
+  or a model calculation works.
+- **Missing packages** — a required import or class is unavailable. Score needs
+  `torch`, `open_clip`, `transformers`, `timm`, `numpy` and Pillow. The row names
+  the missing dependency and cannot be selected until it passes discovery.
+- **CPU only** — the required imports are present, but CUDA is not available in
+  that interpreter. A CPU calculation has not been verified by discovery either.
+- **No answer** — the interpreter could not be checked, for example because its
+  environment moved or did not respond.
 
-**The app never installs anything into an environment it did not create.** Your
-ai-toolkit venv runs your training and ComfyUI's runs your generation; a silent
-`pip install` into either is not something a dataset tool gets to do. When a
-package is missing the dialog shows you the exact command and leaves the choice
-to you — run it in a terminal, then hit **↻ Check again** and the row updates.
+**Test calculation** is a separate button on each usable interpreter. It runs a
+small convolution and attention calculation on the detected device and reports
+its result separately from discovery. It downloads no models and starts no Bank
+pass or training. A failure reports a bounded diagnostic; if another task is
+using the runtime, the check can be deferred. A passed check verifies those small
+operations, not every model or a complete scoring pass. Opening the dialog,
+checking imports or selecting a Python never starts this calculation automatically.
 
-**Not listed? That field is not a fallback.** Most machines have neither
-ai-toolkit nor ComfyUI where the app looks — or at all — so entering a path
-yourself is a first-class route, checked exactly the same way. Paste an
-interpreter *or* the environment folder that contains it: a venv, a conda or
-miniconda env, a uv venv, a portable bundle, the system Python, something on a
-second disk. Spaces, accents and quotes around the path are fine ("Copy as path"
-on Windows wraps it in quotes; that is handled). The layout is never assumed —
-the app knocks on the shapes an environment can have and keeps whichever one
-actually answers.
+**Setup → Quality tools → Bank scoring → Reinstall** repairs the managed
+environment even when Score uses an external Python. It preserves that external
+selection and never installs into it. After a repair, click **↻ Check again** in
+the picker, then **Use managed environment** if you want Score to use the
+repaired environment. You do not need to clear the Python setting first.
 
-No version of PyTorch or CUDA is required. The only question asked is the one
-that matters: do the packages import, and does PyTorch see a card. An old card
-on cu118, a 50-series that only works on cu128, a nightly build — all fine.
+**Back to the app default** clears the explicit selection. For Score, an empty
+`bank_scoring.python` falls back to the Python running the app; it does not
+explicitly select the managed environment. Use the dedicated managed button for
+that choice.
 
-**No NVIDIA card?** Then there is nothing to fix, and the app says so plainly
-instead of suggesting a CUDA install you could not use. Borrowing an interpreter
-is still offered, for one honest reason: if another Python here already has the
-packages, you can skip installing them a second time. It will not be faster.
+**The app never installs packages into an external environment.** When an
+external Python is missing a package, the dialog shows the command you can run
+yourself. Afterwards, use **↻ Check again** to refresh discovery. Diagnostic
+results are cleared when discovery refreshes so an old result does not describe
+a repaired or changed environment.
 
 **What borrowing a GPU interpreter changes besides speed.** This is the one part
 that is not a free win, and it is worth reading before you pick. A Score pass
@@ -2942,43 +2864,40 @@ reversible at any time, and the note under the passes always says which
 interpreter is in use. If you never open this dialog, nothing changes: an install
 that works today keeps working, untouched.
 
+**No NVIDIA card?** CPU interpreters can still be selected to reuse packages
+already installed. The dialog does not suggest a CUDA speed-up in that case.
 
 ## Build the SigLIP 2 index on a GPU Python you already have
 
-The **SigLIP 2** semantic engine is the same story with a different dependency
-list. Its index is built by a worker that lives in the app's own environment —
-the CPU-only one — so on a machine with a card the index crawls for the same
-reason Score used to.
+Open **Bank → ⚙ Passes → Semantic engine → Manage SigLIP 2 Python…**. This
+management action stays visible independently of CUDA detection, installed
+packages and the selected semantic engine. During a pass or semantic operation,
+it remains visible but disabled.
 
-SigLIP 2 is the lighter of the two: **92.9 M parameters against 303 M for the
-CLIP ViT-L/14 Score runs**, measured at about **105 ms per image on the CPU**
-rather than 336. Lighter is not free: a 30 000-image bank is still the better
-part of an hour.
+The dialog has the same effective-path display, **Use managed environment**
+choice and explicit **Test calculation** as Score. CUDA detection alone does not
+verify the runtime, and the small calculation does not build or verify a Bank's
+semantic index. Building that index remains a separate action.
 
-The **Semantic engine** panel now tells you which device the index will actually
-use, and when a card is sitting idle it offers the same button, **⚡ Use a GPU
-Python I already have**. It is the same detector, the same dialog and the same
-promise — with one difference that matters:
+**The dependency list is SigLIP 2's, not Score's.** It checks PyTorch, NumPy,
+Pillow and a Transformers build carrying `Siglip2Model`. It does not require
+`open_clip` or `timm`. An interpreter missing a required import or class is
+refused for selection, with the missing dependency named.
 
-**The dependency list is SigLIP 2's, not Score's.** The semantic worker never
-imports `open_clip` or `timm`. An interpreter Score refuses for a missing
-OpenCLIP — the most common shape of a ComfyUI venv — can be perfectly good here,
-and refusing it would be a lie about a worker that does not need it. What it
-*does* need is a **Transformers recent enough to carry `Siglip2Model`** (4.49 or
-newer). That one is checked by really looking for the class, not just for the
-package: an older `transformers` imports fine and then dies at model load, an
-hour into an index. Such an interpreter is refused, and the repair line the
-dialog hands you carries the version floor.
+**Borrowing an interpreter downloads nothing.** The pinned SigLIP 2 checkpoint
+lives in the app's data folder, not inside the interpreter. Selecting a different
+Python does not move or duplicate those weights.
 
-**Borrowing an interpreter downloads nothing here.** The pinned SigLIP 2
-checkpoint lives in the app's own data folder, not inside the interpreter, so a
-borrowed Python needs no copy of it.
+**Setup → Quality tools → SigLIP 2 → Reinstall** repairs the managed Bank
+environment and preserves an existing external SigLIP 2 selection. Afterwards,
+refresh discovery and choose **Use managed environment** explicitly to run the
+index there. Repairing that environment does not change Score's Python selection.
 
-**Where the index runs is not where anything is installed.** Setup ▸ Quality
-tools always installs SigLIP 2 into the environment the app built, whatever you
-picked in this dialog — including when you later hit Install/repair, which now
-*keeps* your choice instead of quietly putting the index back on the CPU.
-
+**Back to the app default** clears `bank_semantic.python`, which then inherits
+`bank_scoring.python` or the app Python. That inherited Python can be external;
+clearing the setting is not the same as choosing the managed environment. Score
+and SigLIP 2 have separate explicit settings, but this fallback links them while
+the SigLIP 2 setting is empty.
 
 ## Run the watermark detector on a GPU Python you already have
 
@@ -2993,8 +2912,8 @@ Two things changed:
 
 - **The Bank's 🚩 Watermarks panel now says it.** When the fast detector is
   installed but its Python cannot reach CUDA on a machine that has a card, an
-  amber note names the situation and offers the same button as Score and
-  SigLIP 2: **⚡ Use a GPU Python I already have**. The pass summary also
+  amber note names the situation and offers **⚡ Use a GPU Python I already
+  have**, opening the shared interpreter picker. The pass summary also
   reports which device the scan *actually* ran on — "(detector on GPU, …)" or
   "(detector on CPU, …)" — read back from the scan itself, not from a guess.
 - **The picker speaks the detector's own dependency list.** It never imports

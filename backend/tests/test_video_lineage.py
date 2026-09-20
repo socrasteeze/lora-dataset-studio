@@ -11,6 +11,9 @@ from app.services import video_lineage
 from test_video_checkpoints import _deployed, _local_saves, _loras_root, _video_dataset
 
 
+import pytest
+pytestmark = pytest.mark.plugins('video')
+
 PAIR_100 = ['video_surf_000000100_high_noise.safetensors',
             'video_surf_000000100_low_noise.safetensors']
 FINAL = ['video_surf.safetensors']
@@ -123,7 +126,7 @@ def test_samples_are_listed_by_step_and_served_by_name_only(
 
 def test_a_poster_is_cut_once_and_cached(app, client, tmp_path, monkeypatch):
     _loras_root(tmp_path, monkeypatch)
-    from app.services import video_bank_service as vbs
+    from lds_video import video_bank_service as vbs
     calls = []
 
     def cut(src, _ts, dst):

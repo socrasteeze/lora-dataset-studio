@@ -540,7 +540,7 @@ export function useDataset() {
     // No numbers here on purpose: the input budget is a setting now, and a
     // copy of it in a toast is exactly how a hint goes stale.
     if (failed) toast.warning(`${failed} image${failed === 1 ? '' : 's'} not imported — use JPEG, PNG, WebP or BMP within the image size budget (Settings ▸ Captioning & quality ▸ Image size budget); resize a larger file, or raise the budget.`);
-    if (dup && !imported) toast.warning('All files were already in the dataset (perceptual duplicates).');
+    if (dup && !imported && !failed) toast.warning('All files were already in the dataset (perceptual duplicates).');
     if (small) toast.warning(`${small} image(s) are under 768 px — training only downscales, they will stay soft.`);
     await refresh();
   }), [wrap, currentId, refresh, toast]);
@@ -1569,6 +1569,7 @@ export function useDataset() {
       // fromStep = resume from a chosen (possibly earlier) checkpoint; overrides =
       // safe-subset settings (cadence / preview prompts). Both optional.
       ...(opts.fromStep != null ? { from_step: opts.fromStep } : {}),
+      ...(opts.expectedRecordId != null ? { expected_record_id: opts.expectedRecordId } : {}),
       ...(opts.overrides ? { overrides: opts.overrides } : {}),
       resume_mode: opts.resumeMode || 'weights_only',
       ...(opts.stateBundleId ? { state_bundle_id: opts.stateBundleId } : {}),
@@ -1595,37 +1596,6 @@ export function useDataset() {
   // on this machine. Same payload as continueTraining — one dialog, two lanes — and
   // the same interactive-refusal contract, so TrainingPanel's confirm+retry helper
   // drives either lane without a second code path.
-  const continueTrainingInCloud = useCallback(async (extraSteps = 1000, baseModel, variant, trainType, opts = {}) => {
-    const body = {
-      extra_steps: extraSteps,
-      ...trainingRunSelection(baseModel, trainType, variant),
-      ...(typeof opts.masked === 'boolean' ? { masked: opts.masked } : {}),
-      allow_caption_mismatch: !!opts.allowCaptionMismatch,
-      allow_uncaptioned: !!opts.allowUncaptioned,
-      allow_unverified_weights: !!opts.allowUnverifiedWeights,
-      allow_caption_quality: !!opts.allowCaptionQuality,
-      allow_not_ready: !!opts.allowNotReady,
-      allow_parallel_run: !!opts.allowParallelRun,
-      ...(opts.fromStep != null ? { from_step: opts.fromStep } : {}),
-      ...(opts.overrides ? { overrides: opts.overrides } : {}),
-      resume_mode: opts.resumeMode || 'weights_only',
-      ...(opts.stateBundleId ? { state_bundle_id: opts.stateBundleId } : {}),
-      ...(opts.gpuName ? { gpu_name: opts.gpuName } : {}),
-    };
-    const d = await postJson(`/api/dataset/${currentId}/train/cloud/continue-local`, body);
-    if (d.ok) toast.success(`Cloud run started from step ${d.resumed_from} → ${d.target_steps}`);
-    // `opts.quiet`: same contract as continueTraining above — the caller owns
-    // the refusal message (the ▶ Continue dialog stays open and shows it).
-    else if (!opts.quiet
-             && !String(d.error || '').includes('CUSTOM_WEIGHTS_UNVERIFIED: ')
-             && !String(d.error || '').includes('CAPTION_QUALITY: ')
-             && !String(d.error || '').includes('MISMATCH_CAPTION: ')
-             && !String(d.error || '').includes('UNCAPTIONED: ')) {
-      toast.error(d.error || 'Unexpected error');
-    }
-    return d;
-  }, [currentId, toast]);
-
   // trainType = famille sélectionnée dans le menu LORA TYPE (Z-Image / SDXL / Krea).
   // Transmise à l'API pour que checkpoints + liste « IN COMFYUI » suivent le menu et
   // pas le train_type persisté du dataset (sinon LoRA Krea affichés sur la page Z-Image).
@@ -1863,7 +1833,7 @@ export function useDataset() {
            findWatermarks, cancelWatermarkScan, findText, cancelTextScan, cleanWatermarks, cleanWatermarkImages, restoreWatermarkImage, repairImageRegion, undoImageRepair, dismissWatermarks, saveWatermarkRegions,
            purgeUnused, exportZip, exportBackup, exportZipFor, exportBackupFor, importBackup, importDatasetZip, importDatasetFolder,
            backupEverything, backupJob, downloadBackup, openBackupsFolder, dismissBackup, restoreJob, dismissRestore,
-           refresh, train, stopTraining, continueTraining, continueTrainingInCloud,
+           refresh, train, stopTraining, continueTraining,
            listCheckpoints, importCheckpoint, deleteCheckpoint,
            trainBaseInfo, setTrainSettings, setDatasetTrainingMode, prepareBase };
 }

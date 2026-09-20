@@ -31,7 +31,11 @@ def _no_real_subprocess(monkeypatch):
 
 # --- brief tests, verbatim ---------------------------------------------
 
-def test_probe_all_off_when_unconfigured(app):
+@pytest.mark.parametrize('api_installed', [
+    pytest.param(False, marks=pytest.mark.plugins()),
+    pytest.param(True, marks=pytest.mark.plugins('api_engines')),
+])
+def test_probe_all_off_when_unconfigured(app, api_installed):
     with app.app_context():
         from app import capabilities
         with patch('app.capabilities._http_ok', return_value=False):
@@ -907,6 +911,7 @@ def test_probe_exposes_dir_valid(app, tmp_path):
 
 # --- probe() caching ------------------------------------------------------
 
+@pytest.mark.plugins('api_engines')
 def test_probe_caches_for_30s_without_force(app, monkeypatch):
     with app.app_context():
         from app import capabilities
@@ -919,6 +924,7 @@ def test_probe_caches_for_30s_without_force(app, monkeypatch):
     assert second == first
     assert second['cloud_training'] is False
 
+@pytest.mark.plugins('api_engines')
 def test_probe_force_bypasses_cache(app, monkeypatch):
     with app.app_context():
         from app import capabilities

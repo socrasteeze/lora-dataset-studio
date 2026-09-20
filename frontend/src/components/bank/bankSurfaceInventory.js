@@ -299,7 +299,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Check the Pythons on this machine and point the SigLIP 2 index at one that reaches your GPU. They are read, never changed.",
+    "Inspect, test or change the Python used by the SigLIP 2 index",
     1
   ],
   [
@@ -411,7 +411,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Go back to the environment the app set up for this pass",
+    "Clear this explicit choice and follow the configured defaults; this can select an external Python",
     1
   ],
   [

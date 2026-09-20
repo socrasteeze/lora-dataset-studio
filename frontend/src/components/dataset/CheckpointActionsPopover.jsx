@@ -1,5 +1,6 @@
 import { checkpointActionModel } from './checkpointPopover.js';
 import { Trash2 } from 'lucide-react';
+import PluginSlot from '../../plugins/PluginSlot.jsx';
 
 /* ◉ THE checkpoint actions popover — one component, two surfaces.
 
@@ -18,7 +19,11 @@ import { Trash2 } from 'lucide-react';
 
    `pill` may be null. A click on a run CARD opens the same popover with only its
    run-level row (ⓘ Details), which is what took the detail drawer off the
-   click: it now opens because it was asked for, not because a card was touched. */
+   click: it now opens because it was asked for, not because a card was touched.
+
+   `surface` names the host ('graph' | 'canvas') for the rows the PLUGINS add
+   (`checkpoint.action`): a plugin row asks its host-mounted layer for a dialog
+   and closes the popover, so the dialog outlives it. */
 
 const ROW = 'flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.6875rem] font-medium';
 // Disabled rows are TEXT, not buttons: a greyed-out button invites the click it
@@ -26,7 +31,7 @@ const ROW = 'flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.6875r
 const MUTED = 'rounded-md border border-border bg-app/40 px-2 py-1 text-content-subtle text-[0.625rem]';
 
 export default function CheckpointActionsPopover({
-  node, pill, runLabel = null,
+  node, pill, runLabel = null, surface = 'graph',
   continueSource = 'cloud', continueReason = null, folderLabel = null,
   importing = false, deleting = false,
   onContinue, onDeploy, onDelete, onDetails, onClose,
@@ -100,6 +105,13 @@ export default function CheckpointActionsPopover({
         ) : (
           <span className={MUTED}>{a.deploy.reason}</span>
         ))}
+
+        {/* The rows the plugins add (checkpoint.action): a publisher's "make
+            this save a model page", for instance. Each gets the same facts —
+            the node, the pill, whether this is a run card — and closes the
+            popover itself; the dialog it opens is its host-mounted layer's. */}
+        <PluginSlot slot="checkpoint.action" surface={surface} node={node} pill={pill}
+          isRun={a.isRun} onClose={onClose} />
 
         {/* ⓘ The detail drawer — config, run note, checkpoint notes — now ASKED
             for. It used to spring open on any card click, which turned a glance
