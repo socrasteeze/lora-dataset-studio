@@ -1,5 +1,9 @@
-import io, json, zipfile
+
 import pytest
+
+pytestmark = pytest.mark.plugins('api_engines')
+
+import io, json, zipfile
 from PIL import Image
 
 

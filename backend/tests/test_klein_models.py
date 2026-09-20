@@ -11,6 +11,7 @@ import io
 import os
 import struct
 
+
 from PIL import Image
 
 # Smallest structurally-valid safetensors header (8-byte LE length + '{}'), so a

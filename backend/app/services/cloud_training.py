@@ -2346,6 +2346,9 @@ def _auto_retry_child(parent_id):
 
 def _maybe_auto_retry(run, error):
     """Rent at most one fresh pod after a transient failure of an existing pod."""
+    from .legacy_cloud_recovery import recovery_only
+    if recovery_only():
+        return None
     if (run.status != 'error' or not run.vast_instance_id
             or not _is_retryable_pod_failure(error)):
         return None
@@ -3030,6 +3033,9 @@ def _provision(run):
     """Search offers and create the instance, honoring the launch-time GPU
     choice when the picked class is still available.
     LEAK-SAFE: any failure after create_instance destroys the instance."""
+    from .legacy_cloud_recovery import recovery_only
+    if recovery_only():
+        raise RuntimeError('Install Cloud Training before renting another pod')
     c = cfg.get('cloud') or {}
     params = json.loads(run.train_params or '{}')
     fam = params.get('train_type') or 'zimage'
@@ -3817,7 +3823,9 @@ def boot_recover(app):
                 else:
                     _set(run, status='error', finished_at=naive_utcnow(),
                          error='app restarted before the pod was created')
-            _recover_pending_auto_retries()
+            from .legacy_cloud_recovery import recovery_only
+            if not recovery_only():
+                _recover_pending_auto_retries()
     except Exception:
         logger.exception('cloud boot recovery failed')
 
@@ -4767,6 +4775,13 @@ def _monitor(app, run_id):
     with app.app_context():
         run = db.session.get(CloudTrainingRun, run_id)
         if not run:
+            _stop_events.pop(int(run_id), None)
+            _monitor_threads.pop(int(run_id), None)
+            return
+        from .legacy_cloud_recovery import recovery_only
+        if recovery_only() and not run.vast_instance_id:
+            _set(run, status='error', finished_at=naive_utcnow(),
+                 error='Cloud Training is not installed; no replacement pod was rented')
             _stop_events.pop(int(run_id), None)
             _monitor_threads.pop(int(run_id), None)
             return
@@ -7160,6 +7175,8 @@ def _lineage_node(rec, crun, requested_id, failed_local_id):
             _ck['preview_url'] = _pv.get('url')
             _ck['preview_status'] = _pv.get('status')
             _ck['preview_count'] = _pv.get('count') or 0
+    from ..plugins.hooks import run_filter
+    node['checkpoints'] = run_filter('lineage.checkpoints', node.get('checkpoints') or [], rec.id)
     return node
 
 

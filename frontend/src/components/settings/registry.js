@@ -1,3 +1,4 @@
+import { engineIds } from '../../engines/catalog.js'
 import { BarChart3, Dumbbell, Globe, Monitor, Network, Palette, PenLine, Save, Search, Wrench } from 'lucide-react';
 // Data-driven section list for the Settings page: sidebar labels, deep-link
 // ids, the mono eyebrow tag, and the keywords the sidebar search matches on.
@@ -17,14 +18,10 @@ export const SETTINGS_SECTIONS = [
       'seedvr2', 'seed vr2', 'upscaler', 'super resolution', 'restore', 'sharpen', 'fidelity',
       'colour shift', 'color shift', 'target resolution', 'colour correction', 'blocks to swap',
       'hi-res fix', 'hires fix', 'highres', 'second pass', 'two pass', '2 pass', 'latent upscale',
-      'detail', 'denoise',
-      'finishing', 'finish', 'film grain', 'grain', 'noise', 'unsharp', 'colour match',
-      'color match', 'plastic', 'smooth', 'photographic'] },
-  { id: 'scraping', title: 'Scraping & sources', icon: Search, eyebrow: 'sources',
-    description: 'Credentials used when scanning image sources.',
-    keywords: ['reddit', 'client id', 'civitai', 'pexels', 'pexels api', 'api key', 'scrape', 'scraper',
-      'rate limit', '429', 'quota', 'nsfw', 'source', 'import',
-      'klein', 'small image', 'rescue', 'upscale'] },
+      'detail', 'denoise'] },
+  { id: 'scraping', title: 'Shared service access', icon: Search, eyebrow: 'services',
+    description: 'Access shared by the Civitai browser, model downloads and installed plugins.',
+    keywords: ['civitai', 'api key', 'nsfw', 'source', 'import'] },
   { id: 'local-tools', title: 'Local tools', icon: Monitor, eyebrow: 'integrations',
     description: 'ComfyUI, Ollama and ai-toolkit — where they run and where they live.',
     keywords: ['comfyui', 'ollama', 'ai-toolkit', 'vision model', 'path', 'url', 'hugging face', 'hf token', 'directory', 'install'] },
@@ -87,9 +84,14 @@ export function sectionStatus(id, caps) {
   }
 }
 
+/** General Settings indexes core sections; product fields live in their plugin. */
+export function sectionKeywords(section) {
+  return section.keywords
+}
+
 export function matchesQuery(section, q) {
   const needle = (q || '').trim().toLowerCase()
   if (!needle) return true
   return section.title.toLowerCase().includes(needle)
-    || section.keywords.some((k) => k.includes(needle))
+    || sectionKeywords(section).some((k) => k.includes(needle))
 }

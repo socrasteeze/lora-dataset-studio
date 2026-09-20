@@ -91,7 +91,7 @@ def _stub_klein(monkeypatch, calls, job_id='klein-job-1'):
 
 # --- the list ---------------------------------------------------------------
 
-def test_both_local_engines_can_edit_the_reference():
+def test_both_local_engines_can_edit_the_reference(app):
     """THE red assertion. Krea 2 Edit (and Klein) were simply not in the set the
     route accepts, so the modal could not offer them however it was written."""
     editable = svc.editable_engines()

@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { installRuntimeHost } from '../../tests/support/runtimeHost.mjs';
+
+test.beforeEach(installRuntimeHost);
 import {
   anchorDataset, canvasBaseModelAxis, canvasBlendBlocker, canvasCheckpointKey, canvasFamily,
   canvasRunSelections, canvasSelectionSummary, canvasStackKey, canvasStackTriggers,
   canvasStackWeight, canvasStackWithoutTrigger, canvasUndeployed,
   describeCanvasLaunch, isCanvasCheckpointSelected,
   pruneCanvasSelection, refreshCanvasSelection, toggleCanvasCheckpoint,
-} from './canvasGeneration.js';
+} from "../../../bundled/canvas/frontend/utils/canvasGeneration.js";
 
 const pick = (datasetId, recordId, step, extra = {}) => ({
   datasetId, recordId, step, family: 'krea', deployed: true,

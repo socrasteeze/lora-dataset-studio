@@ -7,9 +7,23 @@ import assert from 'node:assert/strict'
 import { createElement, renderToStaticMarkup } from './support/mountJsx.mjs'
 
 const { default: VideoLineageGraph, VideoCheckpointPopover } =
-  await import('../src/components/videobank/VideoLineageGraph.jsx')
-const { default: VideoSampleLightbox } = await import('../src/components/videobank/VideoSampleLightbox.jsx')
-const { pillActionModel } = await import('../src/components/videobank/videoLineage.js')
+  await import("../../bundled/video/frontend/videobank/VideoLineageGraph.jsx")
+const { default: VideoSampleLightbox } = await import("../../bundled/video/frontend/videobank/VideoSampleLightbox.jsx")
+const { pillActionModel } = await import("../../bundled/video/frontend/videobank/videoLineage.js")
+
+const { configureHostRuntime } = await import('../src/plugins/runtimeHost.jsx')
+const { publishRuntime } = await import('../src/plugins/loadPlugins.js')
+const { ToastProvider } = await import('../src/components/common/Toast.jsx')
+const { MemoryRouter } = await import('react-router')
+test.beforeEach(t => {
+  const saved = { window: globalThis.window, document: globalThis.document, fetch: globalThis.fetch }
+  t.after(() => Object.assign(globalThis, saved))
+  globalThis.window = {}
+  globalThis.document = { cookie: '', querySelector: () => null }
+  globalThis.fetch = () => { throw new Error('A render must not contact a service') }
+  configureHostRuntime()
+  publishRuntime()
+})
 
 const file = (filename, extra = {}) => ({
   filename, size: 314572800, deployed_as: null, undeployable: false, ...extra,
@@ -38,8 +52,9 @@ const TREE = {
     ],
   }],
 }
-const html = (props) => renderToStaticMarkup(createElement(VideoLineageGraph,
-  { datasetId: 9, tree: TREE, onPlaySample: () => {}, ...props }))
+const html = (props) => renderToStaticMarkup(createElement(MemoryRouter, null,
+  createElement(ToastProvider, null, createElement(VideoLineageGraph,
+    { datasetId: 9, tree: TREE, onPlaySample: () => {}, ...props }))))
 
 test('one local run card has one pill per step and no continuation edge', () => {
   const markup = html()

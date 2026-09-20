@@ -54,7 +54,11 @@ def test_install_all_plan_endpoint(client, monkeypatch):
     assert r.status_code == 200 and r.get_json()['plan'] == ['face_scoring', 'masks']
 
 
-def test_install_all_starts_plan(client, monkeypatch):
+@pytest.mark.parametrize('scrape_installed', [
+    pytest.param(False, marks=pytest.mark.plugins()),
+    pytest.param(True, marks=pytest.mark.plugins('scrape')),
+])
+def test_install_all_starts_plan(client, monkeypatch, scrape_installed):
     from app import capabilities, setup_installer
     started = []
     monkeypatch.setattr(capabilities, 'probe', lambda force=False: {})
@@ -71,6 +75,16 @@ def test_install_all_starts_plan(client, monkeypatch):
                             'wd14']
     assert set(body['statuses']) == set(body['plan'])
     assert started == body['plan']
+    # Scrape remains explicit in the owner's preparation, even when installed.
+    assert setup_installer.known_action('scrape_extras') is scrape_installed
+    if scrape_installed:
+        prepared = client.post('/api/setup/install/scrape_extras')
+        assert prepared.status_code == 200 and prepared.get_json()['state'] == 'running'
+        # Upstream names its plan `expected`; this fork asserts the plan inline
+        # above (its list is longer -- scrape_extras and wd14 are fork actions),
+        # so the same property reads off body['plan'] here. Adapted, not deleted:
+        # it still proves an explicit re-prepare APPENDS rather than replacing.
+        assert started == body['plan'] + ['scrape_extras']
 
 
 def test_install_all_status_batches_requested_actions(client):

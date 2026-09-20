@@ -260,7 +260,7 @@ CFG_CHOICES = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0]
 # 25 is the sample-step count a dense Krea 2 run previews with — see
 # KREA_RAW_DEFAULTS below; without it in the picker the recommended setting for a
 # full-model artifact would not be selectable at all.
-STEPS_CHOICES = [6, 8, 10, 12, 16, 20, 24, 25, 30, 32, 40, 50]
+STEPS_CHOICES = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 25, 30, 32, 40, 50]
 
 # --- Per-BASE-MODEL sampler defaults (bobba84, GitHub #18) --------------------
 # Z-Image ships in two flavours that need opposite sampler settings, and the app
@@ -5361,3 +5361,35 @@ def delete_prompt_everywhere(user_id, prompt) -> int:
         except ValueError:
             continue
     return n
+
+
+def enhance_with_instructions(instructions: str, model: str | None = None) -> str:
+    """Run bounded caller-owned writing instructions through the normal local writer."""
+    if not isinstance(instructions, str) or not instructions.strip() or len(instructions) > 30000:
+        raise ValueError('Writing instructions must contain at most 30000 characters.')
+    from .vision_keepalive import keep_alive_for_isolated_call
+    from .vision_llm import ensure_ready, generate_text as generate_text_ollama, label
+    ready = ensure_ready(model)
+    if not ready.get('ok'):
+        # The remedy is not the same word for the two providers: an Ollama model is
+        # PULLED, an LM Studio one is LOADED in its app. Saying "load" to an Ollama
+        # user was a regression this wave introduced; saying "pull" to an LM Studio
+        # user names an action their server does not have.
+        if model:
+            fix = (' — pick another model from the ✨ Enhance ⚙️ options, or load this '
+                   'one in LM Studio first.' if label() == 'LM Studio'
+                   else ' — pick another model from the ✨ Enhance ⚙️ options, or pull '
+                        'this one first.')
+        else:
+            fix = (f' — Enhance needs the local {label()} model configured in '
+                   'Settings › Local tools.')
+        raise RuntimeError((ready.get('error') or f'{label()} is unavailable') + fix)
+    text = generate_text_ollama(instructions, model=model,
+                                num_predict=500,
+                                keep_alive=keep_alive_for_isolated_call(), strict=True)
+    text = (text or '').strip().strip('"').strip()
+    if not text:
+        raise RuntimeError(
+            f'The model returned an empty prompt — check the configured {label()} model '
+            'in Settings and the application log.')
+    return text

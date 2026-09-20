@@ -11,8 +11,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
 
-const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8')
-const PICKER = read('./VideoSourcePicker.jsx')
+const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+const PICKER = read("../../../../../../bundled/video/frontend/studio/video/VideoSourcePicker.jsx")
 
 /** The strip of staged frames follows the last tab: its guard is the end of
  * the clip tab's JSX. */

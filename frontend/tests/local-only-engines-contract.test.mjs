@@ -164,7 +164,10 @@ const ALLOWED_SRC_CLOUD_REFS = {
   'components/dataset/IdentityPromptModal.jsx': 1,
   // canonicalEngines' comment about quietly retiring a stored cloud id.
   'components/dataset/engineSelection.js': 3,
-  'components/dataset/scraperState.js': 1,
+  // scraperState.js left frontend/src in the V2 merge: it moved into the
+  // bundled `scrape` plugin, so core no longer carries its one historical
+  // cloud mention and the budget entry went stale. Removed per this test's
+  // own instruction rather than zeroed -- the file is gone, not cleaned.
   'help/helpRegistry.js': 1,
   // Historical entries announcing engines this fork later removed. They moved
   // from whatsNew.js to whatsNewArchive.js on 2026-08-24 when upstream split the

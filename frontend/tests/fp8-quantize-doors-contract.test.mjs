@@ -1,10 +1,10 @@
 /**
  * The fp8 quantize tool has TWO doors and must stay ONE implementation.
  *
- * It shipped reachable from a single place: the bottom of a dataset's ordinary
- * Training panel, which only exists once you have a dataset. Someone who
- * downloaded a 26 GB model from Hugging Face — the person the tool was written
- * for — has no dataset and never saw it. Settings ▸ Storage is the second door.
+ * It shipped reachable from a single place: the full-model recipe card, which
+ * only exists inside a dense dataset. Someone who downloaded a 26 GB model from
+ * Hugging Face — the person the tool was written for — has no dataset and never
+ * saw it. The Model tools settings page is the second door.
  *
  * The failure this file exists to prevent is not "the card is missing": it is
  * the SECOND implementation. Copying the JSX into StorageSection would look
@@ -14,12 +14,8 @@
  * below pin that exactly one file talks to the endpoints, and the mount
  * assertions pin that BOTH hosts render the real thing rather than a lookalike.
  *
- * This fork does not carry upstream's HfStorageCard (Divergence 4: no Hugging
- * Face storage forecast, no cloud-quantize third door) — the Settings door
- * therefore mounts cleanly without a ToastProvider workaround for a sibling
- * this fork does not have. The ToastProvider wrap stays anyway: StorageSection
- * itself renders inside one in the real app, and mounting it bare is not the
- * same test as mounting it the way the app actually does.
+ * Mounting matters here too: the plugin settings group uses real host controls
+ * and the managed-engine card; the isolated tool cannot prove those imports.
  */
 import assert from 'node:assert/strict'
 import { readSource } from './support/readSource.mjs'
@@ -32,11 +28,12 @@ import { createElement, renderToStaticMarkup } from './support/mountJsx.mjs'
 /* ⚠️ Dynamic — the hooks that teach Node to read .jsx are installed while
    mountJsx.mjs is evaluated, and a static import would already be linked. */
 const { default: Fp8QuantizeTool } =
-  await import('../src/components/dataset/Fp8QuantizeTool.jsx')
+  await import('../../bundled/model_tools/frontend/panels/Fp8QuantizeTool.jsx')
 const { default: StorageSection } =
   await import('../src/components/settings/StorageSection.jsx')
+const { default: StorageQuantizeGroup } = await import('../../bundled/model_tools/frontend/panels/StorageQuantizeGroup.jsx')
 const { ToastProvider } = await import('../src/components/common/Toast.jsx')
-const { helpTopics, getHelpTopic, searchHelpTopics } =
+const { getHelpTopic, searchHelpTopics } =
   await import('../src/help/helpRegistry.js')
 
 const read = readSource
@@ -48,43 +45,60 @@ const walk = (dirUrl) => {
     const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, dirUrl)
     if (entry.isDirectory()) out.push(...walk(child))
     else if (/\.jsx?$/.test(entry.name) && !/\.test\.jsx?$/.test(entry.name)) {
-      out.push([fileURLToPath(child), readFileSync(fileURLToPath(child), 'utf8')])
+      out.push([fileURLToPath(child), readFileSync(fileURLToPath(child), 'utf8').replace(/\r\n/g, '\n')])
     }
   }
   return out
 }
-const SRC_FILES = walk(new URL('../src/', import.meta.url))
+const REPO_DIR = fileURLToPath(new URL('../../', import.meta.url)).replace(/\\/g, '/')
+const SRC_FILES = [...walk(new URL('../src/', import.meta.url)),
+  ...walk(new URL('../../bundled/', import.meta.url))]
 
 // ---- one implementation ----------------------------------------------------
 
+const { configureHostRuntime } = await import('../src/plugins/runtimeHost.jsx')
+const { publishRuntime } = await import('../src/plugins/loadPlugins.js')
+const { registerDescriptor, resetRegistry, setEnabled, helpTopics } = await import('../src/plugins/registry.js')
+const { default: modelTools } = await import('../../bundled/model_tools/frontend/index.js')
+const manifest = JSON.parse(readSource('../bundled/model_tools/plugin.json'))
+test.beforeEach(t => {
+  const saved = { window: globalThis.window, document: globalThis.document, fetch: globalThis.fetch }
+  t.after(() => { Object.assign(globalThis, saved); resetRegistry() })
+  globalThis.window = {}
+  globalThis.document = { cookie: '', querySelector: () => null }
+  globalThis.fetch = () => { throw new Error('Rendering must not contact any service') }
+  resetRegistry()
+  configureHostRuntime()
+  publishRuntime()
+  assert.equal(registerDescriptor(modelTools, { guideOwnership: manifest.guide_ownership }), true)
+  setEnabled(['model_tools'])
+})
+
+
 test('exactly one component talks to the quantize endpoints', () => {
-  // `/api/tools/fp8-quantize` is THE lane in this fork. Upstream moved its
-  // screens onto an `/api/tools/fp8-deliver` endpoint that can also FETCH a
-  // master from a private Hugging Face repo and write into ComfyUI's folder;
-  // that whole lane rides on the dense cloud delivery this fork rejects
-  // (Divergence 4), so it is deliberately absent here — see FORK_NOTES.
+  // One component chooses the transport: optional Cloud delivery can fetch a
+  // remote master; the local endpoint keeps Model tools usable on its own.
   const callers = SRC_FILES
-    .filter(([, src]) => src.includes('/api/tools/fp8-quantize'))
-    .map(([path]) => path.replace(/\\/g, '/').split('/src/')[1])
-  assert.deepEqual(callers, ['components/dataset/Fp8QuantizeTool.jsx'],
-    'a second file calling the quantize endpoints means the tool was copied, not reused')
-  const rejected = SRC_FILES
     .filter(([, src]) => src.includes('/api/tools/fp8-deliver'))
-    .map(([path]) => path.replace(/\\/g, '/').split('/src/')[1])
-  assert.deepEqual(rejected, [],
-    'the fp8-deliver lane is rejected here — it fetches from the dense cloud delivery')
+    .map(([path]) => path.replace(/\\/g, '/').slice(REPO_DIR.length))
+  assert.deepEqual(callers, ['bundled/model_tools/frontend/panels/Fp8QuantizeTool.jsx'],
+    'a second file calling the quantize endpoints means the tool was copied, not reused')
+  const legacy = SRC_FILES
+    .filter(([, src]) => src.includes('/api/tools/fp8-quantize'))
+    .map(([path]) => path.replace(/\\/g, '/').slice(REPO_DIR.length))
+  assert.deepEqual(legacy, ['bundled/model_tools/frontend/panels/Fp8QuantizeTool.jsx'])
+  assert.match(read('../bundled/model_tools/frontend/panels/Fp8QuantizeTool.jsx'),
+    /const endpoint = delivery \? '\/api\/tools\/fp8-deliver' : '\/api\/tools\/fp8-quantize'/)
 })
 
 test('both hosts render the shared component instead of their own controls', () => {
-  // DIVERGENCE 4 — upstream's training-side host is the extracted recipe card
-  // (slice 1). This fork keeps the recipe inside TrainingPanel.jsx, so the panel
-  // is the host that must import and mount the tool.
-  for (const rel of ['src/components/dataset/TrainingPanel.jsx',
-    'src/components/settings/StorageSection.jsx']) {
-    const src = read(rel)
-    assert.match(src, /import Fp8QuantizeTool from '[^']*Fp8QuantizeTool'/, `${rel}: no import`)
-    assert.match(src, /<Fp8QuantizeTool\b/, `${rel}: imported but never rendered`)
-  }
+  const recipe = read('../bundled/cloud_training/frontend/dataset/FullTransformerRecipe.jsx')
+  const descriptor = read('../bundled/model_tools/frontend/index.js')
+  const settings = read('../bundled/model_tools/frontend/panels/StorageQuantizeGroup.jsx')
+  assert.match(recipe, /<PluginSlot slot="dense.recipe.tool"/)
+  assert.match(descriptor, /'dense.recipe.tool':[\s\S]*?import\('\.\/panels\/Fp8QuantizeTool\.jsx'\)/)
+  assert.match(settings, /import Fp8QuantizeTool from '\.\/Fp8QuantizeTool\.jsx'/)
+  assert.match(settings, /<Fp8QuantizeTool framed=\{false\}/)
 })
 
 // ---- the tool renders in both chromes --------------------------------------
@@ -94,16 +108,14 @@ const CONTROLS = [
   /Quantize to fp8<\/button>/,
 ]
 
-test('the Training-panel door keeps its accent frame and its own title', () => {
+test('the recipe-card door keeps its accent frame and its own title', () => {
   const html = renderToStaticMarkup(createElement(Fp8QuantizeTool, {}))
   assert.match(html, /bg-sky-400\/10/)
-  // "an EXISTING model", "on this machine": both are load-bearing here and are
-  // NOT upstream's wording. Upstream dropped them when the block learned to
-  // reach a master that only exists in a private Hugging Face repo — the dense
-  // cloud delivery this fork rejects (Divergence 4). Here the tool is exactly
-  // what the title says: a file already on this machine.
-  assert.match(html, /Quantize an existing model to fp8/)
-  assert.match(html, /on this machine into/)
+  // "an EXISTING model" was dropped from the title with the words "on this
+  // machine" from the blurb: the block now also reaches a master that only
+  // exists in a private Hugging Face repo, which is the whole point.
+  assert.match(html, /Quantize a model to fp8/)
+  assert.doesNotMatch(html, /on this machine into/)
   for (const re of CONTROLS) assert.match(html, re)
 })
 
@@ -131,29 +143,35 @@ const storageProps = {
   saveConfigPatch: async () => {}, toast: { success: () => {}, error: () => {} },
 }
 
-test('Settings ▸ Storage renders the tool, with the help-mode focus target on it', () => {
+test('Model tools settings render the tool, while core Storage keeps its own controls', () => {
   const html = renderToStaticMarkup(
-    createElement(ToastProvider, null, createElement(StorageSection, storageProps)),
+    createElement(ToastProvider, null, createElement(StorageQuantizeGroup, storageProps)),
   )
   assert.match(html, /id="storage-fp8-quantize"/)
   for (const re of CONTROLS) assert.match(html, re)
-  // Still the whole disk tab, not a page that lost a card to the new one.
-  assert.match(html, /Trash/)
-  assert.match(html, /Run image archive/)
+  const core = renderToStaticMarkup(createElement(ToastProvider, null, createElement(StorageSection, storageProps)))
+  assert.doesNotMatch(core, /id="storage-fp8-quantize"/)
+  assert.match(core, /Trash/)
+  assert.match(core, /What lives where/)
+  assert.equal(modelTools.slots['settings.group'][0].id, 'model-tools')
 })
 
 // ---- the door is addressable ----------------------------------------------
 
 test('the Settings door has its own help topic, pointing at that focus id', () => {
   const topic = getHelpTopic('storage.fp8_quantize')
-  assert.ok(topic, 'no help topic for the Settings ▸ Storage door')
+  assert.ok(topic, 'no help topic for the Model tools settings door')
+  // The bundled model_tools plugin declares this door at '/settings/storage'
+  // (see bundled/model_tools/frontend/index.js). Upstream's copy of this test
+  // pins its own plugin-settings route; adapted to the route the plugin
+  // actually publishes here, so the test still proves the door is addressable.
   assert.equal(topic.app.route, '/settings/storage')
   assert.equal(topic.app.focus, 'storage-fp8-quantize')
   // Two doors, two topics, two distinct titles — a search result that reads the
   // same twice cannot tell you which screen you are being sent to.
   const other = getHelpTopic('training.fp8_quantize_local')
   assert.ok(other && other.title !== topic.title)
-  assert.equal(helpTopics.filter((t) => t.app.route === '/settings/storage'
+  assert.equal(helpTopics().filter((t) => t.app.route === '/settings/storage'
     && t.app.focus === 'storage-fp8-quantize').length, 1)
 })
 
@@ -164,6 +182,6 @@ test('the words someone with an oversized model would type reach it', () => {
   // dense dataset actually has.
   for (const query of ['quantize', 'fp8', 'shrink', 'smaller', 'comfyui', 'safetensors']) {
     assert.ok(searchHelpTopics(query).some((t) => t.id === 'storage.fp8_quantize'),
-      `"${query}" does not surface the Settings ▸ Storage door`)
+      `"${query}" does not surface the Model tools settings door`)
   }
 })

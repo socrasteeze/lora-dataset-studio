@@ -1,10 +1,12 @@
-# LoRA Dataset Studio
+# LoRA Dataset Studio V2
 
 [![CI](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml) [![Join our Discord](https://img.shields.io/discord/1525908170331914411?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/j6hnJBFtXE) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/perfectgf)
 
 **A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train it on your own GPU, then compare checkpoints before export.
 
-No account, paid tier, API key or telemetry. **This fork runs entirely on hardware you control**: generation is local (Klein/ComfyUI — no Nano Banana, ChatGPT or OpenRouter), and training runs on your own GPU — there is no rented-GPU lane. Generation, the analysis passes and training can each be sent to another machine on your network. Everything else works with no GPU at all.
+The core and the 13 public plugins are available at no charge, with public source under the project's PolyForm Noncommercial license, no account required for the core and no telemetry. Additional optional paid plugins may be offered later. API engines and rented GPUs are optional; local and manual workflows remain available.
+
+> **V2 is now the main LDS release.** Install from the default [`v2` branch](https://github.com/perfectgf/lora-dataset-studio/tree/v2) or the [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest). Existing ZIP installations can use **Update & restart** to upgrade the core while keeping their datasets, media and history. Git installations still on `main` must first switch to `v2` as described below. Then install the optional features you use from **Plugins → Store** and review each plugin's settings before its first run.
 
 <h3 align="center">❤ Keep the project in development</h3>
 
@@ -14,7 +16,7 @@ No account, paid tier, API key or telemetry. **This fork runs entirely on hardwa
 
 <p align="center">
   <strong><a href="https://github.com/sponsors/perfectgf">github.com/sponsors/perfectgf</a></strong> — one-off or monthly, and 100% reaches the project (GitHub takes no platform fee).<br>
-  No paid tier, now or ever, so this is what funds the work: upstream's own API credits and rented GPUs, which is how the lanes this fork keeps are verified before they reach it, and the hours that go into the next release. <a href="#support-the-project">What it pays for →</a>
+  Donations help fund the free core and public plugins: the API credits and rented GPUs used for testing, and the hours that go into the next release. <a href="#support-the-project">What it pays for →</a>
 </p>
 
 > New here? Start with [Setup & install](#setup--install), then follow the [end-to-end workflow](docs/guide/workflow.md). The [documentation index](docs/README.md) links every guide. Project news and current development live on [Discord](https://discord.gg/j6hnJBFtXE).
@@ -941,7 +943,9 @@ This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter AP
 
 ## Setup & install
 
-On first launch, **Setup** scans the machine and links every missing capability to its install/configuration step. You can skip optional tools and begin with imported images immediately.
+On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins → Store** and install only the features you want. Each plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
+
+The Store offers **13 free public plugins**: API image engines, Camera angles, Canvas, Publish to Civitai, Cloud training, Publish to Hugging Face, Klein Improve, Live channels, Model tools, Resource monitor, Web scraping, SeedVR2 and Video lane. Their individual updates appear under each plugin.
 
 ### Option 1 — release ZIP + start.bat (Windows)
 
@@ -976,9 +980,9 @@ Ollama on the machine — it cannot tell whose); it leaves ComfyUI alone. After
 Settings ▸ Restart, Ctrl+C still works — the relaunch stays in the same
 console.
 
-A ZIP install updates from inside the app too: **Update & restart** downloads the next **release** and swaps it in, keeping `data/`, `config.json`, `.env`, `.venv` and `.python` untouched. A git checkout follows every commit instead — and needs `git` on your PATH, which an install made through a desktop Git client does not always provide.
+On an existing ZIP installation, **Update & restart** downloads the next release and swaps the core in, keeping `data/`, `config.json`, `.env`, `.venv` and `.python` untouched. Install and update optional plugins separately from the Store. A git checkout follows its configured branch instead and needs `git` on your PATH, which an install made through a desktop Git client does not always provide.
 
-From a git checkout, the same launcher works and **Update & restart** can pull fixes directly:
+The default `v2` branch carries the maintained version of LDS. Clone it to follow its commits with **Update & restart**:
 
 ```bash
 git clone https://github.com/socrasteeze/lora-dataset-studio.git
@@ -986,9 +990,21 @@ cd lora-dataset-studio
 start.bat
 ```
 
+The former `main` branch is now [`v1`](https://github.com/perfectgf/lora-dataset-studio/tree/v1). It is read-only and no longer maintained; updates and contributions go to `v2`.
+
+**Want a guided migration?** [Download the V2 migration helper](https://github.com/perfectgf/lora-dataset-studio/releases/download/v2026.09.14.4/LDS-Migrate-to-V2.zip), extract it outside your installation and run `migrate-to-v2.bat`. It checks the Git installation, backs up the database/settings and switches branches while leaving media in place. [Instructions, backup scope and supported installations](docs/guide/migrate-to-v2.md).
+
+For an existing git installation still on `main`, stop LDS and run these commands from its folder, then start LDS again:
+
+```bash
+git fetch origin
+git switch v2
+git branch --set-upstream-to=origin/v2 v2
+```
+
 ### Option 2 — manual venv (any OS)
 
-Clone/download the source, open a terminal in its root, then run:
+Clone the default branch as above or download its [source archive](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip), open a terminal in its root, then run:
 
 ```bash
 python -m venv .venv
@@ -1009,7 +1025,7 @@ npm run build
 
 ### Option 3 — Docker + your existing ComfyUI
 
-**Beginner Windows flow:** download/extract the **source** ZIP (GitHub ▸ **Code → Download ZIP**) — the release asset `LoRA-Dataset-Studio-windows.zip` does not carry the Docker launchers — start Docker Desktop, then double-click **`start-docker.bat`**. On the first run, select either the ComfyUI folder containing `main.py` and `models`, or its portable parent containing `ComfyUI\main.py`. LDS validates the folder and remembers it for this checkout.
+**Beginner Windows flow:** download/extract the [**source ZIP**](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip) — the release asset `LoRA-Dataset-Studio-windows.zip` does not carry the Docker launchers — start Docker Desktop, then double-click **`start-docker.bat`**. On the first run, select either the ComfyUI folder containing `main.py` and `models`, or its portable parent containing `ComfyUI\main.py`. LDS validates the folder and remembers it for this checkout.
 
 Start your usual ComfyUI on the host. LDS uses `http://host.docker.internal:8188` from its container and mounts the selected folder at `/external-comfyui`. If the folder later moves, double-click **`configure-docker.bat`**. The launcher chooses a free Studio port and opens the browser automatically. Local training still needs ai-toolkit on the host — this fork has no cloud fallback.
 
@@ -1017,7 +1033,7 @@ Start your usual ComfyUI on the host. LDS uses `http://host.docker.internal:8188
 
 **Beginner Windows flow:**
 
-1. On GitHub, choose **Code → Download ZIP**, then extract the complete folder.
+1. Download the [source ZIP](https://github.com/perfectgf/lora-dataset-studio/archive/refs/heads/v2.zip), then extract the complete folder.
 2. Start **Docker Desktop** and wait until it reports that Docker is running.
 3. Double-click **`start-docker-gpu.bat`** in the extracted folder.
 4. Leave the first build/start running; it downloads the image and ComfyUI environment. The launcher prints both actual addresses and opens Studio as soon as Studio responds, while its batch window stays open until ComfyUI finishes its first boot. You do not need to open a second ComfyUI window.
@@ -1048,13 +1064,13 @@ existing-ComfyUI adoption, UID/GID, DNS, update commands, resource caps and
 operational limits are documented in the dedicated
 [Docker guide](docs/guide/docker.md).
 
-To update any Docker install, double-click **`update-docker.bat`** (latest stable release; pass `main` for the preview channel) — it rebuilds transactionally and rolls back if the container does not come up healthy. Both `start-docker.bat` and `start-docker-gpu.bat` also accept `--rebuild` and `--update-rebuild`; `start-docker.bat` additionally accepts `--configure`, which is what `configure-docker.bat` calls.
+To update a Docker install, double-click **`update-docker.bat`** for the latest stable release, or pass `main` to follow commits on the main branch. It rebuilds transactionally and rolls back if the container does not come up healthy. Both `start-docker.bat` and `start-docker-gpu.bat` accept `--rebuild` and `--update-rebuild`; `start-docker.bat` also accepts `--configure`, which is what `configure-docker.bat` calls. After upgrading from V1, install the optional features you use from **Plugins → Store**.
 
 ### Option 5 — Pinokio (one click, any OS)
 
 In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/socrasteeze/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
 
-Only the core app is installed this way — ComfyUI, Ollama, ai-toolkit and the optional ML helpers are still connected from the app's own **Setup** screen. Updates go through Pinokio's **Update** tab: because Pinokio starts and stops the server, the app detects this install shape and shows *Stop → Update → Start* instead of its own **Update & restart** button, which would relaunch the server outside Pinokio's control.
+Only the core app is installed this way. Complete **Setup**, then choose your optional features in **Plugins → Store**; each plugin carries its own settings and preparation steps. Updates go through Pinokio's **Update** tab: because Pinokio starts and stops the server, the app detects this install shape and shows *Stop → Update → Start* instead of its own **Update & restart** button, which would relaunch the server outside Pinokio's control.
 
 ### External tools (install once, connect in Settings)
 
@@ -1164,12 +1180,13 @@ Still stuck? Open the app's **Guide → Getting help** for the one-click **diagn
   <a href="https://github.com/sponsors/perfectgf"><img src="https://img.shields.io/badge/Sponsor%20this%20project-%E2%9D%A4-EA4AAA?logo=githubsponsors&logoColor=white&style=for-the-badge" alt="Sponsor LoRA Dataset Studio on GitHub Sponsors" height="44"></a>
 </p>
 
-LoRA Dataset Studio is free, open source, and has no paid tier, no telemetry and
-no upsell — nothing in the app is gated, and nothing you use costs more because
-of it. This fork carries no referral or affiliate links of any kind: upstream
-tags its vast.ai links, and since the rented-GPU lane is removed here there is
-nothing for them to tag. It is built and maintained by one person, on personal
-time — every feature in the list above came out of somebody's evenings.
+The LDS core and the public plugins in this release have public source and are available at no charge under the project's PolyForm Noncommercial license,
+with no telemetry. Additional optional paid plugins may be offered later;
+the core and these public plugins remain free. Voluntary donations and the
+[vast.ai](https://cloud.vast.ai/?ref_id=683073) referral links disclosed above help
+fund development; those links do not change the price you pay. The project is
+built and maintained by one person, on personal time — every feature in the
+list above came out of somebody's evenings.
 
 If the app saves you an afternoon of sorting, captioning and re-running failed
 trainings, consider giving a little of that time back through

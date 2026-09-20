@@ -31,12 +31,17 @@ def _no_real_network(monkeypatch):
     capabilities._import_cache.clear()
     monkeypatch.setattr(capabilities, '_http_ok', lambda *a, **k: False)
     monkeypatch.setattr(capabilities, '_import_ok', lambda *a, **k: False)
+    # Settings report discovered IPs; this contract does not probe the host network.
+    monkeypatch.setattr('app.routes.settings._lan_ip', lambda: None)
+    monkeypatch.setattr('app.routes.settings._tailscale_ip', lambda: None)
+    monkeypatch.setattr('app.services.updater.current_sha', lambda root=None: None)
     yield
     capabilities._cache = None
     capabilities._cache_ts = 0.0
     capabilities._import_cache.clear()
 
 
+@pytest.mark.plugins('api_engines')
 def test_get_settings_masks_secrets(client, monkeypatch):
     monkeypatch.setenv('HF_TOKEN', 'hf-secret')
     data = client.get('/api/settings').get_json()
@@ -140,11 +145,12 @@ def test_put_settings_skip_persists_when_dir_empty(client):
     assert r.get_json()['config']['comfyui']['setup_skipped'] is True
 
 
+@pytest.mark.plugins('scrape')
 def test_put_settings_saves_scrape_credentials(client, monkeypatch):
     """Scrape credentials are presence-only and effective without restart."""
     import os
     monkeypatch.setenv('PEXELS_API_KEY', '')
-    r = client.put('/api/settings', json={'secrets': {'REDDIT_CLIENT_ID': 'my-cid',
+    r = client.put('/api/settings?plugin=scrape', json={'secrets': {'REDDIT_CLIENT_ID': 'my-cid',
                                                       'CIVITAI_API_KEY': 'civ-key',
                                                       'PEXELS_API_KEY': 'pexels-key'}})
     assert r.status_code == 200
@@ -154,35 +160,37 @@ def test_put_settings_saves_scrape_credentials(client, monkeypatch):
     payload = str(r.get_json())
     assert 'my-cid' not in payload and 'pexels-key' not in payload  # presence only
     assert os.environ['REDDIT_CLIENT_ID'] == 'my-cid'      # effective immediately
-    from app.scrape.sources import reddit
-    from app.scrape.sources.civitai import civitai_api_key
-    from app.scrape.sources.pexels import pexels_api_key
+    from lds_scrape.sources import reddit
+    from lds_scrape.sources.civitai import civitai_api_key
+    from lds_scrape.sources.pexels import pexels_api_key
     assert reddit._client_id() == 'my-cid'
     assert civitai_api_key() == 'civ-key'
     assert pexels_api_key() == 'pexels-key'
 
 
+@pytest.mark.plugins('scrape')
 def test_delete_scrape_credential_falls_back_to_shared_id(client, monkeypatch):
     """Removing the saved Reddit client id must drop it from the env too, so the
     source falls back to the shared gallery-dl id instead of a stale value."""
     import os
-    from app.scrape.sources import reddit
+    from lds_scrape.sources import reddit
     monkeypatch.setattr(reddit, 'resolve_cookies', lambda key: None)  # ignore any local admin file
-    client.put('/api/settings', json={'secrets': {'REDDIT_CLIENT_ID': 'my-cid'}})
-    r = client.delete('/api/settings/secret/REDDIT_CLIENT_ID')
+    client.put('/api/settings?plugin=scrape', json={'secrets': {'REDDIT_CLIENT_ID': 'my-cid'}})
+    r = client.delete('/api/settings/secret/REDDIT_CLIENT_ID?plugin=scrape')
     assert r.status_code == 200
     assert r.get_json()['secrets']['REDDIT_CLIENT_ID'] is False
     assert 'REDDIT_CLIENT_ID' not in os.environ
     assert reddit._client_id() == reddit._GDL_CLIENT_ID
 
 
+@pytest.mark.plugins('scrape')
 def test_delete_pexels_api_key_clears_runtime_secret_without_leak(client):
     import os
-    from app.scrape.sources.pexels import pexels_api_key
+    from lds_scrape.sources.pexels import pexels_api_key
 
-    client.put('/api/settings', json={'secrets': {'PEXELS_API_KEY': 'delete-me'}})
+    client.put('/api/settings?plugin=scrape', json={'secrets': {'PEXELS_API_KEY': 'delete-me'}})
     assert pexels_api_key() == 'delete-me'
-    r = client.delete('/api/settings/secret/PEXELS_API_KEY')
+    r = client.delete('/api/settings/secret/PEXELS_API_KEY?plugin=scrape')
 
     assert r.status_code == 200
     assert r.get_json()['secrets']['PEXELS_API_KEY'] is False
@@ -340,6 +348,7 @@ def test_put_settings_accepts_bank_scoring_and_keeps_autoprovisioned_python(clie
     assert body['klein']['generation_lora_presets'][0]['name'] == 'My preset'
 
 
+@pytest.mark.plugins('video')
 def test_put_settings_protects_the_shot_detection_interpreter(client):
     """shot_detect.python is written by its installer and has no Settings input, so
     the frontend echoes it back as "" on every full Save. Without the guard, saving
@@ -349,7 +358,7 @@ def test_put_settings_protects_the_shot_detection_interpreter(client):
     interpreters already carry a guard for."""
     from app import config
     config.save_config({'shot_detect': {'python': '/envs/scoring/py.exe'}})
-    r = client.put('/api/settings', json={'config': {
+    r = client.put('/api/settings?plugin=video', json={'config': {
         'shot_detect': {'python': '', 'device': 'cuda'},
     }})
     assert r.status_code == 200, r.get_json()
@@ -409,7 +418,7 @@ def _cloud_status(*, ok=True, namespace='lds-deliveries', error=None,
 
 def test_put_settings_skips_dense_validation_without_new_cloud_token(
         client, monkeypatch):
-    from app.services import cloud_training
+    from lds_cloud_training import cloud_training
 
     calls = []
     monkeypatch.setattr(
@@ -427,16 +436,17 @@ def test_put_settings_skips_dense_validation_without_new_cloud_token(
     assert calls == []
 
 
+@pytest.mark.plugins('cloud_training')
 def test_hf_cloud_connection_target_reports_ready_and_invalid(
         client, monkeypatch):
-    from app.services import cloud_training
+    from lds_cloud_training import cloud_training
 
     monkeypatch.setattr(
         cloud_training,
         'full_transformer_token_preflight',
         lambda: _cloud_status(namespace='private-lds'),
     )
-    ready = client.post('/api/settings/test/hf_cloud')
+    ready = client.post('/api/settings/test/hf_cloud?plugin=cloud_training')
     assert ready.status_code == 200
     assert ready.get_json()['ok'] is True
     assert ready.get_json()['namespace'] == 'private-lds'
@@ -450,7 +460,7 @@ def test_hf_cloud_connection_target_reports_ready_and_invalid(
             namespace='tester', code='broad_access', severity='warning',
             warning=warning),
     )
-    broad = client.post('/api/settings/test/hf_cloud')
+    broad = client.post('/api/settings/test/hf_cloud?plugin=cloud_training')
     assert broad.status_code == 200
     assert broad.get_json()['ok'] is True
     assert broad.get_json()['code'] == 'broad_access'
@@ -464,7 +474,7 @@ def test_hf_cloud_connection_target_reports_ready_and_invalid(
             ok=False, error=('HF_CLOUD_TOKEN requires repository write access; '
                              'read-only tokens cannot be used.')),
     )
-    invalid = client.post('/api/settings/test/hf_cloud')
+    invalid = client.post('/api/settings/test/hf_cloud?plugin=cloud_training')
     assert invalid.status_code == 200
     assert invalid.get_json()['ok'] is False
     assert invalid.get_json()['detail'] == (
@@ -563,18 +573,10 @@ def test_static_assets_do_not_replant_csrf_cookie(client):
 
 
 @pytest.fixture()
-def csrf_client(tmp_path, monkeypatch):
+def csrf_client(plugin_app_factory):
     """A client on an app with CSRF actually enforced (the default fixture turns
     it off). Mirrors conftest's app fixture env/cache isolation."""
-    monkeypatch.setenv('LDS_DATA_DIR', str(tmp_path / 'data'))
-    monkeypatch.setenv('LDS_CONFIG', str(tmp_path / 'config.json'))
-    monkeypatch.setenv('LDS_ENV', str(tmp_path / '.env'))
-    import app.config as _cfg
-    monkeypatch.setattr(_cfg, 'ENV_PATH', tmp_path / '.env')
-    monkeypatch.setattr(_cfg, '_cache', None)
-    from app import create_app
-    application = create_app({'TESTING': True, 'WTF_CSRF_ENABLED': True,
-                              'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:'})
+    application = plugin_app_factory(config_object={'WTF_CSRF_ENABLED': True})
     return application.test_client()
 
 
@@ -1070,6 +1072,7 @@ def test_update_progress_endpoint_returns_state(client, monkeypatch):
     assert d['phase'] == 'downloading' and d['downloaded'] == 10 and d['total'] == 100
 
 
+@pytest.mark.plugins('api_engines')
 def test_settings_offers_an_engine_added_by_an_update(client, tmp_path, monkeypatch):
     """End to end over HTTP: someone who saved their settings back when Klein was
     the only engine opens Settings after updating and is OFFERED Krea 2 Edit —
@@ -1084,6 +1087,7 @@ def test_settings_offers_an_engine_added_by_an_update(client, tmp_path, monkeypa
     assert enabled[:1] == ['klein']
 
 
+@pytest.mark.plugins('api_engines')
 def test_unchecking_an_engine_over_the_api_sticks(client, monkeypatch):
     """The counter-test over HTTP: the SPA saves the full config it was shown,
     minus the engine the user just unchecked. It must not reappear on reload."""
@@ -1104,14 +1108,24 @@ def test_unchecking_an_engine_over_the_api_sticks(client, monkeypatch):
 # button would then restore a number that is no longer the default without saying
 # so. These tests pin that the payload is DERIVED, not a second copy.
 
-def test_get_settings_exposes_the_shipped_config_defaults(client):
+@pytest.mark.parametrize('owner', [
+    pytest.param(None, marks=pytest.mark.plugins()),
+    pytest.param('image_upscale', marks=pytest.mark.plugins('image_upscale')),
+    pytest.param('api_engines', marks=pytest.mark.plugins('api_engines')),
+])
+def test_get_settings_exposes_the_shipped_config_defaults(client, owner):
     import app.config as _cfg
-    data = client.get('/api/settings').get_json()
+    url = '/api/settings' + (f'?plugin={owner}' if owner else '')
+    data = client.get(url).get_json()
     d = data['config_defaults']
-    # every section of DEFAULTS is offered, with its shipped value
-    assert set(d) == set(_cfg.DEFAULTS)
-    assert d['klein']['improve_steps'] == _cfg.DEFAULTS['klein']['improve_steps']
-    assert d['krea']['grounding_px'] == _cfg.DEFAULTS['krea']['grounding_px']
+    # Every setting owned by this page is offered, with its shipped value.
+    assert d == _cfg.settings_view(_cfg.DEFAULTS, owner)
+    if owner == 'image_upscale':
+        assert d['klein']['improve_steps'] == _cfg.DEFAULTS['klein']['improve_steps']
+    if owner is None:
+        assert d['krea']['grounding_px'] == _cfg.DEFAULTS['krea']['grounding_px']
+        assert 'improve_steps' not in d['klein']
+        assert 'nanobanana_model' not in d['engines']
     # blank-means-auto keys keep their EMPTY default: resetting one must write ''
     # back, not a made-up value that would freeze the field (see the frontend's
     # resetToDefault.test.js for the UI half of this contract).
@@ -1121,13 +1135,14 @@ def test_get_settings_exposes_the_shipped_config_defaults(client):
     assert d['krea']['base_model'] == ''
 
 
+@pytest.mark.plugins('image_upscale')
 def test_config_defaults_follows_DEFAULTS_and_is_not_a_frozen_copy(client, monkeypatch):
     """The regression this whole payload exists to prevent: move a default, and
     what the UI would reset to moves with it. A hand-maintained copy anywhere
     between DEFAULTS and the button fails here."""
     import app.config as _cfg
     monkeypatch.setitem(_cfg.DEFAULTS['klein'], 'improve_steps', 43)
-    assert client.get('/api/settings').get_json()['config_defaults']['klein']['improve_steps'] == 43
+    assert client.get('/api/settings?plugin=image_upscale').get_json()['config_defaults']['klein']['improve_steps'] == 43
 
 
 def test_config_defaults_is_a_copy_the_caller_cannot_corrupt(client):

@@ -7,7 +7,8 @@ import LineageDiffPanel from './LineageDiffPanel';
 import CheckpointActionsPopover from './CheckpointActionsPopover';
 import PreviewLightbox from './PreviewLightbox';
 import CheckpointGalleryPanel from '../shared/CheckpointGalleryPanel';
-import { checkpointPopoverPlacement, POPOVER_H, POPOVER_W } from './checkpointPopover.js';
+import PluginSlot from '../../plugins/PluginSlot.jsx';
+import { checkpointPopoverPlacement, POPOVER_W, popoverHeight } from './checkpointPopover.js';
 import { noteBadge, toggleDiffSelection } from './lineageDetail.js';
 import { removeRunFromTree } from '../../utils/runDeletable.js';
 import { postJson } from '../../api/fetchClient';
@@ -409,10 +410,11 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
             units, flipped above the pill when there is no room below and clamped
             horizontally so the scroll panel never clips it. */}
         {openCk && (() => {
-          const at = checkpointPopoverPlacement(openCk.pill, g);
+          const height = popoverHeight('graph');
+          const at = checkpointPopoverPlacement(openCk.pill, g, { height });
           return (
           <foreignObject className="lds-gnode overflow-visible"
-            x={at.x} y={at.y} width={POPOVER_W + 10} height={POPOVER_H + 8}>
+            x={at.x} y={at.y} width={POPOVER_W + 10} height={height + 8}>
             <div style={{ width: POPOVER_W }}>
               <CheckpointActionsPopover
                 node={openCk.node} pill={openCk.pill}
@@ -450,6 +452,12 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
         opens, so the results of a generation are reachable from either surface. */}
     <CheckpointGalleryPanel target={gallery} onClose={() => setGallery(null)}
       onDeleted={() => { Promise.resolve(refetchTree?.()).catch(() => {}); }} />
+    {/* The layers the plugins keep mounted here for their popover rows
+        (checkpoint.layer): a dialog a row asked for outlives the popover. A
+        change made in one (a page linked, a link removed) changes what the
+        pills carry, so the lineage is re-read when it closes. */}
+    <PluginSlot slot="checkpoint.layer" surface="graph"
+      onChanged={() => { Promise.resolve(refetchTree?.()).catch(() => {}); }} />
     </>
   );
 }

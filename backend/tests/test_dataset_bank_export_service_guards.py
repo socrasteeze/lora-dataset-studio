@@ -44,7 +44,8 @@ _EXCLUSIVE_DATASET_ACTIVITIES = (
 
 
 @pytest.mark.parametrize('_name,operation', _OPERATIONS, ids=[
-    name for name, _operation in _OPERATIONS
+    getattr(operation, 'id', None) or operation[0]
+    for operation in _OPERATIONS
 ])
 @pytest.mark.parametrize('activity_kind,error_text',
                          _EXCLUSIVE_DATASET_ACTIVITIES,

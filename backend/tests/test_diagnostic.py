@@ -7,6 +7,7 @@ are reduced to booleans.
 import json
 
 
+
 def test_diagnostic_ok_and_shape(client):
     r = client.get('/api/diagnostic')
     assert r.status_code == 200

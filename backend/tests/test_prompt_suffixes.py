@@ -9,6 +9,7 @@ variation at WRAP time only:
     then the global suffix,
   - empty suffix -> byte-identical prompts (regression invariant).
 """
+
 import io
 import json
 import os

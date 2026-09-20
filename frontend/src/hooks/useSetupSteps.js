@@ -24,9 +24,19 @@ export const SETUP_STEP_IDS = ['comfyui', 'ollama', 'quality', 'training']
 // engine installs live there), it just isn't a tool to configure. SetupPage's
 // SCREENS list is the display order; this one is the LINKABLE set, used by the
 // What's-new target validator and the help-registry contract test.
-export const SETUP_DEEP_LINK_STEPS = [...SETUP_STEP_IDS, 'install']
+export const SETUP_DEEP_LINK_STEPS = [...SETUP_STEP_IDS, 'install', 'tools']
+
+// Shared with the plugins' Setup rows (the `setup.step` slot): the note a
+// lane shows while ComfyUI is merely off, and the topic that door opens.
+export const COMFYUI_OFF_NOTE = 'launch ComfyUI to enable'
+export const COMFYUI_WAITING_TOPIC = 'comfyui.api_url'
 
 // Tool reachable + its extra piece present -> ready; reachable only -> partial.
+import { contributions } from '../plugins/registry.js'
+import {
+  apiEngineIds, apiEngineSetupRows, engineSpec, localEngineIds, recommendedEngineIds,
+} from '../engines/catalog.js'
+
 function gateStatus(reachable, complete) {
   if (reachable && complete) return 'ready'
   if (reachable) return 'partial'
@@ -188,7 +198,7 @@ export const COMFYUI_SKIP_LOST = [
   'Local Klein generation, including the uncensored (NSFW) local lane',
   'Watermark cleaning with Klein (LaMa inpainting and crop still work)',
   'Test Studio (comparing checkpoints, every model family)',
-  'Training on your own ComfyUI base models (built-in and cloud bases still work)',
+  'Training on your own ComfyUI base models (built-in local bases still work)',
   'Picking LoRA presets from what is on disk (free-text entry still works)',
 ]
 export const COMFYUI_SKIP_KEPT = [
@@ -197,6 +207,28 @@ export const COMFYUI_SKIP_KEPT = [
   'LoRA training — local ai-toolkit',
   'Publishing datasets and LoRAs to Hugging Face',
 ]
+
+const COMFYUI_SKIP_KEPT_CORE = [
+  'Importing images, dataset curation and export',
+  'Editing captions and using a configured local vision model',
+  'LoRA training with a configured local ai-toolkit',
+]
+
+/** The cloud engines' line of a KEPT list: named from the catalog, or absent. */
+function apiEnginesKeptLine() {
+  const names = apiEngineIds().map((id) => engineSpec(id).label)
+  if (!names.length) return null
+  const last = names[names.length - 1]
+  const head = names.slice(0, -1)
+  return `${head.length ? `${head.join(', ')} and ${last}` : last} image engine${names.length > 1 ? 's' : ''}`
+}
+
+export function comfyuiSkipKept() {
+  const api = apiEnginesKeptLine()
+  const out = [...COMFYUI_SKIP_KEPT_CORE]
+  if (api) out.splice(2, 0, api)
+  return out
+}
 
 // What "continue without Ollama" costs vs keeps. Same rule as the ComfyUI lists
 // above: every line is sourced from a real gate, nothing is invented.
@@ -216,7 +248,7 @@ export const OLLAMA_SKIP_LOST = [
   'Watermark detection through the vision route (the detector engine still works)',
   'Short captions derived from long ones',
 ]
-export const OLLAMA_SKIP_KEPT = [
+const OLLAMA_SKIP_KEPT_CORE = [
   'Captioning with JoyCaption — prose or booru tags, matched to what you train',
   'Scraping, dataset curation and the bank',
   'Local generation, Test Studio comparisons and the Canvas (ComfyUI)',
@@ -228,14 +260,21 @@ export const OLLAMA_SKIP_KEPT = [
   'LoRA training — local ai-toolkit, on your own GPU',
 ]
 
+/** Everything "continue without Ollama" keeps, before the per-machine cut below. */
+export function ollamaSkipKeptAll() {
+  const api = apiEnginesKeptLine()
+  return api ? [...OLLAMA_SKIP_KEPT_CORE, api] : [...OLLAMA_SKIP_KEPT_CORE]
+}
+
 // The KEPT list as THIS machine may claim it. Every other line is true of any
 // install; the captioning one is not — ticking it where JoyCaption is absent would
 // promise a captioner that isn't there. The panel's amber note names the fix, so
 // the line is withheld rather than reworded into a half-promise.
 export function ollamaSkipKept(joycaptionReady) {
+  const all = ollamaSkipKeptAll()
   return joycaptionReady
-    ? OLLAMA_SKIP_KEPT
-    : OLLAMA_SKIP_KEPT.filter((t) => !/^Captioning with JoyCaption/.test(t))
+    ? all
+    : all.filter((t) => !/^Captioning with JoyCaption/.test(t))
 }
 
 // Why the wizard would keep you on the Ollama step, or `null` when it would not.
@@ -531,11 +570,11 @@ function qualityStep(caps) {
   const ready = parts.every(Boolean)
   const partial = parts.some(Boolean)
   return {
-    id: 'quality', title: 'Quality tools (ML extras)', recommended: false,
+    id: 'quality', title: 'Quality tools', recommended: false,
     unlocks: ['Face-similarity scoring', 'Person masks', 'Watermark inpainting',
       'Bank scoring (aesthetic · NSFW · style)', 'Image tagging (WD14)',
       'SigLIP2 Bank semantics (optional)',
-      'Watermark detector (optional)', 'Scraping extras (optional)'],
+      'Watermark detector (optional)'],
     status: ready ? 'ready' : (partial ? 'partial' : 'available'),
     faceScoring: !!caps.face_scoring, masks: !!caps.masks,
     watermarkInpaint: !!caps.watermark_inpaint,
@@ -545,9 +584,6 @@ function qualityStep(caps) {
     // existing CLIP-ready install does not become "partial" after this update.
     bankSiglip2: !!caps.bank_siglip2,
     watermarkDetect: !!caps.watermark_detect,
-    // Also optional and also install-from-here (its own Setup card lives in
-    // this step, see mlInstallCards.js) — same non-gating treatment.
-    scrapeDeps: !!caps.scrape_deps,
   }
 }
 
@@ -580,7 +616,7 @@ export function deriveSetupSteps(caps, runtimeReadiness = null) {
 // The user's live capability checklist (Summary card). Watermark inpainting is a
 // distinct ML extra (simple-lama-inpainting) — an existing install that never ran
 // it must SEE it as still missing here, not be told "everything's ready".
-export function deriveCapabilitySummary(caps) {
+function coreCapabilitySummary(caps) {
   const c = caps || {}
   const e = c.engines || {}
   const o = c.ollama || {}
@@ -590,28 +626,20 @@ export function deriveCapabilitySummary(caps) {
   // "launch ComfyUI to enable" note instead of a discouraging ✗.
   const cu = c.comfyui || {}
   const comfyOff = !!cu.dir_valid && !cu.reachable
-  const NOTE = 'launch ComfyUI to enable'
+  const NOTE = COMFYUI_OFF_NOTE
   // `topic` = the help-registry topic that OWNS the control turning this
   // capability on. It is not a second navigation table: the route + focus id
   // are read back from the registry (capabilityDestination below), so a field
   // that moves section moves the tile with it. `waitingTopic` is the door for
   // the pending state — "the install is fine, the process isn't up" is not the
   // same problem as "it isn't installed", so it must not lead to the same page.
-  const WAITING = 'comfyui.api_url'
+  const WAITING = COMFYUI_WAITING_TOPIC
   // Krea's two distinct "not ready" causes, kept apart because the actions are
   // different: something is genuinely absent from disk (install it) vs everything
   // is installed and ComfyUI simply has not loaded the node pack yet (restart).
   const kreaDiskGap = !!(Array.isArray(cu.krea_missing) && cu.krea_missing.length)
     || !cu.krea_nodes_installed
   const kreaRestartPending = kreaNeedsComfyuiRestart(c)
-  // The Video lane's three doors (rows below): each is its own install, so
-  // each is its own row. `videoWeightsThere` is the "weights on disk" half of
-  // the pending rule the 🎬 row already applies — down only because ComfyUI
-  // is; Smooth's packs are read from /object_info, unreadable while it is.
-  const videoWeightsThere = !(Array.isArray(cu.video_studio_missing) && cu.video_studio_missing.length)
-  const vfi = (cu.video_studio_options && cu.video_studio_options.vfi) || {}
-  const smoothOk = !!cu.video_studio_ready && vfi.available === true
-  const liveOk = !!cu.video_studio_ready && !!c.video_encode
   return [
     // DIVERGENCE 1 — upstream opens this list with three cloud image engines,
     // each behind an API key. There are no API engines on this fork, so the
@@ -637,54 +665,17 @@ export function deriveCapabilitySummary(caps) {
       ...(!e.krea && !kreaDiskGap && kreaRestartPending
         ? { pending: true, note: 'restart ComfyUI to load its nodes' }
         : !e.krea && !kreaDiskGap && comfyOff ? { pending: true, note: NOTE } : {}) },
-    // 📷 Same counting rule as Krea, for the same reason: the Gallery ships
-    // this verb to every install, so a machine without the weights must read
-    // "not ready, here is the install" — never a shorter list that certifies
-    // completeness by omission. `camera_ready` is asset-only (no node pack, no
-    // per-run process), so unlike the two engines above there is no restart
-    // state — just installed or not, plus the shared "ComfyUI is off" note.
-    { label: '📷 Camera angles (local)', what: 'Re-shoots a picture from another viewpoint, in your ComfyUI', ok: !!cu.camera_ready,
-      topic: 'setup-camera-install', waitingTopic: WAITING,
-      ...(!cu.camera_ready && !(Array.isArray(cu.camera_missing) && cu.camera_missing.length)
-        && comfyOff ? { pending: true, note: NOTE } : {}) },
     // The ACTIVE provider, with the old expression as the fallback for a caps
     // payload that predates it. Keyed on Ollama alone, a working LM Studio install
     // was counted as two MISSING capabilities here — on the screen whose entire
     // job is to tell the user whether they are ready.
-    // 🎬 Counted like Krea and Camera angles, and for the same reason: the Video
-    // tab ships to every install, so a machine without the weights must read
-    // "not ready, here is the install" rather than vanish from the denominator.
-    // Its OPTIONS are not counted — each one degrades a checkbox, not the lane.
-    { label: '🎬 Video Test Studio (beta)', what: 'Tests a LoRA in motion — image- or text-to-video clips with MiniMax H3', ok: !!cu.video_studio_ready,
-      topic: 'setup-video-studio', waitingTopic: WAITING,
-      ...(!cu.video_studio_ready
-        && !(Array.isArray(cu.video_studio_missing) && cu.video_studio_missing.length)
-        && comfyOff ? { pending: true, note: NOTE } : {}) },
-    // ✨ DLSS 5, ↗ Smooth and 🔴 Live are the Video lane's three doors a green
-    // 🎬 row said nothing about ("DLSS is missing" — asked on the Overview,
-    // 2026-09-03). Each is its own install — the bridge and the model file,
-    // two node packs, ffmpeg — so each is its own row, counted like every
-    // other: absent must read "not ready, here is the install", never vanish
-    // from the denominator. DLSS never waits on ComfyUI (a worker of its own).
-    { label: '✨ DLSS 5 neural rendering', ok: !!(c.dlss5nr && c.dlss5nr.ready),
-      what: "Re-renders a finished clip's lighting and materials — NVIDIA DLSS 5, Windows",
-      topic: 'setup-dlss5-install' },
-    { label: '↗ Smooth (frame interpolation)', ok: smoothOk,
-      what: "Doubles or triples a clip's frame rate — RIFE, two ComfyUI node packs",
-      topic: 'setup-video-studio', waitingTopic: WAITING,
-      ...(!smoothOk && videoWeightsThere && comfyOff ? { pending: true, note: NOTE } : {}) },
-    { label: '🔴 Live lane (beta)', ok: liveOk,
-      what: 'Endless clips played as one stream — the video weights plus ffmpeg',
-      // The gap decides the door: weights missing → the video install; weights
-      // there but no ffmpeg → the video extra, on the quality step.
-      topic: cu.video_studio_ready ? 'setup-quality' : 'setup-video-studio', waitingTopic: WAITING,
-      ...(!liveOk && videoWeightsThere && comfyOff ? { pending: true, note: NOTE }
-        : !liveOk && cu.video_studio_ready && !c.video_encode
-          ? { note: 'needs ffmpeg — install the video extra' } : {}) },
+    // (The video lane's rows — 🎬 Video Test Studio, ✨ DLSS 5, ↗ Smooth, 🔴 Live,
+    // the three Video bank pieces — are the video plugin's `setup.step`
+    // contribution, merged by deriveCapabilitySummary below.)
     { label: 'Captioning', what: 'Writes a caption for every picture — JoyCaption or your local LLM',
       ok: !!(cap.joycaption || (cap.local_llm !== undefined ? cap.local_llm : cap.ollama)),
       topic: 'setup-ollama' },
-    { label: 'Auto-framing & head-crop', what: 'The local vision model: framing, head crops — and ✨ motion prompts for video',
+    { label: 'Auto-framing & head-crop', what: 'The local vision model: framing and head crops',
       ok: !!(cap.local_llm_vision !== undefined
         ? cap.local_llm_vision
         : (o.reachable && o.vision_model_ready)),
@@ -740,12 +731,13 @@ export function deriveCapabilitySummary(caps) {
 
 // Human name of the screen a capability route lands on — derived, never typed
 // twice: the Settings rail owns its section titles, the wizard owns its own.
-function destinationName(route) {
+function destinationName(route, topic) {
   const id = (route.match(/^\/settings\/([a-z0-9-]+)/) || [])[1]
   if (id) {
     const s = SETTINGS_SECTIONS.find((x) => x.id === id)
     return s ? s.title : null
   }
+  if (/^\/plugins\/[^/]+\/settings$/.test(route)) return `${topic?.pluginName || 'Plugin'} settings`
   return route.startsWith('/setup') ? 'Setup wizard' : null
 }
 
@@ -762,11 +754,16 @@ function destinationName(route) {
 export function capabilityDestination(entry, getTopic = getHelpTopic) {
   if (!entry) return null
   const id = (entry.pending && entry.waitingTopic) ? entry.waitingTopic : entry.topic
-  const t = id ? getTopic(id) : null
+  let t = id ? getTopic(id) : null
+  if (entry.plugin && !(entry.pending && entry.waitingTopic)) {
+    const route = `/plugins/${entry.plugin}/settings`
+    t = { ...t, pluginName: entry.pluginName || t?.pluginName,
+      app: { route, ...(t?.app?.route === route && t.app.focus ? { focus: t.app.focus } : {}) } }
+  }
   if (!t || !t.app || !t.app.route) return null
   const { route, focus } = t.app
   const href = focus ? `${route}${route.includes('?') ? '&' : '?'}focus=${focus}` : route
-  const where = destinationName(route)
+  const where = destinationName(route, t)
   if (!where) return null
   // Ready rows still lead somewhere — that screen is where the capability is
   // managed (re-test a key, reinstall a helper), so "manage in" not "fix in".
@@ -795,7 +792,7 @@ export function recommendedMet(caps) {
  *  loadable. Mirrors setup_installer._needs_install — the backend authority, which
  *  now also REPLACES a blocking-invalid file instead of returning "already
  *  present" and doing nothing (the trap that made "download it again" a no-op). */
-function brokenOrMissing(missing, invalid) {
+export function brokenOrMissing(missing, invalid) {
   const out = Array.isArray(missing) ? [...missing] : []
   blockingInvalid(invalid).forEach((i) => { if (!out.includes(i.asset)) out.push(i.asset) })
   return out
@@ -808,44 +805,32 @@ export const INSTALL_ALL_ACTION_LABELS = {
   watermark_inpaint: 'Watermark inpainting',
   wd14: 'Image tagging (WD14)',
   watermark_detect: 'Watermark detector',
-  video: 'Video decoding (Video bank)',
-  shot_detect: 'Shot detection (Video bank)',
-  video_text: 'Burned-in text (Video bank)',
+  video_text: 'Burned-in text (shared OCR)',
   ollama_model: 'Vision model (captioning)',
   klein_model: 'Klein model (local generation)',
   klein_text_encoder: 'Klein text encoder',
   klein_vae: 'Klein VAE',
   klein_lora: 'Klein consistency LoRA',
-  klein_enhancement_lora: 'Klein enhancement LoRA (✨ improve detail)',
+  klein_enhancement_lora: 'Klein detail LoRA (optional, shared by editing tools)',
   krea_nodes: 'Krea 2 Edit node pack',
   krea_model: 'Krea 2 base model (Turbo)',
   krea_text_encoder: 'Krea 2 text encoder',
   krea_vae: 'Krea 2 VAE',
   krea_identity_lora: 'Krea 2 Identity Edit LoRA',
-  seedvr2_model: 'SeedVR2 model (3B FP8)',
-  seedvr2_vae: 'SeedVR2 VAE',
   lanpaint_nodes: 'LanPaint sampler (masked Repair)',
-  // 📷 Camera angles. The lane's VAE has no row of its own on purpose: it is
-  // the Krea 2 VAE (same file, same destination), listed once above.
-  camera_model: 'Camera angles model (Qwen-Image-Edit 2511)',
-  camera_lora: 'Camera angles LoRA (96 positions)',
-  camera_speed_lora: 'Camera angles speed LoRA (4-step)',
-  camera_text_encoder: 'Camera angles text encoder (Qwen 2.5-VL)',
-  // 🎬 Video Test Studio. The four weights are named by what they DO, because
-  // "qwen3vl_32b_minimax_h3_nvfp4_awq" tells a user nothing about whether they
-  // need it. The three packs say which checkbox they unlock, for the same
-  // reason: they are optional, and a row that does not say so reads as required.
-  // DLSS 5 neural rendering: the two MIT bridge DLLs this app can fetch.
-  // The MODEL is the user's own file and has no row; the card says where.
-  dlss5nr_bridge: 'DLSS 5 neural rendering bridge',
-  h3_base: 'Video model (MiniMax H3)',
-  h3_text_encoder: 'Video prompt encoder (Qwen3-VL)',
-  h3_video_vae: 'Video decoder (VAE)',
-  h3_audio_vae: 'Video sound decoder (VAE)',
-  h3_turbo_lora: 'Video acceleration: larryvrh Turbo v4 (arena #1, 6 steps)',
-  h3_parasyte_lora: 'Video acceleration: Parasyte Turbo (arena #2, 6 steps)',
-  h3_dareties_lora: 'Video acceleration: DARE-TIES merge (arena #3, 6 steps)',
 }
+
+/** Resolve Setup labels from the feature that owns the action. Core callers
+ * use the same label as a plugin's own card, without importing that plugin. */
+export function installActionLabel(action) {
+  if (INSTALL_ALL_ACTION_LABELS[action]) return INSTALL_ALL_ACTION_LABELS[action]
+  for (const step of contributions('setup.step', 'setup')) {
+    const label = step.labels?.[action]
+    if (typeof label === 'string' && label.trim()) return label
+  }
+  return action
+}
+
 
 // The Krea 2 Edit engine, installable in ONE click but deliberately NOT part of
 // "Install everything": a second local engine is ~20 GB, and downloading it for
@@ -899,73 +884,6 @@ function lanpaintNeedsComfyuiRestart(caps) {
     && Array.isArray(cu.lanpaint_nodes_missing) && cu.lanpaint_nodes_missing.length)
 }
 
-/** What the "Install SeedVR2" button would queue — the missing weights only.
- *  Mirror of setup_installer.install_group_plan('seedvr2', caps), which stays the
- *  authority.
- *
- *  There is NO node-pack action here, and that is the difference from Krea: this
- *  pack declares thirteen pip dependencies that belong in ComfyUI's own
- *  interpreter, which the app does not own and must never pip into. Cloning it
- *  alone would land a pack that fails to import — so the pack is explained, and
- *  only the weights are installed. */
-const SEEDVR2_INSTALL_ORDER = ['seedvr2_model', 'seedvr2_vae']
-
-export function seedvr2InstallPlan(caps) {
-  const cu = (caps || {}).comfyui || {}
-  if (!cu.dir_valid) return []
-  const missing = brokenOrMissing(cu.seedvr2_missing, cu.seedvr2_invalid)
-  return SEEDVR2_INSTALL_ORDER.filter((a) => missing.includes(a))
-}
-
-// 📷 Camera angles — weights only, like SeedVR2 (the graph is stock ComfyUI
-// nodes, so there is no pack to clone and no restart state). Mirrors the
-// backend's setup_installer._INSTALL_GROUPS['camera'], which stays the
-// authority. `krea_vae` is a member on purpose: the lane runs on the Krea 2
-// VAE, and camera_missing reports that file under the action that installs it —
-// one file, one button, whichever engine asked first.
-export const CAMERA_INSTALL_ORDER = [
-  'camera_model', 'camera_lora', 'camera_speed_lora', 'camera_text_encoder',
-  'krea_vae',
-]
-
-// 🎬 The Video Test Studio — WEIGHTS ONLY, required first, so a partial install
-// leaves a lane that RENDERS rather than one that only has its options.
-//
-// Its ComfyUI node packs are deliberately absent: the app downloads model files
-// and does not install code into somebody's ComfyUI (maintainer's call,
-// 2026-08-31). They are named and linked instead — see the card.
-export const VIDEO_STUDIO_INSTALL_ORDER = [
-  'h3_base', 'h3_text_encoder', 'h3_video_vae', 'h3_audio_vae', 'h3_turbo_lora',
-  'h3_parasyte_lora', 'h3_dareties_lora',
-]
-
-export function videoStudioInstallPlan(caps) {
-  const cu = (caps || {}).comfyui || {}
-  if (!cu.dir_valid) return []
-  // An entry with no `action` is a file the app will not fetch: it gets a
-  // sentence in the card, never a button here.
-  const missing = (Array.isArray(cu.video_studio_missing) ? cu.video_studio_missing : [])
-    .map((m) => m && m.action).filter(Boolean)
-  return VIDEO_STUDIO_INSTALL_ORDER.filter((a) => missing.includes(a))
-}
-
-export function cameraInstallPlan(caps) {
-  const cu = (caps || {}).comfyui || {}
-  if (!cu.dir_valid) return []
-  const missing = brokenOrMissing(cu.camera_missing, cu.camera_invalid)
-  return CAMERA_INSTALL_ORDER.filter((a) => missing.includes(a))
-}
-
-/** The one thing an install cannot do: ComfyUI registers custom nodes at STARTUP
- *  only, so a pack on disk but absent from /object_info means "restart ComfyUI".
- *  Same rule as Krea's — here it also covers the case where the pack's Python
- *  dependencies failed to install, which looks identical from outside. */
-export function seedvr2NeedsComfyuiRestart(caps) {
-  const cu = (caps || {}).comfyui || {}
-  return !!(cu.seedvr2_nodes_installed
-    && Array.isArray(cu.seedvr2_nodes_missing) && cu.seedvr2_nodes_missing.length)
-}
-
 // Grouped by capability area (ML extras → Klein weights). The backend
 // serializes pip and parallelizes downloads regardless of fire order, so this order
 // only drives the progress list; it must match the backend's _INSTALL_ALL_ORDER.
@@ -974,13 +892,17 @@ export const INSTALL_ALL_ORDER = [
   'klein_model', 'klein_text_encoder', 'klein_vae', 'klein_lora',
 ]
 
+/** Host Python is not the managed worker's interpreter. Keep old-server fallback. */
+export function managedMlInstallAvailable(caps) {
+  const python = caps?.python
+  return python?.managed_ml ? python.managed_ml.available === true : python?.ml_supported !== false
+}
+
 export function installAllPlan(caps) {
   const c = caps || {}
-  // face_scoring/masks install into the app's OWN Python, so they need it inside the ML
-  // wheel range; on a newer interpreter they'd only source-build and fail. Absent python
-  // info => assume supported (older payloads). watermark_inpaint builds its own venv, so
-  // it stays runnable regardless.
-  const mlOk = !(c.python && c.python.ml_supported === false)
+  // Face scoring and masks use a compatible managed worker environment.
+  // The Flask interpreter's version does not determine their installability.
+  const mlOk = managedMlInstallAvailable(c)
   const cu = c.comfyui || {}
   // Broken counts as missing: an interrupted download leaves a file that every
   // presence check calls installed and no loader can open.
@@ -1003,17 +925,18 @@ export function installAllPlan(caps) {
 // venv is the whole point of the reinstall button). Per item:
 //   present   — the capability is already in place (drives the ✓ Installed / ✗ badge)
 //   available — can be (re)installed from HERE right now (its precondition is met): ML extras
-//               need the app's Python in the wheel range OR an already-present env to repair;
+//               need managed-runtime support or an already-present environment to repair;
 //               the vision model needs Ollama reachable + a model name; Klein weights need a
 //               validated ComfyUI tree. Unavailable items render their `hint` instead of a
 //               button, pointing back at the config step that unblocks them.
-export function installCatalog(caps) {
+function coreInstallCatalog(caps) {
   const c = caps || {}
   // Total: a config written before this setting existed has no local_llm block.
   const llmProvider = ((c.local_llm || {}).provider) || 'ollama'
-  const mlOk = !(c.python && c.python.ml_supported === false)
-  const mlRange = (c.python && c.python.ml_range) || '3.10–3.12'
-  const mlHint = `Needs Python ${mlRange} — install it into a separate 3.10–3.12 env and set its path in Settings.`
+  const mlOk = managedMlInstallAvailable(c)
+  const mlHint = c.python?.managed_ml
+    ? 'Automatic ML installation is not available for this platform.'
+    : 'Update LDS to prepare a compatible ML environment automatically.'
   const o = c.ollama || {}
   const modelName = (o.vision_model || '').trim()
   const cu = c.comfyui || {}
@@ -1021,7 +944,6 @@ export function installCatalog(caps) {
   const kleinMissing = Array.isArray(cu.klein_missing) ? cu.klein_missing : []
   const kleinHint = 'Point the app at a valid ComfyUI folder first (the ComfyUI step).'
   const kreaMissing = Array.isArray(cu.krea_missing) ? cu.krea_missing : []
-  const cameraMissing = Array.isArray(cu.camera_missing) ? cu.camera_missing : []
   // action -> the blocking integrity verdict for a file that IS on disk. This row
   // used to read "✓ Installed" purely because the file existed — which is how a
   // truncated 9.5 GB UNET certified itself on the very screen the user opened to
@@ -1049,6 +971,9 @@ export function installCatalog(caps) {
     || !!(cu.reachable
       && !(Array.isArray(cu.lanpaint_nodes_missing) && cu.lanpaint_nodes_missing.length))
   const lanpaintRestart = lanpaintNeedsComfyuiRestart(c)
+  // Same three-state rule as the two packs above: the folder is there, OR a
+  // REACHABLE ComfyUI exposes the node (installed under another name); on
+  // disk but not loaded yet is a restart, not an install.
   const item = (action, present, available, hint) => {
     const bad = brokenBy[action]
     // A THIRD state, like the Krea node pack's: neither ✓ (it cannot load) nor a
@@ -1082,17 +1007,10 @@ export function installCatalog(caps) {
     }
   }
   const mlItem = (action) => {
-    const present = mlOk ? !!c[action] : !!c[action]
-    // Install fresh only when the app's Python supports the wheels; ALWAYS allow a
-    // repair of one that's already present (its install targets whatever env it lives in).
+    const present = !!c[action]
+    // Keep repair available for a working pre-existing worker environment.
     return item(action, present, mlOk || present, mlHint)
   }
-  // 🎬 The video engine's five files, one row each. `videoStudioMissing` holds
-  // the ones absent from disk; anything not in it is present. Same shape as the
-  // camera rows above — and, like them, gated on a valid ComfyUI folder,
-  // because that is where they land.
-  const videoStudioMissing = (Array.isArray(cu.video_studio_missing)
-    ? cu.video_studio_missing : []).map((m) => m && m.action).filter(Boolean)
   return [
     mlItem('face_scoring'),
     mlItem('masks'),
@@ -1154,21 +1072,6 @@ export function installCatalog(caps) {
     },
     ...['krea_model', 'krea_text_encoder', 'krea_vae', 'krea_identity_lora'].map(
       (a) => item(a, dirValid && !kreaMissing.includes(a), dirValid, kleinHint)),
-    // 📷 Camera angles — the Gallery's re-shoot lane. Four rows, not five: the
-    // Qwen VAE is the krea_vae row above (one file, one button). These rows
-    // exist for the same reason the Krea ones do — the weights were installable
-    // through the 409 and NOWHERE on this screen, which is the exact "engine
-    // invisible where the user decides they are done" gap the menu closes.
-    ...['camera_model', 'camera_lora', 'camera_speed_lora', 'camera_text_encoder'].map(
-      (a) => item(a, dirValid && !cameraMissing.includes(a), dirValid, kleinHint)),
-    // 🎬 Video Test Studio — five WEIGHT rows and no pack row, which is the
-    // whole shape of this lane's install: the app downloads model files and
-    // leaves ComfyUI's custom_nodes alone. Its three optional packs are linked
-    // from the card instead, so this menu never offers a button that would add
-    // code to somebody's ComfyUI.
-    ...['h3_base', 'h3_text_encoder', 'h3_video_vae', 'h3_audio_vae',
-      'h3_turbo_lora', 'h3_parasyte_lora', 'h3_dareties_lora'].map(
-      (a) => item(a, dirValid && !videoStudioMissing.includes(a), dirValid, kleinHint)),
     // LanPaint — the sampler the masked ✦ Repair lane runs on (a ~1 MB clone,
     // zero pip dependencies). Same present/restart logic as the Krea pack: a
     // reachable ComfyUI that exposes the node counts as present whatever the
@@ -1179,4 +1082,29 @@ export function installCatalog(caps) {
       ...(lanpaintRestart ? { state: 'restart', stateLabel: '⟳ Restart ComfyUI' } : {}),
     },
   ]
+}
+
+/* The capability rows and install offers, the core's then the plugins':
+   a plugin contributes `{ id, rows(caps), catalog(caps) }` items to the
+   `setup.step` slot (docs/plugins/README.md), so its lane is counted on the
+   Setup screen exactly like Krea's — a machine without its weights reads
+   "not ready, here is the owner", never completeness by omission. The global
+   wizard requests a core-only catalog; each plugin keeps its own preparation. */
+export function deriveCapabilitySummary(caps) {
+  const rows = coreCapabilitySummary(caps)
+  for (const item of contributions('setup.step', 'setup')) {
+    if (typeof item.rows === 'function') rows.push(...(item.rows(caps) || []).map(row => ({ ...row, plugin: item.plugin, pluginName: item.pluginName })))
+  }
+  return rows
+}
+
+export function installCatalog(caps, { includePlugins = true } = {}) {
+  const items = coreInstallCatalog(caps)
+  if (!includePlugins) return items
+  for (const item of contributions('setup.step', 'setup')) {
+    if (typeof item.catalog === 'function') items.push(...(item.catalog(caps) || []))
+  }
+  // Shared requirements (for example OCR) have one install action even when
+  // both the core and a product offer them. Preserve the first owner's row.
+  return items.filter((item, index) => items.findIndex(other => other.action === item.action) === index)
 }

@@ -110,7 +110,7 @@ test('▶ Continue runs it too, on whichever lane it resumes', () => {
   assert.match(panel, /const lane = laneOfPayload\(payload\);/);
   // (…and its blockers are routed INTO the still-open dialog via onRefused,
   // instead of a toast over a form that had already been thrown away.)
-  assert.match(panel, /await preflightOk\(\{ lane, trainType: checkpointTrainType,\s*variant: checkpointVariant, baseModel: checkpointBase,\s*onRefused: setContinueError \}\)/);
+  assert.match(panel, /await preflightOk\(\{ lane, trainType: continueType,\s*variant: continueVariant, baseModel: continueBase,\s*onRefused: setContinueError \}\)/);
 });
 
 test('the modal carries no rental copy, and keeps its fix-in-place lists', () => {

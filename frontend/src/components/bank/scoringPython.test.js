@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   bestUpgrade,
+  calculationNote,
   canSelect,
   detectionFailure,
   detectionSummary,
@@ -10,6 +11,7 @@ import {
   enteredNote,
   gpuWindowCost,
   missingLabels,
+  interpreterPaths,
   openerLabel,
   selectionNote,
   sortInterpreters,
@@ -54,7 +56,9 @@ test('the best suggestion is a GPU-ready interpreter that is not already in use'
   assert.equal(bestUpgrade(rows).label, 'ai-toolkit');
   assert.equal(sortInterpreters(rows)[0].label, 'ai-toolkit');
   assert.equal(sortInterpreters(rows).at(-1).label, 'App Python');
-  assert.equal(detectionSummary(rows), '1 of 3 can run ✨ Score on your GPU.');
+  assert.match(detectionSummary(rows), /1 of 3 detect CUDA/);
+  assert.match(detectionSummary(rows), /Calculation is not tested/);
+  assert.doesNotMatch(statusBadge('gpu_ready').label, /GPU ready/);
 });
 
 test('the one already selected is never offered again', () => {
@@ -122,8 +126,8 @@ test('nothing found at all is a state, not an error', () => {
 
 test('the wording defaults to "there is a card" while the probe has not answered', () => {
   // Flashing "no NVIDIA card" at someone who has one is the one wrong guess.
-  assert.match(detectionSummary([row()]), /can run/);
-  assert.match(dialogCopy().title, /GPU Python/);
+  assert.match(detectionSummary([row()]), /detect CUDA/);
+  assert.match(dialogCopy().title, /Manage Python/);
   assert.match(openerLabel(), /GPU Python/);
 });
 
