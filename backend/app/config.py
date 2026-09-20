@@ -1709,3 +1709,18 @@ def secret_key() -> str:
     if not f.exists():
         f.write_text(_secrets.token_hex(32), encoding='utf-8')
     return f.read_text(encoding='utf-8').strip()
+
+
+def register_plugin_defaults(plugin_id: str, mapping: dict) -> None:
+    """A plugin's own settings defaults, merged under DEFAULTS['plugins'][<id>]
+    at load. Keys a plugin owns inside a shared core section stay in the core
+    DEFAULTS above (a stored key never moves).
+
+    Adopted from V2: plugins/api.py's register_config_defaults calls straight
+    into this, so a plugin that ships settings cannot load without it.
+    """
+    global _cache
+    section = DEFAULTS.setdefault('plugins', {})
+    section[plugin_id] = _deep_merge(section.get(plugin_id, {}), mapping)
+    with _lock:
+        _cache = None

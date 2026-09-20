@@ -66,7 +66,7 @@ import requests
 from . import capabilities
 from . import config as cfg
 from .utils.redact import redact_user_paths
-from .services import infer_env
+from .services import infer_env, managed_python
 from .version import APP_VERSION
 
 logger = logging.getLogger(__name__)
@@ -590,6 +590,11 @@ _CAPABILITY_PACKAGES = {
 # entirely, so it's excluded. wd14 is here for its pip half but registers a
 # wrapper worker (_run_wd14) that also fetches weights.
 _CAPABILITY_ML_ACTIONS = ('face_scoring', 'masks', 'wd14', 'video', 'video_text')
+# The actions a plugin may install into with python='capability'
+# (plugins/api.py imports this by name). Derived from the set above, so the
+# fork's extra scoped capabilities -- wd14 in particular -- are covered
+# without restating the list.
+_MANAGED_CAPABILITY_ACTIONS = (*_CAPABILITY_ML_ACTIONS, 'shot_detect')
 
 # Actions whose success makes a NEW importable package appear -> the probe
 # import-cache must be dropped so the capability flips without waiting out the
@@ -1682,6 +1687,79 @@ def _ensure_modern_pip(action, python) -> None:
     if rc != 0:
         _append(action, 'pip upgrade failed — continuing with the bundled pip '
                         '(the install may still hit the old-pip wheel refusal)')
+
+
+def _quality_env_dir():
+    return cfg.data_dir() / 'envs' / 'quality'
+
+
+def _managed_env_valid(python):
+    """Verify the running Python actually belongs to this isolated venv.
+
+    Adopted from V2. The fork's _ensure_*_env helpers below tested only that the
+    interpreter FILE exists, which cannot tell an app-built venv from a system
+    Python somebody pointed the setting at -- and installing ML wheels into the
+    latter is what this whole module exists to avoid.
+    """
+    try:
+        result = subprocess.run(
+            [python, '-I', '-c', 'import sys,json,pip; '
+             'print(json.dumps([list(sys.version_info[:2]),sys.prefix,sys.base_prefix]))'],
+            capture_output=True, text=True, timeout=20,
+            env=managed_python.subprocess_env(),
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        version, prefix, base = json.loads(result.stdout)
+        expected = os.path.dirname(os.path.dirname(python))
+        return (result.returncode == 0 and _VENV_PY_MIN <= tuple(version) <= _VENV_PY_MAX
+                and os.path.normcase(os.path.abspath(prefix)) == os.path.normcase(expected)
+                and os.path.normcase(prefix) != os.path.normcase(base))
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return False
+
+
+def _ensure_managed_ml_env(action, env_dir) -> str:
+    """Create/reuse only a validated LDS-owned venv; repair broken ones safely.
+
+    Adopted from V2: the generic form of the fork's per-capability builders. A
+    broken environment is RENAMED aside rather than deleted, so a failed repair
+    can be rolled back instead of costing the user their install.
+    """
+    import uuid
+    env_dir = env_dir.absolute()
+    python = _venv_python(env_dir)
+    try:
+        managed_python.assert_owned_directory(env_dir, cfg.data_dir())
+        if _is_flask_venv(python):
+            raise ValueError('Refusing to install ML tools into the app Python.')
+        if os.path.isfile(python) and _managed_env_valid(python):
+            _append(action, f'reusing the managed {env_dir.name} environment')
+            _ensure_modern_pip(action, python)
+            return python
+        base = _find_base_python(action)
+        if not base:
+            return ''
+        backup = env_dir.with_name(env_dir.name + '.previous-' + uuid.uuid4().hex)
+        env_dir.parent.mkdir(parents=True, exist_ok=True)
+        if env_dir.exists():
+            env_dir.rename(backup)
+            _append(action, 'The previous broken environment was kept for recovery.')
+        try:
+            _append(action, f'building the managed {env_dir.name} environment')
+            rc = _run_pip(action, [base, '-m', 'venv', str(env_dir)])
+            if rc != 0 or not os.path.isfile(python) or not _managed_env_valid(python):
+                raise ValueError('The managed environment failed its Python version check.')
+        except Exception:
+            if env_dir.exists():
+                managed_python.assert_owned_directory(env_dir, cfg.data_dir())
+                shutil.rmtree(env_dir)
+            if backup.exists():
+                backup.rename(env_dir)
+            raise
+        _ensure_modern_pip(action, python)
+        return python
+    except Exception as exc:
+        _append(action, f'could not prepare the managed environment: {exc}')
+        return ''
 
 
 def _watermark_env_dir():
@@ -3525,3 +3603,96 @@ _WORKERS = {**{a: _run_ml_extras for a in _PIP_REQUIREMENTS},   # ml_extras + sc
 # repro: scrape_extras was added to INSTALL_ACTIONS but not here).
 assert set(INSTALL_ACTIONS) == set(_WORKERS), \
     f'INSTALL_ACTIONS/_WORKERS mismatch: {set(INSTALL_ACTIONS) ^ set(_WORKERS)}'
+
+
+# --- Plugin-contributed Setup actions (adopted from V2) ----------------------
+# V2 let a plugin register its own Setup action; the routes and
+# plugins/preparation.py call into the helpers below, so the fork needs them
+# whether or not it ships a plugin that uses them.
+#
+# DIVERGENCE: upstream lists ('scrape_extras', 'video', 'shot_detect') here,
+# because its V2 moved those three into plugins. On this fork all three are CORE
+# actions in INSTALL_ACTIONS above (see the Divergence notes there), so nothing
+# is plugin-managed and _managed_action_enabled answers True for every core
+# action. The set is kept rather than inlined as True: it is the seam where a
+# future fork plugin would register, and an empty frozenset says that precisely.
+_PLUGIN_MANAGED_ACTIONS = frozenset()
+
+
+def _plugin_registry():
+    from .plugins.registry import active
+    return active()
+
+
+def model_download_spec(action):
+    """The core or registered plugin asset specification, without downloading it."""
+    spec = _MODEL_DOWNLOADS.get(action)
+    if spec is not None:
+        return spec
+    registry = _plugin_registry()
+    return registry.model_downloads.get(action) if registry else None
+
+
+def _managed_action_enabled(action) -> bool:
+    if action not in _PLUGIN_MANAGED_ACTIONS:
+        return True
+    registry = _plugin_registry()
+    if registry is None:
+        return True  # Pure installer utilities before an app loads its plugins.
+    owner = registry.owner_of('install_actions', action)
+    record = registry.records.get(owner)
+    return bool(record and record.enabled and record.state == 'loaded'
+                and (cfg.get('plugins.enabled') or {}).get(owner) is not False)
+
+
+def plugin_action_spec(action):
+    """What a plugin registered through ``ctx.register_install_action``, or None
+    for a core action or a model download."""
+    registry = _plugin_registry()
+    from .plugins.environment import action_spec
+    return (action_spec(action, registry) or registry.install_actions.get(action)) if registry else None
+
+
+def _plugin_action_enabled(spec) -> bool:
+    """Offers obey the same owner-state gate as execution."""
+    registry = _plugin_registry()
+    record = registry.records.get(spec['plugin']) if registry else None
+    if record is None:
+        return False
+    from .plugins.environment import EnvironmentError, check_enabled
+    try:
+        check_enabled(record, loaded=not spec.get('environment'))
+    except EnvironmentError:
+        return False
+    return True
+
+
+def known_action(action) -> bool:
+    """Whitelist check for the routes: the core's actions or a plugin's."""
+    if action in INSTALL_ACTIONS:
+        return _managed_action_enabled(action)
+    registry = _plugin_registry()
+    spec = plugin_action_spec(action)
+    model = registry.model_downloads.get(action) if registry else None
+    return bool(registry and ((model is not None and _plugin_action_enabled(model))
+                              or (spec is not None and (spec.get('environment') or _plugin_action_enabled(spec)))))
+
+
+def plugin_actions_catalog() -> dict:
+    """Every Setup action a plugin added, with the label the screen shows."""
+    registry = _plugin_registry()
+    if registry is None:
+        return {}
+    out = {}
+    for key, spec in registry.install_actions.items():
+        if not _plugin_action_enabled(spec):
+            continue
+        kind = 'node_pack' if spec.get('node_pack') else 'run' if callable(spec.get('run')) else 'pip'
+        out[key] = {'label': spec.get('label') or key, 'plugin': spec['plugin'], 'kind': kind,
+                    'python': 'comfyui' if spec.get('node_pack') else spec.get('python') or 'plugin'}
+    for key, spec in registry.model_downloads.items():
+        if not _plugin_action_enabled(spec):
+            continue
+        out[key] = {'label': spec.get('label') or key, 'plugin': spec['plugin'],
+                    'kind': 'model', 'python': 'none'}
+    return out
