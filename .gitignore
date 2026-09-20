@@ -1,5 +1,11 @@
 # secrets & local config — NEVER commit
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 .docker-launch-settings
 .docker-launch-settings.tmp
 .docker-compose.external-comfy.override.yml
