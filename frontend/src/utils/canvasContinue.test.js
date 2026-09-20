@@ -7,7 +7,12 @@ import {
   canvasContinueRow, canvasContinueSettings, canvasContinueSteps,
 } from './canvasContinue.js';
 
-const canvas = fs.readFileSync(new URL('../components/canvas/LineageCanvas.jsx', import.meta.url), 'utf8');
+// V2 moved LineageCanvas into the bundled `canvas` plugin. This test greps the
+// component's SOURCE (it pins how the canvas host wires the shared dialog), so
+// it follows the file rather than the old core path.
+const canvas = fs.readFileSync(new URL(
+  '../../../bundled/canvas/frontend/components/canvas/LineageCanvas.jsx',
+  import.meta.url), 'utf8');
 
 // A cloud lineage node as `_lineage_node` serialises it (cloud branch: run_id +
 // status), with three harvested saves.
@@ -216,7 +221,8 @@ test('an unaddressable run yields no request rather than a wrong one', () => {
 // --- the board wiring (contract) -------------------------------------------
 
 test('the board opens the SHARED ContinueDialog — no third continue form', () => {
-  assert.match(canvas, /import ContinueDialog from '\.\.\/dataset\/ContinueDialog'/);
+  // The plugin reaches the shared dialog through the SDK, not a relative path.
+  assert.match(canvas, /import \{ ContinueDialog \} from '@lds\/plugin-sdk\/canvas'/);
   assert.match(canvas, /<ContinueDialog/);
   assert.match(canvas, /lanes=\{continueLanes\}/);
   assert.match(canvas, /initialFromStep=\{continueTarget\.step\}/);
@@ -264,7 +270,13 @@ test('the board never guesses a lane input it failed to read', () => {
   // The lane guards are fed from the Runs-hub payload + capabilities, fetched
   // ONLY when the dialog opens — a board that polled them on idle would drain a
   // phone drawing a static graph.
-  assert.match(canvas, /apiFetch\('\/api\/dataset\/train\/cloud\/runs\?limit=50'\)/);
+  // V2 made the runs endpoint plugin-supplied: a `training.continue.lane`
+  // contribution may name its own runsUrl, and the board falls back to the
+  // LOCAL runs when none does -- which is always the case on this fork, where
+  // the cloud lane is not shipped. The property this test guards is unchanged:
+  // one fetch, on open, never polled.
+  assert.match(canvas, /contributions\('training\.continue\.lane', 'dataset'\)/);
+  assert.match(canvas, /'\/api\/dataset\/train\/runs\?limit=50'/);
   // ai-toolkit's own probe is the app-wide one — no second request for it
   assert.match(canvas, /const \{ caps \} = useCapabilities\(\)/);
   assert.match(canvas, /aitoolkitValid: caps\?\.aitoolkit\?\.valid/);

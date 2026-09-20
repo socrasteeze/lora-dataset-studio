@@ -248,7 +248,12 @@ export const OLLAMA_SKIP_LOST = [
   'Watermark detection through the vision route (the detector engine still works)',
   'Short captions derived from long ones',
 ]
-const OLLAMA_SKIP_KEPT_CORE = [
+// Exported under its pre-V2 name too. V2 made this list private behind
+// ollamaSkipKeptAll(); COMFYUI_SKIP_KEPT beside it kept its export, and the
+// asymmetry is a merge artifact rather than a decision. On this fork the two
+// are the same list: apiEnginesKeptLine() answers null with no API engine, so
+// ollamaSkipKeptAll() === OLLAMA_SKIP_KEPT here.
+export const OLLAMA_SKIP_KEPT = [
   'Captioning with JoyCaption — prose or booru tags, matched to what you train',
   'Scraping, dataset curation and the bank',
   'Local generation, Test Studio comparisons and the Canvas (ComfyUI)',
@@ -263,7 +268,7 @@ const OLLAMA_SKIP_KEPT_CORE = [
 /** Everything "continue without Ollama" keeps, before the per-machine cut below. */
 export function ollamaSkipKeptAll() {
   const api = apiEnginesKeptLine()
-  return api ? [...OLLAMA_SKIP_KEPT_CORE, api] : [...OLLAMA_SKIP_KEPT_CORE]
+  return api ? [...OLLAMA_SKIP_KEPT, api] : [...OLLAMA_SKIP_KEPT]
 }
 
 // The KEPT list as THIS machine may claim it. Every other line is true of any

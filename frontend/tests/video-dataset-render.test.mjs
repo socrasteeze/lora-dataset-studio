@@ -48,8 +48,10 @@ const { resetRegistry, registerDescriptor, setEnabled, contributions } =
   await import('../src/plugins/registry.js')
 const { default: VideoTrainingBlock } =
   await import('../../bundled/video/frontend/videobank/VideoTrainingBlock.jsx')
-const { default: cloudTraining } = await import('../../bundled/cloud_training/frontend/index.js')
-const cloudManifest = JSON.parse(readSource('../bundled/cloud_training/plugin.json'))
+// DIVERGENCE 4 -- upstream imports the cloud_training descriptor here and asserts
+// its video contribution. bundled/cloud_training is deleted on this fork, so that
+// test went with the lane; the sibling 'Video alone renders local training with no
+// cloud contribution' below is the assertion this fork actually wants, and it stays.
 const { renderToReadableStream } = await import('react-dom/server')
 
 test.beforeEach(t => {
@@ -314,29 +316,4 @@ test('Video alone renders local training with no cloud contribution or cloud con
   assert.match(html, /Train on this PC/)
   assert.doesNotMatch(html, /Train in the cloud|Retry|Train further/)
   assert.deepEqual(contributions('training.launch', 'video'), [])
-})
-
-test('the real Cloud Training owner contributes only when enabled, and its dialog imports', async () => {
-  assert.equal(registerDescriptor(cloudTraining, { guideOwnership: cloudManifest.guide_ownership }), true)
-  assert.deepEqual(contributions('training.launch', 'video'), [])
-  setEnabled(['cloud_training'])
-  const [item] = contributions('training.launch', 'video')
-  assert.equal(item.plugin, 'cloud_training')
-  // Loading the actual contribution walks the dialog and estimate imports.
-  // This is the dependency that used to prevent Video itself from loading.
-  const { VideoCloudActions } = await item.panels.video()
-  const actions = renderTraining(VideoCloudActions, { busyCloud: false, opening: false,
-    blocked: '', run: null, latestGroup: null })
-  assert.match(actions, /Train in the cloud/)
-  const stream = await renderToReadableStream(createElement(MemoryRouter, null,
-    createElement(ToastProvider, null,
-      createElement(VideoTrainingBlock, { ds: { ...DS, clips: 0 } }))))
-  await stream.allReady
-  const enabled = await new Response(stream).text()
-  assert.match(enabled, /Train on this PC/)
-  assert.match(enabled, /no clips on disk/)
-  setEnabled([])
-  const disabled = renderTraining(VideoTrainingBlock, { ds: { ...DS, clips: 0 } })
-  assert.match(disabled, /Train on this PC/)
-  assert.doesNotMatch(disabled, /no clips on disk|Train in the cloud/)
 })
