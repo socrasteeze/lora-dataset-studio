@@ -1,6 +1,6 @@
 # V2 migration preparation
 
-Reviewed 2026-09-20. Preparation only; the live installation has not been switched.
+Source integration qualified 2026-09-20. The live installation has not been switched.
 
 ## Decision
 
@@ -266,14 +266,19 @@ shutdown before cutover.
 
 ## Not yet demonstrated
 
-- Final qualification of the integrated V2 tree and its release archive.
 - A migration and complete rollback rehearsal using a copy of the live installation.
 - Live generation/training on the intended machines.
 - Full media backup and a fresh cutover snapshot.
 
-## Migration verification progress
+## Source migration qualification
 
-The curated fork profile builds and boots all ten intended plugins. Framework
+Qualified source: `aa173b437`. The full backend gate passed 9,862 tests with 23 skips.
+The frontend passed 5,043 core and 1,109 bundled tests with four bundled skips on
+Node 24.21.0. Both linters passed; ESLint retains 40 warnings.
+
+The curated fork profile builds and boots all ten intended plugins. The extracted
+932-file runtime ZIP passed privacy scanning and booted its exact ten plugins
+without a distribution override or outbound network access. Framework
 tests cover archive replacement refusal and invalid build markers. Release and
 container staging select the same root policy and exclude held or rejected
 packages. Container recipes were checked by tests; no local Docker image was
