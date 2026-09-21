@@ -39,10 +39,12 @@ any file.
 
 ## Tests — targeted while you work, full and green before you push
 
-The backend suite is ~7 500 tests. Run whole and sequentially it takes **40
-minutes**; run on 8 workers it takes **7**, with the same result — measured, on
-the same tree, same machine. Use the parallel form. Commits accumulate locally
-during a wave, so the full gate belongs at the **push**, not at every commit.
+The qualified V2 host suite has about 9,900 tests and takes **6-7 minutes on
+eight workers** on the measured Windows host. Use the parallel form. Commits
+accumulate locally during a wave, so the full gate belongs at the landing push,
+not at every repair. Use `scripts/upstream_sync.ps1 -Phase Quick` for the short
+preflight and `-Phase Gates` for complete qualification; the latter includes
+release tooling and runs bundled Python contracts in separate processes.
 
 **Every `python` below means `.venv`'s interpreter** — `.venv/Scripts/python.exe`
 on Windows, `.venv/bin/python` on POSIX — never the machine default. See "Run the
@@ -50,17 +52,19 @@ suite through `.venv`" at the end of this section for why, and for the one comma
 that provisions it.
 
 - **While coding** — only what can tell you something about what you just
-  changed: `python -m pytest -k "<basename of the changed module>"` (test files
+  changed: `python -m pytest backend/tests/test_foo.py -q` (test files
   are named after the module or domain they cover: `app/services/foo.py` →
   `tests/test_foo*.py`). Frontend: the matching `.test.js`, by exact path.
-  Seconds. This is a speed signal, not a gate.
+  Use `node --import ./scripts/registerSdk.mjs --test <file>` from `frontend/`
+  for a targeted frontend check. This is a speed signal, not a gate.
 - **Before a commit** — the above, plus the tests no filename can lead you to:
   `backend/tests/test_no_personal_data.py` and `backend/tests/test_*contract*.py`
-  check invariants across the whole tree. Frontend: `node --test` from
-  `frontend/` (~1 min — it carries the help-registry and What's-new contracts).
+  check invariants across the whole tree. Frontend: `npm test` from `frontend/`;
+  it loads the SDK and runs core plus bundled contracts.
 - **Before the push that LANDS the wave** — both suites, whole and green, on
-  that exact tree: `python -m pytest -n 8 --dist loadfile` and
-  `node --test` from `frontend/`. **Plus both linters**: `ruff check .` from the
+  that exact tree: `python -X utf8 -m pytest backend/tests scripts/tests -n 8 --dist loadfile`,
+  the isolated bundled Python runs, and `npm test` from `frontend/`. The sync
+  driver's `-Phase Gates` runs this complete sequence. **Plus both linters**: `ruff check .` from the
   repo root and `npm run lint` from `frontend/` — CI's Lint job runs OUTSIDE the
   size gate, so a branch merged with a pre-gate file can turn `main` red on lint
   alone with every test green (it happened upstream: an F401 in a branch written

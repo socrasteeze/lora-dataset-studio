@@ -27,13 +27,12 @@ Fork: `socrasteeze/lora-dataset-studio` · Upstream: `perfectgf/lora-dataset-stu
 > **`upstream/v1` is fully merged into this fork (0 incoming, measured
 > 2026-09-20). There is no v1 sync left to run.**
 >
-> **`upstream/v2` is NOT a sync — it is a migration.** Its behind-count reads a
-> harmless 13 while the tree gap is 1,990 files, because a September 16
-> `ours`-strategy merge acknowledged 122 V2 commits without adopting their
-> content. Do not run this page's procedure against `v2`. See
-> [V2_MIGRATION_PREP.md](V2_MIGRATION_PREP.md), which records what an ordinary
-> merge actually delivers (a broken partial: the rejected `cloud_training`
-> plugin, no SDK, 995 paths missing).
+> **The initial V2 migration required a content-base integration.** A September
+> 16 ancestry-only merge had acknowledged 122 commits without adopting their
+> content. That migration is now qualified on this fork; see
+> [V2_MIGRATION_PREP.md](V2_MIGRATION_PREP.md) and `HANDOFF.md`. Subsequent V2
+> updates use the normal reviewed sync sequence below. Do not repeat the old
+> graft or mistake the fork's intentional tree differences for missing content.
 
 ## Running it
 
@@ -46,12 +45,65 @@ runs the sweep and the gates, and removes its own scratch files on exit
 pwsh -File scripts/upstream_sync.ps1 -Phase Orient   # remotes, identity, window
 pwsh -File scripts/upstream_sync.ps1 -Phase Baseline # section 1, before any merge
 pwsh -File scripts/upstream_sync.ps1 -Phase Sweep    # section 4
-pwsh -File scripts/upstream_sync.ps1 -Phase Gates    # section 6
-pwsh -File scripts/upstream_sync.ps1 -Phase All -KeepScratch
+pwsh -File scripts/upstream_sync.ps1 -Phase Quick    # cheap checks while fixing
+pwsh -File scripts/upstream_sync.ps1 -Phase Gates    # complete final qualification
+pwsh -File scripts/upstream_sync.ps1 -Phase All      # Orient + Sweep + Gates, once
 ```
 
 Resolution, documentation and shipping stay here, with a human or a reviewing
 agent. The script reports; it does not decide.
+
+### Faster validation without dropping coverage
+
+The migration's full host suite took about **6-7 minutes on eight workers**.
+The expensive problem was repeated full runs while startup or test isolation was
+still broken. The old `All` phase also ran Baseline and Gates back-to-back without
+a merge between them. That spent two full suites checking one checkout.
+
+Measured after this repair: Quick took **46 seconds**; the complete host/tooling
+suite took **390 seconds** (9,977 passed, 24 skipped, 106 subtests passed), isolated
+bundled Python checks took about **4 seconds** (182 passed), and the frontend
+passed 6,152 tests. This removes wasted runs; it does not claim a sub-minute full
+suite. The timing profile also identified repeated ComfyUI HTTP timeouts in
+`test_diagnostic.py`. Stubbing that unit-test boundary is a possible next experiment,
+not an implemented or measured full-suite speedup.
+
+
+Use this sequence:
+
+1. Run `Baseline` on the untouched pre-merge tree. It does not rebuild the frontend.
+2. Merge and fix one area at a time. Replay its named failing files with the pinned
+   interpreter; keep each replay's data/configuration and basetemp isolated.
+3. Run `Quick` before investing in the full backend run. It stops on the first
+   failed lint, build, served-plugin startup, ownership/hygiene, or frontend check.
+4. Freeze source and test edits, then run `Gates` once. It runs Quick, the bundled
+   Python contracts in separate processes, and `backend/tests scripts/tests` on
+   eight workers. `npm test` already includes core and bundled frontend tests.
+5. If the full gate fails, fix and replay the named failures first. A changed tree
+   still requires a final complete green gate. Quick never qualifies a release.
+
+`All` now audits and qualifies the current checkout once; it is not a pre/post
+merge pair. `Baseline` remains a separate required pre-merge operation.
+A failed validation command returns a nonzero process status and stops later expensive work.
+Attribution-shaped staged matches also stop Gates unless they have been reviewed:
+remove actual attribution; use `-ReviewedAttribution` only for legitimate technical
+or test references that were inspected individually.
+
+Use Node 24, matching CI. Keep the pinned `.venv` and installed frontend dependencies.
+Do not raise workers above eight: prior `-n auto` runs exhausted memory. A scheduler
+change or fixture-cache redesign needs measured timing and isolation evidence first.
+Full runs now print slow-test timings. Each step also records elapsed seconds in a
+small JSON receipt under the checkout's Git metadata (`lds-sync-validation`). Those
+receipts are diagnostic records, not cached qualification: HEAD alone does not
+identify uncommitted source or the installed test environment.
+
+Each driver invocation uses a unique short scratch directory on the checkout's
+volume and removes it on exit, including failures. `-ScratchRoot` changes the
+scratch parent; `-KeepScratch` intentionally retains full logs and fixtures for
+investigation. Environment overrides are restored afterwards. Plugin directories
+are derived from each test's data directory, not forced into one cross-worker lock
+root. Do not run agents against the same basetemp or edit a tree while it is tested.
+
 
 > **Read this page first, then FORK_NOTES.md's divergence sections.** You do not
 > need to read the FORK_NOTES changelog table to perform a sync — it is a
@@ -100,9 +152,8 @@ breaks the fork's ancestry.
 Run it the way CI does — **from the repo root**, which is a different rootdir and
 `sys.path` than running from `backend/`.
 
-```bash
-python -m pytest backend/tests -q -rf 2>&1 | tail -60 > /tmp/baseline-backend.txt
-cd frontend && npm test 2>&1 | tail -20 > /tmp/baseline-frontend.txt && cd ..
+```powershell
+pwsh -File scripts/upstream_sync.ps1 -Phase Baseline
 ```
 
 **No baseline = no merge.** The baseline must both collect *and* execute on the
@@ -390,43 +441,29 @@ prose.
 
 ## 6 · Gates — all of them, in this order
 
-Each exists because the ones before it have a documented blind spot.
+Each exists because the ones before it have a documented blind spot. Run the
+isolated driver from the repository root with the pinned Python environment and
+Node 24 on PATH:
 
-```bash
-# 1 — bare-identifier tripwire. THE gate for the ReferenceError class; the
-#     bundler resolves imports, not identifiers.
-cd frontend && npm run lint
+```powershell
+# During repair: no full backend run if an earlier check is red.
+pwsh -File scripts/upstream_sync.ps1 -Phase Quick
+
+# Final qualification: includes Quick, isolated product Python contracts,
+# backend/tests and scripts/tests, plus the complete frontend suite.
+pwsh -File scripts/upstream_sync.ps1 -Phase Gates
 ```
 
-If the output is anything other than ESLint's own (e.g. `'eslint' is not
-recognized`), the tripwire never fired — `npm install`, then re-run.
+For a named failure, replay its file before repeating Gates. The driver emits the
+failure list and slow-test timings. Use a fresh short `--basetemp` and disposable
+`LDS_DATA_DIR`, `LDS_CONFIG`, and `LDS_ENV` for manual Python runs; never start the
+app against production state for an import check. The driver uses `TESTING=True`
+for startup and verifies `/api/plugins/` plus the complete built plugin set.
 
-```bash
-# 2 — import resolution
-npm run build
-
-# 3 — local-only contract, BOTH halves
-node --test tests/local-only-engines-contract.test.mjs && cd ..
-python -m pytest backend/tests/test_local_only_engines.py -q
-
-# 4 — backend import sanity
-python -c "import sys; sys.path.insert(0,'backend'); import app; app.create_app()"
-
-# 5 — repo hygiene
-python -m pytest backend/tests/test_no_personal_data.py \
-                backend/tests/test_windows_scripts_are_ascii.py -q
-
-# 6 — full suites, CI's own invocation, diffed against the §1 baseline
-python -m pytest backend/tests -q -rf 2>&1 | tail -60 > /tmp/post-backend.txt
-cd frontend && npm test 2>&1 | tail -20 > /tmp/post-frontend.txt && cd ..
-diff /tmp/baseline-backend.txt /tmp/post-backend.txt
-
-# 7 — attribution and identity, before EVERY commit including build(frontend):
-git diff --cached | grep -niE \
-  'co-authored-by|signed-off-by|generated-by|assisted-by|generated with|AI-assisted|claude|haiku|sonnet|opus|fable|mythos|anthropic|chatgpt|copilot|cursor|codex' \
-  | grep -viE 'cursor-pointer|cursor-not-allowed|cursor-default'
-git log --format='%an <%ae> | %cn <%ce>' origin/main..HEAD | sort -u
-```
+Attribution and sensitive-data review still apply before every commit/push. A
+matching technical term is not automatically attribution; classify it before
+acknowledging the driver warning. Never remove legitimate project content merely
+because it discusses an AI system.
 
 | Gate | Catches what nothing before it can |
 |---|---|

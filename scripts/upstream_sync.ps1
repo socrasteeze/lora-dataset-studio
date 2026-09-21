@@ -17,8 +17,9 @@
     -Phase Orient    section 0 + 2   remotes, identity, tree state, incoming window
     -Phase Baseline  section 1       pre-merge suites (no merge may happen without one)
     -Phase Sweep     section 4       rejected-feature leftovers, re-delete list
-    -Phase Gates     section 6       lint, build, contracts, import, hygiene, suites
-    -Phase All       everything above, in order
+    -Phase Quick     section 6       fail-fast lint/build/startup/frontend checks
+    -Phase Gates     section 6       Quick, isolated product tests, full host/tooling suite
+    -Phase All       Orient, Sweep, Gates ONCE (baseline is a separate pre-merge run)
 
   SCRATCH FILES. Every run writes under one directory and removes it on exit --
   including on Ctrl-C or a thrown gate. Keep it with -KeepScratch when you need to
@@ -27,13 +28,19 @@
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('Orient', 'Baseline', 'Sweep', 'Gates', 'All')]
+  [ValidateSet('Orient', 'Baseline', 'Sweep', 'Quick', 'Gates', 'All')]
   [string]$Phase = 'Orient',
 
   # Upstream branch to compare against. Empty means "derive it": upstream's own
   # HEAD. Do not hardcode a branch here -- upstream renamed main to v1 and made
   # v2 default on 2026-09-19, which deleted the ref every older script fetched.
   [string]$UpstreamBranch = '',
+
+  # Short paths avoid Windows path-length and console-wrapping failures.
+  [string]$ScratchRoot = (Join-Path ([IO.Path]::GetPathRoot($PSScriptRoot)) 'tmp'),
+
+  # Acknowledge only manually classified technical/test references, never real attribution.
+  [switch]$ReviewedAttribution,
 
   [switch]$KeepScratch
 )
@@ -54,34 +61,81 @@ function Write-Head([string]$m) { Write-Host ''; Write-Host "=== $m ===" }
 # try/finally below is what makes "cleans up after itself" true even when a gate
 # throws, which is the case that used to leave $env:TEMP full of half-runs.
 
-$script:Scratch = Join-Path $env:TEMP ("lds-sync-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-New-Item -ItemType Directory -Path $script:Scratch -Force | Out-Null
-$script:Worktrees = New-Object System.Collections.ArrayList
+$scratchParent = if ([IO.Path]::IsPathRooted($ScratchRoot)) { $ScratchRoot } else { Join-Path $Root $ScratchRoot }
+$script:ScratchBase = [IO.Path]::GetFullPath($scratchParent)
+$script:RunId = [guid]::NewGuid().ToString('N').Substring(0, 10)
+$script:Scratch = Join-Path $script:ScratchBase ("ls-" + $script:RunId)
+New-Item -ItemType Directory -Path $script:Scratch -ErrorAction Stop | Out-Null
+$script:Results = New-Object System.Collections.ArrayList
+$script:ExitCode = 0
 
 function Scratch([string]$name) { Join-Path $script:Scratch $name }
 
 function Remove-Scratch {
-  # Worktrees first: git owns metadata in .git/worktrees, so removing the
-  # directory alone would leave the repo believing a checkout still exists.
-  foreach ($wt in $script:Worktrees) {
-    if (Test-Path -LiteralPath $wt) {
-      & git worktree remove --force $wt 2>&1 | Out-Null
-    }
-  }
-  if ($script:Worktrees.Count) { & git worktree prune 2>&1 | Out-Null }
-
   if ($KeepScratch) {
     Write-Info "Scratch kept: $script:Scratch"
     return
   }
-  if (Test-Path -LiteralPath $script:Scratch) {
-    Remove-Item -LiteralPath $script:Scratch -Recurse -Force -ErrorAction SilentlyContinue
-    if (Test-Path -LiteralPath $script:Scratch) {
-      Write-Warn "Could not fully remove scratch: $script:Scratch"
-    } else {
-      Write-Info 'Scratch removed.'
+  $resolved = [IO.Path]::GetFullPath($script:Scratch)
+  $prefix = $script:ScratchBase.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+  if (-not $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or
+      (Split-Path -Leaf $resolved) -ne ("ls-" + $script:RunId)) {
+    throw 'Scratch cleanup refused: path is outside this run.'
+  }
+  if (Test-Path -LiteralPath $resolved) {
+    Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $resolved) { Write-Warn "Could not fully remove scratch: $resolved" }
+    else { Write-Info 'Scratch removed.' }
+  }
+}
+
+# Every child inherits scratch config/data before collection imports the app.
+# Never impose one shared plugin directory on all xdist workers: direct app
+# fixtures derive their plugin directory from their own isolated data root.
+function Invoke-IsolatedValidation([scriptblock]$Body) {
+  $names = @('LDS_DATA_DIR', 'LDS_CONFIG', 'LDS_ENV', 'LDS_PLUGINS_DIR',
+             'LDS_EXTENSIONS_DIR', 'LDS_BUNDLED_DIR', 'LDS_PLUGIN_DISTRIBUTION',
+             'LDS_PLUGIN_BUILD_MODE', 'LDS_PLUGINS', 'LDS_EXTENSIONS', 'LDS_SYNC_SCRATCH')
+  $saved = @{}
+  foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
+  try {
+    foreach ($name in $names) { Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue }
+    $env:LDS_DATA_DIR = Scratch 'data'
+    $env:LDS_CONFIG = Scratch 'config.json'
+    $env:LDS_ENV = Scratch '.env'
+    $env:LDS_SYNC_SCRATCH = $script:Scratch
+    & $Body
+  } finally {
+    foreach ($name in $names) {
+      if ($null -eq $saved[$name]) { Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue }
+      else { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
     }
   }
+}
+
+function Write-ValidationSummary {
+  if (-not $script:Results.Count) { return }
+  Write-Head 'Validation timings'
+  foreach ($step in $script:Results) {
+    Write-Info ("{0}: exit={1}, {2:N2}s" -f $step.Name, $step.Exit, $step.Seconds)
+  }
+  # Keep a small receipt, not gigabytes of test fixtures. This is diagnostic
+  # evidence only: it never exempts a changed tree from the final full gate.
+  $gitPath = & git rev-parse --git-path lds-sync-validation
+  if ($LASTEXITCODE -ne 0) { throw 'Cannot locate validation receipt directory.' }
+  $directory = $gitPath.Trim()
+  if (-not [IO.Path]::IsPathRooted($directory)) { $directory = Join-Path $Root $directory }
+  $directory = [IO.Path]::GetFullPath($directory)
+  New-Item -ItemType Directory -Path $directory -Force | Out-Null
+  $receipt = Join-Path $directory ($script:RunId + '.json')
+  [pscustomobject]@{
+    Phase = $Phase; Head = (& git rev-parse HEAD).Trim()
+    Steps = @($script:Results | Select-Object Name, Exit, Seconds)
+    ScratchKept = [bool]$KeepScratch
+    Succeeded = ($script:ExitCode -eq 0)
+    AttributionReviewed = [bool]$ReviewedAttribution
+  } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $receipt -Encoding UTF8
+  Write-Info "Timing receipt: $receipt"
 }
 
 # --- the pinned interpreter -------------------------------------------------
@@ -109,11 +163,19 @@ function Invoke-Step {
   if (-not $LogName) { $LogName = ($Name -replace '[^A-Za-z0-9]+', '-').ToLower() + '.txt' }
   $log = Scratch $LogName
   Write-Head $Name
-  & $Body 2>&1 | Tee-Object -FilePath $log
+  $timer = [Diagnostics.Stopwatch]::StartNew()
+  $global:LASTEXITCODE = 0
+  & $Body 2>&1 | Tee-Object -FilePath $log | Out-Host
   $code = $LASTEXITCODE
+  $timer.Stop()
   if ($null -eq $code) { $code = 0 }
-  if ($code -eq 0) { Write-Ok "$Name" } else { Write-Err "$Name -- exit $code" }
-  [pscustomobject]@{ Name = $Name; Exit = $code; Log = $log }
+  $result = [pscustomobject]@{ Name = $Name; Exit = $code; Log = $log; Seconds = $timer.Elapsed.TotalSeconds }
+  [void]$script:Results.Add($result)
+  if ($code -ne 0) {
+    throw "$Name failed (exit $code). Stop here; replay the named failures before the full gate."
+  }
+  Write-Ok ("{0} ({1:N2}s)" -f $Name, $result.Seconds)
+  $result
 }
 
 # --- phase 0/2: orient ------------------------------------------------------
@@ -217,24 +279,34 @@ function Invoke-Orient {
 
 # --- phase 1: baseline ------------------------------------------------------
 
-function Invoke-Baseline {
-  $py = Get-Python
-  Write-Info "interpreter: $py"
-  Write-Warn 'A baseline is only valid if it both collects AND executes on the pre-merge tree.'
-
-  $b1 = Invoke-Step -Name 'Baseline backend' -LogName 'baseline-backend.txt' -Body {
-    & $py -m pytest backend/tests -q -rf -n 8 --dist loadfile --basetemp (Scratch 'bt')
-  }
+function Invoke-FrontendSuite {
   Push-Location (Join-Path $Root 'frontend')
-  try {
-    $b2 = Invoke-Step -Name 'Baseline frontend' -LogName 'baseline-frontend.txt' -Body { & npm test }
-  } finally { Pop-Location }
+  try { Invoke-Step -Name 'Frontend suite (core and bundled)' -LogName 'frontend.txt' -Body { & npm test } | Out-Null }
+  finally { Pop-Location }
+}
 
-  Write-Head 'Baseline summary'
-  Write-Info "backend  exit=$($b1.Exit)"
-  Write-Info "frontend exit=$($b2.Exit)"
-  Write-Warn 'Record the failure LIST, not just totals. No baseline = no merge.'
-  @($b1, $b2)
+function Invoke-BackendSuites {
+  $py = Get-Python
+  $tested = 0
+  foreach ($plugin in (Get-ChildItem -LiteralPath (Join-Path $Root 'bundled') -Directory | Sort-Object Name)) {
+    $tests = Join-Path $plugin.FullName 'tests'
+    if (-not (Test-Path -LiteralPath $tests -PathType Container)) { continue }
+    if (-not (Get-ChildItem -LiteralPath $tests -Filter 'test_*.py' -File -Recurse)) { continue }
+    Invoke-Step -Name ("Bundled Python: " + $plugin.Name) -LogName ($plugin.Name + '-python.txt') -Body {
+      & $py -X utf8 -m pytest $tests -q -p no:flask --basetemp (Scratch ("p-" + $plugin.Name)) --durations=10
+    } | Out-Null
+    $tested++
+  }
+  if ($tested -eq 0) { throw 'No bundled Python contracts were discovered.' }
+  Invoke-Step -Name 'Full backend and release tooling' -LogName 'backend.txt' -Body {
+    & $py -X utf8 -m pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile --basetemp (Scratch 'pt') --durations=25
+  } | Out-Null
+}
+
+function Invoke-Baseline {
+  Write-Warn 'Freeze the pre-merge tree until both suites finish. No baseline = no merge.'
+  Invoke-FrontendSuite
+  Invoke-BackendSuites
 }
 
 # --- phase 4: sweep ---------------------------------------------------------
@@ -293,49 +365,27 @@ function Invoke-Sweep {
 
 # --- phase 6: gates ---------------------------------------------------------
 
-function Invoke-Gates {
+function Invoke-Quick {
   $py = Get-Python
-  $results = New-Object System.Collections.ArrayList
-
+  Invoke-Step -Name 'Backend lint' -LogName 'ruff.txt' -Body { & $py -m ruff check . } | Out-Null
   Push-Location (Join-Path $Root 'frontend')
   try {
-    $g = Invoke-Step -Name 'Gate 1 -- lint (bare-identifier tripwire)' -LogName 'gate1-lint.txt' -Body { & npm run lint }
-    [void]$results.Add($g)
-    if ((Get-Content -LiteralPath $g.Log -Raw) -match "not recognized|ENOENT|Cannot find module 'eslint'") {
-      Write-Err 'Output is not ESLint''s own -- the tripwire never fired. npm install, then re-run.'
-    }
-
-    [void]$results.Add((Invoke-Step -Name 'Gate 2 -- build' -LogName 'gate2-build.txt' -Body { & npm run build }))
-    [void]$results.Add((Invoke-Step -Name 'Gate 3a -- local-only contract (frontend)' -LogName 'gate3a.txt' -Body {
-      & node --test tests/local-only-engines-contract.test.mjs
-    }))
+    Invoke-Step -Name 'Frontend lint' -LogName 'eslint.txt' -Body { & npm run lint } | Out-Null
+    Invoke-Step -Name 'Frontend build' -LogName 'build.txt' -Body { & npm run build } | Out-Null
   } finally { Pop-Location }
+  Invoke-Step -Name 'Served plugin startup' -LogName 'startup.txt' -Body {
+    & $py -X utf8 (Join-Path $PSScriptRoot 'sync_smoke.py')
+  } | Out-Null
+  Invoke-Step -Name 'Ownership and hygiene preflight' -LogName 'preflight.txt' -Body {
+    & $py -X utf8 -m pytest backend/tests/test_local_only_engines.py backend/tests/test_no_personal_data.py backend/tests/test_windows_scripts_are_ascii.py backend/tests/test_public_plugin_fixture.py backend/tests/test_fork_plugin_profile.py backend/tests/test_video_fork_plugin_contract.py backend/tests/test_extension_loader.py backend/tests/test_bank_scan_no_db_lock.py -q --basetemp (Scratch 'q') --durations=10
+  } | Out-Null
+  Invoke-FrontendSuite
+  Write-Ok 'Quick checks passed. This is NOT full backend qualification; run -Phase Gates before landing.'
+}
 
-  [void]$results.Add((Invoke-Step -Name 'Gate 3b -- local-only contract (backend)' -LogName 'gate3b.txt' -Body {
-    & $py -m pytest backend/tests/test_local_only_engines.py -q
-  }))
-
-  # Import sanity points at a scratch data dir, never the production one: V2-era
-  # create_app() runs additive schema updates, cleanup and backfills at startup,
-  # and a branch switch does not reverse them.
-  [void]$results.Add((Invoke-Step -Name 'Gate 4 -- backend import sanity' -LogName 'gate4.txt' -Body {
-    $env:LDS_DATA_DIR = Scratch 'import-probe-data'
-    & $py -c "import sys; sys.path.insert(0,'backend'); import app; app.create_app()"
-  }))
-
-  [void]$results.Add((Invoke-Step -Name 'Gate 5 -- repo hygiene' -LogName 'gate5.txt' -Body {
-    & $py -m pytest backend/tests/test_no_personal_data.py backend/tests/test_windows_scripts_are_ascii.py -q
-  }))
-
-  [void]$results.Add((Invoke-Step -Name 'Gate 5b -- ruff' -LogName 'gate5b-ruff.txt' -Body { & $py -m ruff check . }))
-
-  [void]$results.Add((Invoke-Step -Name 'Gate 6 -- backend suite' -LogName 'post-backend.txt' -Body {
-    & $py -m pytest backend/tests -q -rf -n 8 --dist loadfile --basetemp (Scratch 'pt')
-  }))
-  Push-Location (Join-Path $Root 'frontend')
-  try {
-    [void]$results.Add((Invoke-Step -Name 'Gate 6 -- frontend suite' -LogName 'post-frontend.txt' -Body { & npm test }))
-  } finally { Pop-Location }
+function Invoke-Gates {
+  Invoke-Quick
+  Invoke-BackendSuites
 
   Write-Head 'Gate 7 -- attribution and identity (run before EVERY commit)'
   $staged = & git diff --cached
@@ -344,25 +394,17 @@ function Invoke-Gates {
     'claude|haiku|sonnet|opus|fable|mythos|anthropic|chatgpt|copilot|cursor|codex'
   ) | Where-Object { $_.Line -notmatch 'cursor-pointer|cursor-not-allowed|cursor-default' }
   if ($hits) {
-    Write-Err 'Staged content carries attribution-shaped text. Judge feature-name hits by context.'
+    Write-Warn 'Staged content carries attribution-shaped text. Judge feature-name hits by context.'
     $hits | Select-Object -First 20
+    if (-not $ReviewedAttribution) {
+      throw 'Review attribution matches before committing. Remove real attribution; acknowledge only legitimate technical/test references with -ReviewedAttribution.'
+    }
   } else {
     Write-Ok 'No attribution hits in staged content.'
   }
   & git log --format='%an <%ae> | %cn <%ce>' origin/main..HEAD | Sort-Object -Unique
 
-  Write-Head 'Gate summary'
-  foreach ($r in $results) {
-    if ($r.Exit -eq 0) { Write-Ok $r.Name } else { Write-Err "$($r.Name) -- exit $($r.Exit) -- $($r.Log)" }
-  }
-  $failed = @($results | Where-Object { $_.Exit -ne 0 })
-  if ($failed.Count) {
-    Write-Err "$($failed.Count) gate(s) red. Do not commit dist, do not push."
-    Write-Warn 'A parallel worker dies about once in five full runs. Replay a named failure ALONE before believing it.'
-  } else {
-    Write-Ok 'All gates green.'
-  }
-  $results
+  Write-Ok 'All gates green.'
 }
 
 # --- main -------------------------------------------------------------------
@@ -374,20 +416,25 @@ try {
 
   switch ($Phase) {
     'Orient'   { Invoke-Orient }
-    'Baseline' { Invoke-Baseline | Out-Null }
+    'Baseline' { Invoke-IsolatedValidation { Invoke-Baseline } }
     'Sweep'    { Invoke-Sweep -Ref ("upstream/" + (Resolve-UpstreamBranch)) }
-    'Gates'    { Invoke-Gates | Out-Null }
+    'Quick'    { Invoke-IsolatedValidation { Invoke-Quick } }
+    'Gates'    { Invoke-IsolatedValidation { Invoke-Gates } }
     'All' {
       Invoke-Orient
-      Invoke-Baseline | Out-Null
       Invoke-Sweep -Ref ("upstream/" + (Resolve-UpstreamBranch))
-      Invoke-Gates | Out-Null
+      Invoke-IsolatedValidation { Invoke-Gates }
     }
   }
 
   Write-Host ''
   Write-Info 'This script never merges, commits or pushes. Resolution and shipping stay with docs/UPSTREAM_SYNC.md.'
 }
+catch {
+  $script:ExitCode = 1
+  Write-Err $_.Exception.Message
+  exit 1
+}
 finally {
-  Remove-Scratch
+  try { Write-ValidationSummary } finally { Remove-Scratch }
 }

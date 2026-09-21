@@ -80,8 +80,8 @@ label cut by its own box), **targets** (40 px below `lg`) and **overlap**.
 - **Source-only commits.** Never commit `frontend/dist/**` alongside sources;
   the dist rebuild is a separate consolidated `build(frontend):` commit at the
   end of the wave.
-- Frontend tests: `node --test` from `frontend/` — includes the help-registry
-  and what's-new contract tests.
+- Frontend tests: `npm test` from `frontend/`. It loads the SDK and includes
+  core and bundled tests. For one file, keep `--import ./scripts/registerSdk.mjs`.
 
 ## Stable identifiers
 

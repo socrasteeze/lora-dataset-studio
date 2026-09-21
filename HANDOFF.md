@@ -7,8 +7,8 @@ The V2 source migration is qualified on main. Live data, running services and ex
 
 ## Done this session
 - Source integration and fork fixes: `f32e6acb1`; separate source-built frontend: `aa173b437`.
-- Backend: 9,862 passed, 23 skipped. Frontend on Node 24.21.0: 5,043 core + 1,109 bundled passed, four skips.
-- Both linters pass; frontend retains 40 warnings. Privacy/ASCII: 13 passed, two optional private-name skips; working-tree and archive pattern scans found no sensitive data.
+- Latest full driver gate: 9,977 host/tooling tests passed, 24 skipped, 106 subtests passed; 182 isolated bundled Python tests passed. Frontend: 6,152 passed, four skips on Node 24.
+- Both linters pass; frontend retains 40 warnings. The 46-second Quick gate now stops before expensive runs on failure; All runs one full qualification, not a duplicate baseline/gate pair.
 - Ten curated plugins boot in the extracted release ZIP without environment profile overrides; held/excluded packages are absent.
 - Eight rendered routes and the Bank Python picker passed desktop/mobile checks; the picker covered five widths with stubbed calculation results.
 - A synthetic legacy database survived two V2 starts with IDs, captions, decisions, tags and paths intact; an independent old-state rollback copy booted under old code.
@@ -36,15 +36,17 @@ The V2 source migration is qualified on main. Live data, running services and ex
 - Upstream is read-only. Do not use its fork-refusing migration helper or carry its generated frontend.
 
 ## Verify
-Set LDS_DATA_DIR, LDS_CONFIG and LDS_ENV to a disposable root before backend commands.
+Use Node 24 and the pinned `.venv`. The driver isolates data/configuration, uses
+unique short scratch directories, restores environment overrides and cleans up.
 ```powershell
-.venv\Scripts\python.exe -m pytest backend/tests -q -n 8 --dist loadfile --basetemp=D:/tmp/lds-final
-.venv\Scripts\python.exe -m ruff check .
-.venv\Scripts\python.exe -m pytest backend/tests/test_no_personal_data.py backend/tests/test_windows_scripts_are_ascii.py -q
+# Before an upstream merge, on the untouched tree:
+pwsh -File scripts/upstream_sync.ps1 -Phase Baseline
+# During repair (not release qualification):
+pwsh -File scripts/upstream_sync.ps1 -Phase Quick
+# Freeze edits, then qualify once before landing:
+pwsh -File scripts/upstream_sync.ps1 -Phase Gates
 & 'C:/Program Files/Git/bin/bash.exe' scripts/scan-sensitive.sh
-cd frontend
-npm test
-npm run lint
-npm run build
 ```
-The final frontend gate used Node 24, matching CI. Runtime archive construction uses `packaging/release_bundle.py` from a committed tree, followed by `scripts/check_release_artifacts.py <archive>`.
+The full host/tooling run measured 390 seconds. Small timing receipts remain under
+the checkout's Git metadata; they are not cached qualification. Details and the
+remaining profiling opportunity are in `docs/UPSTREAM_SYNC.md`.
