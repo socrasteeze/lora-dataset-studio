@@ -1,40 +1,39 @@
 # HANDOFF
 
-**Updated:** 2026-09-20 · **Branch:** `feat/v2-integration` · **Base:** `d51efc88a` · **Tree:** dirty; merge from origin/main pending
+**Updated:** 2026-09-20 · **Branch:** `main` · **Qualified code:** `aa173b437` · **Tree:** clean
 
 ## State
-V2 migration repairs are in the working tree. Frontend and rendered UI qualification pass; the final backend gate is in progress. Delivery commits and publication follow the final qualification gates.
+The V2 source migration is qualified on main. Live data, running services and external media have not been switched or modified.
 
 ## Done this session
-- Restored actual plugin route registration, startup ownership, local restoration dispatch, Caption Lab parity and capability probes.
-- Completed installer admission/FIFO, managed Python verification, node preparation and companion model downloads.
-- Added a curated ten-plugin fork profile, archive replacement refusal, and matching frontend/backend build marker.
-- Ported Video routes, checkpoint/lineage UI and folder reuse to local-only plugin owners; held publisher remains excluded from the profile.
-- Preserved mixed local tests, restored cache/disabled-owner regression coverage, and updated moved-owner contracts.
-- Frontend: 5,043 core + 1,109 bundled passed, four bundled skips. Privacy/ASCII: 13 passed, two optional private-name skips.
+- Source integration and fork fixes: `f32e6acb1`; separate source-built frontend: `aa173b437`.
+- Backend: 9,862 passed, 23 skipped. Frontend on Node 24.21.0: 5,043 core + 1,109 bundled passed, four skips.
+- Both linters pass; frontend retains 40 warnings. Privacy/ASCII: 13 passed, two optional private-name skips; working-tree and archive pattern scans found no sensitive data.
+- Ten curated plugins boot in the extracted release ZIP without environment profile overrides; held/excluded packages are absent.
+- Eight rendered routes and the Bank Python picker passed desktop/mobile checks; the picker covered five widths with stubbed calculation results.
+- A synthetic legacy database survived two V2 starts with IDs, captions, decisions, tags and paths intact; an independent old-state rollback copy booted under old code.
 
 ## Open
-1. Finish final backend gate after the plugin blueprint fix; do not land a red tree.
-2. Finish isolated rendered UI smoke and address any actual runtime errors.
-3. Complete fork runtime packaging: root policy and curated source plugins must ship together; stock Store exclusions cannot drop required runtime files.
-4. Rebuild dist from final fork source, run both linters, local-only contracts, privacy scan and final suites.
-5. Review all source changes and update migration docs; commit source separately from the generated frontend bundle.
-6. Push/land only after qualification. Live copied-state migration, rollback rehearsal, media recovery and live machine tests remain separate cutover gates.
+1. Before live cutover, inventory and protect external media, drain work, stop writers and take a fresh complete state snapshot.
+2. Rehearse migration and rollback on an isolated copy of the actual installation, with writable paths/endpoints remapped and dispatch blocked.
+3. Verify local generation/training and owned-machine routing on the intended machines before accepting live cutover.
+4. Docker recipes and staging tests pass, but no Docker image was built locally because the CLI is unavailable.
 
 ## Decisions
-- Ten enabled sources in `fork-plugins.json`; Civitai publisher stays on hold, API engines and rental training stay excluded.
-- Normal frontend build selects the curated fork; backend reads its marker unless a test/development profile is explicit.
-- Core repair recipes remain fallback primitives; a discovered disabled owner must block resolution, preflight and enqueue.
-- Core Help wording and historical news remain canonical. Bundled duplicate guide sections cannot overwrite fork docs.
-- Remove only tests for rejected functionality. The prior handoff's blanket instruction to delete 30 marked files was wrong for mixed local suites.
+- `fork-plugins.json` is authoritative: ten enabled sources, Civitai publisher held, API engines and rental training excluded.
+- Normal frontend build selects the fork profile; backend reads its build marker. Store archives cannot replace fork-owned sources.
+- Core repair recipes remain fallback primitives; discovered disabled owners block resolution, preflight and enqueue.
+- Core Help wording and historical news remain canonical; duplicate source-plugin guide sections cannot overwrite fork docs.
+- Mixed local tests were retained. A deleted-plugin marker is not evidence that a whole test file is obsolete.
+- The temporary Git replacement was removed; its object remains under local `refs/migration/v2-content-base`. Published commits keep real ancestry.
 
 ## Traps
-- Never boot against production data: `create_app()` migrates, backfills and cleans state.
+- `create_app()` changes schema and state. Never use production data for an import or smoke test.
 - Use `npm test`; bare Node discovery omits the SDK loader and bundled suite.
-- Core `app.services.cloud_training` is local training. Deleted `lds_cloud_training` is the rental product.
-- A loaded Python registry does not prove a working frontend: `/api/plugins/` must return 200 and expose the same enabled set.
-- Use distinct short pytest basetemps. A killed worker requires isolated replay before attribution.
-- Upstream remains read-only; never carry its generated dist or use its fork-refusing migration helper.
+- Core `app.services.cloud_training` is local training; deleted `lds_cloud_training` is the rental product.
+- Test direct app factories must isolate plugin and extension directories as well as database/configuration paths.
+- Use distinct short pytest basetemps; keep live services and model downloads outside test runs.
+- Upstream is read-only. Do not use its fork-refusing migration helper or carry its generated frontend.
 
 ## Verify
 Set LDS_DATA_DIR, LDS_CONFIG and LDS_ENV to a disposable root before backend commands.
@@ -48,3 +47,4 @@ npm test
 npm run lint
 npm run build
 ```
+The final frontend gate used Node 24, matching CI. Runtime archive construction uses `packaging/release_bundle.py` from a committed tree, followed by `scripts/check_release_artifacts.py <archive>`.
