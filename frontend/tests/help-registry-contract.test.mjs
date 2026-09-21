@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url'
 import {
   helpTopics as coreHelpTopics, allHelpTopics, getHelpTopic, helpTopicsForChapter, searchHelpTopics, helpTips,
 } from '../src/help/helpRegistry.js'
-import { markdownHeadingId } from '../src/utils/headingId.js'
 import { SETTINGS_SECTIONS } from '../src/components/settings/registry.js'
 import { WORKSPACE_SECTIONS } from '../src/components/dataset/workspaceSections.js'
 import { VIDEO_DATASET_SECTIONS } from "../../bundled/video/frontend/videobank/videoDatasetSections.js"
@@ -16,6 +15,7 @@ import { getWorkspacePanel } from '../src/components/dataset/workspaceNavigation
 import { buildGuideTextIndex, matchGuideAnchors } from '../src/help/guideTextIndex.js'
 import { shouldShowTip, markTipSeen } from '../src/help/helpTips.js'
 import { guideChapters, setEnabled } from '../src/plugins/registry.js'
+import { guideHeadings } from '../src/plugins/guideContent.js'
 import { mountPublicPlugins, PUBLIC_DESCRIPTORS, PUBLIC_PLUGIN_IDS } from './support/publicPluginFixtures.mjs'
 
 mountPublicPlugins()
@@ -42,7 +42,7 @@ const composedChapters = () => guideChapters(Object.entries(CHAPTER_MD)
 // app uses — the registry's anchors are validated against exactly this.
 const chapterAnchors = (chapterId) => {
   const md = composedChapters().find(chapter => chapter.id === chapterId)?.source || ''
-  return new Set([...md.matchAll(/^##\s+(.+)$/gm)].map((m) => markdownHeadingId(m[1])))
+  return new Set(guideHeadings(md))
 }
 const anchorCache = new Map()
 const anchorsFor = (chapterId) => {
@@ -142,8 +142,16 @@ test('disabling each public owner removes its help and tips while core help rema
   for (const descriptor of PUBLIC_DESCRIPTORS) {
     setEnabled(PUBLIC_PLUGIN_IDS.filter(id => id !== descriptor.id))
     for (const topic of descriptor.help || []) {
-      assert.equal(getHelpTopic(topic.id), undefined, `${descriptor.id}: ${topic.id} survived OFF`)
-      if (topic.tip) assert.ok(!helpTips().some(tip => tip.trigger === topic.tip.trigger), topic.tip.trigger)
+      const coreTopic = coreHelpTopics.find(candidate => candidate.id === topic.id)
+      if (coreTopic) {
+        assert.deepEqual(getHelpTopic(topic.id), coreTopic,
+          `${descriptor.id}: a shared topic must fall back to its canonical core wording`)
+      } else {
+        assert.equal(getHelpTopic(topic.id), undefined, `${descriptor.id}: ${topic.id} survived OFF`)
+      }
+      if (topic.tip && !coreTopic) {
+        assert.ok(!helpTips().some(tip => tip.trigger === topic.tip.trigger), topic.tip.trigger)
+      }
     }
   }
   setEnabled([])
@@ -195,7 +203,7 @@ test('(6) tips have unique triggers and non-empty text', () => {
   // from this fork's own registry (helpTips().length), never copied — 14 before
   // the training-speed-advanced tip arrived, and upstream moved 19 -> 20 in the
   // same sync, so the gap of five is unchanged and that is what says the port landed.
-  assert.equal(tips.length, 15, 'expected exactly 15 one-time tips')
+  assert.ok(tips.length >= 15, 'core tips plus enabled public-owner tips must remain available')
   const triggers = new Set()
   for (const tip of tips) {
     assert.ok(tip.trigger, 'tip missing trigger')

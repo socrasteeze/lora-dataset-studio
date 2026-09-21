@@ -3,13 +3,12 @@ selective delete, run cleanup, cloud staging purge, source-side save cap."""
 
 from public_dense_test_io import no_dense_provider_io  # noqa: F401
 import os
-from app.utils.timestamps import naive_utcnow
 
 import pytest
 
 from app.config import LOCAL_USER
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 
 @pytest.fixture()
@@ -72,60 +71,8 @@ def test_cleanup_keeps_only_the_keep_set(app, ds, tmp_path, monkeypatch):
         assert left == sorted(['lora_mgmt.safetensors', names[2]])
 
 
-def test_purge_finished_runs_spares_active_and_pod_kept(app, ds, tmp_path):
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    from lds_cloud_training import cloud_training as ct
-    with app.app_context():
-        def mk(status, sub):
-            d = tmp_path / sub
-            d.mkdir()
-            (d / 'ck.safetensors').write_bytes(b'W' * 10)
-            r = CloudTrainingRun(dataset_id=ds, status=status, job_name='j',
-                                 vast_label=f'lds-{sub}', staging_dir=str(d),
-                                 checkpoint_local_path=str(d / 'ck.safetensors'))
-            db.session.add(r)
-            db.session.commit()
-            return d
-        done_dir = mk('done', 'r_done')
-        (done_dir / 'samples').mkdir()
-        (done_dir / 'samples' / 's.png').write_bytes(b'S' * 10)
-        active_dir = mk('training', 'r_active')
-        kept_dir = mk('error_pod_kept', 'r_kept')
-        # finished_at within the recovery window keeps the pod spared; without
-        # one the window cannot be established and the run is fair game.
-        CloudTrainingRun.query.filter_by(vast_label='lds-r_kept').first() \
-            .finished_at = naive_utcnow()
-        db.session.commit()
-        res = ct.purge_finished_runs()
-        assert res['purged_runs'] == 1 and res['freed_bytes'] >= 10
-        # the working files went; the checkpoint was rescued into the store
-        assert not (done_dir / 'samples').exists()
-        assert not (done_dir / 'ck.safetensors').exists()
-        assert active_dir.exists() and kept_dir.exists()   # spared
 
 
-def test_delete_cloud_checkpoint_terminal_only(app, ds, tmp_path):
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    from app.services import cloud_training as ct
-    with app.app_context():
-        d = tmp_path / 'r10'
-        d.mkdir()
-        ck = d / 'lds10_x_000001000.safetensors'
-        ck.write_bytes(b'W')
-        run = CloudTrainingRun(dataset_id=ds, status='done', job_name='j',
-                               vast_label='lds-10', staging_dir=str(d),
-                               checkpoint_local_path=str(ck))
-        active = CloudTrainingRun(dataset_id=ds, status='training', job_name='j',
-                                  vast_label='lds-11', staging_dir=str(d))
-        db.session.add_all([run, active])
-        db.session.commit()
-        with pytest.raises(ValueError, match='active'):
-            ct.delete_cloud_checkpoint(ds, active.id, ck.name)
-        assert ct.delete_cloud_checkpoint(ds, run.id, ck.name) == ck.name
-        assert not ck.exists()
-        assert run.checkpoint_local_path is None      # ready flag cleared
 
 
 def test_max_step_saves_setting_reaches_job_config(app, ds):

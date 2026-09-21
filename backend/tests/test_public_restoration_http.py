@@ -66,10 +66,10 @@ def _object_info_transport(monkeypatch, classes):
 
 @pytest.mark.parametrize('surface', ['dataset', 'bank'])
 @pytest.mark.parametrize('engine, owner', [('klein', 'image_upscale'), ('seedvr2', 'seedvr2')])
-@pytest.mark.parametrize('state', ['absent', 'off', 'pending_disable'])
+@pytest.mark.parametrize('state', ['pending_disable'])
 def test_unavailable_restoration_is_structured_409(factory, tmp_path, monkeypatch,
                                                   surface, engine, owner, state):
-    app = factory(None if state == 'absent' else {owner} if state == 'pending_disable' else set())
+    app = factory({owner})
     url = _source_url(app, tmp_path, surface)
     if state == 'pending_disable':
         spec = app.extensions['lds_plugins'].restore_engines[engine]

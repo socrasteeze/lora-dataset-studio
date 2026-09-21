@@ -1,18 +1,9 @@
-"""The ◉ Graph of a VIDEO dataset's runs, and the previews behind its pills.
+"""The ◉ Graph of a VIDEO dataset's local run and its training samples.
 
-WHY THE SAME SHAPE AS THE IMAGE TREE. The image workspace draws its runs with
-`utils/lineageGraph.buildLineageGraph` and the `GraphCard` / `CheckpointPill`
-components — a pure layout over `{nodes, edges}` where a node is a run keyed by
-`record_id`, `edges` carry `parent → child` with the step the child resumed
-from, and each node holds its `checkpoints` as pills. That layout knows nothing
-of `TrainingRunRecord`; it reads a dozen fields. So the video lane answers the
-same fields for its own rows — a `CloudTrainingRun` per cloud launch, whose
-genealogy is the `parent_run_id` its params stamp (see `video_run_lineage`),
-plus ONE node for the local run — and the same drawing serves both surfaces.
-Anything image-specific the tree carries (versions, notes, the Lab's generated
-previews) is simply absent here: `version` is None because video runs are
-unversioned by design (`cloud_video_training`), and a pill's preview is the
-training SAMPLE ai-toolkit rendered at that step, not a Studio generation.
+The image workspace's lineage renderer is a pure layout over ``{nodes, edges}``.
+This fork trains video locally only, so the video answer is deliberately one
+local node with checkpoint pills and no rented-pod genealogy. A pill's preview
+is the training sample ai-toolkit rendered at that step, not a Studio render.
 
 THE LOCAL NODE. A local video run has no row anywhere (the folder IS the run:
 `video_training_local`), so its node borrows a `record_id` that can collide
@@ -37,8 +28,7 @@ first frame — cut by PIL for an animated WebP/GIF, by the video bank's frame
 writer (PyAV) for an mp4 — cached under the app's data dir. Serving the
 sample itself as its poster was the first version of this file, and on a Wan
 graph it made every pill thumbnail download and animate the whole clip.
-Locally the samples folder sits under the save root; a pod's samples are
-mirrored into staging by the monitor (`cloud_training._pull_log_and_samples`).
+Samples sit under the local save root.
 """
 import json
 import logging
@@ -46,10 +36,6 @@ import os
 import re
 
 from lds_sdk.video_host import config as cfg
-from lds_sdk.video_host.models import CloudTrainingRun
-from lds_sdk.video_host import cloud_run_dataset as crd
-from lds_sdk import cloud_training as ct
-from lds_sdk.video_host import cloud_video_training as cvt
 from lds_sdk.video_host import lora_training as lt
 from lds_video import video_checkpoints as vck
 from lds_video import video_targets
@@ -86,32 +72,17 @@ def local_record_id(ds) -> int:
     return -int(ds.id)
 
 
-def _cloud_runs(ds) -> list:
-    """This dataset's cloud runs, oldest first — the order the layout sorts
-    siblings in. Ownership is the (id, table) pair."""
-    return [r for r in (CloudTrainingRun.query.filter_by(dataset_id=ds.id)
-                        .order_by(CloudTrainingRun.id.asc()).all())
-            if crd.owns(r, ds.id, crd.VIDEO)]
-
-
-def _params(run) -> dict:
-    try:
-        return json.loads(run.train_params or '{}')
-    except ValueError:
-        return {}
-
-
 # ── samples ─────────────────────────────────────────────────────────────────
 
 
 def samples_dir(ds, run=None) -> str | None:
-    """Where this lane's samples are, or None when the lane has no folder."""
-    if run is None:
-        try:
-            return os.path.join(str(vtl.save_root(ds)), 'samples')
-        except RuntimeError:            # no local trainer configured
-            return None
-    return os.path.join(run.staging_dir, 'samples') if run.staging_dir else None
+    """Where the local lane's samples are, or None when it has no folder."""
+    if run is not None:                 # DIVERGENCE 4: no rented-pod lane
+        return None
+    try:
+        return os.path.join(str(vtl.save_root(ds)), 'samples')
+    except RuntimeError:                # no local trainer configured
+        return None
 
 
 def sample_kind(filename) -> str:
@@ -188,7 +159,7 @@ def poster_path(ds, run, filename) -> str | None:
     own = os.path.join(os.path.dirname(src), _AITK_THUMBS, filename + '.jpg')
     if os.path.isfile(own):
         return own
-    lane = f'run_{int(run.id)}' if run is not None else f'local_{int(ds.id)}'
+    lane = f'local_{int(ds.id)}'
     cache = cfg.data_dir() / 'cache' / _POSTER_CACHE / lane
     dst = str(cache / (filename + '.jpg'))
     try:
@@ -203,8 +174,6 @@ def poster_path(ds, run, filename) -> str | None:
 
 def _sample_urls(ds, run, sample) -> dict:
     q = f"filename={sample['filename']}"
-    if run is not None:
-        q = f'run_id={int(run.id)}&' + q
     base = f'/api/video-dataset/{int(ds.id)}/train/sample'
     return {'url': f'{base}?{q}', 'poster_url': f'{base}/poster?{q}'}
 
@@ -212,7 +181,7 @@ def _sample_urls(ds, run, sample) -> dict:
 # ── the tree ────────────────────────────────────────────────────────────────
 
 
-def _pills(ds, run, steps, paths, deployed, samples) -> list:
+def _pills(ds, steps, paths, deployed, samples) -> list:
     """One pill per STEP, with the fields the shared renderers read, the
     video lane's own (`files`, `download_urls`) and the previews: the sample
     of prompt 0 at that step as the thumbnail, the count of samples at it."""
@@ -224,11 +193,7 @@ def _pills(ds, run, steps, paths, deployed, samples) -> list:
         rows = vck._step_rows([s], paths.get, deployed)[0]
         files = rows['files']
         names = [f['filename'] for f in files]
-        if run is not None:
-            urls = [f'/api/video-dataset/{ds.id}/train/cloud/checkpoint?run_id={run.id}&filename={n}'
-                    for n in names]
-        else:
-            urls = [f'/api/video-dataset/{ds.id}/train/checkpoint?filename={n}' for n in names]
+        urls = [f'/api/video-dataset/{ds.id}/train/checkpoint?filename={n}' for n in names]
         at_step = by_step.get(s['step']) if s['step'] is not None else None
         first = min(at_step, key=lambda x: x['prompt_idx']) if at_step else None
         pill = {
@@ -243,9 +208,9 @@ def _pills(ds, run, steps, paths, deployed, samples) -> list:
         }
         if first is not None:
             pill.update({'preview_status': 'ready', **{k: v for k, v in
-                         _sample_urls(ds, run, first).items() if k == 'poster_url'}})
+                         _sample_urls(ds, None, first).items() if k == 'poster_url'}})
             pill['preview_url'] = pill.pop('poster_url')
-            pill['sample_url'] = _sample_urls(ds, run, first)['url']
+            pill['sample_url'] = _sample_urls(ds, None, first)['url']
         else:
             pill['preview_url'] = None
             pill['preview_status'] = None
@@ -271,42 +236,14 @@ def local_total_steps(ds) -> int | None:
     return None
 
 
-def _cloud_node(ds, run, run_ids, deployed) -> dict:
-    p = _params(run)
-    parent = p.get('parent_run_id')
-    parent = int(parent) if parent is not None and int(parent) in run_ids else None
-    resumed_from = p.get('resume_step')
-    steps = cvt.harvested_steps(run)
-    paths = ct.run_checkpoint_files(run)
-    pills = _pills(ds, run, steps, paths, deployed, list_samples(ds, run))
-    return {
-        'record_id': run.id, 'run_id': run.id, 'source': 'cloud',
-        'parent_record_id': parent,
-        'resumed_from': int(resumed_from) if resumed_from is not None else None,
-        'origin_unknown': bool(resumed_from is not None and parent is None),
-        'dataset_id': ds.id, 'dataset_name': ds.name,
-        'train_type': 'video',
-        'variant': _target_label(p.get('target_profile') or ds.target_profile),
-        'base_model': p.get('base_model') or '', 'version': None,
-        'steps': p.get('steps'),
-        'config': {k: p[k] for k in vck._PUBLIC_PARAMS if k in p},
-        'note': '', 'has_note': False, 'is_current': False,
-        'created_at': run.created_at.isoformat() if run.created_at else None,
-        'finished_at': run.finished_at.isoformat() if run.finished_at else None,
-        'status': run.status, 'active': run.status in ct.ACTIVE_STATES,
-        'training_mode': 'lora', 'gpu': run.gpu_name, 'price_per_hour': run.price_per_hour,
-        'checkpoints': pills, 'saves': len(paths), 'checkpoint_ready': bool(pills),
-    }
-
-
 def _local_node(ds, deployed) -> dict | None:
     saves = vck._local_saves(ds)
     if not saves:
         return None
     total = local_total_steps(ds)
-    steps = cvt.group_saves_by_step(saves, target=total)
+    steps = vck._group_saves_by_step(saves, target=total)
     active = bool(vtl.video_training_progress(ds.id, ds.user_id)['active'])
-    pills = _pills(ds, None, steps, saves, deployed, list_samples(ds, None))
+    pills = _pills(ds, steps, saves, deployed, list_samples(ds, None))
     return {
         'record_id': local_record_id(ds), 'run_id': None, 'source': 'local',
         'parent_record_id': None, 'resumed_from': None, 'origin_unknown': False,
@@ -322,29 +259,17 @@ def _local_node(ds, deployed) -> dict | None:
 
 
 def tree(user_id, dataset_id) -> dict:
-    """The genealogy forest of this dataset's runs — the shape
-    `cloud_training.dataset_lineage` answers, for the video lane. Cloud runs
-    oldest first, then the local node; an edge per continuation whose parent
-    is one of these runs (a parent that was deleted leaves an honest root with
-    "origin unknown"). Empty → an empty, safe shape."""
+    """The local run in the image-lineage shape, or an empty safe shape."""
     ds = vck._dataset(user_id, dataset_id)
     deployed = vck._deployed_index()
-    runs = _cloud_runs(ds)
-    run_ids = {r.id for r in runs}
-    nodes = [_cloud_node(ds, r, run_ids, deployed) for r in runs]
     local = _local_node(ds, deployed)
-    if local is not None:
-        nodes.append(local)
-    edges = [{'parent': n['parent_record_id'], 'child': n['record_id'],
-              'resumed_from': n['resumed_from'], 'superseded': False}
-             for n in nodes if n['parent_record_id'] is not None]
-    return {'root_id': None, 'current_id': None, 'nodes': nodes, 'edges': edges,
-            'single': len(nodes) < 2}
+    nodes = [local] if local is not None else []
+    return {'root_id': None, 'current_id': None, 'nodes': nodes, 'edges': [],
+            'single': True}
 
 
 def resolve_run(ds, run_id):
-    """The lane a `run_id` query names: None for the local run (absent, empty
-    or 'local'), else one of THIS dataset's cloud runs or LookupError."""
+    """Resolve only the local lane; numbered rented-pod runs are absent here."""
     if run_id in (None, '', 'local', 'null'):
         return None
-    return vck._cloud_run(ds, run_id)
+    raise LookupError('video training run not found')

@@ -72,7 +72,7 @@ export function createTailwindConfig(distribution = resolvePluginBuildMode()) {
   return {
     ...baseConfig,
     content: ['./index.html', './src/**/*.{js,jsx}',
-      ...(distribution === 'bundled' ? ['../bundled/*/frontend/**/*.{js,jsx}'] : [])],
+      ...(['bundled', 'fork'].includes(distribution) ? ['../bundled/*/frontend/**/*.{js,jsx}'] : [])],
   }
 }
 

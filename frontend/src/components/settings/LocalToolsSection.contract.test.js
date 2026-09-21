@@ -74,5 +74,5 @@ test('focus=HF_CLOUD_TOKEN lands on the secret input id', () => {
   assert.match(primitives, /htmlFor=\{f\.key\}/)
   assert.match(primitives, /type="password"/)
   assert.match(primitives, /\{f\.testTarget && <TestResult result=\{testResults\[f\.testTarget\]\} \/>\}/)
-  assert.match(primitives, /onResult\(await postJson\(\`\/api\/settings\/test\/\$\{target\}\`, \{\}\)\)/)
+  assert.match(primitives, /onResult\(await postJson\(settingsApiUrl\(pluginId, `\/api\/settings\/test\/\$\{encodeURIComponent\(target\)\}`\), \{\}\)\)/)
 })

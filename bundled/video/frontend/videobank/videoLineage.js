@@ -18,15 +18,14 @@ export const MUTED_CLS = 'rounded-md border border-border bg-app/40 px-2 py-1 te
 
 /** The GROUP a tree node stands for, in the list's vocabulary. */
 export function nodeGroup(node) {
-  const local = node?.source === 'local'
   return {
-    key: local ? 'local' : `cloud-${node?.run_id}`,
-    lane: local ? 'local' : 'cloud',
-    run_id: local ? null : (node?.run_id ?? null),
+    key: 'local',
+    lane: 'local',
+    run_id: null,
     active: !!node?.active,
     status: node?.status ?? null,
     run_name: node?.run_name ?? null,
-    parent_run_id: node?.parent_record_id ?? null,
+    parent_run_id: null,
     steps: node?.checkpoints || [],
   }
 }

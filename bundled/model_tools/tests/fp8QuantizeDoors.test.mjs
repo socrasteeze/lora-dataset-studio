@@ -165,13 +165,12 @@ test('the Settings door has its own help topic, pointing at that focus id', () =
     const topic = getHelpTopic('storage.fp8_quantize')
     assert.ok(topic, 'no help topic for the Model tools settings door')
     assert.equal(topic.app.route, '/plugins/model_tools/settings')
-    assert.equal(topic.app.legacyRoute, '/settings/storage')
     assert.equal(topic.app.focus, 'storage-fp8-quantize')
     // Two doors, two topics, two distinct titles — a search result that reads the
     // same twice cannot tell you which screen you are being sent to.
     const other = getHelpTopic('training.fp8_quantize_local')
     assert.ok(other && other.title !== topic.title)
-    assert.equal(allHelpTopics().filter((t) => t.app.route === '/plugins/model_tools/settings'
+    assert.equal(allHelpTopics().filter((t) => t.id === 'storage.fp8_quantize' && t.app.route === '/plugins/model_tools/settings'
       && t.app.focus === 'storage-fp8-quantize').length, 1)
     // A second door nobody can search for is not a second door. These are the
     // terms of the problem as it is felt ("this file is too big"), not the terms
@@ -186,8 +185,8 @@ test('the Settings door has its own help topic, pointing at that focus id', () =
   }
 })
 
-test('with the plugin off, the topics are gone with the doors', () => {
+test('with the plugin off, canonical core topics remain addressable', () => {
   resetRegistry()
-  assert.equal(getHelpTopic('storage.fp8_quantize'), undefined)
-  assert.equal(getHelpTopic('workspace-lora-merge'), undefined)
+  assert.equal(getHelpTopic('storage.fp8_quantize')?.app.route, '/plugins/model_tools/settings')
+  assert.equal(getHelpTopic('workspace-lora-merge')?.app.route, '/datasets?section=checkpoints')
 })

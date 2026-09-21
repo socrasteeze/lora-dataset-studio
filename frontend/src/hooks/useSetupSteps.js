@@ -718,7 +718,9 @@ function coreCapabilitySummary(caps) {
       topic: 'setup-quality' },
     { label: 'Watermark detector (optional)', what: 'Finds watermarks about ten times faster and marks where they sit', ok: !!c.watermark_detect,
       topic: 'setup-quality' },
-    { label: 'Scraping extras (optional)', what: 'Gallery links, keyless web image search and video sources (gallery-dl, yt-dlp…)', ok: !!c.scrape_deps, topic: 'setup-quality' },
+    ...(contributions('settings.group').some(group => group.plugin === 'scrape')
+      ? [{ label: 'Scraping extras (optional)', what: 'Gallery links, keyless web image search and video sources (gallery-dl, yt-dlp…)', ok: !!c.scrape_deps, topic: 'setup-quality' }]
+      : []),
     // DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream counts a
     // '📤 Civitai publishing' row here, reading `c.civitai` from a probe this
     // fork does not run, and pointing at a Setup step it does not have. The
@@ -841,6 +843,9 @@ export function installActionLabel(action) {
   for (const step of contributions('setup.step', 'setup')) {
     const label = step.labels?.[action]
     if (typeof label === 'string' && label.trim()) return label
+    const catalogLabel = typeof step.catalog === 'function'
+      ? step.catalog({}).find(row => row.action === action)?.label : null
+    if (typeof catalogLabel === 'string' && catalogLabel.trim()) return catalogLabel
   }
   return action
 }

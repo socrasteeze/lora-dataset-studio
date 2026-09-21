@@ -7,7 +7,7 @@ the local run's own listing, and a poster is cut once and cached.
 import json
 import os
 
-from app.services import video_lineage
+from lds_video import video_lineage
 from test_video_checkpoints import _deployed, _local_saves, _loras_root, _video_dataset
 
 
@@ -61,7 +61,7 @@ def test_the_tree_is_empty_when_the_local_run_has_no_saves(
     _loras_root(tmp_path, monkeypatch)
     with app.app_context():
         ds = _video_dataset(tmp_path)
-        from app.services import video_training_local as vtl
+        from lds_video import video_training_local as vtl
         monkeypatch.setattr(vtl, 'save_root', lambda _ds: tmp_path / 'missing')
         ds_id = ds.id
     tree = client.get(f'/api/video-dataset/{ds_id}/train/lineage').get_json()
@@ -70,7 +70,7 @@ def test_the_tree_is_empty_when_the_local_run_has_no_saves(
 
 def test_the_local_final_takes_its_number_from_the_job_config(app, tmp_path, monkeypatch):
     from app.services import lora_training as lt
-    from app.services import video_training_local as vtl
+    from lds_video import video_training_local as vtl
     jobs = tmp_path / 'jobs'
     jobs.mkdir()
     monkeypatch.setattr(lt, '_jobs_dir', lambda: jobs)
@@ -190,7 +190,7 @@ def test_a_wan_sample_uses_a_still_poster(app, client, tmp_path, monkeypatch):
 def test_ai_toolkits_thumbnail_wins_before_frame_cut(
         app, client, tmp_path, monkeypatch):
     _loras_root(tmp_path, monkeypatch)
-    from app.services import video_bank_service as vbs
+    from lds_video import video_bank_service as vbs
     fail = lambda *_args: (_ for _ in ()).throw(AssertionError('cut called'))
     monkeypatch.setattr(vbs, '_write_thumbnail', fail)
     monkeypatch.setattr(video_lineage, '_first_frame_still', fail)

@@ -67,7 +67,7 @@ test('every capability row carries a destination, in every rig', () => {
     // here from the array deriveCapabilitySummary actually returns rather
     // than copied from either side's prose —
     // 25 - 3 cloud - 1 Civitai + 1 WD14 = 22.
-    assert.equal(rows.length, 22, `${name}: expected 22 capabilities`)
+    assert.equal(rows.length, 16, `${name}: expected 16 core capabilities`)
     for (const row of rows) {
       const dest = capabilityDestination(row)
       assert.ok(dest, `${name}: "${row.label}" has no destination`)
@@ -125,9 +125,8 @@ test('a pending row is not a missing one: own destination, own wording', () => {
   // (Smooth's packs are read from /object_info). DLSS has a worker of its
   // own and never waits on ComfyUI, so it is not in this list.
   assert.deepEqual(pending.map((r) => r.label),
-    ['Klein (local)', '📷 Camera angles (local)', '🎬 Video Test Studio (beta)',
-      '↗ Smooth (frame interpolation)', '🔴 Live lane (beta)', '🖼️ Test Studio (images)'],
-    'ComfyUI down leaves Klein + Camera angles + the video rows + Test Studio pending')
+    ['Klein (local)', '🖼️ Test Studio (images)'],
+    'ComfyUI down leaves the core image-engine and Test Studio rows pending')
   for (const row of pending) {
     assert.ok(row.note, `${row.label}: pending row must explain itself`)
     const waiting = capabilityDestination(row)

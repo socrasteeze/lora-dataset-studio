@@ -5,8 +5,18 @@ def dataset_folder_conflict(*args, **kwargs):
     return dataset_folder_conflict(*args, **kwargs)
 
 
+def norm(path):
+    from app.services.path_guard import norm as normalize
+    return normalize(path)
 
-__all__ = ['dataset_folder_conflict']
+
+def relation(first, second):
+    from app.services.path_guard import relation as compare
+    return compare(first, second)
+
+
+
+__all__ = ['dataset_folder_conflict', 'norm', 'relation']
 
 
 # Compatibility with the original public SDK exports.

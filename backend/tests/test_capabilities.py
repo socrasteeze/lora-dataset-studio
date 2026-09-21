@@ -31,11 +31,7 @@ def _no_real_subprocess(monkeypatch):
 
 # --- brief tests, verbatim ---------------------------------------------
 
-@pytest.mark.parametrize('api_installed', [
-    pytest.param(False, marks=pytest.mark.plugins()),
-    pytest.param(True, marks=pytest.mark.plugins('api_engines')),
-])
-def test_probe_all_off_when_unconfigured(app, api_installed):
+def test_probe_all_off_when_unconfigured(app):
     with app.app_context():
         from app import capabilities
         with patch('app.capabilities._http_ok', return_value=False):
@@ -911,28 +907,34 @@ def test_probe_exposes_dir_valid(app, tmp_path):
 
 # --- probe() caching ------------------------------------------------------
 
-@pytest.mark.plugins('api_engines')
-def test_probe_caches_for_30s_without_force(app, monkeypatch):
+def test_probe_reuses_a_fresh_cached_local_result(app, monkeypatch):
     with app.app_context():
         from app import capabilities
+        calls = []
+        monkeypatch.setattr(capabilities, '_probe_uncached',
+                            lambda: calls.append('scan') or {'fixture': len(calls)})
         capabilities._cache = None
         capabilities._cache_ts = 0.0
-        with patch('app.capabilities._http_ok', return_value=False):
-            first = capabilities.probe(force=True)
-            monkeypatch.setenv('VAST_API_KEY', 'vk-new')
-            second = capabilities.probe()  # stale cache, ignores the new key
-    assert second == first
-    assert second['cloud_training'] is False
+        capabilities._cache_plugin_signature = None
+        first = capabilities.probe(force=True)
+        second = capabilities.probe()
+    assert first == second
+    assert first['fixture'] == 1
+    assert calls == ['scan']
 
-@pytest.mark.plugins('api_engines')
-def test_probe_force_bypasses_cache(app, monkeypatch):
+
+def test_probe_force_bypasses_a_fresh_local_cache(app, monkeypatch):
     with app.app_context():
         from app import capabilities
-        with patch('app.capabilities._http_ok', return_value=False):
-            capabilities.probe(force=True)
-            monkeypatch.setenv('VAST_API_KEY', 'vk-new')
-            refreshed = capabilities.probe(force=True)
-    assert refreshed['cloud_training'] is True
+        calls = []
+        monkeypatch.setattr(capabilities, '_probe_uncached',
+                            lambda: calls.append('scan') or {'fixture': len(calls)})
+        capabilities._cache = None
+        capabilities._cache_ts = 0.0
+        capabilities._cache_plugin_signature = None
+        assert capabilities.probe(force=True)['fixture'] == 1
+        assert capabilities.probe(force=True)['fixture'] == 2
+    assert calls == ['scan', 'scan']
 
 
 # --- ollama vision-model presence + import-cache clear --------------------

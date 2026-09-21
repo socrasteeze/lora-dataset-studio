@@ -72,9 +72,11 @@ test('the core lends the slots and imports neither tool', () => {
 })
 
 test('the help topics moved out of the core registry', () => {
-  const topics = core('help/topics/settingsFields.js') + core('help/topics/workspaceSections.js')
+  const legacy = ['help/topics/settingsFields.js', 'help/topics/workspaceSections.js']
+    .filter(rel => existsSync(here(`../../../frontend/src/${rel}`)))
+    .map(core).join('')
   for (const id of ['storage.fp8_quantize', 'training.fp8_quantize_local', 'workspace-lora-merge']) {
-    assert.ok(!topics.includes(`id: '${id}'`), `${id} is still a core topic`)
+    assert.ok(!legacy.includes(`id: '${id}'`), `${id} is still a core topic`)
   }
 })
 
@@ -90,19 +92,6 @@ test('the backend mounts the tools through their plugin and retains shared file 
   assert.doesNotMatch(back('app/routes/__init__.py'), /'tools'/)
   assert.match(read('../lds_model_tools/routes.py'), /Blueprint\('model_tools', __name__\)/)
   assert.match(read('../lds_model_tools/__init__.py'), /ctx\.register_blueprint\(bp, url_prefix='\/api'\)/)
-})
-
-test('the cloud plugin owns one-click delivery and uses the host converter independently', () => {
-  assert.match(read('../../cloud_training/lds_cloud_training/routes.py'),
-    /tools\/fp8-deliver\/plan/)
-  const delivery = read('../../cloud_training/lds_cloud_training/fp8_local_delivery.py')
-  assert.match(delivery,
-    /from lds_sdk\.cloud_host\.services import comfy_model_paths, fp8_export, fp8_quantize/)
-  assert.doesNotMatch(delivery, /from lds_model_tools|import lds_model_tools/)
-  const host = back('lds_sdk/cloud_host/services/__init__.py')
-  assert.match(host, /from app\.services import \([\s\S]*\bfp8_quantize,/)
-  const manifest = JSON.parse(read('../../cloud_training/plugin.json'))
-  assert.ok(!manifest.requires.includes('model_tools'))
 })
 
 test('explicit bundled development generates the classes the plugin screens use', async () => {

@@ -72,8 +72,23 @@ def resource_for(content):
             'members': members, 'external_source': copy.deepcopy(UPSTREAM_SOURCE)}
 
 
+def test_fork_policy_allows_only_curated_source_prefixes(monkeypatch):
+    monkeypatch.setenv('LDS_PLUGIN_DISTRIBUTION', 'fork')
+    assert policy.private_plugin_path_reason('bundled/video/core.py') is None
+    assert policy.private_plugin_path_reason('bundled/cloud_training/core.py') is not None
+    assert policy.private_plugin_path_reason('bundled/unreviewed/core.py') is not None
+    assert policy.private_plugin_path_reason('nested/bundled/video/core.py') is not None
+    assert policy.private_plugin_path_reason('BUNDLED/VIDEO/core.py') is not None
+    assert policy.private_plugin_path_reason('bundled/video/nested/bundled/private.py') is not None
+    assert policy.private_plugin_path_reason('bundled/video/payload.ldsplugin') is not None
+    assert policy.private_plugin_path_reason('bundled/video/transition-pack.zip') is not None
+
+
 class PublicHistoryTests(unittest.TestCase):
     def setUp(self):
+        distribution = patch.dict(os.environ, {'LDS_PLUGIN_DISTRIBUTION': 'store'})
+        distribution.start()
+        self.addCleanup(distribution.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name) / 'repo'
@@ -579,6 +594,8 @@ class PublicHistoryTests(unittest.TestCase):
         self.assertTrue(self.approved()['allowed'])
         self.assertEqual(self.approved()['commits_checked'], 2, 'The installed baseline must not advance')
         self.assertIsNotNone(policy.private_plugin_path_reason('bundled/video/core.py'))
+        self.assertIsNotNone(policy.private_plugin_path_reason('bundled/cloud_training/core.py'))
+        self.assertIsNotNone(policy.private_plugin_path_reason('bundled/unreviewed/core.py'))
         self.manifest['commits'][0]['exceptions'][0]['provenance']['kind'] = 'generated'
         self.assertTrue(self.approved()['allowed'])
 

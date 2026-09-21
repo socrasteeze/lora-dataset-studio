@@ -13,15 +13,17 @@ PRODUCT_ACTIONS = {
 }
 
 
-def test_empty_install_has_only_core_preparation_actions(host, monkeypatch):
+def test_empty_install_retains_fork_core_repair_recipes(host, monkeypatch):
     monkeypatch.setenv('LDS_PLUGIN_DISTRIBUTION', 'store')
     monkeypatch.delenv('LDS_BUNDLED_DIR')
     activate(host, set())
     for actions in PRODUCT_ACTIONS.values():
         for action in actions:
-            assert not installer.known_action(action), action
-            assert action not in installer.INSTALL_ACTIONS
-    assert set(installer.install_groups()) == {'krea'}
+            # The fork retains explicit core repairs for existing installations.
+            # A loaded product replaces its recipe and owns disablement below.
+            assert installer.known_action(action), action
+            assert action in installer.INSTALL_ACTIONS
+    assert set(installer.install_groups()) == {'krea', 'seedvr2', 'camera'}
     assert installer.plugin_actions_catalog() == {}
     for action in ('face_scoring', 'masks', 'video_text', 'klein_model', 'krea_vae'):
         assert installer.known_action(action), action

@@ -57,7 +57,7 @@ export const VIDEO_DATASET_SECTIONS = [
     ] },
   { id: 'training', title: 'Training', icon: GraduationCap, eyebrow: 'train',
     helpTopic: 'video-dataset-training',
-    description: 'Turn the clips into a video LoRA — on this machine or on a rented pod. One set of dials, two destinations.',
+    description: 'Turn the clips into a video LoRA on this machine.',
     panels: [
       { id: 'launch', title: 'Launch & progress', targetId: 'vds-training-launch', when: 'always' },
     ] },

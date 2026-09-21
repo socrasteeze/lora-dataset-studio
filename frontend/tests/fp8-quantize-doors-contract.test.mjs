@@ -92,10 +92,8 @@ test('exactly one component talks to the quantize endpoints', () => {
 })
 
 test('both hosts render the shared component instead of their own controls', () => {
-  const recipe = read('../bundled/cloud_training/frontend/dataset/FullTransformerRecipe.jsx')
   const descriptor = read('../bundled/model_tools/frontend/index.js')
   const settings = read('../bundled/model_tools/frontend/panels/StorageQuantizeGroup.jsx')
-  assert.match(recipe, /<PluginSlot slot="dense.recipe.tool"/)
   assert.match(descriptor, /'dense.recipe.tool':[\s\S]*?import\('\.\/panels\/Fp8QuantizeTool\.jsx'\)/)
   assert.match(settings, /import Fp8QuantizeTool from '\.\/Fp8QuantizeTool\.jsx'/)
   assert.match(settings, /<Fp8QuantizeTool framed=\{false\}/)
@@ -161,17 +159,17 @@ test('Model tools settings render the tool, while core Storage keeps its own con
 test('the Settings door has its own help topic, pointing at that focus id', () => {
   const topic = getHelpTopic('storage.fp8_quantize')
   assert.ok(topic, 'no help topic for the Model tools settings door')
-  // The bundled model_tools plugin declares this door at '/settings/storage'
+  // The bundled model_tools plugin declares this door at '/plugins/model_tools/settings'
   // (see bundled/model_tools/frontend/index.js). Upstream's copy of this test
   // pins its own plugin-settings route; adapted to the route the plugin
   // actually publishes here, so the test still proves the door is addressable.
-  assert.equal(topic.app.route, '/settings/storage')
+  assert.equal(topic.app.route, '/plugins/model_tools/settings')
   assert.equal(topic.app.focus, 'storage-fp8-quantize')
   // Two doors, two topics, two distinct titles — a search result that reads the
   // same twice cannot tell you which screen you are being sent to.
   const other = getHelpTopic('training.fp8_quantize_local')
   assert.ok(other && other.title !== topic.title)
-  assert.equal(helpTopics().filter((t) => t.app.route === '/settings/storage'
+  assert.equal(helpTopics().filter((t) => t.app.route === '/plugins/model_tools/settings'
     && t.app.focus === 'storage-fp8-quantize').length, 1)
 })
 

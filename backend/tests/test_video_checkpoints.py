@@ -333,7 +333,7 @@ def test_deleting_a_local_step_is_refused_while_training_writes_it(
     assert all((d / n).is_file() for n in PAIR_50)
 
 
-@pytest.mark.plugins('video', 'cloud_training')
+@pytest.mark.plugins('video')
 def test_a_held_file_is_kept_and_named_rather_than_reported_gone(
         app, client, tmp_path, monkeypatch):
     """The clips' rule (`remove_dataset_clips`): a file the OS holds open stays,

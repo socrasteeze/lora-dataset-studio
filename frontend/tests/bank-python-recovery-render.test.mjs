@@ -6,10 +6,13 @@ import { createElement, render } from './support/mountJsx.mjs'
 const { default: BankPassesPanel } = await import('../src/components/bank/BankPassesPanel.jsx')
 const { semanticEngineState } = await import('../src/components/bank/bankSemanticEngine.js')
 const noop = () => {}
-const RoutedPanel = (props) => createElement(MemoryRouter, null, createElement(BankPassesPanel, props))
+const readyPassGate = new Proxy({}, { get: () => ({ ok: true, disabled: false, title: '' }) })
+const RoutedPanel = (props) => createElement(
+  MemoryRouter, null, createElement(BankPassesPanel, { passGate: readyPassGate, ...props }),
+)
 
 function panel(overrides = {}) {
-  const payload = { counts: { total: 2, keep: 2 }, semantic: {
+  const payload = { counts: { total: 2, keep: 2 }, summary: { faces: {} }, semantic: {
     engine: 'siglip2', ready: true, counts: { total: 2, ok: 2 },
     device: { requested: 'auto', device: 'cuda', gpu: true },
   } }
@@ -18,6 +21,7 @@ function panel(overrides = {}) {
     caps: { bank_scoring: true, bank_siglip2: true }, capsLoading: false,
     semanticState: semanticEngineState(payload, { bank_siglip2: true }),
     semanticReady: true, semanticSwitching: false, semanticOperationBusy: false,
+    passGate: readyPassGate, tagsState: { disabled: false, title: '' },
     scoreGpuPresent: true, scoreDevice: { device: 'cuda', gpu: true }, scoreNote: null,
     selected: new Set(), captionScope: '', captionVocab: 'neutral',
     onPickPython: noop, onPassOpen: noop, onPassRedo: noop,

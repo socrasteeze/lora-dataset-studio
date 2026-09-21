@@ -182,7 +182,7 @@ def _rushes(tmp_path, names=('a.mp4',)):
 
 def test_adding_the_same_rushes_folder_twice_reuses_the_video_bank(app, tmp_path):
     from app.models import VideoBank
-    from app.services import video_bank_service as vbanks
+    from lds_video import video_bank_service as vbanks
 
     folder = _rushes(tmp_path, ('a.mp4', 'b.mov'))
     with app.app_context():
@@ -196,7 +196,7 @@ def test_adding_the_same_rushes_folder_twice_reuses_the_video_bank(app, tmp_path
 
 def test_the_reused_video_bank_picks_up_new_rushes(app, tmp_path):
     from app.models import VideoSource
-    from app.services import video_bank_service as vbanks
+    from lds_video import video_bank_service as vbanks
 
     folder = _rushes(tmp_path, ('a.mp4',))
     with app.app_context():
@@ -211,7 +211,7 @@ def test_the_reused_video_bank_picks_up_new_rushes(app, tmp_path):
 def test_both_lanes_answer_the_same_question_the_same_way(app, tmp_path):
     """One name, one meaning, both lanes — the pair that must not drift."""
     from app.services import image_bank_service as banks
-    from app.services import video_bank_service as vbanks
+    from lds_video import video_bank_service as vbanks
 
     images = _tree(tmp_path / 'img', {'': 1})
     rushes = _rushes(tmp_path / 'vid')

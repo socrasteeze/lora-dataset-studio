@@ -1519,6 +1519,7 @@ def _weight_present(subfolders, filename) -> bool:
     extra_model_paths root is present, whatever the app would have chosen.
     """
     from lds_sdk.video_host import comfy_model_paths
+    target = filename.lower()
     for sub in subfolders:
         try:
             roots = comfy_model_paths.search_roots(sub)
@@ -1527,12 +1528,13 @@ def _weight_present(subfolders, filename) -> bool:
         for root in roots:
             if os.path.isfile(os.path.join(str(root), filename)):
                 return True
-            try:
-                names = {n.lower() for n in os.listdir(str(root))}
-            except OSError:
-                continue
-            if filename.lower() in names:
-                return True
+        try:
+            models = comfy_model_paths.list_models(sub)
+        except Exception:
+            models = []
+        if any(os.path.basename(relative).lower() == target
+               for relative, _absolute in models):
+            return True
     return False
 
 def vdn_roots() -> list[str]:

@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 
 def _rec(dataset_id, family='krea', variant='base', steps=1000, version=1,
@@ -304,99 +304,12 @@ def test_local_continue_refuses_conv_geometry_mismatch(app, monkeypatch):
 
 # --- the local→cloud lane (the one that actually burned 3000 steps) -----------
 
-def test_local_to_cloud_continue_inherits_parent_and_geometry(app, monkeypatch):
-    from lds_cloud_training import cloud_training as ct
-    from app.services import lora_training as lt
-    from app.config import LOCAL_USER
-    with app.app_context():
-        ds, recA, recB, _ = _lane(app, monkeypatch, live_rank=32)
-        monkeypatch.setattr(lt, 'checkpoint_file_path',
-                            lambda *a, **k: '/tmp/lora_000002500.safetensors')
-        launched = {}
-        monkeypatch.setattr(ct, 'launch_cloud_training',
-                            lambda *a, **k: launched.update(k) or {'run_id': 1})
-        ct.continue_local_run_in_cloud(LOCAL_USER, ds.id, extra_steps=500)
-
-        assert launched['parent_record_id'] == recA.id       # not the newest record
-        assert launched['resumed_from'] == 2500
-        # …and the run trains at the CHECKPOINT's rank, not the dataset's live 32.
-        snap = json.loads(launched['train_settings_snapshot'])
-        assert snap['rank'] == 64 and snap['alpha'] == 32
 
 
-def test_local_to_cloud_inherits_known_lokr_topology(app, monkeypatch):
-    from lds_cloud_training import cloud_training as ct
-    from app.services import lora_training as lt
-    from app.config import LOCAL_USER
-    topology = {'rank': 64, 'alpha': 32, 'network_type': 'lokr',
-                'lokr_factor': 'auto', 'lokr_full_rank': True}
-    with app.app_context():
-        # The live preset changed back to LoRA but retained a stale factor.  The
-        # cloud child must replay the source's complete known topology instead.
-        ds, recA, _, _ = _lane(
-            app, monkeypatch, live_rank=32, parent_settings=topology,
-            live_settings={'network_type': 'lora', 'lokr_factor': 16})
-        monkeypatch.setattr(lt, 'checkpoint_file_path',
-                            lambda *a, **k: '/tmp/lora_000002500.safetensors')
-        launched = {}
-        monkeypatch.setattr(ct, 'launch_cloud_training',
-                            lambda *a, **k: launched.update(k) or {'run_id': 1})
-        ct.continue_local_run_in_cloud(LOCAL_USER, ds.id, extra_steps=500)
-
-        assert launched['parent_record_id'] == recA.id
-        snap = json.loads(launched['train_settings_snapshot'])
-        assert {k: snap[k] for k in topology} == topology
-        view = ct._run_config_dataset(ds, {
-            'train_type': 'krea', 'variant': 'base', 'base_model': '',
-            'train_settings_snapshot': launched['train_settings_snapshot'],
-        })
-        network = lt._network_block(view, 64, 'krea')
-        assert network['lokr_full_rank'] is True
-        assert 'lokr_factor' not in network       # source's explicit auto wins over live 16
 
 
-def test_local_to_cloud_inherits_parent_conv_topology(app, monkeypatch):
-    from lds_cloud_training import cloud_training as ct
-    from app.services import lora_training as lt
-    from app.config import LOCAL_USER
-    topology = {
-        'rank': 64, 'alpha': 32, 'network_type': 'lora',
-        'conv': 16, 'conv_alpha': 16,
-    }
-    with app.app_context():
-        ds, recA, _, _ = _lane(
-            app, monkeypatch, live_rank=64, parent_settings=topology)
-        monkeypatch.setattr(
-            lt, 'checkpoint_file_path',
-            lambda *a, **k: '/tmp/lora_000002500.safetensors')
-        launched = {}
-        monkeypatch.setattr(
-            ct, 'launch_cloud_training',
-            lambda *a, **k: launched.update(k) or {'run_id': 1})
-        ct.continue_local_run_in_cloud(LOCAL_USER, ds.id, extra_steps=500)
-        assert launched['parent_record_id'] == recA.id
-        snap = json.loads(launched['train_settings_snapshot'])
-        assert {k: snap[k] for k in topology} == topology
 
 
-def test_local_to_cloud_refuses_legacy_lokr_with_unknown_full_rank(app, monkeypatch):
-    from lds_cloud_training import cloud_training as ct
-    from app.services import lora_training as lt
-    from app.config import LOCAL_USER
-    with app.app_context():
-        ds, _, _, _ = _lane(
-            app, monkeypatch, live_rank=64,
-            parent_settings={'rank': 64, 'alpha': 32, 'network_type': 'lokr',
-                             'lokr_factor': 16},
-            live_settings={'network_type': 'lokr', 'lokr_factor': 16})
-        monkeypatch.setattr(lt, 'checkpoint_file_path',
-                            lambda *a, **k: '/tmp/lora_000002500.safetensors')
-        launched = []
-        monkeypatch.setattr(ct, 'launch_cloud_training',
-                            lambda *a, **k: launched.append(k))
-        with pytest.raises(ValueError, match='lokr_full_rank'):
-            ct.continue_local_run_in_cloud(LOCAL_USER, ds.id, extra_steps=500)
-        assert launched == []
 
 
 @pytest.mark.parametrize('setting', ('alpha', 'grad_accum'))

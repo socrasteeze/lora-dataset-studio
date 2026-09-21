@@ -26,32 +26,6 @@ def queue_capture(app, monkeypatch):
     return captured
 
 
-@pytest.mark.plugins('cloud_training')
-@pytest.mark.usefixtures('no_dense_provider_io')
-def test_training_reconcile_spares_other_lanes_and_keeps_active_training(app, monkeypatch):
-    from lds_cloud_training import cloud_training as ct
-    monkeypatch.setenv('VAST_API_KEY', 'test-key')
-    labels = ['lds-123', 'lds-234', 'lds-quantize-abcd', 'lds-live-abcd',
-              'lds-user-box', 'lds-123-extra', 'lds-123\n', 'lds-\u0661', 'unrelated']
-    fleet = [{'instance_id': str(i + 100), 'label': label} for i, label in enumerate(labels)]
-    destroyed = []
-    with app.app_context():
-        ct.db.session.add_all([
-            ct.CloudTrainingRun(dataset_id=1, status='error', job_name='old',
-                                vast_instance_id='100', vast_label='lds-123'),
-            ct.CloudTrainingRun(dataset_id=2, status='training', job_name='live',
-                                vast_instance_id='101', vast_label='lds-234'),
-        ])
-        ct.db.session.commit()
-    monkeypatch.setattr(ct.vast_client, 'list_instances', lambda **_kw: fleet)
-    monkeypatch.setattr(ct.vast_client, 'get_instance',
-                        lambda ident, **_kw: next(item for item in fleet
-                                                if item['instance_id'] == ident))
-    monkeypatch.setattr(ct.vast_client, 'destroy_instance',
-                        lambda ident, **_kw: destroyed.append(ident) or True)
-    assert ct.reconcile_orphans(app) == 1
-    assert destroyed == ['100'], 'only a locally owned orphan with its exact provider identity may be destroyed'
-
 
 @pytest.mark.parametrize('fails', [False, True])
 def test_last_frame_is_published_only_after_successful_extraction(app, tmp_path, monkeypatch, fails):

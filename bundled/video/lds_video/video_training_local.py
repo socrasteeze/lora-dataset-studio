@@ -556,34 +556,19 @@ def video_training_progress(video_dataset_id, user_id=None) -> dict:
 
 
 def training_preflight(user_id, video_dataset_id, lane='local') -> dict:
-    """Pre-launch report for a video dataset — the same shape the image lane's
-    preflight answers with (`checks` + `verdict`), so the same readiness card
-    renders it and the same "blockers stop, warnings ask once" rule applies
-    before a pod is rented.
+    """Report dataset and machine prerequisites for local video training.
 
-    The video launcher already refuses everything below, one refusal at a time,
-    AFTER the click — which on the cloud lane is after the money question was
-    answered. This asks all of it at once, before, and it invents nothing: every
-    row is a probe the launcher runs itself (installed_arch_available,
-    weights_report, resolution_note, reference_dirs, the guardrails' fleet and
-    budget reads), only asked earlier.
-
-    Rows carry a `scope`, exactly as the image preflight's do: 'dataset' rows
-    are true on any lane, 'machine' rows read THIS box and are dropped for the
-    cloud lane, 'cloud' rows are account prerequisites and are dropped for the
-    local lane. `can_override` is always False here — none of these are quality
-    guard-rails a user may waive; they are either facts about the set or about
-    the machine that will run it.
+    Every row describes a check made by the launcher. Failed checks cannot be
+    waived, and rental lanes are refused before probing the machine.
     """
-    from lds_sdk import cloud_training as ct
-    from lds_sdk.lifecycle import is_available, state_change_lock
     from lds_sdk.video_host import gpu_speed
     from lds_video import video_bank_service as _vbs
     ds = VideoDataset.query.filter_by(id=int(video_dataset_id),
                                       user_id=user_id).first()
     if ds is None:
         raise ValueError('video dataset not found')
-    lane = 'cloud' if lane == 'cloud' else 'local'
+    if lane != 'local':
+        raise ValueError('Only local video training is available in this fork')
     profile = video_targets.get(getattr(ds, 'target_profile', None)) or {}
     label = profile.get('label', ds.target_profile or 'this target')
     arch = profile.get('aitk_arch')
@@ -654,38 +639,6 @@ def training_preflight(user_id, video_dataset_id, lane='local') -> dict:
                        else f'about {report["gigabytes"]} GB will be downloaded from '
                             f'{report["repo"]} on the first run — the launch asks first',
                        scope='machine')
-
-    # ---- the account (cloud lane only) -----------------------------------------
-    if lane == 'cloud':
-        with state_change_lock:
-            if not is_available('cloud_training'):
-                _check('cloud_plugin', 'Cloud training plugin', 'fail',
-                       'Install and enable Cloud training in Plugins before renting a GPU.',
-                       scope='cloud')
-            else:
-                configured = bool(ct.cfg.secret('VAST_API_KEY'))
-                _check('vast', 'vast.ai account',
-                       'ok' if configured else 'fail',
-                       'API key configured' if configured
-                       else 'no vast.ai API key — add it in the Cloud training plugin settings before renting a GPU',
-                       scope='cloud')
-                c = ct.cfg.get('cloud') or {}
-                limit = max(1, int((c.get('max_concurrent_runs') or 1)))
-                actives = ct.get_active_runs()
-                _check('fleet', 'Cloud run limit',
-                       'warn' if len(actives) >= limit else 'ok',
-                       f'{len(actives)} of {limit} allowed run(s) already on a pod — '
-                       'the launch will be refused until one finishes'
-                       if len(actives) >= limit else f'{len(actives)} of {limit} run(s) active',
-                       scope='cloud')
-                budget = float(c.get('monthly_budget_usd') or 0)
-                if budget > 0:
-                    spent = ct.month_spend_usd()
-                    _check('budget', 'Monthly budget',
-                           'warn' if spent >= budget else 'ok',
-                           f'${spent:.2f} of ${budget:.2f} spent this month'
-                           + (' — the launch will be refused' if spent >= budget else ''),
-                           scope='cloud')
 
     statuses = {c['status'] for c in checks}
     verdict = ('blocked' if 'fail' in statuses

@@ -8,7 +8,6 @@ import { captionFrequencyEntries } from '@lds/plugin-sdk/data'
 import { TrainingReadiness } from '@lds/plugin-sdk/training'
 import VideoTrainingBlock from './VideoTrainingBlock.jsx'
 import VideoCheckpointManager from './VideoCheckpointManager.jsx'
-import { videoPreflightUrl } from './videoCloudLaunch.js'
 import VideoDatasetGrid from './VideoDatasetGrid.jsx'
 import VideoDatasetLightbox from './VideoDatasetLightbox.jsx'
 import NeuralRenderDialog from './NeuralRenderDialog.jsx'
@@ -16,6 +15,7 @@ import {
   videoDatasetClipCaptionUrl, videoDatasetClipOriginalUrl, videoDatasetNeuralRenderCancelUrl,
   videoDatasetNeuralRenderRestoreUrl,
   videoDatasetNeuralRenderUrl, videoDatasetReferencesUrl, videoDatasetRemoveClipsUrl,
+  videoPreflightUrl,
 } from './videoBankApi.js'
 import { toggleSelection, selectRange } from './videoTriage.js'
 import { VIDEO_DATASET_SECTIONS } from './videoDatasetSections.js'
@@ -38,8 +38,8 @@ import {
  * bottom of the library: an accordion listing its clips, one textarea each, and
  * the training block. Everything you would actually work a set with — a grid, a
  * player, a search, bulk edits — existed only on the BANK, which triages SHOTS,
- * before any encode. So the object you are about to spend a night (or a pod
- * bill) training on was the one object in the app you could not look at
+ * before any encode. So the object you are about to spend a night training on
+ * was the one object in the app you could not look at
  * properly. The image lane has never worked that way, and CLAUDE.md's standing
  * rule is that a difference between the two surfaces is the maintainer's call,
  * not an accident of what got built first.
@@ -76,8 +76,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
   // The training block's polls report how many saves exist; the Checkpoints &
   // LoRAs section re-reads on that number, so a harvest shows up there without
   // a poll of its own. The other way round, a delete in that section bumps
-  // `trainingRefresh` so the block's "Train further" stops offering a run that
-  // is gone.
+  // `trainingRefresh` so the training block updates its save count.
   const [saveCount, setSaveCount] = useState(0)
   const [trainingRefresh, setTrainingRefresh] = useState(0)
   // ✨ Neural render (DLSS 5). `nr` is the GET's answer — the capability's own
@@ -667,13 +666,11 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
           <section className={sectionCls('training')} aria-hidden={section !== 'training'}>
             {heading('training')}
             <div id="vds-training-launch" className="flex flex-col gap-2">
-              {/* The image lane's readiness card, reading the VIDEO preflight —
-                  one card, two lanes, the parity rule made literal. Local lane
-                  here (this machine's toolkit and weights); the cloud lane's
-                  report is asked by the launch window, right before the money.
-                  Fix → jumps to the section a row names. */}
+              {/* The image lane's readiness card, reading the local video
+                  preflight for this machine's toolkit and weights. Fix → jumps
+                  to the section a row names. */}
               <TrainingReadiness datasetId={ds.id}
-                endpoint={videoPreflightUrl(ds.id, 'local')}
+                endpoint={videoPreflightUrl(ds.id)}
                 refreshKey={`${counts.total}:${ds.references}:${ds.target_profile}`}
                 onJump={(target) => setSection(target)} />
               <VideoTrainingBlock ds={{ ...ds, clips: counts.total }}

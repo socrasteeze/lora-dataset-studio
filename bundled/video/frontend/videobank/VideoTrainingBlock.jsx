@@ -1,110 +1,91 @@
 import { useCallback, useEffect, useState } from 'react'
-import { apiFetch, postJson } from '@lds/plugin-sdk'
-import { useToast } from '@lds/plugin-sdk'
+import { apiFetch, postJson, useToast } from '@lds/plugin-sdk'
 import { HelpBadge } from '@lds/plugin-sdk'
-import { PluginSlot, hasContributions } from '@lds/plugin-sdk/ui'
 import { ensureLicenceAck } from './licenceAck.js'
 
-/** Targets that have been trained end to end at least once — locally or on a
- * rented pod, it does not matter which: what the note below cares about is
- * whether a real run has ever finished. A target absent from this set is wired
- * from the installed ai-toolkit's own code and preset — correct as far as
- * reading goes, never yet proven by a run — and the card says so, because "it
- * is wired" and "it works" are different claims and only the user can decide
- * whether to spend a night (or a pod bill) on the second. */
+/** Targets that have been trained end to end at least once. A target absent
+ * from this set is wired from the installed ai-toolkit's own code and preset —
+ * correct as far as reading goes, never yet proven by a run — and the card says
+ * so, because "it is wired" and "it works" are different claims and only the
+ * user can decide whether to spend a night on the second.
+ *
+ * A set answers what a user can act on: whether anyone has finished a run with
+ * this target. */
 const PROVEN_TARGETS = new Set(['wan22_14b', 'minimax_h3', 'minimax_h3_ref2va'])
 
-/** 🎬 The training block of one video dataset: one set of dials, two
- * destinations, and everything the runs report back.
+/** 🎬 The training block of one video dataset: one set of dials, and everything
+ * the run reports back.
  *
- * This used to be two stacked sections — a local one and a cloud one — each
- * with its own Steps field and its own i2v checkbox. Two fields for one number
- * read as two different features, and a value typed in one lane silently did
- * not apply to the other. The settings describe the RUN, not the machine, so
- * they are asked for once and the destination is just the button you press
- * (maintainer's call, 2026-08-30).
+ * The settings describe the RUN, so they are asked for once, above the button
+ * that spends them. Upstream reaches the same shape from the other direction —
+ * it had two stacked sections, one per destination, each with its own Steps
+ * field and its own i2v checkbox. This build trains video on this machine only
+ * (Divergence 4), so there is one destination and the block keeps upstream's
+ * name and structure.
  *
- * WHY THE COST IS ON SCREEN BEFORE THE CLICK (cloud)
- * A pod is billed from the moment it boots, so the block says the GPU and the
- * hourly price as soon as the run has one, and it refuses a launch it can
- * already tell will fail (no clips, a run already on a pod) rather than
- * rendering the server's 409.
- *
- * WHY THE LOCAL BUTTON MUST NEVER START SILENTLY
- * MiniMax H3 pulls about 43 GB of weights on its first local run, so the server
+ * WHY THE BUTTON MUST NEVER START SILENTLY
+ * MiniMax H3 pulls about 43 GB of weights on its first run, so the server
  * refuses with the repository and the size, and this asks, once, before that
  * becomes a night of downloading behind a bar that reads "Starting up…".
  *
- * WHY A CHECKPOINT IS A STEP AND NOT A FILE
- * A Wan 2.2 LoRA is TWO files at one step — the high-noise and low-noise
- * experts — and either one alone is a LoRA no loader can complete. So the unit
- * on screen is the step, its files are downloaded together, and a MiniMax H3
- * step (one file) renders through the same shape without a special case.
- *
- * Polling is strictly on demand: the local line polls only while this
+ * Polling is strictly on demand: the progress line polls only while this
  * dataset's own run is live (`active` is answered from the training fence,
  * which names the TABLE as well as the id — a face training of the colliding
- * id must not drive this bar), the cloud line only while a pod is on the
- * clock, and GPU offers are fetched on click, never on mount — a library page
- * with a dozen datasets must not fan out a vast.ai search per card.
+ * id must not drive this bar).
  */
 export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) {
   const toast = useToast()
-  // ONE dial set for both destinations. Prefilled with the server's
-  // dataset-sized suggestion (steps scale with the clip count — measured, not
-  // vibes; see suggested_steps in video_training.py). Still just a prefill:
-  // what the user types is what trains, wherever it trains.
+  // Prefilled with the server's dataset-sized suggestion (steps scale with the
+  // clip count — measured, not vibes; see suggested_steps in video_training.py).
+  // Still just a prefill: what the user types is what trains.
   const [steps, setSteps] = useState(ds?.suggested_steps || 2000)
   const [doI2v, setDoI2v] = useState(false)
-
-  // Local lane.
   const [progress, setProgress] = useState(null)
-  const [busyLocal, setBusyLocal] = useState(false)
+  const [busy, setBusy] = useState(false)
 
-  // Cloud Training contributes the optional lane; Video keeps the shared dials.
-  const [launchHost, setLaunchHost] = useState(null)
-  const [cloudSaveCount, setCloudSaveCount] = useState(0)
-  const cloudAvailable = hasContributions('training.launch', 'video')
-  const confirmLicence = () => ensureLicenceAck(ds, {
-    storage: window.localStorage, confirmFn: window.confirm,
-  })
-
-  const pollLocal = useCallback(async () => {
+  const poll = useCallback(async () => {
     try {
       setProgress(await apiFetch(`/api/video-dataset/${ds.id}/train/progress`,
         { background: true }))
     } catch { /* the card stays useful without its progress line */ }
   }, [ds.id])
-  useEffect(() => { pollLocal() }, [pollLocal])
+  useEffect(() => { poll() }, [poll])
 
-  const localActive = !!progress?.active
+  const active = !!progress?.active
   useEffect(() => {
-    if (!localActive) return undefined
-    const t = setInterval(pollLocal, 3000)
+    if (!active) return undefined
+    const t = setInterval(poll, 3000)
     return () => clearInterval(t)
-  }, [localActive, pollLocal])
+  }, [active, poll])
 
-  // Report both destinations through the workspace's existing refresh signal.
-  const saveCount = (cloudAvailable ? cloudSaveCount : 0)
-    + (progress?.checkpoints?.length || 0)
+  // Told, rather than guessed at from outside: this poll is the only thing that
+  // knows when a save lands, and the workspace's Checkpoints & LoRAs section
+  // re-reads on the number it reports.
+  // There is one lane here, so the local run's own files are the count.
+  const saveCount = progress?.checkpoints?.length || 0
   useEffect(() => { onSaveCount?.(saveCount) }, [saveCount, onSaveCount])
-  useEffect(() => { if (refreshKey) pollLocal() }, [refreshKey, pollLocal])
+  // The other direction: that section deleted a save, and this card must not
+  // go on offering what is gone.
+  useEffect(() => {
+    if (!refreshKey) return
+    poll()
+  }, [refreshKey, poll])
 
-  const startLocal = async (acceptDownload = false) => {
+  const start = async (acceptDownload = false) => {
     // The licence question comes BEFORE anything is spent — not after the
     // download confirm, whose 43 GB would already be an investment in a run
     // the licence answer might forbid.
     if (!ensureLicenceAck(ds, {
       storage: window.localStorage, confirmFn: window.confirm,
     })) return undefined
-    setBusyLocal(true)
+    setBusy(true)
     try {
       const r = await postJson(`/api/video-dataset/${ds.id}/train`,
         { steps, do_i2v: doI2v, accept_download: acceptDownload })
       toast.success(`Training started — ${r.clips} clips, ${r.steps} steps.`)
       // Things the run will not fail on but that change what to expect from it.
       ;(r.warnings || []).forEach((w) => toast.warning(w))
-      pollLocal()
+      poll()
     } catch (e) {
       const body = e?.body
       if (body?.needs_download) {
@@ -115,8 +96,8 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
           ? ` You have ${body.free_gigabytes.toFixed(1)} GB free there.`
           : ''
         if (window.confirm(`${body.error}\n\nDownload about ${body.gigabytes} GB from ${body.repo}?${room}`)) {
-          setBusyLocal(false)
-          return startLocal(true)
+          setBusy(false)
+          return start(true)
         }
       } else {
         // A refusal that carries its own fix (a pip line to paste) needs
@@ -125,19 +106,19 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
         toast.error(msg, msg.length > 200 ? 20000 : undefined)
       }
     } finally {
-      setBusyLocal(false)
+      setBusy(false)
     }
     return undefined
   }
 
-  const stopLocal = async () => {
+  const stop = async () => {
     try {
       const r = await postJson(`/api/video-dataset/${ds.id}/train/stop`, {})
       // `ok: false` means the fence names another run. Saying "stopped" there
       // would tell the user a GPU was released while ai-toolkit still owns it.
       if (r.ok) toast.success('Training stopped.')
       else toast.warning('That run is not this dataset’s — nothing was stopped.')
-      pollLocal()
+      poll()
     } catch (e) {
       toast.error(e?.message || 'Could not stop training.')
     }
@@ -149,9 +130,9 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
 
   return (
     <section className="flex flex-col gap-1.5 border-t border-border pt-1.5">
-      {localActive ? (
+      {active ? (
         <div className="flex flex-wrap items-center gap-1.5">
-          <button type="button" onClick={stopLocal}
+          <button type="button" onClick={stop}
             className="rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-[0.6875rem] font-semibold text-rose-100 hover:bg-rose-500/20">
             ⏹ Stop training
           </button>
@@ -183,22 +164,31 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
             {/* BETA, and honestly so (maintainer's call, 2026-08-30): the rail
                 is proven end to end but days old, and a label that says "expect
                 rough edges" costs less than a user who assumed a settled
-                feature. Same chip both destinations — the beta is the RAIL. */}
+                feature. Upstream words this "same chip both destinations"; this
+                build has only the local one, and the beta is still the RAIL. */}
             <span className="rounded border border-amber-500/50 bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wider text-amber-200">
               Beta
             </span>
-            <button type="button" onClick={() => startLocal(false)}
-              disabled={busyLocal || !ds.clips}
+            {/* Upstream reads "▶ Train on this PC" because it has a second
+                button beside it. There is only one destination here, so naming
+                the machine would advertise a lane this build does not offer. */}
+            <button type="button" onClick={() => start(false)}
+              disabled={busy || !ds.clips}
               className="rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-50">
-              {busyLocal ? 'Starting…' : '▶ Train on this PC'}
+              {busy ? 'Starting…' : '▶ Train this dataset'}
             </button>
             <HelpBadge topic="video-train-local" />
-            <span ref={setLaunchHost} className="contents" />
           </div>
         </>
       )}
 
-      {localActive && (
+      {!active && !ds.clips && (
+        <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-100">
+          This set has no clips yet — promote some shots into it first.
+        </p>
+      )}
+
+      {active && (
         <p className="text-[0.6875rem] text-content-muted">
           {dl
             ? `Downloading weights — ${dl.percent ?? 0}%`
@@ -208,7 +198,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
         </p>
       )}
 
-      {!localActive && !PROVEN_TARGETS.has(ds.target_profile) && (
+      {!active && !PROVEN_TARGETS.has(ds.target_profile) && (
         <p className="text-[0.6875rem] text-content-subtle">
           {ds.target_label} is wired from ai-toolkit’s own settings but has not
           been trained end to end yet.
@@ -216,7 +206,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
       )}
       {/* On the card, not only in the toast after launching: a warning that
           arrives once the run is up is a warning about a decision already made. */}
-      {!localActive && progress?.resolution_note && (
+      {!active && progress?.resolution_note && (
         <p className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-100">
           ⚠ {progress.resolution_note}
         </p>
@@ -227,13 +217,6 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
           {progress.checkpoints.length === 1 ? '' : 's'} in {progress.run_name}
         </p>
       )}
-
-      <PluginSlot slot="training.launch" surface="video"
-        ds={ds} steps={steps} doI2v={doI2v} confirmLicence={confirmLicence}
-        cloudUrl={`/api/video-dataset/${ds.id}/train/cloud`}
-        preflightUrl={`/api/video-dataset/${ds.id}/train/preflight?lane=cloud`}
-        launchHost={launchHost} localActive={localActive}
-        onSaveCount={setCloudSaveCount} refreshKey={refreshKey} />
     </section>
   )
 }

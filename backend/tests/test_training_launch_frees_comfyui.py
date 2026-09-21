@@ -153,11 +153,12 @@ def test_a_raising_free_does_not_stop_the_launch(app, tmp_path, monkeypatch):
 
 # --- the video lane -------------------------------------------------------------
 
+@pytest.mark.plugins('video')
 def test_the_video_launch_asks_too(app, tmp_path, monkeypatch):
     """Same admission block, copied verbatim into video_training_local — so the
     same request, at the same place: after the Ollama fence, before the child."""
     from app.services import system_stats
-    from app.services import video_training_local as vtl
+    from lds_video import video_training_local as vtl
     calls = []
     _video_aitoolkit(monkeypatch, tmp_path)
     monkeypatch.setattr(system_stats, 'gpu_vram_used_gb', lambda: 1.5)

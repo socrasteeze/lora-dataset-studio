@@ -313,7 +313,7 @@ test('the caption tools are there for a set with NO caption at all', () => {
 
 test('Video alone renders local training with no cloud contribution or cloud controls', () => {
   const html = renderTraining(VideoTrainingBlock, { ds: DS })
-  assert.match(html, /Train on this PC/)
+  assert.match(html, /Train this dataset/)
   assert.doesNotMatch(html, /Train in the cloud|Retry|Train further/)
   assert.deepEqual(contributions('training.launch', 'video'), [])
 })

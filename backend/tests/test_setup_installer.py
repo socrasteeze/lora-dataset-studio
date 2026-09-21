@@ -1448,7 +1448,7 @@ def test_install_all_plan_none_and_empty_caps_are_safe():
     tiles read missing (default present=falsey) and Ollama/ComfyUI are absent so their
     gated actions are skipped; only the always-runnable extras remain."""
     from app import setup_installer
-    ungated = ['scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint', 'wd14']
+    ungated = ['face_scoring', 'masks', 'watermark_inpaint', 'wd14']
     assert setup_installer.install_all_plan(None) == ungated
     assert setup_installer.install_all_plan({}) == ungated
 

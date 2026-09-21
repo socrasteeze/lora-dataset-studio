@@ -60,7 +60,7 @@ function FloatingVideoMenu({ anchor, onClose, children }) {
  * image popover's rows (⬇, ▶, 📦/⏏, ⓘ, 🗑) with one difference the video lane
  * owns: ⬇ is one link PER FILE, because a Wan pair is two files at one step. */
 export function VideoCheckpointPopover({
-  node, pill, a, busy = null, onDeploy, onUndeploy, onDelete, onContinue, onDetails,
+  node, pill, a, busy = null, onDeploy, onUndeploy, onDelete,
   onPlaySample, onClose,
 }) {
   if (!a) return null
@@ -99,14 +99,7 @@ export function VideoCheckpointPopover({
             <span aria-hidden>🎬</span> Play sample{preview.count > 1 ? `s (${preview.count})` : ''}
           </button>
         )}
-        {a.continue.ok ? (
-          <button type="button" disabled={rowBusy} onClick={() => { onContinue?.(g, s, node, pill); onClose?.() }}
-            className={ROW_CLS + ' border-indigo-400/40 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25'}>
-            <span aria-hidden>▶</span> Continue from here
-          </button>
-        ) : (
-          <span className={MUTED_CLS}><span aria-hidden>▶</span> {a.continue.reason}</span>
-        )}
+        <span className={MUTED_CLS}><span aria-hidden>▶</span> {a.continue.reason}</span>
         {a.deployed ? (a.undeploy?.ok ? (
           <button type="button" disabled={rowBusy} onClick={() => onUndeploy?.(g, s, node, pill)}
             className={ROW_CLS + ' border-emerald-500/40 bg-emerald-600/5 text-emerald-200/90 hover:bg-emerald-600/20'}>
@@ -122,12 +115,6 @@ export function VideoCheckpointPopover({
         ) : (
           <span className={MUTED_CLS}><span aria-hidden>📦</span> {a.deploy?.reason}</span>
         ))}
-        {a.details && (
-          <button type="button" onClick={() => { onDetails?.(node); onClose?.() }}
-            className={ROW_CLS + ' border-border bg-app/60 text-content hover:border-indigo-400/50'}>
-            <span aria-hidden>ⓘ</span> Details
-          </button>
-        )}
         {a.del.ok ? (
           <button type="button" disabled={rowBusy} onClick={() => onDelete?.(g, s, node, pill)}
             title={a.del.title}
@@ -152,7 +139,7 @@ export function VideoCheckpointPopover({
  * is no compare, no notes and no "Generate previews" bar — see PREVIEWS_NOTE. */
 export default function VideoLineageGraph({
   datasetId, tree, ctx = {}, busy = null,
-  onDeploy, onUndeploy, onDelete, onContinue, onDetails, onPlaySample,
+  onDeploy, onUndeploy, onDelete, onPlaySample,
 }) {
   const [bigPreviews, setBigPreviews] = useState(() => {
     try { return localStorage.getItem('lds.videoGraphBigPreviews') === '1' } catch { return false }
@@ -234,7 +221,7 @@ export default function VideoLineageGraph({
               : 'border-border bg-app/60 text-content-muted hover:text-content ')}>
           🔍 Big previews
         </button>
-        <span>Click a save for its actions · a run card for its details · a still to play the sample</span>
+        <span>Click a save for its actions · a still to play the sample</span>
       </div>
       <div ref={scrollRef} className="lds-lgraph-scroll relative overflow-auto rounded-xl"
         style={{ maxHeight: MAX_H }} data-probe-panel="video-lineage-graph"
@@ -254,9 +241,7 @@ export default function VideoLineageGraph({
                 onPointerLeave={() => setHoverId((cur) => (cur === n.node.record_id ? null : cur))}>
                 <div style={{ position: 'relative', width: CARD_W, height: n.cellH }}>
                   <GraphCard node={n.node} lit={isLit(n.node.record_id)} annotated={false}
-                    compareRole={null}
-                    onSelect={n.node.source === 'cloud' && typeof onDetails === 'function'
-                      ? (node) => onDetails(node) : undefined} />
+                    compareRole={null} />
                   {n.checkpoints.map((p) => (
                     <CheckpointPill key={`${p.step}-${p.filename ?? p.x}`}
                       pill={p} offX={p.x - n.x} offY={p.y - n.y}
@@ -285,7 +270,7 @@ export default function VideoLineageGraph({
             a={pillActionModel(datasetId, openCk.node, openCk.pill, ctx)}
             busy={busy}
             onDeploy={onDeploy} onUndeploy={onUndeploy} onDelete={onDelete}
-            onContinue={onContinue} onDetails={onDetails} onPlaySample={onPlaySample}
+            onPlaySample={onPlaySample}
             onClose={closePopover} />
         </FloatingVideoMenu>
       )}

@@ -2589,6 +2589,11 @@ def _probe_uncached():
         'bank_siglip2': probe_bank_siglip2,
         'watermark_inpaint': probe_watermark_inpaint,
         'watermark_detect': probe_watermark_detect,
+        # The fork still publishes the legacy Video and DLSS capability rows.
+        # Keep their probes in the bounded pool until every retained reader has
+        # moved to a plugin-owned capability payload.
+        'video': probe_video,
+        'dlss5nr': probe_dlss5nr,
         'video_text': probe_video_text,
         'scrape_deps': probe_scrape_deps,
         # Fork-only lane: another cached-but-possibly-cold `import onnxruntime`,

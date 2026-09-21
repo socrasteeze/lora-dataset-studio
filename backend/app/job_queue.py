@@ -1420,14 +1420,12 @@ class JobQueueManager:
             # This LOCAL worker only ever claims jobs it owns -- claiming a
             # remote dispatcher's row would render it on the wrong machine. Same
             # predicate as the busy check above, by construction.
-            job = (local_rows_only(
-                       ImageGenerationQueue.query.filter_by(status='pending'))
-                   .order_by(ImageGenerationQueue.priority.desc(),
-                             ImageGenerationQueue.created_at.asc()).first())
-            candidates = (ImageGenerationQueue.query.filter_by(status='pending')
+            candidates = (local_rows_only(
+                              ImageGenerationQueue.query.filter_by(status='pending'))
                           .order_by(ImageGenerationQueue.priority.desc(),
                                     ImageGenerationQueue.created_at.asc()))
-            job = next((candidate for candidate in candidates if _job_owner_available(candidate)), None)
+            job = next((candidate for candidate in candidates
+                        if _job_owner_available(candidate)), None)
             if job is None:
                 return False
             if not _claim(job.job_id):

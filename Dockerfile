@@ -1,3 +1,10 @@
+FROM python:3.12-slim AS fork-plugins
+WORKDIR /source
+COPY fork-plugins.json fork-plugins.json
+COPY bundled bundled
+COPY packaging/stage_fork_plugins.py packaging/stage_fork_plugins.py
+RUN python packaging/stage_fork_plugins.py --repo /source --destination /curated-plugins
+
 # API-only mode: ComfyUI and ai-toolkit are host-native and out of scope for this container.
 FROM python:3.12-slim
 WORKDIR /app
@@ -5,6 +12,8 @@ COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend backend
 COPY frontend/dist frontend/dist
+COPY fork-plugins.json .
+COPY --from=fork-plugins /curated-plugins bundled
 COPY config.example.json .
 COPY packaging/docker/seed_comfy_config.py /app/packaging/docker/seed_comfy_config.py
 COPY packaging/docker/studio_api_entrypoint.sh /usr/local/bin/studio-api-entrypoint.sh

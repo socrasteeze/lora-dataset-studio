@@ -156,6 +156,7 @@ test('the set of files allowed to raw-fetch is closed', () => {
     'hooks/useLoraTestStudio.js',                          // status poll, silent retry on transient errors
     'hooks/useStudioRun.js',                               // run-status poll, silent retry on transient errors
     'pages/CloudRunsPage.jsx',                             // history/lineage GETs render their own error states
+    'components/runs/RunsHub.jsx',                         // local/history shell owns its best-effort reads
     // DIVERGENCE 6 — peer/device training, fork-only, so upstream's list has
     // neither. Both are the case rule 2 sanctions: a best-effort GET whose
     // failure is expected weather. They probe a route an OLDER backend on

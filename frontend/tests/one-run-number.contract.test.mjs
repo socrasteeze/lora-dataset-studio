@@ -28,7 +28,7 @@ const read = (p) => fs.readFileSync(new URL(p, SRC), 'utf8')
 
 const chip = read('components/dataset/RunIdentityBadges.jsx')
 const panel = read('components/dataset/TrainingPanel.jsx')
-const runsPage = read('pages/CloudRunsPage.jsx')
+const runsPage = read('components/runs/RunsHub.jsx')
 const card = read('components/dataset/lineageNodes.jsx')
 const tree = read('components/dataset/RunLineageTree.jsx')
 
@@ -98,7 +98,7 @@ test('⚙ Details and ⇄ Compare pass the RECORD id — the key the tree indexe
 test('the checkpoints group chip and the Runs-page chips print the record id', () => {
   assert.match(panel, /<RunIdChip source="cloud" recordId=\{g\.record_id\} cloudId=\{g\.run_id\} \/>/)
   // History card, live local card, active cloud card — all on the new contract.
-  assert.match(runsPage, /recordId=\{run\.record_id\} cloudId=\{run\.run_id\}/)
+  assert.match(runsPage, /recordId=\{run\.record_id\} cloudId=\{run\.source === 'cloud' \? run\.run_id : null\}/)
   assert.match(runsPage, /recordId=\{data\.local_active\.record_id\}/)
   // Row ANCHORS keep their own keys (deep links must survive the display fix):
   // cloud rows still anchor by cloud id, local rows by record id.

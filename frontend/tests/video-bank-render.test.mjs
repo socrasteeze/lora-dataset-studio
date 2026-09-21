@@ -368,8 +368,11 @@ test('the video bank is announced and documented', async () => {
   const allWhatsNew = () => [...WHATS_NEW, ...WHATS_NEW_ARCHIVE, ...whatsNewEntries()]
   const helpIds = ['page-video-bank', 'video-bank-passes', 'video-capability-pieces',
     'video-datasets', 'video-promote-target']
-  for (const id of helpIds) assert.equal(getHelpTopic(id), undefined, `absent owner: ${id}`)
-  assert.ok(!allWhatsNew().some(e => e.id === '2026-08-04-video-bank'))
+  setEnabled([])
+  // D10 keeps the fork's canonical help wording in core. Enabling the bundled
+  // owner must preserve those entries rather than duplicate or replace them.
+  const canonicalHelp = new Map(helpIds.map((id) => [id, getHelpTopic(id)]))
+  for (const [id, topic] of canonicalHelp) assert.ok(topic, `missing canonical help topic ${id}`)
   assert.deepEqual(pluginWhatsNew('video'), [])
   assert.equal(registerBundledDescriptor(videoDescriptor), true)
   setEnabled(['video'])
@@ -382,11 +385,13 @@ test('the video bank is announced and documented', async () => {
   assert.match(entry.title, /rushes/)
 
   for (const id of helpIds) {
-    assert.ok(getHelpTopic(id), `missing help topic ${id}`)
+    assert.equal(getHelpTopic(id), canonicalHelp.get(id), `canonical help topic replaced: ${id}`)
   }
   assert.equal(getHelpTopic('page-video-bank').app.route, '/video-bank')
   setEnabled([])
-  for (const id of helpIds) assert.equal(getHelpTopic(id), undefined, `disabled owner: ${id}`)
-  assert.ok(!allWhatsNew().some(e => e.id === '2026-08-04-video-bank'))
+  for (const id of helpIds) {
+    assert.equal(getHelpTopic(id), canonicalHelp.get(id), `canonical help topic lost after disable: ${id}`)
+  }
+  assert.ok(allWhatsNew().some(e => e.id === '2026-08-04-video-bank'))
   assert.ok(pluginWhatsNew('video').some(e => e.id === entry.id), 'installed owner history remains readable')
 })

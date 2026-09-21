@@ -1,7 +1,7 @@
 """Build the Windows core ZIP from one committed Git tree.
 
-Working files and installed plugins never enter this archive. Plugin packages
-are distributed separately through the Store.
+Working files and installed plugins never enter this archive. The fork's curated
+source plugins ship with the repository; held, excluded and arbitrary bundles do not.
 """
 from __future__ import annotations
 
@@ -14,7 +14,11 @@ import re
 import subprocess
 import zipfile
 
-ROOT_FILES = {'start.bat', 'README.md', 'LICENSE', 'config.example.json', '.env.example'}
+POLICY_FILE = Path(__file__).resolve().parents[1] / 'fork-plugins.json'
+FORK_POLICY = json.loads(POLICY_FILE.read_text(encoding='utf-8'))
+CURATED_PLUGINS = tuple(FORK_POLICY['enabled'])
+ROOT_FILES = {'start.bat', 'README.md', 'LICENSE', 'config.example.json', '.env.example',
+              'fork-plugins.json'}
 BACKEND_FILES = {'bootstrap_dependencies.py', 'port_utils.py', 'requirements.txt',
                  'requirements-ml.txt', 'requirements-scrape.txt', 'run.py',
                  'single_instance.py', 'supervise.py'}
@@ -29,7 +33,7 @@ REQUIRED = ROOT_FILES | {'backend/run.py', 'backend/requirements.txt',
                         'frontend/dist/index.html', 'scripts/bootstrap_python.ps1'} | PUBLIC_STORE_FILES
 
 
-def runtime_member(name: str) -> bool:
+def runtime_member(name: str, curated_plugins=CURATED_PLUGINS) -> bool:
     """Select runtime paths, retaining the host's app/plugins implementation."""
     parts = PurePosixPath(name).parts
     if (not parts or name.startswith('/') or any(part in {'', '.', '..'} for part in parts)
@@ -37,9 +41,22 @@ def runtime_member(name: str) -> bool:
         raise ValueError('Invalid Git member path')
     if name in ROOT_FILES or name == 'scripts/bootstrap_python.ps1' or name in PUBLIC_STORE_FILES:
         return True
-    if any(part.casefold() in LOCAL_DIRS or part.startswith('.') for part in parts):
+    lower = name.lower()
+    pinned_wheel = (len(parts) >= 5 and parts[0] == 'bundled'
+                    and parts[2:4] == ('resources', 'wheels') and lower.endswith('.whl'))
+    if ((parts[-1].casefold() == '.env'
+         or lower.endswith(('.exe', '.pyc', '.pyo', '.ldsplugin', '.sqlite', '.sqlite3',
+                            '.db', '.key', '.pem', '.p12', '.pfx', '.env') + ARCHIVE_SUFFIXES))
+            and not pinned_wheel):
         return False
-    if name.lower().endswith(('.exe', '.pyc', '.pyo', '.ldsplugin', '.sqlite', '.sqlite3', '.db') + ARCHIVE_SUFFIXES):
+    if len(parts) >= 3 and parts[0] == 'bundled':
+        if parts[1] not in curated_plugins:
+            return False
+        # Ship the complete declared product, including requirements, workflows,
+        # assets and pinned wheels. Keep development and runtime residue out.
+        return not any(part.casefold() in LOCAL_DIRS or part.startswith('.')
+                       for part in parts[2:])
+    if any(part.casefold() in LOCAL_DIRS or part.startswith('.') for part in parts):
         return False
     if len(parts) >= 3 and parts[:2] == ('frontend', 'dist'):
         return True
@@ -63,12 +80,21 @@ def build(repo: Path, output_dir: Path, *, ref: str = 'HEAD',
                                       ref + '^{commit}'], text=True, env=git_env).strip()
     if not re.fullmatch(r'[0-9a-f]{40,64}', commit):
         raise ValueError('Expected a complete Git commit')
+    try:
+        committed_policy = json.loads(subprocess.check_output(
+            [*git, 'show', f'{commit}:fork-plugins.json'], text=True, env=git_env))
+        curated = committed_policy['enabled']
+    except (subprocess.CalledProcessError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError('The committed fork plugin policy is missing or invalid') from exc
+    if (not isinstance(curated, list) or not curated or len(curated) != len(set(curated))
+            or any(not isinstance(value, str) or not value for value in curated)):
+        raise ValueError('The committed fork plugin policy has no valid enabled list')
     entries = []
     tree = subprocess.check_output([*git, 'ls-tree', '-rz', '--full-tree', commit], env=git_env)
     for raw in filter(None, tree.split(b'\0')):
         metadata, encoded_path = raw.split(b'\t', 1)
         path = encoded_path.decode('utf-8')
-        if not runtime_member(path):
+        if not runtime_member(path, curated):
             continue
         mode, kind, oid = metadata.split()
         if mode not in {b'100644', b'100755'} or kind != b'blob':
@@ -96,12 +122,16 @@ def build(repo: Path, output_dir: Path, *, ref: str = 'HEAD',
     info = {'version': match[1], 'tag': tag or 'v' + match[1], 'commit': commit,
             'built_at': datetime.now(timezone.utc).isoformat(timespec='seconds')}
     members['build_info.json'] = (json.dumps(info, indent=2) + '\n').encode('utf-8')
+    included = sorted({PurePosixPath(path).parts[1] for path in members
+                       if path.startswith('bundled/')})
+    if included != sorted(curated):
+        raise ValueError('The committed fork plugin set is incomplete')
     output_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, 'x', compression=zipfile.ZIP_DEFLATED) as archive:
         for path, content in sorted(members.items()):
             archive.writestr(name + '/' + path, content)
     return {'archive': str(destination), 'commit': commit, 'files': len(members),
-            'bytes': destination.stat().st_size, 'plugins_included': 0}
+            'bytes': destination.stat().st_size, 'plugins_included': len(included)}
 
 
 def main():

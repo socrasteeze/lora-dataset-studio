@@ -1,15 +1,11 @@
 """Public Video/API registration and local data routes with the real host SDK."""
 import importlib
-import base64
-import json
 from pathlib import Path
-from unittest.mock import Mock
 
 from PIL import Image
 import pytest
 
 from app import models
-from app.engines import registry as engines
 from app.extensions import db
 from test_public_sdk_integration import ROOT, activate, host  # noqa: F401 — shared fixture
 
@@ -26,7 +22,7 @@ def no_external_connection_or_worker(monkeypatch):
     monkeypatch.setattr('threading.Thread.start', refuse)
 
 
-@pytest.mark.parametrize('product', ['video', 'api_engines'])
+@pytest.mark.parametrize('product', ['video'])
 def test_all_product_service_modules_import_with_real_sdk(host, product):
     loaded = activate(host, {product})
     assert loaded.records[product].state == 'loaded', loaded.records[product].error
@@ -38,7 +34,7 @@ def test_all_product_service_modules_import_with_real_sdk(host, product):
             if parts[-1] == '__init__':
                 parts.pop()
             importlib.import_module('.'.join([package, *parts]))
-    assert len(db.metadata.tables) == 28
+    assert len(db.metadata.tables) == 33
 
 
 def test_video_catalog_and_empty_lists_work_without_other_plugins(host):
@@ -185,59 +181,3 @@ def test_video_local_progress_ignores_face_training_with_the_same_id(host):
     assert response.status_code == 200, response.json
     assert response.json['active'] is False
     assert response.json['checkpoints'] == []
-
-
-def test_api_engines_register_callbacks_and_readiness_without_a_paid_request(host):
-    activate(host, {'api_engines'})
-    assert set(engines.ids()) == {'nanobanana', 'chatgpt', 'openrouter'}
-    for spec in engines.all_specs():
-        assert spec.plugin == 'api_engines'
-        assert callable(engines.generate_fn(spec.id))
-        assert spec.probe()['ok'] is False
-    with host[0].app_context():
-        assert engines.generate_kwargs('chatgpt') == {'force_lane': 'api'}
-
-
-@pytest.mark.parametrize('engine,key', [('nanobanana', 'GEMINI_API_KEY'),
-                                      ('chatgpt', 'OPENAI_API_KEY'),
-                                      ('openrouter', 'OPENROUTER_API_KEY')])
-@pytest.mark.parametrize('status', [200, 401])
-def test_api_dispatch_uses_real_sdk_and_shared_fatal_errors(host, monkeypatch, engine, key, status):
-    activate(host, {'api_engines'})
-    monkeypatch.setenv(key, 'test-only-provider-fixture')
-    encoded = base64.b64encode(b'fixture-image').decode()
-    body = {'data': [{'b64_json': encoded, 'media_type': 'image/png'}]}
-    if engine == 'nanobanana':
-        body = {'candidates': [{'content': {'parts': [
-            {'inlineData': {'mimeType': 'image/png', 'data': encoded}}]}, 'finishReason': 'STOP'}]}
-    if status == 401:
-        body = {'error': {'message': 'Invalid fixture key', 'code': 401}}
-    response = Mock(status_code=status, headers={}, text=json.dumps(body))
-    response.json.return_value = body
-    post = Mock(return_value=response)
-    monkeypatch.setattr('requests.post', post)
-    from app.services.engine_errors import EngineFatal
-    with host[0].app_context():
-        callback = engines.generate_fn(engine)
-        kwargs = engines.generate_kwargs(engine)
-        if status == 200:
-            assert callback([b'ref-a', b'ref-b'], 'fixture', **kwargs) == b'fixture-image'
-        else:
-            with pytest.raises(EngineFatal) as error:
-                callback([b'ref-a', b'ref-b'], 'fixture', **kwargs)
-            assert 'test-only-provider-fixture' not in str(error.value)
-    assert post.call_count == 1
-
-
-def test_api_oauth_routes_use_only_the_temporary_data_folder(host):
-    activate(host, {'api_engines'})
-    from lds_api_engines import chatgpt_oauth
-    token_file = host[2] / 'data' / 'chatgpt_oauth.json'
-    token_file.parent.mkdir(parents=True, exist_ok=True)
-    token_file.write_text(json.dumps({'access_token': 'test-only-oauth-fixture'}), encoding='utf-8')
-    assert chatgpt_oauth._token_path() == token_file
-    client = host[0].test_client()
-    response = client.get('/api/settings/chatgpt-oauth/poll')
-    assert response.status_code == 200 and response.json['status'] == 'error'
-    assert client.post('/api/settings/chatgpt-oauth/logout').json == {'ok': True}
-    assert not token_file.exists()

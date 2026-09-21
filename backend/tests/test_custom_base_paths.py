@@ -24,7 +24,7 @@ import struct
 
 import pytest
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 
 # --- fake .safetensors: 8-byte LE header length + JSON metadata (no real weights) ---
@@ -287,36 +287,8 @@ def test_sdxl_builder_emits_custom_weights_and_overrides(app, tmp_path):
 
 # --- guardrail (d): cloud refuses a persisted custom base -----------------------
 
-def test_cloud_custom_weights_need_pushed_private_repo(app, tmp_path, monkeypatch):
-    """A persisted Krea custom base is no longer flat-refused: the cloud lane
-    trains it from a private HF repo. Without HF_TOKEN the launch still fails
-    BEFORE renting, with the actionable token message."""
-    from lds_cloud_training import cloud_training as ct
-    from app.services import face_dataset_service as svc
-    from app.config import LOCAL_USER
-    monkeypatch.setenv('VAST_API_KEY', 'k-test')
-    monkeypatch.setattr(ct, '_reconcile_before_launch', lambda a: None)
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'CC', 'zc_cc', train_type='krea')
-        ds.train_base_model = _mkfile(tmp_path, 'w.safetensors', _KREA_KEYS)
-        svc.db.session.commit()
-        with pytest.raises(ValueError, match='HF_TOKEN'):
-            ct.launch_cloud_training(LOCAL_USER, ds.id)
 
 
-def test_cloud_refuses_persisted_sdxl_override(app, tmp_path, monkeypatch):
-    from lds_cloud_training import cloud_training as ct
-    from app.services import face_dataset_service as svc
-    from app.config import LOCAL_USER
-    monkeypatch.setenv('VAST_API_KEY', 'k-test')
-    monkeypatch.setattr(ct, '_reconcile_before_launch', lambda a: None)
-    with app.app_context():
-        # zimage is a cloud-supported family; a stray VAE override must still block.
-        ds = svc.create_dataset(LOCAL_USER, 'CV', 'zc_cv', train_type='zimage')
-        ds.train_vae_path = str(tmp_path / 'vae.safetensors')
-        svc.db.session.commit()
-        with pytest.raises(ValueError, match='local-only'):
-            ct.launch_cloud_training(LOCAL_USER, ds.id)
 
 
 def test_continue_bypasses_custom_weight_sniff_after_caption_preflight(

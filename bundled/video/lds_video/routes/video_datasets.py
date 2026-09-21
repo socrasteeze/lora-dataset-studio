@@ -17,6 +17,7 @@ import io
 import logging
 import mimetypes
 import os
+
 from flask import Blueprint, jsonify, request, send_file
 
 from lds_sdk.video_host.config import LOCAL_USER
@@ -300,62 +301,25 @@ def video_dataset_train_stop(dataset_id):
     return jsonify({'ok': bool(stopped)})
 
 
-@bp.post('/video-dataset/<int:dataset_id>/train/cloud')
-def video_dataset_train_cloud(dataset_id):
-    """Rent a pod and train a LoRA on this video dataset.
-
-    Deliberately its own endpoint rather than the face lane's
-    `/dataset/<id>/train/cloud`: that route's id means a `face_dataset`, and the
-    two tables share one integer space — the same URL shape for both would make
-    the id alone ambiguous at the outermost layer, which is precisely the
-    confusion the run's `dataset_table` column exists to end.
-
-    A target we have no verified base for is a 400, not a 500: the user picked a
-    model this build cannot train unattended, and that is a choice they can
-    correct — the message names what to do."""
-    from lds_sdk.video_host import cloud_video_training as cvt
-    from lds_video import video_training
-    body = request.get_json(silent=True) or {}
-    try:
-        return jsonify(cvt.launch_cloud_video_training(
-            LOCAL_USER, dataset_id,
-            steps=body.get('steps') or 1000,
-            base_model=(body.get('base_model') or '').strip() or None,
-            low_vram=bool(body.get('low_vram', False)),
-            do_i2v=bool(body.get('do_i2v', False)),
-            sample_prompts=body.get('sample_prompts'),
-            distillation=body.get('distillation') or 'auto',
-            gpu_name=body.get('gpu_name'),
-            allow_parallel_run=bool(body.get('allow_parallel_run'))))
-    except video_training.VideoTrainingUnsupported as e:
-        return jsonify({'error': str(e)}), 400
-    except ValueError as e:
-        # 'video dataset not found' is the only ValueError that is a 404; the
-        # rest ('no clips on disk') are things about THIS dataset the user can
-        # act on, and a 404 would tell them the dataset does not exist.
-        if 'not found' in str(e):
-            return _missing(dataset_id)
-        return jsonify({'error': str(e)}), 400
-    except RuntimeError as e:
-        # The launch guard: already running, fleet limit, budget. 409 — the
-        # request was well-formed, the state refuses it.
-        return jsonify({'error': str(e)}), 409
-
+# DIVERGENCE 4 — upstream continues here with the rented-pod video lane:
+# POST /train/cloud, GET /train/cloud/progress, GET /train/cloud/checkpoints,
+# GET /train/cloud/checkpoint, POST /train/cloud/retry, POST /train/cloud/continue,
+# DELETE /train/cloud/run/<id> (2026-08-31: the 🗑 that clears one finished run),
+# GET /train/cloud/offers (2026-09-03: the live price/h tier list the launch
+# window shows) and GET /train/cloud/run/<id> (2026-09-03: the ⓘ details card,
+# which reports GPU and price), plus their `_video_run` / `_relaunch` helpers.
+# This fork trains video LOCALLY only, so none of it is carried and
+# `cloud_video_training` is not a module here.
+# The local lane above (/train, /train/progress, /train/stop) is the whole
+# surface. `cloud_run_dataset` IS kept and used above: despite the name it is the
+# face_dataset/video_dataset table disambiguator, not part of the rental lane.
+# The Checkpoints & LoRAs section below arrived in the SAME upstream commit as
+# the two 2026-09-03 rejections (779aee6): its ⬇ / 📦 / ⏏ / 🗑 verbs read the
+# local run's own saves and are kept, resolved per hunk rather than per file.
 
 @bp.get('/video-dataset/<int:dataset_id>/train/preflight')
 def video_dataset_train_preflight(dataset_id):
-    """Pre-launch report — `checks` + `verdict`, the image preflight's shape, so
-    the same readiness card renders it. `?lane=cloud` drops the rows that read
-    THIS machine (ai-toolkit, weights) and adds the account ones (vast key, run
-    limit, budget); absent or `local` is the reverse.
-
-    Its own route and not `/dataset/<id>/train/preflight`, for the reason every
-    video route is: the two dataset tables share one integer space.
-
-    No capability gate in front of it, on purpose. The image route 409s without
-    ai-toolkit, and its caller treats a non-200 as "no objection" — which is the
-    silent no-op this report exists to prevent on the lane where money is about
-    to be spent. A missing tool is a ROW here, not an absence of answer."""
+    """Report local training prerequisites; refuse unsupported rental lanes."""
     from lds_video import video_training_local as vtl
     try:
         report = vtl.training_preflight(LOCAL_USER, dataset_id,
@@ -365,184 +329,6 @@ def video_dataset_train_preflight(dataset_id):
             return _missing(dataset_id)
         return jsonify({'error': str(e)}), 400
     return jsonify({'ok': True, **report})
-
-
-@bp.get('/video-dataset/<int:dataset_id>/train/cloud/offers')
-def video_dataset_cloud_offers(dataset_id):
-    """Live GPU tiers for the launch — price/h, VRAM, and a rough time+cost per
-    class. Read-only: rents nothing. Estimates are one-measured-run rough and
-    the payload labels them so."""
-    from lds_sdk.video_host import cloud_video_training as cvt
-    try:
-        data = cvt.video_gpu_tiers(LOCAL_USER, dataset_id,
-                                   steps=request.args.get('steps', type=int))
-    except ValueError as e:
-        if 'not found' in str(e):
-            return _missing(dataset_id)
-        return jsonify({'error': str(e)}), 400
-    except RuntimeError as e:
-        return jsonify({'error': str(e)}), 409
-    return jsonify({'ok': True, **data})
-
-
-@bp.get('/video-dataset/<int:dataset_id>/train/cloud/progress')
-def video_dataset_train_cloud_progress(dataset_id):
-    """The newest cloud run OF THIS VIDEO DATASET, for the page to poll.
-
-    Scoped to the video table explicitly. Resolved by integer alone it would
-    return the face dataset of the same id's run — the same phase, cost and
-    progress bar, for a training the user is not watching."""
-    from lds_sdk.video_host import cloud_run_dataset as crd
-    from lds_sdk import cloud_training as ct
-    run = ct.latest_run_for(dataset_id, dataset_table=crd.VIDEO)
-    if run is None:
-        return jsonify({'run_id': None, 'status': None})
-    return jsonify({
-        'run_id': run.id, 'status': run.status,
-        'phase_detail': run.phase_detail or '',
-        'gpu': run.gpu_name, 'price_per_hour': run.price_per_hour,
-        'error': run.error,
-        'steps': ct._run_param(run, 'steps'),
-        'saves': len(ct.run_checkpoint_files(run)),
-        'created_at': run.created_at.isoformat() if run.created_at else None,
-        'finished_at': run.finished_at.isoformat() if run.finished_at else None,
-    })
-
-
-def _video_run(dataset_id, run_id):
-    """One cloud run OF THIS VIDEO DATASET, or None.
-
-    The ownership test is the PAIR (id, table), never the id alone: a face run
-    carrying the same integer is a different training on someone else's data,
-    and these three routes serve its weights and relaunch it."""
-    from lds_sdk import cloud_training
-    from lds_sdk.video_host import cloud_run_dataset as crd
-    return cloud_training.get_run(LOCAL_USER, run_id, dataset_id=dataset_id, dataset_table=crd.VIDEO)
-
-
-@bp.get('/video-dataset/<int:dataset_id>/train/cloud/checkpoints')
-def video_dataset_cloud_checkpoints(dataset_id):
-    """Every LoRA this dataset's cloud runs brought back, grouped by run then by
-    STEP.
-
-    Grouped by step and not by file, because a Wan 2.2 checkpoint IS two files —
-    `_high_noise` and `_low_noise` — and a list of individual files invites a UI
-    to offer half a LoRA. MiniMax H3 has one file per step (ai-toolkit's
-    `MinimaxH3Model` defines no `save_lora`, so the generic single-file save
-    applies), and the same shape carries it without a special case."""
-    from lds_sdk.video_host.models import CloudTrainingRun
-    from lds_sdk.video_host import cloud_run_dataset as crd
-    from lds_sdk import cloud_training as ct
-    from lds_sdk.video_host import cloud_video_training as cvt
-    if not svc.get_video_dataset(LOCAL_USER, dataset_id):
-        return _missing(dataset_id)
-    groups = []
-    for run in (CloudTrainingRun.query.filter_by(dataset_id=dataset_id)
-                .order_by(CloudTrainingRun.id.desc()).all()):
-        if not crd.owns(run, dataset_id, crd.VIDEO):
-            continue
-        steps = cvt.harvested_steps(run)
-        if not steps:
-            continue
-        groups.append({
-            'run_id': run.id, 'status': run.status,
-            'active': run.status in ct.ACTIVE_STATES,
-            'gpu': run.gpu_name, 'price_per_hour': run.price_per_hour,
-            'target_profile': ct._run_param(run, 'target_profile'),
-            'parent_run_id': ct._run_param(run, 'parent_run_id'),
-            'created_at': run.created_at.isoformat() if run.created_at else None,
-            'finished_at': run.finished_at.isoformat() if run.finished_at else None,
-            # Paths stay server-side: the client asks for a file by NAME and the
-            # server resolves it against this run's own saves.
-            'steps': [{'step': s['step'], 'final': s['final'],
-                       'files': s['files']} for s in steps],
-        })
-    return jsonify({'groups': groups})
-
-
-@bp.get('/video-dataset/<int:dataset_id>/train/cloud/checkpoint')
-def video_dataset_cloud_checkpoint(dataset_id):
-    """Download ONE harvested save of one of this dataset's cloud runs.
-
-    Both halves of a Wan pair are fetched as two calls to this route — a single
-    archive would be friendlier and would also be a second format to explain to
-    every loader downstream; two files is what ai-toolkit wrote and what the
-    loaders expect side by side."""
-    from flask import abort
-    from lds_sdk import cloud_training as ct
-    import os
-    run = _video_run(dataset_id, request.args.get('run_id'))
-    if not run:
-        abort(404)
-    # Resolved through the run's own save list, which is basename-only by
-    # construction — the client can never point this at a path of its choosing.
-    path = ct.run_checkpoint_path(run, request.args.get('filename'))
-    if not path or not os.path.isfile(path):
-        abort(404)
-    return send_file(path, as_attachment=True)
-
-
-@bp.delete('/video-dataset/<int:dataset_id>/train/cloud/run/<int:run_id>')
-def video_dataset_cloud_run_delete(dataset_id, run_id):
-    """🗑 Remove one terminal run — its harvested LoRA files and its history
-    line. Ownership is the (id, table) pair like every other run route; an
-    active run answers 409 (its pod is on the clock — stop it first)."""
-    from lds_sdk.video_host import cloud_video_training as cvt
-    run = _video_run(dataset_id, run_id)
-    if not run:
-        return _missing(dataset_id)
-    try:
-        return jsonify(cvt.delete_cloud_video_run(LOCAL_USER, run.id))
-    except RuntimeError as e:
-        return jsonify({'error': str(e)}), 409
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-
-
-@bp.post('/video-dataset/<int:dataset_id>/train/cloud/retry')
-def video_dataset_cloud_retry(dataset_id):
-    """↻ Relaunch a failed run of this dataset on a fresh pod."""
-    from lds_sdk.video_host import cloud_video_training as cvt
-    body = request.get_json(silent=True) or {}
-    run = _video_run(dataset_id, body.get('run_id'))
-    if not run:
-        return _missing(dataset_id)
-    # The PARALLEL_RUN question's answer rides along, as on the launch route —
-    # a retry rents a pod too, and the same guardrails ask the same question.
-    return _relaunch(lambda: cvt.retry_cloud_video_run(
-        LOCAL_USER, run.id, allow_parallel_run=bool(body.get('allow_parallel_run'))))
-
-
-@bp.post('/video-dataset/<int:dataset_id>/train/cloud/continue')
-def video_dataset_cloud_continue(dataset_id):
-    """▶ Train an existing LoRA of this dataset further, from one of its
-    harvested steps."""
-    from lds_sdk.video_host import cloud_video_training as cvt
-    body = request.get_json(silent=True) or {}
-    run = _video_run(dataset_id, body.get('run_id'))
-    if not run:
-        return _missing(dataset_id)
-    return _relaunch(lambda: cvt.continue_cloud_video_run(
-        LOCAL_USER, run.id, extra_steps=body.get('extra_steps', 1000),
-        from_step=body.get('from_step'),
-        allow_parallel_run=bool(body.get('allow_parallel_run'))))
-
-
-def _relaunch(call):
-    """The two relaunch routes answer identically, and the mapping is the same
-    one the launch route uses: anything the user can act on is a 400, and the
-    launch guard (already running, fleet limit, budget) is a 409 — the request
-    was well-formed, the state refuses it.
-
-    No branch for `VideoTrainingUnsupported`: it IS a ValueError, and the launch
-    route only names it separately because there ValueError also carries the
-    "dataset not found" 404. Here it would be a line that never runs."""
-    try:
-        return jsonify({'ok': True, **call()})
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except RuntimeError as e:
-        return jsonify({'error': str(e)}), 409
 
 
 # ── Checkpoints & LoRAs — the workspace section, both lanes, per STEP ──────
@@ -624,17 +410,6 @@ def video_dataset_local_checkpoint(dataset_id):
     if not path:
         abort(404)
     return send_file(path, as_attachment=True)
-
-
-@bp.get('/video-dataset/<int:dataset_id>/train/cloud/run/<int:run_id>')
-def video_dataset_cloud_run_details(dataset_id, run_id):
-    """ⓘ One cloud run of this dataset: status, timing, GPU and price,
-    genealogy, and the allow-listed parameters it was launched with."""
-    from lds_video import video_checkpoints as vck
-    try:
-        return jsonify(vck.run_details(LOCAL_USER, dataset_id, run_id))
-    except LookupError as e:
-        return jsonify({'error': str(e)}), 404
 
 
 # ── ✨ Neural render (DLSS 5) — in place, original kept ──────────────────────
@@ -750,9 +525,7 @@ def video_dataset_neural_render_restore(dataset_id):
 
 @bp.get('/video-dataset/<int:dataset_id>/train/lineage')
 def video_dataset_lineage(dataset_id):
-    """🌳 Every run of this video dataset as ONE genealogy forest, in the shape
-    the image workspace's graph draws (`cloud_training.dataset_lineage`):
-    cloud runs linked by the step they continued from, plus the local run."""
+    """The local video run in the shape the image workspace's graph draws."""
     from lds_video import video_lineage
     try:
         return jsonify(video_lineage.tree(LOCAL_USER, dataset_id))
@@ -761,8 +534,7 @@ def video_dataset_lineage(dataset_id):
 
 
 def _sample_lane(dataset_id):
-    """(dataset, run|None) for the sample routes — `run_id` absent means the
-    local run. LookupError when the dataset or the run is not this user's."""
+    """Resolve the local sample lane; numbered cloud runs are not carried."""
     from lds_video import video_checkpoints as vck
     from lds_video import video_lineage
     ds = vck._dataset(LOCAL_USER, dataset_id)

@@ -27,12 +27,12 @@ const LOCAL = {
 }
 
 test('a node becomes the group the list reasons about, a pill the step', () => {
-  assert.deepEqual(nodeGroup(CLOUD), { key: 'cloud-12', lane: 'cloud', run_id: 12, active: false, status: 'done',
-    run_name: null, parent_run_id: 7, steps: CLOUD.checkpoints })
+  assert.deepEqual(nodeGroup(CLOUD), { key: 'local', lane: 'local', run_id: null, active: false, status: 'done',
+    run_name: null, parent_run_id: null, steps: CLOUD.checkpoints })
   assert.deepEqual(nodeGroup(LOCAL), { key: 'local', lane: 'local', run_id: null, active: false, status: null,
     run_name: 'video_x_ds9', parent_run_id: null, steps: LOCAL.checkpoints })
   assert.deepEqual(pillStep(CLOUD.checkpoints[0]), { step: 100, final: false, deployed: true, files: CLOUD.checkpoints[0].files })
-  assert.equal(pillKey(CLOUD, CLOUD.checkpoints[1]), 'cloud-12:final')
+  assert.equal(pillKey(CLOUD, CLOUD.checkpoints[1]), 'local:final')
   assert.equal(pillKey(LOCAL, LOCAL.checkpoints[0]), 'local:50')
 })
 
@@ -42,8 +42,8 @@ test('the graph popover decides EXACTLY what the list row decides for the same s
   assert.deepEqual(fromGraph, fromList)
   assert.equal(fromGraph.deployed, true)
   assert.deepEqual(fromGraph.undeploy, { reason: HAND_PLACED_REASON })
-  assert.deepEqual(fromGraph.continue, { ok: true })
-  assert.equal(fromGraph.files[0].url, '/api/video-dataset/9/train/cloud/checkpoint?run_id=12&filename=a_000000100.safetensors')
+  assert.deepEqual(fromGraph.continue, { reason: CONTINUE_LOCAL_REASON })
+  assert.equal(fromGraph.files[0].url, '/api/video-dataset/9/train/checkpoint?filename=a_000000100.safetensors')
   const local = pillActionModel(9, LOCAL, LOCAL.checkpoints[0])
   assert.deepEqual(local.continue, { reason: CONTINUE_LOCAL_REASON })
   assert.deepEqual(local.files.map((f) => f.short), ['high noise', 'low noise'])

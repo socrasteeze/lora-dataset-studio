@@ -70,9 +70,8 @@ def test_factory_discards_inherited_discovery_and_kill_switch(plugin_app_factory
 def test_second_factory_boot_has_no_previous_engines_or_config(plugin_app_factory):
     from app import config
     from app.engines import registry
-    first = plugin_app_factory(enabled=('api_engines',))
-    assert first.extensions['lds_plugins'].records['api_engines'].state == 'loaded'
-    assert 'chatgpt' in registry.ids()
+    first = plugin_app_factory(enabled=('canvas',))
+    assert first.extensions['lds_plugins'].records['canvas'].state == 'loaded'
     config.save_config({'canvas': {'external_loras': [{'filename': 'test-only.safetensors'}]}})
     second = plugin_app_factory()
     assert second.extensions['lds_plugins'].records == {}
@@ -125,7 +124,7 @@ def test_runtime_isolation_resets_without_removing_imported_mappings(plugin_app_
     from app import config, capabilities
     from app.engines import registry as engines
     from app.plugins import registry
-    plugin_app_factory(enabled=('video', 'api_engines'))
+    plugin_app_factory(enabled=('video', 'canvas'))
     from lds_video.models import VideoBank
     old_registry, old_specs, old_defaults = registry.active(), engines._specs, config.DEFAULTS
     old_path = list(sys.path)
@@ -135,30 +134,26 @@ def test_runtime_isolation_resets_without_removing_imported_mappings(plugin_app_
         assert registry.active() is None and engines.ids() == ()
         assert config._cache is None and capabilities._cache is None
         assert capabilities._import_cache == {}
-        config.DEFAULTS['plugins']['test-only'] = {}
+        config.DEFAULTS.setdefault('plugins', {})['test-only'] = {}
         sys.path.append('test-only-path')
         assert sys.modules['lds_video.models'].VideoBank is VideoBank
     assert registry.active() is old_registry and engines._specs is old_specs
-    assert config.DEFAULTS is old_defaults and 'test-only' not in config.DEFAULTS['plugins']
+    assert config.DEFAULTS is old_defaults
+    assert 'plugins' not in config.DEFAULTS or 'test-only' not in config.DEFAULTS['plugins']
     assert sys.path == old_path
     assert sys.modules['lds_video.models'].VideoBank is VideoBank
 
 
-@pytest.mark.plugins('cloud_training')
-def test_hf_guard_covers_both_real_cloud_implementations(app, monkeypatch):
+def test_hf_guard_covers_core_local_training(app, monkeypatch):
     from app.services import cloud_training as historical
-    from lds_cloud_training import cloud_training as product
     monkeypatch.setattr(urllib.request.OpenerDirector, 'open',
                         lambda *a, **k: pytest.fail('The HF gate reached real transport'))
-    for module in (historical, product):
-        assert module._assert_official_base_reachable('fixture/model', 'fake-token') is None
+    assert historical._assert_official_base_reachable('fixture/model', 'fake-token') is None
 
 
 @pytest.mark.hf_gate
-@pytest.mark.plugins('cloud_training')
-def test_hf_gate_opt_in_keeps_refusal_logic_for_both_owners(app, monkeypatch):
+def test_hf_gate_opt_in_keeps_refusal_logic_for_core_local_training(app, monkeypatch):
     from app.services import cloud_training as historical
-    from lds_cloud_training import cloud_training as product
     calls = []
 
     def refused(request, **kwargs):
@@ -166,10 +161,9 @@ def test_hf_gate_opt_in_keeps_refusal_logic_for_both_owners(app, monkeypatch):
         raise urllib.error.HTTPError(request.full_url, 403, 'fixture refusal', None, None)
 
     monkeypatch.setattr(urllib.request, 'urlopen', refused)
-    for module in (historical, product):
-        with pytest.raises(ValueError, match='Hugging Face refuses access'):
-            module._assert_official_base_reachable('fixture/model', 'fake-token')
-    assert len(calls) == 2
+    with pytest.raises(ValueError, match='Hugging Face refuses access'):
+        historical._assert_official_base_reachable('fixture/model', 'fake-token')
+    assert len(calls) == 1
 
 
 @pytest.mark.hf_gate

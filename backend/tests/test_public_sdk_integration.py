@@ -24,7 +24,7 @@ from app.plugins import registry
 from app.plugins.loader import load_plugins
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCTS = ('api_engines', 'camera_angles', 'canvas', 'civitai_publish', 'cloud_training', 'hf_publish', 'image_upscale', 'live',
+PRODUCTS = ('camera_angles', 'canvas', 'hf_publish', 'image_upscale', 'live',
             'model_tools', 'resource_monitor', 'scrape', 'seedvr2', 'video')
 
 
@@ -94,7 +94,7 @@ def test_each_public_product_registers_alone_with_real_sdk(host, pid):
     assert loaded.records[pid].state == 'loaded', loaded.records[pid].error
     assert all(r.state == 'disabled' for key, r in loaded.records.items() if key != pid)
     # Public Video/publication history persists even while the packages are absent.
-    assert len(db.metadata.tables) == 28
+    assert len(db.metadata.tables) == 33
     assert {'video_civitai_link', 'video_checkpoint_preview'} <= set(db.metadata.tables)
     assert not any('creature' in name for name in db.metadata.tables)
 
@@ -170,14 +170,6 @@ def test_publish_png_strips_metadata_without_rewriting_master(tmp_path):
     with Image.open(sanitized) as image:
         assert image.info == {}
         assert image.getpixel((0, 0)) == (12, 34, 56, 128)
-
-
-def test_engine_errors_keep_the_identity_caught_by_main():
-    from lds_sdk import engine_errors
-    from app.services import chatgpt_image, engine_errors as main_errors
-    assert engine_errors.EngineFatal is main_errors.EngineFatal
-    assert engine_errors.SubscriptionQuotaExceeded is chatgpt_image.SubscriptionQuotaExceeded
-    assert engine_errors.SubscriptionUnavailable is chatgpt_image.SubscriptionUnavailable
 
 
 def test_image_and_export_snapshots_preserve_main_fields_and_user_boundaries(host):
@@ -280,12 +272,25 @@ def test_video_queue_owns_admission_and_cancellation(host, monkeypatch):
 
 
 def test_declared_sdk_exports_are_real_symbols():
+    """Kept SDK modules import and expose their declared public symbols.
+
+    The excluded modules are compatibility projections used only by the rejected
+    rental-cloud product. They stay lazy on this fork so old imports fail at the
+    operation boundary rather than making core import the removed provider.
+    """
+    excluded = {
+        'lds_sdk.training_runtime',
+        'lds_sdk.video_host.cloud_video_training',
+    }
     root = ROOT / 'backend' / 'lds_sdk'
     for path in root.rglob('*.py'):
         relative = path.relative_to(root).with_suffix('')
         parts = list(relative.parts)
         if parts[-1] == '__init__':
             parts.pop()
-        module = importlib.import_module('.'.join(['lds_sdk', *parts]))
+        module_name = '.'.join(['lds_sdk', *parts])
+        if module_name in excluded or module_name.startswith('lds_sdk.cloud_host.services'):
+            continue
+        module = importlib.import_module(module_name)
         for name in getattr(module, '__all__', ()):
             assert hasattr(module, name), f'{module.__name__}.{name}'

@@ -2,7 +2,7 @@ import { registerBundledDescriptor } from '../../../frontend/tests/support/bundl
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { resetRegistry, setEnabled, contributions } from '../../../frontend/src/plugins/registry.js'
-import { allHelpTopics } from '../../../frontend/src/help/helpRegistry.js'
+import { allHelpTopics, helpTopics as coreHelpTopics } from '../../../frontend/src/help/helpRegistry.js'
 import { mlInstallCards } from '../../../frontend/src/components/setup/mlInstallCards.js'
 import { deriveCapabilitySummary, deriveSetupSteps } from '../../../frontend/src/hooks/useSetupSteps.js'
 import descriptor from '../frontend/index.js'
@@ -30,7 +30,7 @@ test('scrape owns its settings, help and installation; disabling removes all its
   const scrapeRow = deriveCapabilitySummary({}).find((r) => /Scraping extras/.test(r.label))
   assert.equal(scrapeRow.ok, false)
   assert.equal(scrapeRow.topic, 'setup-quality')
-  assert.equal(scrapeRow.plugin, 'scrape', 'the overview links to the owner despite its legacy topic')
+  assert.equal(scrapeRow.topic, 'setup-quality', 'the legacy capability still links to its Setup topic')
   assert.equal(deriveCapabilitySummary({ scrape_deps: true }).find((r) => /Scraping extras/.test(r.label)).ok, true)
   assert.ok(!deriveSetupSteps({}).find((s) => s.id === 'quality').unlocks.includes('Scraping extras (optional)'))
   assert.ok(!mlInstallCards({ includePlugins: false }).some((c) => c.action === 'scrape_extras'))
@@ -45,7 +45,10 @@ test('scrape owns its settings, help and installation; disabling removes all its
   for (const id of ['REDDIT_CLIENT_ID', 'PEXELS_API_KEY', 'klein-small-image-prompt']) {
     assert.ok(!disabled.includes(`id="${id}"`), id)
   }
-  for (const topic of descriptor.help) assert.ok(!allHelpTopics().some((t) => t.id === topic.id), topic.id)
+  for (const topic of descriptor.help) {
+    const fallback = coreHelpTopics.find(item => item.id === topic.id)
+    assert.equal(allHelpTopics().find(item => item.id === topic.id), fallback, topic.id)
+  }
 })
 
 

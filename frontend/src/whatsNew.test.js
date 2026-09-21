@@ -38,15 +38,21 @@ function fakeStorage(initial = {}) {
 
 test('every entry has the required shape and a unique, stable id', () => {
   assert.ok(WHATS_NEW.length > 0, 'feed is not empty');
-  const seen = new Set();
-  for (const e of publicNews()) {
-    assert.equal(typeof e.id, 'string');
-    assert.match(e.id, /^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/, `id shape: ${e.id}`);
-    assert.match(e.date, /^\d{4}-\d{2}-\d{2}$/, `date shape: ${e.id}`);
-    assert.ok(e.title && typeof e.title === 'string', `title: ${e.id}`);
-    assert.ok(e.blurb && typeof e.blurb === 'string', `blurb: ${e.id}`);
-    assert.ok(!seen.has(e.id), `duplicate id: ${e.id}`);
-    seen.add(e.id);
+  const checkFeed = (entries, owner) => {
+    const seen = new Set();
+    for (const e of entries) {
+      assert.equal(typeof e.id, 'string');
+      assert.match(e.id, /^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/, `id shape: ${e.id}`);
+      assert.match(e.date, /^\d{4}-\d{2}-\d{2}$/, `date shape: ${e.id}`);
+      assert.ok(e.title && typeof e.title === 'string', `title: ${e.id}`);
+      assert.ok(e.blurb && typeof e.blurb === 'string', `blurb: ${e.id}`);
+      assert.ok(!seen.has(e.id), `${owner}: duplicate id ${e.id}`);
+      seen.add(e.id);
+    }
+  };
+  checkFeed(WHATS_NEW, 'core');
+  for (const descriptor of PUBLIC_DESCRIPTORS) {
+    checkFeed(descriptor.whatsNew || [], descriptor.id);
   }
 });
 
@@ -221,7 +227,11 @@ test('parseTarget splits path and workspace query params', () => {
 test('every seed entry target is a valid, navigable in-app route', () => {
   for (const e of publicNews()) {
     if (e.to === undefined) continue; // optional — reliability entries omit it
-    assert.equal(isValidTarget(e.to), true, `${e.id} → ${e.to}`);
+    const pluginSettings = e.to.match(/^\/plugins\/([^/]+)\/settings(?:\?.*)?$/);
+    const valid = pluginSettings
+      ? PUBLIC_DESCRIPTORS.some((descriptor) => descriptor.id === pluginSettings[1])
+      : isValidTarget(e.to);
+    assert.equal(valid, true, `${e.id} → ${e.to}`);
   }
 });
 

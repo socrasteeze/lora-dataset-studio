@@ -178,7 +178,7 @@ test('the graph opens for any run with a checkpoint, not only 2+ run lineages', 
   // button + body both gate on lineage OR a saved checkpoint
   assert.match(cloud, /run\.lineage\s*\|\|\s*run\.checkpoint_ready/);
   // single-run graph is labelled ◉ Graph, a real lineage stays Lineage
-  assert.match(cloud, /run\.lineage \? 'Lineage' : '◉ Graph'/);
+  assert.match(cloud, /run\.lineage \? '🌳 Lineage' : '◉ Graph'/);
 });
 
 test('continue-from-checkpoint is cloud-only by default and allows terminal (done OR failed) runs', () => {

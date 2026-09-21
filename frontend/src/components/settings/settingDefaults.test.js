@@ -27,6 +27,7 @@ const SECTION_FILES = ['EnginesSection.jsx', 'CaptioningSection.jsx', 'TrainingS
   'LocalToolsSection.jsx', 'ServerSection.jsx', 'ScrapingSection.jsx', 'MaintenanceSection.jsx', 'StorageSection.jsx',
 ];
 const sources = Object.fromEntries(SECTION_FILES.map((f) => [f, read(`./${f}`)]));
+sources.ScrapeSettingsGroup = read('../../../../bundled/scrape/frontend/panels/ScrapeSettingsGroup.jsx');
 const button = read('./ResetToDefault.jsx');
 const settingsPage = read('../../pages/SettingsPage.jsx');
 
@@ -152,16 +153,11 @@ test('the sources read the defaults through the shared lookup', () => {
 const COVERED = [
   // Image engines — the reported gap. "Upscale & improve ▸ Steps" is the last one.
   ['EnginesSection.jsx', 'engines', 'default'],
-  ['EnginesSection.jsx', 'engines', 'enabled'],
   // Divergence 1: upstream also covers engines.chatgpt_auth / nanobanana_model /
   // chatgpt_image_model / openrouter_model. Those cards, and their id= anchors,
   // do not exist on this fork.
   ['EnginesSection.jsx', 'klein', 'generation_steps'],
   ['EnginesSection.jsx', 'klein', 'edit_base_lora_strength'],
-  ['EnginesSection.jsx', 'klein', 'improve_megapixels'],
-  ['EnginesSection.jsx', 'klein', 'improve_base_lora_strength'],
-  ['EnginesSection.jsx', 'klein', 'improve_consistency_strength'],
-  ['EnginesSection.jsx', 'klein', 'improve_steps'],
   ['EnginesSection.jsx', 'krea', 'grounding_px'],
   ['EnginesSection.jsx', 'krea', 'steps'],
   ['EnginesSection.jsx', 'krea', 'base_model'],
@@ -189,7 +185,7 @@ const COVERED = [
   ['LocalToolsSection.jsx', 'ollama', 'vision_concurrency'],
   ['LocalToolsSection.jsx', 'ollama', 'vision_keep_warm_seconds'],
   ['ServerSection.jsx', 'server', 'port'],
-  ['ScrapingSection.jsx', 'klein', 'small_image_prompt'],
+  ['ScrapeSettingsGroup', 'klein', 'small_image_prompt'],
   ['StorageSection.jsx', 'paths', 'dataset_images_root'],
 ];
 

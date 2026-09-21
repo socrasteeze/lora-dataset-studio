@@ -7,7 +7,7 @@ from app.extensions import db
 import pytest
 from sqlalchemy import text
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 
 def _dataset(app, *, train_type='krea'):
@@ -396,102 +396,10 @@ def test_legacy_and_explicit_lora_configs_are_identical(app, tmp_path):
     assert process['model']['quantize'] is True
 
 
-def test_preflight_route_forwards_and_echoes_training_mode(
-        app, client, monkeypatch):
-    _valid_training_capabilities(monkeypatch)
-    dataset_id = _dataset(app)
-    seen = {}
-
-    def fake_preflight(user_id, requested_dataset_id, **kwargs):
-        seen.update(kwargs)
-        return {'blockers': [], 'warnings': [], 'checks': [], 'verdict': 'ready',
-                'training_mode': kwargs['training_mode']}
-
-    monkeypatch.setattr(
-        'app.services.lora_training.training_preflight', fake_preflight)
-    response = client.get(
-        f'/api/dataset/{dataset_id}/train/preflight'
-        '?lane=cloud&train_type=krea&variant=base&base_model='
-        '&training_mode=full_transformer')
-    assert response.status_code == 200
-    assert seen['training_mode'] == 'full_transformer'
-    assert seen['base_model'] == ''
-    assert response.get_json()['training_mode'] == 'full_transformer'
 
 
-def test_preflight_uses_exact_selected_base_and_variant(app, monkeypatch):
-    from app.config import LOCAL_USER
-    from app.extensions import db
-    from app.models import FaceDataset
-    from app.services import lora_training as lt
-
-    dataset_id = _dataset(app)
-    monkeypatch.setattr(
-        'app.services.cloud_training.full_transformer_token_preflight',
-        lambda: {'ok': True, 'configured': True, 'namespace': 'tester'})
-    with app.app_context():
-        ds = db.session.get(FaceDataset, dataset_id)
-        ds.training_mode = 'full_transformer'
-        ds.train_variant = 'turbo'
-        ds.train_base_model = 'persisted-custom.safetensors'
-        db.session.commit()
-
-        report = lt.training_preflight(
-            LOCAL_USER, dataset_id, train_type='krea', variant='base',
-            base_model='', training_mode='full_transformer', lane='cloud')
-        dense = next(c for c in report['checks'] if c['id'] == 'training_mode')
-        assert dense['status'] == 'ok'
-        assert not any('custom base models are not supported' in blocker
-                       for blocker in report['blockers'])
 
 
-@pytest.mark.parametrize(
-    ('token_status', 'expected_status'),
-    [
-        ({'ok': False, 'configured': False,
-          'error': 'HF_CLOUD_TOKEN is required in Settings'}, 'fail'),
-        ({'ok': False, 'configured': True,
-          'error': ('HF_CLOUD_TOKEN requires repository write access; '
-                    'read-only tokens cannot be used')}, 'fail'),
-        ({'ok': True, 'configured': True, 'namespace': 'tester'}, 'ok'),
-        ({'ok': True, 'configured': True, 'namespace': 'tester',
-          'severity': 'warning',
-          'warning': 'Global write access for tester is accepted with a warning.'}, 'warn'),
-    ],
-)
-def test_dense_preflight_route_reports_dedicated_cloud_token(
-        app, client, monkeypatch, token_status, expected_status):
-    _valid_training_capabilities(monkeypatch)
-    dataset_id = _dataset(app)
-    monkeypatch.setattr(
-        'app.services.cloud_training.full_transformer_token_preflight',
-        lambda: dict(token_status))
-
-    response = client.get(
-        f'/api/dataset/{dataset_id}/train/preflight'
-        '?lane=cloud&train_type=krea&variant=base&base_model='
-        '&training_mode=full_transformer')
-    assert response.status_code == 200
-    payload = response.get_json()
-    token_check = next(
-        check for check in payload['checks']
-        if check['id'] == 'hf_cloud_token')
-    assert token_check['status'] == expected_status
-    assert token_check['scope'] == 'cloud'
-    assert payload['hf_cloud_token_status'] == token_status
-    if expected_status == 'fail':
-        assert token_check['bypassable'] is False
-        assert token_check['target'] == 'gf-training'
-        assert token_status['error'] in payload['blockers']
-        assert payload['verdict'] == 'blocked'
-    else:
-        expected_warning = token_status.get('warning')
-        if expected_warning:
-            assert token_check['detail'] == expected_warning
-        else:
-            assert 'tester' in token_check['detail']
-        assert not any('HF_CLOUD_TOKEN' in blocker
-                       for blocker in payload['blockers'])
 
 
 @pytest.mark.plugins()
@@ -560,20 +468,11 @@ def test_local_continuation_routes_force_source_lora_mode(
         db.session.commit()
 
     local_seen = {}
-    cloud_seen = {}
     monkeypatch.setattr(
         'app.services.lora_training.continue_training',
         lambda *args, **kwargs: local_seen.update(kwargs) or {'started': True})
-    monkeypatch.setattr(
-        'lds_cloud_training.cloud_training.continue_local_run_in_cloud',
-        lambda *args, **kwargs: cloud_seen.update(kwargs) or {'run_id': 9})
-
     local = client.post(
         f'/api/dataset/{dataset_id}/train/continue',
         json={'training_mode': 'full_transformer', 'extra_steps': 500})
-    cloud = client.post(
-        f'/api/dataset/{dataset_id}/train/cloud/continue-local',
-        json={'training_mode': 'full_transformer', 'extra_steps': 500})
-    assert local.status_code == cloud.status_code == 200
+    assert local.status_code == 200
     assert local_seen['training_mode'] == 'lora'
-    assert cloud_seen['training_mode'] == 'lora'
