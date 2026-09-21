@@ -6,6 +6,10 @@
 // plugin stays registered but contributes nothing.
 import { KNOWN_SLOTS, SETTINGS_GROUP_SECTIONS, surfacesOf } from './parity.js'
 import { validateGuide, composeGuide } from './guideContent.js'
+import { CORE_GUIDE_ANCHORS } from '../help/guideHosts.js'
+import forkPolicy from '../../../fork-plugins.json' with { type: 'json' }
+
+const FORK_SOURCES = new Set([...forkPolicy.enabled, ...forkPolicy.held])
 
 const ID = /^[a-z][a-z0-9_]{1,31}(\.[a-z][a-z0-9_]{1,31})?$/
 
@@ -52,6 +56,15 @@ export function registerDescriptor(descriptor, { external = false, official = fa
   if (external && !official && typeof descriptor?.id === 'string' && !descriptor.id.includes('.')) {
     state.problems.push({ plugin: descriptor.id, message: 'A short plugin id requires a verified official package.' })
     return false
+  }
+  if (!external && FORK_SOURCES.has(descriptor?.id) && descriptor.guide && guideOwnership) {
+    // The fork retains its edited guide in core. A migrated source bundle may
+    // contribute new sections, but must not replace or repeat those chapters.
+    const sections = descriptor.guide.sections.filter(section =>
+      !CORE_GUIDE_ANCHORS[section.chapter]?.includes(section.anchor))
+    const retained = new Set(sections.map(section => `${section.chapter}#${section.anchor}`))
+    descriptor = { ...descriptor, guide: { ...descriptor.guide, sections } }
+    guideOwnership = { ...guideOwnership, sections: guideOwnership.sections.filter(id => retained.has(id)) }
   }
   const problem = validateDescriptor(descriptor, guideOwnership)
   if (problem) {

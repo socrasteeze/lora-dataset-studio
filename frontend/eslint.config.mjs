@@ -37,7 +37,7 @@ export default [
   {
     files: ["**/*.{js,jsx,mjs}"],
     languageOptions: {
-      ecmaVersion: 2024,
+      ecmaVersion: 2025,
       sourceType: "module",
       parserOptions: { ecmaFeatures: { jsx: true } },
       globals: { ...globals.browser, ...globals.node, ...globals.es2021 },

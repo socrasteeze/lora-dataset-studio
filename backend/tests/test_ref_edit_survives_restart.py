@@ -30,7 +30,7 @@ life of an abandoned edit beyond what staying up would have allowed.
 
 import pytest
 
-pytestmark = pytest.mark.plugins('api_engines')
+pytestmark = pytest.mark.plugins()
 
 import io
 import json

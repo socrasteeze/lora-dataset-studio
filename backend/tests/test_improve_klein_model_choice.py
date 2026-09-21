@@ -31,6 +31,8 @@ from PIL import Image
 
 from test_klein_model_locations_documented import DOCUMENTED_LAYOUTS, KLEIN_FILE
 
+pytestmark = pytest.mark.plugins()
+
 _VALID_ST = struct.pack('<Q', 2) + b'{}'
 OTHER_FILE = 'flux-2-klein-32b-heavy.safetensors'
 

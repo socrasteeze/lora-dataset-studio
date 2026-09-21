@@ -113,8 +113,8 @@ test('the honest line about what blending two identities does is on screen', () 
 })
 
 test('the toggle has a help topic and the wave has a What\'s-new entry', () => {
-  assert.equal(getHelpTopic('canvas-blend'), undefined, 'the absent owner contributes no help')
-  assert.ok(!allWhatsNew().some(e => e.id === '2026-08-03-canvas-blend'))
+  assert.equal(getHelpTopic('canvas-blend').app.route, '/canvas', 'the core keeps canonical fork help')
+  assert.ok(allWhatsNew().some(e => e.id === '2026-08-03-canvas-blend'), 'the fork keeps its historical release entry')
   assert.deepEqual(pluginWhatsNew('canvas'), [])
   assert.equal(registerBundledDescriptor(canvasDescriptor), true)
   setEnabled(['canvas'])
@@ -129,7 +129,7 @@ test('the toggle has a help topic and the wave has a What\'s-new entry', () => {
   // Archived → no in-app target, by doctrine (whatsNew.js, "Keep the list tidy").
   assert.equal(entry.to, undefined)
   setEnabled([])
-  assert.equal(getHelpTopic('canvas-blend'), undefined, 'a disabled owner contributes no help')
-  assert.ok(!allWhatsNew().some(e => e.id === '2026-08-03-canvas-blend'))
+  assert.equal(getHelpTopic('canvas-blend').app.route, '/canvas', 'the core help remains after disabling the contribution')
+  assert.ok(allWhatsNew().some(e => e.id === '2026-08-03-canvas-blend'), 'the fork keeps its historical release entry')
   assert.ok(pluginWhatsNew('canvas').some(e => e.id === entry.id), 'installed owner history remains readable')
 })

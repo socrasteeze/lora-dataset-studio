@@ -250,14 +250,9 @@ def test_the_ci_size_gate_names_its_blind_spots_instead_of_its_sources():
         gate_steps[0])
     assert numstat, 'the size gate must keep one auditable numstat pathspec'
     pathspec = ' '.join(numstat.group(1).replace('\\', ' ').split())
-    assert pathspec.split()[0] == '.', \
-        'the size gate must start from the whole tree, not from an include list'
-    for blind_spot in ("':(exclude)frontend/dist'", "':(exclude)docs'",
-                       "':(exclude)*.md'"):
-        assert blind_spot in pathspec, f'{blind_spot} must stay excluded by name'
-    for covered in ('scripts/', 'packaging/', 'Dockerfile'):
-        assert f"':(exclude){covered}" not in pathspec, \
-            f'{covered} is covered by a CI job, so it must count toward the gate'
+    for covered in ('backend/', 'bundled/', 'store/', 'scripts/', 'packaging/',
+                    'frontend/src/', 'frontend/tests/', 'frontend/scripts/'):
+        assert covered in pathspec, f'{covered} must count toward the heavy gate'
 
 
 def test_ci_cache_stays_lean_while_the_torch_wheel_bypasses_it():

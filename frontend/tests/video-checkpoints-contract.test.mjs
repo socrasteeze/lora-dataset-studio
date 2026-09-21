@@ -9,8 +9,6 @@
  *    clips' removal already uses. A "Trash" typed by hand in the JSX is exactly
  *    what shipped wrong once (a sentence promising the app's Trash on an
  *    install whose default is the OS recycle bin).
- *  · ▶ rents a pod, so it owes the licence question and the confirmations
- *    loop, like every other pod-renting POST of the lane.
  *  · The rail's two new sections point at anchors the workspace renders.
  */
 import test from 'node:test'
@@ -37,9 +35,9 @@ test('the training block renders no checkpoint file any more — the section is 
 
 test('every confirmation the section asks is a sentence of the model, never typed in the JSX', () => {
   const confirms = [...manager.matchAll(/window\.confirm\(([^)]*\()/g)].map((m) => m[1])
-  assert.ok(confirms.length >= 3, `expected the three confirmations, found ${confirms.length}`)
+  assert.equal(confirms.length, 2, `expected the two local confirmations, found ${confirms.length}`)
   for (const c of confirms) {
-    assert.match(c, /^(describeStepDelete|describeUndeploy|runDeleteConfirmation)\($/,
+    assert.match(c, /^(describeStepDelete|describeUndeploy)\($/,
       `a confirmation is not a model sentence: ${c}`)
   }
   assert.ok(!/Trash(?!2)|recoverable|Recycle Bin/.test(manager),   // Trash2 is the icon
@@ -48,19 +46,6 @@ test('every confirmation the section asks is a sentence of the model, never type
   assert.match(model, /isRecoverable\(mode\)/)
   // Both deletes of the workspace read the same helper — one destination, two verbs.
   assert.match(clips, /deleteDestination\(/)
-})
-
-test('▶ Continue from here owes the licence question and the confirmations loop', () => {
-  const at = manager.indexOf('const confirmContinue = (g, s) => {')
-  assert.notEqual(at, -1)
-  const body = manager.slice(at, manager.indexOf('if (err && !payload)'))
-  const ack = body.indexOf('ensureLicenceAck(ds')
-  const post = body.indexOf("postWithConfirmations((b) => postJson(url, b),\n        continueBody(g, s, extraSteps), 'Launch anyway (force)')")
-  assert.ok(ack !== -1 && post !== -1 && ack < post, 'licence ack first, then the confirmations loop')
-  assert.match(body, /if \(d === null\) return/, 'a declined question rents nothing and says nothing')
-  // No bare postJson may rent a pod: the continue URL appears only inside the loop.
-  const bare = [...manager.matchAll(/await postJson\(([^,]+),/g)].map((m) => m[1].trim())
-  assert.ok(!bare.some((u) => /Continue/.test(u)), `a bare postJson rents a pod: ${bare}`)
 })
 
 test('the rail\'s Checkpoints and Studio sections land on anchors the workspace renders', async () => {
@@ -79,7 +64,8 @@ test('the ◉ Graph is a second view of the SAME saves: same handlers, same mode
   const graph = codeOnly(readSource('../bundled/video/frontend/videobank/VideoLineageGraph.jsx'))
   // The manager hands the graph the very functions the list rows call.
   assert.match(manager, /<VideoLineageGraph datasetId=\{ds\.id\} tree=\{tree\} busy=\{busy\}/)
-  assert.match(manager, /onDeploy=\{deploy\} onUndeploy=\{undeploy\} onDelete=\{remove\}\s+onContinue=\{continueFrom\}/)
+  assert.match(manager, /onDeploy=\{deploy\} onUndeploy=\{undeploy\} onDelete=\{remove\}/)
+  assert.ok(!/onContinue=|onDetails=/.test(manager))
   // The popover's decisions come from the list's model through the bridge.
   assert.match(graph, /a=\{pillActionModel\(datasetId, openCk\.node, openCk\.pill, ctx\)\}/)
   assert.ok(!/\/api\//.test(graph), 'the graph builds no URL of its own — the model does')

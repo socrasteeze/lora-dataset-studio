@@ -11,11 +11,18 @@
    not (a local video run cannot pick a step to continue from; see
    CONTINUE_LOCAL_REASON), which is CLAUDE.md's parity rule made literal. */
 import { deleteDestination, isRecoverable } from '@lds/plugin-sdk/data'
-import { stepLabel } from './videoCloudStatus.js'
-import { videoDatasetCheckpointUrl, videoDatasetLocalCheckpointUrl } from './videoBankApi.js'
+import { videoDatasetLocalCheckpointUrl } from './videoBankApi.js'
 
-export const EMPTY_NOTE = 'No checkpoints yet — train this set on this PC or in the '
-  + 'cloud, and every save comes back here, step by step.'
+export function stepLabel(step) {
+  if (!step) return ''
+  const n = step.files?.length || 0
+  const head = step.final
+    ? (step.step != null ? `Final (step ${step.step})` : 'Final')
+    : `Step ${step.step}`
+  return n > 1 ? `${head} — ${n} files (both experts)` : head
+}
+
+export const EMPTY_NOTE = 'No checkpoints yet — train this dataset, and each save appears here.'
 
 /* Why a LOCAL save offers no ▶ Continue: ai-toolkit resumes from whatever it
    finds in the run folder, so the next local launch continues from the NEWEST
@@ -23,7 +30,6 @@ export const EMPTY_NOTE = 'No checkpoints yet — train this set on this PC or i
    something other than what it says. */
 export const CONTINUE_LOCAL_REASON = 'Resumes from its newest save on the next '
   + 'local launch — the run folder is the resume state, so no step is picked here'
-export const ACTIVE_CLOUD_REASON = 'This run is still on its pod — stop it first'
 export const ACTIVE_LOCAL_REASON = 'Training is running and still writing these '
   + 'saves — stop it first'
 export const NO_LORAS_ROOT_REASON = 'ComfyUI\'s loras folder is not configured — '
@@ -31,10 +37,7 @@ export const NO_LORAS_ROOT_REASON = 'ComfyUI\'s loras folder is not configured �
 export const HAND_PLACED_REASON = 'Deployed by hand — remove it from ComfyUI\'s '
   + 'loras folder yourself'
 
-/** The groups the section renders, in order: the local run first (it is this
- * machine), then the cloud runs newest first — the server's own order. A group
- * with no step is not a group: the empty state is one sentence, not a header
- * over nothing. */
+/** The local run, when it has at least one save. */
 export function checkpointGroups(payload) {
   const out = []
   const local = payload?.local
@@ -45,41 +48,15 @@ export function checkpointGroups(payload) {
       status: local.active ? 'training' : 'done', steps: local.steps,
     })
   }
-  for (const g of payload?.cloud || []) {
-    if (g?.steps?.length) out.push({ key: `cloud-${g.run_id}`, lane: 'cloud', ...g })
-  }
   return out
 }
 
 export function groupTitle(group) {
-  if (group.lane === 'local') return `On this PC — ${group.run_name || 'local run'}`
-  const from = group.parent_run_id ? ` — continued from #${group.parent_run_id}` : ''
-  return `Cloud run #${group.run_id}${from}`
-}
-
-// Relative "15m ago" from a naive-UTC backend timestamp — the Runs page's rule,
-// so a group header reads exactly like its Runs row.
-export function timeAgo(iso, now = Date.now()) {
-  if (!iso) return ''
-  const t = new Date(/[Z+]/.test(iso) ? iso : `${iso}Z`).getTime()
-  if (Number.isNaN(t)) return ''
-  const s = Math.max(0, (now - t) / 1000)
-  if (s < 60) return 'just now'
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
-  return `${Math.floor(s / 86400)}d ago`
+  return `On this PC — ${group.run_name || 'local run'}`
 }
 
 export function groupSub(group, now = Date.now()) {
-  if (group.lane === 'local') {
-    return group.active ? 'training now — saves still being written' : 'this machine\'s run folder'
-  }
-  const bits = [group.status || 'unknown']
-  if (group.gpu) bits.push(group.gpu)
-  if (group.price_per_hour != null) bits.push(`$${Number(group.price_per_hour).toFixed(2)}/h`)
-  const when = timeAgo(group.finished_at || group.created_at, now)
-  if (when) bits.push(when)
-  return bits.join(' · ')
+  return group.active ? 'training now — saves still being written' : 'this machine\'s run folder'
 }
 
 export function fmtSize(bytes) {
@@ -112,9 +89,7 @@ export function downloadLinks(datasetId, group, step) {
     filename: f.filename,
     short: fileShortName(f.filename, files.length),
     size: f.size,
-    url: group.lane === 'cloud'
-      ? videoDatasetCheckpointUrl(datasetId, group.run_id, f.filename)
-      : videoDatasetLocalCheckpointUrl(datasetId, f.filename),
+    url: videoDatasetLocalCheckpointUrl(datasetId, f.filename),
   }))
 }
 
@@ -135,12 +110,7 @@ export function stepActionModel(datasetId, group, step, ctx = {}) {
   const { canDeploy = true, deployFolder = 'h3/lds', deleteMode = 'app_trash' } = ctx
   const files = step.files || []
   const deployed = !!step.deployed && files.length > 0
-  const cloud = group.lane === 'cloud'
-
-  let cont
-  if (!cloud) cont = { reason: CONTINUE_LOCAL_REASON }
-  else if (group.active) cont = { reason: ACTIVE_CLOUD_REASON }
-  else cont = { ok: true }
+  const cont = { reason: CONTINUE_LOCAL_REASON }
 
   let deploy = null
   let undeploy = null
@@ -151,7 +121,7 @@ export function stepActionModel(datasetId, group, step, ctx = {}) {
   }
 
   let del
-  if (group.active) del = { reason: cloud ? ACTIVE_CLOUD_REASON : ACTIVE_LOCAL_REASON }
+  if (group.active) del = { reason: ACTIVE_LOCAL_REASON }
   else {
     del = {
       ok: true,
@@ -164,7 +134,7 @@ export function stepActionModel(datasetId, group, step, ctx = {}) {
   return {
     key: stepKey(group, step), label: stepLabel(step),
     files: downloadLinks(datasetId, group, step),
-    deployed, continue: cont, deploy, undeploy, del, details: cloud,
+    deployed, continue: cont, deploy, undeploy, del, details: false,
   }
 }
 
@@ -205,13 +175,6 @@ export function describeUndeploy(step, mode = 'app_trash') {
 /** The run-level 🗑 the training block used to carry, moved here unchanged:
  * this one removes the run's files and its history line for good (the server
  * deletes the store directory by name — no trash), and says so. */
-export function runDeleteConfirmation(group) {
-  const n = (group.steps || []).reduce((sum, s) => sum + (s.files?.length || 0), 0)
-  return `Delete run #${group.run_id} and its ${n} LoRA file(s) from disk?\n\n`
-    + 'The dataset and its clips are untouched — only this run’s '
-    + 'checkpoints and its history line go. This cannot be undone.'
-}
-
 export function deleteReport(res = {}) {
   const removed = res.removed || []
   const kept = res.files_kept || []
@@ -232,45 +195,4 @@ export function deployReport(res = {}) {
 export function undeployReport(step) {
   const files = (step?.files || []).filter((f) => f.deployed_as)
   return `Removed from ComfyUI: ${files.map((f) => f.filename).join(' + ')}. The training save is kept.`
-}
-
-/** The ▶ Continue body. `from_step` is the harvested step the server seeds the
- * new pod with — for a FINAL save that is the run's total step count, which is
- * the number the listing reports it at. */
-export function continueBody(group, step, extraSteps) {
-  const extra = Math.max(1, Math.floor(Number(extraSteps) || 0))
-  return { run_id: group.run_id, extra_steps: extra, from_step: step.step }
-}
-
-const fmtWhen = (iso) => {
-  if (!iso) return null
-  const t = new Date(/[Z+]/.test(iso) ? iso : `${iso}Z`)
-  return Number.isNaN(t.getTime()) ? String(iso) : t.toLocaleString()
-}
-
-/** ⓘ label/value rows of one cloud run, in reading order; a value the run
- * does not carry is not a row. */
-export function detailsRows(d = {}) {
-  const p = d.params || {}
-  const yesNo = (v) => (v == null ? null : (v ? 'yes' : 'no'))
-  const rows = [
-    ['Status', [d.status, d.phase_detail].filter(Boolean).join(' — ') || null],
-    ['GPU', d.gpu ? `${d.gpu}${d.price_per_hour != null ? ` · $${Number(d.price_per_hour).toFixed(2)}/h` : ''}` : null],
-    ['Requested GPU class', p.requested_gpu ?? null],
-    ['Started', fmtWhen(d.created_at)],
-    ['Finished', fmtWhen(d.finished_at)],
-    ['Continued from', d.parent_run_id != null ? `run #${d.parent_run_id}` : null],
-    ['Resumed at step', p.resume_step ?? null],
-    ['Steps', p.steps ?? null],
-    ['Target', p.target_profile ?? null],
-    ['Frames per clip', p.frames ?? null],
-    ['Image-to-video', yesNo(p.do_i2v)],
-    ['Low VRAM', yesNo(p.low_vram)],
-    ['Distillation', p.distillation ?? null],
-    ['Base model', p.base_model || null],
-    ['Sample prompts', Array.isArray(p.sample_prompts) ? String(p.sample_prompts.length) : null],
-    ['Saves on this machine', d.saves ?? null],
-    ['Error', d.error || null],
-  ]
-  return rows.filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, String(v)])
 }

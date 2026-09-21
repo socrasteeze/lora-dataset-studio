@@ -29,9 +29,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { installCatalog, INSTALL_ALL_ACTION_LABELS } from '../src/hooks/useSetupSteps.js'
+import { installCatalog, installActionLabel } from '../src/hooks/useSetupSteps.js'
 import { resetRegistry, setEnabled } from '../src/plugins/registry.js'
 import { registerBundledDescriptor } from './support/bundledDescriptors.mjs'
+import { mlInstallCards } from '../src/components/setup/mlInstallCards.js'
 
 const BUNDLED = path.join(process.cwd(), '..', 'bundled')
 const products = await Promise.all(fs.readdirSync(BUNDLED).filter(id =>
@@ -79,7 +80,8 @@ function backendGroups() {
   for (const m of block.matchAll(/'([a-z0-9_]+)': \(([^)]*)\)/g)) {
     groups[m[1]] = [...m[2].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1])
   }
-  assert.deepEqual(Object.keys(groups), ['krea'], 'core owns Krea; product groups belong to their manifest')
+  assert.deepEqual(Object.keys(groups), ['krea', 'seedvr2', 'camera'],
+    'core retains the shared Krea, SeedVR2 and camera install groups')
   return groups
 }
 
@@ -127,11 +129,14 @@ function mlCardActions() {
 const FULL_CAPS = { comfyui: { dir_valid: true, reachable: true } }
 
 test('every backend install action is reachable from a Setup surface', () => {
+  for (const product of products) registerBundledDescriptor(product.descriptor)
+  setEnabled(products.map(product => product.id))
   const groups = backendGroups()
   const posted = postedGroups()
   const reachable = new Set([
     ...installCatalog(FULL_CAPS).map((r) => r.action),
     ...mlCardActions(),
+    ...mlInstallCards().map(card => card.action),
     ...inlineRunnerActions(),
     ...[...posted].flatMap((g) => groups[g] || []),
   ])
@@ -155,13 +160,15 @@ test('every group a card posts exists on the backend', () => {
 })
 
 test('every surfaced action carries a human label', () => {
+  for (const product of products) registerBundledDescriptor(product.descriptor)
+  setEnabled(products.map(product => product.id))
   const groups = backendGroups()
   const surfaced = new Set([
     ...installCatalog(FULL_CAPS).map((r) => r.action),
     ...Object.values(groups).flat(),
   ])
   for (const a of surfaced) {
-    assert.ok(INSTALL_ALL_ACTION_LABELS[a],
+    assert.ok(installActionLabel(a) && installActionLabel(a) !== a,
       `${a} is on a Setup surface with no entry in INSTALL_ALL_ACTION_LABELS — `
       + 'its row would render as a bare identifier')
   }

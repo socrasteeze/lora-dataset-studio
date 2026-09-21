@@ -21,7 +21,8 @@ fail loudly when APP_VERSION stops satisfying it.
 import re
 
 # Keep in step with .github/workflows/release.yml's "Tag must match APP_VERSION".
-RELEASE_TAG_RE = re.compile(r'^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(?:\.[0-9]+)?F?$')
+RELEASE_TAG_RE = re.compile(
+    r'^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(?:\.[0-9]+)?(?:\+fork)?$')
 
 
 def test_app_version_is_a_tag_this_repo_can_actually_publish():
@@ -31,16 +32,14 @@ def test_app_version_is_a_tag_this_repo_can_actually_publish():
         'tagging it would fail the release AFTER the ZIP was built')
 
 
-def test_the_fork_marker_is_last_so_it_cannot_disturb_ordering():
-    """F sits after the date and the counter on purpose. The update check is a
-    string comparison, so a marker anywhere earlier would reorder releases."""
+def test_the_fork_marker_is_a_pep440_local_suffix():
+    """The fork suffix stays parseable by the V2 plugin compatibility check."""
     from app.version import APP_VERSION
-    assert APP_VERSION.endswith('F'), (
-        'this fork marks its builds with a trailing F so a tag, a ZIP and the '
+    from packaging.version import Version
+    assert APP_VERSION.endswith('+fork'), (
+        'this fork marks its builds with +fork so a tag, a ZIP and the '
         'About screen all say which codebase they came from')
-    assert 'F' not in APP_VERSION[:-1], 'the marker must appear once, at the end'
-    # The property that matters: same version, marked, still reads as newer.
-    assert APP_VERSION > APP_VERSION[:-1]
+    assert Version(APP_VERSION).local == 'fork'
 
 
 def test_the_update_feed_is_this_fork_and_not_upstream(app):

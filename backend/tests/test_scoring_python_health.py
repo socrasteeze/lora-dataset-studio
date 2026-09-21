@@ -108,24 +108,6 @@ def test_no_success_for_unfinished_or_broken_child(health, monkeypatch, outcome)
     assert h.check('/tmp/ml/python')['status'] == 'failed'
 
 
-@pytest.mark.parametrize('profile,endpoint', [('scoring', 'scoring'), ('semantic', 'semantic'),
-                                            ('watermark_detect', 'watermark')])
-def test_explicit_check_route_and_bad_input(client, monkeypatch, profile, endpoint):
-    from app.services import scoring_python_health as h
-    calls = []
-    def check(path, prof):
-        calls.append((path, prof))
-        return {'status': 'busy', 'detail': 'Busy'}
-    monkeypatch.setattr(h, 'check', check)
-    url = f'/api/{endpoint}-python/check'
-    assert client.get(url).status_code == 405
-    assert client.post(url, json=[]).status_code == 400
-    assert client.post(url, json={'python': ['not a path']}).status_code == 400
-    assert not calls
-    r = client.post(url, json={'python': '/tmp/ml/python'})
-    assert r.status_code == 409 and calls == [('/tmp/ml/python', profile)]
-
-
 def test_detection_names_effective_and_managed_without_calculation(app, monkeypatch):
     from app import config as cfg, setup_installer
     from app.services import scoring_python as sp

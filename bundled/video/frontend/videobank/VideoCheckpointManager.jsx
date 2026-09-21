@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
-import { apiFetch, del, postJson } from '@lds/plugin-sdk'
+import { apiFetch, postJson } from '@lds/plugin-sdk'
 import { useToast } from '@lds/plugin-sdk'
-import { postWithConfirmations } from '@lds/plugin-sdk/training'
-import { ensureLicenceAck } from './licenceAck.js'
 import {
   videoDatasetCheckpointsUrl, videoDatasetCheckpointDeployUrl,
   videoDatasetCheckpointUndeployUrl, videoDatasetCheckpointDeleteUrl,
-  videoDatasetCloudContinueUrl, videoDatasetCloudRunUrl, videoDatasetLineageUrl,
+  videoDatasetLineageUrl,
 } from './videoBankApi.js'
 import VideoLineageGraph from './VideoLineageGraph.jsx'
 import VideoSampleLightbox from './VideoSampleLightbox.jsx'
-import { EMPTY_GRAPH_NOTE, MUTED_CLS, PREVIEWS_NOTE, ROW_CLS, graphSummary, nodeGroup } from './videoLineage.js'
+import { EMPTY_GRAPH_NOTE, MUTED_CLS, PREVIEWS_NOTE, ROW_CLS, graphSummary } from './videoLineage.js'
 import {
-  EMPTY_NOTE, checkpointGroups, continueBody, deleteReport, deployReport,
-  describeStepDelete, describeUndeploy, detailsRows, fmtSize, groupSub, groupTitle,
-  runDeleteConfirmation, stepActionModel, stepKey, undeployReport,
+  EMPTY_NOTE, checkpointGroups, deleteReport, deployReport,
+  describeStepDelete, describeUndeploy, fmtSize, groupSub, groupTitle,
+  stepActionModel, stepKey, undeployReport,
 } from './videoCheckpoints.js'
 
 // The row styles are the lane's shared ones (videoLineage.js): the list and
@@ -33,9 +31,7 @@ const MUTED = MUTED_CLS
  * The unit is the STEP: a Wan 2.2 save is two files at one step, and one row
  * per step with one ⬇ per file is the only shape that never offers half a LoRA. */
 export function VideoCheckpointList({
-  datasetId, payload, busy = null, details = null, continueTarget = null,
-  extraSteps = 1000, onExtraSteps, onConfirmContinue, onCancelContinue,
-  onDeploy, onUndeploy, onDelete, onDeleteRun, onContinue, onDetails,
+  datasetId, payload, busy = null, onDeploy, onUndeploy, onDelete,
 }) {
   const groups = checkpointGroups(payload)
   if (!groups.length) {
@@ -53,30 +49,7 @@ export function VideoCheckpointList({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <p className="m-0 text-xs font-semibold text-content">{groupTitle(g)}</p>
             <p className="m-0 font-mono text-[0.625rem] text-content-subtle">{groupSub(g)}</p>
-            {/* The run-level 🗑 the training block used to carry, kept as a
-                verb of its own: it clears a whole run — files AND history line
-                — where the per-step one trashes one save. */}
-            {g.lane === 'cloud' && !g.active && (
-              <button type="button" onClick={() => onDeleteRun?.(g)}
-                disabled={busy === `${g.key}:run`}
-                aria-label={`Delete run ${g.run_id} and its checkpoints`}
-                title="Delete this run and its LoRA files"
-                className="ml-auto rounded border border-border px-1 py-0.5 text-content-subtle hover:border-rose-500/60 hover:text-rose-200 disabled:opacity-60">
-                🗑
-              </button>
-            )}
           </div>
-          {details && details.run_id === g.run_id && g.lane === 'cloud' && (
-            <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded border border-border bg-app/40 px-2 py-1.5 text-[0.6875rem]"
-              aria-label={`Run ${g.run_id} details`}>
-              {details.rows.map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="text-content-subtle">{k}</dt>
-                  <dd className="m-0 break-words text-content">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {g.steps.map((s) => {
               const a = stepActionModel(datasetId, g, s, ctx)
@@ -108,15 +81,7 @@ export function VideoCheckpointList({
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
-                    {a.continue.ok ? (
-                      <button type="button" disabled={rowBusy} onClick={() => onContinue?.(g, s)}
-                        title="Rent a fresh pod and train this LoRA further from exactly this step"
-                        className={ROW + ' border-indigo-400/40 bg-indigo-500/15 text-indigo-100 hover:bg-indigo-500/25'}>
-                        <span aria-hidden>▶</span> Continue from here
-                      </button>
-                    ) : (
-                      <span className={MUTED}><span aria-hidden>▶</span> {a.continue.reason}</span>
-                    )}
+                    <span className={MUTED}><span aria-hidden>▶</span> {a.continue.reason}</span>
                     {a.deployed ? (a.undeploy?.ok ? (
                       <button type="button" disabled={rowBusy} onClick={() => onUndeploy?.(g, s)}
                         title="Remove this LoRA from ComfyUI's loras folder. Reversible: the training save is kept, so you can deploy it again"
@@ -134,13 +99,6 @@ export function VideoCheckpointList({
                     ) : (
                       <span className={MUTED}><span aria-hidden>📦</span> {a.deploy?.reason}</span>
                     ))}
-                    {a.details && (
-                      <button type="button" disabled={rowBusy} onClick={() => onDetails?.(g)}
-                        title="What this run was launched with: GPU, price, steps, target, timing"
-                        className={ROW + ' border-border bg-app/60 text-content hover:border-indigo-400/50'}>
-                        <span aria-hidden>ⓘ</span> Details
-                      </button>
-                    )}
                     {/* 🗑 in retreat — a quiet text row, not a fourth coloured
                         button one clicks by reflex; its label names what goes. */}
                     {a.del.ok ? (
@@ -154,29 +112,6 @@ export function VideoCheckpointList({
                       <span className={MUTED + ' ml-auto'}><span aria-hidden>🗑</span> {a.del.reason}</span>
                     )}
                   </div>
-                  {continueTarget === a.key && (
-                    <form className="flex flex-wrap items-center gap-1.5 border-t border-border pt-1 text-[0.6875rem]"
-                      onSubmit={(e) => { e.preventDefault(); onConfirmContinue?.(g, s) }}>
-                      <label className="flex items-center gap-1 text-content-muted">
-                        +
-                        {/* step={1}, not a round number: with min={1} the browser's
-                            step base is 1, so step={100} made 500, 1000 and 2000
-                            INVALID and the form never submitted — silently in
-                            headless, a tooltip in a real browser (live check, 02/09). */}
-                        <input type="number" min={1} step={1} value={extraSteps}
-                          onChange={(e) => onExtraSteps?.(e.target.value)}
-                          aria-label="Extra steps"
-                          className="w-20 rounded border border-border bg-app px-1 py-0.5 text-content" />
-                        steps from {a.label.toLowerCase()}
-                      </label>
-                      <button type="submit" disabled={rowBusy}
-                        className={ROW + ' border-indigo-400/40 bg-indigo-500/20 text-indigo-100 hover:bg-indigo-500/30'}>
-                        {busy === `${a.key}:continue` ? 'Renting a pod…' : '▶ Train further'}
-                      </button>
-                      <button type="button" onClick={() => onCancelContinue?.()}
-                        className="text-content-subtle hover:text-content">Cancel</button>
-                    </form>
-                  )}
                 </li>
               )
             })}
@@ -197,9 +132,6 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
   const [sampleTarget, setSampleTarget] = useState(null)
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(null)
-  const [details, setDetails] = useState(null)
-  const [continueTarget, setContinueTarget] = useState(null)
-  const [extraSteps, setExtraSteps] = useState(ds?.suggested_steps || 1000)
 
   const load = useCallback(async () => {
     try {
@@ -218,7 +150,7 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
   useEffect(() => { load() }, [load, refreshKey])
 
   // After a verb changed what is on disk: this list re-reads, and the training
-  // block is told so its "Train further" does not offer a run that is gone.
+  // block is told so its save count stays current.
   const changed = () => { load(); onSavesChange?.() }
 
   const act = async (key, fn) => {
@@ -262,40 +194,6 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
     })
   }
 
-  const removeRun = (g) => {
-    if (!window.confirm(runDeleteConfirmation(g))) return
-    act(`${g.key}:run`, async () => {
-      const d = await del(videoDatasetCloudRunUrl(ds.id, g.run_id))
-      toast.success(`Run #${d.deleted} deleted — ${d.files} file(s) removed.`)
-      if (details?.run_id === g.run_id) setDetails(null)
-      changed()
-    })
-  }
-
-  const showDetails = (g) => {
-    if (details?.run_id === g.run_id) { setDetails(null); return }
-    act(`${g.key}:details`, async () => {
-      const d = await apiFetch(videoDatasetCloudRunUrl(ds.id, g.run_id))
-      setDetails({ run_id: g.run_id, rows: detailsRows(d) })
-    })
-  }
-
-  // ▶ rents a pod, so it owes what every pod-renting POST of the video lane
-  // owes: the licence question first, then the confirmations loop that turns
-  // the server's `PARALLEL_RUN:` refusal into a question rather than an error.
-  const confirmContinue = (g, s) => {
-    if (!ensureLicenceAck(ds, { storage: window.localStorage, confirmFn: window.confirm })) return
-    act(`${stepKey(g, s)}:continue`, async () => {
-      const url = videoDatasetCloudContinueUrl(ds.id)
-      const d = await postWithConfirmations((b) => postJson(url, b),
-        continueBody(g, s, extraSteps), 'Launch anyway (force)')
-      if (d === null) return                       // declined: nothing rented
-      setContinueTarget(null)
-      toast.success(`Continuing from ${stepKey(g, s).split(':').pop() === 'final' ? 'the final save' : `step ${s.step}`}, +${continueBody(g, s, extraSteps).extra_steps} steps — the Training section follows the pod from here.`)
-      changed()
-    })
-  }
-
   if (err && !payload) {
     return (
       <p className="m-0 flex flex-wrap items-center gap-2 text-xs text-amber-200">
@@ -305,15 +203,6 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
     )
   }
   if (!payload) return <p className="m-0 text-xs text-content-subtle">Reading the saves…</p>
-  // ▶ from a graph pill opens the SAME inline form as the list row, and brings
-  // that row into view: one place to type the extra steps, one POST.
-  const continueFrom = (g, s) => {
-    const key = stepKey(g, s)
-    setContinueTarget(key)
-    requestAnimationFrame(() => {
-      document.querySelector(`li[data-step-key="${key}"]`)?.scrollIntoView({ block: 'nearest' })
-    })
-  }
   const hasGraph = (tree?.nodes?.length || 0) > 0
   return (
     <div className="flex flex-col gap-3">
@@ -328,15 +217,11 @@ export default function VideoCheckpointManager({ ds, refreshKey = 0, onSavesChan
             ctx={{ canDeploy: payload?.can_deploy !== false,
               deployFolder: payload?.deploy_folder || 'h3/lds', deleteMode: payload?.delete_mode }}
             onDeploy={deploy} onUndeploy={undeploy} onDelete={remove}
-            onContinue={continueFrom} onDetails={(node) => showDetails(nodeGroup(node))}
             onPlaySample={(node, pill) => setSampleTarget({ node, pill })} />
         )}
       </details>
-      <VideoCheckpointList datasetId={ds.id} payload={payload} busy={busy} details={details}
-        continueTarget={continueTarget} extraSteps={extraSteps} onExtraSteps={setExtraSteps}
-        onConfirmContinue={confirmContinue} onCancelContinue={() => setContinueTarget(null)}
-        onDeploy={deploy} onUndeploy={undeploy} onDelete={remove} onDeleteRun={removeRun}
-        onContinue={continueFrom} onDetails={showDetails} />
+      <VideoCheckpointList datasetId={ds.id} payload={payload} busy={busy}
+        onDeploy={deploy} onUndeploy={undeploy} onDelete={remove} />
       {sampleTarget && (
         <VideoSampleLightbox datasetId={ds.id} target={sampleTarget}
           onClose={() => setSampleTarget(null)} />

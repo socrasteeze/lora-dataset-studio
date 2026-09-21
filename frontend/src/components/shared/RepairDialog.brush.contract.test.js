@@ -176,7 +176,7 @@ test('Escape peels one layer, not two', () => {
      `civitaiOpen`, the publisher's own layer. That layer is not carried here. */
   assert.match(generated, /if \(repairOpen \|\| improveOpen\) return;/);
   assert.match(generated,
-    /if \(repairOpen \|\| improveOpen\) return;[^]{0,700}if \(cameraOpen\) \{[^]{0,300}if \(e\.key === 'ArrowLeft' && onPrev\)/);
+    /if \(repairOpen \|\| improveOpen\) return;[^]{0,300}if \(pluginLayersRef\.current\.any\(\)\) return;[^]{0,300}if \(e\.key === 'ArrowLeft' && onPrev\)/);
   assert.match(generated, /if \(zoom\.zoomed\) \{ zoom\.reset\(\); return; \}/);
   assert.match(generated, /if \(zoom\.zoomed\) \{ zoom\.reset\(\); return; \}[^]{0,40}onClose\?\.\(\);/);
 });
@@ -184,7 +184,7 @@ test('Escape peels one layer, not two', () => {
 test('the guards are re-read when the dialog opens, not captured stale', () => {
   // A listener registered once with repairOpen=false would keep closing forever.
   assert.match(review, /doDismiss, doReject, repairOpen\]\);/);
-  assert.match(lightbox, /panelOpen, closePanel,\s*\n\s*repairOpen, cameraOpen, improveOpen, patchImageState\]\);/);
+  assert.match(lightbox, /pluginLayer, panelOpen, closePanel,\s*\n\s*repairOpen, improveOpen, patchImageState\]\);/);
   // DIVERGENCE 1 (Civitai note) — upstream's dep list also carries `civitaiOpen`.
-  assert.match(generated, /\}, \[img, onClose, repairOpen, cameraOpen, improveOpen, zoom, onPrev, onNext\]\);/);
+  assert.match(generated, /\}, \[img, onClose, repairOpen, improveOpen, zoom, onPrev, onNext\]\);/);
 });

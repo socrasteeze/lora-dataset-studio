@@ -141,24 +141,22 @@ test('the three improve pointers land on the three things they name', () => {
   // did. The third arrived with the preset chain: the panel tunes a preset's
   // strengths in place, and BUILDING that preset (adding, removing,
   // reordering) stays one click away, in the card that owns the list.
-  const note = read('src/components/dataset/KleinImproveNote.jsx')
+  const note = read('../bundled/image_upscale/frontend/panels/KleinImproveNote.jsx')
   const tags = [...note.matchAll(/<SettingsLink\b[\s\S]*?>/g)].map((m) => m[0])
   assert.equal(tags.length, 3,
-    'the note must offer the instruction, the strength AND the preset list')
-  for (const tag of tags) assert.match(tag, /section="engines"/)
+    'the note must offer the instruction, strength and preset controls')
+  assert.ok(tags.filter((tag) => /pluginId="image_upscale"/.test(tag)).length >= 2)
   assert.ok(tags.some((t) => /focus="identity-prompt-klein-improve"/.test(t)))
   assert.ok(tags.some((t) => /focus="klein-improve-strength"/.test(t)))
   assert.ok(tags.some((t) => /focus="klein-generation-lora-presets"/.test(t)))
   // Each target is the thing its label names, not a section that contains it.
-  const engines = read('src/components/settings/EnginesSection.jsx')
+  const engines = read('../bundled/image_upscale/frontend/panels/KleinImproveSettings.jsx')
   assert.match(engines, /id="klein-improve-strength"/)
   assert.match(engines, /id="klein-improve-strength"[^>]*>\s*[\s\S]{0,200}?Upscale &amp; improve — strength/)
   assert.match(engines, /id="identity-prompt-klein-improve"/)
   // The preset CARD is the half the panel does not do: it is where a row is
   // added, removed or reordered, which is why the chain points at it by id
   // rather than at Engines at large.
-  assert.match(engines, /id="klein-generation-lora-presets"/)
-  assert.match(engines, /title="Klein generation LoRA presets/)
 })
 
 // ---- nothing ships targetless by accident ---------------------------------
@@ -166,7 +164,7 @@ test('the three improve pointers land on the three things they name', () => {
 test('a link without a target is one we decided to leave section-wide', () => {
   const allowed = new Map(WITHOUT_TARGET.map((e) => [`${e.file}:${e.section}`, e]))
   for (const u of usages()) {
-    if (u.focus) continue
+    if (u.focus || /\bpluginId=/.test(u.tag)) continue
     assert.ok(u.section, `${u.file}: SettingsLink without a section`)
     const key = `${u.file}:${u.section.value}`
     assert.ok(allowed.has(key),

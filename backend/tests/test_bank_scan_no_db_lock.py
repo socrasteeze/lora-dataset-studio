@@ -32,6 +32,8 @@ import time
 from unittest.mock import patch
 
 import pytest
+
+pytestmark = pytest.mark.plugins()
 from PIL import Image
 from sqlalchemy import text
 
@@ -44,6 +46,10 @@ def file_db(tmp_path, monkeypatch):
     monkeypatch.setenv('LDS_DATA_DIR', str(tmp_path / 'data'))
     monkeypatch.setenv('LDS_CONFIG', str(tmp_path / 'config.json'))
     monkeypatch.setenv('LDS_ENV', str(tmp_path / '.env'))
+    monkeypatch.setenv('LDS_PLUGINS_DIR', str(tmp_path / 'plugins'))
+    monkeypatch.setenv('LDS_EXTENSIONS_DIR', str(tmp_path / 'extensions'))
+    monkeypatch.setenv('LDS_PLUGIN_DISTRIBUTION', 'store')
+    monkeypatch.delenv('LDS_BUNDLED_DIR', raising=False)
     from app import config as cfg
     monkeypatch.setattr(cfg, 'ENV_PATH', tmp_path / '.env')
     monkeypatch.setattr(cfg, '_cache', None)

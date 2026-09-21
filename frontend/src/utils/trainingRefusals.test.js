@@ -226,26 +226,24 @@ test('confirmableRetryFlag defaults to the shared list when none is passed', asy
 
 // --- the call site ----------------------------------------------------------
 
-const page = fs.readFileSync(new URL('../pages/CloudRunsPage.jsx', import.meta.url), 'utf8');
+const page = fs.readFileSync(new URL('../components/runs/RunsHub.jsx', import.meta.url), 'utf8');
 
 test('every mutating handler of the Runs hub says something when it is refused', () => {
   // fetchClient's postJson REJECTS on a 400 and shows nothing of its own for
   // that status, so a handler without a catch is a button that does nothing.
   // These three had `try { … } finally { … }` (or no try at all) before #23.
   for (const handler of [
-    /const retry = async \(run\) => \{[\s\S]*?\n  \};/,
-    /const stop = async \(run\) => \{[\s\S]*?\n  \};/,
+    /const retry = async \(run\) => \{[\s\S]*?(?=\nconst shareConfig)/,
+    /const stopLocal = async \(\) => \{[\s\S]*?(?=\n  const \[retrying)/,
   ]) {
     const body = page.match(handler)?.[0];
     assert.ok(body, `handler not found: ${handler}`);
-    assert.match(body, /\} catch \(e\) \{[\s\S]*?toast\.error\(/);
+    assert.match(body, /\} catch \((?:e|error)\) \{[\s\S]*?toast\.error\(/);
   }
-  // the global 🧹 purge posts inside a try whose catch toasts
-  assert.match(page, /cloud\/purge', \{\}\);[\s\S]{0,600}?\} catch \(e\) \{\s*\n\s*toast\.error\(/);
 });
 
 test('retry answers confirmable refusals through the shared loop, not a bare post', () => {
-  const body = page.match(/const retry = async \(run\) => \{[\s\S]*?\n  \};/)[0];
+  const body = page.match(/const retry = async \(run\) => \{[\s\S]*?(?=\nconst shareConfig)/)[0];
   assert.match(body, /postWithConfirmations\(/);
   assert.match(body, /RETRY_CONFIRMABLE_REFUSALS/);
   assert.match(body, /'Retry anyway \(force\)'/);

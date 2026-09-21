@@ -10,8 +10,12 @@ def search_roots(*args, **kwargs):
     return search_roots(*args, **kwargs)
 
 
+def list_models(*args, **kwargs):
+    from app.services.comfy_model_paths import list_models
+    return list_models(*args, **kwargs)
 
-__all__ = ['scan_family_tree', 'search_roots']
+
+__all__ = ['scan_family_tree', 'search_roots', 'list_models']
 
 
 # Compatibility with the original public SDK exports.

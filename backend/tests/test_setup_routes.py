@@ -71,12 +71,11 @@ def test_install_all_starts_plan(client, monkeypatch, scrape_installed):
     body = r.get_json()
     assert r.status_code == 200
     # the {} snapshot -> the always-runnable extras (scrape stack + the four ML ones)
-    assert body['plan'] == ['scrape_extras', 'face_scoring', 'masks', 'watermark_inpaint',
-                            'wd14']
+    assert body['plan'] == ['face_scoring', 'masks', 'watermark_inpaint', 'wd14']
     assert set(body['statuses']) == set(body['plan'])
     assert started == body['plan']
     # Scrape remains explicit in the owner's preparation, even when installed.
-    assert setup_installer.known_action('scrape_extras') is scrape_installed
+    assert setup_installer.known_action('scrape_extras') is True
     if scrape_installed:
         prepared = client.post('/api/setup/install/scrape_extras')
         assert prepared.status_code == 200 and prepared.get_json()['state'] == 'running'

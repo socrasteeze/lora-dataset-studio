@@ -1,0 +1,8 @@
+{
+  "enabled": [
+    "camera_angles", "canvas", "hf_publish", "image_upscale", "live",
+    "model_tools", "resource_monitor", "scrape", "seedvr2", "video"
+  ],
+  "held": ["civitai_publish"],
+  "excluded": ["api_engines", "cloud_training"]
+}

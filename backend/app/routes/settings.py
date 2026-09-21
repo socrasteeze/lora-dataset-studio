@@ -23,6 +23,15 @@ def _paste_safe(line):
 bp = Blueprint('settings', __name__, url_prefix='/api')
 
 
+@bp.before_request
+def _reject_unknown_plugin_scope():
+    scope = request.args.get('plugin') or None
+    if scope and request.path.startswith('/api/settings'):
+        registry = current_app.extensions.get('lds_plugins')
+        if registry is None or scope not in registry.records:
+            return jsonify({'error': 'Plugin settings are unavailable: package is not installed.'}), 404
+
+
 _TEST_TARGETS = {
     'comfyui': capabilities.probe_comfyui,
     # End-to-end (reachable + vision model pulled), NOT reachability alone: the old
@@ -139,8 +148,11 @@ def _settings_payload() -> dict:
     # the real default next to whichever subject type the user is editing.
     from ..services.face_variations import (identity_prompt_defaults,
                                             identity_prompt_defaults_by_subject)
+    scope = request.args.get('plugin') or None
     return {
-        'config': cfg.load_config(), 'secrets': _secret_presence(),
+        'config': cfg.settings_view(cfg.load_config(), scope),
+        'secrets': {key: present for key, present in _secret_presence().items()
+                    if key in cfg.settings_secret_keys(scope)},
         # The shipped default of every config key, for the SCALAR settings what
         # identity_prompt_defaults is for the prompts: `config` above is already
         # merged, so a number in it is indistinguishable from the default and the
@@ -149,7 +161,7 @@ def _settings_payload() -> dict:
         # the frontend never carries its own copy of a default that could go
         # stale. No secret lives here — secrets are in .env, and `secrets` above
         # only reports presence.
-        'config_defaults': cfg.defaults(),
+        'config_defaults': cfg.settings_view(cfg.defaults(), scope),
         'identity_prompt_defaults': identity_prompt_defaults(),
         'identity_prompt_defaults_by_subject': identity_prompt_defaults_by_subject(),
         # What THIS running process is actually bound to — run.py stamps these
@@ -230,6 +242,12 @@ def put_settings():
         return jsonify({'error': "'secrets' must be an object"}), 400
     config_partial = body.get('config') or {}
     secrets_partial = body.get('secrets') or {}
+    if 'plugins' in config_partial:
+        return jsonify({'error': 'Plugin enablement is changed through the Plugins API.'}), 400
+    scope = request.args.get('plugin') or None
+    if (cfg.settings_view(config_partial, scope) != config_partial
+            or set(secrets_partial) - set(cfg.settings_secret_keys(scope))):
+        return jsonify({'error': 'These settings belong to another owner. Open its plugin settings.'}), 400
     # Validate through config's persistence boundary before saving config.json
     # too, so a rejected combined request changes neither file.  This covers all
     # control/format/Unicode line separators and a pre-existing poisoned .env,
@@ -388,7 +406,6 @@ def comfy_model_files():
     return jsonify({'files': files, 'folder': folder})
 
 
-@bp.get('/seedvr2/models')
 def seedvr2_models_list():
     """The SeedVR2 DiT builds actually PRESENT in this install's SEEDVR2 folder(s),
     plus the catalog of builds the app can talk about.

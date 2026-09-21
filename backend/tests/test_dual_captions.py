@@ -28,7 +28,7 @@ from app.services import face_dataset_service as svc
 from app.services import lora_training as lt
 from app.config import LOCAL_USER, save_config
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 
 def _png(w=64, h=64):
@@ -272,24 +272,6 @@ def test_caption_route_regenerates_both_when_dual_on(app, client, monkeypatch):
 
 
 # --- cloud strips dual back to the historical shape --------------------------
-def test_cloudify_strips_dual_captions(app):
-    from lds_cloud_training import cloud_training as ct
-    with app.app_context():
-        staging = 'C:/stage/dataset'
-        job_config = {'job': 'extension', 'config': {'name': 'x', 'process': [{
-            'type': 'sd_trainer',
-            'datasets': [{'folder_path': staging + '/_captions.json', 'caption_ext': 'txt'}],
-            'train': {'steps': 100, 'short_and_long_captions': True},
-            'model': {},
-        }]}}
-        pod_settings = {'DATASETS_FOLDER': '/workspace/datasets',
-                        'TRAINING_FOLDER': '/workspace/out'}
-        out = ct._cloudify_job_config(job_config, 'myjob', staging, pod_settings)
-        proc = out['config']['process'][0]
-        # Reverted to the historical folder + .txt sidecars, dual flag dropped.
-        assert proc['datasets'][0]['folder_path'] == '/workspace/datasets/myjob'
-        assert proc['datasets'][0]['caption_ext'] == 'txt'
-        assert 'short_and_long_captions' not in proc['train']
 
 
 # --- dual captions vs families that cache their text embeddings (issue #22) ----

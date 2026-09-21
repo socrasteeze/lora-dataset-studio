@@ -1002,16 +1002,6 @@ def _start_workers(app):
     except ImportError:
         pass  # phase(<3): training service not lifted yet
 
-
-    import threading
-    from .services import cloud_training
-    threading.Thread(target=cloud_training.boot_recover, args=(app,),
-                     daemon=True, name='cloud-boot-recover').start()
-    # Started separately from boot_recover on purpose: the watchdog that
-    # enforces the runtime cap, the stop deadline and the freeze detection must
-    # not share a fate with the recovery it supervises.
-    cloud_training.start_supervisor(app)
-
     # Cluster: persist a node_id; sweep stale artifacts; start the peer pull-loop
     # when role=peer. The sweep runs at boot for the same reason the staged-input
     # one does — it is the single moment nothing is in flight.

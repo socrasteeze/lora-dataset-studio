@@ -13,7 +13,7 @@ lands in loras/anima, and — crucially for THIS wave — the cloud path is REFU
 from public_dense_test_io import no_dense_provider_io  # noqa: F401
 import pytest
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 
 def _configure_aitoolkit(tmp_path, app, supports_anima=True):
@@ -141,22 +141,6 @@ def test_official_base_repo_anima_is_public(app, tmp_path):
 
 # --- 4) cloud path REFUSED (local-first this wave) -----------------------------
 
-def test_cloud_training_refuses_anima(app, tmp_path, monkeypatch):
-    """Local-first: cloud must refuse Anima BEFORE reserving anything, with a
-    readable reason (the pod image predates the 'anima' arch). Both cloud entry
-    points (tiers estimate + launch) enforce it."""
-    from lds_cloud_training import cloud_training as ct
-    from app.services import face_dataset_service as svc
-    from app.config import LOCAL_USER
-    # Fake VAST key so the anima refusal (which sits AFTER the key check) is reached.
-    monkeypatch.setattr(ct.cfg, 'secret',
-                        lambda k: 'fake-key' if k == 'VAST_API_KEY' else None)
-    with app.app_context():
-        ds = svc.create_dataset(LOCAL_USER, 'AC', 'zchar_ac', train_type='anima')
-        with pytest.raises(ValueError, match='Anima cloud training is coming'):
-            ct.gpu_tiers(LOCAL_USER, ds.id)
-        with pytest.raises(ValueError, match='Anima cloud training is coming'):
-            ct.launch_cloud_training(LOCAL_USER, ds.id, train_type='anima')
 
 
 # --- 5) run tag isolation + deploy routing -------------------------------------

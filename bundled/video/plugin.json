@@ -9,7 +9,7 @@
     "id": "lds",
     "name": "LDS"
   },
-  "description": "Video Bank, clip curation, video training sets, local and cloud training, and the local H3 Test Studio with manual continuation, interpolation and DLSS 5. Live is a separate plugin.",
+  "description": "Video Bank, clip curation, video training sets, local training, and the local H3 Test Studio with manual continuation, interpolation and DLSS 5. Live is a separate plugin.",
   "requires": [],
   "python_package": "lds_video",
   "frontend": "frontend/index.js",
@@ -173,7 +173,6 @@
       "2026-08-06-video-flag-chips",
       "2026-08-04-video-minimum-length",
       "2026-08-04-video-train-local",
-      "2026-08-04-video-cloud-training",
       "2026-08-04-video-caption-wording",
       "2026-08-04-video-caption-model-choice",
       "2026-08-04-video-describe-shots",
@@ -196,8 +195,7 @@
     "comfyui",
     "gpu",
     "filesystem",
-    "network",
-    "secrets:VAST_API_KEY"
+    "network"
   ],
   "license": "PolyForm-Noncommercial-1.0.0",
   "author": "lora-dataset-studio",

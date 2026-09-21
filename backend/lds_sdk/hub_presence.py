@@ -1,6 +1,9 @@
 """Named shared operations for hub_presence."""
 
-from app.services.hub_presence import GONE
+# Keep the compatibility constant importable after the rejected cloud product's
+# implementation leaves core. Calls remain lazy for installations that provide
+# the historical service.
+GONE = 'gone'
 
 __all__ = ['check', 'GONE']
 

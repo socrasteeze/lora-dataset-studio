@@ -20,7 +20,7 @@ import pytest
 
 from app.config import LOCAL_USER
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 ZIMAGE_MERGE = 'z image\\bigLove_zt3.safetensors'
 
@@ -244,54 +244,12 @@ def test_coherent_selections_are_not_flagged():
 
 # --- 5) the cloud lane: no push, no pod, for another family's base -------------
 
-def test_cloud_readiness_names_the_family_not_a_missing_file(app, style_ds):
-    """The reported modal said "The local file is unavailable (missing) —
-    restore it to push". The file was never missing: base_push_state resolved a
-    Z-Image merge NAME as a Krea absolute path and blamed the disk."""
-    from lds_cloud_training import hf_base_push
-    from app.services import face_dataset_service as svc
-    with app.app_context():
-        ds = svc.get_dataset(LOCAL_USER, style_ds)
-        ds.train_type = 'krea'
-        svc.db.session.commit()
-        st = hf_base_push.base_push_state(LOCAL_USER, style_ds, 'krea', 'base',
-                                          ZIMAGE_MERGE, 'a-token')
-    assert st['ready'] is False
-    assert st['reason'] == 'foreign_family'
-    assert 'Krea 2' in st['foreign_base_message']
 
 
-def test_cloud_push_refuses_another_familys_base(app, style_ds):
-    from lds_cloud_training import hf_base_push
-    with app.app_context():
-        with pytest.raises(hf_base_push.HfPublishError) as e:
-            hf_base_push.start_push(app, style_ds, 'krea', 'base', ZIMAGE_MERGE,
-                                    'a-token')
-    assert e.value.code == 'foreign_family'
 
 
-def test_cloud_push_refuses_when_the_local_file_is_absent(app, style_ds, tmp_path):
-    """Independent of the family question: an action must not be offered for a
-    file that is not there. Absent locally, the one-time upload has nothing to
-    send — refused synchronously, before any thread or HF call."""
-    from lds_cloud_training import hf_base_push
-    missing = str(tmp_path / 'deleted_after_being_chosen.safetensors')
-    with app.app_context():
-        with pytest.raises(hf_base_push.HfPublishError) as e:
-            hf_base_push.start_push(app, style_ds, 'krea', 'base', missing, 'a-token')
-    assert e.value.code == 'weights_missing'
-    assert 'deleted_after_being_chosen' in e.value.message
 
 
-def test_cloud_launch_guard_refuses_another_familys_base(app, style_ds):
-    """require_base_repo is what runs before a pod is RENTED."""
-    from lds_cloud_training import hf_base_push
-    from app.services import face_dataset_service as svc
-    with app.app_context():
-        ds = svc.get_dataset(LOCAL_USER, style_ds)
-        with pytest.raises(ValueError, match='another model family'):
-            hf_base_push.require_base_repo(ds, 'krea', 'base', ZIMAGE_MERGE,
-                                           'a-token')
 
 
 # --- 6) the LIST of bases is family-scoped too, not just the chosen one --------

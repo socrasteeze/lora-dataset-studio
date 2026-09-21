@@ -80,8 +80,6 @@ test('the core files that host the publisher name none of it', () => {
   const workspace = core('components/dataset/DatasetWorkspace.jsx')
   assert.match(workspace, /<PluginSlot slot="export\.action" surface="dataset"/)
   assert.match(workspace, /contributions\('export\.action', 'dataset'\)/)
-  // The raw-fetch allowlist no longer names the dialog: it left the core.
-  assert.doesNotMatch(read('../../../frontend/tests/direct-fetch-discipline.contract.test.mjs'), /PublishHfModal/)
 })
 
 test('the plugin mounts its dialog from the row, portaled out of the disclosure', () => {

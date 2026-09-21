@@ -2598,7 +2598,6 @@ def train_activity():
 # A CPU-only file conversion for a full-precision model already on this machine.
 # It is deliberately independent of the rejected rental-GPU training lane.
 
-@bp.post('/tools/fp8-quantize/plan')
 def tools_fp8_quantize_plan():
     """Describe the output, or return the refusal used to disable the button."""
     from ..services import fp8_quantize
@@ -2606,7 +2605,6 @@ def tools_fp8_quantize_plan():
     return jsonify(fp8_quantize.describe(data.get('path')))
 
 
-@bp.post('/tools/fp8-quantize')
 def tools_fp8_quantize_start():
     from ..services import fp8_quantize
     data = request.get_json(silent=True) or {}
@@ -2619,13 +2617,11 @@ def tools_fp8_quantize_start():
     return jsonify({'ok': True, **info, 'status': fp8_quantize.status()})
 
 
-@bp.get('/tools/fp8-quantize/status')
 def tools_fp8_quantize_status():
     from ..services import fp8_quantize
     return jsonify({'ok': True, **(fp8_quantize.status() or {})})
 
 
-@bp.get('/train/canvas/datasets')
 def train_canvas_datasets():
     """◉ LoRA Canvas index: which datasets have runs worth drawing, how many, and
     in which families. Cheap by design (no checkpoints, no disk) — the canvas
@@ -2634,7 +2630,6 @@ def train_canvas_datasets():
     return jsonify(ct.canvas_dataset_index(LOCAL_USER))
 
 
-@bp.post('/train/canvas/generate')
 def train_canvas_generate():
     """◉ Generate from the LoRA Canvas — the same Test-Studio engine, driven by
     the checkpoints ticked on the board instead of by a picker. Body:
@@ -2997,7 +2992,6 @@ def train_checkpoint_images_zip_plan(record_id, step):
     return jsonify({k: v for k, v in plan.items() if k != 'entries'})
 
 
-@bp.get('/train/canvas/positions')
 def train_canvas_positions():
     """◉ LoRA Canvas: every remembered card position, grouped by dataset id.
     One request for the whole board — the lanes need their overrides before the
@@ -3006,7 +3000,6 @@ def train_canvas_positions():
     return jsonify(ct.canvas_positions(LOCAL_USER))
 
 
-@bp.put('/dataset/<int:dataset_id>/canvas/positions')
 def dataset_canvas_positions_save(dataset_id):
     """Remember where cards sit in ONE lane. Body: {positions:[{record_id,x,y}]}.
     Upsert, so re-sending the same coordinates is a no-op — the canvas re-pins a
@@ -3019,7 +3012,6 @@ def dataset_canvas_positions_save(dataset_id):
         return jsonify({'error': 'not found'}), 404
 
 
-@bp.delete('/dataset/<int:dataset_id>/canvas/positions')
 def dataset_canvas_positions_clear(dataset_id):
     """✦ Tidy up one lane: forget every dragged position and fall back to the
     automatic tree."""
@@ -3029,7 +3021,6 @@ def dataset_canvas_positions_clear(dataset_id):
         return jsonify({'error': 'not found'}), 404
 
 
-@bp.get('/train/canvas/lanes')
 def train_canvas_lanes():
     """◉ LoRA Canvas: every arranged LANE — where it sits and how much room it
     keeps. Travels with the card positions above and for the same reason: the
@@ -3037,7 +3028,6 @@ def train_canvas_lanes():
     return jsonify(ct.canvas_lane_placements(LOCAL_USER))
 
 
-@bp.put('/dataset/<int:dataset_id>/canvas/lane')
 def dataset_canvas_lane_save(dataset_id):
     """Remember one lane's placement. Body: {x?, y?, h?}.
     A MERGE — the client sends only what its gesture changed, so moving a lane
@@ -3049,7 +3039,6 @@ def dataset_canvas_lane_save(dataset_id):
         return jsonify({'error': 'not found'}), 404
 
 
-@bp.delete('/dataset/<int:dataset_id>/canvas/lane')
 def dataset_canvas_lane_clear(dataset_id):
     """✦ Tidy up one lane: back to the automatic stack."""
     try:
@@ -3058,13 +3047,11 @@ def dataset_canvas_lane_clear(dataset_id):
         return jsonify({'error': 'not found'}), 404
 
 
-@bp.get('/train/canvas/external-loras')
 def canvas_external_loras_get():
     """🔌 The board's external LoRA plugin nodes, as persisted."""
     return jsonify({'loras': cfg.get('canvas.external_loras', []) or []})
 
 
-@bp.put('/train/canvas/external-loras')
 def canvas_external_loras_put():
     """Replace the board's external LoRA nodes. Sanitizes: dedupe by filename,
     reject path-traversal/absolute/drive-letter names (dropped, not erred —
@@ -3100,7 +3087,6 @@ def canvas_external_loras_put():
     return jsonify({'ok': True, 'loras': cleaned})
 
 
-@bp.get('/train/canvas/images')
 def train_canvas_images():
     """Every image pinned on the ◉ LoRA Canvas, grouped by dataset id, with
     the image row alongside its geometry — one request for the whole board, like
@@ -3109,7 +3095,6 @@ def train_canvas_images():
     return jsonify(ct.canvas_image_nodes(LOCAL_USER))
 
 
-@bp.put('/dataset/<int:dataset_id>/canvas/images')
 def dataset_canvas_images_save(dataset_id):
     """Remember pinned images of ONE lane.
     Body: {nodes:[{image_id,x,y,w,h,visible}]}.
@@ -3125,7 +3110,6 @@ def dataset_canvas_images_save(dataset_id):
         return jsonify({'error': 'not found'}), 404
 
 
-@bp.delete('/dataset/<int:dataset_id>/canvas/images')
 def dataset_canvas_images_clear(dataset_id):
     """Forget every pinned image of one lane, geometry included. Deliberately
     NOT what ✦ Tidy up calls — see clear_canvas_image_nodes."""
@@ -3135,13 +3119,11 @@ def dataset_canvas_images_clear(dataset_id):
         return jsonify({'error': 'not found'}), 404
 
 
-@bp.get('/train/canvas/layouts')
 def train_canvas_layouts():
     """💾 The named board arrangements this install has kept."""
     return jsonify(ct.canvas_layout_presets(LOCAL_USER))
 
 
-@bp.post('/train/canvas/layouts')
 def train_canvas_layouts_save():
     """Keep the board's current arrangement under a name.
     Body: {name, positions:{ds:[{record_id,x,y}]}, images:{ds:[{image_id,...}]},
@@ -3159,7 +3141,6 @@ def train_canvas_layouts_save():
         return jsonify({'error': str(e)}), 400
 
 
-@bp.post('/train/canvas/layouts/<int:preset_id>/apply')
 def train_canvas_layouts_apply(preset_id):
     """Put a remembered arrangement back. Everything travels through the live
     writers, so anything that no longer exists is simply not restored."""
@@ -3169,7 +3150,6 @@ def train_canvas_layouts_apply(preset_id):
         return jsonify({'error': 'not found'}), 404
 
 
-@bp.delete('/train/canvas/layouts/<int:preset_id>')
 def train_canvas_layouts_delete(preset_id):
     try:
         return jsonify(ct.delete_canvas_layout_preset(LOCAL_USER, preset_id))

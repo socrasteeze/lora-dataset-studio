@@ -25,9 +25,17 @@ def repository(tmp_path):
     git(repo, 'config', 'user.name', 'lora-dataset-studio')
     git(repo, 'config', 'user.email', 'noreply@lora-dataset-studio.dev')
     files = {path: 'committed\n' for path in bundle.REQUIRED}
+    files['fork-plugins.json'] = json.dumps({
+        'enabled': list(bundle.CURATED_PLUGINS), 'held': ['held'], 'excluded': ['excluded'],
+    })
     files['backend/app/version.py'] = "APP_VERSION = '2026.9.13'\n"
     files['backend/app/plugins/loader.py'] = 'host plugin loader\n'
     files['frontend/dist/assets/app.js'] = 'export const value = "committed";\n'
+    for plugin_id in bundle.CURATED_PLUGINS:
+        files[f'bundled/{plugin_id}/plugin.json'] = json.dumps({
+            'id': plugin_id, 'frontend': 'frontend/index.js',
+        })
+        files[f'bundled/{plugin_id}/frontend/index.js'] = f'export default {{ id: "{plugin_id}" }};\n'
     files.update({path: 'local-only\n' for path in (
         'backend/extensions/private/__init__.py', 'backend/data/session.json',
         'backend/app/.env', 'backend/tests/test_private.py',
@@ -57,7 +65,62 @@ def test_zip_uses_exact_committed_bytes_and_excludes_local_products(repository, 
     assert not any(b'local-only' in content or b'untracked' in content for content in members.values())
     info = json.loads(members['build_info.json'])
     assert info['commit'] == git(repository, 'rev-parse', 'HEAD').decode().strip()
-    assert result['plugins_included'] == 0
+    assert result['plugins_included'] == len(bundle.CURATED_PLUGINS)
+    assert {name.split('/')[1] for name in members if name.startswith('bundled/')} == set(bundle.CURATED_PLUGINS)
+    assert 'bundled/private/plugin.json' not in members
+
+
+def test_curated_plugin_payload_keeps_runtime_resources(repository, tmp_path):
+    wheel = repository / 'bundled' / 'seedvr2' / 'resources' / 'wheels' / 'fixture.whl'
+    workflow = repository / 'bundled' / 'camera_angles' / 'workflows' / 'fixture.json'
+    test_file = repository / 'bundled' / 'video' / 'tests' / 'test_fixture.py'
+    for path, body in ((wheel, b'wheel'), (workflow, b'{}'), (test_file, b'not shipped')):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+    git(repository, 'add', '--', wheel.relative_to(repository), workflow.relative_to(repository),
+        test_file.relative_to(repository))
+    git(repository, 'commit', '-q', '-m', 'Add synthetic plugin resources')
+    result = bundle.build(repository, tmp_path / 'out')
+    with zipfile.ZipFile(result['archive']) as archive:
+        names = {name.split('/', 1)[1] for name in archive.namelist()}
+    assert wheel.relative_to(repository).as_posix() in names
+    assert workflow.relative_to(repository).as_posix() in names
+    assert test_file.relative_to(repository).as_posix() not in names
+
+
+@pytest.mark.parametrize('path', [
+    'bundled/video/runtime.db',
+    'bundled/video/tool.exe',
+    'bundled/video/archive.zip',
+    'bundled/video/cache.pyc',
+    'bundled/video/.env',
+    'bundled/video/production.env',
+    'bundled/video/private.key',
+    'bundled/video/private.pem',
+    'bundled/video/private.p12',
+    'bundled/video/private.pfx',
+])
+def test_curated_plugin_payload_rejects_runtime_residue(repository, tmp_path, path):
+    file = repository / path
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_bytes(b'private runtime residue')
+    git(repository, 'add', '--', path)
+    git(repository, 'commit', '-q', '-m', 'Add rejected plugin residue')
+    result = bundle.build(repository, tmp_path / 'out')
+    with zipfile.ZipFile(result['archive']) as archive:
+        assert path not in {name.split('/', 1)[1] for name in archive.namelist()}
+
+
+def test_build_uses_the_selected_committed_policy_not_the_worktree_policy(repository, tmp_path):
+    committed = json.loads((repository / 'fork-plugins.json').read_text(encoding='utf-8'))
+    (repository / 'fork-plugins.json').write_text(json.dumps({
+        **committed, 'enabled': ['unreviewed'],
+    }), encoding='utf-8')
+    result = bundle.build(repository, tmp_path / 'out')
+    with zipfile.ZipFile(result['archive']) as archive:
+        members = {name.split('/', 1)[1] for name in archive.namelist()}
+    assert 'bundled/video/plugin.json' in members
+    assert 'bundled/unreviewed/plugin.json' not in members
 
 
 def test_destination_cannot_escape_or_replace_an_archive(repository, tmp_path):

@@ -111,10 +111,10 @@ changes, a V2 merge, a live schema migration or a release.
    `frontend/src/plugins/bundled.js` registers nothing. The backend also ignores
    `bundled/` unless explicitly put into development mode. Copying source alone
    therefore does not deliver the previous feature set.
-2. **The machine-routing implementation is absent from stock V2.** The fork's
-   `cluster.py`, `cluster_remote.py`, `backend_worker.py`, `peer_worker.py` and
-   `peer_training.py` services need to be ported. Dormant `worker_url` parameters
-   and the `worker_id` database column do not replace their behavior.
+2. **The machine-routing implementation is absent from stock V2, but survives
+   the content-base integration.** The fork's `cluster.py`, `cluster_remote.py`,
+   `backend_worker.py`, `peer_worker.py` and `peer_training.py` remain in core.
+   Validate their callers and ownership boundaries; no wholesale re-port is owed.
 3. **Bank features need explicit preservation.** The fork's bank groups, durable
    queue, splitting and WD14 tagging services/tests are absent at their current
    paths in V2. Preserve their behavior and resolve any replacement individually.
@@ -176,13 +176,18 @@ database has no records for them.
 | `scrape` | Carry source import and credentials behavior; verify bank/dataset parity and fork queue integration. |
 | `live`, `resource_monitor` | Carry owned-machine behavior; check routing, network scope and GPU contention. |
 
-For initial integration, use only a curated set of reviewed development bundles,
-with matching frontend/backend build modes and explicit enablement. This is a
-rehearsal mechanism, not a settled production distribution choice. Before shipping,
-choose and test a reproducible fork distribution that cannot be overwritten by a
-stock plugin update. Respect package provenance; do not fabricate official Store
-receipts. If packages need independent identities, update ownership, settings,
-dependencies and data mappings together.
+The fork distribution is defined by `fork-plugins.json`: ten reviewed sources,
+one held publisher, and two excluded products. `npm run build` selects that curated
+profile and records the exact selection in `frontend/dist/plugin-build.json`.
+Without an explicit development/test override, the backend reads that marker and
+loads the matching sources. A malformed or contradictory marker refuses startup.
+Store archives cannot replace fork-owned source plugins; these update with the
+repository. No official Store receipt is fabricated.
+
+For isolated tests, `LDS_PLUGIN_DISTRIBUTION=store` keeps the backend empty, and
+`LDS_PLUGIN_BUILD_MODE=store` produces a corresponding frontend. Development can
+still opt into the unrestricted source profile. Production qualification uses
+the curated fork profile, including its runtime package and rendered interface.
 
 ## Schema review
 
@@ -261,11 +266,34 @@ shutdown before cutover.
 
 ## Not yet demonstrated
 
-- A resolved V2 integration with all fork features retained.
-- A fork-safe plugin distribution and update path.
-- A V2 boot on isolated copied state and a complete rollback rehearsal.
+- Final qualification of the integrated V2 tree and its release archive.
+- A migration and complete rollback rehearsal using a copy of the live installation.
 - Live generation/training on the intended machines.
 - Full media backup and a fresh cutover snapshot.
+
+## Migration verification progress
+
+The curated fork profile builds and boots all ten intended plugins. Framework
+tests cover archive replacement refusal and invalid build markers. Release and
+container staging select the same root policy and exclude held or rejected
+packages. Container recipes were checked by tests; no local Docker image was
+built because the Docker CLI was unavailable.
+
+A disposable legacy database was created from the pre-migration `origin/main`
+code with one image dataset, image, image bank, bank image and video dataset.
+Copied state was remapped into a separate root before V2 started, and outbound
+connections were blocked. Two separate V2 starts passed SQLite integrity and
+foreign-key checks. Existing IDs, captions, decisions, tags, bank separation
+flags and media references were preserved; `video_dataset.best_settings` was
+added. The second start left those rows unchanged. An independent copy of the
+original state also booted with the old code. This synthetic rehearsal proves
+the tested migration path, not recovery of the live database or external media.
+
+Rendered smoke checks used only synthetic state. Setup, Settings, plugin
+management, Video Bank, Canvas and three plugin settings pages rendered without
+console errors or horizontal overflow at mobile and desktop widths. The Bank's
+Python picker was exercised at five viewport sizes with stubbed discovery and
+calculation results. No real inference, training or package install was started.
 
 References: [upstream migration guide](https://github.com/perfectgf/lora-dataset-studio/blob/ce92e34993b246205b01a8dff2af4422199617c8/docs/guide/migrate-to-v2.md),
 [plugin packaging guide](https://github.com/perfectgf/lora-dataset-studio/blob/ce92e34993b246205b01a8dff2af4422199617c8/docs/plugins/packaging-guide.md),

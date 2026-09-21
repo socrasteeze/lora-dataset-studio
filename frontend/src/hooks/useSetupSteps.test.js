@@ -460,14 +460,6 @@ test('installCatalog lists every app-installable component, present + available'
       'klein_enhancement_lora',
       'krea_nodes', 'krea_model', 'krea_text_encoder', 'krea_vae',
       'krea_identity_lora',
-      // 📷 Camera angles — four rows, not five: its VAE is the krea_vae row
-      // above (one file, one button).
-      'camera_model', 'camera_lora', 'camera_speed_lora', 'camera_text_encoder',
-      // 🎬 Video Test Studio — five weights and NO pack row. The lane's three
-      // optional node packs are linked from its card, never installed by the
-      // app: it downloads model files and does not add code to a ComfyUI.
-      'h3_base', 'h3_text_encoder', 'h3_video_vae', 'h3_audio_vae',
-      'h3_turbo_lora', 'h3_parasyte_lora', 'h3_dareties_lora',
       'lanpaint_nodes'],
   );
   // Everything installed in fullCaps -> every tile present, and available to REINSTALL.
@@ -479,14 +471,10 @@ test('installCatalog lists every app-installable component, present + available'
 
 test('installCatalog stays fully available for reinstall when all is green', () => {
   // The menu must never collapse once installed — each item can always be repaired.
-  // 30, not upstream's 29: this fork's catalog carries the 🔖 WD14 tagger row on
-  // top of upstream's list. Recomputed from the deepEqual list just above, never
-  // copied from upstream's literal — upstream added the two optional arena
-  // accelerations in this sync, and the fork's own count moved by the same two
-  // for a DIFFERENT total. The one time this reads as "unchanged" is the one
-  // time it is wrong.
+  // Plugin-owned install rows are tested by their owners. Core stays complete
+  // without requiring an unregistered plugin contribution.
   const cat = installCatalog(fullCaps());
-  assert.ok(cat.length === 30 && cat.every((c) => c.available));
+  assert.ok(cat.length === 19 && cat.every((c) => c.available));
 });
 
 test('installCatalog marks missing ML extras not-present but still available', () => {
@@ -504,7 +492,7 @@ test('installCatalog blocks fresh ML installs on an unsupported Python, with a h
     face_scoring: false, masks: false }));
   // Can't install into the app's out-of-range Python -> unavailable + an actionable hint.
   assert.equal(cat.face_scoring.available, false);
-  assert.match(cat.face_scoring.hint, /3\.10–3\.12/);
+  assert.match(cat.face_scoring.hint, /compatible ML environment/);
   // watermark auto-provisions its own venv, so it stays available regardless.
   assert.equal(cat.watermark_inpaint.available, true);
 });
@@ -527,50 +515,6 @@ test('installCatalog gates the vision model on a reachable, named Ollama', () =>
     ollama: { reachable: true, vision_model_ready: false, vision_model: '' } }));
   assert.equal(noName.ollama_model.available, false);
   assert.match(noName.ollama_model.hint, /model name/);
-});
-
-test('the Video lane\'s three doors are rows of their own: ready, waiting, or missing with a door', () => {
-  const row = (caps, label) => deriveCapabilitySummary(caps).find((s) => s.label === label);
-  const DLSS = '✨ DLSS 5 neural rendering';
-  const SMOOTH = '↗ Smooth (frame interpolation)';
-  const LIVE = '🔴 Live lane (beta)';
-  // Everything there.
-  const on = { comfyui: { dir_valid: true, reachable: true, video_studio_ready: true,
-    video_studio_options: { vfi: { available: true } } }, dlss5nr: { ready: true }, video_encode: true };
-  for (const l of [DLSS, SMOOTH, LIVE]) assert.equal(row(on, l).ok, true, l);
-  // ComfyUI down with the weights on disk: Smooth and Live wait (their
-  // verdict needs the process), DLSS does not — it has a worker of its own.
-  const off = { comfyui: { dir_valid: true, reachable: false, video_studio_missing: [] },
-    dlss5nr: { ready: false }, video_encode: true };
-  assert.equal(row(off, SMOOTH).pending, true);
-  assert.match(row(off, SMOOTH).note, /launch ComfyUI/);
-  assert.equal(row(off, LIVE).pending, true);
-  assert.equal(row(off, DLSS).pending, undefined);
-  assert.equal(row(off, DLSS).ok, false);
-  // ComfyUI up, packs missing: Smooth is plainly missing, its door the video
-  // install card (which lists the packs) — never "waiting".
-  const noPacks = { comfyui: { dir_valid: true, reachable: true, video_studio_ready: true,
-    video_studio_options: { vfi: { available: false, nodes: ['RIFE VFI'] } } }, video_encode: true };
-  assert.equal(row(noPacks, SMOOTH).ok, false);
-  assert.equal(row(noPacks, SMOOTH).pending, undefined);
-  assert.equal(row(noPacks, SMOOTH).topic, 'setup-video-studio');
-  // /object_info unreadable while ComfyUI answers (available: null) is not a
-  // verdict either way: the row does not go green on it.
-  const unread = { comfyui: { dir_valid: true, reachable: true, video_studio_ready: true,
-    video_studio_options: { vfi: { available: null } } } };
-  assert.equal(row(unread, SMOOTH).ok, false);
-  // Weights there, ffmpeg not: Live names the gap and its door is the video
-  // extra on the quality step, not the weights it already has.
-  const noFfmpeg = { comfyui: { dir_valid: true, reachable: true, video_studio_ready: true }, video_encode: false };
-  assert.equal(row(noFfmpeg, LIVE).ok, false);
-  assert.match(row(noFfmpeg, LIVE).note, /ffmpeg/);
-  assert.equal(row(noFfmpeg, LIVE).topic, 'setup-quality');
-  // Weights missing: the door is the video install.
-  const noWeights = { comfyui: { dir_valid: true, reachable: true, video_studio_ready: false,
-    video_studio_missing: ['h3_unet'] }, video_encode: true };
-  assert.equal(row(noWeights, LIVE).ok, false);
-  assert.equal(row(noWeights, LIVE).pending, undefined);
-  assert.equal(row(noWeights, LIVE).topic, 'setup-video-studio');
 });
 
 test('installCatalog gates Klein weights on a validated ComfyUI', () => {
@@ -758,7 +702,7 @@ test('the capability summary counts the video pieces', () => {
 // Sources panel — but none of the four had a row on the wizard's final screen.
 // Same defect as the video pieces above, just for four different engines: a
 // machine missing all four still certified "14 of 14 capabilities ready".
-test('the capability summary counts bank scoring, SigLIP2, the watermark detector and scraping extras', () => {
+test('the core capability summary counts bank scoring, SigLIP2, and the watermark detector', () => {
   const off = deriveCapabilitySummary({
     bank_scoring: false, bank_siglip2: false, watermark_detect: false, scrape_deps: false,
   });
@@ -766,21 +710,17 @@ test('the capability summary counts bank scoring, SigLIP2, the watermark detecto
   const bank = off.find((r) => /^Bank scoring/.test(r.label));
   const siglip = off.find((r) => /SigLIP2/.test(r.label));
   const wmDetect = off.find((r) => /Watermark detector/.test(r.label));
-  const scrape = off.find((r) => /Scraping extras/.test(r.label));
   assert.ok(bank, `no bank-scoring row in the summary: ${labels.join(', ')}`);
   assert.ok(siglip, `no SigLIP2 row in the summary: ${labels.join(', ')}`);
   assert.ok(wmDetect, `no watermark-detector row in the summary: ${labels.join(', ')}`);
-  assert.ok(scrape, `no scraping-extras row in the summary: ${labels.join(', ')}`);
   // Each reads its OWN capability key, not a neighbour's — the bug this guards
   // against is a copy-pasted row that always reports another engine's state.
   assert.equal(bank.ok, false);
   assert.equal(siglip.ok, false);
   assert.equal(wmDetect.ok, false);
-  assert.equal(scrape.ok, false);
   assert.equal(bank.topic, 'setup-quality');
   assert.equal(siglip.topic, 'setup-quality');
   assert.equal(wmDetect.topic, 'setup-quality');
-  assert.equal(scrape.topic, 'setup-quality');
 
   const on = deriveCapabilitySummary({
     bank_scoring: true, bank_siglip2: true, watermark_detect: true, scrape_deps: true,
@@ -788,7 +728,7 @@ test('the capability summary counts bank scoring, SigLIP2, the watermark detecto
   assert.equal(on.find((r) => /^Bank scoring/.test(r.label)).ok, true);
   assert.equal(on.find((r) => /SigLIP2/.test(r.label)).ok, true);
   assert.equal(on.find((r) => /Watermark detector/.test(r.label)).ok, true);
-  assert.equal(on.find((r) => /Scraping extras/.test(r.label)).ok, true);
+  assert.equal(on.some((r) => /Scraping extras/.test(r.label)), false);
 });
 
 // The third video piece. probe_video() reports decode / detect / encode apart
@@ -896,12 +836,6 @@ test('each new capability row maps to the quality wizard step in SetupPage', () 
 // Setup wizard never pointed at (and could not: capabilityDestination() only
 // resolves /settings and /setup routes). Without this card the new row's
 // "manage in Setup wizard" promise would be a dead end.
-test('the quality step offers a Setup card for scraping extras', () => {
-  const cards = fs.readFileSync(new URL('../components/setup/mlInstallCards.js', import.meta.url), 'utf8');
-  assert.match(cards, /action:\s*'scrape_extras'/);
-  assert.match(cards, /cap:\s*'scrape_deps'/);
-});
-
 test('the install catalog offers the video extras for install and repair', () => {
   const rows = installCatalog({ video_decode: false, video_detect: true });
   const video = rows.find((r) => r.action === 'video');

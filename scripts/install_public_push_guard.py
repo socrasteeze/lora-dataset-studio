@@ -81,6 +81,7 @@ def install(repo: Path, public_base: str, private_source: str, private_remote: s
         if not result['allowed']:
             raise ValueError('Unapproved private entries remain in the proposed export history.')
     sources = {filename: (source_root / filename).read_bytes() for filename in GUARD_FILES}
+    sources['fork-plugins.json'] = (source_root.parent / 'fork-plugins.json').read_bytes()
     if (hook.read_bytes() if hook.exists() else b'') != before:
         raise ValueError('The pre-push hook changed during validation; installation refused.')
     hook.parent.mkdir(parents=True, exist_ok=True)

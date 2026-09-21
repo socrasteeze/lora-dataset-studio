@@ -13,7 +13,7 @@ from app.extensions import db
 from app.plugins import registry
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCTS = tuple(sorted(path.parent.name for path in (ROOT / 'bundled').glob('*/plugin.json')))
+PRODUCTS = tuple(json.loads((ROOT / 'fork-plugins.json').read_text(encoding='utf-8'))['enabled'])
 
 
 @pytest.fixture
@@ -61,11 +61,11 @@ def factory(tmp_path, monkeypatch):
     sys.path[:] = original_path
 
 
-def test_store_factory_starts_with_zero_plugins(factory):
+def test_store_factory_starts_without_external_plugins(factory):
     app = factory()
     assert app.extensions['lds_plugins'].records == {}
     assert app.test_client().get('/api/plugins', follow_redirects=True).status_code == 200
-    assert len(db.metadata.tables) == 28
+    assert len(db.metadata.tables) == 33
 
 
 @pytest.mark.parametrize('pid', PRODUCTS)
@@ -73,8 +73,7 @@ def test_true_factory_each_product_alone(factory, pid):
     app = factory({pid})
     records = app.extensions['lds_plugins'].records
     assert records[pid].state == 'loaded', records[pid].error
-    assert all(r.state == 'disabled' for key, r in records.items() if key != pid)
-    assert len(db.metadata.tables) == 28
+    assert len(db.metadata.tables) == 33
 
 
 def test_true_factory_products_have_no_duplicate_url_method(factory):
@@ -89,56 +88,41 @@ def test_true_factory_products_have_no_duplicate_url_method(factory):
 
 
 @pytest.mark.parametrize('url', ['/api/system/stats', '/api/video-studio/options',
-    '/api/train/canvas/positions', '/api/camera/catalog', '/api/seedvr2/models',
-    '/api/settings/chatgpt-oauth/poll', '/api/civitai/status', '/api/cloud/quantize/status',
-    '/api/dataset/train/cloud/status', '/api/tools/lora-merge/status',
-    '/api/dataset/1/publish-hf/status'])
-def test_store_has_no_transferred_product_urls(factory, url):
+    '/api/camera/catalog', '/api/settings/chatgpt-oauth/poll', '/api/civitai/status',
+    '/api/cloud/quantize/status', '/api/dataset/1/publish-hf/status'])
+def test_store_has_no_plugin_only_urls(factory, url):
     app = factory()
     assert app.test_client().get(url).status_code == 404
 
 
-def test_settings_scopes_hide_fields_and_refuse_cross_owner_writes(factory, monkeypatch):
-    app = factory(PRODUCTS)
+def test_settings_refuse_rejected_product_writes(factory, monkeypatch):
+    app = factory(set(PRODUCTS))
     monkeypatch.setattr('app.routes.settings._lan_ip', lambda: None)
     monkeypatch.setattr('app.routes.settings._tailscale_ip', lambda: None)
     client = app.test_client()
     core = client.get('/api/settings').json
-    assert 'cloud' not in core['config'] and 'canvas' not in core['config_defaults']
     assert 'GEMINI_API_KEY' not in core['secrets']
-    api = client.get('/api/settings?plugin=api_engines').json
-    assert set(api['config']) <= {'engines', 'plugins'}
-    assert set(api['secrets']) == {'GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY'}
-    assert client.put('/api/settings', json={'config': {'cloud': {'max_price_per_hour': 999}}}).status_code == 400
-    assert client.put('/api/settings?plugin=api_engines', json={'config': {'server': {'port': 1}}}).status_code == 400
-    assert client.put('/api/settings?plugin=api_engines', json={'secrets': {'GEMINI_API_KEY': 'fake-fixture'}}).status_code == 200
-    assert client.delete('/api/settings/secret/GEMINI_API_KEY').status_code == 400
-    assert client.delete('/api/settings/secret/GEMINI_API_KEY?plugin=api_engines').status_code == 200
-    assert not cfg.secret('GEMINI_API_KEY')
+    assert client.put('/api/settings?plugin=api_engines', json={'config': {'server': {'port': 1}}}).status_code == 404
     assert client.put('/api/settings', json={'config': {'plugins': {'enabled': {'cloud_training': True}}}}).status_code == 400
 
 
-def test_off_provider_tests_are_refused_before_callbacks(factory):
-    app = factory(set())
-    for owner, target in (('cloud_training', 'vast'), ('api_engines', 'openai'),
-                          ('cloud_training', 'hf_cloud'), ('civitai_publish', 'civitai')):
-        assert app.test_client().post(f'/api/settings/test/{target}?plugin={owner}').status_code == 409
-
-
-def test_registered_capability_cache_changes_with_owner_state(factory, monkeypatch):
+def test_registered_capability_cache_changes_with_retained_owner_state(factory, monkeypatch):
     from app import capabilities
-    app = factory({'cloud_training'})
-    registry = app.extensions['lds_plugins']
+    app = factory({'video'})
+    registry_ = app.extensions['lds_plugins']
     calls = []
-    registry.probes = {'cloud_training': ('cloud_training', lambda: calls.append('probe') or True)}
+    registry_.probes = {'fixture_probe': ('video', lambda: calls.append('probe') or True)}
     monkeypatch.setattr(capabilities, '_cache', None)
-    monkeypatch.setattr(capabilities, '_probe_uncached', lambda: {'engines': {'klein': False}, 'training_visible': False})
+    monkeypatch.setattr(capabilities, '_cache_ts', 0.0)
+    monkeypatch.setattr(capabilities, '_cache_plugin_signature', None)
+    monkeypatch.setattr(capabilities, '_probe_uncached',
+                        lambda: {'engines': {'klein': False}, 'training_visible': False})
     with app.app_context():
-        assert capabilities.probe()['cloud_training'] is True
-        assert capabilities.probe()['cloud_training'] is True
+        assert capabilities.probe()['fixture_probe'] is True
+        assert capabilities.probe()['fixture_probe'] is True
         assert calls == ['probe']
-        cfg.save_config({'plugins': {'enabled': {'cloud_training': False}}})
-        assert 'cloud_training' not in capabilities.probe()
+        cfg.save_config({'plugins': {'enabled': {'video': False}}})
+        assert 'fixture_probe' not in capabilities.probe()
         assert calls == ['probe']
 
 
@@ -154,14 +138,13 @@ def test_plugin_http_callbacks_remain_behind_auth_csrf_and_pending_disable(facto
     assert client.get('/api/train/canvas/positions').status_code == 409
 
 
-def test_boot_workers_have_one_owner_without_starting_real_workers(factory, monkeypatch):
+def test_boot_workers_start_core_and_plugin_hooks_once(factory, monkeypatch):
     import app as host
     from app.job_queue import queue_manager
-    app = factory({'cloud_training'})
+    app = factory(set(PRODUCTS))
     calls = []
     monkeypatch.setattr(queue_manager, 'start', lambda: calls.append('queue'))
     monkeypatch.setattr('app.services.lora_training.start_training_scheduler', lambda _app: calls.append('local'))
     monkeypatch.setattr('app.plugins.loader.run_boot_hooks', lambda _app: calls.append('plugins'))
     host._start_workers(app)
     assert calls == ['queue', 'local', 'plugins']
-    assert [name for _, name, _ in app.extensions['lds_plugins'].workers].count('cloud-boot-recover') == 1

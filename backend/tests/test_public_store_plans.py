@@ -28,10 +28,10 @@ def test_latest_compatible_release_and_dependencies_in_install_order():
 
 
 def test_reverse_dependency_constrains_requested_update_and_conflict_is_explicit():
-    cloud = release('cloud_training', dependencies={'video': '<2'})
+    dependent = release('sample.training', dependencies={'video': '<2'})
     video = [release('video', '2.0.0'), release('video', '1.0.0')]
-    catalog = {'cloud_training': [cloud], 'video': video}
-    installed = {'cloud_training': cloud.manifest, 'video': video[1].manifest}
+    catalog = {'sample.training': [dependent], 'video': video}
+    installed = {'sample.training': dependent.manifest, 'video': video[1].manifest}
     assert dict(versions(resolve(catalog, 'video', installed)))['video'] == '1.0.0'
     with pytest.raises(StoreError, match='No compatible set'):
         resolve(catalog, 'video', installed, version='2.0.0')

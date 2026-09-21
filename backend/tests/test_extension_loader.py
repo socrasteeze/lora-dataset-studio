@@ -19,6 +19,8 @@ def _make_app(tmp_path, monkeypatch, ext_dir):
     monkeypatch.setenv('LDS_CONFIG', str(tmp_path / 'config.json'))
     monkeypatch.setenv('LDS_ENV', str(tmp_path / '.env'))
     monkeypatch.setenv('LDS_EXTENSIONS_DIR', str(ext_dir))
+    monkeypatch.setenv('LDS_PLUGINS_DIR', str(tmp_path / 'plugins'))
+    monkeypatch.setenv('LDS_PLUGIN_DISTRIBUTION', 'store')
     import app.config as _cfg
     monkeypatch.setattr(_cfg, 'ENV_PATH', tmp_path / '.env')
     monkeypatch.setattr(_cfg, '_cache', None)

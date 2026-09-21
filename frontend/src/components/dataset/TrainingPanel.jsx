@@ -3299,11 +3299,6 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               Dataset version: <span className="text-content font-semibold">v{datasetState.version}</span> — unchanged since the last training.
             </p>
           ))}
-          {/* The model tools' place in this panel -- the `training.tool` slot,
-              surface `dataset`: the bundled `model_tools` plugin mounts its LoRA
-              merge disclosure here. V2 moved LoraMergeTool out of core into that
-              plugin, so the block that used to render it inline is gone with it.
-              Nothing is drawn with the plugin off. */}
           <PluginSlot slot="training.tool" surface="dataset" family={checkpointTrainType} />
           <div className="flex items-center gap-2 flex-wrap">
             {/* () => … sinon React passe l'event en 1er arg → forBase = PointerEvent
@@ -3729,8 +3724,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       </details>
       </CheckpointPortal>
 
-      {/* Fp8QuantizeTool moved into the bundled `model_tools` plugin in V2,
-          which mounts it itself — nothing is rendered here any more. */}
+
 
       {/* Portalled, like the ▶ Continue dialog above and for the same reason:
           this panel lives in a section the workspace hides with display:none,

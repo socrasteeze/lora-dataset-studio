@@ -28,14 +28,13 @@ clips' removal does (`video_bank_service.remove_dataset_clips`) — never
 import json
 import os
 
-from lds_sdk.video_host.models import CloudTrainingRun
 from lds_video.models import VideoDataset
 from lds_sdk.video_host import cloud_run_dataset as crd
 from lds_sdk import cloud_training as ct
-from lds_sdk.video_host import cloud_video_training as cvt
 from lds_sdk.video_host import trash
 from lds_video import video_test_studio as vts
 from lds_video import video_training_local as vtl
+from lds_video import video_training
 
 # Same destination as a removed clip: the app's own trash (Settings ▸ Storage),
 # recoverable until it is emptied. Named on every delete answer so the UI's
@@ -50,6 +49,32 @@ _PUBLIC_PARAMS = ('train_type', 'steps', 'base_model', 'low_vram', 'do_i2v',
                   'resume_step', 'parent_run_id', 'auto_retry_of',
                   'sample_prompts')
 
+
+
+def _group_saves_by_step(saves, target=None) -> list:
+    """Cut a folder of saves into STEPS, so a Wan 2.2 pair travels together.
+
+    DIVERGENCE 4 — upstream keeps this in `cloud_video_training.py` and its own
+    docstring says the local run folder uses it too, "so both lanes cut a Wan
+    pair at the same seam". That module is the rented-pod lane and is not
+    carried here; the seam is local, so it lives with the lane that still
+    exists. `target` numbers the FINAL save; the local lane passes None and the
+    final is reported with `step: None`.
+    """
+    by_step = {}
+    for name, path in saves.items():
+        step, _stage = video_training.split_checkpoint_name(name)
+        final = step is None
+        key = (target if final else step, final)
+        by_step.setdefault(key, []).append((name, path))
+    out = []
+    for (step, final), items in sorted(by_step.items(),
+                                       key=lambda kv: (kv[0][1], kv[0][0] or 0)):
+        items.sort()
+        out.append({'step': None if step is None else int(step), 'final': final,
+                    'files': [n for n, _ in items],
+                    'paths': [p for _, p in items]})
+    return out
 
 def _dataset(user_id, dataset_id):
     ds = VideoDataset.query.filter_by(id=int(dataset_id), user_id=user_id).first()
@@ -137,7 +162,7 @@ def local_group(ds, deployed=None) -> dict | None:
         return None
     if deployed is None:
         deployed = _deployed_index()
-    steps = cvt.group_saves_by_step(saves, target=None)
+    steps = _group_saves_by_step(saves, target=None)
     return {
         'run_name': vtl.local_run_name(ds),
         'folder': str(vtl.save_root(ds)),
@@ -147,32 +172,12 @@ def local_group(ds, deployed=None) -> dict | None:
 
 
 def cloud_groups(ds, deployed=None) -> list:
-    """This dataset's cloud runs that brought files back, newest first, each
-    with its steps. Same run facts as the training block's own list
-    (`/train/cloud/checkpoints`) — that route keeps file NAMES for the block,
-    this one describes each file for the section that acts on them."""
-    if deployed is None:
-        deployed = _deployed_index()
-    out = []
-    for run in (CloudTrainingRun.query.filter_by(dataset_id=ds.id)
-                .order_by(CloudTrainingRun.id.desc()).all()):
-        if not crd.owns(run, ds.id, crd.VIDEO):
-            continue
-        steps = cvt.harvested_steps(run)
-        if not steps:
-            continue
-        paths = ct.run_checkpoint_files(run)
-        out.append({
-            'run_id': run.id, 'status': run.status,
-            'active': run.status in ct.ACTIVE_STATES,
-            'gpu': run.gpu_name, 'price_per_hour': run.price_per_hour,
-            'target_profile': ct._run_param(run, 'target_profile'),
-            'parent_run_id': ct._run_param(run, 'parent_run_id'),
-            'created_at': run.created_at.isoformat() if run.created_at else None,
-            'finished_at': run.finished_at.isoformat() if run.finished_at else None,
-            'steps': _step_rows(steps, paths.get, deployed),
-        })
-    return out
+    """DIVERGENCE 4 — upstream lists this dataset's rented-pod runs and the
+    steps each brought back. This fork trains video LOCALLY only, so there is
+    never a pod harvest to describe. The key stays in `list_checkpoints`'
+    answer, empty, because the section renders both lanes from one payload and
+    a missing key would be a different shape rather than an empty lane."""
+    return []
 
 
 def list_checkpoints(user_id, dataset_id) -> dict:
@@ -197,14 +202,15 @@ def _step_files(ds, run_id, step, final) -> list:
     """``[(filename, path)]`` of ONE step of the local run (`run_id` None) or of
     one cloud run of this dataset. A step that is not there is a LookupError —
     a deploy or a delete must never act on "the nearest" save."""
-    if run_id is None:
-        saves = _local_saves(ds)
-        steps = cvt.group_saves_by_step(saves, target=None)
-        paths = saves
-    else:
-        run = _cloud_run(ds, run_id)
-        steps = cvt.harvested_steps(run)
-        paths = ct.run_checkpoint_files(run)
+    # DIVERGENCE 4 — upstream branches here on `run_id`: None is the local run,
+    # a number is one of this dataset's rented-pod runs. There is no pod lane
+    # here, so a step is always the local run's; a caller naming a run id is
+    # asking for something this build cannot have.
+    if run_id is not None:
+        raise LookupError('unknown checkpoint step')
+    saves = _local_saves(ds)
+    steps = _group_saves_by_step(saves, target=None)
+    paths = saves
     final = bool(final)
     for s in steps:
         if bool(s['final']) != final:

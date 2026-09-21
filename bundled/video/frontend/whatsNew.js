@@ -53,11 +53,10 @@ export const WHATS_NEW = [
     date: '2026-09-03',
     title: 'A video set draws its runs as a graph, with the training samples on each save',
     blurb:
-      'The Checkpoints & LoRAs section of a video set now opens on the same run graph '
-      + 'an image dataset has: one card per run, this PC or a rented pod, a pill per '
-      + 'save, and a curve from the exact step a continuation resumed from. A save that '
+      'The Checkpoints & LoRAs section of a video set now opens on a run graph: '
+      + 'one card for the local run and one pill per save. A save that '
       + 'training rendered a sample for shows its still — click it to play the clip, '
-      + 'one prompt after another — and every verb (download, deploy, continue, delete) '
+      + 'one prompt after another — and every verb (download, deploy, undeploy, delete) '
       + 'is one click away on the pill, the same as in the list below.',
     to: '/datasets',
   },
@@ -195,15 +194,14 @@ export const WHATS_NEW = [
   {
     id: '2026-09-02-video-checkpoints-and-loras',
     date: '2026-09-02',
-    title: 'A video set gets its Checkpoints & LoRAs section — deploy, continue, clear, step by step',
+    title: 'A video set gets its Checkpoints & LoRAs section — deploy, clear, step by step',
     blurb:
-      'Every save a video training brought back — from this PC or from a rented '
-      + 'pod — now has its own section in the video workspace, listed by step so '
-      + 'both experts of a Wan 2.2 pair travel together. Each step offers what an '
-      + 'image dataset’s does: ⬇ download, 📦 deploy into ComfyUI’s loras folder '
-      + '(the Video Test Studio lists it as deployed right away), ⏏ undeploy, '
-      + '▶ continue training from that exact step on a fresh pod, ⓘ the run’s '
-      + 'details, and 🗑 delete — to the app’s Trash, recoverable. A Studio section '
+      'Every save a video training brought back now has its own section in the '
+      + 'video workspace, listed by step so both experts of a Wan 2.2 pair travel '
+      + 'together. Each step offers what an image dataset’s does: ⬇ download, '
+      + '📦 deploy into ComfyUI’s loras folder (the Video Test Studio lists it as '
+      + 'deployed right away), ⏏ undeploy, and 🗑 delete — to the app’s Trash, '
+      + 'recoverable. A Studio section '
       + 'opens the Video tab of the Test Studio next door.',
     to: '/datasets',
   },
@@ -533,8 +531,8 @@ export const WHATS_NEW = [
     blurb:
       'Building a first video training set means guessing a target, a size and '
       + 'a clip count — so the window stops making you guess. Each target '
-      + 'carries a one-line hint (which one is proven locally, which trains in '
-      + 'the cloud, which needs reference photos). The size menu says which '
+      + 'carries a one-line hint (which one is proven locally and which needs '
+      + 'reference photos). The size menu says which '
       + 'sizes train exactly as cut and which of the model’s stated sizes get '
       + 'rescaled a little. And a line under the clip count tells you where '
       + 'your dataset sits: a dozen clips proves the pipeline, strong LoRAs '
@@ -550,7 +548,7 @@ export const WHATS_NEW = [
       'The Ref2V flavour of H3 generates from reference images of a subject, '
       + 'and now you can train for it: pick the MiniMax H3 Ref2V target when '
       + 'promoting clips, attach 1–4 reference images on the dataset card, and '
-      + 'train locally or in the cloud with the same recipe H3 uses. The app '
+      + 'train locally with the same recipe H3 uses. The app '
       + 'refuses to launch without references on purpose — without them the '
       + 'trainer silently learns nothing of the identity, which is a paid run '
       + 'wasted. Local training needs an ai-toolkit from 2026-08-13 or newer; '
@@ -578,7 +576,7 @@ export const WHATS_NEW = [
       'If you animate still images, train the way you generate: one checkbox '
       + 'on the video training panels switches an H3 run to first-frame '
       + 'conditioning, so the LoRA learns under the same setup your i2v '
-      + 'generations use. Works locally and in the cloud, on any ai-toolkit '
+      + 'generations use. Works locally on any ai-toolkit '
       + 'that trains H3 at all.',
     to: '/datasets',
   },
@@ -606,8 +604,7 @@ export const WHATS_NEW = [
       + 'the clips it actually holds — about 28 steps per clip, taken from '
       + 'measured runs, never below the old default and never past what the '
       + 'measurements support. And there is exactly ONE such field per dataset: '
-      + 'the training block asks for the settings once, and training on this PC '
-      + 'or on a rented GPU is just the button you press — no run starts on a '
+      + 'the training block asks for the settings once, and no run starts on a '
       + 'number you never saw. Type over it freely: what you enter is what trains.',
     to: '/datasets',
   },
@@ -621,8 +618,8 @@ export const WHATS_NEW = [
       + 'contrastive guidance loss and a small training adapter, and made the '
       + 'pair its default for H3 — video training here now uses both, wherever '
       + 'the ai-toolkit it is driving can actually run them: your installed copy '
-      + 'is read for the capability, and a rented pod is judged on the image it '
-      + 'boots, so an older setup quietly skips the recipe instead of failing. '
+      + 'is read for the capability, so an older setup quietly skips the recipe '
+      + 'instead of failing. '
       + 'Alongside it, a clip now defaults to 39 frames instead of 107 — the '
       + 'length the trainer itself trains at, and about a third of the work per '
       + 'step — with every other length still on the menu, 22 included.',
@@ -789,13 +786,6 @@ export const WHATS_NEW = [
     title: 'Your video sets can now be trained here, without leaving the app',
     blurb:
       'A promoted video set now carries a ▶ Train this dataset button, and it hands the clips straight to the ai-toolkit already installed on your machine — no export, no copy, no config to write by hand. It shares the GPU with everything else honestly: a captioning pass or a ComfyUI render in flight refuses the launch instead of fighting over the card, and an image training already running blocks it exactly as another video run would. MiniMax H3 is wired in alongside Wan, with the quantisation, the noise schedule, the audio flags and the guidance its own trainer actually expects — a mismatch there does not crash, it just trains a slightly wrong model, which is why each value was read in the installed trainer rather than guessed. Two things it refuses to do quietly. H3 needs about 43 GB of weights: if they are not on your disk the button says so, names the repository and the size, and waits for a yes rather than turning into a silent overnight download. And a set re-promoted to a different target is refused rather than resumed, because the run folder still holds the previous model’s LoRA. Wan 2.2 is the one target a finished run has been through here; the card says plainly which of the others are wired but not yet proven.',
-  },
-  {
-    id: '2026-08-04-video-cloud-training',
-    date: '2026-08-04',
-    title: 'A promoted video dataset can now be trained on a rented GPU without leaving the app',
-    blurb:
-      'Open a video training set in your library and it has a Cloud training panel: pick a step count, click Train in the cloud, and watch the run — the GPU it landed on and what it costs per hour are on screen as soon as the pod has them. When it finishes, the checkpoints are listed by step and downloadable from the same panel. Wan 2.2 saves TWO files per step, the high-noise and low-noise experts, and either one alone is a LoRA nothing can load — so a step is offered as a step, with both of its files, never as a loose file list. A run that failed has a Retry, a run that finished has Train further, and continuing a Wan run sends both experts back to the new pod rather than resuming half of it. Before the job starts, the pod is asked to decode one of the clips you just uploaded with the same decoder the trainer uses; a pod that cannot read them fails in the first minute instead of billing you for hours of training on nothing.',
   },
   {
     id: '2026-08-04-video-caption-wording',

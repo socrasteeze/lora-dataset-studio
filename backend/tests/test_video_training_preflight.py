@@ -70,51 +70,6 @@ def test_the_report_has_the_image_preflight_shape_and_a_verdict(client, tmp_path
     assert body['can_override'] is False
 
 
-@pytest.mark.plugins('video', 'cloud_training')
-def test_the_two_lanes_read_different_things(client, tmp_path, seams):
-    """Machine rows (ai-toolkit, weights) mean nothing for a rented pod; account
-    rows (the vast key, the run limit, the budget) mean nothing for this box."""
-    ds_id = _promoted(client, tmp_path)
-
-    local = _rows(client.get(f'/api/video-dataset/{ds_id}/train/preflight').get_json())
-    cloud = _rows(client.get(f'/api/video-dataset/{ds_id}/train/preflight?lane=cloud').get_json())
-
-    assert all(c['scope'] != 'cloud' for c in local.values())
-    assert all(c['scope'] != 'machine' for c in cloud.values())
-    assert 'aitoolkit' in local and 'aitoolkit' not in cloud
-    assert 'vast' in cloud and 'vast' not in local
-    # The dataset rows are on BOTH lanes — they are true wherever the job runs.
-    for lane in (local, cloud):
-        assert 'clips' in lane and 'target' in lane
-
-
-@pytest.mark.plugins('video', 'cloud_training')
-def test_no_vast_key_is_a_BLOCKER_on_the_cloud_lane(client, tmp_path, seams, monkeypatch):
-    from app.services import cloud_training as ct
-    monkeypatch.setattr(ct.cfg, 'secret', lambda key, *a, **k: '' if key == 'VAST_API_KEY' else None)
-    ds_id = _promoted(client, tmp_path)
-
-    body = client.get(f'/api/video-dataset/{ds_id}/train/preflight?lane=cloud').get_json()
-
-    assert _rows(body)['vast']['status'] == 'fail'
-    assert body['verdict'] == 'blocked'
-    assert any('vast.ai' in b for b in body['blockers'])
-
-
-@pytest.mark.plugins('video', 'cloud_training')
-def test_an_empty_folder_blocks_both_lanes(client, tmp_path, seams):
-    import os
-    ds_id = _promoted(client, tmp_path)
-    out = client.get(f'/api/video-dataset/{ds_id}').get_json()['output_dir']
-    for name in os.listdir(out):
-        os.remove(os.path.join(out, name))
-
-    for lane in ('', '?lane=cloud'):
-        body = client.get(f'/api/video-dataset/{ds_id}/train/preflight{lane}').get_json()
-        assert _rows(body)['clips']['status'] == 'fail', lane
-        assert body['verdict'] == 'blocked', lane
-
-
 def test_a_missing_reference_set_is_a_blocker_with_its_destination(client, tmp_path, seams,
                                                                     monkeypatch):
     """The row has to point at the section that fixes it: the readiness card's
@@ -152,10 +107,5 @@ def test_cloud_preflight_is_blocked_without_querying_an_absent_owner(client, tmp
     ds_id = _promoted(client, tmp_path)
 
     response = client.get(f'/api/video-dataset/{ds_id}/train/preflight?lane=cloud')
-    assert response.status_code == 200
-    report = response.get_json()
-    assert report['verdict'] == 'blocked'
-    row = _rows(report)['cloud_plugin']
-    assert row['status'] == 'fail' and row['scope'] == 'cloud'
-    assert row['target'] is None, 'the workspace jump callback only accepts section ids'
-    assert row['detail'] == 'Install and enable Cloud training in Plugins before renting a GPU.'
+    assert response.status_code == 400
+    assert 'local' in response.get_json()['error'].lower()

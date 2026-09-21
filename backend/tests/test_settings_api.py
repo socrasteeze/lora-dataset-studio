@@ -41,7 +41,6 @@ def _no_real_network(monkeypatch):
     capabilities._import_cache.clear()
 
 
-@pytest.mark.plugins('api_engines')
 def test_get_settings_masks_secrets(client, monkeypatch):
     monkeypatch.setenv('HF_TOKEN', 'hf-secret')
     data = client.get('/api/settings').get_json()
@@ -401,85 +400,6 @@ def test_stale_full_config_save_keeps_installed_bank_semantic_python(client):
 def test_capabilities_endpoint(client):
     caps = client.get('/api/capabilities').get_json()
     assert 'engines' in caps and 'studio_visible' in caps
-
-def _cloud_status(*, ok=True, namespace='lds-deliveries', error=None,
-                  code=None, severity=None, warning=None):
-    return {
-        'ok': ok,
-        'configured': True,
-        'code': code or ('ready' if ok else 'invalid'),
-        'severity': severity or ('success' if ok else 'error'),
-        'namespace': namespace if ok else None,
-        'settings_focus': 'HF_CLOUD_TOKEN',
-        'warning': warning,
-        'error': error,
-    }
-
-
-def test_put_settings_skips_dense_validation_without_new_cloud_token(
-        client, monkeypatch):
-    from lds_cloud_training import cloud_training
-
-    calls = []
-    monkeypatch.setattr(
-        cloud_training,
-        'full_transformer_token_status',
-        lambda *args, **kwargs: calls.append((args, kwargs)),
-    )
-
-    assert client.put('/api/settings', json={
-        'config': {'ollama': {'url': 'http://127.0.0.1:11501'}},
-    }).status_code == 200
-    assert client.put('/api/settings', json={
-        'secrets': {'HF_TOKEN': 'hf_classic_read_token'},
-    }).status_code == 200
-    assert calls == []
-
-
-@pytest.mark.plugins('cloud_training')
-def test_hf_cloud_connection_target_reports_ready_and_invalid(
-        client, monkeypatch):
-    from lds_cloud_training import cloud_training
-
-    monkeypatch.setattr(
-        cloud_training,
-        'full_transformer_token_preflight',
-        lambda: _cloud_status(namespace='private-lds'),
-    )
-    ready = client.post('/api/settings/test/hf_cloud?plugin=cloud_training')
-    assert ready.status_code == 200
-    assert ready.get_json()['ok'] is True
-    assert ready.get_json()['namespace'] == 'private-lds'
-    assert 'krea/Krea-2-Raw is readable' in ready.get_json()['detail']
-
-    warning = 'Global write access is accepted with a warning.'
-    monkeypatch.setattr(
-        cloud_training,
-        'full_transformer_token_preflight',
-        lambda: _cloud_status(
-            namespace='tester', code='broad_access', severity='warning',
-            warning=warning),
-    )
-    broad = client.post('/api/settings/test/hf_cloud?plugin=cloud_training')
-    assert broad.status_code == 200
-    assert broad.get_json()['ok'] is True
-    assert broad.get_json()['code'] == 'broad_access'
-    assert broad.get_json()['severity'] == 'warning'
-    assert broad.get_json()['detail'] == warning
-
-    monkeypatch.setattr(
-        cloud_training,
-        'full_transformer_token_preflight',
-        lambda: _cloud_status(
-            ok=False, error=('HF_CLOUD_TOKEN requires repository write access; '
-                             'read-only tokens cannot be used.')),
-    )
-    invalid = client.post('/api/settings/test/hf_cloud?plugin=cloud_training')
-    assert invalid.status_code == 200
-    assert invalid.get_json()['ok'] is False
-    assert invalid.get_json()['detail'] == (
-        'HF_CLOUD_TOKEN requires repository write access; read-only tokens cannot be used.')
-
 
 def test_test_connection_unknown_target(client):
     assert client.post('/api/settings/test/nope').status_code == 404
@@ -1072,7 +992,6 @@ def test_update_progress_endpoint_returns_state(client, monkeypatch):
     assert d['phase'] == 'downloading' and d['downloaded'] == 10 and d['total'] == 100
 
 
-@pytest.mark.plugins('api_engines')
 def test_settings_offers_an_engine_added_by_an_update(client, tmp_path, monkeypatch):
     """End to end over HTTP: someone who saved their settings back when Klein was
     the only engine opens Settings after updating and is OFFERED Krea 2 Edit —
@@ -1087,7 +1006,6 @@ def test_settings_offers_an_engine_added_by_an_update(client, tmp_path, monkeypa
     assert enabled[:1] == ['klein']
 
 
-@pytest.mark.plugins('api_engines')
 def test_unchecking_an_engine_over_the_api_sticks(client, monkeypatch):
     """The counter-test over HTTP: the SPA saves the full config it was shown,
     minus the engine the user just unchecked. It must not reappear on reload."""
@@ -1111,7 +1029,6 @@ def test_unchecking_an_engine_over_the_api_sticks(client, monkeypatch):
 @pytest.mark.parametrize('owner', [
     pytest.param(None, marks=pytest.mark.plugins()),
     pytest.param('image_upscale', marks=pytest.mark.plugins('image_upscale')),
-    pytest.param('api_engines', marks=pytest.mark.plugins('api_engines')),
 ])
 def test_get_settings_exposes_the_shipped_config_defaults(client, owner):
     import app.config as _cfg
@@ -1126,13 +1043,13 @@ def test_get_settings_exposes_the_shipped_config_defaults(client, owner):
         assert d['krea']['grounding_px'] == _cfg.DEFAULTS['krea']['grounding_px']
         assert 'improve_steps' not in d['klein']
         assert 'nanobanana_model' not in d['engines']
+        assert d['krea']['base_model'] == ''
     # blank-means-auto keys keep their EMPTY default: resetting one must write ''
     # back, not a made-up value that would freeze the field (see the frontend's
     # resetToDefault.test.js for the UI half of this contract).
     # Divergence 1: this fork's `engines` section carries no per-engine *_model
     # keys (upstream asserts engines.nanobanana_model here). krea.base_model is
     # the blank-means-auto key that DOES exist locally, so it carries the contract.
-    assert d['krea']['base_model'] == ''
 
 
 @pytest.mark.plugins('image_upscale')

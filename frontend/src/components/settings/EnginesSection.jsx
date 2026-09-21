@@ -857,7 +857,7 @@ function IdentityPromptsCard({ config, setField, promptDefaults, promptDefaultsB
         </div>
       </div>
 
-      {identityPromptFields(subject).map((f) => (
+      {identityPromptFields(subject).filter((f) => f.engines.includes('klein')).map((f) => (
         <PromptOverrideField
           key={`${subject}-${f.key}`}
           id={f.id}

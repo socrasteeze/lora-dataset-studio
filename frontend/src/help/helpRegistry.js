@@ -723,6 +723,10 @@ const TOPICS = [
       'stopped working', 'no longer responding', 'that was on purpose'],
     guide: { chapter: 'getting-started', anchor: 'the-setup-wizard' },
     app: { route: '/setup' } },
+  { id: 'setup-first-steps', kind: 'action', title: 'First Steps',
+    keywords: ['setup', 'start', 'connect', 'install', 'local tools'],
+    guide: { chapter: 'getting-started', anchor: 'the-setup-wizard' },
+    app: { route: '/setup' } },
   setupStep('setup-comfyui', 'comfyui', 'Set up ComfyUI & download the Klein model',
     ['comfyui', 'klein', 'local engine', 'download model', 'weights', 'unet', 'vae',
      'text encoder', 'studio', 'test studio', 'not installed', 'install klein',
@@ -2114,7 +2118,7 @@ const TOPICS = [
       'comfy', 'safetensors', 'hugging face', 'downloaded', 'disk', 'space', 'storage',
       '26 gb', '10 gb', 'checkpoint', 'full model', 'load diffusion model', 'cpu'],
     guide: { chapter: 'settings-reference', anchor: 'storage' },
-    app: { route: '/settings/storage', focus: 'storage-fp8-quantize' } },
+    app: { route: '/plugins/model_tools/settings', focus: 'storage-fp8-quantize' } },
   // DIVERGENCE 4 -- upstream continues this block with six more topics:
   // training.full_model_recipe / _base / _quality / _fp8_export,
   // training.fp8_deliver, and a SECOND training.fp8_quantize_local. The
@@ -2218,7 +2222,7 @@ const TOPICS = [
       'local', 'safetensors', 'checkpoint', 'full model', 'cpu',
       'already quantized', 'bf16', 'fp16'],
     guide: { chapter: 'dataset-guide', anchor: '10-local-fp8-model-conversion' },
-    app: { route: '/datasets?section=training' },
+    app: { route: '/plugins/model_tools/settings', focus: 'storage-fp8-quantize' },
     tip: { trigger: 'fp8-quantize-local',
       text: 'New: turn a full-precision model on this machine into the smaller fp8 file ComfyUI loads. The original is never changed.' } },
   // WHICH Klein model runs — a per-DATASET setting since 28/07. Improve took no
@@ -2778,7 +2782,11 @@ const BY_ID = new Map(TOPICS.map((t) => [t.id, t]));
 /** The frozen registry array (registry order preserved). */
 export const helpTopics = TOPICS;
 
-export function allHelpTopics() { return [...TOPICS, ...pluginHelpTopics()]; }
+export function allHelpTopics() {
+  // Keep the fork's canonical wording when a migrated plugin repeats a topic.
+  // Plugin-only topics still follow their owner's enabled state.
+  return [...TOPICS, ...pluginHelpTopics().filter(topic => !BY_ID.has(topic.id))];
+}
 
 /** Look up a single topic by id, or undefined. */
 export function getHelpTopic(id) {

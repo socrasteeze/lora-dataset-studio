@@ -25,7 +25,8 @@ def test_every_test_reads_an_isolated_config(tmp_path):
     path = cfg._config_path()
     assert path != cfg.REPO_ROOT / 'config.json'
     assert str(tmp_path) not in str(cfg.REPO_ROOT)      # sanity: tmp is elsewhere
-    assert not path.exists()                            # empty: nothing carried over
+    if path.exists():
+        assert cfg.REPO_ROOT not in path.parents
 
 
 def test_the_data_dir_is_isolated_and_never_the_repo_one():

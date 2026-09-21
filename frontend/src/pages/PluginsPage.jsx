@@ -3,7 +3,7 @@ import { Puzzle, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { apiFetch, fetchWithCsrfRetry, postJson, postForm, del } from '../api/fetchClient';
 import { useToast } from '../components/common/Toast';
 import { Card, SectionHeader } from '../components/settings/primitives';
-import { pluginWhatsNew } from '../plugins/registry.js';
+import { pluginWhatsNew, registeredDescriptors } from '../plugins/registry.js';
 import { sortedEntries } from '../whatsNew.js';
 import InstallRunner from '../components/setup/InstallRunner';
 import { pendingLabel, pluginActive, pluginDesired, waitForPluginBoot } from '../plugins/lifecycle.js';
@@ -144,7 +144,7 @@ export default function PluginsPage() {
   const [applyError, setApplyError] = useState('');
   const [consent, setConsent] = useState(null);
   const [tab, setTab] = useState(() => ['discover', 'installed', 'updates', 'purchases'].includes(searchParams.get('tab'))
-    ? searchParams.get('tab') : 'discover');
+    ? searchParams.get('tab') : registeredDescriptors().some(entry => !entry.external) ? 'installed' : 'discover');
   const [catalog, setCatalog] = useState(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [storePlan, setStorePlan] = useState(null);

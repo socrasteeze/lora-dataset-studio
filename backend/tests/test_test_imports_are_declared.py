@@ -152,7 +152,7 @@ def test_the_guard_would_catch_the_three_packages_that_broke_a_release():
     else."""
     local = _repo_local()
     stdlib = set(sys.stdlib_module_names)
-    assert 'lds_api_engines' in local  # a tracked, manifested package
+    assert 'lds_video' in local  # a tracked, manifested package
     assert 'lds_unregistered_fixture' not in local  # no prefix exemption
     for name in ('safetensors', 'instaloader', 'pytest_flask'):
         assert name not in stdlib, f'{name} misread as stdlib'

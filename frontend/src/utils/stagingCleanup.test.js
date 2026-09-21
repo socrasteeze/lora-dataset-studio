@@ -141,21 +141,20 @@ test('the global toast distinguishes "nothing to clean" from a real cleanup', ()
   assert.match(failed.text, /Could not clean/);
 });
 
-test('the hub wires the per-run 🧹 without paying for sizes on every poll', () => {
-  const page = fs.readFileSync(new URL('../pages/CloudRunsPage.jsx', import.meta.url), 'utf8');
-  // sizes come from their OWN endpoint, fetched on mount and after a cleanup —
-  // never folded into the 5 s runs poll (a staging walk is thousands of files).
-  assert.match(page, /\/api\/dataset\/train\/cloud\/staging-sizes/);
-  assert.match(page, /useEffect\(\(\) => \{ loadStagingSizes\(\); \}, \[loadStagingSizes\]\)/);
+test('the core hub consumes shared staging cleanup without owning cloud purge transport', () => {
+  const page = fs.readFileSync(new URL('../components/runs/RunsHub.jsx', import.meta.url), 'utf8');
+  // Cloud plugins may supply sizes and purge callbacks. Core must not own those
+  // endpoints, and its 5 s history poll must remain a runs-only request.
+  assert.doesNotMatch(page, /staging-sizes|purge-run/);
   // …and the 5 s poll itself never sizes anything: its callback only fetches runs.
   const pollBody = page.slice(page.indexOf('const poll = useCallback'),
     page.indexOf('}, [historyLimit]);'));
   assert.ok(pollBody.length > 50);
   assert.doesNotMatch(pollBody, /staging-sizes/);
-  // the button and its confirmation come from the shared helper, not from inline JSX
+  // The pure cleanup policy remains shared; an enabled owner supplies transport.
+  assert.match(page, /const \{ stagingSizes = \{\}, recheckFullDelivery/);
+  assert.match(page, /fetchFullModel, purgeRun, purgingRun = \{\} \} = cloud \|\| \{\}/);
   assert.match(page, /const cleanup = runStagingCleanup\(run, stagingSizes\);/);
-  assert.match(page, /window\.confirm\(info\.confirmMessage\)/);
-  assert.match(page, /cloud\/purge-run/);
-  assert.match(page, /purgeAllResultMessage\(d\)/);
+  assert.match(page, /onClick=\{\(\) => purgeRun\(run\)\}/);
   assert.ok(TRASH_REMINDER.length > 20);
 });

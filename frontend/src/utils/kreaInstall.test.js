@@ -132,7 +132,7 @@ test('Krea is a counted capability, never quietly dropped from the total', () =>
   // moved and this literal auto-merged untouched, red only at the full suite.
   // When one of the two moves, move both — and run
   // deriveCapabilitySummary with this fixture and count, never copy.
-  assert.equal(rows.length, 22);
+  assert.equal(rows.length, 16);
   assert.ok(rows.filter((r) => r.ok).length < rows.length);
 });
 

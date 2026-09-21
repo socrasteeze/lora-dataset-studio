@@ -146,12 +146,8 @@ export function videoDatasetUrl(datasetId) {
 
 /** The pre-launch readiness report the workspace card renders.
  *
- * DIVERGENCE 4 — upstream defines this in `videoCloudLaunch.js`, beside the
- * sentences its rented-pod launch window says. That module is not carried here,
- * and this one function is: a request with NO lane is the local report, reading
- * this machine's ai-toolkit and weights, which is exactly what the local card
- * shows. The `?lane=` filter itself stays server-side and dormant (see the
- * route's own note in `routes/video_datasets.py`). */
+ * DIVERGENCE 4 — this request has no lane because it reads this machine's
+ * ai-toolkit and weights. */
 export function videoPreflightUrl(datasetId) {
   return `${videoDatasetUrl(datasetId)}/train/preflight`
 }
@@ -203,53 +199,7 @@ export function videoDatasetRemoveClipsUrl(datasetId) {
   return `/api/video-dataset/${datasetId}/clips/remove`
 }
 
-/** ☁ The cloud lane of ONE video dataset.
- *
- * Its own URL family, and not the face lane's `/api/dataset/<id>/train/cloud`,
- * for the reason the run's `dataset_table` column exists: the two dataset tables
- * share one integer space, so the same URL shape for both would make the id
- * alone ambiguous at the outermost layer. `/api/video-dataset/...` says which
- * table it means before the server has to.
- */
-export function videoDatasetCloudUrl(datasetId) {
-  return `/api/video-dataset/${datasetId}/train/cloud`
-}
-
-export function videoDatasetCloudProgressUrl(datasetId) {
-  return `/api/video-dataset/${datasetId}/train/cloud/progress`
-}
-
-/** Everything this dataset's cloud runs brought back, grouped by run then by
- * STEP — a Wan 2.2 save is a `_high_noise` + `_low_noise` PAIR, and a list of
- * loose files invites a button that downloads half a LoRA. */
-export function videoDatasetCloudCheckpointsUrl(datasetId) {
-  return `/api/video-dataset/${datasetId}/train/cloud/checkpoints`
-}
-
-/** ⬇ ONE harvested file. The filename is encoded rather than interpolated: it
- * comes back from the server carrying the dataset's own name, which may hold
- * anything a user typed. */
-export function videoDatasetCheckpointUrl(datasetId, runId, filename) {
-  const p = new URLSearchParams({ run_id: String(runId), filename: String(filename ?? '') })
-  return `/api/video-dataset/${datasetId}/train/cloud/checkpoint?${p.toString()}`
-}
-
-export function videoDatasetCloudRetryUrl(datasetId) {
-  return `/api/video-dataset/${datasetId}/train/cloud/retry`
-}
-
-export function videoDatasetCloudContinueUrl(datasetId) {
-  return `/api/video-dataset/${datasetId}/train/cloud/continue`
-}
-
-export function videoDatasetCloudRunUrl(datasetId, runId) {
-  return `/api/video-dataset/${datasetId}/train/cloud/run/${runId}`
-}
-
-/* ── Checkpoints & LoRAs — the workspace section, both lanes, per STEP ─────
- * `run_id` null on a body means the LOCAL run; a number means one of this
- * dataset's cloud runs. The server resolves every file by NAME against the
- * lane's own listing, so no path ever travels in a request. */
+/* ── Checkpoints & LoRAs — the workspace section, local saves per step ──── */
 
 /** Both lanes' saves grouped by step, each file with its deployed state —
  * the section's one read. */
@@ -272,7 +222,7 @@ export function videoDatasetCheckpointDeleteUrl(datasetId) {
   return `/api/video-dataset/${datasetId}/train/checkpoint/delete`
 }
 
-/** ⬇ ONE save of the LOCAL run — the cloud link's twin, same encoding rule. */
+/** ⬇ One save of the local run, with the filename safely encoded. */
 export function videoDatasetLocalCheckpointUrl(datasetId, filename) {
   const p = new URLSearchParams({ filename: String(filename ?? '') })
   return `/api/video-dataset/${datasetId}/train/checkpoint?${p.toString()}`

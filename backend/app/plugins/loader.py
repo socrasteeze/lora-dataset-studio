@@ -32,6 +32,7 @@ from .legacy import discover_legacy, legacy_dir, legacy_manifest, register_legac
 from .registry import PluginRecord, PluginRegistry, set_active
 from . import storage
 from . import official
+from . import fork_profile
 
 log = logging.getLogger(__name__)
 
@@ -67,9 +68,15 @@ def _discover(registry: PluginRegistry, root: Path, *, bundled: bool) -> None:
         path = root / name
         if not path.is_dir() or name.startswith(('.', '_')):
             continue
+        if fork_profile.active():
+            if bundled and name not in fork_profile.ENABLED:
+                continue
+            if not bundled and name in fork_profile.RESERVED:
+                registry.invalid.append({'dir': name, 'reason': 'This plugin is managed by the fork repository.'})
+                continue
         if bundled:
             try:
-                if official.bundled_retired(name):
+                if not fork_profile.active() and official.bundled_retired(name):
                     continue
             except (OSError, ValueError):
                 registry.invalid.append({'dir': name, 'reason': 'The migration marker cannot be verified; the old bundled copy was not loaded.'})

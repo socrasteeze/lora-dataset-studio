@@ -19,6 +19,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const BUNDLED_DIR = path.join(REPO_ROOT, 'bundled')
 const SDK_DIR = path.join(REPO_ROOT, 'sdk', 'frontend')
 const SDK_PACKAGE = JSON.parse(readFileSync(path.join(SDK_DIR, 'package.json'), 'utf8'))
+const FORK_PLUGINS = JSON.parse(readFileSync(path.join(REPO_ROOT, 'fork-plugins.json'), 'utf8')).enabled
+const FORK_ENTRY = '\0lds-fork-plugins'
 
 /* A bundled plugin's screens import `react`, `lucide-react`… like any core
  * file, but they sit outside this package, and Node's resolver walks up from
@@ -57,13 +59,17 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [privatePluginBuild({ distribution }), react(), {
       name: 'lds-plugin-build-mode',
+      enforce: 'pre',
       generateBundle() {
         this.emitFile({ type: 'asset', fileName: 'plugin-build.json',
-          source: JSON.stringify({ schema_version: 1, distribution: storeBuild ? 'store' : 'bundled' }) })
+          source: JSON.stringify({ schema_version: 1, distribution,
+            ...(distribution === 'fork' ? { plugins: FORK_PLUGINS } : {}) }) })
       },
       // Replacing the module before Vite transforms its glob means store builds
       // never traverse plugin sources, even when those folders are present.
       resolveId(source, importer) {
+        if (distribution === 'fork' && importer?.replaceAll('\\', '/').endsWith('/src/main.jsx')
+            && source === './plugins/bundled') return FORK_ENTRY
         if (!storeBuild && importer?.replaceAll('\\', '/').endsWith('/src/main.jsx')
             && source === './plugins/bundled') return path.join(REPO_ROOT, 'frontend/src/plugins/bundledDevelopment.js')
         if (source === '@lds/plugin-sdk' || source.startsWith('@lds/plugin-sdk/')) {
@@ -72,6 +78,16 @@ export default defineConfig(({ mode }) => {
           return path.join(SDK_DIR, SDK_PACKAGE.exports[key])
         }
         return null
+      },
+      load(id) {
+        if (id !== FORK_ENTRY) return null
+        const imports = FORK_PLUGINS.map((pid, index) =>
+          `import descriptor${index} from '@bundled/${pid}/frontend/index.js';\n`
+          + `import manifest${index} from '@bundled/${pid}/plugin.json';`).join('\n')
+        const registrations = FORK_PLUGINS.map((_pid, index) =>
+          `if (registerDescriptor(descriptor${index}, { external: false, guideOwnership: manifest${index}.guide_ownership, pluginName: manifest${index}.name })) ids.push(descriptor${index}.id);`).join('\n')
+        return `${imports}\nimport { registerDescriptor } from ${JSON.stringify(path.join(REPO_ROOT, 'frontend/src/plugins/registry.js').replaceAll('\\', '/'))};\n`
+          + `export function registerBundledPlugins() { const ids = []; ${registrations} return ids; }`
       },
     }],
     base: '/',

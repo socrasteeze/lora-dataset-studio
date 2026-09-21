@@ -112,6 +112,9 @@ def inspect_plugin_zip(path, *, official: bool = False) -> tuple:
             entries = {rel: info.file_size for info, rel in _validated_entries(zf) if not info.is_dir()}
     except zipfile.BadZipFile as exc:
         raise ArchiveError(f'not a ZIP archive ({exc})') from exc
+    from .fork_profile import refuses_archive
+    if isinstance(data, dict) and refuses_archive(data.get('id')):
+        raise ArchiveError('This plugin is managed by the fork repository; Store archives cannot replace it.')
     try:
         manifest = parse_manifest(data, Path('.'), official=official)
     except ManifestError as exc:

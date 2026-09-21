@@ -30,6 +30,33 @@ same commit as any change that adds a new divergence.
 | Merge routine | the short form of the procedure |
 | Fork changelog (at the end) | what shipped, wave by wave — a record, not a checklist |
 
+## V2 distribution and ownership
+
+The migration uses the reviewed content base described in
+`docs/V2_MIGRATION_PREP.md`, not an ordinary merge against the ancestry-only V2
+acknowledgement. `fork-plugins.json` is the distribution authority. Ten source
+plugins ship with this fork; the Civitai publisher stays on hold, and API engines
+and rented-GPU training remain excluded.
+
+`npm run build` builds the curated fork. The backend reads its
+`frontend/dist/plugin-build.json` marker unless a test or developer explicitly
+sets a distribution override. Store archives cannot replace these fork-owned
+sources. The curated runtime must include both the root policy and those plugin
+packages. Explicit Store and unrestricted development profiles remain available
+for framework tests.
+
+Core keeps the fork's Help wording, historical release entries, machine routing,
+and explicit repair recipes. Loaded plugins own their HTTP routes, settings
+contributions and execution. A discovered disabled restoration owner blocks
+engine resolution, preflight and enqueue; absence may use the retained local
+fallback. Shared setup groups prefer the loaded plugin's current members.
+Duplicate plugin guide sections cannot overwrite the fork's core documentation.
+
+Migration tests follow actual owners. A deleted-plugin marker does not justify
+deleting a mixed test file: local slider, masking, custom-base, checkpoint and
+continuation coverage remains required. Copied-state rehearsal and live cutover
+are separate from source integration.
+
 ## Divergence 1: local-only generation (API engines removed)
 
 **Non-negotiable.** The fork generates exclusively on the local Klein engine

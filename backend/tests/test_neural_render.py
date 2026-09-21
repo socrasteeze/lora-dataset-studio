@@ -164,10 +164,11 @@ def test_the_install_action_is_wired_and_opt_in(app, monkeypatch):
     calls = []
     monkeypatch.setattr(nr, 'install_bridge', lambda log: calls.append(log) or 0)
     with app.app_context():
-        assert 'dlss5nr_bridge' not in setup_installer.INSTALL_ACTIONS
+        assert 'dlss5nr_bridge' in setup_installer.INSTALL_ACTIONS
         assert setup_installer.known_action('dlss5nr_bridge')
         action = setup_installer.plugin_action_spec('dlss5nr_bridge')
         assert action['plugin'] == 'video'
+        assert setup_installer._worker_for('dlss5nr_bridge') is setup_installer._run_plugin_action
         log = lambda line: None
         assert action['run'](log) == 0 and calls == [log]
         assert setup_installer._action_needed('dlss5nr_bridge', {}) is False

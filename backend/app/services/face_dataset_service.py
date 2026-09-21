@@ -7766,6 +7766,22 @@ def _caption_concept(ds, force, backend, token=None, image_ids=None,
     return n
 
 
+def _dataset_caption_recipe(ds, opts, mode=None):
+    """Return the base prompt and cleaner shared by batch and preview paths."""
+    if is_concept(ds):
+        return (caption_prompt_for_concept((ds.concept_desc or '').strip()),
+                lambda text: text)
+    train_type = (getattr(ds, 'train_type', None) or 'zimage').lower()
+    mode = (mode or ('booru' if train_type == 'sdxl' else 'prose')).lower()
+    if is_style(ds):
+        return caption_prompt_for_style(mode), drop_style_lead_in
+    body = is_body_fidelity(ds)
+    appearance = opts.get('appearance') or None
+    base_cleaner = drop_identity_tags if mode == 'booru' else drop_identity_sentences
+    return (caption_prompt_for(mode, body=body, appearance=appearance),
+            lambda text: base_cleaner(text, body=body, appearance=appearance))
+
+
 def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, report=None,
                    outcome=None):
     """Caption les images gardees. Defaut: seulement celles SANS caption ; force=True
@@ -7852,28 +7868,7 @@ def caption_images(user_id, dataset_id, force=False, mode=None, image_ids=None, 
     # Anima est HYBRIDE (booru ET langage naturel sont natifs) : son défaut reste la
     # prose, mais mode='booru' est un choix légitime, pas un contournement — le garde
     # MISMATCH_CAPTION du lancement ne dit rien sur anima (lora_training.assert_trainable).
-    ttype = (getattr(ds, 'train_type', None) or 'zimage').lower()
-    mode = (mode or ('booru' if ttype == 'sdxl' else 'prose')).lower()
-    style = is_style(ds)
-    if style:
-        # Dataset STYLE : captions de CONTENU pur — le rendu n'est jamais décrit pour
-        # qu'il soit absorbé par le LoRA. AUCUN nettoyage d'identité : les sujets varient,
-        # leur description EST le contenu contrôlable. Le prompt porte la règle, mais elle
-        # est NÉGATIVE et JoyCaption ne la suit pas — d'où le post-filtre d'amorce, exact
-        # pendant de drop_identity_sentences sur la voie character.
-        cap_prompt = caption_prompt_for_style(mode)
-        def cleaner(text):
-            return drop_style_lead_in(text)
-    else:
-        # Fidélité corps : le prompt bannit EN PLUS les marques corporelles permanentes
-        # (tatouages/cicatrices/piercings…) et le post-filtre les retire — elles doivent
-        # se lier au trigger, pas aux mots (même principe que le visage).
-        body = is_body_fidelity(ds)
-        appearance = (opts.get('appearance') or None) or None
-        cap_prompt = caption_prompt_for(mode, body=body, appearance=appearance)
-        base_cleaner = drop_identity_tags if mode == 'booru' else drop_identity_sentences
-        def cleaner(text):
-            return base_cleaner(text, body=body, appearance=appearance)
+    cap_prompt, cleaner = _dataset_caption_recipe(ds, opts, mode=mode)
     # Extra user instructions ride at the END of the prompt (both engines) — the kind
     # omission rules stay first, and the cleaner above still post-filters the output.
     cap_prompt = _with_caption_instructions(cap_prompt, extra_instructions)
@@ -8279,24 +8274,18 @@ def caption_paths(paths, *, prompt=None, backend=None, ollama_model=None,
 
 
 # --- Caption Lab: per-candidate preview (no persistence) ---------------------
-# The 🧪 Caption Lab lets the user try a caption CONFIG (engine × Ollama model ×
-# vocabulary register) on ONE image and read the result WITHOUT writing anything to
-# the row. It rides on caption_paths() — the dataset-free by-path brick — so it runs
-# purely DESCRIPTIVE captioning (no kind omission, no dual short): the point is to
-# compare raw model output side by side and pick the config, not to produce the final
-# stored caption (that still goes through the normal caption pass with its kind rules).
+# Dataset previews use the dataset recipe; bank previews stay descriptive.
+# Both share candidate validation and inference, and neither persists a caption.
+_PREVIEW_UNSET = object()
 
-def _compose_preview_instructions(vocabulary, instructions, length=None) -> str | None:
-    """Combine the presets (the SAME appended register and length text the dataset pass
-    uses) with the user's free extra instructions into the single ``extra_instructions``
-    string caption_paths appends to the prompt. Same order as the dataset pass — presets
-    first, free text last. None when nothing is set (byte-identical to a plain descriptive
-    pass)."""
-    parts = _caption_preset_parts(vocabulary, length)
-    extra = (instructions or '').strip()[:_CAPTION_INSTRUCTIONS_MAX]
-    if extra:
-        parts.append(extra)
-    return '\n'.join(parts) if parts else None
+
+def _compose_preview_instructions(vocabulary, instructions, length=None,
+                                  appearance=None) -> str | None:
+    """Use the batch instruction composition with bounded candidate free text."""
+    return _combined_caption_instructions({
+        'vocabulary': vocabulary, 'length': length, 'appearance': appearance,
+        'instructions': (instructions or '').strip()[:_CAPTION_INSTRUCTIONS_MAX],
+    }) or None
 
 
 # Public so the image bank's caption lane validates against — and appends — the SAME
@@ -8326,7 +8315,8 @@ def caption_preset_instructions(vocabulary=None, length=None) -> str | None:
     return '\n\n'.join(parts) if parts else None
 
 
-def preview_caption(user_id, dataset_id, image_id, *, backend=None, ollama_model='',
+def preview_caption(user_id, dataset_id, image_id, *, backend=None,
+                    ollama_model=_PREVIEW_UNSET,
                     vocabulary=None, length=None, instructions=None,
                     should_cancel=None) -> dict:
     """Caption ONE dataset image with a candidate config and return the text WITHOUT
@@ -8355,13 +8345,29 @@ def preview_caption(user_id, dataset_id, image_id, *, backend=None, ollama_model
     path = _img_path(img)
     if not os.path.isfile(path):
         raise ValueError('image file missing on disk')
-    return preview_caption_path(
-        path, backend=backend, ollama_model=ollama_model, vocabulary=vocabulary,
-        length=length, instructions=instructions, should_cancel=should_cancel)
+    opts = caption_options(ds)
+    base_prompt, cleaner = _dataset_caption_recipe(ds, opts)
+    result = preview_caption_path(
+        path, backend=opts['backend'] if backend is None else backend,
+        ollama_model=opts['ollama_model'] if ollama_model is _PREVIEW_UNSET else ollama_model,
+        vocabulary=opts['vocabulary'] if vocabulary is None else vocabulary,
+        length=opts['length'] if length is None else length,
+        instructions=opts['instructions'] if instructions is None else instructions,
+        prompt=base_prompt, appearance=opts.get('appearance'),
+        should_cancel=should_cancel)
+    if result['caption'] and not is_concept(ds):
+        cleaned = cleaner(result['caption']) or result['caption']
+        result['caption'] = _cap_caption(_with_camera_pose_phrase(img, cleaned))
+        result['chars'] = len(result['caption'])
+    if is_concept(ds):
+        result['prompt_note'] = ('This is the first captioning prompt. The concept batch also '
+                                 'refines captions and removes concept terms afterwards.')
+    return result
 
 
 def preview_caption_path(path, *, backend=None, ollama_model='', vocabulary=None,
-                         length=None, instructions=None, should_cancel=None) -> dict:
+                         length=None, instructions=None, should_cancel=None,
+                         prompt=None, appearance=None) -> dict:
     """The Caption Lab's bench, on ONE FILE: validate a candidate config, compose its
     instructions, run it, and return the text. Writes NOTHING, anywhere.
 
@@ -8386,19 +8392,22 @@ def preview_caption_path(path, *, backend=None, ollama_model='', vocabulary=None
     size = (length or '').strip().lower() or None
     if size and size not in _CAPTION_LENGTHS:
         raise ValueError(f'invalid caption length: {size}')
-    extra = _compose_preview_instructions(vocab, instructions, size)
+    extra = _compose_preview_instructions(vocab, instructions, size, appearance)
+    composed_prompt = _with_caption_instructions(
+        prompt or DESCRIPTIVE_CAPTION_PROMPT, extra)
     ollama_model = normalize_ollama_model_ref(
         ollama_model, allow_empty=True) or None
     started = time.perf_counter()
     out = caption_paths([path], backend=backend, ollama_model=ollama_model,
-                        extra_instructions=extra, should_cancel=should_cancel)
+                        prompt=composed_prompt, should_cancel=should_cancel)
     duration_ms = int((time.perf_counter() - started) * 1000)
     caption = (out.get(path) or '').strip()
     # A stop consumed before the (single) image ran leaves no caption — surface it so the
     # Lab card reads "cancelled" rather than a misleading empty result.
     cancelled = bool(not caption and should_cancel and should_cancel())
     return {'caption': caption, 'chars': len(caption),
-            'duration_ms': duration_ms, 'cancelled': cancelled}
+            'duration_ms': duration_ms, 'cancelled': cancelled,
+            'prompt': composed_prompt}
 
 
 # --- Short-caption derivation (ai-toolkit dual long+short captioning) --------
@@ -11081,10 +11090,24 @@ def resolve_improve_engine(requested=None):
     for candidate in (requested, cfg.get('improve.engine')):
         name = str(candidate or '').strip().lower()
         if name in IMPROVE_ENGINES:
+            _registered_restore_provider(name)
             return name
         if name:
             logger.warning('unknown improve engine %r — falling back to klein', candidate)
+    _registered_restore_provider('klein')
     return 'klein'
+
+
+def _registered_restore_provider(engine):
+    """Return an installed provider, while retaining core fallback if none exists."""
+    from flask import current_app, has_app_context
+    from ..plugins import restoration
+    from ..plugins.registry import active
+    registry = (current_app.extensions.get('lds_plugins')
+                if has_app_context() else active())
+    if registry is None or engine not in registry.restore_engines:
+        return None
+    return restoration.provider(engine)
 
 
 def _improve_preflight(engine):
@@ -11096,6 +11119,10 @@ def _improve_preflight(engine):
     already turn each into its own actionable 409 body, and collapsing them into
     one would lose the "install the node pack" vs "place the weights" distinction
     that makes those bodies useful."""
+    provider = _registered_restore_provider(engine)
+    if provider is not None:
+        provider['preflight']()
+        return
     if engine == 'seedvr2':
         from . import seedvr2_helper
         seedvr2_helper.preflight()
@@ -11136,6 +11163,22 @@ def _enqueue_improve(engine, *, user_id, source, source_path, prompt, label,
             else _improve_extra_metadata(source, label, engine=engine))
     source_filename = (getattr(source, 'filename', None)
                        or os.path.basename(str(source_path or '')))
+    provider = _registered_restore_provider(engine)
+    if provider is not None:
+        kwargs = {
+            'user_id': str(user_id), 'source_filename': source_filename,
+            'source_path': source_path, 'extra_metadata': meta,
+        }
+        if engine == 'klein':
+            kwargs['prompt'] = prompt
+            selected_profile = profile
+            if selected_profile is None:
+                # The fork stores the model choice on the dataset. The public
+                # provider's profile accepts a model name, not the ORM row.
+                selected_profile = _improve_enqueue_profile(dataset)
+            if selected_profile:
+                kwargs['profile'] = selected_profile
+        return provider['enqueue'](**kwargs)
     if engine == 'seedvr2':
         from . import seedvr2_helper
         return seedvr2_helper.enqueue_seedvr2_upscale(

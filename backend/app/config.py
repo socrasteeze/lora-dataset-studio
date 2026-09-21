@@ -55,6 +55,7 @@ _V3_KREA_REF_BOOST = 0.25
 _V3_KREA_STEPS = 8
 
 DEFAULTS = {
+    'plugins': {'enabled': {}},
     # host: '127.0.0.1' = this machine only ; '0.0.0.0' = reachable from the LAN
     # (phone, tablet, another PC) — the Settings "Server" card's LAN toggle just
     # flips this. Port defaults to 5050 to match start.bat's default bind (so the
@@ -1116,6 +1117,75 @@ DEFAULTS = {
 
 _lock = threading.Lock()
 _cache = None
+
+
+def settings_ownership():
+    """Return config and secret ownership declared by active plugins."""
+    from .plugins.registry import active
+    owners = {'image_upscale': {
+        'sections': [],
+        'keys': {
+            'klein': ['improve_consistency_strength',
+                      'improve_character_lora_strength', 'improve_steps',
+                      'improve_base_lora_strength', 'improve_megapixels',
+                      'improve_lora_preset'],
+            'identity_prompts': ['klein_improve', 'klein_improve_enabled'],
+            'improve': ['colour_match', 'sharpen', 'grain', 'grain_saturation'],
+        },
+        'secrets': [],
+    }}
+    registry = active()
+    for plugin_id, record in (registry.records.items() if registry else ()):
+        manifest = record.manifest
+        prior = owners.get(plugin_id, {'sections': [], 'keys': {}, 'secrets': []})
+        keys = copy.deepcopy(prior['keys'])
+        for section, names in manifest.owns.get('config_keys_in_shared_sections', {}).items():
+            keys[section] = sorted(set(keys.get(section, ())) | set(names))
+        owners[plugin_id] = {
+            'sections': sorted(set(prior['sections']) |
+                               set(manifest.owned('config_sections'))),
+            'keys': keys,
+            'secrets': sorted(set(prior['secrets']) | {
+                permission[8:] for permission in manifest.permissions
+                if permission.startswith('secrets:')}),
+        }
+    return owners
+
+
+def settings_view(value, plugin_id=None):
+    """Filter a settings payload to core or one active plugin owner."""
+    owners = settings_ownership()
+    sections = {section for spec in owners.values() for section in spec['sections']}
+    keys = {(section, key) for spec in owners.values()
+            for section, names in spec['keys'].items() for key in names}
+    own = owners.get(plugin_id, {}) if plugin_id else {}
+    result = {}
+    for section, node in value.items():
+        if section == 'plugins':
+            continue
+        if plugin_id:
+            if section in own.get('sections', ()):
+                result[section] = copy.deepcopy(node)
+            elif section in own.get('keys', {}) and isinstance(node, dict):
+                result[section] = {
+                    key: copy.deepcopy(item) for key, item in node.items()
+                    if key in own['keys'][section]}
+        elif section not in sections:
+            result[section] = ({
+                key: copy.deepcopy(item) for key, item in node.items()
+                if (section, key) not in keys
+            } if isinstance(node, dict) else copy.deepcopy(node))
+    return result
+
+
+def settings_secret_keys(plugin_id=None):
+    owners = settings_ownership()
+    if plugin_id:
+        return tuple(key for key in owners.get(plugin_id, {}).get('secrets', ())
+                     if key in SECRET_KEYS)
+    owned = {key for spec in owners.values() for key in spec['secrets']}
+    shared_core = {'HF_TOKEN', 'CIVITAI_API_KEY'}
+    return tuple(key for key in SECRET_KEYS if key not in owned or key in shared_core)
 
 
 def defaults() -> dict:

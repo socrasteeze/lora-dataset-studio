@@ -10,7 +10,7 @@ import pytest
 
 from app.config import LOCAL_USER
 
-pytestmark = pytest.mark.plugins('cloud_training')
+pytestmark = pytest.mark.plugins()
 
 
 @pytest.fixture()
@@ -249,182 +249,16 @@ def test_new_legacy_baseline_annotates_the_local_lane(
         assert listed[0]['source'] == 'legacy'
 
 
-def test_cloud_checkpoints_lists_synced_saves_and_checks_files(app, ds_with_images, tmp_path):
-    """The panel list must show cloud saves synced locally — including an
-    ACTIVE run's latest (user-observed: step 1000, save synced, list empty) —
-    and only files that still exist (hand-deletion must not yield 404s)."""
-    import json as _json
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    from lds_cloud_training import cloud_training as ct
-    ds_id, _ = ds_with_images
-    with app.app_context():
-        d10 = tmp_path / 'r10'
-        d10.mkdir()
-        d11 = tmp_path / 'r11'
-        d11.mkdir()
-        ck = d10 / 'lds10_x_000001000.safetensors'
-        ck.write_bytes(b'W')
-        gone = d11 / 'lds11_x_000000500.safetensors'   # never created
-        active = CloudTrainingRun(
-            dataset_id=ds_id, status='training', job_name='j', vast_label='lds-10',
-            staging_dir=str(d10), checkpoint_local_path=str(ck),
-            train_params=_json.dumps({'train_type': 'krea', 'version': 2, 'steps': 3100}))
-        deleted = CloudTrainingRun(
-            dataset_id=ds_id, status='done', job_name='j', vast_label='lds-11',
-            staging_dir=str(d11), checkpoint_local_path=str(gone),
-            train_params=_json.dumps({'train_type': 'krea'}))
-        db.session.add_all([active, deleted])
-        db.session.commit()
-        from app.services.cloud_training import cloud_checkpoints
-        out = cloud_checkpoints(ds_id, 'krea')
-        assert len(out) == 1                              # missing file filtered out
-        assert out[0]['step'] == 1000 and out[0]['active'] is True
-        assert out[0]['version'] == 2 and out[0]['cloud'] is True
-        # checkpoint_ready reflects the FILE, not the stored path
-        assert ct._run_payload(active)['checkpoint_ready'] is True
-        assert ct._run_payload(deleted)['checkpoint_ready'] is False
-        # family filter: zimage view doesn't show krea saves
-        assert cloud_checkpoints(ds_id, 'zimage') == []
 
 
-def test_checkpoint_download_targets_run_id(app, client, monkeypatch, ds_with_images, tmp_path):
-    """Two finished runs of a family: the older row's ⬇ must serve ITS file,
-    not the newest run's (family resolution alone did)."""
-    import json as _json
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    ds_id, _ = ds_with_images
-    monkeypatch.setenv('VAST_API_KEY', 'k-test')
-    with app.app_context():
-        runs = []
-        for i, content in ((1, b'OLD'), (2, b'NEW')):
-            ck = tmp_path / f'lds{i}_x_000001000.safetensors'
-            ck.write_bytes(content)
-            r = CloudTrainingRun(dataset_id=ds_id, status='done', job_name='j',
-                                 vast_label=f'lds-{i}', staging_dir=str(tmp_path),
-                                 checkpoint_local_path=str(ck),
-                                 train_params=_json.dumps({'train_type': 'krea'}))
-            db.session.add(r)
-            db.session.commit()
-            runs.append(r.id)
-    old_id, new_id = runs
-    # family resolution -> newest run's file (unchanged default)
-    assert client.get(f'/api/dataset/{ds_id}/train/cloud/checkpoint?train_type=krea').data == b'NEW'
-    # run_id targets the OLD row's own file
-    assert client.get(f'/api/dataset/{ds_id}/train/cloud/checkpoint?run_id={old_id}').data == b'OLD'
-    # a run_id of another dataset -> 404, no cross-dataset leak
-    assert client.get(f'/api/dataset/{ds_id + 999}/train/cloud/checkpoint?run_id={old_id}').status_code == 404
 
 
-def test_baseline_evidence_is_family_scoped(app, client, monkeypatch, ds_with_images, tmp_path):
-    """A dataset with only a ZIMAGE cloud run must not get a krea/sdxl
-    baseline just because the user clicks through family tabs (live sighting:
-    tata got zimage+krea+sdxl v1 rows after tab browsing)."""
-    import json as _json
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    from app.services import checkpoint_registry as reg
-    ds_id, _ = ds_with_images
-    monkeypatch.setattr('app.capabilities.probe',
-                        lambda force=False: {'aitoolkit': {'valid': True},
-                                             'cloud_training': True})
-    with app.app_context():
-        from app import config as cfg
-        cfg.save_config({'aitoolkit': {'dir': str(tmp_path)}})
-        run = CloudTrainingRun(dataset_id=ds_id, status='done', job_name='j',
-                               vast_label='lds-1',
-                               train_params=_json.dumps({'train_type': 'zimage'}))
-        db.session.add(run)
-        db.session.commit()
-    client.get(f'/api/dataset/{ds_id}/train/checkpoints?train_type=krea')
-    client.get(f'/api/dataset/{ds_id}/train/checkpoints?train_type=zimage')
-    with app.app_context():
-        assert reg.latest_record(ds_id, 'krea') is None       # not trained -> no baseline
-        z = reg.latest_record(ds_id, 'zimage')
-        assert z is not None and z.version == 1               # trained -> baseline
 
 
-def test_import_route_accepts_cloud_run_id(app, client, monkeypatch, ds_with_images, tmp_path):
-    """POST /train/import {cloud_run_id}: imports from the run's staging with
-    the run's dataset version in the deployed name."""
-    import json as _json
-    from app import config as cfg
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    ds_id, _ = ds_with_images
-    monkeypatch.setattr('app.capabilities.probe',
-                        lambda force=False: {'aitoolkit': {'valid': True},
-                                             'cloud_training': True})
-    with app.app_context():
-        cfg.save_config({'comfyui': {'base_dir': str(tmp_path / 'comfy')}})
-        ck = tmp_path / 'lds10_x_000001000.safetensors'
-        ck.write_bytes(b'W')
-        run = CloudTrainingRun(
-            dataset_id=ds_id, status='training', job_name='j', vast_label='lds-10',
-            staging_dir=str(tmp_path), checkpoint_local_path=str(ck),
-            train_params=_json.dumps({'train_type': 'zimage', 'version': 3}))
-        db.session.add(run)
-        db.session.commit()
-        run_id = run.id
-    r = client.post(f'/api/dataset/{ds_id}/train/import',
-                    json={'filename': ck.name, 'train_type': 'zimage',
-                          'cloud_run_id': run_id})
-    assert r.status_code == 200
-    # deployed name carries the source cloud run id (_rc<id>) so importing the
-    # same step from another run never overwrites this one, plus the dataset
-    # version (_v3), before the extension.
-    assert r.get_json()['dest'] == (
-        f'lds10_x_000001000_Z-Image-Turbo_rc{run_id}_v3.safetensors')
-    # unknown run / wrong dataset -> 404
-    r = client.post(f'/api/dataset/{ds_id}/train/import',
-                    json={'filename': ck.name, 'cloud_run_id': 999999})
-    assert r.status_code == 404
 
 
-def test_cloud_launch_registers_and_stamps_version(app, client, monkeypatch, ds_with_images):
-    from lds_cloud_training import cloud_training as ct
-    ds_id, _ = ds_with_images
-    monkeypatch.setenv('VAST_API_KEY', 'k-test')
-    monkeypatch.setattr(ct, '_start_monitor', lambda *a, **k: None)
-    monkeypatch.setattr(ct, '_reconcile_before_launch', lambda a: None)
-    monkeypatch.setattr(ct.lt, 'export_dataset_to_aitoolkit',
-                        lambda uid, did, masked=True, dest_dir=None: dest_dir)
-    monkeypatch.setattr(ct.lt, 'default_steps', lambda ds, **kw: 1000)
-    monkeypatch.setattr(ct.lt, 'assert_trainable', lambda *a, **kw: None)
-    with app.app_context():
-        ct.launch_cloud_training(LOCAL_USER, ds_id)
-        run = ct.get_active_run()
-        assert json.loads(run.train_params)['version'] == 1
-        assert ct._run_payload(run)['version'] == 1
 
 
-def test_imported_list_shows_cloud_epoch_deployments(app, ds_with_images, tmp_path):
-    """A cloud EPOCH deployed into loras/<family> must appear in the
-    "in ComfyUI" list. Its deployed name is `<staging_stem>_<base_tag>_v<N>`
-    while only the run's FINAL checkpoint_local_path basename is recorded —
-    the exact-basename match missed every epoch (user-observed 2026-07-13:
-    imports succeeded, header stuck at "0 in ComfyUI"). The pod-job prefix
-    (`lds<run.id>_`) is what identifies the run's deployments."""
-    from app import config as cfg
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    from app.services import lora_training as lt
-    ds_id, _ = ds_with_images
-    with app.app_context():
-        cfg.save_config({'comfyui': {'base_dir': str(tmp_path / 'comfy')}})
-        run = CloudTrainingRun(dataset_id=ds_id, status='completed')
-        db.session.add(run)
-        db.session.commit()
-        dest = tmp_path / 'comfy' / 'models' / 'loras' / 'krea'
-        dest.mkdir(parents=True)
-        epoch = f'lds{run.id}_ulocal_prov_Krea-2-Raw_000002000_Krea-2-Raw_v1.safetensors'
-        (dest / epoch).write_bytes(b'W')
-        (dest / 'unrelated_other_lora.safetensors').write_bytes(b'W')
-        names = [c['filename'] for c in
-                 lt.list_imported_checkpoints(LOCAL_USER, ds_id, family='krea')]
-        assert any(n.endswith(epoch) for n in names)          # the epoch is listed
-        assert not any('unrelated' in n for n in names)       # others stay hidden
 
 
 def test_register_launch_stores_settings_snapshot(app, ds_with_images):
@@ -464,80 +298,8 @@ def test_launch_settings_snapshot_reflects_effective_values(app, ds_with_images)
         assert snap2['dropout'] == 0.1
 
 
-def test_cloud_checkpoint_groups_carry_run_identity_and_map_epochs(app, ds_with_images, tmp_path):
-    """Two finished cloud runs of a family produce look-alike epoch sets; the
-    grouped payload must keep them apart, one group PER run, each carrying the
-    run's identity + outcome (id/status/gpu/cost) so the panel can label which
-    run made which epochs and deep-link back to its Runs row."""
-    import json as _json
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    from app.services import cloud_training as ct
-    ds_id, _ = ds_with_images
-    with app.app_context():
-        run_ids = []
-        for i in (1, 2):
-            d = tmp_path / f'run{i}'
-            d.mkdir()
-            for step in ('000000500', '000002500'):
-                (d / f'lds{i}_x_{step}.safetensors').write_bytes(b'W')
-            (d / f'lds{i}_x.safetensors').write_bytes(b'W')   # final (no step)
-            r = CloudTrainingRun(
-                dataset_id=ds_id, status='done', job_name='j',
-                vast_label=f'lds-{i}', gpu_name='RTX 5090', price_per_hour=0.5,
-                staging_dir=str(d),
-                train_params=_json.dumps({'train_type': 'krea', 'version': i}))
-            db.session.add(r)
-            db.session.commit()
-            run_ids.append(r.id)
-
-        from app.services.cloud_training import cloud_checkpoint_groups
-        groups = cloud_checkpoint_groups(ds_id, 'krea')
-        assert [g['run_id'] for g in groups] == run_ids[::-1]   # newest run first
-        for g in groups:
-            assert g['source'] == 'cloud' and g['status'] == 'done'
-            assert g['gpu'] == 'RTX 5090' and g['cost_estimate'] >= 0
-            # every checkpoint of a group belongs to THAT run — no cross-mixing
-            assert {c['run_id'] for c in g['checkpoints']} == {g['run_id']}
-            steps = [c['step'] for c in g['checkpoints']]
-            assert steps == sorted(steps)                      # step-sorted
-            assert any(c['final'] for c in g['checkpoints'])   # final present
-        # the flat view is exactly the concatenation of the groups' checkpoints
-        flat = ct.cloud_checkpoints(ds_id, 'krea')
-        assert flat == [c for g in groups for c in g['checkpoints']]
 
 
-def test_checkpoints_route_exposes_cloud_groups(app, client, monkeypatch, ds_with_images, tmp_path):
-    """GET /train/checkpoints must surface the per-run grouped cloud saves so the
-    panel can render an identity header per checkpoint set."""
-    import json as _json
-    from app import config as cfg
-    from app.extensions import db
-    from app.models import CloudTrainingRun
-    monkeypatch.setattr('app.capabilities.probe',
-                        lambda force=False: {'aitoolkit': {'valid': True},
-                                             'cloud_training': True})
-    ds_id, _ = ds_with_images
-    with app.app_context():
-        cfg.save_config({'comfyui': {'base_dir': str(tmp_path / 'comfy')},
-                         'aitoolkit': {'dir': str(tmp_path / 'aitk')}})
-        d = tmp_path / 'run'
-        d.mkdir()
-        (d / 'lds7_x_000001000.safetensors').write_bytes(b'W')
-        r = CloudTrainingRun(dataset_id=ds_id, status='done', job_name='j',
-                             vast_label='lds-7', gpu_name='RTX 4090',
-                             price_per_hour=0.4, staging_dir=str(d),
-                             train_params=_json.dumps({'train_type': 'zimage'}))
-        db.session.add(r)
-        db.session.commit()
-        rid = r.id
-    body = client.get(
-        f'/api/dataset/{ds_id}/train/checkpoints?train_type=zimage').get_json()
-    assert 'cloud_checkpoint_groups' in body
-    grp = body['cloud_checkpoint_groups']
-    assert len(grp) == 1 and grp[0]['run_id'] == rid
-    assert grp[0]['gpu'] == 'RTX 4090'
-    assert [c['step'] for c in grp[0]['checkpoints']] == [1000]
 
 
 def test_import_never_overwrites_a_different_lora_silently(app, ds_with_images, tmp_path, monkeypatch):
@@ -578,63 +340,3 @@ def test_import_never_overwrites_a_different_lora_silently(app, ds_with_images, 
         lt.import_checkpoint(LOCAL_USER, ds_id, ck.name, src_dir=str(src))
         dup = lt.import_checkpoint(LOCAL_USER, ds_id, ck.name, src_dir=str(src))
         assert os.path.basename(dup) == first_name   # same name, overwritten in place
-
-
-def test_one_run_number_record_id_rides_every_cloud_payload(app, ds_with_images, tmp_path):
-    """THE run number is the provenance record id — every payload that names a
-    cloud run carries it, so no surface prints the cloud id as the run's own
-    number. The two-number display was user-reported (2026-08-29): the
-    checkpoints chip wore the cloud id while the lineage card wore the record
-    id, and the card's ⚙ Details chased the cloud id through record-keyed
-    lineage nodes, answering "not in the lineage tree" for a run whose tree
-    was one click away. A run that predates the registry stays record-less
-    (record_id None) — the chip then falls back to the cloud id AND SAYS SO,
-    instead of silently wearing the wrong identity."""
-    import json as _json
-    from app.models import CloudTrainingRun
-    from app.services import checkpoint_registry as reg
-    from lds_cloud_training import cloud_training as ct
-    ds_id, _ = ds_with_images
-    with app.app_context():
-        def mk_run(i):
-            d = tmp_path / f'onenum{i}'
-            d.mkdir()
-            (d / f'lds9{i}_x_000000500.safetensors').write_bytes(b'W')
-            r = CloudTrainingRun(
-                dataset_id=ds_id, status='done', job_name='j',
-                vast_label=f'lds-9{i}', staging_dir=str(d),
-                train_params=_json.dumps({'train_type': 'krea', 'version': 1}))
-            db.session.add(r)
-            db.session.commit()
-            return r
-        tracked, legacy = mk_run(1), mk_run(2)
-        rec = reg.register_launch(LOCAL_USER, ds_id, 'krea', 'cloud',
-                                  steps=500, cloud_run_id=tracked.id)
-        assert rec is not None
-
-        from app.services.cloud_training import cloud_checkpoint_groups
-        by_run = {g['run_id']: g for g in cloud_checkpoint_groups(ds_id, 'krea')}
-        assert by_run[tracked.id]['record_id'] == rec.id
-        assert by_run[legacy.id]['record_id'] is None
-
-        # The Runs-hub payloads (actives and the legacy-fallback history rows
-        # both go through _run_payload) resolve the same mapping.
-        assert ct._run_payload(tracked)['record_id'] == rec.id
-        assert ct._run_payload(legacy)['record_id'] is None
-
-        # Deployed files carry the run in their NAME (`_rc<cloud id>` — never
-        # rewritten), so the listing maps the tag back to the record at read
-        # time: tracked run -> its record id, pre-registry run -> no record_id
-        # key at all (the chip falls back to the cloud id and says so).
-        from app import config as cfg
-        from app.services import lora_training as lt
-        cfg.save_config({'comfyui': {'base_dir': str(tmp_path / 'comfy')}})
-        dest = tmp_path / 'comfy' / 'models' / 'loras' / 'krea'
-        dest.mkdir(parents=True)
-        (dest / f'lds{tracked.id}_x_000000500_rc{tracked.id}.safetensors').write_bytes(b'W')
-        (dest / f'lds{legacy.id}_x_000000500_rc{legacy.id}.safetensors').write_bytes(b'W')
-        rows = {c['run_id']: c for c in
-                lt.list_imported_checkpoints(LOCAL_USER, ds_id, family='krea')
-                if c.get('run_source') == 'cloud'}
-        assert rows[tracked.id]['record_id'] == rec.id
-        assert 'record_id' not in rows[legacy.id]
