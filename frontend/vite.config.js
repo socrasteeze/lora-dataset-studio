@@ -101,6 +101,9 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
+      // Index chunk exceeds default 500 kB; warning goes to stderr and
+      // PowerShell Stop + 2>&1 turns it into a blank Gates failure.
+      chunkSizeWarningLimit: 2000,
     },
     server: {
       port: 5173,
