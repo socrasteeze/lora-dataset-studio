@@ -10,6 +10,7 @@ failure keeps the pod recoverable until its direct Hugging Face delivery and
 licence metadata are verified; only then may completion destroy it. The local
 training path is untouched: a cloud run never sets 'training_in_progress', so
 local generation/captioning stay available."""
+from ..timeout_settings import network_timeout
 import json
 from ..utils.timestamps import naive_utcnow
 import logging
@@ -338,7 +339,7 @@ def _assert_official_base_reachable(repo_id, token, timeout=8):
         f'https://huggingface.co/api/models/{repo_id}/tree/main',
         headers={'Authorization': f'Bearer {token}'} if token else {})
     try:
-        urllib.request.urlopen(req, timeout=timeout).read(1)
+        urllib.request.urlopen(req, timeout=network_timeout(timeout)).read(1)
     except urllib.error.HTTPError as e:
         if e.code not in (401, 403):
             return                          # 404 / 5xx: not our call to make
@@ -1281,12 +1282,10 @@ def _video_lane(run):
 
 
 def retry_cloud_run(user_id, run_id) -> dict:
-    """Relance un run TERMINÉ EN ERREUR avec les paramètres exacts persistés au
-    lancement d'origine (train_params) — le bouton ↻ Retry de la page Cloud.
-    C'est un VRAI launch_cloud_training (pod frais, mêmes garde-fous : limite
-    de runs actifs, budget, unicité par famille), pas une réanimation du pod
-    mort. Les confirmations ne sont rejouées que si le lancement d'origine les
-    avait explicitement enregistrées."""
+    """Retry a terminal failed cloud run using its original persisted
+    train_params. This is a real launch_cloud_training on a fresh pod with
+    normal active-run, budget and family-uniqueness safeguards, not revival
+    of a dead pod. Replay confirmations only when originally recorded."""
     run = db.session.get(CloudTrainingRun, int(run_id))
     if not run:
         raise ValueError('unknown cloud run')
@@ -1499,22 +1498,18 @@ def continue_cloud_run(user_id, run_id, extra_steps=1000, from_step=None,
                        overrides=None, resume_mode='weights_only',
                        state_bundle_id=None, transport=None,
                        allow_parallel_run=False) -> dict:
-    """Reprend un run cloud TERMINAL (done OU en échec) depuis un checkpoint
-    harvesté et vise step_de_reprise + extra_steps — le pendant cloud de
-    lora_training.continue_training. C'est un VRAI launch_cloud_training (pod
-    frais, mêmes garde-fous : limite de runs actifs, budget, unicité par
-    famille) avec les paramètres persistés du run source (variante/famille/
-    masked/GPU class, comme retry_cloud_run) ; son monitor, AVANT de démarrer le
-    job, dépose le checkpoint dans le save_root du job sur le pod pour déclencher
-    l'auto-resume d'ai-toolkit.
+    """Continue a terminal cloud run (done or failed) from a harvested
+    checkpoint, targeting resume_step+extra_steps. Cloud equivalent of
+    lora_training.continue_training: fresh pod, normal run/budget/family
+    guards and the source run's persisted variant/family/masked/GPU settings.
+    Before starting, the monitor stages the checkpoint in save_root to
+    trigger ai-toolkit auto-resume.
 
-    ``from_step`` absent → dernier checkpoint (défaut). Fourni → CE step précis, y
-    compris un checkpoint plus ancien : le seed d'un checkpoint arbitraire sur un
-    pod NEUF est le même canal que le seed du dernier, et le staging du run source
-    n'est jamais touché — repartir d'un step inférieur est donc gratuit côté cloud.
-    ``overrides`` = mêmes réglages sûrs que le local (cadence/preview prompts),
-    fusionnés dans le snapshot du run (jamais dans le dataset). register_launch
-    reste un launch cloud normal — le resume est un détail d'exécution."""
+    Missing from_step selects the latest checkpoint; an explicit earlier
+    step uses the same fresh-pod staging path without modifying the source
+    run. Safe overrides match local continuation (cadence/preview prompts)
+    and merge into the run snapshot, never the dataset. register_launch
+    remains an ordinary cloud launch; resume is an execution detail."""
     _require_cloud_weights_only(resume_mode, state_bundle_id)
     run = db.session.get(CloudTrainingRun, int(run_id))
     if not run:
@@ -1929,9 +1924,9 @@ def _lct_resolve_and_refuse(user_id, dataset_id, train_type, base_model,
     if fam == 'sdxl':
         raise ValueError('SDXL training needs a local base checkpoint — '
                          'cloud training supports Z-Image, Krea and FLUX.2 Klein')
-    # flux2klein n'est PAS bloqué (contrairement à flux) : ses bases sont des repos
-    # HF officiels que le pod télécharge lui-même — le 9B (32-48 GB VRAM) est même
-    # la voie cloud principale de la famille.
+    # Unlike flux, flux2klein is not blocked: pods download its official
+    # Hugging Face bases themselves. The 9B model (32-48 GB VRAM) is even
+    # the family's primary cloud option.
     if fam == 'flux':
         raise ValueError('FLUX.1 training is local-only for now — '
                          'cloud training supports Z-Image, Krea and FLUX.2 Klein')
@@ -7968,7 +7963,7 @@ def gpu_tiers(user_id, dataset_id, train_type=None, steps=None,
     if fam == 'sdxl':
         raise ValueError('SDXL training needs a local base checkpoint — '
                          'cloud training supports Z-Image, Krea and FLUX.2 Klein')
-    # flux2klein passe (cf. launch_cloud_training) — seul flux reste local-only.
+    # flux2klein is supported (see launch_cloud_training); only flux remains local-only.
     if fam == 'flux':
         raise ValueError('FLUX.1 training is local-only for now — '
                          'cloud training supports Z-Image, Krea and FLUX.2 Klein')

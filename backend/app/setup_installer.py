@@ -48,6 +48,7 @@ one venv fail 6/6 with WinError 2 / Errno 13). Each pip run also retries once on
 transient file-lock error (an antivirus holding a fresh file). Model downloads and the
 ollama pull don't touch a venv, so they stay parallel.
 """
+from .timeout_settings import network_timeout, processing_timeout
 import contextlib
 import importlib
 import json
@@ -1622,8 +1623,10 @@ def _pip_version(python):
     """(major, minor) of `python`'s pip — read by RUNNING it — or None when it
     cannot be read (missing/fake interpreter, no pip module)."""
     try:
-        proc = subprocess.run([python, '-m', 'pip', '--version'],
-                              capture_output=True, text=True, timeout=30,
+        cmd = ([python, '-I', '-m', 'pip', '--isolated', '--version'] if isolated_env is not None
+               else [python, '-m', 'pip', '--version'])
+        proc = subprocess.run(cmd, env=isolated_env,
+                              capture_output=True, text=True, timeout=processing_timeout(30),
                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except (OSError, subprocess.SubprocessError):
         return None
@@ -1770,8 +1773,8 @@ def _python_minor(exe: str):
     or None when it can't be executed. Short timeout, no console window."""
     try:
         proc = subprocess.run(
-            [exe, '-c', 'import sys; print("%d.%d" % sys.version_info[:2])'],
-            capture_output=True, text=True, timeout=15,
+            [exe, '-I', '-c', 'import sys; print("%d.%d" % sys.version_info[:2])'],
+            capture_output=True, text=True, timeout=processing_timeout(15),
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except (OSError, subprocess.SubprocessError):
         return None
@@ -1794,7 +1797,7 @@ def _base_python_candidates() -> list:
                 try:
                     p = subprocess.run([launcher, f'-{tag}', '-c',
                                         'import sys; print(sys.executable)'],
-                                       capture_output=True, text=True, timeout=15,
+                                       capture_output=True, text=True, timeout=processing_timeout(15),
                                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                     exe = (p.stdout or '').strip()
                     if p.returncode == 0 and exe:
@@ -2297,7 +2300,7 @@ def _onnxruntime_provided(python) -> bool:
         return False
     try:
         proc = subprocess.run([python, '-c', 'import onnxruntime'],
-                              capture_output=True, timeout=_ONNXRUNTIME_PROBE_TIMEOUT,
+                              capture_output=True, timeout=processing_timeout(_ONNXRUNTIME_PROBE_TIMEOUT),
                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except subprocess.TimeoutExpired:
         return True    # slow import == a real runtime is loading; do not overwrite it
@@ -2368,7 +2371,7 @@ def _verify_capability_import(action, python, *, log_action=None) -> bool:
         proc = subprocess.run(infer_env.worker_argv(python, '-c', expr),
                               capture_output=True, text=True,
                               encoding='utf-8', errors='replace',
-                              timeout=_WARM_IMPORT_TIMEOUT,
+                              timeout=processing_timeout(_WARM_IMPORT_TIMEOUT),
                               env=infer_env.worker_env(python),
                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except subprocess.TimeoutExpired:
@@ -2764,7 +2767,7 @@ def _clone_node_pack(action, spec, dest) -> bool:
     try:
         proc = subprocess.run([git, 'clone', '--depth', '1', spec['repo'], dest],
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                              text=True, timeout=_GIT_CLONE_TIMEOUT_S)
+                              text=True, timeout=network_timeout(_GIT_CLONE_TIMEOUT_S))
     except (OSError, subprocess.SubprocessError) as e:
         _append(action, f'git clone failed ({e}) — falling back to a ZIP download')
         return False
@@ -2789,7 +2792,7 @@ def _zip_node_pack(action, spec, dest) -> bool:
     tmp_dir = tempfile.mkdtemp(prefix='.lds_nodepack_', dir=parent)
     archive = os.path.join(tmp_dir, 'pack.zip')
     try:
-        with requests.get(spec['zip'], stream=True, timeout=_ZIP_TIMEOUT,
+        with requests.get(spec['zip'], stream=True, timeout=network_timeout(_ZIP_TIMEOUT),
                           allow_redirects=True) as resp:
             if resp.status_code >= 400:
                 _append(action, f'HTTP {resp.status_code} downloading the ZIP')
@@ -3026,7 +3029,7 @@ def _run_ollama_model(action) -> int:
             json={'model': model, 'stream': True},
             stream=True,
             allow_redirects=False,
-            timeout=(_OLLAMA_CONNECT_TIMEOUT, _OLLAMA_READ_TIMEOUT),
+            timeout=network_timeout((_OLLAMA_CONNECT_TIMEOUT, _OLLAMA_READ_TIMEOUT)),
         )
         run = _runs.get(action)
         if run is not None:
@@ -3180,7 +3183,7 @@ def _verify_shot_detect_import(action, python) -> bool:
                               infer_env.worker_argv(
                                   python, '-c', 'import torch, transnetv2_pytorch, av'),
                               capture_output=True, text=True, encoding='utf-8',
-                              errors='replace', timeout=_WARM_IMPORT_TIMEOUT,
+                              errors='replace', timeout=processing_timeout(_WARM_IMPORT_TIMEOUT),
                               env=infer_env.worker_env(python),
                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except subprocess.TimeoutExpired:
@@ -3366,8 +3369,10 @@ def _plugin_action_command(spec) -> list:
         cmd += ['-c', str(_ML_REQUIREMENTS), *_flask_pillow_guard(cmd[0])]
     if spec.get('python') == 'app' or (spec.get('python') == 'capability' and _is_flask_venv(cmd[0])):
         if not _APP_REQUIREMENTS.is_file():
-            raise Precondition('The LDS dependency constraints are missing. Repair LDS before installing extras.')
-        cmd += ['-c', str(_APP_REQUIREMENTS)]
+            raise Precondition('The LDS dependency requirements are missing. Repair LDS before installing extras.')
+        # Host requirements can include extras, which pip forbids in constraints.
+        # Resolve them alongside the plugin to preserve both host pins and extras.
+        cmd += ['-r', str(_APP_REQUIREMENTS)]
     return cmd
 
 
@@ -3520,14 +3525,22 @@ def install_groups() -> dict:
     return out
 
 
-def group_caps_keys(group) -> dict:
-    """The capability keys a group's plan reads its gaps from, every key
-    present (None = the group has no such lane)."""
-    registry = _plugin_registry()
-    spec = registry.install_groups.get(group) if registry else None
-    keys = spec['caps_keys'] if spec else _GROUP_CAPS_KEYS.get(group, {})
-    return {'missing': None, 'invalid': None, 'pack_action': None,
-            'nodes_missing': None, 'nodes_installed': None, **keys}
+def _managed_env_valid(python):
+    """Verify the running Python actually belongs to this isolated venv."""
+    try:
+        result = subprocess.run(
+            [python, '-I', '-c', 'import sys,json,pip; '
+             'print(json.dumps([list(sys.version_info[:2]),sys.prefix,sys.base_prefix]))'],
+            capture_output=True, text=True, timeout=processing_timeout(20),
+            env=managed_python.subprocess_env(),
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        version, prefix, base = json.loads(result.stdout)
+        expected = os.path.dirname(os.path.dirname(python))
+        return (result.returncode == 0 and _VENV_PY_MIN <= tuple(version) <= _VENV_PY_MAX
+                and os.path.normcase(os.path.abspath(prefix)) == os.path.normcase(expected)
+                and os.path.normcase(prefix) != os.path.normcase(base))
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return False
 
 
 def _install_quality_tools(action, features) -> int:
@@ -3601,7 +3614,130 @@ def _bank_runtime_notice(action, python, selected, *, imports_ok=None, selection
     }
 
 
-_COMPANION_LOCKS = {}
+def _extra_roots_for(comfy_type):
+    """Generic configured extra model roots; product-derived roots are callbacks."""
+    from .services import comfy_model_paths
+    return comfy_model_paths.extra_roots(comfy_type)
+
+
+def _log_denied(action, status, license_url, provider):
+    """The recovery steps for a 401/403, the same four lines whichever file of
+    an action the host refused — a companion can be gated while its main file
+    was not (the INT8 row's adapters live on another repository)."""
+    host, key_url, key_name, verb = _AUTH_RECOVERY.get(provider, _AUTH_RECOVERY['hf'])
+    _append(action, f'HTTP {status} - {host} denied access to this file.')
+    if license_url:
+        _append(action, f'1. Open {license_url} and {verb} continue')
+    _append(action, f'2. Create an API key at {key_url}')
+    _append(action, f'3. Paste it as {key_name} in Settings -> API keys, then retry')
+    _append(action, '   (or download the file manually into the folder above)')
+
+
+def _companion_dest_path(comp) -> str:
+    return os.path.join(_comfyui_root(), 'models', *comp['dest'])
+
+
+def _companion_unusable_reason(comp, path):
+    """Why the companion at `path` cannot be kept, or None. A JSON file is
+    kept when it parses; a weight when the shared validator does not condemn
+    it — an HTML page named adapter_model.safetensors is the failure mode."""
+    if comp.get('kind') == 'json':
+        try:
+            with open(path, encoding='utf-8') as fh:
+                json.load(fh)
+            return None
+        except (OSError, ValueError) as exc:
+            return f'not a readable JSON file ({exc})'
+    return _unloadable_reason('companion', path, comp)
+
+
+def _companion_lock(companions):
+    with _lock:
+        key = tuple(sorted(tuple(item['dest']) for item in companions))
+        return _COMPANION_LOCKS.setdefault(key, threading.Lock())
+
+
+def _run_companion_downloads(action) -> int:
+    """Fetch every companion of `action` that is absent or unusable, each to a
+    .part then renamed, verified by its own kind. Progress restarts per file;
+    the log names each. rc 1 on the first failure — a stage is whole or it is
+    not, and the branch that already landed stays."""
+    spec = model_download_spec(action)
+    companions = spec.get('companions') or ()
+    if not companions:
+        return 0
+    with _companion_lock(companions):
+        return _fetch_companions(action, spec, companions)
+
+
+def _fetch_companions(action, spec, companions) -> int:
+    headers, provider = _download_auth(spec)
+    for comp in companions:
+        dest = _companion_dest_path(comp)
+        part = dest + '.part'
+        try:
+            if os.path.isfile(dest):
+                reason = _companion_unusable_reason(comp, dest)
+                if not reason:
+                    _append(action, f'already present: {dest}')
+                    continue
+                _append(action, f'the companion already here cannot be used: {reason} — replacing it')
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            _append(action, f"downloading {comp['url']}")
+            _append(action, f'-> {dest}')
+            with requests.get(comp['url'], stream=True, timeout=network_timeout((10, 120)),
+                              headers=headers, allow_redirects=True) as resp:
+                if resp.status_code in (401, 403):
+                    _log_denied(action, resp.status_code,
+                                comp.get('license_url') or spec.get('license_url'), provider)
+                    return 1
+                if resp.status_code >= 400:
+                    _append(action, f'HTTP {resp.status_code} on {os.path.basename(dest)}')
+                    return 1
+                total = int(resp.headers.get('content-length') or 0)
+                done = 0
+                _set_progress(action, 0, total)
+                with open(part, 'wb') as fh:
+                    for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                        if not chunk:
+                            continue
+                        fh.write(chunk)
+                        done += len(chunk)
+                        _set_progress(action, done, total)
+            if total and done < total:
+                _append(action, f'incomplete download ({done}/{total} bytes) - retry')
+                os.remove(part)
+                return 1
+            if comp.get('kind') == 'json':
+                reason = _companion_unusable_reason(comp, part)
+                if reason:
+                    _append(action, f'download verification failed: {reason}; retry the download')
+                    os.remove(part)
+                    return 1
+            elif not _verify_downloaded_model(action, part, comp, provider):
+                return 1
+            os.replace(part, dest)
+            _append(action, f'done -> {dest}')
+        except requests.RequestException as e:
+            _append(action, f'network error: {e}')
+            _discard_part(part)
+            return 1
+        except OSError as e:
+            # A filesystem refusal (a file held open, a full disk, a folder
+            # that vanished) ends the run with a readable line, not a
+            # traceback in the button.
+            _append(action, f'could not write {os.path.basename(dest)}: {e} — retry the download')
+            _discard_part(part)
+            return 1
+    return 0
+
+
+def _discard_part(part):
+    try:
+        os.remove(part)
+    except OSError:
+        pass
+
 
 def _run_primary_download(action) -> int:
     """Stream one model asset (Klein or Krea) into the validated ComfyUI tree.
@@ -3659,7 +3795,7 @@ def _run_primary_download(action) -> int:
     _append(action, f'-> {dest}')
     part = dest + '.part'
     try:
-        with requests.get(spec['url'], stream=True, timeout=(10, 120),
+        with requests.get(spec['url'], stream=True, timeout=network_timeout((10, 120)),
                           headers=headers, allow_redirects=True) as resp:
             if resp.status_code in (401, 403):
                 if spec.get('gated') or spec.get('license_url'):

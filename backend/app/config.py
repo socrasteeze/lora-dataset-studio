@@ -133,7 +133,19 @@ DEFAULTS = {
                 # hardcoded 8 s broke the people who had invested the most in their
                 # ComfyUI (reported by j_o_e_l. on Discord, who measured ~15 s on his
                 # own install). Clamped to 5-300 by utils.comfyui.object_info_timeout().
-                'object_info_timeout_s': 45},
+                'object_info_timeout_s': 45,
+                # Local generation is queued serially; this is a queue budget,
+                # not the number of images rendered simultaneously.
+                'local_queue_limit': 1000,
+                # Per submitted ComfyUI prompt. Zero removes the elapsed-time
+                # deadline; cancellation and worker-health checks still apply.
+                'generation_timeout_minutes': 15,
+                'repair_timeout_minutes': 5,
+                'improve_timeout_minutes': 30},
+    # Factors preserve each operation's existing budget (including batch-size
+    # allowances). They apply at execution/transport boundaries, not to polling
+    # intervals, retry counts or the grace period after an explicit Stop.
+    'timeouts': {'processing_multiplier': 1.0, 'network_multiplier': 1.0},
     'ollama': {'url': 'http://127.0.0.1:11434', 'vision_model': 'huihui_ai/qwen3-vl-abliterated:8b-instruct',  # -instruct, NOT ':8b' (=thinking): see get_vision_model()
                # How many vision calls a bank pass keeps in flight. 4 is the
                # measured knee; see services/vision_pool.py for the numbers.
@@ -334,16 +346,14 @@ DEFAULTS = {
         # "[Errno 28] No space left on device". Floored in code like that
         # lane's, so a config frozen before this key existed cannot undercut it.
         'video_disk_gb': 120,
-        # min_vram_gb est PAR FAMILLE (pas par variante) : pour flux2klein on prend
-        # 32 — le 9B (32-48 GB) est la voie cloud principale de cette famille, et un
-        # pod 32 GB entraîne aussi le 4B sans problème (l'inverse serait faux).
-        # 'video' covers the whole video-dataset lane, whose pods run with
-        # low_vram OFF (paying cloud prices for the PCIe shuttle is the thing
-        # the lane exists to avoid) — so the weights are RESIDENT: MiniMax H3's
-        # pruned int8 transformer alone is ~21 GB with a ~16 GB nvfp4 text
-        # encoder beside it, and Wan 2.2 A14B holds two experts. The 24 GB
-        # fallback that applied before this entry existed rented pods that
-        # could only OOM after the money was spent.
+        # min_vram_gb is per family, not variant. flux2klein uses 32: its 9B
+        # model (32-48 GB) is the main cloud option, and a 32 GB pod also trains
+        # 4B successfully; the reverse is not true.
+        # video covers the entire video-dataset lane with low_vram OFF, avoiding
+        # paid PCIe shuttling. Weights therefore remain resident: MiniMax H3's
+        # pruned int8 transformer is about 21 GB plus a 16 GB nvfp4 text encoder,
+        # and Wan 2.2 A14B holds two experts. The previous 24 GB fallback rented
+        # pods that could only run out of memory after payment.
         'min_vram_gb': {'zimage': 24, 'sdxl': 16, 'krea': 24, 'flux2klein': 32,
                         'video': 48},
         # Compute capability floor, per family, as vast reports it: 750 Turing,

@@ -1,4 +1,5 @@
 """Settings API: config/secrets CRUD + capability probes."""
+from ..timeout_settings import network_timeout
 import os
 import sys
 
@@ -356,6 +357,11 @@ def get_capabilities():
     return jsonify(capabilities.probe(force=force))
 
 
+@bp.get('/capabilities/startup')
+def get_startup_capabilities():
+    return jsonify(capabilities.probe_startup())
+
+
 @bp.get('/loras/list')
 def loras_list():
     """LoRAs on disk for the generation-LoRA preset picker, shared by the
@@ -643,7 +649,7 @@ def update_check():
         out['current_sha'] = sha
     try:
         r = requests.get(f'https://api.github.com/repos/{repo}/releases/latest',
-                         timeout=6, headers={'Accept': 'application/vnd.github+json'})
+                         timeout=network_timeout(6), headers={'Accept': 'application/vnd.github+json'})
         if r.status_code == 200:
             j = r.json()
             latest = (j.get('tag_name') or '').lstrip('vV').strip()
@@ -695,7 +701,7 @@ def update_apply():
     if updater.is_docker_runtime():
         return jsonify({
             'ok': False,
-            'reason': 'Docker GPU installs must be updated by rebuilding the image.',
+            'reason': 'Docker installs must be updated by rebuilding the image.',
             **updater.docker_update_payload(),
         })
     # Pinokio owns the process: pulling here would work, but the restart that

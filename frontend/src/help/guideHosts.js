@@ -180,6 +180,7 @@ export const CORE_GUIDE_ANCHORS = {
     "server-access",
     "devices",
     "maintenance",
+    "usage-statistics",
     "per-dataset-settings",
     "config-file-only-settings",
     "config-json-key-reference-all-keys"

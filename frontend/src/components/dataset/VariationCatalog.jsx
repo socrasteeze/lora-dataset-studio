@@ -794,6 +794,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
   const blockedReason = generateBlockedReason({
     engines, shotCount: selected.size, mode: engineMode, multiplier,
     maxFanout: Number(caps.max_fanout) || 0,
+    maxLocalFanout: Number(caps.max_local_fanout) || 0,
   });
   // Klein unavailable has FOUR distinct causes and the hint must name the right
   // one — a reachable ComfyUI with no Klein model used to show "Configure
@@ -913,8 +914,8 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
       preset.selectedIds.forEach((id) => { const fr = framingById.get(id); if (fr) counts[fr] += 1; });
       return [preset.id, { counts, total: preset.selectedIds.length }];
     }));
-    // userShots, pas customShots : la map lit AUSSI les shots importes, et
-    // une dep sur la moitie de la source laissait leurs framings figes.
+    // Depend on userShots, not customShots: the map ALSO reads imported shots.
+    // Depending on only half the source left imported framings frozen.
   }, [catalog, nsfwCatalog, userShots, customPresets]);
 
   const toggle = (id) => setSelected((s) => {
@@ -2002,7 +2003,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           <select value={multiplier} onChange={(e) => setMultiplier(+e.target.value)}
             aria-label="Variation multiplier"
             className="bg-app/60 border border-border rounded px-1 py-0.5 text-content ml-1">
-            {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+            {[1, 2, 3, 5, 10, 20].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
         <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy"

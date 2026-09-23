@@ -1,137 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Puzzle, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { Puzzle, RefreshCw, Upload } from 'lucide-react';
 import { apiFetch, fetchWithCsrfRetry, postJson, postForm, del } from '../api/fetchClient';
 import { useToast } from '../components/common/Toast';
 import { Card, SectionHeader } from '../components/settings/primitives';
-import { pluginWhatsNew, registeredDescriptors } from '../plugins/registry.js';
-import { sortedEntries } from '../whatsNew.js';
-import InstallRunner from '../components/setup/InstallRunner';
-import { pendingLabel, pluginActive, pluginDesired, waitForPluginBoot } from '../plugins/lifecycle.js';
-import { Link, useSearchParams } from 'react-router';
-import { pluginSettingsPath } from './pluginSettings.js';
+import { waitForPluginBoot } from '../plugins/lifecycle.js';
+import { useSearchParams } from 'react-router';
 import Catalog, { InstallPlan } from './store/Catalog.jsx';
 import { useCapabilities } from '../context/CapabilitiesContext';
-import { productReadiness } from '../plugins/readiness.js';
 import Library from './store/Library.jsx';
 import Administration from './store/Administration.jsx';
+import { catalogView } from './store/catalogModel.js';
 
 // Store packages bring their screens, services and help together. The running
 // registry remains authoritative until a prepared transaction restarts LDS.
 
 const BTN = 'min-h-10 lg:min-h-0 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-surface-raised disabled:opacity-50';
 const BTN_PRIMARY = BTN + ' border-primary bg-primary text-primary-foreground hover:bg-primary/90';
-
-const STATE_LABEL = {
-  loaded: 'Active now', disabled: 'Inactive', pending: 'Not active yet', error: 'Failed to load', incompatible: 'Incompatible', misplaced: 'Misplaced',
-};
-
-function stateClass(state) {
-  if (state === 'loaded') return 'text-emerald-500';
-  if (state === 'disabled') return 'text-content-muted';
-  return 'text-amber-500';
-}
-
-export function PluginRow({ plugin, restart, onToggle, onRemove, onInstalled, busy, caps, capsKnown = false }) {
-  const requires = plugin.requires || [];
-  const news = sortedEntries(pluginWhatsNew(plugin.id));
-  const desired = pluginDesired(plugin);
-  const pending = pendingLabel(plugin);
-  const removing = plugin.pending_action === 'remove';
-  const packagePending = ['install', 'update', 'remove'].includes(plugin.pending_action);
-  const readiness = pluginActive(plugin) && capsKnown ? productReadiness(plugin.id, caps) : [];
-  return (
-    <li id={'plugin-row-' + plugin.id} data-plugin-id={plugin.id} className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0 md:flex-row md:items-start md:gap-4">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{plugin.name}</span>
-          <span className="text-xs text-content-muted">{plugin.version}</span>
-          <span className="rounded border border-border px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-content-muted">
-            {plugin.official ? 'LDS' : plugin.bundled ? 'Included' : 'External'}
-          </span>
-          <span className={'text-xs font-medium ' + stateClass(plugin.state)}>{pluginActive(plugin) ? 'Active now' : STATE_LABEL[plugin.state] || plugin.state}</span>
-        </div>
-        {pending && <p className="mt-2 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-sm text-content" data-plugin-pending>{pending}</p>}
-        {plugin.description && <p className="mt-1 text-sm text-content-muted">{plugin.description}</p>}
-        {pluginActive(plugin) && plugin.package_contract?.experience && <div className="mt-3 space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {plugin.package_contract.experience.entrypoints.map(entry => <Link key={entry.path} to={entry.path} className={BTN}>{entry.label}</Link>)}
-            {plugin.package_contract.experience.setup && <Link to={plugin.package_contract.experience.setup.path} className={BTN}>
-              {plugin.package_contract.experience.setup.label}
-            </Link>}
-          </div>
-          {plugin.package_contract.experience.setup_hint && <p className="text-sm text-content-muted">{plugin.package_contract.experience.setup_hint}</p>}
-        </div>}
-        {plugin.error && <p className="mt-1 text-xs text-amber-500">{plugin.error}</p>}
-        {pluginActive(plugin) && !capsKnown && <p className="text-xs text-content-muted">Checking configured components…</p>}
-        {readiness.length > 0 && <details className="mt-2 text-sm" data-plugin-readiness>
-          <summary className="min-h-10 cursor-pointer py-2 font-medium">Configured components · {readiness.filter(row => row.state === 'ready').length}/{readiness.length} ready</summary>
-          <ul className="space-y-2 rounded-md border border-border p-3">
-            {readiness.map((row, index) => <li key={index}>
-              <span className="font-medium">{row.label}</span>{' · '}
-              <span className={row.state === 'ready' ? 'text-emerald-500' : 'text-content-muted'}>
-                {{ ready: 'Ready', pending: 'Waiting for the local service', setup: 'Needs setup', unknown: 'Check unavailable' }[row.state]}
-              </span>
-              {(row.note || row.what) && <p className="mt-1 text-xs text-content-muted">{row.note || row.what}</p>}
-            </li>)}
-          </ul>
-        </details>}
-        {plugin.disabled_by && plugin.disabled_by.length > 0 && (
-          <p className="mt-1 text-xs text-content-muted">Off because it needs: {plugin.disabled_by.join(', ')}</p>
-        )}
-        {requires.length > 0 && <p className="mt-1 text-xs text-content-muted">Requires: {requires.join(', ')}</p>}
-        {plugin.permissions && plugin.permissions.length > 0 && (
-          <p className="mt-1 text-xs text-content-muted">Declares: {plugin.permissions.join(', ')}</p>
-        )}
-        {plugin.environment && (
-          <div className="mt-3 space-y-2 rounded-md border border-border p-3 [&_button]:min-h-10 lg:[&_button]:min-h-0">
-            <p className="text-sm font-medium">Python environment · {plugin.environment.ready ? 'Ready' : 'Needs installation'}</p>
-            <p className="text-xs text-content-muted">Installs this plugin’s CPU dependencies in its own environment. Installation logs appear here; keep LDS open until it finishes.</p>
-            {plugin.environment.reason && <p className="text-xs text-content-muted">{plugin.environment.reason}</p>}
-            {plugin.environment.can_install && (
-              <InstallRunner action={plugin.environment.action}
-                buttonLabel={plugin.environment.ready ? 'Repair Python environment' : 'Install Python environment'}
-                onDone={onInstalled} />
-            )}
-          </div>
-        )}
-        {news.length > 0 && (
-          <details className="mt-2" data-probe-reading>
-            <summary className="min-h-10 cursor-pointer py-2 text-sm font-medium lg:min-h-0">
-              What’s new in {plugin.name}
-            </summary>
-            <ol className="max-h-96 space-y-4 overflow-y-auto rounded-md border border-border p-3">
-              {news.map((entry) => (
-                <li key={entry.id} className="break-words text-sm">
-                  <time className="text-xs text-content-muted" dateTime={entry.date}>{entry.date}</time>
-                  <p className="font-medium">{entry.title}</p>
-                  <p className="mt-1 text-content-muted">{entry.blurb}</p>
-                </li>
-              ))}
-            </ol>
-          </details>
-        )}
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <Link to={pluginSettingsPath(plugin.id)} className={BTN}>Settings</Link>
-        {plugin.state !== 'misplaced' && plugin.state !== 'incompatible' && (
-          <button type="button" className={BTN} disabled={busy || removing}
-            onClick={() => onToggle(plugin, !desired)}
-            aria-pressed={desired}>
-            {plugin.pending_action === 'enable' || plugin.pending_action === 'disable' ? 'Undo change' : desired ? 'Turn off' : 'Turn on'}
-          </button>
-        )}
-        {!plugin.bundled && (
-          <button type="button" className={BTN} disabled={busy || packagePending}
-            title={packagePending ? 'Apply the pending package change before removing this plugin' : 'Remove this plugin (its data is kept for reinstalling)'}
-            onClick={() => onRemove(plugin)}>
-            <span className="inline-flex items-center gap-1"><Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> Remove</span>
-          </button>
-        )}
-      </div>
-      {restart && <span className="sr-only">{restart.how}</span>}
-    </li>
-  );
-}
 
 export default function PluginsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -142,9 +26,20 @@ export default function PluginsPage() {
   const [busy, setBusy] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState('');
+  const [applyWarning, setApplyWarning] = useState('');
   const [consent, setConsent] = useState(null);
-  const [tab, setTab] = useState(() => ['discover', 'installed', 'updates', 'purchases'].includes(searchParams.get('tab'))
-    ? searchParams.get('tab') : registeredDescriptors().some(entry => !entry.external) ? 'installed' : 'discover');
+  const { tab, filter } = catalogView(searchParams);
+  const setTab = (nextTab) => setSearchParams(current => {
+    const next = new URLSearchParams(current);
+    next.set('tab', nextTab === 'purchases' ? 'purchases' : 'plugins');
+    if (nextTab === 'installed' || nextTab === 'updates') next.set('filter', nextTab);
+    return next;
+  });
+  const setFilter = (nextFilter) => setSearchParams(current => {
+    const next = new URLSearchParams(current);
+    next.set('tab', 'plugins'); next.set('filter', nextFilter); next.delete('plugin');
+    return next;
+  });
   const [catalog, setCatalog] = useState(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [storePlan, setStorePlan] = useState(null);
@@ -157,16 +52,12 @@ export default function PluginsPage() {
   const catalogRequest = useRef(null);
   const catalogAdminToken = useRef('');
   const requestedPlugin = searchParams.get('plugin') || '';
-  const requestedTab = searchParams.get('tab');
   useEffect(() => {
-    if (['discover', 'installed', 'updates', 'purchases'].includes(requestedTab)) setTab(requestedTab);
-  }, [requestedTab]);
-  useEffect(() => {
-    if (tab === 'installed' && requestedPlugin && data && scrolledPlugin.current !== requestedPlugin) {
+    if (tab === 'plugins' && requestedPlugin && data && scrolledPlugin.current !== requestedPlugin) {
       const element = document.getElementById('plugin-row-' + requestedPlugin);
       if (element) { element.scrollIntoView({ block: 'nearest' }); scrolledPlugin.current = requestedPlugin; }
     }
-  }, [tab, requestedPlugin, data]);
+  }, [tab, requestedPlugin, data, catalog]);
 
   const load = useCallback(async () => {
     try {
@@ -200,7 +91,7 @@ export default function PluginsPage() {
     } catch {
       if (request === catalogRequest.current) setCatalog(previous => ({ status: 'unavailable',
         products: previous?.products || [],
-        message: 'The plugin catalog could not be loaded. Check your connection and retry. Your installed plugins remain available in My plugins.' }));
+        message: 'The plugin catalog could not be loaded. Check your connection and retry. You can still manage your installed plugins below.' }));
     } finally {
       if (request === catalogRequest.current) setCatalogLoading(false);
     }
@@ -219,10 +110,12 @@ export default function PluginsPage() {
   const mutation = (url, body) => postJson(url, body, adminOptions);
   const upload = (form) => postForm('/api/plugins/install', form, adminOptions);
 
-  const planInstall = async (id, version) => {
+  const planInstall = async (id, version, updateOnly = false) => {
     setBusy(true);
     try {
-      setStorePlan(await mutation('/api/plugins/store/plan', { id, version }));
+      setStorePlan(await mutation('/api/plugins/store/plan', {
+        ...(Array.isArray(id) ? { ids: id } : { id, version }), update_only: updateOnly,
+      }));
     } catch (e) {
       toast.error(e?.message || 'Could not prepare this installation.');
     } finally { setBusy(false); }
@@ -230,10 +123,19 @@ export default function PluginsPage() {
   const installFromStore = async () => {
     setBusy(true);
     try {
-      await mutation('/api/plugins/store/install', { id: storePlan.requested, version: storePlan.version, plan_id: storePlan.plan_id });
+      const selection = Array.isArray(storePlan.requested) ? { ids: storePlan.requested }
+        : { id: storePlan.requested, version: storePlan.version };
+      const prepared = await mutation('/api/plugins/store/install', {
+        ...selection, plan_id: storePlan.plan_id, update_only: Boolean(storePlan.update_only),
+      });
+      const autoRestart = storePlan.update_only && prepared.restart?.can_apply;
       setStorePlan(null);
       setTab('installed');
       await load();
+      if (autoRestart) {
+        await apply();
+        return;
+      }
       await loadCatalog();
       toast.success('Plugins downloaded. Apply the changes to use them.');
     } catch (e) { toast.error(e?.message || 'Installation could not be prepared.'); }
@@ -251,11 +153,13 @@ export default function PluginsPage() {
     setBusy(true);
     setApplying(true);
     setApplyError('');
+    setApplyWarning('');
     const controller = new AbortController();
     restartAbort.current = controller;
     try {
       const result = await mutation('/api/plugins/apply', {});
       if (!result.ok || !result.restarting) throw new Error(result.error || 'The restart could not be started.');
+      setApplyWarning((result.warnings || []).join(' '));
       await waitForPluginBoot(result.boot_id || data?.boot_id, { signal: controller.signal });
       window.location.reload();
     } catch (e) {
@@ -338,25 +242,32 @@ export default function PluginsPage() {
   };
 
   const plugins = data?.plugins || [];
-  const bundled = plugins.filter((p) => p.bundled);
-  const external = plugins.filter((p) => !p.bundled);
   const restart = data?.restart;
   const pendingRestart = Boolean(data?.pending_restart);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-6" data-probe-panel="plugins" data-probe-content="plugin-store">
+    <div className="mx-auto w-full space-y-6" data-probe-panel="plugins" data-probe-content="plugin-store">
       <div className="space-y-2">
-        <SectionHeader eyebrow="Plugins" title="Plugin store"
-          description="Add the tools you need. Each plugin brings its features, interface and help together." />
+        <SectionHeader eyebrow="Workspace" title="Plugins"
+          description="Find new tools and manage your installed plugins in one place." />
         <p className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
           <Puzzle aria-hidden="true" className="h-3.5 w-3.5" />
           Your data stays with LDS when a plugin is updated or removed.
         </p>
       </div>
 
+      {tab === 'plugins' && <div className="flex flex-wrap items-center gap-2">
+        <label className={BTN + ' inline-flex cursor-pointer items-center gap-1'}>
+          <Upload aria-hidden="true" className="h-3.5 w-3.5" /> Install from a ZIP
+          <input ref={fileRef} type="file" accept=".ldsplugin,.zip,application/zip" className="sr-only"
+            onChange={(e) => inspect(e.target.files && e.target.files[0])} disabled={busy} />
+        </label>
+        <span className="text-xs text-content-muted">The archive is inspected first; nothing is written until you confirm.</span>
+      </div>}
+
       <div role="tablist" aria-label="Plugin store sections" className="flex flex-wrap gap-2 border-b border-border pb-3"
         onKeyDown={(event) => {
-          const keys = ['discover', 'installed', 'updates', 'purchases'];
+          const keys = ['plugins', 'purchases'];
           let next;
           if (event.key === 'ArrowRight') next = (keys.indexOf(tab) + 1) % keys.length;
           if (event.key === 'ArrowLeft') next = (keys.indexOf(tab) + keys.length - 1) % keys.length;
@@ -367,7 +278,7 @@ export default function PluginsPage() {
           setTab(keys[next]);
           document.getElementById(`store-tab-${keys[next]}`)?.focus();
         }}>
-        {[['discover', 'Discover'], ['installed', 'My plugins'], ['updates', 'Updates'], ['purchases', 'Purchases']].map(([key, label]) =>
+        {[['plugins', 'Plugins'], ['purchases', 'Purchases']].map(([key, label]) =>
           <button key={key} type="button" role="tab" tabIndex={tab === key ? 0 : -1} aria-selected={tab === key} aria-controls={`store-${key}`} id={`store-tab-${key}`}
             className={tab === key ? BTN_PRIMARY : BTN} onClick={() => setTab(key)}>{label}</button>)}
       </div>
@@ -377,6 +288,7 @@ export default function PluginsPage() {
         rejected={Boolean(adminToken) && adminToken === adminDraft && !catalogLoading && catalog.status === 'ready'} />}
 
       {storePlan && <InstallPlan plan={storePlan} busy={busy} onConfirm={installFromStore} onCancel={() => setStorePlan(null)}
+        restart={data?.restart}
         onAcquire={id => { setPurchaseId(id); setStorePlan(null); setTab('purchases'); }} />}
 
       {error && <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">{error}</p>}
@@ -400,16 +312,19 @@ export default function PluginsPage() {
             {restart.can_apply && <button type="button" className={BTN_PRIMARY + ' shrink-0'} disabled={busy} onClick={apply}>Apply and restart</button>}
           </div>
           {!restart.can_apply && <p className="text-content-muted">{restart.how}</p>}
+          {applyWarning && <p role="status" className="text-amber-500">{applyWarning}</p>}
           {applyError && <p role="alert" className="text-amber-500">{applyError}</p>}
         </div>
       )}
 
-      {['discover', 'updates'].includes(tab) && <div role="tabpanel" id={`store-${tab}`} aria-labelledby={`store-tab-${tab}`}>
-        <Catalog catalog={catalog} installed={plugins} updatesOnly={tab === 'updates'} busy={busy || catalogLoading} onPlan={planInstall}
+      {tab === 'plugins' && <div role="tabpanel" id="store-plugins" aria-labelledby="store-tab-plugins">
+        <Catalog catalog={catalog} installed={plugins} filter={filter} onFilterChange={setFilter} busy={busy} onPlan={planInstall}
+          onUpdateAll={ids => planInstall(ids, undefined, true)} pendingRestart={pendingRestart}
           loading={catalogLoading} onRetry={loadCatalog}
+          onToggle={toggle} onRemove={remove} onInstalled={() => { load(); refreshCaps(true); }} caps={caps} capsKnown={capsKnown}
           onUnlock={() => document.getElementById('plugin-admin-token')?.focus()}
-          selectedId={tab === 'discover' ? requestedPlugin : ''} onClearSelection={() => {
-            const next = new URLSearchParams(searchParams); next.delete('plugin'); setSearchParams(next, { replace: true });
+          selectedId={requestedPlugin} onClearSelection={() => {
+            const next = new URLSearchParams(searchParams); next.delete('plugin'); next.set('tab', 'plugins'); next.set('filter', 'all'); setSearchParams(next, { replace: true });
           }} />
       </div>}
       {tab === 'purchases' && <div role="tabpanel" id="store-purchases" aria-labelledby="store-tab-purchases">
@@ -417,7 +332,7 @@ export default function PluginsPage() {
           onPlan={planInstall} onChanges={() => { load(); loadCatalog(); }} />
       </div>}
 
-      {tab === 'installed' && <div role="tabpanel" id="store-installed" aria-labelledby="store-tab-installed" className="space-y-5">
+      {tab === 'plugins' && <div className="space-y-5">
       {data?.transactions?.length > 0 && <details className="rounded-lg border border-border p-4 text-sm"
         open={data.transactions[0].phase === 'rolled_back'}>
         <summary className="min-h-10 cursor-pointer py-2 font-medium">Installation history</summary>
@@ -433,26 +348,6 @@ export default function PluginsPage() {
         {window.lds.loadProblems.map((item) => <p key={item.plugin}>{item.plugin}: {item.reason}</p>)}
         <button type="button" className={BTN + ' mt-3'} onClick={() => window.location.reload()}>Reload interfaces</button>
       </div>}
-      {bundled.length > 0 && <Card title="Included plugins" id="plugins-bundled"
-        help="These ship in every release and are replaced by every update. Turn off what you do not use.">
-        {bundled.length === 0
-          ? <p className="text-sm text-content-muted">This build bundles no plugin yet.</p>
-          : <ul>{bundled.map((p) => <PluginRow key={p.id} plugin={p} caps={caps} capsKnown={capsKnown} restart={restart} onToggle={toggle} onRemove={remove} onInstalled={() => { load(); refreshCaps(true); }} busy={busy} />)}</ul>}
-      </Card>}
-
-      <Card title="Installed plugins" id="plugins-external" help="Your plugins are kept across LDS updates.">
-        {external.length === 0
-          ? <p className="text-sm text-content-muted">No plugin installed yet.</p>
-          : <ul>{external.map((p) => <PluginRow key={p.id} plugin={p} caps={caps} capsKnown={capsKnown} restart={restart} onToggle={toggle} onRemove={remove} onInstalled={() => { load(); refreshCaps(true); }} busy={busy} />)}</ul>}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <label className={BTN + ' inline-flex cursor-pointer items-center gap-1'}>
-            <Upload aria-hidden="true" className="h-3.5 w-3.5" /> Install from a ZIP
-            <input ref={fileRef} type="file" accept=".ldsplugin,.zip,application/zip" className="sr-only"
-              onChange={(e) => inspect(e.target.files && e.target.files[0])} disabled={busy} />
-          </label>
-          <span className="text-xs text-content-muted">The archive is inspected first; nothing is written until you confirm.</span>
-        </div>
-      </Card>
       </div>}
 
       {consent && (

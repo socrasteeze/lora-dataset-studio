@@ -3,8 +3,9 @@
  * (GET /api/capabilities). Drives feature gating (e.g. the Studio nav item)
  * and the onboarding redirect when the app has never been configured.
  */
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../api/fetchClient'
+import { mergeStartupCapabilities } from './startupCapabilities.js'
 
 const CapabilitiesContext = createContext(null)
 
@@ -39,6 +40,7 @@ export function CapabilitiesProvider({ children }) {
   // the app on a reconnecting link dropped the first requests of the page
   // load, and a verified install was sent through Setup (2026-09-04).
   const [known, setKnown] = useState(false)
+  const fullSnapshotReceived = useRef(false)
 
   // Return the fetched snapshot on success and null on failure. Most callers
   // only need the state update, while managed-runtime polling needs the verdict:
@@ -50,9 +52,10 @@ export function CapabilitiesProvider({ children }) {
         `/api/capabilities${force ? '?force=1' : ''}`,
         options,
       )
+      fullSnapshotReceived.current = true
       // Fork is local-only: never surface remote-rental / cloud-training UI even if a
       // leftover rental API key exists in .env (FORK_NOTES Divergence 4). The
-      // OVERRIDE has to be in the returned value too, not only in state —
+      // OVERRIDE has to be in the returned value too, not only in state --
       // upstream's new `return data` is read directly by the background setup
       // probe, which would otherwise see a capability this app does not have.
       const local = { ...data, cloud_training: false }
@@ -70,6 +73,17 @@ export function CapabilitiesProvider({ children }) {
 
   useEffect(() => {
     let alive = true
+    // Training and Studio only need tool presence. Do not keep those doors
+    // closed while cold optional ML imports and model scans finish. Leave
+    // loading/known to the full answer, so Setup cannot mistake pending checks
+    // for missing dependencies. A late startup answer cannot replace a full one.
+    apiFetch('/api/capabilities/startup', { background: true })
+      .then((data) => {
+        if (alive) setCaps((previous) => mergeStartupCapabilities(
+          previous, data, fullSnapshotReceived.current,
+        ))
+      })
+      .catch(() => {}) // The full request and its retry remain authoritative.
     ;(async () => {
       if ((await refresh()) !== null || !alive) return
       // One quiet retry: the first request of a page load is the one a

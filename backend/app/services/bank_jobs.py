@@ -297,6 +297,7 @@ def start(app, bank_id, kind, fn, total=0, reserve_ids=None,
     _log(bank_id, f'{kind} started', 'info',
          detail=f'{total} image(s)' if total else None, device=device_label)
 
+
     def _run():
         completed = False
         try:

@@ -169,12 +169,33 @@ later visits return to the application.
 
 Choose an optional goal when you need more: captioning prepares the shared
 vision tools; local generation prepares ComfyUI and its selected models;
-**Plugins** opens the Store and your installed plugins. Nothing is downloaded
-by choosing a goal or visiting a plugin page.
+**Plugins** opens one list for browsing and managing plugins, with **All**,
+**Installed** and **Updates** filters. Nothing is downloaded by choosing a goal
+or visiting a plugin page.
 
-Each plugin keeps its own settings and preparation under **My plugins**. Select
-the components you want, then prepare that selection. The server checks the
-whole plan before starting and displays progress and any failures. A completed
+To install several plugins, tick them in **Plugins**, choose **Review
+selected**, and confirm the shared plan. All selected packages are checked before
+any changes are staged; one LDS restart applies the whole selection.
+
+To update installed plugins, choose **Update all** and review the available
+updates together. **Update all and restart** downloads and verifies the complete
+selection, prepares one transaction and restarts LDS once. The page reloads when
+the new server is ready. Disabled plugins stay disabled; connected private
+catalogs keep their own signature checks. If your launcher requires a manual
+restart, LDS shows its restart instructions after preparing the updates. Active
+local work can postpone the restart; the prepared updates remain available to
+apply when it finishes. A retained cloud pod does not block a restart that keeps
+its plugin enabled.
+
+Each plugin's card offers **Install**, or its controls once installed: open the
+plugin, **Settings**, turn it on or off, and update it when available. **More
+actions** contains **Remove plugin**. Installed plugins remain listed even if
+they are absent from the catalog or the store is offline. **Purchases** remains
+a separate tab for your licenses.
+
+For preparation, open **Settings** on the plugin's card. Select the components
+you want, then prepare that selection. The server checks the whole plan before
+starting and displays progress and any failures. A completed
 download means the component is prepared; **Re-check** verifies availability.
 New custom nodes may need a ComfyUI restart before they appear.
 

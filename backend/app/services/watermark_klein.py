@@ -165,6 +165,7 @@ import uuid
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 from .. import config as cfg
+from ..generation_limits import repair_timeout_seconds
 from . import image_encoding
 from . import klein_edit_helper as keh
 from ..job_queue import queue_manager
@@ -676,7 +677,7 @@ def _wait_for_job(job_id, timeout):
         row = (ImageGenerationQueue.query
                .filter_by(job_id=job_id)
                .first())
-        if row is not None and row.status in ('completed', 'failed', 'cancelled'):
+        if row is not None and row.status in ('completed', 'failed', 'cancelled', 'stalled', 'cancel_requested'):
             return row.status, row.result_filename, row.error_message
         if time.monotonic() >= deadline:
             return 'timeout', None, None
@@ -684,8 +685,8 @@ def _wait_for_job(job_id, timeout):
 
 
 def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
-                   denoise=KLEIN_DENOISE, timeout=KLEIN_TIMEOUT, klein_model=None,
-                   device_id=None, prompt=None):
+                   denoise=KLEIN_DENOISE, timeout=None, klein_model=None,
+                   prompt=None):
     """Enqueue one native full-edit job on `crop_img` and return (rendered_image, None) or
     (None, error). Whatever is passed becomes the KSampler latent AND the ReferenceLatent
     (no SetLatentNoiseMask) — a PRE-FILLED crop on the box-repair lane, the WHOLE photo on
@@ -699,6 +700,7 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
     inherit) get. A named model that has left the disk raises KleinModelGone rather
     than repainting on a neighbour: this lane overwrites the user's file in place,
     so a silent swap is not even reversible by regenerating."""
+    timeout = repair_timeout_seconds() if timeout is None else timeout
     workflow = load_workflow_local(str(KLEIN_INPAINT_WORKFLOW_PATH))
     if not workflow:
         return None, {'kind': 'failed', 'detail': 'failed to load klein_inpaint workflow'}
@@ -771,24 +773,18 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
     workflow['9']['inputs']['filename_prefix'] = f'wmklein_{uid}'
 
     job_id = str(uuid.uuid4())
-    meta = {'model_name': 'watermark_klein'}
-    if remote:
-        meta['staged_inputs'] = [crop_name]
-        meta['staged_input_paths'] = {crop_name: os.path.abspath(crop_path)}
+    status = None
     try:
-        try:
-            queue_manager.add_job(job_type='image', user_id=str(user_id),
-                                  workflow_data=workflow,
-                                  prompt=text, job_id=job_id,
-                                  metadata=meta, worker_id=device_id)
-        except ValueError as e:
-            # e.g. the picked backend was removed in Settings mid-pass. One
-            # image's failure, not the whole pass's: the loop counts it and
-            # the report names it.
-            return None, {'kind': 'failed', 'detail': str(e)}
+        queue_manager.add_job(job_type='image', user_id=str(user_id), workflow_data=workflow,
+                              prompt=text, job_id=job_id,
+                              metadata={'model_name': 'watermark_klein',
+                                        'processing_timeout_seconds': 0 if math.isinf(timeout) else timeout})
         status, filename, err_msg = _wait_for_job(job_id, timeout)
     finally:
-        _cleanup(crop_path)
+        # A stalled/cancelling worker may still need its input. The orphan
+        # sweeper can collect it once the queue confirms the worker stopped.
+        if status not in ('stalled', 'cancel_requested'):
+            _cleanup(crop_path)
 
     if status != 'completed' or not filename:
         return None, {'kind': 'failed',
@@ -808,7 +804,7 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
 
 
 def _run_klein_mask_job(user_id, frame_img, mask_img, *, seed, steps=KLEIN_MASK_STEPS,
-                        denoise=KLEIN_DENOISE, timeout=KLEIN_TIMEOUT, klein_model=None,
+                        denoise=KLEIN_DENOISE, timeout=None, klein_model=None,
                         prompt=None):
     """Enqueue ONE LanPaint masked-inpaint job: Klein sees `frame_img` whole and
     the LanPaint sampler regenerates only where `mask_img` is white. The caller
@@ -818,6 +814,7 @@ def _run_klein_mask_job(user_id, frame_img, mask_img, *, seed, steps=KLEIN_MASK_
     Fill-model conditioning smeared the masked region (GitHub #43); the sampler
     enforces the mask itself, so no inpaint training is needed. Kept as its own
     seam so tests can stand in for the GPU round-trip."""
+    timeout = repair_timeout_seconds() if timeout is None else timeout
     from . import lanpaint_helper
     missing = lanpaint_helper.lanpaint_missing_nodes()
     if missing:
@@ -881,11 +878,13 @@ def _run_klein_mask_job(user_id, frame_img, mask_img, *, seed, steps=KLEIN_MASK_
     try:
         queue_manager.add_job(job_type='image', user_id=str(user_id),
                               workflow_data=workflow, prompt=text, job_id=job_id,
-                              metadata={'model_name': 'watermark_klein_mask'})
+                              metadata={'model_name': 'watermark_klein_mask',
+                                        'processing_timeout_seconds': 0 if math.isinf(timeout) else timeout})
         status, filename, err_msg = _wait_for_job(job_id, timeout)
     finally:
-        for stale in (frame_path, mask_path):
-            _cleanup(stale)
+        if status not in ('stalled', 'cancel_requested'):
+            for stale in (frame_path, mask_path):
+                _cleanup(stale)
 
     if status != 'completed' or not filename:
         return None, {'kind': 'failed',
@@ -976,7 +975,7 @@ def _prefill_mask(frame, mask):
 
 
 def inpaint_mask_klein(user_id, image_path, boxes=None, *, mask=None, seed=None,
-                       device='cpu', timeout=KLEIN_TIMEOUT,
+                       device='cpu', timeout=None,
                        klein_model=None, prompt=None) -> tuple[bool, dict | None]:
     """Masked Klein inpaint, in place, on the smallest region worth sending.
 
@@ -1116,7 +1115,7 @@ def run_compare(user_id, rows, *, model, image_id=None, seed=None):
 
 
 def compare_preview(user_id, image_path, boxes, *, klein_model, seed,
-                    timeout=KLEIN_TIMEOUT, max_side=896):
+                    timeout=None, max_side=896):
     """Run ONE model's inpaint on a THROWAWAY copy and hand back preview bytes.
 
     The judging half of "compare Klein models before the batch": the caller runs
@@ -1172,8 +1171,8 @@ def compare_preview(user_id, image_path, boxes, *, klein_model, seed,
 
 
 def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cpu',
-                            timeout=KLEIN_TIMEOUT,
-                            klein_model=None, device_id=None, prompt=None,
+                            timeout=None,
+                            klein_model=None, prompt=None,
                             klein_prompt=None, klein_max_mp=None,
                             klein_output=None) -> tuple[bool, dict | None]:
     """Klein, on `image_path`, in place — the 🧽 watermark CLEAN or the ✦ BOX repair.
@@ -1239,9 +1238,8 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
 
 
 def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
-                      device='cpu', timeout=KLEIN_TIMEOUT,
-                      klein_model=None, device_id=None,
-                      klein_prompt=None, klein_max_mp=None,
+                      device='cpu', timeout=None,
+                      klein_model=None, klein_prompt=None, klein_max_mp=None,
                       klein_output=None) -> tuple[bool, dict | None]:
     """The 🧽 clean (maintainer's 2026-08-31 recipe): ERASE the detected zones on the
     whole photo, hand that whole photo to Klein under "remove watermark", and write the
@@ -1328,8 +1326,7 @@ def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
 
 
 def _repair_boxes_crop_and_stitch(user_id, image_path, original, norm, *, seed=None,
-                                  device='cpu', timeout=KLEIN_TIMEOUT, klein_model=None,
-                                  device_id=None,
+                                  device='cpu', timeout=None, klein_model=None,
                                   prompt=None) -> tuple[bool, dict | None]:
     """The ✦ prompted BOX repair: prefill + Klein full-edit refine of a padded crop +
     per-zone harmonization + feathered composite of the boxes' footprint only.

@@ -56,6 +56,8 @@ from PIL import Image, ImageOps
 from sqlalchemy import and_, case, func, or_, text, update
 
 from .. import config as cfg
+from ..generation_limits import improve_timeout_seconds
+from ..timeout_settings import processing_timeout
 from ..extensions import db
 from ..models import (BankDupDistinct, BankImage, FaceDataset, FaceDatasetImage,
                       ImageBank)
@@ -795,7 +797,7 @@ def create_bank(user_id, name, folder):
     tell the two apart by asking bank_for_source BEFORE this — the return shape
     is deliberately unchanged, because dozens of callers unpack the pair."""
     name = (name or '').strip()
-    # Windows «Copier en tant que chemin» pastes the path quoted — unquote so
+    # Windows "Copy as path" pastes the path quoted — unquote so
     # the direct paste works first try (same nicety as the dataset folder import).
     folder = (folder or '').strip().strip('"\'')
     if not name:
@@ -8642,6 +8644,8 @@ def _score_job(bank_id, device_id=None, rescore=False):
         # report as "scored": see the counter in the write-back loop.
         ok = [r for r in results.values() if r.get('state') == 'ok']
         failed = sum(r.get('state') == 'error' for r in results.values())
+        if failed:
+            job['_usage_result'] = 'partial' if ok else 'failed'
         failure_note = ''
         if failed:
             failure_note = (f'{failed} image(s) failed; run Score again to retry '
@@ -10279,7 +10283,7 @@ def _await_queue_job(job_id, timeout, *, should_cancel=None):
     while True:
         db.session.rollback()
         row = ImageGenerationQueue.query.filter_by(job_id=job_id).first()
-        if row is not None and row.status in ('completed', 'failed', 'cancelled'):
+        if row is not None and row.status in ('completed', 'failed', 'cancelled', 'stalled', 'cancel_requested'):
             return row.status, row.result_filename, row.error_message
         if should_cancel is not None and should_cancel():
             return 'cancelled', None, None
@@ -10462,6 +10466,13 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
                 # GPU round-trip runs: the poll below reads across threads, and a
                 # held SQLite lock is how a long pass starves everything else.
                 db.session.commit()
+                timeout = improve_timeout_seconds()
+                timeout_metadata = {}
+                # Preserve the original 15-minute worker limit at defaults;
+                # explicitly changed improve budgets must reach that worker.
+                if (timeout != _IMPROVE_TIMEOUT_SECONDS
+                        or processing_timeout(_IMPROVE_TIMEOUT_SECONDS) != _IMPROVE_TIMEOUT_SECONDS):
+                    timeout_metadata['processing_timeout_seconds'] = 0 if math.isinf(timeout) else timeout
                 try:
                     job_id = fds._enqueue_improve(
                         engine, user_id=bank.user_id, source=row,
@@ -10469,7 +10480,7 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
                         label=None, dataset=None,
                         extra_metadata={'is_bank_improve': True,
                                         'bank_id': bank_id,
-                                        'bank_image_id': row.id})
+                                        'bank_image_id': row.id, **timeout_metadata})
                 except Exception as exc:
                     logger.warning('bank improve: image %s could not be queued: %s',
                                    rid, exc)
@@ -10477,7 +10488,7 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
                     bank_jobs.bump(job)
                     continue
                 status, filename, err = _await_queue_job(
-                    job_id, _IMPROVE_TIMEOUT_SECONDS,
+                    job_id, timeout,
                     should_cancel=lambda: bank_jobs.cancelled(job))
                 if status != 'completed':
                     if status != 'cancelled':
@@ -12444,6 +12455,8 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
             # user has to be able to see afterwards that the protection did
             # something, otherwise it is a promise with no evidence.
             skipped += f', {skipped_asserted} kept (written by you)'
+        if any(left.get(key, 0) for key in ('failed', 'fenced', 'unanswered')):
+            job['_usage_result'] = 'partial' if captioned else 'failed'
         skipped += _skipped_note(vanished=vanished, stale=stale,
                                  fenced=left.get('fenced', 0),
                                  fence_reason=left.get('fence_reason', ''),

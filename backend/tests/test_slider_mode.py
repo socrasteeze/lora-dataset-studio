@@ -497,6 +497,7 @@ def test_effective_train_settings_reports_slider_768_default(app, tmp_path):
 
 def test_slider_route_and_base_info_payload(app, client, monkeypatch):
     from app import capabilities
+    monkeypatch.setattr(capabilities, 'probe_aitoolkit', lambda: {'ok': True})
     monkeypatch.setattr(capabilities, 'probe', lambda: {
         'aitoolkit': {'valid': True}, 'cloud_training': False})
     ds_id = client.post('/api/dataset/create',
@@ -517,6 +518,7 @@ def test_slider_route_rejects_dense_activation_and_allows_disable(
     from app.extensions import db
     from app.models import FaceDataset
 
+    monkeypatch.setattr(capabilities, 'probe_aitoolkit', lambda: {'ok': True})
     monkeypatch.setattr(capabilities, 'probe', lambda: {
         'aitoolkit': {'valid': True}, 'cloud_training': False})
     ds_id = client.post(

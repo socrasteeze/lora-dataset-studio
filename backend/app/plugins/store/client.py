@@ -5,6 +5,7 @@ an uploaded ZIP. Each root/origin pair has its own rollback-protected metadata
 cache. Expiration can stop new downloads, never the installed application.
 """
 from __future__ import annotations
+from ...timeout_settings import network_timeout
 
 import hashlib
 import ipaddress
@@ -24,6 +25,7 @@ from tuf.ngclient.fetcher import FetcherInterface
 from ... import config as cfg
 from ..install import MAX_TOTAL_BYTES, _entry_relpath
 from ..official import OFFICIAL_IDS
+from ..manifest import EXTERNAL_ID
 from ..storage import managed_path
 
 _LOCK = threading.RLock()
@@ -67,6 +69,8 @@ class StoreConfig:
     target_url: str
     root: bytes
     official_ids: frozenset
+    external_ids: frozenset = frozenset()
+    scoped_ids: frozenset = frozenset()
 
     def __post_init__(self):
         object.__setattr__(self, 'metadata_url', _base_url(self.metadata_url))
@@ -76,10 +80,23 @@ class StoreConfig:
                 or any(pid not in OFFICIAL_IDS for pid in self.official_ids)):
             raise StoreError('The store trust configuration cannot be verified.')
         object.__setattr__(self, 'official_ids', frozenset(self.official_ids))
+        if (not isinstance(self.external_ids, (set, frozenset))
+                or any(not isinstance(pid, str) or not EXTERNAL_ID.fullmatch(pid) for pid in self.external_ids)):
+            raise StoreError('External catalog permissions must name exact publisher.plugin identifiers.')
+        object.__setattr__(self, 'external_ids', frozenset(self.external_ids))
+        if (not isinstance(self.scoped_ids, (set, frozenset))
+                or (self.scoped_ids and self.scoped_ids != self.official_ids | self.external_ids)):
+            raise StoreError('Catalog permissions must match its selected plugin identifiers.')
+        object.__setattr__(self, 'scoped_ids', frozenset(self.scoped_ids))
+
+    @property
+    def selected_ids(self):
+        return self.scoped_ids or self.external_ids
 
     @property
     def identity(self):
-        return hashlib.sha256(self.root + self.metadata_url.encode() + b'\0' + self.target_url.encode()).hexdigest()
+        scope = json.dumps(sorted(self.selected_ids)).encode() if self.selected_ids else b''
+        return hashlib.sha256(self.root + self.metadata_url.encode() + b'\0' + self.target_url.encode() + scope).hexdigest()
 
 
 def load_config():
@@ -88,17 +105,85 @@ def load_config():
         raise StoreNotConfigured('The store has not been connected to a trusted catalog yet.')
     try:
         data = json.loads(path.read_text(encoding='utf-8'))
+        return _read_config(data, path.parent)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise StoreError('The store trust configuration cannot be verified.') from exc
+
+
+def _read_config(data, directory, *, external_ids=frozenset(), scoped_ids=frozenset()):
+    try:
         root_path = Path(data['root_path'])
         if not root_path.is_absolute():
-            root_path = path.parent / root_path
+            root_path = directory / root_path
         root = root_path.read_bytes()
         ids = data.get('official_ids', [])
         if (not root or len(root) > 512000 or not isinstance(ids, list)
                 or any(not isinstance(pid, str) or pid not in OFFICIAL_IDS for pid in ids)):
             raise ValueError('invalid trust configuration')
-        return StoreConfig(_base_url(data['metadata_url']), _base_url(data['target_url']), root, frozenset(ids))
+        return StoreConfig(_base_url(data['metadata_url']), _base_url(data['target_url']), root,
+                           frozenset(ids), external_ids, scoped_ids)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise StoreError('The store trust configuration cannot be verified.') from exc
+
+
+def load_private_configs():
+    """Explicit operator roots and scopes; private catalogs cannot grant themselves rights."""
+    path = cfg.data_dir() / 'plugin-store' / 'sources.json'
+    if not path.exists():
+        return []
+    try:
+        if path.stat().st_size > 128 * 1024:
+            raise ValueError('source list too large')
+        sources = json.loads(path.read_text(encoding='utf-8'))['sources']
+        if not isinstance(sources, list) or len(sources) > 20:
+            raise ValueError('invalid sources')
+        result, claimed = [], set()
+        for source in sources:
+            if 'first_party_ids' in source:
+                external, official = source['plugin_ids'], source['first_party_ids']
+                if (not isinstance(external, list) or not isinstance(official, list)
+                        or any(not isinstance(pid, str) or not EXTERNAL_ID.fullmatch(pid) for pid in external)
+                        or 'official_ids' in source):
+                    raise ValueError('invalid first-party source permissions')
+                # Older clients keep their external scope and ignore this new
+                # field until the core update; no temporary catalog outage.
+                source = {**source, 'plugin_ids': external + official, 'official_ids': official}
+            ids = source['plugin_ids']
+            if (not isinstance(ids, list) or not 1 <= len(ids) <= 100
+                    or any(not isinstance(pid, str) or not (EXTERNAL_ID.fullmatch(pid) or pid in OFFICIAL_IDS)
+                           for pid in ids)
+                    or len(set(ids)) != len(ids) or claimed.intersection(ids)):
+                raise ValueError('invalid or overlapping source permissions')
+            selected = frozenset(ids)
+            official = source.get('official_ids', [])
+            if (not isinstance(official, list)
+                    or any(not isinstance(pid, str) or pid not in OFFICIAL_IDS for pid in official)
+                    or len(set(official)) != len(official)
+                    or frozenset(official) != selected.intersection(OFFICIAL_IDS)):
+                raise ValueError('first-party permissions must be explicit and match the scope')
+            if official and load_config().official_ids.intersection(official):
+                raise ValueError('a private catalog cannot replace primary first-party products')
+            result.append(_read_config(source, path.parent, external_ids=selected.difference(official),
+                                       scoped_ids=selected))
+            claimed.update(ids)
+        return result
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise StoreError('The private plugin sources configuration cannot be verified.') from exc
+
+
+def config_for_plugins(plugin_ids):
+    """None preserves the default Store session and its existing trust root."""
+    requested = [plugin_ids] if isinstance(plugin_ids, str) else plugin_ids
+    if (not isinstance(requested, (list, tuple)) or not 1 <= len(requested) <= 50
+            or any(not isinstance(pid, str) for pid in requested)):
+        raise StoreError('Select valid plugin identifiers.')
+    sources = load_private_configs()
+    selected = {next((index for index, source in enumerate(sources) if pid in source.selected_ids), -1)
+                for pid in requested}
+    if len(selected) > 1:
+        raise StoreError('Update plugins from different catalogs separately.')
+    index = next(iter(selected), -1)
+    return sources[index] if index >= 0 else None
 
 
 class _Fetcher(FetcherInterface):
@@ -119,7 +204,7 @@ class _Fetcher(FetcherInterface):
             # Public metadata/archives must never inherit NETRC credentials,
             # authenticated proxies, cookies or custom CA settings from the host.
             session.trust_env = False
-            with session.get(url, headers=headers, stream=True, timeout=(10, 30), allow_redirects=False) as response:
+            with session.get(url, headers=headers, stream=True, timeout=network_timeout((10, 30)), allow_redirects=False) as response:
                 if response.status_code != 200:
                     raise DownloadHTTPError('The store download failed.', response.status_code)
                 for chunk in response.iter_content(chunk_size=65536):

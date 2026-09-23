@@ -45,6 +45,8 @@ def parse_catalog(data, config):
     try:
         for product in products:
             plugin_id = product['id']
+            if config.selected_ids and plugin_id not in config.selected_ids:
+                continue
             if plugin_id in result:
                 raise ValueError('duplicate product')
             versions = {}
@@ -55,9 +57,7 @@ def parse_catalog(data, config):
                 manifest = parse_manifest(release['manifest'], Path('.'), official=plugin_id in config.official_ids)
                 if manifest.bundled or manifest.id != plugin_id or manifest.contract['schema_version'] != 2:
                     raise ValueError('invalid package identity')
-                if not manifest.official:
-                    # The initial store contains reviewed LDS products only.
-                    # Third-party namespaces still work through explicit ZIP consent.
+                if not manifest.official and plugin_id not in config.external_ids:
                     raise ValueError('publisher is not approved for this store')
                 version = Version(manifest.version)
                 if version in versions:
@@ -90,7 +90,7 @@ def _satisfies(version, ranges, *, installed=False):
     return all(SpecifierSet(spec).contains(version, prereleases=SpecifierSet(spec).prereleases is True) for spec in ranges)
 
 
-def resolve(catalog, requested, installed, *, version=None, active=None):
+def resolve(catalog, requested, installed, *, version=None, active=None, enable_requested=True):
     """Backtrack the small reviewed catalog, preserving reverse dependencies.
 
     Enabled products constrain dependencies. All installed manifests, including
@@ -98,12 +98,17 @@ def resolve(catalog, requested, installed, *, version=None, active=None):
     require updating its old combined owner in this same consented transaction,
     without acquiring a permanent dependency on it or enabling it.
     """
-    if not isinstance(requested, str) or requested not in catalog:
+    roots = [requested] if isinstance(requested, str) else requested
+    if (not isinstance(roots, (list, tuple)) or not 1 <= len(roots) <= 50
+            or any(not isinstance(pid, str) or pid not in catalog for pid in roots)):
         raise StoreError('This plugin is not available from this catalog.')
+    roots = sorted(set(roots))
     constraints = {}
     if version is not None:
+        if len(roots) != 1:
+            raise StoreError('Review a specific version of one plugin at a time.')
         try:
-            constraints.setdefault(requested, []).append('==' + str(Version(version)))
+            constraints.setdefault(roots[0], []).append('==' + str(Version(version)))
         except (ValueError, TypeError) as exc:
             raise StoreError('The requested version is invalid.') from exc
 
@@ -111,7 +116,7 @@ def resolve(catalog, requested, installed, *, version=None, active=None):
     active = set(installed) if active is None else set(active)
 
     def enabled_ids(chosen):
-        result = active | {requested}
+        result = active | (set(roots) if enable_requested else set())
         while True:
             expanded = result | {dep for pid in result if pid in chosen for dep in chosen[pid].manifest.requires}
             if expanded == result:
@@ -130,7 +135,7 @@ def resolve(catalog, requested, installed, *, version=None, active=None):
             return visit(chosen, needed[1:])
         candidates = list(catalog.get(pid, []))
         current = installed.get(pid)
-        if current and pid != requested:
+        if current and pid not in roots:
             # An installed version need not remain offered for sale to satisfy a dependency.
             candidates.insert(0, Release(current, '', '', (), {'kind': 'installed'}))
         for candidate in candidates:
@@ -160,7 +165,7 @@ def resolve(catalog, requested, installed, *, version=None, active=None):
                 return result
         return None
 
-    solution = visit({}, [requested] + sorted((set(installed) | active) - {requested}))
+    solution = visit({}, roots + sorted((set(installed) | active) - set(roots)))
     if solution is None:
         raise StoreError('No compatible set of plugin versions satisfies the installed plugins, their ownership and this app. '
                          'Update or remove an older combined product if it reserves this feature, even when disabled.')

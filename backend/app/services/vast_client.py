@@ -2,6 +2,7 @@
 here so an API change touches one file. The API key is read from the secret
 store on every call — never cached, so a key pasted in Settings applies
 immediately."""
+from ..timeout_settings import network_timeout
 import logging
 import re
 
@@ -92,7 +93,7 @@ def _request(method, path, *, base=API_BASE, **kwargs):
     headers = {'Authorization': f'Bearer {key}', 'Accept': 'application/json'}
     try:
         return requests.request(method, f'{base}{path}', headers=headers,
-                                timeout=_TIMEOUT, **kwargs)
+                                timeout=network_timeout(_TIMEOUT), **kwargs)
     except requests.RequestException as e:
         raise VastError(f'vast.ai request failed: {e}') from e
 

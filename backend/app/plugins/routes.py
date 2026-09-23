@@ -43,12 +43,12 @@ def admin_mutation_gate():
 
 
 def restart_payload() -> dict:
-    if updater.is_docker_runtime():
-        mode, how = 'container', 'Restart the container (docker compose restart) for the change to apply.'
-    elif updater.is_pinokio_runtime():
+    if updater.is_pinokio_runtime():
         mode, how = 'pinokio', 'Stop the app in Pinokio, then Start it again, for the change to apply.'
     elif os.environ.get('LDS_RESTART_MODE', '').strip().lower() == 'supervisor':
         mode, how = 'self', 'Apply changes and restart LDS to use the requested plugin state.'
+    elif updater.is_docker_runtime():
+        mode, how = 'container', 'Restart the container (docker compose restart) for the change to apply.'
     else:
         mode, how = 'manual', 'Close the app and start it again for the change to apply.'
     return {'required': True, 'mode': mode, 'how': how, 'can_apply': mode == 'self'}
@@ -134,9 +134,11 @@ def prepare_plugin(plugin_id):
         return jsonify(error=str(exc)), exc.status
 
 
-def _change_blocker(plugin_id):
+def _change_blocker(plugin_id, *, disabling=True):
     if setup_installer.plugin_install_busy(plugin_id) or environment.running(plugin_id):
         return jsonify({'error': 'Wait for this plugin’s installation or running work to finish.'}), 409
+    if not disabling:
+        return None
     try:
         blockers = [str(r) for r in (run_filter(
             'plugin.disable_blockers', [], plugin_id, strict=True) or ()) if r]
