@@ -686,7 +686,7 @@ def _wait_for_job(job_id, timeout):
 
 def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
                    denoise=KLEIN_DENOISE, timeout=None, klein_model=None,
-                   prompt=None):
+                   device_id=None, prompt=None):
     """Enqueue one native full-edit job on `crop_img` and return (rendered_image, None) or
     (None, error). Whatever is passed becomes the KSampler latent AND the ReferenceLatent
     (no SetLatentNoiseMask) — a PRE-FILLED crop on the box-repair lane, the WHOLE photo on
@@ -1172,7 +1172,7 @@ def compare_preview(user_id, image_path, boxes, *, klein_model, seed,
 
 def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cpu',
                             timeout=None,
-                            klein_model=None, prompt=None,
+                            klein_model=None, device_id=None, prompt=None,
                             klein_prompt=None, klein_max_mp=None,
                             klein_output=None) -> tuple[bool, dict | None]:
     """Klein, on `image_path`, in place — the 🧽 watermark CLEAN or the ✦ BOX repair.
@@ -1239,7 +1239,8 @@ def inpaint_watermark_klein(user_id, image_path, boxes, *, seed=None, device='cp
 
 def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
                       device='cpu', timeout=None,
-                      klein_model=None, klein_prompt=None, klein_max_mp=None,
+                      klein_model=None, device_id=None,
+                      klein_prompt=None, klein_max_mp=None,
                       klein_output=None) -> tuple[bool, dict | None]:
     """The 🧽 clean (maintainer's 2026-08-31 recipe): ERASE the detected zones on the
     whole photo, hand that whole photo to Klein under "remove watermark", and write the
@@ -1327,6 +1328,7 @@ def _clean_full_frame(user_id, image_path, original, norm=None, *, seed=None,
 
 def _repair_boxes_crop_and_stitch(user_id, image_path, original, norm, *, seed=None,
                                   device='cpu', timeout=None, klein_model=None,
+                                  device_id=None,
                                   prompt=None) -> tuple[bool, dict | None]:
     """The ✦ prompted BOX repair: prefill + Klein full-edit refine of a padded crop +
     per-zone harmonization + feathered composite of the boxes' footprint only.

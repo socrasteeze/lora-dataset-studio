@@ -178,8 +178,16 @@ def test_a_render_remembers_its_dials_and_the_mode_it_used(app, client, tmp_path
     monkeypatch.setattr(vts, 'clips_dir', lambda create=True: str(tmp_path))
     (tmp_path / 'clip.mp4').write_bytes(b'ORIGINAL')
     _ready(monkeypatch)
-    monkeypatch.setattr(engine, 'render_video', lambda src, dst, params, **kw: (
-        open(dst, 'wb').write(b'R') and {'frames': 56, 'temporal': True, 'mean_ms': 31.7, 'mode_note': 'temporal mode'}))
+    # Gate: read as-asked while render is still in flight (Divergence 5).
+    started, release = threading.Event(), threading.Event()
+
+    def _render(src, dst, params, **kw):
+        started.set()
+        release.wait(timeout=10)
+        open(dst, 'wb').write(b'R')
+        return {'frames': 56, 'temporal': True, 'mean_ms': 31.7, 'mode_note': 'temporal mode'}
+
+    monkeypatch.setattr(nr, 'render_video', _render)
     src_id = _clip(app)
     with app.app_context():
         new_id = nr.start_studio_render(app, 'local', src_id, {'strength': 2, 'passes': 1, 'scale': 2, 'tone': 0})['clip_id']

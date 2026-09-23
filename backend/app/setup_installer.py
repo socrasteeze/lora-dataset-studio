@@ -1619,7 +1619,7 @@ def _install_cpu_torch_pair(action, python, *, constraints=None) -> int:
 _MIN_PIP = (23, 1)
 
 
-def _pip_version(python):
+def _pip_version(python, *, isolated_env=None):
     """(major, minor) of `python`'s pip — read by RUNNING it — or None when it
     cannot be read (missing/fake interpreter, no pip module)."""
     try:
@@ -3543,6 +3543,16 @@ def _managed_env_valid(python):
         return False
 
 
+def group_caps_keys(group) -> dict:
+    """The capability keys a group's plan reads its gaps from, every key
+    present (None = the group has no such lane)."""
+    registry = _plugin_registry()
+    spec = registry.install_groups.get(group) if registry else None
+    keys = spec['caps_keys'] if spec else _GROUP_CAPS_KEYS.get(group, {})
+    return {'missing': None, 'invalid': None, 'pack_action': None,
+            'nodes_missing': None, 'nodes_installed': None, **keys}
+
+
 def _install_quality_tools(action, features) -> int:
     python = _ensure_managed_ml_env(action, _quality_env_dir())
     if not python:
@@ -3650,6 +3660,8 @@ def _companion_unusable_reason(comp, path):
             return f'not a readable JSON file ({exc})'
     return _unloadable_reason('companion', path, comp)
 
+
+_COMPANION_LOCKS = {}
 
 def _companion_lock(companions):
     with _lock:

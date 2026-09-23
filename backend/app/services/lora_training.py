@@ -34,6 +34,17 @@ from ..models import FaceDataset, FaceDatasetImage
 from ..job_queue import GPU_ARBITER_LOCK, queue_manager
 from . import cloud_run_dataset as _crd
 from . import dataset_activity, face_dataset_service as fds, face_mask, trash
+
+
+def _activity(dataset_id, message, level='info', detail=None):
+    """Mirror a training transition into the activity log. Lazy + swallowed."""
+    try:
+        from . import activity_log
+        activity_log.record('training', message, level=level,
+                            dataset_id=dataset_id, detail=detail)
+    except Exception:  # noqa: BLE001
+        pass
+
 from .person_mask import generate_person_masks
 
 logger = logging.getLogger(__name__)
@@ -5030,6 +5041,7 @@ def _build_job_config_krea(ds, dataset_folder: str, steps: int, training_folder=
     _krank = _lora_rank(ds, 'krea')   # default 32/32; editable through train_settings
     # Custom local krea2 weights replace name_or_path; bundled TE/VAE remain
     # official. The selected variant still determines adapter and preview CFG.
+    _kbase = getattr(ds, 'train_base_model', None)
     model = {
         'arch': 'krea2',
         'name_or_path': (_kbase if _is_custom_weights(_kbase)
