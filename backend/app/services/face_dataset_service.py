@@ -267,6 +267,8 @@ def check_fanout_budget(dataset_id, total, *, generators=()):
     a half-dispatched batch. The multi-engine route calls this with the aggregate
     BEFORE dispatching anything, so the run is all-or-nothing. The per-call
     checks stay as defense in depth."""
+    from ..generation_limits import local_queue_limit
+    limit = local_queue_limit() if generators and all(g in LOCAL_ENGINES for g in generators) else MAX_FANOUT
     total = int(total)
     if total > limit:
         raise ValueError(f'fan-out too large ({total} > {limit})')
