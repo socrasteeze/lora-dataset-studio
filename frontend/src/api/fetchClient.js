@@ -40,11 +40,10 @@ function csrfHeaderName(headers) {
   return Object.keys(headers || {}).find((k) => k.toLowerCase() === 'x-csrftoken');
 }
 
-// Rebuild request options with a freshly-read CSRF token: the header for JSON
+// Rebuild request options with the refreshed CSRF token: the header for JSON
 // bodies, plus the csrf_token field for FormData bodies (the generation path
 // sends the token both ways). FormData is mutable, so it is reused in place.
-function withFreshCsrf(options) {
-  const token = getCsrfToken();
+function withFreshCsrf(options, token) {
   const name = csrfHeaderName(options.headers) || 'X-CSRFToken';
   if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
     options.body.set?.('csrf_token', token);
@@ -86,14 +85,8 @@ export async function fetchWithCsrfRetry(url, options = {}) {
   let opts = { credentials: 'include', ...options };
   let res = await fetch(url, opts);
   if (isCsrfRejection(res) && csrfHeaderName(opts.headers)) {
-    await refreshCsrfToken();
-    opts = { credentials: 'include', ...withFreshCsrf(opts) };  // the busy replay below reuses it
-    res = await fetch(url, opts);
-  }
-  for (let i = 0; i < DB_BUSY_RETRIES; i += 1) {
-    if (!await isDbBusy(res)) break;
-    await sleep(DB_BUSY_BACKOFF_MS * (i + 1));
-    res = await fetch(url, opts);
+    const token = await refreshCsrfToken();
+    res = await fetch(url, { credentials: 'include', ...withFreshCsrf(opts, token) });
   }
   return res;
 }
@@ -254,15 +247,19 @@ export function postForm(url, formData, opts = {}) {
 }
 
 /**
- * Refresh the CSRF token (server regenerates `session['csrf_token']` and
- * resets the matching cookie). Used as a recovery step when a POST fails
- * with a CSRF-mismatch 400 (typical after the session was regenerated
- * server-side — e.g. Flask-Login's session_protection='strong').
+ * Return this server's fresh token directly. Cookies are shared across ports:
+ * another local application can overwrite csrf_token before the retry reads it.
+ * The response body stays tied to the session that requested this refresh.
  */
 export async function refreshCsrfToken() {
   try {
-    await fetch('/api/csrf-token', { credentials: 'include' });
+    const res = await fetch('/api/csrf-token', { credentials: 'include', cache: 'no-store' });
+    if (res.ok) {
+      const body = await res.json();
+      if (typeof body?.csrf_token === 'string' && body.csrf_token) return body.csrf_token;
+    }
   } catch { /* network errors handled by caller */ }
+  return getCsrfToken();
 }
 
 /**

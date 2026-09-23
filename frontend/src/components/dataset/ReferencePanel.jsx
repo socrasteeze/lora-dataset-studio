@@ -4,7 +4,7 @@ import IdentityPromptModal from './IdentityPromptModal';
 // this tooltip ended up naming two engines while a third could already edit.
 import { editEngineNames, pendingEditNote } from './referenceEdit';
 
-// Cap identique à MAX_EXTRA_REFS côté backend (face_dataset_service).
+// Same limit as backend MAX_EXTRA_REFS in face_dataset_service.
 const MAX_EXTRA_REFS = 3;
 
 export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCropRef, onEditRef, busy,

@@ -19,7 +19,7 @@
  * `lanes` lets the user choose it — a checkpoint is a file, so a run trained here
  * can be finished on a rented GPU and vice-versa; a mount that doesn't gets its
  * own `where` back and can ignore the field. */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { HelpBadge } from '../../help/HelpMode';
 import {
   defaultResumeMode,
@@ -98,8 +98,8 @@ export default function ContinueDialog({
   // than carrying a now-invalid full-state choice to another save/lane.
   useEffect(() => {
     setResumeMode(defaultResumeMode(selectedCheckpoint, lane));
-    // L'IDENTITE utile du checkpoint (bundle_id), pas l'objet : le poll le
-    // recree a chaque tick et ecraserait un choix en cours.
+    // Depend on the checkpoint IDENTITY (bundle_id), not the object: polling recreates it each
+    // tick and would overwrite an in-progress choice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromStep, lane, selectedCheckpoint?.resume_state?.bundle_id, fullStateAvailable]);
 
@@ -160,6 +160,7 @@ export default function ContinueDialog({
   const isEarlier = fromStep < latest;
 
   const submit = () => {
+    if (busy || blockedReason || (resumeMode === 'full_state' && !fullStateAvailable)) return;
     const overrides = {};
     if (!trajectoryLocked && saveEvery !== inheritedSave) {
       overrides.save_every = Number(saveEvery);
@@ -491,7 +492,7 @@ export default function ContinueDialog({
           <button type="button" onClick={dismiss} disabled={busy}
             className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40">Cancel</button>
           <button type="button" onClick={submit}
-            disabled={busy || latest === 0 || laneBlocked
+            disabled={busy || latest === 0 || laneBlocked || gpuBlocked || !!transportReason
               || (resumeMode === 'full_state' && !fullStateAvailable)}
             title={laneBlocked ? laneState(lane).reason || undefined : undefined}
             className="ml-auto px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">

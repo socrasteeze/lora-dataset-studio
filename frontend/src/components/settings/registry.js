@@ -45,8 +45,9 @@ export const SETTINGS_SECTIONS = [
     keywords: ['device', 'devices', 'peer', 'primary', 'worker', 'cluster', 'gpu', 'tailscale',
       'remote', 'laptop', 'hub', 'join', 'hardware'] },
   { id: 'maintenance', title: 'Maintenance', icon: Wrench, eyebrow: 'housekeeping',
-    description: 'Updates, server log and bug reports.',
-    keywords: ['update', 'restart', 'log', 'diagnostic', 'version', 'bug'] },
+    description: 'Usage sharing, updates, server log and bug reports.',
+    keywords: ['update', 'restart', 'log', 'diagnostic', 'version', 'bug',
+      'usage', 'statistics', 'analytics', 'telemetry', 'privacy', 'consent', 'sharing'] },
 ]
 
 /* Sidebar LED per section — derived from live capabilities so the rail doubles

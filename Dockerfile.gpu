@@ -83,6 +83,7 @@ COPY backend backend
 COPY frontend/dist frontend/dist
 COPY fork-plugins.json .
 COPY --from=fork-plugins /curated-plugins bundled
+COPY store/bootstrap.json store/public-root.json store/
 COPY config.example.json .
 COPY packaging/docker packaging/docker
 

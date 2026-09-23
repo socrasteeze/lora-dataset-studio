@@ -4,7 +4,7 @@
 
 **A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train it on your own GPU, then compare checkpoints before export.
 
-The core and the 13 public plugins are available at no charge, with public source under the project's PolyForm Noncommercial license, no account required for the core and no telemetry. Additional optional paid plugins may be offered later. API engines and rented GPUs are optional; local and manual workflows remain available.
+The core and the public plugins are available at no charge, with public source under the project's PolyForm Noncommercial license and no account required for the core. Optional usage statistics are off by default. Additional optional paid plugins may be offered later. API engines and rented GPUs are optional; local and manual workflows remain available.
 
 > **V2 is now the main LDS release.** Install from the default [`v2` branch](https://github.com/perfectgf/lora-dataset-studio/tree/v2) or the [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest). Existing ZIP installations can use **Update & restart** to upgrade the core while keeping their datasets, media and history. Git installations still on `main` must first switch to `v2` as described below. Then install the optional features you use from **Plugins → Store** and review each plugin's settings before its first run.
 
@@ -943,9 +943,9 @@ This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter AP
 
 ## Setup & install
 
-On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins → Store** and install only the features you want. Each plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
+On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins → Store**, select the features you want and install them together with one LDS restart. Each plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
 
-The Store offers **13 free public plugins**: API image engines, Camera angles, Canvas, Publish to Civitai, Cloud training, Publish to Hugging Face, Klein Improve, Live channels, Model tools, Resource monitor, Web scraping, SeedVR2 and Video lane. Their individual updates appear under each plugin.
+The Store offers **free public plugins** for generation, editing, training, publishing and other optional features. Each listing describes the plugin's capabilities and preparation requirements. Their individual updates appear under each plugin.
 
 ### Option 1 — release ZIP + start.bat (Windows)
 
@@ -1064,7 +1064,7 @@ existing-ComfyUI adoption, UID/GID, DNS, update commands, resource caps and
 operational limits are documented in the dedicated
 [Docker guide](docs/guide/docker.md).
 
-To update a Docker install, double-click **`update-docker.bat`** for the latest stable release, or pass `main` to follow commits on the main branch. It rebuilds transactionally and rolls back if the container does not come up healthy. Both `start-docker.bat` and `start-docker-gpu.bat` accept `--rebuild` and `--update-rebuild`; `start-docker.bat` also accepts `--configure`, which is what `configure-docker.bat` calls. After upgrading from V1, install the optional features you use from **Plugins → Store**.
+To update a Docker install, double-click **`update-docker.bat`** for the latest stable release, or pass `v2` to follow the maintained branch (`main` remains a compatibility alias for `v2`). It rebuilds transactionally and rolls back if the container does not come up healthy. Both `start-docker.bat` and `start-docker-gpu.bat` accept `--rebuild` and `--update-rebuild`; `start-docker.bat` also accepts `--configure`, which is what `configure-docker.bat` calls. After upgrading from V1, install the optional features you use from **Plugins → Store**. Both images include the public Store configuration; [Docker plugin administration and restarts](docs/guide/docker.md#v2-plugins) explains how to unlock installation and apply changes.
 
 ### Option 5 — Pinokio (one click, any OS)
 
@@ -1181,7 +1181,7 @@ Still stuck? Open the app's **Guide → Getting help** for the one-click **diagn
 </p>
 
 The LDS core and the public plugins in this release have public source and are available at no charge under the project's PolyForm Noncommercial license,
-with no telemetry. Additional optional paid plugins may be offered later;
+with usage statistics off by default. Additional optional paid plugins may be offered later;
 the core and these public plugins remain free. Voluntary donations and the
 [vast.ai](https://cloud.vast.ai/?ref_id=683073) referral links disclosed above help
 fund development; those links do not change the price you pay. The project is
