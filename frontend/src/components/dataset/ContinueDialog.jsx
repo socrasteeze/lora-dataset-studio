@@ -492,7 +492,7 @@ export default function ContinueDialog({
           <button type="button" onClick={dismiss} disabled={busy}
             className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40">Cancel</button>
           <button type="button" onClick={submit}
-            disabled={busy || latest === 0 || laneBlocked || gpuBlocked || !!transportReason
+            disabled={busy || latest === 0 || laneBlocked
               || (resumeMode === 'full_state' && !fullStateAvailable)}
             title={laneBlocked ? laneState(lane).reason || undefined : undefined}
             className="ml-auto px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">

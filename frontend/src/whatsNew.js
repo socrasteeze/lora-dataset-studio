@@ -239,7 +239,6 @@ export const WHATS_NEW = [
     blurb: 'Docker images now include the public plugin Store configuration. GPU installs can apply plugin changes by restarting only LDS, and update instructions follow your Docker setup. The Docker updater also follows the maintained V2 branch. Thanks to _nofaceman for reporting the missing catalog.',
   },
   {
-    id: '2026-09-20-plugin-install-review-focus',
     id: '2026-09-20-v2-local-fork',
     date: '2026-09-20',
     title: 'Local Tools, Migrated',
