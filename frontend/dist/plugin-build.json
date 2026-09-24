@@ -1,1 +1,1 @@
-{"schema_version":1,"distribution":"fork","plugins":["camera_angles","canvas","dlss5","hf_publish","image_upscale","live","model_tools","resource_monitor","scrape","seedvr2","video"]}
+{"schema_version":1,"distribution":"fork","plugins":["camera_angles","canvas","dlss5","hf_publish","image_upscale","live","model_tools","qwen_dataset","resource_monitor","scrape","seedvr2","video"]}
