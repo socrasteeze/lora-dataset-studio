@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import threading
+import time
 import uuid
 
 from lds_sdk.lifecycle import state_change_lock
@@ -37,10 +38,13 @@ def read(ident):
     path = folder(ident) / 'record.json'
     if path.is_symlink() or not path.is_file():
         raise nr.NeuralRenderError('Clip not found.')
-    try:
-        record = json.loads(path.read_text(encoding='utf-8'))
-    except (ValueError, OSError) as exc:
-        raise nr.NeuralRenderError('The clip record is unreadable.') from exc
+    # Share _LOCK with save() so Windows status polls cannot hold record.json
+    # open across os.replace.
+    with _LOCK:
+        try:
+            record = json.loads(path.read_text(encoding='utf-8'))
+        except (ValueError, OSError) as exc:
+            raise nr.NeuralRenderError('The clip record is unreadable.') from exc
     if not isinstance(record, dict) or record.get('id') != ident:
         raise nr.NeuralRenderError('The clip record is invalid.')
     return record
@@ -53,7 +57,18 @@ def save(record):
     if part.is_symlink() or final.is_symlink():
         raise nr.NeuralRenderError('The clip record cannot be a linked file.')
     part.write_text(json.dumps(record), encoding='utf-8')
-    os.replace(part, final)
+    # Windows denies ReplaceFile while another handle still has the destination
+    # open (status polling reads record.json). Retry briefly for that race and
+    # for transient scanner locks; Linux replace succeeds on the first try.
+    deadline = time.monotonic() + 2.0
+    while True:
+        try:
+            os.replace(part, final)
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.02)
 
 
 def imported(upload):
