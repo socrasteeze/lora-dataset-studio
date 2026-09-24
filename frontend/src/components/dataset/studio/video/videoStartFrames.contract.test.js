@@ -19,18 +19,26 @@ test('the strip is the state, and `source` is its first frame — what the ✨ h
   assert.doesNotMatch(STUDIO, /setSource\(|useState\(\{ image: null/, 'a second, single-frame state would drift from the strip')
   // The helpers still read `source.image` — the first frame — and the
   // poller still resets on it (the motion-length contract pins the lines).
-  assert.match(STUDIO, /image: mode === 't2v' \? null : \(source\.image \|\| null\)/)
-  assert.match(STUDIO, /useEffect\(\(\) => \{ stopWaiting\(\); \}, \[mode, source\.image, seconds, stopWaiting\]\);/)
-  // Blocked on an EMPTY strip, not on a missing first image.
-  assert.match(STUDIO, /const needsImage = mode === 'i2v' && sources\.length === 0;/)
+  // The ref2va lane added a branch ahead of it (a reference's own first
+  // frame, not the strip's) but `source.image` is still what a non-reference
+  // launch sends.
+  assert.match(STUDIO,
+    /image: isReference \? reference\.firstFrame\?\.\s*image : launchMode === 't2v' \? null : \(source\.image \|\| null\)/)
+  assert.match(STUDIO,
+    /useEffect\(\(\) => \{ stopWaiting\(\); \}, \[mode, source\.image, seconds, reference\.signature, stopWaiting\]\);/)
+  // Blocked on an EMPTY strip, not on a missing first image — except when
+  // identity RefMods supply the image instead (useRefmods).
+  assert.match(STUDIO, /const needsImage = mode === 'i2v' && sources\.length === 0 && !useRefmods;/)
 })
 
 test('Generate walks the strip through queueClips — one POST per frame, text-only one launch', () => {
   const gen = STUDIO.slice(STUDIO.indexOf('const generate = async () => {'), STUDIO.indexOf('const rate = '))
   assert.ok(gen.length > 0, 'generate is gone')
   // `let`: the per-picture batch mode swaps the strip for the same frames
-  // carrying the prompts written for them, before anything is queued.
-  assert.match(gen, /let launches = mode === 't2v' \? \[null\] : sources;/)
+  // carrying the prompts written for them, before anything is queued. The
+  // ref2va lane launches from the reference's own first frame instead of the
+  // strip, ahead of the text/image-mode choice.
+  assert.match(gen, /let launches = isReference \? \[reference\.firstFrame\] : launchMode === 't2v' \? \[null\] : sources;/)
   assert.match(gen, /const perPicture = mode === 'i2v' && promptMode === 'per-image' && launches\.length > 1;/)
   // One batched request writes for the whole strip, THEN the loop reads the
   // answers back — no second round trip and no second vision window.
@@ -68,7 +76,9 @@ test('the button counts the clips — in the rail and in the phone bar — and t
   assert.doesNotMatch(STUDIO, /'Queueing…' : 'Generate clip'|runLabel="▶ Generate clip"/)
   // ↻ Reuse replaces the strip, and the frames it drops let go of their
   // upload previews first (the same release the picker's ✕ and Clear all do).
-  assert.match(STUDIO, /sources\.forEach\(releasePreview\);\n\s*setSources\(\[\{ key: `staged:\$\{clip\.source_image\}`/)
+  // An explanatory comment on the Continue chain now sits between the two
+  // lines, so matched loosely rather than by adjacency.
+  assert.match(STUDIO, /sources\.forEach\(releasePreview\);[\s\S]*?setSources\(\[\{ key: `staged:\$\{clip\.source_image\}`/)
   assert.match(STUDIO, /sources\.length > 1 \? `from \$\{sources\.length\} images` : 'from an image'/)
   // The header sentence follows the behaviour: a launch is no longer one clip.
   assert.match(STUDIO, /One clip per start frame — compare in time, same seed, one dial changed\./)
@@ -76,8 +86,13 @@ test('the button counts the clips — in the rail and in the phone bar — and t
 })
 
 test('↻ Reuse puts the clip’s own frame ALONE in the strip, and the picker gets the strip and its three verbs', () => {
-  assert.match(STUDIO, /setSources\(\[\{ key: `staged:\$\{clip\.source_image\}`, image: clip\.source_image, ratio: null, preview: null \}\]\);/)
-  assert.match(STUDIO, /<VideoSourcePicker mode=\{mode\} onMode=\{setMode\} frames=\{sources\}\n\s*aspect=\{aspect\} onAspect=\{setAspect\}\n\s*onAdd=\{addSources\} onRemove=\{removeSource\} onClear=\{clearSources\} \/>/)
+  // Gained `continues: clip.continues_of || null`, so the reused launch keeps
+  // the same ⏭ Continue parent and the ✨ writers keep their chain.
+  assert.match(STUDIO, /setSources\(\[\{ key: `staged:\$\{clip\.source_image\}`, image: clip\.source_image, ratio: null, preview: null,\n\s*continues: clip\.continues_of \|\| null \}\]\);/)
+  // Prefix only: the picker gained more props (identityReferences, history,
+  // onOpen, the end-frame trio) with the last-frame/reference lanes — the
+  // three original verbs (add/remove/clear) are still exactly what it gets.
+  assert.match(STUDIO, /<VideoSourcePicker mode=\{mode\} onMode=\{setMode\} frames=\{sources\} identityReferences=\{useRefmods\}\n\s*aspect=\{aspect\} onAspect=\{setAspect\}\n\s*onAdd=\{addSources\} onRemove=\{removeSource\} onClear=\{clearSources\}/)
   // Additions go through the helper's dedupe by origin, on the latest state.
   assert.match(STUDIO, /const addSources = useCallback\(\(list\) => setSources\(\(prev\) => addFrames\(prev, list\)\.frames\), \[\]\);/)
   assert.match(STUDIO, /const removeSource = useCallback\(\(key\) => setSources\(\(prev\) => removeFrame\(prev, key\)\), \[\]\);/)

@@ -15,6 +15,21 @@ const {
   CONTINUE_LOCAL_REASON, EMPTY_NOTE, NO_LORAS_ROOT_REASON,
 } = await import("../../bundled/video/frontend/videobank/videoCheckpoints.js")
 
+// VideoCheckpointList now renders <PluginSlot slot="checkpoint.action"/"checkpoint.layer">
+// (adopted for the Civitai action/layer rows), which resolves the plugin-sdk
+// runtime — same host every other render test in this folder publishes.
+const { configureHostRuntime } = await import('../src/plugins/runtimeHost.jsx')
+const { publishRuntime } = await import('../src/plugins/loadPlugins.js')
+test.beforeEach((t) => {
+  const saved = { window: globalThis.window, document: globalThis.document, fetch: globalThis.fetch }
+  t.after(() => Object.assign(globalThis, saved))
+  globalThis.window = {}
+  globalThis.document = { cookie: '', querySelector: () => null }
+  globalThis.fetch = () => { throw new Error('A render must not contact a service') }
+  configureHostRuntime()
+  publishRuntime()
+})
+
 const file = (filename, extra = {}) => ({ filename, size: 314572800, deployed_as: null, undeployable: false, ...extra })
 const PAYLOAD = {
   can_deploy: true, deploy_folder: 'h3/lds', delete_mode: 'app_trash',

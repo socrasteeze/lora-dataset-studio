@@ -21,7 +21,7 @@ from ..extensions import db
 from .registry import OwnershipConflict, PluginRegistry
 
 LDS_PLUGIN_API_MAJOR = 1
-LDS_PLUGIN_API_MINOR = 21  # Automatic product lanes can block local memory release.
+LDS_PLUGIN_API_MINOR = 23  # Local dataset engines through the shared image queue.
 
 
 PUBLIC_NAMES = (

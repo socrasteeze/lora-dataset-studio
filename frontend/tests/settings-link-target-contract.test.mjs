@@ -40,14 +40,40 @@ const walk = (dirUrl) => {
   }
   return out
 }
-const SOURCES = walk(new URL('../src/', import.meta.url))
+const BUNDLED = new URL('../../bundled/', import.meta.url)
+const SOURCES = [
+  ...walk(new URL('../src/', import.meta.url)),
+  ...readdirSync(BUNDLED, { withFileTypes: true }).filter(entry => entry.isDirectory())
+    .flatMap(entry => walk(new URL(`${entry.name}/frontend/`, BUNDLED))),
+]
+// Concrete settings components behind the public owners used by targeted links.
+// DIVERGENCE 4/1 — upstream's map also lists `cloud_training`
+// (CloudTrainingGroup.jsx); that plugin is excluded from `bundled/` on this
+// fork (no cloud engine or rental training plugin is ever carried), so its
+// entry is dropped rather than pointed at a file that does not exist here.
+const PLUGIN_SETTINGS = {
+  image_upscale: ['../bundled/image_upscale/frontend/panels/KleinImproveSettings.jsx',
+    '../bundled/image_upscale/frontend/panels/ImproveFinishCard.jsx'],
+  scrape: ['../bundled/scrape/frontend/panels/ScrapeSettingsGroup.jsx'],
+  qwen_dataset: ['src/pages/pluginSettingsGroups.jsx',
+    '../bundled/qwen_dataset/frontend/panels/QwenPreparation.jsx',
+    '../bundled/qwen_dataset/frontend/panels/QwenSettings.jsx'],
+}
 
 // DOM ids the Settings sections actually render: literal id="…" plus the secret
 // field keys (SecretField renders id={f.key}, so the config key IS the DOM id).
-const settingsDomIds = () => {
+// With `owner`, read that plugin's OWN settings source instead of core's —
+// a plugin-scoped link (`pluginId="…"`) targets a field on its own settings
+// page, never one of core's.
+const settingsDomIds = (owner = null) => {
   const dir = new URL('../src/components/settings/', import.meta.url)
   let src = ''
-  for (const f of readdirSync(dir)) if (f.endsWith('.jsx')) src += read(`src/components/settings/${f}`) + '\n'
+  if (owner) {
+    assert.ok(PLUGIN_SETTINGS[owner], `Settings source inventory missing for ${owner}`)
+    src = PLUGIN_SETTINGS[owner].map(read).join('\n')
+  } else {
+    for (const f of readdirSync(dir)) if (f.endsWith('.jsx')) src += read(`src/components/settings/${f}`) + '\n'
+  }
   const ids = new Set()
   for (const m of src.matchAll(/id="([^"]+)"/g)) ids.add(m[1])
   for (const m of src.matchAll(/\bkey:\s*'([^']+)'/g)) ids.add(m[1])
@@ -67,15 +93,27 @@ const usages = () => {
   const out = []
   for (const { path, src } of SOURCES) {
     for (const m of src.matchAll(/<SettingsLink\b([\s\S]*?)>/g)) {
-      out.push({ file: path, tag: m[1], section: attr(m[1], 'section'), focus: attr(m[1], 'focus') })
+      out.push({ file: path, tag: m[1], section: attr(m[1], 'section'), plugin: attr(m[1], 'pluginId'), focus: attr(m[1], 'focus') })
     }
   }
   return out
 }
 
 /* Links that point at a SECTION, on purpose. Each needs a reason: the bar is
-   "no single field answers this label", not "nobody got round to it". */
+   "no single field answers this label", not "nobody got round to it".
+   DIVERGENCE 4/1 — upstream's list also carries `VideoCloudLaunchDialog.jsx`
+   (section `cloud_training`); that dialog is not carried here (no cloud
+   training plugin ever loads), so its entry is dropped rather than pointed at
+   a file that does not exist. */
 const WITHOUT_TARGET = [
+  {
+    file: 'ImprovePreparationLinks.jsx', section: 'engine.plugin',
+    reason: 'Preparing this engine may need both downloads and options; its whole plugin settings page owns that installation flow.',
+  },
+  {
+    file: 'SetupPage.jsx', section: 's.plugin',
+    reason: 'Each readiness item links to the owning plugin preparation page because a recipe can require several downloads and settings.',
+  },
   {
     file: 'TrainingPanel.jsx',
     section: 'training',
@@ -113,8 +151,11 @@ test('every target a SettingsLink uses is a DOM id the Settings really render', 
   for (const u of usages()) {
     if (!u.focus || u.focus.kind !== 'literal') continue
     checked += 1
-    assert.ok(ids.has(u.focus.value),
-      `${u.file}: SettingsLink focus="${u.focus.value}" is not rendered by any settings/*.jsx `
+    // A plugin-scoped link (pluginId="…", literal) targets a field on that
+    // plugin's OWN settings source, never one of core's.
+    const ownerIds = u.plugin?.kind === 'literal' ? settingsDomIds(u.plugin.value) : ids
+    assert.ok(ownerIds.has(u.focus.value),
+      `${u.file}: SettingsLink focus="${u.focus.value}" is not rendered by the linked settings owner `
       + '— a ?focus= that resolves to nothing scrolls nowhere and reports nothing.')
   }
   assert.ok(checked >= 3, `expected several targeted links, found ${checked}`)
@@ -164,11 +205,12 @@ test('the three improve pointers land on the three things they name', () => {
 test('a link without a target is one we decided to leave section-wide', () => {
   const allowed = new Map(WITHOUT_TARGET.map((e) => [`${e.file}:${e.section}`, e]))
   for (const u of usages()) {
-    if (u.focus || /\bpluginId=/.test(u.tag)) continue
-    assert.ok(u.section, `${u.file}: SettingsLink without a section`)
-    const key = `${u.file}:${u.section.value}`
+    if (u.focus) continue
+    const owner = u.plugin || u.section
+    assert.ok(owner, `${u.file}: SettingsLink without a section or plugin`)
+    const key = `${u.file}:${owner.value}`
     assert.ok(allowed.has(key),
-      `${u.file}: SettingsLink section="${u.section.value}" carries no focus. Give it the DOM `
+      `${u.file}: SettingsLink section="${owner.value}" carries no focus. Give it the DOM `
       + 'id of the field its label promises, or add it to WITHOUT_TARGET here with the reason.')
     assert.ok(allowed.get(key).reason.length > 40, `${key}: reason too thin to be a decision`)
   }

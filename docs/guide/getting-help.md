@@ -3,8 +3,8 @@
 Stuck, found a bug, or missing a feature? Two doors, both watched:
 
 - **Discord** — [discord.gg/j6hnJBFtXE](https://discord.gg/j6hnJBFtXE) — ask in
-  **#help**; usually the fastest way to get unstuck. Feature ideas and votes
-  live in **#roadmap**.
+  **#help**; usually the fastest way to get unstuck. Share feature ideas in
+  **#feature-requests**.
 - **GitHub** — [Issues](https://github.com/perfectgf/lora-dataset-studio/issues) —
   best for reproducible bugs and feature requests; the templates walk you
   through what to include.
@@ -46,7 +46,7 @@ report itself failed.
 ## Feature requests
 
 Describe the **job you were doing when you missed the feature** — the problem
-is more valuable than the proposed solution. Post it in Discord **#roadmap** or
+is more valuable than the proposed solution. Post it in Discord **#feature-requests** or
 open a GitHub issue with the *Feature request* template.
 
 ## Support the project

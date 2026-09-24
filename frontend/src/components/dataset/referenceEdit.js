@@ -14,23 +14,34 @@
    empty they would each be dead in one fixed direction, which is exactly the
    Divergence-1b trap that has bitten this fork before. */
 import {
-  primaryEngine, readEngines, ENGINES, LOCAL_ENGINES, ENGINE_LABELS, DEFAULT_ENGINE,
+  primaryEngine, readEngines, engineLabel, localEngineIds, DEFAULT_ENGINE,
 } from './engineSelection.js';
+import { engineCatalog } from '../../engines/catalog.js';
 
 /** Engines that can edit the reference — DERIVED from the canonical engine list,
  *  never a second hardcoded list. The server accepts exactly
  *  svc.editable_engines() on /ref/edit, and a private copy here is how the modal
- *  ends up offering what the route refuses (or, as happened upstream with BOTH
- *  local engines, hiding what the route would have accepted). Copied, not
- *  aliased, so a caller can't mutate the generation list through this one. */
-export const EDIT_ENGINES = [...ENGINES];
+ *  ends up offering what the route refuses (or, as happened with a new API engine and
+ *  then with BOTH local engines, hiding what the route would have accepted).
+ *  A fresh copy at each call, so a caller can't mutate the catalog through this
+ *  one — and a call, not a constant, so an engine a plugin registered at load is
+ *  in it. Order = canonical engine order = toggle order in the modal, which puts
+ *  the FREE local engines first — cheapest option first is not a ranking, it is
+ *  the honest reading order for a gesture billed per press.
+ *
+ *  ON THIS FORK apiEngineIds() is always empty (Divergence 1: no cloud engine
+ *  plugin is ever loaded), so every id this returns is local and free — the
+ *  whole feature stays what the module docstring above says it is. */
+export function editEngines() {
+  return engineCatalog().filter((spec) => spec.referenceEdit !== false).map((spec) => spec.id);
+}
 
-/** The refusal shown for a non-editable engine, DERIVED from EDIT_ENGINES:
+/** The refusal shown for a non-editable engine, DERIVED from editEngines():
  *  "Pick Klein or Krea 2 Edit". Unreachable in practice (every engine this fork
  *  ships can edit) and kept as the guard for a client that sends something else —
  *  a stored legacy engine tag, most likely. */
 export function editEngineNames() {
-  const names = EDIT_ENGINES.map((e) => ENGINE_LABELS[e] || e);
+  const names = editEngines().map((e) => engineLabel(e));
   if (!names.length) return '';
   const last = names[names.length - 1];
   const head = names.slice(0, -1);
@@ -51,10 +62,11 @@ export function editEngineChoiceMessage() {
  *  would have made the modal open on something no route accepts. (FORK_NOTES merge
  *  diagnostic 10 — never read a default off upstream.) */
 export function defaultEditEngine(storage, usable = null) {
-  const ok = (e) => EDIT_ENGINES.includes(e) && (typeof usable !== 'function' || usable(e));
+  const editable = editEngines();
+  const ok = (e) => editable.includes(e) && (typeof usable !== 'function' || usable(e));
   const primary = primaryEngine(readEngines(storage));
   if (ok(primary)) return primary;
-  return EDIT_ENGINES.find(ok) || DEFAULT_ENGINE;
+  return editable.find(ok) || DEFAULT_ENGINE;
 }
 
 /** Ceiling on the dialog's own uploads, mirroring
@@ -124,7 +136,7 @@ export function acceptsExtraEditRefsForBatch(engines) {
  *  disappearance reads as a bug. */
 export function editRefNote(engine, { datasetExtraCount = 0 } = {}) {
   const support = editRefSupport(engine);
-  const label = ENGINE_LABELS[engine] || engine;
+  const label = engineLabel(engine);
   const n = Math.max(0, Number(datasetExtraCount) || 0);
   // Klein's second reference is PERSISTENT (it locks identity for every future
   // generation, not just this edit), so it lives on the dataset's reference card
@@ -165,7 +177,7 @@ export function editCostNote(engineOrEngines) {
   if (!engines.length) return 'Select at least one engine to see its cost.';
   if (engines.length === 1) {
     const engine = engines[0];
-    return `${ENGINE_LABELS[engine] || engine} renders on your own ComfyUI — no API key, no `
+    return `${engineLabel(engine)} renders on your own ComfyUI — no API key, no `
       + 'bill, nothing leaves your machine, so you can retry a prompt as often as you like. '
       + 'It queues behind any generation already running on your GPU.';
   }
@@ -194,10 +206,10 @@ export function editKeepNote() {
  *  engine's sentence and tell the user to download a weight for an engine this
  *  fork does not ship. Same rule localEngineUnavailableReason follows. */
 function editEngineBlockedBy(engine, { available = {}, reasonFor = null } = {}) {
-  if (!LOCAL_ENGINES.includes(engine)) return null;
+  if (!localEngineIds().includes(engine)) return null;
   if (available[engine]) return null;
   const reason = typeof reasonFor === 'function' ? reasonFor(engine) : null;
-  return reason || `⚠ ${ENGINE_LABELS[engine] || engine} is not available on this install`;
+  return reason || `⚠ ${engineLabel(engine)} is not available on this install`;
 }
 
 /** The engines the modal actually renders, with their state.
@@ -208,11 +220,11 @@ function editEngineBlockedBy(engine, { available = {}, reasonFor = null } = {}) 
  *  the engine stays visible and says which action. */
 export function editEngineOptions({ comfyuiConfigured = false, available = {},
                                     reasonFor = null } = {}) {
-  return EDIT_ENGINES
+  return editEngines()
     .filter(() => comfyuiConfigured)
     .map((engine) => {
       const blocked = editEngineBlockedBy(engine, { available, reasonFor });
-      return { engine, label: ENGINE_LABELS[engine] || engine, blocked, usable: !blocked };
+      return { engine, label: engineLabel(engine), blocked, usable: !blocked };
     });
 }
 
@@ -221,7 +233,7 @@ export function editEngineOptions({ comfyuiConfigured = false, available = {},
  *  free-form, but it needs SOMETHING). The engine reason comes FIRST — typing a
  *  prompt would not make a missing node pack appear. */
 export function editBlockedReason(prompt, engine, engineBlocked = null) {
-  if (!EDIT_ENGINES.includes(engine)) return editEngineChoiceMessage();
+  if (!editEngines().includes(engine)) return editEngineChoiceMessage();
   if (engineBlocked) return engineBlocked;
   if (!prompt || !prompt.trim()) return 'Describe the edit first';
   return null;
@@ -233,7 +245,7 @@ export function editBlockedReason(prompt, engine, engineBlocked = null) {
 export function editBatchBlockedReason(prompt, engines, options = []) {
   const selected = [...new Set(Array.from(engines || []))];
   if (!selected.length) return 'Select at least one engine';
-  if (selected.some((engine) => !EDIT_ENGINES.includes(engine))) {
+  if (selected.some((engine) => !editEngines().includes(engine))) {
     return editEngineChoiceMessage();
   }
   const blocked = selected
@@ -337,6 +349,7 @@ export function batchLiveNote(activity) {
 }
 
 // Re-exported so the modal imports one module for all edit constants. Upstream
-// also re-exports API_ENGINES; it is empty here and nothing in the modal reads
-// it, so it stays out rather than sitting as a dead reference.
-export { LOCAL_ENGINES, ENGINE_LABELS };
+// also re-exports apiEngineIds; it is always empty here (Divergence 1) and
+// nothing in the modal reads it, so it stays out rather than sitting as a dead
+// reference.
+export { localEngineIds, engineLabel };

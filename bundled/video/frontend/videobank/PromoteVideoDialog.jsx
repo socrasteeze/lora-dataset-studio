@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, postJson } from '@lds/plugin-sdk'
-import { useToast } from '@lds/plugin-sdk'
+import { apiFetch, postJson } from '@lds/plugin-sdk';
+import { useToast } from '@lds/plugin-sdk';
 import {
   frameOptions, defaultFrames, needsManualFrames, sizeOptions,
   promoteProblem, promotePayload, promoteScopeLabel, datasetScaleNote,
   insetProblem, insetHint, insetOutcome,
   capProblem, capHint, capBalanceNote,
-} from './videoTargetChoice.js'
+} from './videoTargetChoice'
 import {
   uncaptionedWarning, overBudgetWarning, overTokenBudgetWarning, servedShortNote,
   sliceGainNote,
-} from './videoClipSearch.js'
-import { lengthSuggestion, lengthSuggestionNote } from './videoTargetChoice.js'
-import { passBlockedBy } from '../lib/videoCapability.js'
-import VideoTargetPicker from './VideoTargetPicker.jsx'
+} from './videoClipSearch'
+import { lengthSuggestion, lengthSuggestionNote } from './videoTargetChoice'
+import { passBlockedBy } from '../lib/videoCapability.js';
+import VideoTargetPicker from './VideoTargetPicker'
 
 /** 🎬 Turn the shots you kept into a training set.
  *
@@ -305,7 +305,7 @@ export default function PromoteVideoDialog({
               instead of only its first {frames || 'N'} frames. Each slice
               carries the SHOT&rsquo;s caption, which describes the whole shot —
               so a later slice may be captioned with things that happen earlier.
-              Up to 8 clips per shot.
+              Keeps every complete clip from each shot.
             </span>
           </span>
         </label>

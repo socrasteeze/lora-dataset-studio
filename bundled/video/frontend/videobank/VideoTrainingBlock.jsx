@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson, useToast } from '@lds/plugin-sdk'
 import { HelpBadge } from '@lds/plugin-sdk'
 import { ensureLicenceAck } from './licenceAck.js'
+import VideoTrainingControls from './VideoTrainingControls.jsx'
+import { videoTrainingControls } from './videoTrainingSettings.js'
 
 /** Targets that have been trained end to end at least once. A target absent
  * from this set is wired from the installed ai-toolkit's own code and preset —
@@ -40,6 +42,10 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
   // Still just a prefill: what the user types is what trains.
   const [steps, setSteps] = useState(ds?.suggested_steps || 2000)
   const [doI2v, setDoI2v] = useState(false)
+  const [controls, setControls] = useState({ rank: 16, memory: 'auto', prompts: '' })
+  let controlsError = ''
+  try { videoTrainingControls(controls, 'local') } catch (e) { controlsError = e.message }
+
   const [progress, setProgress] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -72,6 +78,7 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
   }, [refreshKey, poll])
 
   const start = async (acceptDownload = false) => {
+    if (controlsError) { toast.error(controlsError); return undefined }
     // The licence question comes BEFORE anything is spent — not after the
     // download confirm, whose 43 GB would already be an investment in a run
     // the licence answer might forbid.
@@ -81,7 +88,8 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
     setBusy(true)
     try {
       const r = await postJson(`/api/video-dataset/${ds.id}/train`,
-        { steps, do_i2v: doI2v, accept_download: acceptDownload })
+        { steps, do_i2v: doI2v, accept_download: acceptDownload,
+          ...videoTrainingControls(controls, 'local') })
       toast.success(`Training started — ${r.clips} clips, ${r.steps} steps.`)
       // Things the run will not fail on but that change what to expect from it.
       ;(r.warnings || []).forEach((w) => toast.warning(w))
@@ -133,13 +141,14 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
       {active ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={stop}
-            className="rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-[0.6875rem] font-semibold text-rose-100 hover:bg-rose-500/20">
+            className="min-h-10 lg:min-h-0 rounded border border-rose-500/60 bg-rose-500/10 px-2 py-1 text-[0.6875rem] font-semibold text-rose-100 hover:bg-rose-500/20">
             ⏹ Stop training
           </button>
           <HelpBadge topic="video-train-local" />
         </div>
       ) : (
         <>
+          <VideoTrainingControls value={controls} onChange={setControls} error={controlsError} />
           <div className="flex flex-wrap items-center gap-1.5">
             <label className="flex items-center gap-1 text-[0.6875rem] text-content-muted">
               Steps
@@ -173,8 +182,8 @@ export default function VideoTrainingBlock({ ds, onSaveCount, refreshKey = 0 }) 
                 button beside it. There is only one destination here, so naming
                 the machine would advertise a lane this build does not offer. */}
             <button type="button" onClick={() => start(false)}
-              disabled={busy || !ds.clips}
-              className="rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-50">
+              disabled={busy || !ds.clips || Boolean(controlsError)}
+              className="min-h-10 lg:min-h-0 rounded border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] font-semibold text-content hover:bg-surface disabled:opacity-50">
               {busy ? 'Starting…' : '▶ Train this dataset'}
             </button>
             <HelpBadge topic="video-train-local" />

@@ -57,6 +57,47 @@ If nothing on the grid tells you where to start, the line at the bottom opens th
 
 This section controls the shared local image engines, **Klein** and **Krea 2 Edit**. Configure ComfyUI under **Local tools**. Additional engines appear when their plugin is active; their credentials and provider options live on that plugin's settings page.
 
+### Trained image models
+
+**Test Image / Studio** supports all seven image training families: Z-Image,
+SDXL, Krea 2, FLUX.1, FLUX.2 Klein, Anima and Qwen-Image 2.1. The **Trained image
+models** group prepares FLUX.1, Anima and Qwen 2.1 using the same model selection
+that generation checks before launch.
+
+Each family needs its own diffusion model, text encoder(s) and VAE. Leave a
+file field blank to detect compatible installed files, including shared
+ComfyUI model roots. Test Studio also offers **Download** buttons beside missing
+models, with file sizes, progress and a check after installation, so you can
+prepare the files without leaving your test. Choose **Install** in Settings;
+existing valid files
+are reused. Downloads are explicit and show progress and cancellation. Save
+file selections before **Check models again**. A missing or damaged custom
+selection must be corrected or cleared; downloading the recommended model
+does not silently change that selection.
+
+| Setting | Purpose |
+|---|---|
+| `studio_models.<family>.diffusion_model` | Optional ComfyUI-relative base model name; `<family>` is `flux`, `anima` or `qwenimage21` |
+| `studio_models.<family>.text_encoder` | Optional compatible encoder selection |
+| `studio_models.flux.text_encoder_2` | Optional FLUX.1 CLIP-L selection, in addition to T5 |
+| `studio_models.<family>.vae` | Optional compatible VAE selection |
+
+Qwen-Image 2.1 uses Qwen3-VL **8B** and the dedicated **2.1 VAE**. Its older
+Qwen Image/Edit counterparts are incompatible. If native nodes are missing,
+choose **Fix missing ComfyUI nodes** in Studio or this Settings group. The repair
+panel provides update steps for Windows portable, Desktop and manual/server
+installations, links to ComfyUI and the official downloads, and identifies custom
+node packages when a test requires them. Finish active jobs before updating or
+restarting. Preserve local changes in customized installations; the panel also
+links instructions for sharing existing models with a separate installation.
+After restarting, use **Check nodes again** to query the running ComfyUI afresh.
+A failed connection or a still-missing node keeps the repair open; your prompt
+and checkpoint choices remain in place. LDS guides the update; it does not run
+ComfyUI's updater or restart an external process for you. LDS checks files and
+node availability separately and cannot report readiness while ComfyUI is
+unreachable. Sampler defaults follow the selected family; FLUX.1's guidance
+control is distilled guidance, while its sampler CFG stays at 1.
+
 ### Engines
 
 - **Default engine** → `engines.default`. The engine preselected in the workspace. A fresh core installation uses **Klein**; available choices follow the active engine catalog.
@@ -271,7 +312,7 @@ Each preset has a **name** and an **ordered list of LoRAs**, and each LoRA row h
 - a **file** — a name relative to your ComfyUI `models/loras` folder (e.g. `klein/my-lora.safetensors`), exactly like the consistency LoRA. The field is a **searchable dropdown of the LoRAs actually on disk** (every folder, `extra_model_paths.yaml` included), with Klein-compatible files listed first and each one badged by architecture; free text still works for a file you haven't downloaded yet;
 - a **strength** — `0`–`1.5`, default **`0.6`**.
 
-Use **＋ New preset**, **Duplicate**, **Delete** and rename to manage them, and the up/down controls to set chain order. **Caps: 8 LoRAs per preset, 12 presets.**
+Use **＋ New preset**, **Duplicate**, **Delete** and rename to manage them, and the up/down controls to set chain order. **Each preset can chain 8 LoRAs. Save as many named presets as you need.**
 
 **The strengths are also editable from the ✨ Upscale & improve window** (the one the ✨ button opens on a picture, and the inline panel on the dataset's bulk toolbar): once a preset is picked there, its LoRAs are listed with a slider each, saved as you drag. That is *tuning only* — the same `klein.generation_lora_presets` values, app-wide, so a change there applies wherever that preset runs, generation included. **Adding, removing, reordering and renaming stay here**, because those change what the preset *is* for every surface that runs Klein; the window links straight back to this card for them.
 

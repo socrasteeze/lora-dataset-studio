@@ -37,6 +37,8 @@ from ..extensions import db
 from ..models import (CanvasImageNode, CanvasLanePlacement, CanvasNodePosition, FaceDataset,
                       FaceDatasetImage, LoraTestImage)
 from .. import config as cfg
+from ..engines.registry import (api_ids as api_engine_ids, ids as known_engine_ids,
+                               local_ids as local_engine_ids)
 from . import (bank_transfer_metadata, caption_origin, dataset_activity,
                image_encoding, reference_edit_jobs,
                scene_captions, trash)
@@ -268,7 +270,7 @@ def check_fanout_budget(dataset_id, total, *, generators=()):
     BEFORE dispatching anything, so the run is all-or-nothing. The per-call
     checks stay as defense in depth."""
     from ..generation_limits import local_queue_limit
-    limit = local_queue_limit() if generators and all(g in LOCAL_ENGINES for g in generators) else MAX_FANOUT
+    limit = local_queue_limit() if generators and all(g in local_engine_ids() for g in generators) else MAX_FANOUT
     total = int(total)
     if total > limit:
         raise ValueError(f'fan-out too large ({total} > {limit})')
@@ -4583,6 +4585,8 @@ def start_reference_edit(app, user_id, dataset_id, engine, prompt,
         raise ValueError('reference image required')
     if not os.path.exists(_ref_path(ds)):
         raise ValueError('reference image file missing')
+    # DIVERGENCE 1c — reference editing is local-only here; no API lane to
+    # split engines against (see start_reference_edit's own docstring).
     local_engines = tuple(item for item in engines if item in LOCAL_ENGINES)
     transient_refs = tuple(extra_edit_ref_bytes or ())
     if len(transient_refs) > MAX_EDIT_REFERENCE_UPLOADS:
@@ -5236,15 +5240,30 @@ def _image_engine(img):
     A legacy API tag also returns None: the engine that made the row no longer
     exists on this fork, so naming it would advertise something unselectable."""
     value = (img.klein_model or '').strip()
+    # Persisted provenance outlives a disabled/uninstalled plugin.
+    try:
+        metadata = json.loads(getattr(img, 'generation_meta', None) or '{}')
+    except (TypeError, ValueError):
+        metadata = {}
+    if (value and isinstance(metadata, dict)
+            and metadata.get('engine') == value):
+        return metadata['engine']
     if not value:
         return None
+    # A legacy row born on a removed cloud engine names it explicitly, and
+    # that must win over the checks below: unlike krea/qwen_dataset, a removed
+    # cloud engine's tag can never be "picked up again" by the live registry
+    # (Divergence 1 — no cloud engine plugin is ever loaded here), so it is
+    # checked first and answers None on purpose.
     if value in LEGACY_API_ENGINE_TAGS:
         return None
-    # Krea 2 Edit rows store the engine id here, unlike Klein: the engine
-    # resolves its base model deterministically at enqueue AND at regenerate
-    # (krea_edit_helper.resolve_krea_unet), so there is no per-row model to keep.
-    if value == KREA_ENGINE:
-        return KREA_ENGINE
+    # Historical rows predate generation_meta. Their append-only engine tags
+    # remain provenance even when a provider is disabled or uninstalled; only
+    # generation admission depends on the current registry — this is what
+    # picks up a new plugin engine (e.g. qwen_dataset) that a static
+    # KNOWN_ENGINES tuple alone would miss.
+    if value in KNOWN_ENGINES or value in known_engine_ids():
+        return value
     return 'klein'   # a local model file name — the row was rendered on the GPU
 
 
@@ -11732,26 +11751,53 @@ def _rgn_resolve_target(img, prompt, engine):
     if prompt is None:
         raise ValueError('variation prompt unknown')
     requested = (engine or '').strip() or None
-    if requested is not None and requested not in KNOWN_ENGINES:
+    if requested is not None and requested not in known_engine_ids():
         raise ValueError(f'unknown engine: {requested}')
-    # A row remembers its origin through `klein_model`: an engine TAG for Krea
-    # (and for legacy rows born on a removed API engine), a real model FILE for
-    # Klein. Anything that isn't a known tag is therefore a Klein row. A legacy
-    # API tag names an engine this fork no longer has, so it resolves to Klein —
-    # this is what keeps those old rows regenerable (see LEGACY_API_ENGINE_TAGS).
-    origin = img.klein_model if img.klein_model in KNOWN_ENGINES else 'klein'
+    # A row remembers its origin through `klein_model`: an engine TAG for a
+    # plugin engine (Krea, qwen_dataset, and legacy rows born on a removed API
+    # engine), a real model FILE for Klein. Anything that isn't a known tag is
+    # therefore a Klein row — _image_engine already resolves a legacy cloud tag
+    # to None (LEGACY_API_ENGINE_TAGS), which keeps those old rows regenerable
+    # on Klein rather than raising on an engine this fork no longer has.
+    origin = _image_engine(img) or 'klein'
+    if origin not in ('klein', 'krea') and requested is None:
+        from ..engines.registry import require_available
+        spec = require_available(origin)  # Never replace an unavailable plugin with Klein.
+        enabled = cfg.get('engines.enabled') or []
+        if spec.local_enqueue is not None and enabled and origin not in enabled:
+            raise ValueError(f'Enable {spec.label} in its plugin settings before retrying.')
     target = requested or origin
-    # No NSFW clamp is needed here: every engine on this fork is local, and the
-    # local engines are exactly the ones allowed to receive NSFW shots.
-    # Engines disabled in Settings must not be used even when the row (or a
-    # stale workspace selection) points at them: fall back to the default
-    # engine, then to the first enabled one. An empty list means "all
-    # enabled" (legacy configs).
-    enabled = [e for e in (cfg.get('engines.enabled') or [])
-               if e in KNOWN_ENGINES]
-    if enabled and target not in enabled:
-        default = cfg.get('engines.default')
-        target = default if default in enabled else enabled[0]
+    if requested is not None:
+        from ..engines.registry import require_available
+        from . import local_dataset_engines
+        if local_dataset_engines.is_plugin_engine(requested):
+            spec = require_available(requested)
+            enabled = cfg.get('engines.enabled') or []
+            if enabled and requested not in enabled:
+                raise ValueError(f'Enable {spec.label} in its plugin settings before retrying.')
+    # No NSFW clamp is reachable here in practice: api_engine_ids() is always
+    # empty on this fork (Divergence 1 — no cloud engine plugin is ever
+    # loaded), so `target in api_engine_ids()` is always False. Kept as
+    # upstream wrote it rather than special-cased away: it costs nothing, and
+    # it is the one line that would fail closed if that ever stopped being true.
+    if is_nsfw_label(img.variation_label) and target in api_engine_ids():
+        # Fail-closed: NSFW never reaches a third-party API. It stays on whatever
+        # LOCAL engine the row came from (a Krea row keeps Krea) — forcing Klein
+        # here would silently change engine behind the user's back.
+        target = origin if origin in local_engine_ids() else 'klein'
+    else:
+        # Engines disabled in Settings must not be used even when the row (or a
+        # stale workspace selection) points at them: fall back to the default
+        # engine, then to the first enabled one. An empty list means "all
+        # enabled" (legacy configs).
+        enabled = [e for e in (cfg.get('engines.enabled') or [])
+                   if e in known_engine_ids()]
+        if enabled and target not in enabled:
+            default = cfg.get('engines.default')
+            target = default if default in enabled else enabled[0]
+        # ...and the NSFW clamp must survive that fallback.
+        if is_nsfw_label(img.variation_label) and target in api_engine_ids():
+            target = origin if origin in local_engine_ids() else 'klein'
     return edited, stored_prompt, prompt, target
 
 
@@ -11777,13 +11823,27 @@ def _rgn_prepare_target(user_id, img, ds, target, engine, klein_model,
             'filename', 'caption', 'status', 'fail_reason', 'job_id',
             'klein_model', 'variation_prompt', 'watermark_state',
             'watermark_bbox', 'watermark_regions', 'face_score', 'face_state',
-            'content_sig', 'content_sig_stat')
+            'content_sig', 'content_sig_stat', 'generation_meta')
     }
     old_path = (os.path.join(_dataset_path(img.dataset_id), img.filename)
                 if img.filename else None)
     new_job_id = None
     model = None
-    if target == KREA_ENGINE:
+    # DIVERGENCE 1 — upstream's api_engine_ids() branch here (an _api_generate_fn
+    # dispatch) is not carried: no cloud engine plugin is ever loaded on this
+    # fork, so api_engine_ids() is always empty and the branch would be dead
+    # code referencing a deleted function (_api_generate_fn). The plugin-engine
+    # branch below IS carried — it is how a local plugin engine (qwen_dataset)
+    # reaches regenerate, same as Klein and Krea.
+    from . import local_dataset_engines
+    if local_dataset_engines.is_plugin_engine(target):
+        engine = target
+        local_dataset_engines.preflight(user_id, ds.id, engine)
+        # local_dataset_engines.enqueue() derives the aspect ratio itself from
+        # the same label/framing passed below — nothing to compute here.
+        new_job_id = local_dataset_engines.enqueue(
+            user_id, ds, engine, prompt, label=img.variation_label, framing=img.framing)
+    elif target == KREA_ENGINE:
         # Krea 2 Identity Edit: same shape as the Klein branch below, minus the
         # knobs it doesn't have. Its preflight raises KreaModelsMissing HERE,
         # before the row transition — so the tile keeps its current image.
@@ -11804,6 +11864,8 @@ def _rgn_prepare_target(user_id, img, ds, target, engine, klein_model,
             extra_metadata={'is_dataset': True, 'dataset_id': img.dataset_id,
                             'variation_label': img.variation_label})
     else:
+        if target != 'klein':
+            raise ValueError(f'Unsupported dataset engine: {target}')
         try:
             from .klein_edit_helper import enqueue_klein_edit, resolve_generation_lora_preset
         except ImportError:
@@ -11819,12 +11881,15 @@ def _rgn_prepare_target(user_id, img, ds, target, engine, klein_model,
         if missing_nodes:
             raise KleinNodesMissing(_kleh.klein_missing_assets(), missing_nodes)
         # Klein target: keep the row's real model file when it has one. A row born
-        # on a removed API engine — or on Krea — holds an engine TAG here, not a
-        # model, so it must NOT be passed off as one: use the workspace's Klein
-        # pick instead (None = enqueue's default model). Testing against the tags
-        # rather than against the (empty) API_ENGINES is what keeps this correct
-        # on a local-only fork.
-        _tags = LEGACY_API_ENGINE_TAGS + (KREA_ENGINE,)
+        # on a removed API engine, on Krea, or on a local plugin engine (e.g.
+        # qwen_dataset) holds an engine TAG here, not a model, so it must NOT be
+        # passed off as one: use the workspace's Klein pick instead (None =
+        # enqueue's default model). Testing against LEGACY_API_ENGINE_TAGS UNION
+        # the live non-klein registry — never against known_engine_ids() alone —
+        # is what keeps this correct on a fork where the cloud tags are not
+        # live: a removed cloud engine's tag is not in known_engine_ids() here,
+        # so upstream's own check would pass it through AS a model filename.
+        _tags = LEGACY_API_ENGINE_TAGS + tuple(e for e in known_engine_ids() if e != 'klein')
         model = (img.klein_model if img.klein_model not in _tags
                  else ((klein_model or '').strip() or dataset_klein_model(ds)))
         ref_path = os.path.join(_dataset_path(ds.id), ds.ref_filename)
@@ -11882,9 +11947,11 @@ def _rgn_swap_row(user_id, img, edited, stored_prompt, target, engine,
         img.content_sig = None
         img.content_sig_stat = None
         img.face_state = None
-        # Engine TAG for Krea (it resolves its own model deterministically);
-        # the real model FILE for Klein.
-        img.klein_model = KREA_ENGINE if target == KREA_ENGINE else model
+        # Engine TAG for Krea and for any local plugin engine (each resolves
+        # its own model); the real model FILE for Klein.
+        img.klein_model = (engine if target != 'klein'
+                           else model)
+        img.generation_meta = _generation_meta_json(engine=target)
         img.filename = None
         # The row loses its file AND its words; the stamp goes with them, or the
         # regenerated image would be born already protected against captioning.
@@ -12051,12 +12118,26 @@ def editable_engines():
     the engine tuples above, so an engine joining the app reaches the edit path
     with no second edit here.
 
-    Note the shape is upstream's verbatim — `LOCAL_ENGINES + API_ENGINES` — and it
-    is correct here BY CONSTRUCTION rather than by special case, because
-    `API_ENGINES` is the empty tuple (Divergence 1b). That is the point of keeping
-    the empty export instead of deleting it: this reads as upstream's rule and
-    answers the fork's reality without a fork-specific branch to drift."""
-    return tuple(LOCAL_ENGINES) + tuple(API_ENGINES)
+    DIVERGENCE 1c — upstream derives the WHOLE answer from `available_specs()`.
+    That form was tried here and reverted: `available_specs()` reads the live
+    engine registry, which is only populated once `create_app()` (or a test's
+    `app` fixture) has run — and `test_the_edit_lane_is_local_only_and_stays_
+    that_way` deliberately calls this with NO app context, pinning that the
+    local-only outcome must hold independent of registry/boot state. So the two
+    local engines are the static base (correct by construction, same as the old
+    `LOCAL_ENGINES + API_ENGINES` sum, with API_ENGINES empty on this fork), and
+    a PLUGIN engine (e.g. qwen_dataset) is layered on top only when the live
+    registry has it AND it opts in via `extra['supports_reference_edit']` — so a
+    newly-adopted local plugin engine still reaches the edit path with no second
+    edit here, without making the base two local engines depend on app state."""
+    from ..engines.registry import available_specs
+    ids = list(LOCAL_ENGINES)
+    for spec in available_specs():
+        if spec.id in ids:
+            continue
+        if spec.local_enqueue is None or spec.extra.get('supports_reference_edit') is True:
+            ids.append(spec.id)
+    return tuple(ids)
 
 
 def edit_engine_choice_message():

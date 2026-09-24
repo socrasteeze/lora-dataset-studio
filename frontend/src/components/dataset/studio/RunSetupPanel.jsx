@@ -11,11 +11,13 @@ import LaunchBar from './LaunchBar';
 import StudioGenerationSettings from './StudioGenerationSettings';
 import StudioActionBar from './StudioActionBar';
 import StudioPreflightBanner from './StudioPreflightBanner';
+import StudioModelDownloads from './StudioModelDownloads';
 import { launchSettings, launchText as batchLaunchText, mergeBatches, visibleBatch } from './promptBatch';
 import { readInjectTrigger, writeInjectTrigger } from './triggerPref';
 import ScenePromptsPanel from './ScenePromptsPanel';
 import { combinedPromptBatch } from './scenePrompts';
 import { heavyRunConfirm, heavyRunNotice, runCost } from './runCost';
+import { studioModelSettingsLink, supportsNegativePrompt } from '../../../utils/studioFamilySettings';
 
 // Left run-setup rail: pickers, seed/launch controls and status banners, extracted unchanged from
 // LoraTestStudio.jsx. Preserve gpu_busy, pending/cancel and resumable/resume banners and the
@@ -89,8 +91,10 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
   const promptMult = Math.max(1, allPickedPrompts.length);
   const cells = cellTotal != null ? cellTotal : form.total;
   const total = cells * promptMult;
+  const modelError = d.generation_readiness?.config_error || form.modelError;
   const canLaunch = total > 0 && !d.pending && !d.gpu_busy && !studio.launching
-    && !launchBlocked;
+    && !launchBlocked && !modelError && d.generation_readiness?.models_ready !== false
+    && !d.generation_readiness?.missing_nodes?.length;
   const launchText = batchLaunchText(launchLabel, allPickedPrompts);
   // Always-on LoRA batch comparison generates each configuration WITHOUT then WITH each checked
   // LoRA. Image/time estimates must include the backend's 1 + checked-count multiplier.
@@ -102,6 +106,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
   const cost = runCost(total * batchMult * form.genCount, d.seconds_per_image);
 
   const onLaunch = async () => {
+    if (!canLaunch) return;
     if (cost.heavy && !window.confirm(heavyRunConfirm(cost))) return;
     // prompts travels through the SAME channel as global settings, which both hooks spread into
     // POST bodies. No signature change is needed and both routes receive the same batch. Omit with
@@ -127,6 +132,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
     <>
       {/* Preflight: missing models/nodes (P0-a) and architecture mismatch. */}
       <StudioPreflightBanner missing={preflight} archMismatch={archMismatch}
+        onRefresh={async () => { await studio.refresh(); setPreflight(null); }}
         onDismiss={() => { setPreflight(null); setArchMismatch(null); }} />
 
       {/* Safeguards. */}
@@ -255,6 +261,22 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
             baseNote={d.base_note}
             fmt={fmt}
           />
+          {modelError && (
+            <p className="m-0 text-[0.6875rem] text-amber-200" role="alert">
+              {modelError}{' '}
+              {!d.generation_readiness?.config_error && d.z_models?.length > 0 && (
+                <button type="button" onClick={form.resetModels} className="underline">
+                  Use {d.z_models[0].label}
+                </button>
+              )}
+              {studioModelSettingsLink(d.family) && (
+                <> <a href={studioModelSettingsLink(d.family)} className="underline">Open model settings →</a></>
+              )}
+            </p>
+          )}
+
+          <StudioModelDownloads readiness={d.generation_readiness}
+            onRefresh={async () => { await studio.refresh(); setPreflight(null); }} />
 
           {/*
            * Global generation settings match Generate: aspect/resolution and family-specific
@@ -263,6 +285,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
            */}
           <StudioGenerationSettings
             family={d.family}
+            capabilities={d.generation_capabilities}
             // The canvas overrides the namespace: its runs are cross-dataset, so
             // "the engine settings of dataset 7" would be restored (and saved)
             // under whichever pick happened to be first — the same reason
@@ -329,7 +352,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
             { id: 'st-engine', emoji: '⚙️', label: 'Engine' },
           ] : []),
           ...(d.family === 'sdxl' ? [{ id: 'st-detail', emoji: '✨', label: 'Detail' }] : []),
-          ...(d.family === 'zimage' ? [{ id: 'st-negative', emoji: '🚫', label: 'Negative' }] : []),
+          ...(supportsNegativePrompt(d.generation_capabilities, d.family) ? [{ id: 'st-negative', emoji: '🚫', label: 'Negative' }] : []),
           { id: 'st-results', emoji: '🖼️', label: 'Results' },
         ]}
         canRun={canLaunch}

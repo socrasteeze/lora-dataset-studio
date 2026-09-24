@@ -30,7 +30,8 @@ from ..services.face_variations import (NSFW_VARIATION_CATALOG, VARIATION_CATALO
                                         nsfw_variation_catalog, presets_for,
                                         preset_meta_for, all_catalog_labels,
                                         sanitize_custom_shots,
-                                        MAX_CUSTOM_SHOTS_PER_SUBJECT)
+                                        MAX_CUSTOM_SHOTS_PER_SUBJECT,
+                                        is_nsfw_label)
 from ..utils.comfyui import (KREA_ALLOWED_SAMPLERS, KREA_ALLOWED_SCHEDULERS,
                             KREA_SAMPLER_PRESETS, get_krea_loras)
 from ._common import (_map_error, _require_comfyui, _require_no_stalled_comfyui,
@@ -814,7 +815,10 @@ def _parse_engine_batches(data):
     # `in`, not truthiness: an EMPTY list means "the user has no engine selected"
     # and must be refused, not silently reinterpreted as a legacy Klein request.
     if 'engine_batches' not in data:
-        return [(data.get('generator') or 'klein', data.get('variations') or [])]
+        generator = data.get('generator') or 'klein'
+        if generator not in svc.known_engine_ids():
+            raise ValueError(f'unknown engine: {generator}')
+        return [(generator, data.get('variations') or [])]
     raw = data.get('engine_batches')
     if raw is None:
         raise ValueError('no engine selected')
@@ -828,7 +832,7 @@ def _parse_engine_batches(data):
         variations = entry.get('variations') or []
         # Every entry is checked — not just the first one — or an unknown engine
         # could ride along behind a valid one.
-        if generator not in svc.KNOWN_ENGINES:
+        if generator not in svc.known_engine_ids():
             raise ValueError(f'unknown engine: {generator}')
         if not isinstance(variations, list):
             raise ValueError('engine_batches variations must be a list')
@@ -854,10 +858,20 @@ def dataset_generate(dataset_id):
     except ValueError as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
     multiplier = data.get('multiplier', 1)
-    # No NSFW route guard is needed on this fork: every engine in svc.KNOWN_ENGINES
-    # is local (Divergence 1), and the local engines are exactly the ones allowed
-    # to receive NSFW shots. _parse_engine_batches has already refused anything
-    # outside that catalogue.
+    # Route-level fail-closed, applied to EACH batch: NSFW variations never reach
+    # an API engine — they exist only on the local Klein path (the service
+    # re-checks, defense in depth). Refused before anything is created, so a bad
+    # entry in the middle of good ones cannot leave a half-dispatched run.
+    # On this fork svc.api_engine_ids() is always empty (Divergence 1 — no cloud
+    # engine plugin is ever loaded), so this is a live-registry restatement of
+    # the guard rather than a behaviour change: harmless now, and automatically
+    # correct if a plugin ever registers a non-local engine.
+    for generator, variations in batches:
+        if generator in svc.api_engine_ids() and any(
+                v.get('nsfw') or is_nsfw_label(v.get('label')) for v in variations):
+            return jsonify({'ok': False,
+                            'error': 'NSFW variations run on a local engine only — '
+                                     'switch the generator to Klein or Krea 2 Edit.'}), 400
     # Klein node preflight (once per request — /object_info is large, so never
     # per-tile): if the workflow needs a custom node this ComfyUI lacks, answer
     # one actionable 409 instead of a grid of tiles each failing ComfyUI
@@ -870,6 +884,14 @@ def dataset_generate(dataset_id):
     # first, since it ran the preflight itself).
     if not svc.get_dataset(LOCAL_USER, dataset_id):
         return jsonify({'ok': False, 'error': 'dataset not found'}), 400
+    # DIVERGENCE 6 — upstream gates the stalled-ComfyUI barrier on engine
+    # locality (any(g in svc.local_engine_ids() ...)) here. That is the exact
+    # D6a trap: it answers "is this engine local", not "will this machine run
+    # it" — a Klein/Krea batch aimed at a peer via device_id is still local by
+    # that test, so a stalled Primary ComfyUI would refuse work bound for a
+    # healthy remote machine. This fork's own gate below is keyed on
+    # `remote_device` instead, which is the question that actually matters, and
+    # it already covers every batch reaching this point. Not adopted.
     # Runs BEFORE any dispatch, and covers the MODEL FILES as well as the nodes:
     # generate_variations checks the assets itself, but by then the API batches of
     # a mixed run would already be in flight — the user would be told the batch
@@ -907,6 +929,16 @@ def dataset_generate(dataset_id):
             keh2.preflight()
         except keh2.KreaModelsMissing as e:
             return _krea_missing_response(e)
+    from ..services import local_dataset_engines
+    try:
+        for generator, _variations in batches:
+            if local_dataset_engines.is_plugin_engine(generator):
+                local_dataset_engines.preflight(LOCAL_USER, dataset_id, generator)
+    except local_dataset_engines.LocalEngineNotReady as exc:
+        return jsonify({'ok': False, 'error': str(exc), 'engine': exc.engine,
+                        'setup_path': f'/plugins/{exc.plugin}/settings'}), 409
+    except ValueError as exc:
+        return _map_error(exc)
     created, per_engine = 0, {}
     try:
         # The per-engine calls each enforce MAX_FANOUT on their own share, which
@@ -916,7 +948,10 @@ def dataset_generate(dataset_id):
             dataset_id, sum(len(v) for _, v in batches) * max(1, int(multiplier or 1)),
             generators=[generator for generator, _ in batches])
         for generator, variations in batches:
-            if generator == 'krea':
+            if local_dataset_engines.is_plugin_engine(generator):
+                ids = local_dataset_engines.generate(
+                    LOCAL_USER, dataset_id, variations, multiplier, engine=generator)
+            elif generator == 'krea':
                 # Second LOCAL path (Krea 2 Identity Edit): GPU-bound like Klein,
                 # free, NSFW-capable. Its one dial (grounding_px) is a setting,
                 # not a per-run argument — see krea_edit_helper.grounding_px.
@@ -928,7 +963,7 @@ def dataset_generate(dataset_id):
                     LOCAL_USER, dataset_id, variations, multiplier,
                     generation_lora_preset=data.get('krea_generation_lora_preset'),
                     device_id=data.get('device_id'))
-            else:
+            elif generator == 'klein':
                 ids = svc.generate_variations(LOCAL_USER, dataset_id,
                                               variations, multiplier,
                                               data.get('klein_model'),
@@ -939,6 +974,8 @@ def dataset_generate(dataset_id):
                                               generation_lora_preset=data.get('generation_lora_preset'),
                                               device_id=data.get('device_id'))
                 _autostart_optional_klein()  # bg-fetch the consistency LoRA if it's absent
+            else:
+                raise ValueError(f'Unsupported dataset engine: {generator}')
             created += len(ids)
             per_engine[generator] = per_engine.get(generator, 0) + len(ids)
     except Exception as e:

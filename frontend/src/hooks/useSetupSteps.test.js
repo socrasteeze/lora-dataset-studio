@@ -535,8 +535,8 @@ test('Video and Live expose their own preparation rows; DLSS has its own setting
   try {
 
     const row = (caps, label) => deriveCapabilitySummary(caps).find((s) => s.label === label);
-    const DLSS = 'DLSS 5 neural rendering';
-    const SMOOTH = 'Smooth (frame interpolation)';
+    const DLSS = '✨ DLSS 5 neural rendering';
+    const SMOOTH = '↗ Smooth (frame interpolation)';
     const LIVE = 'Live — local generation';
     // Everything there.
     const on = { comfyui: { dir_valid: true, reachable: true, video_studio_ready: true,

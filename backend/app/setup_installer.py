@@ -352,8 +352,12 @@ _H3_DOWNLOADS = {
     },
 }
 
+
+from .services.trained_image_models import model_downloads as _studio_model_downloads
+
+_STUDIO_DOWNLOADS = _studio_model_downloads()
 _MODEL_DOWNLOADS = {**_KLEIN_DOWNLOADS, **_KREA_DOWNLOADS, **_SEEDVR2_DOWNLOADS,
-                    **_CAMERA_DOWNLOADS, **_H3_DOWNLOADS}
+                    **_CAMERA_DOWNLOADS, **_H3_DOWNLOADS, **_STUDIO_DOWNLOADS}
 
 # Custom-node packs the app can install itself. The first git-cloned
 # dependencies this app installs at all, so the rules are written down rather
@@ -1117,7 +1121,14 @@ def _download_dest_path(action) -> str:
     """Absolute destination for a model download, under the validated ComfyUI
     models root."""
     spec = model_download_spec(action)
-    return os.path.join(_comfyui_root(), 'models', *spec['dest'])
+    root = _comfyui_root()
+    models_root = os.path.join(root, 'models')
+    if action in _STUDIO_DOWNLOADS and cfg.get('comfyui.models_dir'):
+        # Studio discovery reads the configured models root. Downloading into
+        # the install's default directory would leave those assets invisible.
+        # Keep validating the ComfyUI install before honoring its override.
+        models_root = os.path.abspath(os.fspath(cfg.comfyui_dir('models')))
+    return os.path.join(models_root, *spec['dest'])
 
 
 def _node_pack_dest(action) -> str:
@@ -2466,8 +2477,8 @@ _CAPABILITY_EXTRA_CHECKS = {'video': _verify_video_encoder}
 
 
 def _is_blocking_invalid(path, spec) -> bool:
-    """Is the file at `path` present but impossible to load (an HTML licence page, a
-    truncated/garbage download)? Advisory `too_small` is NOT counted, and a checker
+    """Is the file at `path` a declared superseded revision or impossible to load
+    (an HTML licence page, a truncated/garbage download)? `too_small` is NOT counted, and a checker
     that cannot answer says False — no skip is ever turned into a re-download on a
     guess.
 
@@ -2478,6 +2489,8 @@ def _is_blocking_invalid(path, spec) -> bool:
     that file either — so the corrupted-weight dead end simply came back through a
     different door. Same validator, same rule, all four."""
     try:
+        if os.path.getsize(path) in spec.get('superseded_bytes', ()):
+            return True
         from .services import model_integrity
         res = model_integrity.validate_model_file(path, min_bytes=spec.get('min_bytes'))
     except Exception:
@@ -2612,6 +2625,27 @@ def _verify_downloaded_model(action, dest, spec, provider='hf') -> bool:
     already overwrote the previous copy would leave the user with strictly less
     than they started with, which is the one outcome this whole path exists to
     avoid."""
+    if spec.get('sha256'):
+        import hashlib
+        try:
+            expected_size = spec.get('expected_bytes')
+            if expected_size and os.path.getsize(dest) != expected_size:
+                raise ValueError('download size does not match the published file')
+            digest = hashlib.sha256()
+            _append(action, 'verifying the downloaded file SHA256')
+            with open(dest, 'rb') as downloaded:
+                for chunk in iter(lambda: downloaded.read(8 * 1024 * 1024), b''):
+                    digest.update(chunk)
+            if digest.hexdigest() != spec['sha256']:
+                raise ValueError('SHA256 does not match the published file')
+        except (OSError, ValueError) as exc:
+            _append(action, f'download verification failed: {exc}; retry the download')
+            # This is the temporary download, before replacement of any existing file.
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
+            return False
     try:
         from .services import model_integrity
         res = model_integrity.validate_model_file(dest, min_bytes=spec.get('min_bytes'))
@@ -2646,6 +2680,13 @@ def _resolver_backed_assets():
     out.update({a: (seedvr2_helper.seedvr2_missing_assets,
                     seedvr2_helper.seedvr2_invalid_assets)
                 for a in _SEEDVR2_DOWNLOADS})
+    from functools import partial
+    from .services import trained_image_models as studio_models
+    for family, specs in studio_models.ASSET_SPECS.items():
+        for slot in specs:
+            out[studio_models.install_action(family, slot)] = (
+                partial(studio_models.missing_assets, family),
+                partial(studio_models.invalid_assets, family))
     return out
 
 
@@ -2687,12 +2728,14 @@ def _unloadable_reason(action, path, spec):
     """Why the file at `path` is unusable weights, or None if it is keepable. PURE
     CHECK — it deletes nothing, which is the whole point of splitting it out.
 
-    Condemning a user's file is not done lightly, hence the narrow rule: ONLY a
+    Replacement is limited to explicitly declared superseded revisions or a
     blocking verdict (model_integrity: an HTML gate page, or a header the file is
     too short to satisfy), which is a file no loader can open under any
     circumstances. Advisory `too_small` is the user's business. A failing checker
     is never grounds to condemn either — no answer means keep."""
     try:
+        if os.path.getsize(path) in spec.get('superseded_bytes', ()):
+            return 'superseded model revision; download the current official file'
         from .services import model_integrity
         res = model_integrity.validate_model_file(path, min_bytes=spec.get('min_bytes'))
     except Exception:
@@ -3776,7 +3819,9 @@ def _run_primary_download(action) -> int:
         if not reason:
             _append(action, f'already present: {dest}')
             return 0
-        _append(action, f'the file already here cannot be loaded: {reason}')
+        diagnosis = ('needs replacing' if reason.startswith('superseded model revision')
+                     else 'cannot be loaded')
+        _append(action, f'the file already here {diagnosis}: {reason}')
         # It is NOT deleted now. `dest` is written by os.replace(part, dest) at the
         # end of a successful download, which overwrites it atomically, so there is
         # nothing to clear beforehand — and clearing it beforehand is exactly how a

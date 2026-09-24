@@ -1,7 +1,7 @@
 // react-frontend/src/components/dataset/studio/StudioPreflightBanner.jsx
 /**
  * Pipeline-cannot-run banner appears on launch 409 studio_missing (P0-a). List each missing model
- * with its expected relative path and each missing custom node, preventing new installations from
+ * with its expected relative path and each missing ComfyUI node, preventing new installations from
  * launching grids whose tiles all fail silently. Dismissible; another launch repeats it if still
  * unresolved. missing contains family, files [{path,kind}], nodes [class_type], and optional
  * node_packs [{class_type,pack,url,search}] identifying ComfyUI-Manager packages instead of
@@ -9,10 +9,11 @@
  * when header-detected architecture conflicts with the Studio family. ComfyUI would otherwise
  * ignore that LoRA and render every tile without it. This is a separate, higher-priority blocker.
  */
-const FAMILY_LABELS = { zimage: 'Z-Image', sdxl: 'SDXL', krea: 'Krea 2 Turbo',
-  flux: 'FLUX.1', flux2klein: 'FLUX.2 Klein' };
+import { FAMILY_LABELS } from './constants';
+import { studioModelSettingsLink } from '../../../utils/studioFamilySettings';
+import ComfyNodeRepair from '../../setup/ComfyNodeRepair';
 
-export default function StudioPreflightBanner({ missing, archMismatch, onDismiss }) {
+export default function StudioPreflightBanner({ missing, archMismatch, onDismiss, onRefresh }) {
   if (archMismatch) {
     const fam = FAMILY_LABELS[archMismatch.family] || archMismatch.family || 'this';
     const det = FAMILY_LABELS[archMismatch.detected] || archMismatch.detected || 'a different';
@@ -37,9 +38,9 @@ export default function StudioPreflightBanner({ missing, archMismatch, onDismiss
   const files = missing.files || [];
   const nodes = missing.nodes || [];
   const nodePacks = missing.node_packs || [];
-  const packFor = (ct) => nodePacks.find((p) => p.class_type === ct);
   if (!files.length && !nodes.length) return null;
   const fam = FAMILY_LABELS[missing.family] || missing.family || 'This';
+  const modelSettingsLink = studioModelSettingsLink(missing.family);
 
   return (
     <div role="alert"
@@ -79,45 +80,17 @@ export default function StudioPreflightBanner({ missing, archMismatch, onDismiss
               </li>
             ))}
           </ul>
+          {modelSettingsLink && (
+            <a href={modelSettingsLink}
+              className="self-start text-sm underline hover:text-red-100">
+              Install {fam} test models in Settings →
+            </a>
+          )}
         </div>
       )}
 
       {nodes.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <span className="text-red-200/80 text-[0.6875rem] uppercase tracking-wide">
-            Missing custom node{nodes.length > 1 ? 's' : ''} — install into ComfyUI
-          </span>
-          <ul className="m-0 flex flex-col gap-1">
-            {nodes.map((n) => {
-              const p = packFor(n);
-              return (
-                <li key={n} className="flex flex-col gap-0.5">
-                  <code className="self-start px-1.5 py-0.5 rounded border border-red-400/40 bg-red-500/10 text-red-100 text-[0.6875rem]">
-                    {n}
-                  </code>
-                  {p && (
-                    <span className="text-red-200/70 text-[0.625rem]">
-                      {p.url ? (
-                        <>
-                          Install <b className="font-semibold">{p.pack}</b> via ComfyUI-Manager
-                          {p.search ? <> (search “{p.search}”)</> : null} —{' '}
-                          <a href={p.url} target="_blank" rel="noreferrer"
-                            className="underline break-all hover:text-red-100">{p.url}</a>
-                          , then restart ComfyUI.
-                        </>
-                      ) : (
-                        <>
-                          Install <b className="font-semibold">{p.pack}</b> from {p.setup},
-                          then restart ComfyUI.
-                        </>
-                      )}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <ComfyNodeRepair nodes={nodes} nodePacks={nodePacks} onRefresh={onRefresh} />
       )}
     </div>
   );

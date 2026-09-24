@@ -1,4 +1,3 @@
-import { engineLabel } from '../../engines/catalog.js';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUp, CheckCircle2, Copy, Download, Drama, Eraser, Filter, FolderOpen, Globe, Loader2, Package, PenLine, PersonStanding, RefreshCw, Save, Scissors, Search, Settings, SlidersHorizontal, Sparkles, Trash2, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';

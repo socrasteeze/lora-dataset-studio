@@ -34,6 +34,7 @@ cannot see. Hence ``job_key()`` — the registry itself is happily reused.
 """
 from __future__ import annotations
 
+import sqlalchemy as sa
 import hashlib
 import json
 import logging
@@ -50,19 +51,11 @@ from pathlib import Path
 
 from lds_sdk.video_host import config as cfg
 from lds_video.models import db
-from lds_video.models import VideoBank
-from lds_video.models import VideoClip
-from lds_video.models import VideoDataset
-from lds_video.models import VideoDatasetClip
-from lds_video.models import VideoSource
+from lds_video.models import VideoBank, VideoClip, VideoDataset, VideoDatasetClip, VideoSource
+from lds_video import video_metrics, video_camera_motion, video_clip_export, video_targets, video_training
 from lds_sdk.video_host import bank_jobs
-from lds_video import video_metrics
-from lds_video import video_camera_motion
 from lds_sdk.video_host import ffmpeg_tools
 from lds_sdk.video_host import path_guard
-from lds_video import video_clip_export
-from lds_video import video_targets
-from lds_video import video_training
 
 logger = logging.getLogger(__name__)
 
@@ -690,7 +683,7 @@ def sources_payload(user_id, bank_id) -> list:
     rows = (VideoSource.query.filter_by(bank_id=bank_id)
             .order_by(VideoSource.relpath.asc()).all())
     clip_counts = dict(
-        db.session.query(VideoClip.source_id, db.func.count(VideoClip.id))
+        db.session.query(VideoClip.source_id, sa.func.count(VideoClip.id))
         .filter(VideoClip.bank_id == bank_id).group_by(VideoClip.source_id).all())
     return [{
         'id': s.id, 'relpath': s.relpath, 'file_size': s.file_size,
@@ -802,7 +795,7 @@ def list_clips(user_id, bank_id, *, status=None, source_id=None, ids=None,
     if source_id:
         q = q.filter_by(source_id=int(source_id))
     if ids is not None:
-        q = q.filter(VideoClip.id.in_(ids)) if ids else q.filter(db.false())
+        q = q.filter(VideoClip.id.in_(ids)) if ids else q.filter(sa.false())
     q = q.order_by(VideoClip.source_id.asc(), VideoClip.start_s.asc())
     total = q.count()
     if ids_only:
@@ -1118,7 +1111,7 @@ def _detect_job(bank_id, redetect):
              # Never a file the user declared a single take, in EITHER mode —
              # see SINGLE_SHOT_STATE. "Re-detect everything" is a bulk gesture
              # and a declaration is not something a bulk gesture may overrule.
-             .filter(db.or_(VideoSource.detect_state.is_(None),
+             .filter(sa.or_(VideoSource.detect_state.is_(None),
                             VideoSource.detect_state != SINGLE_SHOT_STATE)))
         if not redetect:
             q = q.filter(VideoSource.detect_state.is_(None))
@@ -1415,7 +1408,7 @@ def _drop_clips_of(bank_id, source_id, *, replace_manual, keep_bounds=None) -> d
     query = (VideoClip.query.filter_by(bank_id=bank_id, source_id=int(source_id))
              .filter(VideoClip.promoted_dataset_id.is_(None)))
     if not replace_manual:
-        query = query.filter(db.or_(VideoClip.detector.is_(None),
+        query = query.filter(sa.or_(VideoClip.detector.is_(None),
                                     VideoClip.detector != 'manual'))
     doomed = [c for c in query.all()
               if _bounds_key(c.start_s, c.end_s) not in keep]
@@ -1533,8 +1526,7 @@ def shot_dry_run(user_id, bank_id, source_id=None, thresholds=None) -> dict | No
     point of a preview is to be able to change your mind after seeing it."""
     if get_bank(user_id, bank_id) is None:
         return None
-    from lds_video import shot_boundaries
-    from lds_video import shot_probs
+    from lds_video import shot_boundaries, shot_probs
     query = VideoSource.query.filter_by(bank_id=bank_id)
     if source_id is not None:
         query = query.filter_by(id=int(source_id))
@@ -1698,9 +1690,9 @@ def _gpu_busy_reason():
     flags training and the vision window raise, so an embedding pass never races
     a training run — the guarantee the whole app is built on."""
     from lds_sdk.video_runtime import queue as queue_manager
-    if queue_manager._get_system_state('training_in_progress'):
+    if queue_manager.get_state('training_in_progress'):
         return 'training is running on the GPU — try again once it finishes'
-    if queue_manager._get_system_state('vision_in_progress'):
+    if queue_manager.get_state('vision_in_progress'):
         return 'a vision/GPU pass is already running — try again in a moment'
     return None
 
@@ -2577,14 +2569,6 @@ def _resolve_edge_inset(value):
     return inset
 
 
-# How many clips ONE shot may contribute when long shots are sliced. A single
-# forty-minute take would otherwise become the whole dataset on its own —
-# `top_source_share` already warns about that at the source level, and this is
-# the same guard one level down. Eight is generous: at the longest H3 clip
-# length that is seventy seconds of one shot.
-MAX_SLICES_PER_CLIP = 8
-
-
 def start_promote(app, user_id, bank_id, *, ids=None, name, target_profile,
                   frames=None, size=None, max_per_source=None,
                   edge_inset_s=None, trigger_word=None, slice_long=False):
@@ -2653,7 +2637,7 @@ def start_promote(app, user_id, bank_id, *, ids=None, name, target_profile,
         for clip in rows:
             n = len(video_clip_export.slice_spans(
                 clip.start_s, clip.end_s, frames, profile['fps'],
-                inset_s=inset, limit=MAX_SLICES_PER_CLIP))
+                inset_s=inset))
             extra_slices += max(0, n - 1)
     # An empty sidecar trains as an EMPTY PROMPT and ai-toolkit says nothing about
     # it, so how many clips are about to ship without one is a limit that has to
@@ -2831,8 +2815,7 @@ def _promote_job(bank_id, dataset_id, clip_ids, profile_key, frames, size,
             # joins between slices are not shot boundaries. Off, the shot is one
             # span exactly as before, so nothing about the default path moved.
             spans = ([(a, b) for a, b in video_clip_export.slice_spans(
-                start_s, end_s, frames, profile_fps,
-                limit=MAX_SLICES_PER_CLIP)]
+                start_s, end_s, frames, profile_fps)]
                 if (slice_long and profile_fps) else [(start_s, end_s)])
             if not spans:
                 spans = [(start_s, end_s)]      # let the encoder speak the refusal
@@ -3123,6 +3106,7 @@ def compose_sidecar_text(trigger, caption, metrics_json, keeps_audio=False) -> s
 
 
 def _dataset_row(ds: VideoDataset) -> dict:
+    from lds_video.video_best_settings import best_settings_loras, read_best
     profile = video_targets.get(ds.target_profile) or {}
     seconds = video_targets.clip_seconds(ds.target_profile, ds.frames) \
         if ds.frames else None
@@ -3144,6 +3128,8 @@ def _dataset_row(ds: VideoDataset) -> dict:
         # they come back to it, not once at creation.
         'licence_note': profile.get('licence_note'),
         'trigger_word': ds.trigger_word,
+        'best_settings': read_best(ds),
+        'best_settings_loras': best_settings_loras(ds),
         'references': len(reference_dirs(ds)),
         'requires_references': bool(profile.get('requires_references')),
         # Where a removed clip goes, for the confirmation that speaks BEFORE the
@@ -3223,9 +3209,9 @@ def create_stills_dataset_from_face_dataset(user_id, face_dataset_id,
     The face dataset's trigger is copied onto the stills set so a later caption
     edit re-writes its sidecar with the same trigger, exactly once - the
     idempotent prepend already guards against doubling it."""
-    from lds_sdk.video_host import face_dataset_service as fds
-    from lds_sdk.video_host import lora_training as lt
-    face = fds.get_dataset(user_id, face_dataset_id)
+    from lds_sdk.dataset_exports import DatasetExports
+    from lds_sdk import video_training_runtime as lt
+    face = DatasetExports(user_id).get_dataset(face_dataset_id)
     if face is None:
         raise ValueError('image dataset not found')
     profile_key = 'minimax_h3'
@@ -3304,6 +3290,8 @@ def video_dataset_payload(user_id, dataset_id) -> dict | None:
     clips = (VideoDatasetClip.query.filter_by(dataset_id=ds.id)
              .order_by(VideoDatasetClip.filename.asc()).all())
     payload = _dataset_row(ds)
+    from lds_video.video_dataset_import import job_key as import_job_key
+    payload['import_activity'] = bank_jobs.get(import_job_key(ds.id))
     payload['items'] = [{
         'id': c.id, 'filename': c.filename, 'caption': c.caption,
         'source_bank_id': c.source_bank_id, 'source_clip_id': c.source_clip_id,
@@ -3554,17 +3542,9 @@ def delete_video_dataset(user_id, dataset_id) -> bool:
     # Divorce this id's cloud-run history from whoever inherits the rowid:
     # `owns()` refuses stamped runs, so a future dataset reusing the id never
     # shows — or serves — a stranger's checkpoints.
-    from lds_sdk.video_host.models import CloudTrainingRun
-    from lds_sdk.video_host import cloud_run_dataset as crd
-    for run in CloudTrainingRun.query.filter_by(dataset_id=ds.id).all():
-        if crd.table_of(run) != crd.VIDEO:
-            continue
-        try:
-            params = json.loads(run.train_params or '{}')
-        except (TypeError, ValueError):
-            params = {}
-        params['dataset_deleted'] = True
-        run.train_params = json.dumps(params)
+    from lds_sdk import cloud_runs
+    from lds_sdk.video_host import run_dataset as crd
+    cloud_runs.mark_dataset_deleted(ds.id, crd.VIDEO)
     db.session.flush()
     out_dir = ds.output_dir
     db.session.delete(ds)
@@ -3618,15 +3598,6 @@ def delete_video_dataset(user_id, dataset_id) -> bool:
 # What is still refused is the one thing consent cannot fix: a folder that belongs
 # to a DATASET. Files landing there would sit inside training material, get
 # trained on, and be attributed to a dataset nobody added them to.
-
-# Per REQUEST cap. Far below the image outlet's 60 for a reason that is arithmetic
-# rather than taste: one image is capped at 12 MB and 20 s, one video at 200 MB
-# and 180 s (netfetch.MAX_DRIVER_BYTES / DOWNLOAD_TIMEOUT). Six items over two
-# workers bounds a request at three download rounds — the same order of magnitude
-# as the image outlet's worst case, instead of an order beyond it. Bigger
-# selections are not refused: the client sends them as successive batches, the way
-# it already does for images.
-SCRAPE_VIDEO_IMPORT_MAX = 6
 
 # Two, not the image lane's six. A video download saturates the link on its own;
 # more of them in flight does not make the pipe wider, it only multiplies the peak
@@ -4032,8 +4003,6 @@ def scrape_import_to_video_bank(user_id, items, bank_id=None, name=None, *,
     items = [it for it in (items or []) if isinstance(it, dict) and it.get('url')]
     if not items:
         raise ValueError('no items')
-    if len(items) > SCRAPE_VIDEO_IMPORT_MAX:
-        raise ValueError(f'max {SCRAPE_VIDEO_IMPORT_MAX} videos per import')
 
     if bank_id is not None:
         key = job_key(bank_id)
@@ -4106,7 +4075,7 @@ def scrape_import_to_video_bank(user_id, items, bank_id=None, name=None, *,
         # stale or purged lease can never publish beside a newer bank owner.
         bank_jobs.require_reservation(_bank_lease, job_key(bank.id))
 
-        from lds_sdk.video_host.face_dataset_service import _source_metadata_storage
+        from lds_sdk.video_media_library import source_metadata_storage as _source_metadata_storage
 
         skipped: dict[str, int] = {}
         saved = already_there = 0

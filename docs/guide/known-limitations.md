@@ -6,7 +6,7 @@ These are current boundaries, not setup failures.
 
 | Area | Current boundary | Practical path |
 |---|---|---|
-| **Test Studio families** | Studio workflows currently cover Z-Image, SDXL, Krea 2 and FLUX.2 Klein; FLUX.1 and Anima are visible and deployable but have no generation lane, because the app holds no unet/VAE/text-encoder setting for either | Asking to generate with one refuses by name rather than falling back to Z-Image; use family-native external inference until they get an engine configuration |
+| **Test Studio preparation** | All seven image training families have generation workflows; each needs matching local models and native ComfyUI support | Prepare missing FLUX.1, Anima or Qwen-Image 2.1 files in Settings → Image engines → Trained image models; update ComfyUI when the node check requests it |
 | **Krea 2 img2img Studio mode** | `backend/workflows/krea2_turbo_img2img.json` exists but is not wired to a separate Studio mode | Krea 2 Edit remains available for dataset/reference generation; Studio uses its reachable text-to-image path |
 | **Canvas comparison generation** | A single launch requires checkpoints from one model family | Run separate same-family comparisons; cross-family workflows do not share one base graph |
 | **Dual captions** | Local training only; Krea 2 and Anima cache text embeddings and use the long caption alone | Keep the long caption complete for every family |

@@ -140,9 +140,18 @@ export function stepActionModel(datasetId, group, step, ctx = {}) {
 
 const quoted = (files) => (files || []).map((f) => `“${f.filename}”`).join(' + ')
 
+export function stepUsesBest(step, loras = []) {
+  const normalize = (name) => String(name || '').replaceAll('\\', '/')
+  const pins = new Set(loras.map(normalize).filter(Boolean))
+  return !!step?.best_settings || (step?.files || []).some((f) => f.deployed_as && pins.has(normalize(f.deployed_as)))
+}
+
+const BEST_WARNING = '\n\n★ This checkpoint is used by the dataset’s best settings. '
+  + 'The saved settings are kept; applying them requires this LoRA to be available in ComfyUI.'
+
 /** The 🗑 confirmation. Names every file the click moves and the destination —
  * from the app-wide wording, never a sentence of this file's own. */
-export function describeStepDelete(group, step, mode) {
+export function describeStepDelete(group, step, mode, bestLoras = []) {
   const files = step.files || []
   const many = files.length > 1
   const where = deleteDestination(mode)
@@ -158,18 +167,18 @@ export function describeStepDelete(group, step, mode) {
   if (deployed(step)) {
     lines.push('', 'The copy deployed into ComfyUI is a separate file and is KEPT — use ⏏ Undeploy for that one.')
   }
-  return lines.join('\n')
+  return lines.join('\n') + (stepUsesBest(step, bestLoras) ? BEST_WARNING : '')
 }
 
 const deployed = (step) => !!step?.deployed
 
-export function describeUndeploy(step, mode = 'app_trash') {
+export function describeUndeploy(step, mode = 'app_trash', bestLoras = []) {
   const files = (step.files || []).filter((f) => f.deployed_as)
   return [
     `UNDEPLOY — REMOVE FROM COMFYUI — ${quoted(files)} (${stepLabel(step)})?`, '',
     `Only the copy in ComfyUI's loras folder goes to ${deleteDestination(mode)}.`,
     'The training save is KEPT — this step offers to deploy again right after.',
-  ].join('\n')
+  ].join('\n') + (stepUsesBest(step, bestLoras) ? BEST_WARNING : '')
 }
 
 /** The run-level 🗑 the training block used to carry, moved here unchanged:

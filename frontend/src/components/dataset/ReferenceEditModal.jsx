@@ -1,6 +1,6 @@
 import { engineLabel } from '../../engines/catalog.js';
 /** Edit the reference photo with a prompt, on any engine the install can run —
- * the list is DERIVED from EDIT_ENGINES and from `engineOptions`, never spelled
+ * the list is DERIVED from editEngines() and from `engineOptions`, never spelled
  * out here.
  *
  * The edit runs as a SERVER background job — a slow (1-3 min) render, so it must
@@ -29,7 +29,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { DEFAULT_ENGINE } from './engineSelection.js';
 import KleinModelSetting from '../shared/KleinModelSetting';
 import {
-  EDIT_ENGINES, LOCAL_ENGINES, batchLiveNote, editPhase,
+  editEngines, localEngineIds, batchLiveNote, editPhase,
   editEngineOptions, editCostNote, editKeepNote, editRefNote,
   acceptsExtraEditRefs, acceptsExtraEditRefsForBatch, editBatchBlockedReason,
   referenceEditCandidates,
@@ -44,7 +44,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                                              onEdit, onRetry = null, canRetry = false,
                                              onKeep, onDiscard, onClose }) {
   const [prompt, setPrompt] = useState('');
-  const initialEngine = EDIT_ENGINES.includes(defaultEngine) ? defaultEngine : DEFAULT_ENGINE;
+  const initialEngine = editEngines().includes(defaultEngine) ? defaultEngine : DEFAULT_ENGINE;
   const [engines, setEngines] = useState([initialEngine]);
   const [editRefs, setEditRefs] = useState([]);            // transient File[]
   const [starting, setStarting] = useState(false);         // bridges POST -> server 'running'
@@ -110,7 +110,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
   const selectedBlocked = options.filter(
     (option) => engines.includes(option.engine) && option.blocked);
   const liveNote = batchLiveNote(liveActivity);
-  const selectedLocalEngines = engines.filter((engine) => LOCAL_ENGINES.includes(engine));
+  const selectedLocalEngines = engines.filter((engine) => localEngineIds().includes(engine));
   const localRefNotes = selectedLocalEngines
     .map((engine) => editRefNote(engine, { datasetExtraCount }))
     .filter(Boolean);
