@@ -131,7 +131,7 @@ def main() -> int:
         from simple_lama_inpainting import SimpleLama
     except Exception as e:
         # Failed imports (missing package/broken torch) return clean JSON, not a silent traceback.
-        print(json.dumps({"ok": False, "error": f"import: {type(e).__name__}: {e}"}))
+        print(json.dumps({"ok": False, "error": f"import: {type(e).__name__}: {e}"}), file=_OUT)
         return 1
     try:
         cuda = bool(torch.cuda.is_available())

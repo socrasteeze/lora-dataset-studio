@@ -774,11 +774,20 @@ def _run_klein_job(user_id, crop_img, *, seed, steps=KLEIN_STEPS,
 
     job_id = str(uuid.uuid4())
     status = None
+    meta = {'model_name': 'watermark_klein',
+            'processing_timeout_seconds': 0 if math.isinf(timeout) else timeout}
+    # Remote peers never see this machine's Comfy input folder — the crop's
+    # absolute path rides staged_input_paths so the peer publisher / BackendWorker
+    # can upload it. Local jobs must NOT carry those paths (privacy + the local
+    # lane's byte-identical contract).
+    add_kw = dict(job_type='image', user_id=str(user_id), workflow_data=workflow,
+                  prompt=text, job_id=job_id, metadata=meta)
+    if remote:
+        meta['staged_inputs'] = [crop_name]
+        meta['staged_input_paths'] = {crop_name: os.path.abspath(crop_path)}
+        add_kw['worker_id'] = device_id
     try:
-        queue_manager.add_job(job_type='image', user_id=str(user_id), workflow_data=workflow,
-                              prompt=text, job_id=job_id,
-                              metadata={'model_name': 'watermark_klein',
-                                        'processing_timeout_seconds': 0 if math.isinf(timeout) else timeout})
+        queue_manager.add_job(**add_kw)
         status, filename, err_msg = _wait_for_job(job_id, timeout)
     finally:
         # A stalled/cancelling worker may still need its input. The orphan
