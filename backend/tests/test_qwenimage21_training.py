@@ -105,7 +105,7 @@ def test_checkpoint_isolation_and_arch_detection(app, tmp_path):
         assert not studio.can_generate_with('qwenimage21')
 
 
-@pytest.mark.plugins('cloud_training')
+@pytest.mark.skip(reason='cloud_training is excluded on this fork (D4)')
 def test_cloud_recipe_resources_and_price_without_invented_estimate(app, tmp_path, monkeypatch):
     import json
     from types import SimpleNamespace
