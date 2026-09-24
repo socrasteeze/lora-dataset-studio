@@ -1122,6 +1122,60 @@ Keeping the **app itself** healthy: updating it, and getting a bug report out of
 - **Stop everything** — one action for when something did not fire correctly and the app is stuck. It cancels queued and running bank passes, dataset batches and in-flight generations, asks ComfyUI to unload its models, stops training, and then clears the two flags the "GPU busy" refusal reads. It **confirms first** — it is destructive to in-flight work by design — and it reports **per target**: an unreachable ComfyUI is *not confirmed*, not "stopped", and a training process that cannot be confirmed dead is a failure whose flag is deliberately left set. Above it, a warning appears **only when the server has checked and found nothing behind a "GPU busy" flag**, offering to clear it alone — that stops nothing and is the fix in the common case. The same warning shows on the bank workspace and the banks page, where the refusal is actually met. See *Troubleshooting → "GPU busy" when nothing is running*.
 - **Server log** — a live tail of the server log, with **Copy all**, for when you need to see what just happened.
 
+## Usage statistics
+
+**Settings → Maintenance → Optional usage statistics.** This is entirely optional
+and **off by default**, including on existing installations. LDS sends no usage
+statistics until you choose **Share usage statistics**. Choose **No thanks** to
+save a refusal and dismiss the invitation; LDS remains fully usable either way.
+If sharing is unavailable on your installation, the settings card says so and no
+invitation appears.
+
+The statistics help the LDS maintainer understand which features people return
+to and which operations fail. When enabled, the allowed information is:
+
+| Information | Purpose |
+|---|---|
+| Random installation ID and days of activity | Count participating installations and returns over time. |
+| Event timestamps and first active day | Group activity by date and measure returns. |
+| Coarse feature names, such as Datasets, Bank or Training | See where development effort is useful. |
+| Supported operation outcomes and error categories | Find reliability problems without uploading an error message or log. |
+| LDS version and operating-system family | Identify version or platform differences. |
+| Approximate duration ranges | Spot slow operations without recording their contents. |
+| Production or test environment | Exclude the maintainer's synthetic tests from product statistics. |
+
+**Not collected:** images or videos, prompts, captions, dataset names or IDs,
+file names or paths, account names, tokens or API keys, log contents, key presses,
+screen recordings or complete page addresses. Plugin names and private routes
+are not sent. The browser only reports a coarse feature after a real pointer or
+keyboard interaction in the visible app; leaving a tab open does not create
+an activity heartbeat. The action or text entered is never reported.
+
+These are **pseudonymous installation statistics**, not a count or directory of
+individual people: one person can use several installations, several people can
+share an installation, and people who decline are absent from the figures.
+The choice applies to the whole LDS server installation, including other
+browsers connected to it.
+
+Statistics are sent in the background by the LDS server to **PostHog Cloud EU**
+for the maintainer's private product dashboard. There is no browser analytics
+SDK, automatic click capture or session replay. A network request necessarily
+exposes the sending server's network address to the receiving service; LDS does
+not add an IP address or location to the event properties. Loss of connectivity
+does not block your work.
+
+**Retention:** PostHog's free plan lists **one year** of event retention.
+The provider is rolling enforcement out by project; while it is not enforced,
+older events remain stored. LDS therefore does not guarantee an automatic
+deletion date. See [PostHog's retention policy](https://posthog.com/docs/data/events-retention).
+Pending local events expire after seven days and are limited to 500 entries.
+
+**Turn off sharing** takes effect as soon as the choice is successfully saved:
+it stops new collection and clears statistics waiting to be sent. It does not
+recall data already delivered. The buttons save independently of the general
+Settings **Save** bar, and a failed save is shown so you can retry. You can change
+your choice here at any time; returning to an open browser tab rechecks it.
+
 ## Per-dataset settings
 
 Separate from everything above: these live **per dataset**, in the **⚙ Dataset settings** modal you open from the workspace. They travel with that one dataset and don't touch the global Settings page.
