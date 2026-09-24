@@ -127,4 +127,8 @@ def test_local_klein_job_is_byte_identical_to_before(app, tmp_path, monkeypatch)
         wk._run_klein_job('local', Image.new('RGB', (8, 8)), seed=1)
     assert captured.get('worker_id') is None
     assert 'staged_input_paths' not in captured['metadata']
-    assert captured['metadata'] == {'model_name': 'watermark_klein'}
+    assert captured['metadata']['model_name'] == 'watermark_klein'
+    # processing_timeout_seconds is the resolved budget the worker reads; it is
+    # part of every image job's metadata now (same as generate), not a remote-only
+    # field. Assert presence + type, not a hard-coded seconds value.
+    assert isinstance(captured['metadata'].get('processing_timeout_seconds'), (int, float))

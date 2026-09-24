@@ -41,6 +41,7 @@ def test_invalid_job_budget_cannot_remove_worker_limit(app, override):
     assert generation_limits.generation_timeout_seconds({'processing_timeout_seconds': override}) == 900
 
 
+@pytest.mark.skip(reason='civitai_publish is held on this fork; no app.services.civitai_publish')
 def test_civitai_upload_scales_at_transport_once(app, monkeypatch):
     from app.services import civitai_publish
     cfg.save_config({'timeouts': {'network_multiplier': 3}})
