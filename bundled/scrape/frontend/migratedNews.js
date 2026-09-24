@@ -1,5 +1,12 @@
 // Historical IDs and dates are preserved when ownership moves out of the core feed.
 export const MIGRATED_NEWS = [
+  {"id": "2026-09-23-web-video-selection", "date": "2026-09-23", "title": "Select all the web videos you need", "blurb": "Video imports no longer ask you to reduce your selection to six videos. Bank imports continue through the whole selection in successive batches.", "to": "/datasets"},
+{
+    id: '2026-09-23-scrape-video-dataset', date: '2026-09-23',
+    title: 'Import web videos directly into a dataset',
+    blurb: 'In a video dataset, open Add videos, scan a website URL and select the videos to import. The picker shows videos, and the import runs in the background with progress and skipped-file counts.',
+    to: '/datasets',
+},
 {
     id: '2026-08-06-bank-scrape-keeps-provenance',
     date: '2026-08-06',

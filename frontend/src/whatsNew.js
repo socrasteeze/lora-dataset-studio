@@ -84,6 +84,60 @@ import { registeredDescriptors } from './plugins/registry.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-23-zzzzzzzz-plugin-engine-settings-save',
+    date: '2026-09-23',
+    title: 'Save your enabled image engines from plugin settings',
+    blurb: 'Engine checkboxes now show your saved selection and save alongside API keys and model choices without an ownership error. Changing a plugin\'s engines preserves your other engine selections.',
+  },
+  {
+    id: '2026-09-23-zzzzzzz-studio-node-repair',
+    date: '2026-09-23',
+    title: 'Resolve missing ComfyUI nodes from your test setup',
+    blurb: 'Studio and model settings now offer installation-specific repair steps, direct ComfyUI links and a fresh node check. Missing nodes stay visible even when all model files are present, and your prompt and checkpoint choices survive the repair.',
+    to: '/studio',
+  },
+  {
+    id: '2026-09-23-video-reference-text-writer',
+    date: '2026-09-23',
+    title: 'Auto and Enrich reach your chosen motion writer',
+    blurb: 'Reference prompts can now continue from JoyCaption to Ollama without a server error. Text generation also keeps the selected local provider when settings change during a request.',
+    to: '/studio',
+  },
+  {
+    id: '2026-09-23-zzzzzz-studio-model-downloads',
+    date: '2026-09-23',
+    title: 'Download missing test models without leaving Studio',
+    blurb: 'Missing Qwen-Image 2.1, FLUX.1 or Anima files now come with download buttons, file sizes and progress. LDS installs them in the correct folders and refreshes the model list while keeping your prompt and checkpoints.',
+    to: '/studio',
+  },
+  {
+    id: '2026-09-23-generation-preset-library',
+    date: '2026-09-23',
+    title: 'Keep every named LoRA preset',
+    blurb: 'Klein and Krea settings let you save and duplicate more than twelve named presets. Every preset stays available in generation selectors instead of being silently dropped.',
+    to: '/settings/engines',
+  },
+  {
+    id: '2026-09-23-zzzzz-test-every-image-family',
+    date: '2026-09-23',
+    title: 'Test and compare every image LoRA family',
+    blurb: 'Generate test images with FLUX.1, Anima and Qwen-Image 2.1 alongside Z-Image, SDXL, Krea 2 and FLUX.2 Klein. Compare checkpoints or blend compatible LoRAs with family-specific models, defaults and negative prompts where supported.',
+    to: '/studio',
+  },
+  {
+    id: '2026-09-23-zzzzz-joycaption-video-enrich',
+    date: '2026-09-23',
+    title: 'Use Auto and Enrich with JoyCaption again',
+    blurb: 'Using JoyCaption to read a reference image no longer makes Auto or Enrich fail with a server error. If the image reader fails or times out, the Video plugin can show the reason.',
+  },
+  {
+    id: '2026-09-23-zzzz-mobile-plugin-navigation',
+    date: '2026-09-23',
+    title: 'Reach every plugin from your phone',
+    blurb: 'The mobile navigation menu now scrolls within the screen, so Plugins, Settings and other entries stay reachable even with many plugins enabled.',
+    to: '/plugins',
+  },
+  {
     id: '2026-09-23-zzz-qwen-image-21-training',
     date: '2026-09-23',
     title: 'Train Qwen-Image 2.1 LoRAs',

@@ -15,7 +15,11 @@ def _graph(**kw):
 
 
 def test_the_arena_podium_stays_at_six_steps_alongside_optional_vdn():
-    podium = [a for a in vts.ACCELERATIONS if a['id'] != 'vdn']
+    # Filtered on `arena` truthy, not on excluded ids: vdn postdates the arena
+    # and carries no rank on purpose (see h3_render.ACCELERATIONS), and the
+    # Chimera recipes (h3_chimera.CHIMERA — TaoMate, FastH3) are stock-graft
+    # extras with their own step counts, not arena-ranked entries either.
+    podium = [a for a in vts.ACCELERATIONS if a['arena']]
     assert [a['id'] for a in podium] == ['turbo', 'parasyte', 'dareties']
     assert all(a['steps'] == vts.TURBO_STEPS == 6 for a in podium)
     assert vts.accel_spec('turbo')['file'] == vts.TURBO_LORA

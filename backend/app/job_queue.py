@@ -154,6 +154,8 @@ def _job_owner_available(job):
         owners.update({kind: pid for kind, (pid, _fn) in registry.job_handlers.items()})
     if any(metadata.get(kind) and not plugin_available(pid) for kind, pid in owners.items()):
         return False
+    if metadata.get('dataset_engine_plugin'):
+        return plugin_available(metadata['dataset_engine_plugin'])
     owner = {'seedvr2_upscale': 'seedvr2', 'qwen_camera_dataset': 'camera_angles'}.get(metadata.get('model_name'))
     return owner is None or plugin_available(owner)
 
@@ -574,6 +576,15 @@ def _poll_outputs(prompt_id, timeout=None):
             history = probe.history or {}
             entry = history.get(prompt_id, history) if isinstance(history, dict) else {}
             outputs = (entry or {}).get('outputs') or {}
+            status = (entry or {}).get('status') or {}
+            if status.get('status_str') == 'error':
+                detail = _execution_error_detail(status)
+                if detail:
+                    job = ImageGenerationQueue.query.filter_by(comfyui_prompt_id=prompt_id).first()
+                    if job:
+                        job.error_message = detail
+                        db.session.commit()
+                return None, True
             for node_output in outputs.values():
                 # `images` is what SaveImage and SaveVideo report under.
                 # `gifs` is what VideoHelperSuite reports EVERY video under —
@@ -586,16 +597,11 @@ def _poll_outputs(prompt_id, timeout=None):
                 for key in ('images', 'gifs'):
                     for img in (node_output or {}).get(key) or []:
                         if (isinstance(img, dict) and img.get('filename')
-                                and img.get('type', 'output') != 'temp'):
+                                and img.get('type', 'output') == 'output'):
                             return img['filename'], False
-            status = (entry or {}).get('status') or {}
-            if status.get('status_str') == 'error' or (status.get('completed') and not outputs):
-                detail = _execution_error_detail(status)
-                if detail:
-                    job = ImageGenerationQueue.query.filter_by(comfyui_prompt_id=prompt_id).first()
-                    if job:
-                        job.error_message = detail
-                        db.session.commit()
+            # LoadVideo also reports its INPUT under `images`. A completed
+            # history containing only inputs/previews/text has no saved result.
+            if status.get('completed'):
                 return None, True
 
             job = ImageGenerationQueue.query.filter_by(comfyui_prompt_id=prompt_id).first()
@@ -639,7 +645,8 @@ def _execution_error_detail(status) -> str | None:
 # name, and twelve images were generated, paid for in GPU time, marked done in
 # the queue — and never attached to their rows. The tile stayed at 0/12 forever
 # with nothing in the logs, because nothing had failed. A new engine must be
-# added HERE, and the contract test that walks this set is what says so.
+# added HERE for legacy helpers. API 1.23 plugin engines instead preserve the
+# host's dataset_engine_plugin marker; no per-plugin core entry is needed.
 DATASET_IMAGE_JOB_NAMES = frozenset({
     'klein_edit_dataset',           # Klein (FLUX.2)
     'krea_identity_edit_dataset',   # Krea 2 Identity Edit
@@ -741,8 +748,10 @@ def _dispatch_completion(job, filename, failed):
             # the whole pass live in bank_jobs, not in one row per image.
             logger.debug('job_queue: bank improve %s finished (failed=%s) — the '
                          'bank pass owns its own result', job.job_id, failed)
-        elif md.get('model_name') in DATASET_IMAGE_JOB_NAMES:
+        elif md.get('dataset_engine_plugin') or md.get('model_name') in DATASET_IMAGE_JOB_NAMES:
             from .services import face_dataset_service
+            # The core owns dataset rows even if their rendering plugin has
+            # since been disabled. Always harvest/cancel already admitted work.
             # The bare fallback 'generation failed' is LESS useful than the tile's
             # own default (which points at the server log) — only pass real detail.
             reason = job.error_message if job.error_message != 'generation failed' else None

@@ -248,7 +248,7 @@ def put_settings():
     scope = request.args.get('plugin') or None
     if (cfg.settings_view(config_partial, scope) != config_partial
             or set(secrets_partial) - set(cfg.settings_secret_keys(scope))):
-        return jsonify({'error': 'These settings belong to another owner. Open its plugin settings.'}), 400
+        return jsonify({'error': 'This page submitted settings outside its plugin. Reload the page and try again.'}), 400
     # Validate through config's persistence boundary before saving config.json
     # too, so a rejected combined request changes neither file.  This covers all
     # control/format/Unicode line separators and a pre-existing poisoned .env,
@@ -323,7 +323,7 @@ def put_settings():
                 'error': hf_cloud_check['detail'],
                 'secret_checks': {'HF_CLOUD_TOKEN': hf_cloud_check},
             }), 400
-    cfg.save_config(config_partial)
+    cfg.save_config(config_partial, plugin_id=scope)
     cfg.set_secrets(secrets_partial)
     # A changed ComfyUI location must take effect NOW: the base/model listers cache
     # their scans for 5 min, so without this the training-base dropdowns keep showing
@@ -410,6 +410,38 @@ def comfy_model_files():
     force = bool(request.args.get('force'))
     files, folder = comfy_model_picker.list_slot_files(slot, force=force)
     return jsonify({'files': files, 'folder': folder})
+
+
+@bp.get('/comfy/trained-image-models')
+def trained_image_models():
+    """Installed assets and explicit preparation actions for image Test Studio."""
+    from ..services.trained_image_models import settings_catalog
+    if request.args.get('force'):
+        from ..utils.comfyui import clear_model_caches
+        clear_model_caches()
+    try:
+        return jsonify({'families': settings_catalog()})
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@bp.get('/comfy/node-check')
+def comfy_node_check():
+    """Recheck the requested node names on the configured ComfyUI after repair.
+
+    This reads the same node registry as Studio preflight, bypassing its cache.
+    Names are compared locally, never interpolated into a URL or command.
+    """
+    nodes = request.args.getlist('nodes')
+    if not 1 <= len(nodes) <= 64 or any(not n.strip() or len(n) > 256 for n in nodes):
+        return jsonify({'error': 'Provide between 1 and 64 node names.'}), 400
+    from ..utils.comfyui import clear_model_caches, fetch_object_info_classes
+    clear_model_caches()
+    classes = fetch_object_info_classes()
+    if classes is None:
+        return jsonify({'error': 'ComfyUI did not answer. Start it, then check nodes again.',
+                        'nodes_checked': False}), 503
+    return jsonify({'nodes_checked': True, 'missing_nodes': sorted(set(nodes) - classes)})
 
 
 def seedvr2_models_list():

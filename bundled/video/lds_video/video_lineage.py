@@ -36,7 +36,7 @@ import os
 import re
 
 from lds_sdk.video_host import config as cfg
-from lds_sdk.video_host import lora_training as lt
+from lds_sdk import video_training_runtime as lt
 from lds_video import video_checkpoints as vck
 from lds_video import video_targets
 from lds_video import video_training_local as vtl
@@ -215,6 +215,12 @@ def _pills(ds, steps, paths, deployed, samples) -> list:
             pill['preview_url'] = None
             pill['preview_status'] = None
         out.append(pill)
+    # D4: no rented-GPU run object exists on this fork's local-only lane —
+    # _pills only ever builds the LOCAL node's pills (see _local_node below),
+    # so there is no `run` to read an id from here.
+    vck._annotate_steps(ds, None, out, paths)
+    from lds_video.video_checkpoint_previews import annotate_pills
+    annotate_pills(ds, None, out, paths)
     return out
 
 
@@ -224,7 +230,7 @@ def local_total_steps(ds) -> int | None:
     format). None when there is no such file — the final save then keeps
     `step: None` and the label says "Final" without inventing a number."""
     try:
-        path = os.path.join(str(lt._jobs_dir()), vtl.local_run_name(ds) + '.json')
+        path = os.path.join(str(lt.jobs_dir()), vtl.local_run_name(ds) + '.json')
         with open(path, encoding='utf-8') as fh:
             job = json.load(fh)
         for proc in (job.get('config') or {}).get('process') or []:

@@ -192,6 +192,23 @@ for (const product of products) {
         assert.ok(action, `${product.id}/${file}: unresolved install action`)
         reachable.add(action[1])
       }
+      // A 5th surface: a data-driven Prepare/InstallRunner whose `action` prop
+      // reads a backend-supplied status field (`action={status.spectrum.action}`),
+      // not a literal string — e.g. VideoPerformanceOptions.jsx, fed by
+      // h3_performance.status(). Proven reachable only when BOTH sides show up:
+      // this exact forwarding idiom in the JSX, and the backend literally
+      // declaring that action id in an 'action': '...' dict entry somewhere
+      // under this product's own Python package — never assumed from one side
+      // alone, or an action with no UI at all would pass silently.
+      if (/action=\{[\w.]+\.action\}/.test(source)) {
+        const pyDir = path.join(BUNDLED, product.id)
+        const pyFiles = fs.readdirSync(pyDir, { recursive: true })
+          .filter((name) => /\.py$/.test(name) && !/[\\/]tests[\\/]/.test(name))
+        for (const pyFile of pyFiles) {
+          const pySource = fs.readFileSync(path.join(pyDir, pyFile), 'utf8')
+          for (const match of pySource.matchAll(/'action':\s*'([a-z0-9_]+)'/g)) reachable.add(match[1])
+        }
+      }
       for (const match of source.matchAll(/install-group\/([a-z0-9_]+)/g)) posted.add(match[1])
     }
     assert.deepEqual((product.manifest.owns?.install_actions || []).filter(action => !reachable.has(action)), [],

@@ -16,12 +16,18 @@ OUTPUTS — a user must not discover that in a forum thread after building a set
 import logging
 import mimetypes
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request, send_file
 
 from lds_sdk.video_host.config import LOCAL_USER
 from lds_video import video_bank_service as svc
 from lds_video import neural_render_media as nr
 from lds_video import video_targets
+from lds_sdk.video_host.http import map_error as _map_error
+from lds_sdk.video_host.http import require_comfyui as _require_comfyui
+from lds_sdk.video_host.http import require_no_stalled_comfyui as _require_no_stalled_comfyui
+from lds_sdk.video_host.http import studio_missing_response as _studio_missing_response
+from lds_video import video_dataset_import as intake
+from lds_sdk.video_host import bank_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +87,42 @@ def video_datasets_list():
     return jsonify({'datasets': svc.list_video_datasets(LOCAL_USER)})
 
 
+@bp.post('/video-datasets')
+def video_dataset_create():
+    data = request.get_json(silent=True) or {}
+    try:
+        out = intake.create(LOCAL_USER, name=data.get('name'),
+            target_profile=data.get('target_profile'), frames=data.get('frames'),
+            size=data.get('size'), trigger_word=data.get('trigger_word'))
+    except (TypeError, ValueError) as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify({'ok': True, **out}), 201
+
+
+@bp.post('/video-dataset/<int:dataset_id>/import')
+@bp.post('/video-dataset/<int:dataset_id>/scrape-import')
+def video_dataset_import(dataset_id):
+    data = request.get_json(silent=True) or {}
+    uploads = request.files.getlist('files') if request.mimetype == 'multipart/form-data' else None
+    try:
+        out = intake.start(current_app._get_current_object(), LOCAL_USER, dataset_id,
+            files=uploads, items=data.get('items'),
+            slice_long=(request.form.get('slice_long') == 'true' if uploads is not None
+                        else data.get('slice_long') is True))
+    except bank_jobs.BankJobBusy:
+        return jsonify({'error': 'An import is already running for this dataset.'}), 409
+    except (TypeError, ValueError, RuntimeError) as exc:
+        return jsonify({'error': str(exc)}), 404 if 'not found' in str(exc) else 400
+    return jsonify(out), 202
+
+
+@bp.post('/video-dataset/<int:dataset_id>/import/cancel')
+def video_dataset_import_cancel(dataset_id):
+    if svc.get_video_dataset(LOCAL_USER, dataset_id) is None:
+        return _missing(dataset_id)
+    return jsonify({'ok': bank_jobs.cancel(intake.job_key(dataset_id))})
+
+
 @bp.post('/video-datasets/from-dataset')
 def video_dataset_from_face_dataset():
     """Build an H3 STILLS set from an existing image dataset — body
@@ -106,6 +148,56 @@ def video_dataset_get(dataset_id):
     if payload is None:
         return _missing(dataset_id)
     return jsonify(payload)
+
+
+@bp.get('/video-dataset/<int:dataset_id>/train/previews')
+def video_dataset_previews(dataset_id):
+    from lds_video import video_checkpoint_previews as previews
+    try:
+        return jsonify(previews.list_previews(LOCAL_USER, dataset_id))
+    except LookupError:
+        return _missing(dataset_id)
+
+
+@bp.post('/video-dataset/<int:dataset_id>/train/previews')
+def video_dataset_render_previews(dataset_id):
+    from lds_video import video_checkpoint_previews as previews
+    from lds_sdk.video_host.studio import StudioAssetsMissing
+    blocked = _require_comfyui() or _require_no_stalled_comfyui()
+    if blocked:
+        return blocked
+    try:
+        payload = previews.start_previews(LOCAL_USER, dataset_id, request.get_json(silent=True))
+    except previews.PreviewSelectionError as exc:
+        return jsonify({'ok': False, 'error': str(exc), 'queued': [], 'failures': exc.failures}), 400
+    except StudioAssetsMissing as exc:
+        return _studio_missing_response(exc)
+    except LookupError:
+        return _missing(dataset_id)
+    except (ValueError, TypeError, RuntimeError, OSError) as exc:
+        return _map_error(ValueError(previews._safe_error(exc)))
+    return jsonify(payload)
+
+
+@bp.get('/video-dataset/<int:dataset_id>/best-settings')
+def video_dataset_best_settings(dataset_id):
+    from lds_video import video_best_settings as best
+    try:
+        ds = best.get_dataset(LOCAL_USER, dataset_id)
+    except LookupError:
+        return _missing(dataset_id)
+    return jsonify({'best_settings': best.read_best(ds),
+                    'best_settings_loras': best.best_settings_loras(ds)})
+
+
+@bp.delete('/video-dataset/<int:dataset_id>/best-settings')
+def video_dataset_remove_best_settings(dataset_id):
+    from lds_video import video_best_settings as best
+    try:
+        best.remove_best(LOCAL_USER, dataset_id)
+    except LookupError:
+        return _missing(dataset_id)
+    return jsonify({'ok': True})
 
 
 @bp.get('/video-dataset/<int:dataset_id>/clip/<int:clip_id>/media')
@@ -214,9 +306,13 @@ def video_dataset_delete(dataset_id):
 
     The bank's clips survive untouched; they only stop claiming to have been
     promoted, so the user can re-cut at a different length without re-triaging."""
-    if not svc.delete_video_dataset(LOCAL_USER, dataset_id):
-        return _missing(dataset_id)
-    nr.forget_backups(dataset_id)      # the kept originals go with the set
+    try:
+        with bank_jobs.mutation_lease(intake.job_key(dataset_id), 'delete'):
+            if not svc.delete_video_dataset(LOCAL_USER, dataset_id):
+                return _missing(dataset_id)
+            nr.forget_backups(dataset_id)      # the kept originals go with the set
+    except bank_jobs.BankJobBusy:
+        return jsonify({'error': 'Stop the video import before deleting this dataset.'}), 409
     return jsonify({'ok': True})
 
 
@@ -243,6 +339,8 @@ def video_dataset_train_local(dataset_id):
             steps=body.get('steps') or 1000,
             base_model=(body.get('base_model') or '').strip() or None,
             low_vram=bool(body.get('low_vram', True)),
+            rank=body.get('rank', 16),
+            sample_prompts=body.get('sample_prompts'),
             do_i2v=bool(body.get('do_i2v', False)),
             accept_download=bool(body.get('accept_download', False))))
     except vtl.VideoWeightsMissing as e:
@@ -291,8 +389,8 @@ def video_dataset_train_stop(dataset_id):
     killing the face dataset of the same number. `ok: false` is the honest answer
     when the fence names another run — the click was refused, not silently
     ignored."""
-    from lds_sdk.video_host import cloud_run_dataset as crd
-    from lds_sdk.video_host import lora_training as lt
+    from lds_sdk.video_host import run_dataset as crd
+    from lds_sdk import video_training_runtime as lt
     stopped = lt.stop_training(expected_dataset_id=dataset_id,
                                expected_dataset_table=crd.VIDEO)
     return jsonify({'ok': bool(stopped)})

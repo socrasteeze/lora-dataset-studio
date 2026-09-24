@@ -23,7 +23,9 @@ test('the studio stages the last frame, marks the launch, and says what the rend
   assert.match(studio, /continues: clip\.id/);
   assert.match(studio, /setMode\('i2v'\)/, 'a continuation is image-to-video by definition');
   assert.match(studio, /onContinue=\{continueFrom\}/);
-  assert.match(studio, /the render lands joined behind it/);
+  // The comment's own line wrap moved (whitespace only) — matched on the
+  // phrase's own line rather than pinning "the" to it too.
+  assert.match(studio, /render lands joined behind it/);
 });
 
 test('the batch prompt pair appears with two frames, and per-picture writing happens before queueing', () => {

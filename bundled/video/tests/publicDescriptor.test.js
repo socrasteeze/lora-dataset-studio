@@ -19,7 +19,11 @@ test('every help topic belongs to Video; global Canvas and Live topics are absen
   assert.deepEqual([...ids].sort(), [...manifest.owns.help_topics].sort())
   assert.ok(ids.includes('setup-video-studio'))
   assert.ok(!ids.includes('setup-dlss5-install'))
-  assert.ok(ids.every(id => !/canvas|live|battle|reference-model|auto-continue/.test(id)))
+  // 'reference-model' and 'auto-continue' dropped from the blacklist: Video
+  // grew its own topics carrying those words as its own vocabulary
+  // (video-studio-reference-model, video-auto-continue) — 'canvas' and 'live'
+  // stay guarded, since nothing here legitimately needs either substring.
+  assert.ok(ids.every(id => !/canvas|live|battle/.test(id)))
 })
 
 test('news and guide contributions exactly match their declared ownership', () => {

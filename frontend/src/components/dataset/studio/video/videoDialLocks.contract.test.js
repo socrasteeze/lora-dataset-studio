@@ -14,9 +14,12 @@ import fs from 'node:fs'
 import test from 'node:test'
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+// VideoLoraPicker.jsx is now a thin re-export of the shared plugin-sdk
+// control (`@lds/plugin-sdk/ui`'s H3LoraPicker) — the slider and its lock
+// live in the CORE implementation behind that control, not in the wrapper.
 const PANELS = {
   'VideoOptionsPanel.jsx': read("../../../../../../bundled/video/frontend/studio/video/VideoOptionsPanel.jsx"),
-  'VideoLoraPicker.jsx': read("../../../../../../bundled/video/frontend/studio/video/VideoLoraPicker.jsx"),
+  'H3LoraPicker.jsx': read("../../../shared/H3LoraPicker.jsx"),
 }
 
 /** Every `<input type="range" … />` tag in a source, whole. */
@@ -64,12 +67,26 @@ test('the picker’s Preview size is the one dial that goes without a lock — o
 
 test('the lock is the app’s one implementation, not a second one', () => {
   // The video lane wearing its own padlock is how the two lanes drift apart.
+  // A PLUGIN file reaches the lock through the shared control; the CORE
+  // implementation behind that control (H3LoraPicker.jsx) reaches it directly
+  // — both must resolve to the same module, never a second one.
   for (const [name, src] of Object.entries(PANELS)) {
-    assert.match(src, /import \{ SliderLock, useSliderLock \} from '@lds\/plugin-sdk\/ui'/,
-      `${name} does not use the shared lock`)
+    if (name === 'H3LoraPicker.jsx') {
+      assert.match(src, /import SliderLock, \{ useSliderLock \} from '\.\/SliderLock(\.jsx)?'/,
+        `${name} does not use the shared lock`)
+    } else {
+      assert.match(src, /import \{ SliderLock, useSliderLock \} from '@lds\/plugin-sdk\/ui'/,
+        `${name} does not use the shared lock`)
+    }
     assert.doesNotMatch(src, /localStorage/,
       `${name} keeps its own lock memory instead of the shared one`)
   }
+  // The plugin-sdk control itself resolves to this exact module (see
+  // frontend/src/plugins/runtimeHost.jsx), so H3LoraPicker.jsx above and every
+  // plugin panel share the one lock, not two that happen to agree today.
+  const host = read('../../../../plugins/runtimeHost.jsx')
+  assert.match(host, /import SliderLock, \{ useSliderLock \} from '\.\.\/components\/shared\/SliderLock\.jsx'/,
+    'the plugin-sdk SliderLock control no longer resolves to the shared implementation')
   const shared = read('../../../shared/LockableSlider.jsx')
   assert.match(shared, /useSliderLock/,
     'LockableSlider still holds a second copy of the lock')

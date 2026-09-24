@@ -1815,6 +1815,10 @@ const TOPICS = [
   setting('engines.enabled', 'engines', 'engines-enabled', 'Enabled engines',
     ['enabled engines', 'engine', 'engines', 'show', 'hide', 'generate panel',
      'klein', 'krea', 'krea 2 edit', 'local']),
+  setting('studio_models', 'engines', 'studio-models', 'Generate with trained image LoRAs',
+    ['qwen', 'qwen-image 2.1', 'flux', 'anima', 'test image', 'studio', 'base model',
+     'text encoder', 'vae', 'install models', 'missing model', 'train then generate',
+     'missing nodes', 'repair ComfyUI', 'update ComfyUI', 'check nodes again']),
   // Klein model-file pins (fork Divergence 2) — name the exact loader files.
   setting('klein.unet', 'engines', 'klein-model-unet', 'Klein diffusion model (UNET) file',
     ['klein', 'unet', 'diffusion model', 'model file', 'path', 'override', 'pin', 'custom model',

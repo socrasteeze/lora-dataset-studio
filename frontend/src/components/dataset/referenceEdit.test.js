@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  EDIT_ENGINES, defaultEditEngine, editBlockedReason, editEngineChoiceMessage,
+  editEngines, defaultEditEngine, editBlockedReason, editEngineChoiceMessage,
   batchLiveNote, editPhase, editEngineOptions, editCostNote, editKeepNote,
   editRefNote, acceptsExtraEditRefs, acceptsExtraEditRefsForBatch, editRefSupport,
   editBatchBlockedReason, referenceEditCandidates,
@@ -24,14 +24,16 @@ function fakeStorage(seed = {}) {
    provider call, and a local edit now waits on the ComfyUI queue like every other
    local render. Derive, never enumerate. */
 test('every engine this fork ships can edit the reference', () => {
-  assert.ok(EDIT_ENGINES.includes('klein'));
-  assert.ok(EDIT_ENGINES.includes('krea'));
+  assert.ok(editEngines().includes('klein'));
+  assert.ok(editEngines().includes('krea'));
 });
 
-test('EDIT_ENGINES is derived from ENGINES, so it cannot drift from it', () => {
-  assert.deepEqual(EDIT_ENGINES, [...ENGINES]);
-  // A copy, not an alias: mutating the edit list must not reach the generation one.
-  assert.notEqual(EDIT_ENGINES, ENGINES);
+test('editEngines() is derived from ENGINES, so it cannot drift from it', () => {
+  assert.deepEqual(editEngines(), [...ENGINES]);
+  // A fresh array each call, not a shared alias: mutating one result must not
+  // reach the generation list or a later call.
+  assert.notEqual(editEngines(), ENGINES);
+  assert.notEqual(editEngines(), editEngines());
 });
 
 /* Divergence 1: the edit lane is local-only here, and it is local BY CONSTRUCTION
@@ -41,7 +43,7 @@ test('EDIT_ENGINES is derived from ENGINES, so it cannot drift from it', () => {
    sync cannot quietly reintroduce a paid edit lane through the derived list. */
 test('no API engine can reach the edit lane', () => {
   assert.deepEqual([...API_ENGINES], [], 'API_ENGINES must stay empty (Divergence 1b)');
-  assert.deepEqual(EDIT_ENGINES, [...LOCAL_ENGINES]);
+  assert.deepEqual(editEngines(), [...LOCAL_ENGINES]);
 });
 
 test('defaultEditEngine mirrors the primary generation engine when it can edit', () => {
@@ -69,7 +71,7 @@ test('defaultEditEngine skips a primary this install cannot run', () => {
    fork and that no route accepts — a default recomputed, not copied. */
 test('with no stored preference the fallback is a real engine of THIS fork', () => {
   assert.equal(defaultEditEngine(fakeStorage()), DEFAULT_ENGINE);
-  assert.ok(EDIT_ENGINES.includes(defaultEditEngine(fakeStorage())));
+  assert.ok(editEngines().includes(defaultEditEngine(fakeStorage())));
 });
 
 test('when nothing is usable the fallback is still an engine, never undefined', () => {
@@ -108,7 +110,7 @@ test('a multi-engine batch requires a selection and gates every selected blocked
 
 test('the refusal names the engines that DO edit, derived from the list', () => {
   const msg = editEngineChoiceMessage();
-  for (const e of EDIT_ENGINES) assert.ok(msg.includes(ENGINE_LABELS[e]), e);
+  for (const e of editEngines()) assert.ok(msg.includes(ENGINE_LABELS[e]), e);
 });
 
 /* ── What an engine does differently, said before the click ────────────────── */
@@ -149,7 +151,7 @@ test('the cost line never invents a price for a local render', () => {
   // render that is simply false, and a price quoted on a free render damages
   // trust as much as one hidden on a paid render. ("no bill" is the point, so
   // the word may appear — a CHARGE being claimed is what must not.)
-  for (const e of EDIT_ENGINES) {
+  for (const e of editEngines()) {
     const note = editCostNote(e);
     assert.match(note, /own ComfyUI/, e);
     assert.match(note, /no bill/, e);

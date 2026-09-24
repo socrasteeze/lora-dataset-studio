@@ -4,30 +4,16 @@
 
 **A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train it on your own GPU, then compare checkpoints before export.
 
-The core and the public plugins are available at no charge, with public source under the project's PolyForm Noncommercial license and no account required for the core. Optional usage statistics are off by default. Additional optional paid plugins may be offered later. API engines and rented GPUs are optional; local and manual workflows remain available.
+The core and public plugins are free under the [PolyForm Noncommercial license](LICENSE). The core needs no account; optional usage statistics are off by default. External APIs and rented GPUs have their own charges. Additional paid plugins may be offered later.
 
-> **V2 is now the main LDS release.** Install from the default [`v2` branch](https://github.com/perfectgf/lora-dataset-studio/tree/v2) or the [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest). Existing ZIP installations can use **Update & restart** to upgrade the core while keeping their datasets, media and history. Git installations still on `main` must first switch to `v2` as described below. Then install the optional features you use from **Plugins → Store** and review each plugin's settings before its first run.
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="docs/screenshots/generate/generate-variations.png"><img src="docs/screenshots/generate/generate-variations.png" alt="Generation engines" width="100%"></a><br><sub>Generation engines</sub></td>
+    <td width="50%" align="center"><a href="docs/screenshots/02-workspace.png"><img src="docs/screenshots/02-workspace.png" alt="Dataset workspace" width="100%"></a><br><sub>Dataset workspace</sub></td>
+  </tr>
+</table>
 
-<h3 align="center">❤ Keep the project in development</h3>
-
-<p align="center">
-  <a href="https://github.com/sponsors/perfectgf"><img src="https://img.shields.io/badge/Sponsor%20this%20project-%E2%9D%A4-EA4AAA?logo=githubsponsors&logoColor=white&style=for-the-badge" alt="Sponsor LoRA Dataset Studio on GitHub Sponsors" height="44"></a>
-</p>
-
-<p align="center">
-  <strong><a href="https://github.com/sponsors/perfectgf">github.com/sponsors/perfectgf</a></strong> — one-off or monthly, and 100% reaches the project (GitHub takes no platform fee).<br>
-  Donations help fund the free core and public plugins: the API credits and rented GPUs used for testing, and the hours that go into the next release. <a href="#support-the-project">What it pays for →</a>
-</p>
-
-> New here? Start with [Setup & install](#setup--install), then follow the [end-to-end workflow](docs/guide/workflow.md). The [documentation index](docs/README.md) links every guide. Project news and current development live on [Discord](https://discord.gg/j6hnJBFtXE).
-
-### 📖 [The complete guide — every feature, screen by screen →](docs/guide/using-the-app.md)
-
-Everything the app can do, in one long read: [getting started](docs/guide/getting-started.md) · [the full workflow](docs/guide/workflow.md) · [every setting explained](docs/guide/settings-reference.md) · [Docker](docs/guide/docker.md) · [troubleshooting](docs/guide/troubleshooting.md).
-
-### ▶️ Watch the whole thing, start to finish
-
-A real Character LoRA built end to end in seven minutes, unedited and without narration:
+A complete Character LoRA workflow in seven minutes:
 
 https://github.com/user-attachments/assets/d51ff89c-34e9-41a9-b47d-08939a8c867b
 
@@ -76,7 +62,7 @@ Four ways to fill a dataset, and one choice at creation that rewires everything 
 
 *Details: [1. Decide what you're teaching](#1-decide-what-youre-teaching) · [2. Fill it with images](#2-fill-it-with-images)*
 
-A dataset is the thirty images you train on. A **bank** is the three thousand you had to look at to find them — and looking at three thousand images by hand is where most datasets die.
+Install optional features from **Plugins → Store**, configure and prepare them in their own settings, and update them through **Plugins → Updates**. Several plugins can be installed together with one LDS restart. Each is independently installable; model downloads, hardware and provider credentials depend on the feature.
 
 Point a bank at a folder, or scrape straight into one. It reads what is there **in place**: your files are never modified, moved or renamed, and the single action that does touch the source folder announces itself in capitals before it runs. Then **one pass measures the whole pile**, and every question afterwards is answered against those measurements instead of against your eyes — what is blurry, what is a duplicate of what, who is in it, how it is framed, whether it is a photograph or a render, and what it actually shows. You keep, reject and shortlist; a kept selection graduates into a dataset with its analysis attached, and can come back the other way.
 
@@ -889,9 +875,9 @@ Nothing here locks your data in — every stage has an exit.
 | Pick a checkpoint | ❌ samples + your eye | ✅ Test Studio grids, multi-LoRA comparison, dataset-caption prompts, votes/rankings, outage-safe pause and export |
 | Move or publish | ⚙️ manual file handling | ✅ ZIP/sidecars, portable backup/restore, folder merge, ComfyUI deployment and optional Hugging Face publishing |
 
-**Honest verdict:** the studio is strongest when you want one guided path from raw images to a reviewed LoRA. A raw ai-toolkit config still exposes the widest surface for unsupported architectures and experimental keys. Standard ZIP/sidecars keep both workflows interoperable.
+API providers apply their own billing and content policies. Model licenses also apply, including MiniMax H3's territory restrictions; check the [video limits](docs/guide/features.md#video-bank-beta--first-release-read-the-limits) before using it. Plugin authors can start with the [SDK and package guide](docs/plugins/README.md).
 
-## Feature matrix by backend
+## Screenshots
 
 Missing dependencies are shown in Setup/Settings and gated features stay unavailable until their requirements are satisfied. Setup's closing screen lists the installable capabilities — including bank scoring, the optional SigLIP 2 engine, the watermark detector and the scraping extras — and each row that is not ready leads to the step that installs it. **Each row also says in one line what it unlocks**, and the video lane's three doors are counted separately rather than hidden behind one green row: ✨ DLSS 5 neural rendering, ↗ Smooth (frame interpolation) and the 🔴 Live lane each carry their own install. The SeedVR2 upscaler is the exception: it installs from its own Setup ▸ ComfyUI card and is not counted on that screen.
 
@@ -943,17 +929,21 @@ This fork is **local-only end to end**: no Nano Banana / ChatGPT / OpenRouter AP
 
 ## Setup & install
 
-On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins → Store**, select the features you want and install them together with one LDS restart. Each plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
+**Windows:** download `LoRA-Dataset-Studio-windows.zip` from the [latest release](https://github.com/perfectgf/lora-dataset-studio/releases/latest), extract it into a new folder and run `start.bat`. The launcher prepares Python and opens LDS in your browser.
 
-The Store offers **free public plugins** for generation, editing, training, publishing and other optional features. Each listing describes the plugin's capabilities and preparation requirements. Their individual updates appear under each plugin.
+Complete **Setup**, then create a dataset or install the plugins you need. Importing, organizing and manually captioning images require no GPU or API key.
 
-### Option 1 — release ZIP + start.bat (Windows)
+| Installation | Instructions |
+|---|---|
+| Git checkout or manual Python environment | [Native installation](docs/guide/installation.md#windows) |
+| Docker with an existing or fresh ComfyUI | [Docker guide](docs/guide/docker.md) |
+| Docker without a GPU | [API-only setup](docs/guide/installation.md#docker-without-a-gpu) |
+| Pinokio | [One-click installation](docs/guide/installation.md#pinokio) |
+| Rented RunPod GPU | [RunPod guide](docs/guide/runpod.md) |
 
 Download **`LoRA-Dataset-Studio-windows.zip`** from the [latest release](https://github.com/socrasteeze/lora-dataset-studio/releases/latest) when that asset is present; otherwise use GitHub's **Source code (zip)**. Extract the entire archive, then double-click:
 
-```text
-start.bat
-```
+### Minimum requirements
 
 Releases deliberately contain an archive/source, not a prebuilt executable launcher.
 No Python is needed up front: `start.bat` looks for a compatible interpreter
@@ -980,9 +970,12 @@ Ollama on the machine — it cannot tell whose); it leaves ComfyUI alone. After
 Settings ▸ Restart, Ctrl+C still works — the relaunch stays in the same
 console.
 
-On an existing ZIP installation, **Update & restart** downloads the next release and swaps the core in, keeping `data/`, `config.json`, `.env`, `.venv` and `.python` untouched. Install and update optional plugins separately from the Store. A git checkout follows its configured branch instead and needs `git` on your PATH, which an install made through a desktop Git client does not always provide.
+## Documentation
 
-The default `v2` branch carries the maintained version of LDS. Clone it to follow its commits with **Update & restart**:
+- [Getting started](docs/guide/getting-started.md) and [end-to-end workflow](docs/guide/workflow.md)
+- [Task instructions](docs/guide/using-the-app.md) and [dataset quality](docs/DATASET_GUIDE.md)
+- [Settings, models and paths](docs/guide/settings-reference.md), [external tools and API keys](docs/guide/installation.md#external-tools)
+- [Troubleshooting](docs/guide/troubleshooting.md) and [known limitations](docs/guide/known-limitations.md)
 
 ```bash
 git clone https://github.com/socrasteeze/lora-dataset-studio.git
@@ -1114,7 +1107,7 @@ The app scales from "no GPU at all" to a full local training rig — each capabi
 
 ## Configuration & network access
 
-Use **Settings** for normal configuration. The complete defaults, `config.json` keys, model locations and environment overrides live in [docs/guide/settings-reference.md](docs/guide/settings-reference.md).
+Use **Settings** for normal configuration. Native installs bind to `127.0.0.1` by default. Read the [security policy](SECURITY.md#the-default-threat-model) before enabling network access; a protected connection also lets you use LDS from a phone or tablet.
 
 The short version:
 
@@ -1176,9 +1169,7 @@ Still stuck? Open the app's **Guide → Getting help** for the one-click **diagn
 
 ## Support the project
 
-<p align="center">
-  <a href="https://github.com/sponsors/perfectgf"><img src="https://img.shields.io/badge/Sponsor%20this%20project-%E2%9D%A4-EA4AAA?logo=githubsponsors&logoColor=white&style=for-the-badge" alt="Sponsor LoRA Dataset Studio on GitHub Sponsors" height="44"></a>
-</p>
+[GitHub Sponsors](https://github.com/sponsors/perfectgf) supports development, API testing and rented test GPUs. Bug reports, contributions and sharing the project also help. For support, generate a diagnostic report under **Guide → Getting help**, then use [Discord](https://discord.gg/j6hnJBFtXE) or [GitHub issues](https://github.com/perfectgf/lora-dataset-studio/issues).
 
 The LDS core and the public plugins in this release have public source and are available at no charge under the project's PolyForm Noncommercial license,
 with usage statistics off by default. Additional optional paid plugins may be offered later;
@@ -1212,48 +1203,12 @@ making it better.
 
 ## Legal & responsible use
 
-> **Short version:** this software is a neutral tool. What you feed it and what you do with the result is entirely your responsibility. Some of its features can build a LoRA of a *real, identifiable person* — doing that without that person's consent may be illegal where you live, and is explicitly outside the intended use of this project.
-
-*This section is not legal advice. Laws differ by country, state, and platform, and they change. If you are unsure whether a particular use is lawful, consult a qualified lawyer before proceeding — not this README.*
-
-### What this project is for
-
-LoRA Dataset Studio is intended for building datasets from imagery **you have the right to use**, specifically:
-
-- **Yourself**, or
-- **Synthetic / AI-generated people** who do not exist (the demo person shown throughout this README is one such synthetic identity), or
-- **Real adults who have given you explicit, informed consent** to train and generate their likeness.
-
-Any other use — in particular training a look-alike model of a real person from photos scraped, downloaded, or otherwise obtained without their consent — is **not** a use this project endorses or supports.
-
-### Your responsibilities as the operator
-
-Because the app runs entirely on your machine, under your control, **you** are the data controller and the sole party responsible for every dataset you build and every image you generate. That includes ensuring you have the necessary rights and that your use complies with all applicable law, which may include (non-exhaustively):
-
-- **Likeness, publicity & personality rights** — many jurisdictions give people control over the commercial and non-commercial use of their face, name, and likeness.
-- **Biometric-data law** — a face-recognition/similarity model of an identifiable person can constitute biometric personal data under regimes such as the EU/UK **GDPR**, Illinois **BIPA**, and similar state and national statutes, with consent and disclosure obligations attached.
-- **Non-consensual intimate imagery & deepfake statutes** — a growing number of countries and U.S. states criminalize creating or sharing sexual or intimate deepfakes of real people without consent. Do not use this tool to make them.
-- **Child protection law** — generating sexual or exploitative imagery of minors, real or synthetic, is a serious crime effectively everywhere. This is an absolute prohibition, without exception.
-- **Copyright & platform terms** — source images may themselves be copyrighted, and scraping may violate a site's terms of service. The built-in scraper is a convenience for collecting material you are entitled to use; respect each site's terms, `robots` directives, rate limits, and the copyright of the images you download.
-
-### Prohibited uses
-
-Do not use this software to:
-
-- Create a model or imagery of **any real person without their consent**;
-- Produce **sexual, intimate, defamatory, harassing, or misleading** content depicting a real person without consent;
-- Produce **any** sexual or exploitative content involving **minors**, real or synthetic;
-- Impersonate a real person or organization, commit fraud, or otherwise deceive;
-- Violate the terms of service, copyright, or rate limits of any site the scraper touches.
-
-### No warranty & limitation of liability
-
-This software is provided **"as is", without warranty of any kind**, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement (see the [PolyForm Noncommercial License 1.0.0](LICENSE) for the full terms). As far as the law allows, **the licensor accepts no liability** for damages — including any legal consequence arising from datasets, models, or images you create with it. By using this software you accept that responsibility yourself.
+Use material you have the rights and consent to train on. Non-consensual likeness use, impersonation, fraud, and sexual or exploitative content involving minors are prohibited. You remain responsible for datasets and outputs. See [responsible use](docs/responsible-use.md) for consent, privacy, copyright, platform terms and warranty details.
 
 ## Contributing
 
-Issues, ideas and pull requests are welcome. For anything bigger than a small fix, say hello first — on [Discord](https://discord.gg/j6hnJBFtXE) (**#help** for questions, **#roadmap** for ideas) or in a [GitHub issue](https://github.com/perfectgf/lora-dataset-studio/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, tests, and PR conventions, and the [Code of Conduct](CODE_OF_CONDUCT.md) for how we treat each other. Found a security issue? Report it privately — see [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and pull requests, and the [Code of Conduct](CODE_OF_CONDUCT.md) for community rules. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-Licensed under the **PolyForm Noncommercial License 1.0.0** — see [LICENSE](LICENSE). Noncommercial use is permitted; commercial use requires separate permission from the licensor.
+[PolyForm Noncommercial 1.0.0](LICENSE). Noncommercial use is permitted; commercial use requires separate permission from the licensor.

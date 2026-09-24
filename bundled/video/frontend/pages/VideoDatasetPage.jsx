@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { apiFetch } from '@lds/plugin-sdk'
-import { videoDatasetUrl } from '../videobank/videoBankApi.js'
-import VideoDatasetWorkspace from '../videobank/VideoDatasetWorkspace.jsx'
-import { shouldEjectOnLoadError, staleNote } from './videoDatasetLoad.js'
+import { apiFetch } from '@lds/plugin-sdk';
+import { videoDatasetUrl } from '../videobank/videoBankApi'
+import VideoDatasetWorkspace from '../videobank/VideoDatasetWorkspace'
+import { shouldEjectOnLoadError, staleNote } from './videoDatasetLoad'
 
 /** 🎬 One video training set, on its own page.
  *
@@ -70,6 +70,12 @@ export default function VideoDatasetPage() {
   // the global loading chrome over the grid.
   useEffect(() => { hasPayload.current = false; load() }, [load])
   const refresh = useCallback(() => load({ background: true }), [load])
+  const importing = !!payload?.import_activity && !payload.import_activity.finished
+  useEffect(() => {
+    if (!importing) return undefined
+    const timer = setInterval(refresh, 1500)
+    return () => clearInterval(timer)
+  }, [importing, refresh])
 
   const back = () => navigate('/datasets')
 

@@ -57,8 +57,11 @@ test('both ✨ gestures send the clip length the dials are set to', () => {
     assert.match(body, /\bseconds\b/, `${url}: the body does not carry the clip length:\n${body}`)
   }
   // And the length is the readback's number, derived from the same dial the
-  // sampler renders — not a second constant that can drift from it.
-  assert.match(PANEL, /const seconds = clipSeconds\(opts\.frames, fps\)/)
+  // sampler renders — not a second constant that can drift from it. `opts`
+  // became `renderOpts` when the reference (ref2va) lane arrived, since a
+  // reference launch reads its render options from `reference.settings`
+  // instead — same arithmetic, renamed source.
+  assert.match(PANEL, /const seconds = clipSeconds\(renderOpts\.frames, fps\)/)
 })
 
 test('the launch carries the frame count the server paces the enrichment on', () => {
@@ -80,14 +83,17 @@ test('a click waiting on the fence is dropped when the mode or the frame changes
   // the guard's own way out, wired to the three things a ✨ click is made
   // for. The hook's behaviour is RUN in tests/ollama-fence-hook-replay.test.mjs;
   // this pins the panel's call.
+  // `reference.signature` joined the dep list with the ref2va lane: a click
+  // waiting on the fence must also be dropped when the reference set changes,
+  // not just the mode/frame/length.
   assert.match(PANEL,
-    /useEffect\(\(\) => \{ stopWaiting\(\); \}, \[mode, source\.image, seconds, stopWaiting\]\)/)
+    /useEffect\(\(\) => \{ stopWaiting\(\); \}, \[mode, source\.image, seconds, reference\.signature, stopWaiting\]\)/)
   // And a switch while the click RUNS: the request cannot be stopped, so
   // each writer asks the guard's handle before writing — `keepAnswer(run,
   // setAside)` (RUN in src/utils/ollamaFence.test.js) sits on its own line
   // between the reply and the field on both ✨ actions, and what it says
   // when told no is the one notice.
-  assert.match(PANEL, /const suggest = async \(run\) =>[\s\S]*?\n[ \t]*if \(r\?\.prompt && keepAnswer\(run, setAside\)\) setPrompt\(r\.prompt\);/)
+  assert.match(PANEL, /const suggest = async \(run\) =>[\s\S]*?\n[ \t]*if \(r\?\.prompt && keepAnswer\(run, setAside\)\) \{\s*\n?[ \t]*setPrompt\(r\.prompt\);/)
   assert.match(PANEL, /const enrich = async \(run\) =>[\s\S]*?\n[ \t]*if \(!keepAnswer\(run, setAside\)\) return;[\s\S]*?setPrompt\(r\.prompt\)/)
   assert.match(PANEL, /const setAside = \(\) => toast\.info\(SUPERSEDED_ANSWER_NOTICE\);/)
 })
@@ -98,10 +104,11 @@ test('the enrichment names the frame only when one will be animated', () => {
   // gate is on the MODE, not on whether a frame happens to be staged.
   const calls = motionCalls(PANEL).filter((c) => c.url === 'motionEnhanceUrl')
   assert.equal(calls.length, 1, 'the ✨ button’s enrichment call is not in the panel')
-  // The ✨ button's call gates on the mode…
+  // The ✨ button's call gates on the mode — or, on the ref2va lane, sends the
+  // reference's own first frame instead, since there is no `source` there.
   const [button] = calls
   assert.match(button.body,
-    /image:\s*mode\s*===\s*'t2v'\s*\?\s*null\s*:\s*\(\s*source\.image\s*\|\|\s*null\s*\)/)
+    /image:\s*isReference\s*\?\s*reference\.firstFrame\?\.\s*image\s*:\s*launchMode\s*===\s*'t2v'\s*\?\s*null\s*:\s*\(\s*source\.image\s*\|\|\s*null\s*\)/)
   // …and the per-picture writer still names the frame it writes for — it just
   // does it for the WHOLE strip in one request now (one vision window instead
   // of one per picture), so the naming moved into the batch body and is

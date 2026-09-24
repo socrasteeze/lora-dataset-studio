@@ -168,8 +168,12 @@ test('the render time reads the way a person says it, and is null for anything e
 
 test('smooth offers whole factors of the source rate, with frames and relative cost', () => {
   const t = smoothTargets({ fps: 24, frames: 124 });
+  // frames = (n - 1) * multiplier + 1: interpolation inserts BETWEEN existing
+  // frames, so the first and last frame of the source are preserved rather
+  // than the whole count being scaled (that older `frames * m` formula over-
+  // counted by `multiplier - 1` frames).
   assert.deepEqual(t.map((x) => [x.multiplier, x.fps, x.frames, x.cost]),
-    [[2, 48, 248, 1], [3, 72, 372, 2], [4, 96, 496, 3]]);
+    [[2, 48, 247, 1], [3, 72, 370, 2], [4, 96, 493, 3]]);
   // A clip that never stored its rate is an H3 clip: 24 fps authored.
   assert.deepEqual(smoothTargets({}).map((x) => x.fps), [48, 72, 96]);
   assert.equal(smoothTargets({ fps: 30 })[0].frames, null, 'no frame count → no count promised');
@@ -192,7 +196,11 @@ test('a poll keeps the loaded older clips: the boundary is the page proper, not 
 });
 
 test('the acceleration travels by name, and larryvrh keeps the older boolean beside it', () => {
-  assert.deepEqual(ACCELERATIONS.map((a) => a.id), ['turbo', 'parasyte', 'dareties']);
+  // Filtered on `arena` truthy: vdn postdates the arena and the Chimera
+  // recipes (taomate_3step, fasth3_v02) are stock-graft extras, neither
+  // arena-ranked — same reasoning as the backend's h3_chimera/h3_render pair.
+  assert.deepEqual(ACCELERATIONS.filter((a) => a.arena).map((a) => a.id),
+    ['turbo', 'parasyte', 'dareties']);
   const base = { prompt: 'p', mode: 't2v' };
   assert.equal(buildGeneratePayload({ ...base, accel: 'parasyte' }).accel, 'parasyte');
   assert.equal(buildGeneratePayload({ ...base, accel: 'parasyte' }).turbo, undefined);

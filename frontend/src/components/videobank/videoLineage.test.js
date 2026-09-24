@@ -31,7 +31,11 @@ test('a node becomes the group the list reasons about, a pill the step', () => {
     run_name: null, parent_run_id: null, steps: CLOUD.checkpoints })
   assert.deepEqual(nodeGroup(LOCAL), { key: 'local', lane: 'local', run_id: null, active: false, status: null,
     run_name: 'video_x_ds9', parent_run_id: null, steps: LOCAL.checkpoints })
-  assert.deepEqual(pillStep(CLOUD.checkpoints[0]), { step: 100, final: false, deployed: true, files: CLOUD.checkpoints[0].files })
+  // civitai/best_settings: the generic best-settings/Civitai-stamp enrichment
+  // (local_group's own fix, same pass image checkpoints get) now reaches every
+  // pill, cloud or local, `null`/`false` when nothing was stamped.
+  assert.deepEqual(pillStep(CLOUD.checkpoints[0]), { step: 100, final: false, deployed: true,
+    files: CLOUD.checkpoints[0].files, civitai: null, best_settings: false })
   assert.equal(pillKey(CLOUD, CLOUD.checkpoints[1]), 'local:final')
   assert.equal(pillKey(LOCAL, LOCAL.checkpoints[0]), 'local:50')
 })

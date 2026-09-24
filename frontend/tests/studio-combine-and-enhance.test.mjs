@@ -105,8 +105,11 @@ test('the studio sends `combine` instead of the strength axis when the stack is 
   // Send checked weights ALONGSIDE sliders; sliders alone would render one
   // image while the panel promises N.
   assert.match(source, /\.\.\.\(combine \? \{ combine: true \} : \{ strengths \}\)/)
-  // A blocked stack must never reach the network.
-  assert.match(source, /if \(!selection\.length \|\| combineBlocked\) return/)
+  // A blocked stack must never reach the network — `launchBlocked` widened to
+  // also cover settingsError/config_error/modelError, but combineBlocked is
+  // still one of the reasons folded into it.
+  assert.match(source, /const launchBlocked = [\s\S]*?\|\| combineBlocked;/)
+  assert.match(source, /if \(!selection\.length \|\| launchBlocked\) return/)
 })
 
 test('the run panel hides the strength sweep and both prompt helpers stay reachable', () => {

@@ -8,6 +8,8 @@ import FullBackupControls from './FullBackupControls';
 import { HelpBadge } from '../../help/HelpMode';
 import { canCreateDataset } from './newDataset';
 import { requestHelpTip } from '../../help/helpTips';
+import { contributions } from '../../plugins/registry.js';
+import { PluginPanel } from '../../plugins/PluginSlot.jsx';
 import {
   datasetKind, datasetMatches, groupDatasets, kindsPresent,
   normalizeCollapsedMap, normalizeTileSize,
@@ -331,6 +333,9 @@ function DatasetRow({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup
 /** The creation form — folded behind "+ New dataset" (auto-open on an empty
  *  library). Fields unchanged from the historical always-open card. */
 function NewDatasetForm({ onCreate, onClose }) {
+  const [media, setMedia] = useState('images');
+  const creators = contributions('datasets.create', 'datasets');
+  const creator = creators.find((item) => `${item.plugin}:${item.id}` === media);
   const [name, setName] = useState('');
   const [trigger, setTrigger] = useState('');
   // Dataset kind: character (identity bound to the trigger) or concept (recurring action/effect
@@ -366,6 +371,24 @@ function NewDatasetForm({ onCreate, onClose }) {
             className="rounded px-1.5 text-content-subtle hover:text-content"><X aria-hidden="true" className="h-4 w-4" /></button>
         )}
       </div>
+      {creators.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Dataset media">
+          {[{ key: 'images', label: 'Images' }, ...creators.map((item) => ({
+            key: `${item.plugin}:${item.id}`, label: item.label,
+          }))].map((item) => (
+            <button key={item.key} type="button" aria-pressed={media === item.key}
+              onClick={() => setMedia(item.key)}
+              className={`min-h-10 flex-1 rounded-lg border px-3 py-1.5 text-sm font-semibold ${media === item.key
+                ? 'border-primary/60 bg-primary/15 text-content'
+                : 'border-border text-content-muted hover:bg-surface-raised'}`}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {creator ? (
+        <PluginPanel panelKey={`datasets.create:${media}`} importer={creator.panel} onClose={onClose} />
+      ) : (<>
       {/*
        * Kind: character (default) or concept. Concept adapts the rest: raw import preserves aspect
        * ratio, captions retain identity, and reference photos and the variation generator are
@@ -478,6 +501,7 @@ function NewDatasetForm({ onCreate, onClose }) {
           Create
         </button>
       </div>
+      </>)}
     </div>
   );
 }

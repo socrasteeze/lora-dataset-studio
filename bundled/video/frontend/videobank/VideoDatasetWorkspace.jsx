@@ -1,6 +1,8 @@
 import { PluginSlot, hasContributions } from '@lds/plugin-sdk/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Clapperboard, Copy, Folder } from 'lucide-react'
+import {
+  ArrowLeft, Clapperboard, Copy, Folder, GraduationCap, Package, Paperclip, PenLine, Puzzle, SlidersHorizontal, Upload,
+} from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { apiFetch, postForm, postJson } from '@lds/plugin-sdk'
 import { useToast } from '@lds/plugin-sdk'
@@ -11,6 +13,7 @@ import VideoTrainingBlock from './VideoTrainingBlock.jsx'
 import VideoCheckpointManager from './VideoCheckpointManager.jsx'
 import VideoDatasetGrid from './VideoDatasetGrid.jsx'
 import VideoDatasetLightbox from './VideoDatasetLightbox.jsx'
+import VideoDatasetImportPanel from './VideoDatasetImportPanel.jsx'
 import {
   videoDatasetClipCaptionUrl, videoDatasetClipOriginalUrl, videoDatasetNeuralRenderCancelUrl,
   videoDatasetNeuralRenderRestoreUrl,
@@ -22,15 +25,15 @@ import { VIDEO_DATASET_SECTIONS } from './videoDatasetSections.js'
 import {
   getVideoDatasetPanels, resolveVideoDatasetLocation, visibleVideoDatasetSections,
   withVideoDatasetLocation,
-} from './videoDatasetNavigation.js'
+} from './videoDatasetNavigation'
 import {
   CLIP_FILTERS, CLIP_SORTS, captionCoverageNote, clipCounts, clipFilterCount,
   hasCaption, lightboxTargets, purgeDraft, removeClipsConfirmation, removeClipsReport,
   visibleClips,
-} from './videoDatasetClips.js'
+} from './videoDatasetClips'
 import {
   captionEditConfirmation, captionEditPlan, captionEditProgressLabel, captionEditReport,
-} from './videoDatasetCaptionTools.js'
+} from './videoDatasetCaptionTools'
 
 /** 🎬 ONE video dataset, worked on — the surface this lane did not have.
  *
@@ -55,6 +58,18 @@ import {
  *  · an export section. A video dataset IS its output folder — a flat directory
  *    of .mp4 and homonym .txt, which is exactly what every trainer reads.
  */
+// The rail's section icons, by the NAME videoDatasetSections.js carries (that
+// module stays lucide-free so node tests can import it); an unknown name gets
+// the plugin piece rather than a crash.
+const SECTION_ICONS = {
+  upload: Upload, clapperboard: Clapperboard, 'graduation-cap': GraduationCap, package: Package, paperclip: Paperclip,
+  'pen-line': PenLine, 'sliders-horizontal': SlidersHorizontal,
+}
+function SectionIcon({ name, className }) {
+  const Icon = SECTION_ICONS[name] || Puzzle
+  return <Icon aria-hidden="true" className={className} />
+}
+
 export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
   const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -93,6 +108,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
   const shownIds = useMemo(() => shown.map((c) => c.id), [shown])
 
   const navContext = {
+    takesVideos: ds.frames > 1 && ds.fps > 0,
     selected: selected.length,
     clips: counts.total,
     requiresReferences: !!ds.requires_references,
@@ -313,7 +329,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
         {!chip && isActive && (
           <span aria-hidden className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded bg-gradient-primary" />
         )}
-        <s.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+        <SectionIcon name={s.icon} className="h-4 w-4 shrink-0" />
         <span>{s.title}</span>
       </button>
     )
@@ -475,6 +491,10 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
               workspace does it: the training block's poll advances a real run
               server-side, and it must not stop because someone looked at the
               clip grid. */}
+          {navContext.takesVideos && <section className={sectionCls('import')} aria-hidden={section !== 'import'}>
+            {heading('import')}
+            <VideoDatasetImportPanel ds={ds} refresh={refresh} />
+          </section>}
           <section className={sectionCls('clips')} aria-hidden={section !== 'clips'}>
             {heading('clips')}
             <div id="vds-clips-review" className="flex flex-col gap-2">
@@ -560,7 +580,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                 onToggle={toggle} onOpen={(clip) => setOpenId(clip.id)}
                 emptyMessage={items.length
                   ? 'No clip matches this filter.'
-                  : 'This dataset has no clip — promote shots from a video bank, or build a stills set from an image dataset.'} />
+                  : 'This dataset has no clip — use Add videos to import files or web videos, promote shots from a video bank, or build a stills set from an image dataset.'} />
             </div>
             {selected.length > 0 && (
               <div id="vds-clips-bulk"

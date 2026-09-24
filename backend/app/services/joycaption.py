@@ -17,6 +17,7 @@ import threading
 import time
 
 from .. import config as cfg
+from ..utils.redact import redact_tokens, redact_user_paths
 from . import infer_env
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def caption_images_joycaption(paths, prompt: str | None = None,
                               max_tokens: int = 300, timeout: int = 1800,
                               activity_token=None, should_cancel=None,
                               on_caption=None, progress=None,
-                              errors_out=None) -> dict:
+                              errors_out=None, diagnostics_out=None) -> dict:
     """Caption an image list with one model load. Return {path: caption},
     or {} for nonfatal unavailability/failure.
 
@@ -77,7 +78,11 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     after the UI says Stopping.
     Optional errors_out maps refused image paths to reasons. Per-image
     failures do not abort the batch, but their explanations must be
-    available beyond server logs."""
+    available beyond server logs. Optional diagnostics_out receives the worker
+    returncode, timed_out flag and last 25 stderr lines, redacted for display.
+    Both outputs preserve the existing caption return value."""
+    if diagnostics_out is not None:
+        diagnostics_out.update(returncode=None, timed_out=False, stderr_tail=[])
     paths = [p for p in (paths or []) if p and os.path.isfile(p)]
     if not paths or not is_available():
         return {}
@@ -103,6 +108,8 @@ def caption_images_joycaption(paths, prompt: str | None = None,
             encoding='utf-8', errors='replace',
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     except OSError as e:
+        if diagnostics_out is not None:
+            diagnostics_out['stderr_tail'] = [redact_user_paths(redact_tokens(str(e)))]
         logger.error('joycaption: could not start subprocess after %.1fs: %s',
                      time.monotonic() - started, e)
         return {}
@@ -220,6 +227,8 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     try:
         proc.wait(timeout=processing_timeout(timeout))
     except subprocess.TimeoutExpired:
+        if diagnostics_out is not None:
+            diagnostics_out['timed_out'] = True
         proc.kill()
         proc.wait()
         t_out.join(timeout=5)
@@ -239,6 +248,10 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     # exit, and those captions are as real as any other — losing them would make
     # the counter stop one short of the truth on every run.
     _pump()
+    if diagnostics_out is not None:
+        diagnostics_out.update(
+            returncode=proc.returncode,
+            stderr_tail=[redact_user_paths(redact_tokens(line)) for line in stderr_tail])
 
     # `captions`/`errors` were filled by the stdout drain as each per-image line arrived, so
     # a graceful Stop (or a timeout) still returns everything produced so far.
