@@ -19,7 +19,7 @@ const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8').rep
 // live in the CORE implementation behind that control, not in the wrapper.
 const PANELS = {
   'VideoOptionsPanel.jsx': read("../../../../../../bundled/video/frontend/studio/video/VideoOptionsPanel.jsx"),
-  'H3LoraPicker.jsx': read("../../../shared/H3LoraPicker.jsx"),
+  'H3LoraPicker.jsx': read('../../../shared/H3LoraPicker.jsx'),
 }
 
 /** Every `<input type="range" … />` tag in a source, whole. */

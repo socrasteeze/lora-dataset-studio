@@ -378,7 +378,7 @@ runs, ✨ improvements — across every dataset, newest first.
 | **One feed, every dataset** | Filter by dataset, by renders vs improved, or by 👍 liked; the feed loads itself as you approach its end, on a phone as well as a desktop |
 | **Where a picture came from** | The viewer walks the feed with the arrow keys and shows everything the image was made from; ⬇ downloads keep the lineage name |
 | **Act from the feed** | ✨ Upscale & improve runs straight from here — Klein opens a small window first (the instruction, model, LoRA preset and output size, then Generate) and shows the finished picture in place; close it early and the result lands at the top as it always did, while SeedVR2 has no dials and fires straight; Select mode deletes the misses, ZIPs a pick, or saves it as ⬇ plain files under the same lineage names — one at a time, so the browser does not treat the burst as an attack |
-| **📷 Camera angles** | Re-shoot a picture from another camera position — the subject stays put and the background moves with it, so what was behind them comes into view. This is not the catalog's "profile view" shot, which turns the *person* and leaves the room where it was. Pick sides, heights and distances; the count under the button is the run |
+| **📷 Camera angles** | Re-shoot a picture from another camera position — the subject stays put and the background moves with it, so what was behind them comes into view. This is not the catalog's "profile view" shot, which turns the *person* and leaves the room where it was. Pick sides, heights and distances; the count under the button is the run. It also has **its own workspace** in the navigation: import any image, shoot the views there, and preview or download each result without touching a dataset or the Gallery |
 
 **📷 Camera angles runs on a second local engine, and the limits are real.** It
 needs Qwen-Image-Edit 2511 plus a Multiple-Angles LoRA — about **21.6 GB**, and
@@ -404,7 +404,7 @@ the first already invented, so the button is refused there and says why.
     </td>
   </tr>
   <tr>
-    <td valign="top"><sub><strong>📷 Camera angles</strong> — pick positions on the dial, read the exact prompts and the cost <em>before</em> you shoot. Lives in the Gallery viewer and on every kept dataset image.</sub></td>
+    <td valign="top"><sub><strong>📷 Camera angles</strong> — pick positions on the dial, read the exact prompts and the cost <em>before</em> you shoot. Lives in the Gallery viewer, on every kept dataset image, and in its own Camera angles workspace.</sub></td>
     <td valign="top"><sub><strong>🌐 Civitai top prompts</strong> — the most-reacted images next to the prompt they were posted with; ⤵ drops one into your prompt field, ☐ Batch collects several for one run. Next to the prompt box on every generation surface.</sub></td>
   </tr>
   <tr>

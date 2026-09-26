@@ -21,7 +21,7 @@ test('the studio stages the last frame, marks the launch, and says what the rend
   assert.match(studio, /postJson\(clipLastFrameUrl\(clip\.id\), \{\}\)/);
   assert.match(studio, /key: `continue:\$\{clip\.id\}`/);
   assert.match(studio, /continues: clip\.id/);
-  assert.match(studio, /setMode\('i2v'\)/, 'a continuation is image-to-video by definition');
+  assert.match(studio, /setMode\(asReference \? 'ref2va' : 'i2v'\)/, 'a continuation preserves reference conditioning when needed');
   assert.match(studio, /onContinue=\{continueFrom\}/);
   // The comment's own line wrap moved (whitespace only) — matched on the
   // phrase's own line rather than pinning "the" to it too.
