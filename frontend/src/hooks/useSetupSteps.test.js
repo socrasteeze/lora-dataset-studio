@@ -396,7 +396,8 @@ const fullCaps = () => ({
   // reachable matters for the Krea node pack: an unreachable ComfyUI's node probe
   // fails open, so "nothing missing" from a stopped ComfyUI must not read as
   // "the pack is installed".
-  comfyui: { dir_valid: true, reachable: true, klein_missing: [], krea_missing: [] },
+  comfyui: { dir_valid: true, reachable: true, klein_missing: [], krea_missing: [],
+    video_studio_reference: { missing_weights: [], missing_nodes: [] } },
 });
 
 test('installAllPlan is empty when everything installable is present', () => {

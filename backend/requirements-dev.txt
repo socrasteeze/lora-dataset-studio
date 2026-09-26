@@ -126,3 +126,8 @@ instaloader>=4.12
 # trap safetensors and instaloader above describe, caught this time by
 # test_test_imports_are_declared.py before a release tag had to find it.
 urllib3>=2.0
+# Direct video-dataset import tests encode and decode real CPU clips. The
+# optional product runtime is not installed by CI, so declare its decoder and
+# bundled encoder here rather than depend on a system-wide ffmpeg installation.
+av==18.1.0
+imageio-ffmpeg==0.6.0
