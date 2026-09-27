@@ -1,52 +1,49 @@
 # HANDOFF
 
-**Updated:** 2026-09-20 · **Branch:** `main` · **Qualified code:** `aa173b437` · **Tree:** clean
+**Updated:** 2026-09-27 · **Branch:** `main` · **Base:** `3f7f3b3` · **Tree:** clean
 
 ## State
-The V2 source migration is qualified on main. Live data, running services and external media have not been switched or modified.
+Fork is current with `upstream/v2` (0 behind at `4fb77a1`). Two syncs landed on main this session; nothing in flight.
 
 ## Done this session
-- Source integration and fork fixes: `f32e6acb1`; separate source-built frontend: `aa173b437`.
-- Latest full driver gate: 9,977 host/tooling tests passed, 24 skipped, 106 subtests passed; 182 isolated bundled Python tests passed. Frontend: 6,152 passed, four skips on Node 24.
-- Both linters pass; frontend retains 40 warnings. The 46-second Quick gate now stops before expensive runs on failure; All runs one full qualification, not a duplicate baseline/gate pair.
-- Ten curated plugins boot in the extracted release ZIP without environment profile overrides; held/excluded packages are absent.
-- Eight rendered routes and the Bank Python picker passed desktop/mobile checks; the picker covered five widths with stubbed calculation results.
-- A synthetic legacy database survived two V2 starts with IDs, captions, decisions, tags and paths intact; an independent old-state rollback copy booted under old code.
+- Synced `8b76628..db72abf` (Camera angles workspace, video picker virtualization) — `fbf7625`, dist `b70ebc3`.
+- Synced `db72abf..4fb77a1` (Python picker dismissal, GitHub #73) — `a11ec39`, dist `3f7f3b3`.
+- Fixed `APP_RELEASE_CHANNEL` being fused onto a comment line (the release workflow's grep needs it) — `backend/app/version.py`.
+- New Divergence 5 carrier: Pexels contract test kept fork-side — `bundled/scrape/tests/scrapeSettings.contract.test.js`, see FORK_NOTES D5.
 
 ## Open
-1. Before live cutover, inventory and protect external media, drain work, stop writers and take a fresh complete state snapshot.
-2. Rehearse migration and rollback on an isolated copy of the actual installation, with writable paths/endpoints remapped and dispatch blocked.
-3. Verify local generation/training and owned-machine routing on the intended machines before accepting live cutover.
-4. Docker recipes and staging tests pass, but no Docker image was built locally because the CLI is unavailable.
+1. Delete the landed branch `noble/affectionate-thompson-ev89j8` from GitHub. It is fully contained in main; this container's git proxy drops branch-delete pushes.
+2. Before live cutover, inventory and protect external media, drain work, stop writers and take a fresh complete state snapshot.
+3. Rehearse migration and rollback on an isolated copy of the actual installation, with writable paths/endpoints remapped and dispatch blocked.
+4. Verify local generation/training and owned-machine routing on the intended machines before accepting live cutover.
+5. Docker recipes and staging tests pass, but no Docker image has been built (the CLI was unavailable).
 
 ## Decisions
+- Upstream's What's-new entries `2026-09-26-windows-dataset-forge` and `2026-09-26-cloud-video-release-compatibility` are rejected. They were re-offered in the 09-27 conflict and dropped again; expect them to come back.
+- Video `2026-09-26-video-publishing-help` news entry is kept. Its topic requires `civitai_publish`, which is held, not excluded.
+- Test-contract conflicts are resolved fork-side unless the merged source changed the asserted shape (e.g. the `VideoPickerGrid` grid count took upstream's).
+- `publicPluginFixtures.mjs` includes `qwenDataset` (enabled here). The fixture still omits the api_engines, cloud_training and civitai_publish descriptors.
 - `fork-plugins.json` is authoritative: ten enabled sources, Civitai publisher held, API engines and rental training excluded.
-- Normal frontend build selects the fork profile; backend reads its build marker. Store archives cannot replace fork-owned sources.
-- Core repair recipes remain fallback primitives; discovered disabled owners block resolution, preflight and enqueue.
-- Core Help wording and historical news remain canonical; duplicate source-plugin guide sections cannot overwrite fork docs.
-- Mixed local tests were retained. A deleted-plugin marker is not evidence that a whole test file is obsolete.
-- The temporary Git replacement was removed; its object remains under local `refs/migration/v2-content-base`. Published commits keep real ancestry.
+- Upstream's release `APP_VERSION` literal is never copied: recompute as `<date>+fork`.
 
 ## Traps
-- `create_app()` changes schema and state. Never use production data for an import or smoke test.
-- Use `npm test`; bare Node discovery omits the SDK loader and bundled suite.
-- Core `app.services.cloud_training` is local training; deleted `lds_cloud_training` is the rental product.
-- Test direct app factories must isolate plugin and extension directories as well as database/configuration paths.
-- Use distinct short pytest basetemps; keep live services and model downloads outside test runs.
-- Upstream is read-only. Do not use its fork-refusing migration helper or carry its generated frontend.
+- `upstream/main` no longer exists; fetch `v1`/`v2` explicitly (see `docs/UPSTREAM_SYNC.md` top). A plain `--prune` makes the window read "0 incoming".
+- Linux containers carry a fixed floor: backend 105 failed / 1076 errors (path separators, `dlss5: incompatible`). Diff failure IDs against a pre-merge baseline; never read totals.
+- `download.pytorch.org` is blocked in the cloud container, so the Torch test overlay cannot install there. Baseline and post-merge still compare on the same env.
+- `create_app()` changes schema and state; use disposable `LDS_DATA_DIR`/`LDS_CONFIG`/`LDS_ENV` with `TESTING=True` for an import check.
+- `npm test` runs core and bundled suites; bare `node --test` misses the SDK loader and `testBundled.mjs`.
+- Upstream bundles (`build(frontend):`) are never taken: restore the fork's `frontend/dist`, then rebuild in its own commit.
 
 ## Verify
-Use Node 24 and the pinned `.venv`. The driver isolates data/configuration, uses
-unique short scratch directories, restores environment overrides and cleans up.
 ```powershell
-# Before an upstream merge, on the untouched tree:
-pwsh -File scripts/upstream_sync.ps1 -Phase Baseline
-# During repair (not release qualification):
-pwsh -File scripts/upstream_sync.ps1 -Phase Quick
-# Freeze edits, then qualify once before landing:
-pwsh -File scripts/upstream_sync.ps1 -Phase Gates
-& 'C:/Program Files/Git/bin/bash.exe' scripts/scan-sensitive.sh
+# Pinned venv (both lines), then from the repo root:
+.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
+.venv/Scripts/python.exe -m pip install --no-cache-dir -r backend/requirements-torch-tests.txt
+pwsh -File scripts/upstream_sync.ps1 -Phase Baseline   # before any merge
+pwsh -File scripts/upstream_sync.ps1 -Phase Quick      # during repair
+pwsh -File scripts/upstream_sync.ps1 -Phase Gates      # once, before landing
+# Manual equivalents (CI's own lint commands):
+ruff check .
+cd frontend; npm run lint; npm run build; npm test; cd ..
+.venv/Scripts/python.exe -X utf8 -m pytest backend/tests scripts/tests -n 8 --dist loadfile -q -rf
 ```
-The full host/tooling run measured 390 seconds. Small timing receipts remain under
-the checkout's Git metadata; they are not cached qualification. Details and the
-remaining profiling opportunity are in `docs/UPSTREAM_SYNC.md`.
