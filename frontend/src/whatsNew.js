@@ -84,6 +84,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-27-python-picker-close',
+    date: '2026-09-27',
+    title: 'Close the Python picker without making a selection',
+    blurb: 'The Python picker in Setup and Bank now keeps its close button visible above the scrolling list. You can also press Escape or click outside to dismiss it. Thanks to kennhardy for reporting this.',
+    to: '/setup?step=quality',
+  },
+  {
     id: '2026-09-23-zzzzzzzz-plugin-engine-settings-save',
     date: '2026-09-23',
     title: 'Save your enabled image engines from plugin settings',
