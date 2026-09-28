@@ -1,7 +1,7 @@
 # Mobile dataset workflow implementation
 
 Scope: the mobile audit fixes and shared repository guidance. Work is on
-`noble/mobile-dataset-workflow`, based on `d9436f78c`. No live dataset or GPU
+`noble/mobile-dataset-build`, integrating `422b8085e` with the mobile commits. No live dataset or GPU
 workload was used as a fixture. The live application has not been restarted.
 
 ## Implemented
@@ -30,18 +30,14 @@ workload was used as a fixture. The live application has not been restarted.
 
 ## Verification
 
-- Frontend: 5,120 core and 1,162 bundled tests passed; four bundled skips.
-- Backend mobile/migration/Bank slice: 47 passed. Import receipt/identity tests
-  cover lost responses after commit, duplicates, invalid input and stale identities.
-- The full backend/tooling run completed: 10,245 passed, 59 failed, 33 skipped,
-  and 106 subtests passed. Of the failures, 35 reproduce on pristine `d9436f78c`.
-  The other 24 were schema-count assertions that predated the intentional new
-  receipt table. Those assertions now require 34 tables and explicitly include
-  `dataset_import_receipt`; all 55 tests in the three affected files pass.
-- The isolated bundled-video run needs the host backend directory on PYTHONPATH.
-  With that environment, three additional video contracts fail on both current
-  source and pristine `d9436f78c` (83 pass). Full release qualification is not green.
-- Backend lint passes. Frontend lint has zero errors and 44 warnings.
+- Full integrated delivery gate passed: 10,343 backend/tooling tests, 106
+  subtests, 244 isolated bundled Python tests and 6,283 frontend tests.
+  The main backend suite skipped 22 tests; the bundled frontend skipped four.
+- Both linters, fork ownership/startup checks and privacy checks passed.
+- Earlier baseline failures were resolved during delivery qualification. Local
+  plugin dispatch now uses the live registry while rejecting all API engines.
+  Video readiness handles nested/qualified model paths without losing its direct
+  configured-root fallback; the lineage fixture follows the current resolver API.
 - Staged production frontend build passes and its compiled code passes the mobile
   import/reload/resume/caption scenario against an isolated backend.
 - Folder browser, caption editor and crop editor: 15/15 measured states, zero
@@ -61,16 +57,10 @@ workload was used as a fixture. The live application has not been restarted.
 
 ## Activation
 
-The validated bundle is staged outside `frontend/dist` because an existing LDS
-process serves the checkout. Activation requires the user's pending decision.
-If approved: check for active work, protect the database, install the validated
-bundle, restart LDS and verify the new backend identity fields and served UI.
-If the user chooses staging, preserve the build and report that it is not live.
-No commit, push, release or deployment approval is implied by test completion.
-The user subsequently requested local commits. Source and generated frontend
-are committed separately. The bundle commit stays in an isolated checkout so
-the existing live process does not receive a frontend built for a newer backend.
-Remote integration, pushing and activation remain separate actions.
+The user authorized a clean push to origin/main and an idle-checked restart.
+The integrated source and rebuilt frontend passed the full gate in an isolated
+checkout. Publication and live activation are the remaining delivery steps.
+Protect the live database/configuration and recheck active work before restarting.
 
 ## Preserved work
 

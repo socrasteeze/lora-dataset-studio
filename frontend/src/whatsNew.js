@@ -79,10 +79,29 @@
 import { SETTINGS_SECTIONS } from './components/settings/registry.js';
 import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
 import { SETUP_DEEP_LINK_STEPS } from './hooks/useSetupSteps.js';
-import { registeredDescriptors } from './plugins/registry.js';
+import { registeredDescriptors, routes as pluginRoutes } from './plugins/registry.js';
 
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
+  {
+    id: '2026-09-28-nested-video-weights', date: '2026-09-28',
+    title: 'Find Nested Weights',
+    blurb: 'Video setup recognizes installed weights inside model subfolders and extra ComfyUI roots. Explicit relative paths still select the requested subfolder, including case-insensitive names.',
+    to: '/setup',
+  },
+  {
+    id: '2026-09-28-local-engine-dispatch', date: '2026-09-28',
+    title: 'Use Local Engines',
+    blurb: 'Dataset generation accepts enabled local plugin engines after their preparation checks. API engines remain excluded, and an unavailable engine cannot silently switch to Klein.',
+    to: '/datasets?section=add&panel=generate',
+  },
+  {
+    id: '2026-09-27-python-picker-close',
+    date: '2026-09-27',
+    title: 'Close the Python picker without making a selection',
+    blurb: 'The Python picker in Setup and Bank now keeps its close button visible above the scrolling list. You can also press Escape or click outside to dismiss it. Thanks to kennhardy for reporting this.',
+    to: '/setup?step=quality',
+  },
   {
     id: '2026-09-27-mobile-touch-controls', date: '2026-09-27',
     title: 'Use Touch Controls',
@@ -3038,5 +3057,6 @@ export function isValidTarget(to) {
   }
 
   // Everything else must be a bare, param-less top-level route.
-  return TOP_LEVEL_ROUTES.has(path) && !section && !panel;
+  return (TOP_LEVEL_ROUTES.has(path) || pluginRoutes().some(route => route.path === path))
+    && !section && !panel;
 }

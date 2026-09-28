@@ -44,8 +44,6 @@ ALLOWED_APP_CLOUD_REFS = {
     'config.py': 8,
     # Comment: the removed API engines are not probed as capabilities.
     'capabilities.py': 1,
-    # Comment + the clear 400 a client still sending a cloud engine id gets.
-    'routes/datasets.py': 2,
     # Comment: legacy 'chatgpt:'/'nanobanana:' prefixes on stored rows.
     'routes/settings.py': 2,
     # LEGACY_API_ENGINE_TAGS itself, plus the comment above it and one

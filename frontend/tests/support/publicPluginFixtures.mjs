@@ -12,6 +12,7 @@ import resourceMonitor from '../../../bundled/resource_monitor/frontend/index.js
 import scrape from '../../../bundled/scrape/frontend/index.js'
 import seedvr2 from '../../../bundled/seedvr2/frontend/index.js'
 import video from '../../../bundled/video/frontend/index.js'
+import qwenDataset from '../../../bundled/qwen_dataset/frontend/index.js'
 
 /* DIVERGENCE 1 / 4 -- upstream's api_engines and cloud_training are not in this
    list because bundled/api_engines and bundled/cloud_training do not exist here:
@@ -19,7 +20,7 @@ import video from '../../../bundled/video/frontend/index.js'
    tests/local-only-engines-contract.test.mjs, which fails on their presence) and
    drops their ids from backend/app/plugins/official.OFFICIAL_IDS. */
 export const PUBLIC_DESCRIPTORS = [cameraAngles, canvas, hfPublish, imageUpscale,
-  live, modelTools, resourceMonitor, scrape, seedvr2, video]
+  live, modelTools, resourceMonitor, scrape, seedvr2, video, qwenDataset]
 export const PUBLIC_PLUGIN_IDS = PUBLIC_DESCRIPTORS.map(descriptor => descriptor.id)
 
 export function mountPublicPlugins(enabled = PUBLIC_PLUGIN_IDS) {
@@ -35,7 +36,7 @@ export const imageDigest = url => createHash('sha256').update(readFileSync(url))
 export function publicNewsImage(entry) {
   const url = new URL(entry.image, REPO)
   const anchor = entry.plugin
-    ? new URL(`bundled/${entry.plugin}/frontend/assets/news/`, REPO)
+    ? new URL(`bundled/${entry.plugin}/frontend/assets/`, REPO)
     : new URL('docs/screenshots/', REPO)
   if (!url.href.startsWith(anchor.href)) throw new Error(`Screenshot leaves its public owner: ${entry.id}`)
   return url
@@ -43,6 +44,15 @@ export function publicNewsImage(entry) {
 
 export function curatedImageDigests() {
   const root = new URL('docs/screenshots/', REPO)
-  return new Set(readdirSync(root, { recursive: true }).filter(name => /\.(png|jpe?g|gif|webp)$/i.test(name))
-    .map(name => imageDigest(new URL(name.replaceAll('\\', '/'), root))))
+  // Reviewed neutral Video screenshots already published in the plugin's own
+  // assets. Pin their bytes instead of duplicating them in the core showcase.
+  const pluginShowcase = [
+    'd77ebab2beb0b22b1247f5d66d0c0e53b7db18b564bb39e9becb33bb6384618c',
+    '70eec9fdd66125ece46809aa9465c46287d033ff57f9b50bd9dda9ae7f0ff0ea',
+    '9411f33bc783849e6ecb9ca2e8c566efe99b84f14edfeecbcdb81f1908ce95e0',
+    '79900699d21335fa0cefd6d6549c54e8d7a096b52beea84cb350641b660c6270',
+  ]
+  return new Set([...pluginShowcase, ...readdirSync(root, { recursive: true })
+    .filter(name => /\.(png|jpe?g|gif|webp)$/i.test(name))
+    .map(name => imageDigest(new URL(name.replaceAll('\\', '/'), root)))])
 }

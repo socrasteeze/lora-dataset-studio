@@ -512,6 +512,11 @@ def test_a_weight_in_a_subfolder_is_present_not_missing(app, tmp_path, monkeypat
             assert vts._weight_present(('diffusion_models',), 'deep.safetensors'), (
                 'a weight in a per-family subfolder is one ComfyUI loads happily; '
                 'calling it missing offers a download the user does not need')
+            # A loader can carry ComfyUI's own relative name. Keep that exact
+            # contract while basename discovery supports legacy callers.
+            assert vts._weight_present(('diffusion_models',), 'minimax/deep.safetensors')
+            assert vts._weight_present(('diffusion_models',), 'MINIMAX\\DEEP.SAFETENSORS')
+            assert not vts._weight_present(('diffusion_models',), 'other/deep.safetensors')
             # The flat case never regressed — pinned so the recursive lookup
             # cannot replace it rather than extend it.
             assert vts._weight_present(('loras',), 'top.safetensors')

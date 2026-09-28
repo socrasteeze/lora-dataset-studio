@@ -62,7 +62,10 @@ def test_the_tree_is_empty_when_the_local_run_has_no_saves(
     with app.app_context():
         ds = _video_dataset(tmp_path)
         from lds_video import video_training_local as vtl
-        monkeypatch.setattr(vtl, 'save_root', lambda _ds: tmp_path / 'missing')
+        # `list_run_checkpoints` now asks the real resolver for a missing-safe
+        # location, so this test double accepts that public keyword too.
+        monkeypatch.setattr(vtl, 'save_root',
+                            lambda _ds, missing_ok=False: tmp_path / 'missing')
         ds_id = ds.id
     tree = client.get(f'/api/video-dataset/{ds_id}/train/lineage').get_json()
     assert tree['nodes'] == [] and tree['edges'] == [] and tree['single'] is True
