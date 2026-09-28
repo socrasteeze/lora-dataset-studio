@@ -68,22 +68,16 @@ test('the dropzone reads the live policy, filters exactly the supported formats,
     'the hint must link to the setting it describes');
 });
 
-test('manual import makes server-side file refusals actionable instead of silently succeeding', () => {
-  const importFiles = datasetHook.slice(datasetHook.indexOf('const importFiles ='),
-    datasetHook.indexOf('// Concept only'));
-  // `failed` is summed across the batches a drop is sent in (one request per
-  // 20 files / ~64 MiB), so the refusal count is the drop's, not one batch's.
-  assert.match(importFiles, /if \((?:d\.)?failed\) toast\.warning\(/);
-  assert.match(importFiles, /failed \+= d\.failed \|\| 0/);
-  assert.match(importFiles, /JPEG, PNG, WebP or BMP/);
-  // No literal limit here any more: the budget is a setting, so the toast points
-  // at it instead of carrying a copy that goes stale the moment it is changed.
-  assert.ok(!/\d+ Mi-pixels/.test(importFiles),
-    'the toast must not hardcode a budget the user can change');
-  assert.match(importFiles, /Image size budget/);
-  assert.match(importFiles, /resize a larger file, or raise the budget/);
+test('manual import reports every refused file and keeps the size budget actionable', () => {
+  const panel = src('components/dataset/ImportQueuePanel.jsx');
+  const policy = src('utils/importFilePolicy.js');
+  assert.match(panel, /items.filter\(\(item\) => item.result\?\.failed\)/);
+  assert.match(panel, /JPEG, PNG, WebP or BMP/);
+  assert.match(panel, /Image size budget/);
+  assert.match(panel, /Resize a larger file, or raise/);
+  assert.match(policy, /HEIC\/HEIF: export as JPEG or PNG/);
+  assert.match(datasetHook, /const importFiles = importQueue.start/);
 });
-
 // --- the setting exists, is resettable, is documented -----------------------
 
 test('both import knobs are rendered and registered for help', () => {

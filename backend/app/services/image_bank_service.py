@@ -1679,6 +1679,7 @@ def _image_dict(row: BankImage, th: dict, promoted_by, live) -> dict:
     return {
         **mask,
         'id': row.id,
+        'instance_id': row.instance_id,
         'name': os.path.basename(row.relpath),
         'relpath': row.relpath,
         'rotation': rotation,
@@ -2739,7 +2740,7 @@ def bank_payload(user_id, bank_id) -> dict | None:
     counts['semantic_indexed'] = int(
         semantic['counts']['ok'] if semantic else 0)
     return {
-        'id': bank.id, 'name': bank.name, 'source_path': bank.source_path,
+        'id': bank.id, 'instance_id': bank.instance_id, 'name': bank.name, 'source_path': bank.source_path,
         'semantic_engine': (semantic['engine'] if semantic else
                             _selected_semantic_engine(bank)),
         'created_at': bank.created_at.isoformat() if bank.created_at else None,

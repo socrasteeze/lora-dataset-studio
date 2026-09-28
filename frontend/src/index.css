@@ -291,6 +291,15 @@
   transition: opacity 140ms ease, visibility 140ms ease;
 }
 
+@media (max-width: 1023px), (pointer: coarse) {
+  .dataset-grid-item__actions { flex-wrap: wrap; }
+  .dataset-grid-item__actions button,
+  .dataset-grid-item__select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .dataset-grid-item .dataset-grid-item__actions {
     opacity: 0;

@@ -61,6 +61,8 @@ def list_folders():
         return jsonify({'error': str(e)}), 400
     except PermissionError:
         return jsonify({'error': 'Permission denied for this folder.'}), 403
+    except OSError:
+        return jsonify({'error': 'This drive or folder is unavailable. Choose another location or retry.'}), 503
 
 
 @bp.get('/gpu-flags')

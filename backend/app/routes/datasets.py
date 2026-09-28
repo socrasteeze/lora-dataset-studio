@@ -111,7 +111,7 @@ def dataset_create():
     except ValueError as e:
         # concept dataset without a concept description -> 400 (not a 500)
         return jsonify({'error': str(e)}), 400
-    return jsonify({'ok': True, 'id': ds.id})
+    return jsonify({'ok': True, 'id': ds.id, 'instance_id': ds.instance_id})
 
 
 @bp.post('/dataset/<int:dataset_id>/fidelity')
@@ -232,7 +232,8 @@ def dataset_list():
     empty = {'images_total': 0, 'images_kept': 0, 'images_captioned': 0,
              'trained_families': []}
     return jsonify({'datasets': [
-        {'id': d.id, 'name': d.name, 'trigger_word': d.trigger_word, 'ref_filename': d.ref_filename,
+        {'id': d.id, 'instance_id': d.instance_id,
+         'name': d.name, 'trigger_word': d.trigger_word, 'ref_filename': d.ref_filename,
          'kind': ((d.kind or '').lower() or 'character'),
          'train_type': (d.train_type or 'zimage'),
          # Where the dataset's images live on disk. Displayed on the dataset (with
@@ -994,6 +995,15 @@ def dataset_import(dataset_id):
     ds = svc.get_dataset(LOCAL_USER, dataset_id)
     if not ds:
         return jsonify({'error': 'not found'}), 404
+    upload_key = request.form.get('import_key')
+    if upload_key is not None:
+        instance_id = request.form.get('dataset_instance_id')
+        if not instance_id or instance_id != ds.instance_id:
+            return jsonify({
+                'error': ('This saved upload belongs to a different dataset. '
+                          'Cancel it and select the files again.'),
+                'stale_import': True,
+            }), 409
     files = [f.read() for f in request.files.getlist('files') if f and f.filename]
     if not files:
         return jsonify({'error': 'no files'}), 400
@@ -1007,6 +1017,26 @@ def dataset_import(dataset_id):
     # ComfyUI unnecessarily.
     stats = {}
     want_crop = (not svc.is_conceptual(ds)) and request.form.get('crop', '1') != '0'
+    if upload_key is not None:
+        if len(files) != 1:
+            return jsonify({'error': 'A resumable upload must contain exactly one image.'}), 400
+        from contextlib import nullcontext
+        from ..services.dataset_import_receipts import import_once
+
+        def perform(receipt):
+            window = gpu_exclusive_vision_window(flag_ttl=600) if want_crop else nullcontext()
+            with window:
+                ids, failed = svc.import_images(LOCAL_USER, dataset_id, files,
+                                                crop=want_crop, dedupe=True, stats=stats,
+                                                import_receipt=receipt)
+            return {'ok': True, 'imported': len(ids), 'failed': failed,
+                    'duplicates': stats.get('duplicates', 0), 'small': stats.get('small', 0)}
+        try:
+            with svc._dataset_ingest_lock(LOCAL_USER, dataset_id):
+                result = import_once(dataset_id, upload_key, files[0], want_crop, perform)
+            return jsonify(result)
+        except Exception as e:
+            return _map_error(e)
     if not want_crop:
         ids, failed = svc.import_images(LOCAL_USER, dataset_id, files, crop=False,
                                         dedupe=True, stats=stats)

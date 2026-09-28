@@ -66,7 +66,7 @@ test('opened from the section, the dialog lands ON the bench', () => {
   assert.ok(labAvailableAt > -1 && modeStateAt > -1)
   assert.ok(labAvailableAt < modeStateAt,
     'labAvailable must be declared before the mode initialiser that reads it')
-  assert.match(dialog, /useState\(labAvailable && initialMode === 'lab' \? 'lab' : 'edit'\)/)
+  assert.match(dialog, /useState\(labAvailable && !recovery.conflict && initialMode === 'lab' \? 'lab' : 'edit'\)/)
   // The way back to the picker: benching is a comparison ACROSS rows.
   assert.match(dialog, /onPickAnotherImage/)
   assert.match(workspace, /onPickAnotherImage=\{\(\) => \{ setLabImage\(null\); setLabPickerOpen\(true\); \}\}/)
@@ -202,7 +202,12 @@ test('the topmost layer owns Escape, and an unsaved caption is not thrown away',
       `${name}: the Escape listener left the capture phase`)
   }
   assert.match(dialog, /const dirty = draft !== \(initialCaption \|\| ''\)/)
-  assert.match(dialog, /if \(dirty && !leaveArmed\)/)
+  assert.match(dialog, /if \(dirty\) \{ setPendingExit/)
+  assert.match(dialog, /const dismiss = \(\) => requestExit\(onClose\)/)
+  assert.match(dialog, /const leaveForAnotherImage = \(\) => requestExit\(onPickAnotherImage\)/)
+  assert.match(dialog, /Save & Leave/)
+  assert.match(dialog, /Discard Changes/)
+  assert.match(dialog, /Keep Editing/)
   // …and the bank tells the user the truth about what a bank caption is for.
   assert.match(bank, /captionPlaceholder="Caption — a plain description, used for search…"/)
 })

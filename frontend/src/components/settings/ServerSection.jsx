@@ -151,7 +151,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
       await navigator.clipboard.writeText(config.server.access_token || '')
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard unavailable (non-HTTPS remote origin) — token stays selectable */ }
+    } catch { toast.info('Copy is unavailable here. Select the token and copy it manually.'); }
   }
 
   const copyUrl = async (key, url) => {
@@ -159,7 +159,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
       await navigator.clipboard.writeText(url)
       setCopiedUrl(key)
       setTimeout(() => setCopiedUrl(null), 1500)
-    } catch { /* clipboard unavailable (non-HTTPS remote origin) — URL stays selectable */ }
+    } catch { toast.info('Copy is unavailable here. Select the address and copy it manually.'); }
   }
 
   return (

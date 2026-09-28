@@ -212,6 +212,44 @@ def test_list_roots_when_no_path(client):
     assert isinstance(body['entries'], list) and len(body['entries']) >= 1
 
 
+def test_drive_browser_lists_every_accessible_drive(monkeypatch):
+    _pretend_os_name(monkeypatch, 'nt')
+    monkeypatch.setattr(folder_picker.os.path, 'isdir',
+                        lambda path: path in {'C:\\', 'D:\\', 'Z:\\'})
+    assert [item['path'] for item in folder_picker.list_subfolders()['entries']] == [
+        'C:\\', 'D:\\', 'Z:\\']
+
+
+def test_drive_root_returns_to_drive_list(monkeypatch):
+    import ntpath
+    monkeypatch.setattr(folder_picker.os.path, 'abspath', ntpath.abspath)
+    monkeypatch.setattr(folder_picker.os.path, 'dirname', ntpath.dirname)
+    monkeypatch.setattr(folder_picker.os.path, 'isdir', lambda path: True)
+    from contextlib import nullcontext
+    monkeypatch.setattr(folder_picker.os, 'scandir', lambda path: nullcontext(iter(())))
+    result = folder_picker.list_subfolders('Z:\\')
+    assert result['path'] == 'Z:\\'
+    assert result['parent'] is None
+    assert result['is_root'] is False  # A drive can itself be selected.
+
+
+def test_browse_unavailable_drive_has_actionable_error(client, monkeypatch):
+    def unavailable(path):
+        raise OSError('device disconnected')
+    monkeypatch.setattr(folder_picker, 'list_subfolders', unavailable)
+    response = client.get('/api/system/list-folders', query_string={'path': 'Z:\\'})
+    assert response.status_code == 503
+    assert 'Choose another location' in response.json['error']
+
+
+def test_browse_denied_directory_does_not_claim_missing(client, monkeypatch):
+    def denied(path):
+        raise PermissionError('access denied')
+    monkeypatch.setattr(folder_picker, 'list_subfolders', denied)
+    response = client.get('/api/system/list-folders', query_string={'path': 'Z:\\'})
+    assert response.status_code == 403
+
+
 def test_list_subfolders_lists_dirs_only(client, tmp_path):
     root = tmp_path / 'browse'
     (root / 'alpha').mkdir(parents=True)

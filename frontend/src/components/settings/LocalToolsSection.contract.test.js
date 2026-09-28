@@ -72,7 +72,9 @@ test('there is no cloud full-model token panel to describe', () => {
 test('focus=HF_CLOUD_TOKEN lands on the secret input id', () => {
   assert.match(primitives, /id=\{f\.key\}/)
   assert.match(primitives, /htmlFor=\{f\.key\}/)
-  assert.match(primitives, /type="password"/)
+  assert.match(primitives, /const \[visible, setVisible\] = useState\(false\)/)
+  assert.match(primitives, /type=\{visible \? 'text' : 'password'\}/)
+  assert.match(primitives, /disabled=\{!secretInputs\[f.key\]\}/)
   assert.match(primitives, /\{f\.testTarget && <TestResult result=\{testResults\[f\.testTarget\]\} \/>\}/)
   assert.match(primitives, /onResult\(await postJson\(settingsApiUrl\(pluginId, `\/api\/settings\/test\/\$\{encodeURIComponent\(target\)\}`\), \{\}\)\)/)
 })

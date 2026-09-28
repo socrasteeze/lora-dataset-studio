@@ -5313,7 +5313,8 @@ def dataset_payload(user_id, dataset_id):
         return caption_has_identity_leak(i.caption, body=body, appearance=appearance)
 
     return {
-        'id': ds.id, 'name': ds.name, 'trigger_word': ds.trigger_word,
+        'id': ds.id, 'instance_id': ds.instance_id,
+        'name': ds.name, 'trigger_word': ds.trigger_word,
         'train_type': (ds.train_type or 'zimage'),
         # Results can load without waiting for trainer/model discovery.
         'train_base_model': ds.train_base_model or '',
@@ -6156,7 +6157,7 @@ def _imp_commit_row(user_id, dataset_id, index, stored, extension, scale,
                     framing_at, caption_origin_at, bank_id_at,
                     watermark_state_at, watermark_bbox_at,
                     watermark_regions_at, watermark_source_at,
-                    watermark_score_at):
+                    watermark_score_at, import_receipt=None):
     """One image's atomic landing, moved verbatim: seal the analysis
     sidecar, restore transfer-metadata values, write the file atomically,
     insert the row and commit — and on ANY failure roll back, unlink the
@@ -6213,6 +6214,8 @@ def _imp_commit_row(user_id, dataset_id, index, stored, extension, scale,
                                    metadata_by_index[index]
                                    if index < len(metadata_by_index) else None))
         db.session.add(img)
+        if import_receipt is not None:
+            db.session.add(import_receipt)
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -6239,7 +6242,7 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
                   watermark_scores=None, statuses=None,
                   transfer_metadatas=None, dedupe_seen=None,
                   preserve_exact_bytes=False, created_ids_sink=None,
-                  provenance_changes_sink=None):
+                  provenance_changes_sink=None, import_receipt=None):
     """Store original static bytes (or head-crop) + create import rows (status=keep).
     When crop=True, each image is auto head-cropped via Qwen3-VL - the CALLER
     must then hold the GPU-exclusive window - and is by construction a face,
@@ -6293,6 +6296,8 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
     ds = get_dataset(user_id, dataset_id)
     if not ds:
         return [], 0
+    if import_receipt is not None and len(files_bytes) != 1:
+        raise ValueError('A resumable upload must contain exactly one image.')
     # Without head cropping, preserve aspect ratio and permitted original
     # bytes. The old padded-square path added learnable black bands and
     # forced bust/body photos into squares. ai-toolkit handles multiple ratios.
@@ -6351,13 +6356,18 @@ def import_images(user_id, dataset_id, files_bytes, crop=False, dedupe=False, st
                 match, index, stats, dataset_id, bank_id_at,
                 seal_analysis_snapshot, provenance_changes_sink)
             continue
+        if import_receipt is not None:
+            import_receipt.result = json.dumps({
+                'ok': True, 'imported': 1, 'failed': 0, 'duplicates': 0,
+                'small': (stats or {}).get('small', 0),
+            })
         img = _imp_commit_row(
             user_id, dataset_id, index, stored, extension, scale,
             seal_analysis_snapshot, transfer_metadata_at,
             captions_by_index, metadata_by_index, status_at, framing_at,
             caption_origin_at, bank_id_at, watermark_state_at,
             watermark_bbox_at, watermark_regions_at, watermark_source_at,
-            watermark_score_at)
+            watermark_score_at, import_receipt=import_receipt)
         if dedupe and fp is not None:
             seen.append((fp, img.id))
         ids.append(img.id)

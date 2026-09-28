@@ -17,22 +17,24 @@ const hook = read('../src/hooks/useDataset.js');
 const dropzone = read('../src/components/dataset/ImportDropzone.jsx');
 const workspace = read('../src/components/dataset/DatasetWorkspace.jsx');
 
-test('the hook splits a drop with planImportBatches and sends the batches one after another', () => {
-  assert.match(hook, /import \{[^}]*planImportBatches[^}]*\} from '\.\.\/components\/dataset\/importBatches\.js'/);
-  const body = hook.slice(hook.indexOf('const importFiles = useCallback'));
-  assert.match(body, /planImportBatches\(files, policy\)/);
-  assert.match(body, /for \(const batch of batches\)/);
-  assert.match(body, /importBatchProgress\(sent, batch\.length, total\)/);
-  assert.match(body, /oversizedFilesMessage\(oversized, limits\)/);
+const queue = read('../src/hooks/useImportQueue.js');
+test('imports persist originals and honor server limits before sequential uploads', () => {
+  assert.match(hook, /useImportQueue\(currentId/);
+  assert.match(queue, /planImportBatches\(inspected.accepted, policy\)/);
+  assert.match(queue, /stageImportQueue\(datasetId, instanceId, selected, crop\)/);
+  assert.match(queue, /await postForm\(`/);
+  assert.match(queue, /form.append\('import_key', item.key\)/);
+  assert.match(queue, /await completeImportFile/);
+  assert.match(queue, /oversizedFilesMessage\(oversized, limits\)/);
 });
 
-test('the dropzone passes the server policy along, and says the batch size', () => {
+test('the dropzone forwards policy and describes per-file recovery', () => {
   assert.match(dropzone, /onImport\(files, \{ crop: [^}]*, policy: importPolicy \}\)/);
-  assert.match(dropzone, /A big drop is sent in batches of \{maxFiles\} files\./);
+  assert.match(dropzone, /Photos upload one at a time with recovery after each file/);
 });
-
-test('both workspace dropzones forward the policy to the hook', () => {
+test('all dataset kinds share one dropzone that forwards the policy', () => {
   const sites = workspace.match(/<ImportDropzone[^>]*onImport=\{\(f, o\) => ds\.importFiles\(f, [^)]*\)\}/g) || [];
-  assert.equal(sites.length, 2, 'concept and character dropzones both pass the options through');
+  assert.equal(sites.length, 1, 'all kinds use the same import path');
   assert.ok(sites.every((s) => /policy/.test(s) || /ds\.importFiles\(f, o\)/.test(s)));
+  assert.match(workspace, /cropOption=\{!isConceptual\}/);
 });

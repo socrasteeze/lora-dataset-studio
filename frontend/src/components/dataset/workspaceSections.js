@@ -13,7 +13,7 @@ export const WORKSPACE_SECTIONS = [
   // guided PROGRESS list. The default landing section stays 'images'
   // (workspaceNavigation.js), which is position-independent.
   { id: 'add', title: 'Add images', icon: Camera, eyebrow: 'build',
-    description: 'Generate AI variations from the reference and import photos.',
+    description: 'Import photos, use a Bank selection, or generate from a reference.',
     conceptDescription: 'Import images to build your training dataset.',
     panels: [
       { id: 'reference', title: 'Reference photo', targetId: 'ds-add-reference', when: 'character' },
@@ -91,6 +91,7 @@ export const WORKSPACE_SECTIONS = [
 // checklist targets AND the backend preflight "Fix →" targets (gf-generate,
 // gf-images — see lora_training.py).
 export const SECTION_FOR_TARGET = {
+  'ds-section-add-heading': 'add',
   'gf-reference': 'add',
   'gf-generate': 'add',
   'gf-images': 'images',

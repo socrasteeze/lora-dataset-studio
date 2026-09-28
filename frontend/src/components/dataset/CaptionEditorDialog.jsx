@@ -6,6 +6,8 @@ import CaptionLab from './CaptionLab';
 // WHO wrote the sentence in the box — this is the surface where a caption is read
 // in full, so it is the one that says it in words rather than as a chip.
 import { captionOriginInfo } from '../../utils/captionOrigin.js';
+import { useCaptionDraft } from '../../hooks/useCaptionDraft.js';
+import { useFocusTrap } from '../../hooks/useFocusTrap.js';
 
 /** The authorship line for a text box, or null.
  *
@@ -36,8 +38,8 @@ export default function CaptionEditorDialog({
   // dialog is mounted on both now, so the instruction belongs to the host.
   captionPlaceholder = 'Caption (without the face)…',
 }) {
-  const [draft, setDraft] = useState(initialCaption || '');
-  const [shortDraft, setShortDraft] = useState(initialShortCaption || '');
+  const recovery = useCaptionDraft(labSurface?.draftKey, initialCaption, initialShortCaption);
+  const { caption: draft, short: shortDraft, setCaption: setDraft, setShort: setShortDraft } = recovery;
   // Collapsed by default; auto-open when a short already exists so it isn't hidden.
   const [shortOpen, setShortOpen] = useState(Boolean((initialShortCaption || '').trim()));
   // 'edit' (the default caption editor) | 'lab' (🧪 try several caption configs). The Lab
@@ -53,36 +55,25 @@ export default function CaptionEditorDialog({
   // The Captions section opens this dialog to reach the BENCH, not the textarea
   // — landing on 'edit' there would hide the Lab behind one more click, which is
   // the whole defect that entry point exists to fix.
-  const [mode, setMode] = useState(labAvailable && initialMode === 'lab' ? 'lab' : 'edit');
+  const [mode, setMode] = useState(labAvailable && !recovery.conflict && initialMode === 'lab' ? 'lab' : 'edit');
   const textareaRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  /* ONE way out, and it is closed only while the save is in flight — never
-     because the server said no. Escape, the backdrop, ✕ and Cancel all route
-     here: a dismissal mid-POST would leave the write running with nothing on
-     screen to report it. */
-  const dismiss = () => { if (!busy) onClose(); };
-
-  /* LEAVING FOR ANOTHER IMAGE IS NOT A DISMISSAL — it unmounts the dialog, so the draft
-     goes with it. This whole component exists because a refused save once destroyed a
-     caption the user had just written; a new button that throws one away silently would
-     put the same hole back, one door further along. So a dirty draft is refused ONCE,
-     in words, and the second press leaves anyway (the user has now been told). */
   const dirty = draft !== (initialCaption || '')
     || (showShort && shortDraft !== (initialShortCaption || ''));
-  const [leaveArmed, setLeaveArmed] = useState(false);
-  const leaveForAnotherImage = () => {
+  const [pendingExit, setPendingExit] = useState(null);
+  const requestExit = (exit) => {
     if (busy) return;
-    if (dirty && !leaveArmed) {
-      setLeaveArmed(true);
-      setError('You have an unsaved caption on this image. Save it first, or press '
-        + '‹ Another image again to leave it behind.');
-      return;
-    }
-    setLeaveArmed(false);
-    onPickAnotherImage();
+    if (dirty) { setPendingExit(() => exit); setMode('edit'); }
+    else exit();
   };
+  const dismiss = () => requestExit(onClose);
+  const leaveForAnotherImage = () => requestExit(onPickAnotherImage);
+  const dialogRef = useRef(null);
+  useFocusTrap(dialogRef);
+  const dismissRef = useRef(dismiss);
+  dismissRef.current = dismiss;
 
   /* A refusal used to land on a caption editor that had already closed, so the
      long AND short captions the user had just written were gone — on the most
@@ -94,8 +85,8 @@ export default function CaptionEditorDialog({
   const panelRef = useRef(null);
   useEffect(() => {
     const panel = panelRef.current;
-    if (error && panel) panel.scrollTop = panel.scrollHeight;
-  }, [error]);
+    if ((error || pendingExit) && panel) panel.scrollTop = panel.scrollHeight;
+  }, [error, pendingExit]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -107,18 +98,18 @@ export default function CaptionEditorDialog({
     const closeOnEscape = (event) => {
       if (event.key !== 'Escape') return;
       event.stopImmediatePropagation();
-      dismiss();
+      dismissRef.current();
     };
     window.addEventListener('keydown', closeOnEscape, true);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [onClose, busy]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Pass the short only when the dataset uses dual captions, so a plain edit never writes one.
   const save = async () => {
-    if (busy) return;
+    if (busy || recovery.conflict) return;
     setBusy(true);
     setError(null);
     let outcome;
@@ -127,7 +118,7 @@ export default function CaptionEditorDialog({
         () => onSave(draft, showShort ? shortDraft : undefined),
         { fallback: 'Could not save the caption' });
     } finally { setBusy(false); }
-    if (outcome.close) onClose();
+    if (outcome.close) { recovery.clear(); (pendingExit || onClose)(); }
     else setError(outcome.error);
   };
 
@@ -139,9 +130,9 @@ export default function CaptionEditorDialog({
           so an unmarked dialog is never "clean" — it is unmeasured. `layer` keeps
           it out of the fold budget and the overlap pairing: covering the page is
           what a dialog is for. */}
-      <section role="dialog" aria-modal="true" aria-labelledby="caption-editor-title"
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="caption-editor-title"
         data-probe-chrome="caption-editor" data-probe-layer
-        className="flex h-[min(92vh,50rem)] w-[min(96vw,72rem)] flex-col overflow-hidden rounded-2xl border border-border bg-app shadow-2xl">
+        className="flex h-[min(92dvh,50rem)] w-[min(96vw,72rem)] flex-col overflow-hidden rounded-2xl border border-border bg-app shadow-2xl">
         <header className="flex items-start justify-between gap-4 border-b border-border bg-surface px-4 py-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="min-w-0">
@@ -173,7 +164,7 @@ export default function CaptionEditorDialog({
                   className={`inline-flex min-h-10 items-center rounded-md px-2.5 py-1 text-xs font-semibold lg:min-h-0 ${mode === 'edit' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
                   Edit
                 </button>
-                <button type="button" role="tab" aria-selected={mode === 'lab'} onClick={() => setMode('lab')}
+                <button type="button" role="tab" aria-selected={mode === 'lab'} disabled={!!recovery.conflict || busy} onClick={() => setMode('lab')}
                   className={`inline-flex min-h-10 items-center rounded-md px-2.5 py-1 text-xs font-semibold lg:min-h-0 ${mode === 'lab' ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}>
                   🧪 Caption Lab
                 </button>
@@ -223,6 +214,7 @@ export default function CaptionEditorDialog({
               </p>
             )}
             <textarea id="expanded-caption" ref={textareaRef} value={draft}
+              disabled={busy || !!recovery.conflict}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (isCaptionSaveShortcut(event)) {
@@ -264,6 +256,7 @@ export default function CaptionEditorDialog({
                       </p>
                     )}
                     <textarea value={shortDraft}
+                      disabled={busy || !!recovery.conflict}
                       onChange={(event) => setShortDraft(event.target.value)}
                       onKeyDown={(event) => {
                         if (isCaptionSaveShortcut(event)) {
@@ -283,6 +276,34 @@ export default function CaptionEditorDialog({
                 shrink-0 because this column is a flex box (a flex child is
                 otherwise squashed to a sliver of clipped text at 400 px), and
                 it scrolls in its own box rather than pushing Save off screen. */}
+            {recovery.conflict && (
+              <div role="alert" className="shrink-0 rounded-lg border border-amber-400/40 p-3 text-sm text-content">
+                <p>The saved caption changed since this draft. Restore the draft to review it, or discard it to keep the saved caption.</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={recovery.restore} className="min-h-11 min-w-0 rounded border border-border px-2">Restore Draft</button>
+                  <button type="button" onClick={recovery.discard} className="min-h-11 min-w-0 rounded border border-border px-2">Discard Draft</button>
+                </div>
+              </div>
+            )}
+            {recovery.unavailable ? (
+              <p role="status" className="text-xs text-amber-300">Draft recovery is unavailable in this browser. Save before leaving.</p>
+            ) : recovery.recovered && (
+              <p role="status" className="text-xs text-content-muted">Local draft restored. Save to apply it.</p>
+            )}
+            {pendingExit && (
+              <div role="alert" className="shrink-0 rounded-lg border border-amber-400/40 p-3 text-sm text-content">
+                <p className="font-semibold">Unsaved Changes</p>
+                <p>Save this caption before leaving?</p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <button type="button" disabled={busy} onClick={() => setPendingExit(null)}
+                    className="min-h-11 min-w-0 rounded border border-border px-2">Keep Editing</button>
+                  <button type="button" disabled={busy} onClick={() => { recovery.discard(); pendingExit(); }}
+                    className="min-h-11 min-w-0 rounded border border-border px-2">Discard Changes</button>
+                  <button type="button" disabled={busy || !!recovery.conflict} onClick={save}
+                    className="min-h-11 min-w-0 rounded bg-gradient-primary px-2 text-gray-950">Save & Leave</button>
+                </div>
+              </div>
+            )}
             {error && (
               <div role="alert"
                 className="shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 max-h-28 overflow-y-auto">
@@ -297,14 +318,14 @@ export default function CaptionEditorDialog({
 
             <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-[0.6875rem] text-content-subtle">Esc to close · Ctrl/⌘ + Enter to save</span>
-              <div className="flex justify-end gap-2">
+              <div className="grid w-full grid-cols-2 gap-2 sm:w-64 sm:shrink-0">
                 <button type="button" onClick={dismiss} disabled={busy}
-                  className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-content-muted hover:text-content disabled:opacity-40">
+                  className="min-h-11 min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-content-muted hover:text-content disabled:opacity-40">
                   Cancel
                 </button>
-                <button type="button" onClick={save} disabled={busy}
-                  className="rounded-lg bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-40">
-                  {busy ? 'Saving…' : 'Save caption'}
+                <button type="button" onClick={save} disabled={busy || !!recovery.conflict}
+                  className="min-h-11 min-w-0 rounded-lg bg-gradient-primary px-3 py-2 text-sm font-semibold text-gray-950 disabled:opacity-40">
+                  {busy ? 'Saving…' : 'Save Caption'}
                 </button>
               </div>
             </div>

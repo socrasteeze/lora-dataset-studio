@@ -11,12 +11,18 @@ export function deriveSteps(d, caps, checkpointCount = 0) {
   const captioned = kept.filter((i) => (i.caption || '').trim());
   const scored = kept.filter((i) => i.face_state);
   const trainMode = !!(caps && caps.training_visible);
+  const character = !d?.kind || d.kind === 'character';
+  const hasReference = !!d?.ref_filename;
+  const hasImages = live.some((image) => image.filename);
 
   const steps = [
-    { id: 'reference', label: 'Reference', targetId: 'gf-reference',
-      done: !!(d && d.ref_filename), subtitle: d && d.ref_filename ? 'set' : 'one clear photo' },
-    { id: 'generate', label: 'Generate', targetId: 'gf-generate',
-      done: live.length > 0, subtitle: `${live.length}/25`, busy: generating.length > 0 },
+    ...(character ? [{ id: 'reference', label: 'Reference', targetId: 'gf-reference',
+      done: hasReference, optional: true, subtitle: hasReference ? 'set' : 'for generation' }] : []),
+    { id: 'generate', label: 'Add Images', targetId: 'ds-section-add-heading',
+      description: character
+        ? 'Import photos, bring in a Bank selection, or generate from a reference.'
+        : 'Import photos or bring in a Bank selection.',
+      done: hasImages, subtitle: `${live.filter((image) => image.filename).length} images`, busy: generating.length > 0 },
     { id: 'curate', label: 'Curate', targetId: 'gf-images',
       done: live.length > 0 && triage.length === 0 && kept.length > 0,
       subtitle: triage.length ? `${triage.length} to triage` : `${kept.length} kept` },
@@ -24,7 +30,7 @@ export function deriveSteps(d, caps, checkpointCount = 0) {
       done: kept.length > 0 && captioned.length === kept.length,
       subtitle: `${captioned.length}/${kept.length} captioned` },
   ];
-  if (caps && caps.face_scoring) {
+  if (character && caps && caps.face_scoring) {
     steps.push({ id: 'score', label: 'Score', targetId: 'gf-curation', optional: true,
       done: kept.length > 0 && scored.length === kept.length, subtitle: 'optional' });
   }

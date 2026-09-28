@@ -18,9 +18,15 @@ import { postJson } from '../../api/fetchClient';
 export const imageDisplayName = (img) => img.filename || img.name || String(img.id);
 
 /** The Dataset bench: a dataset OWNS a caption method, stored on the row. */
-export function datasetLabSurface({ datasetId, imageId }) {
+export function datasetLabSurface({ instanceId, datasetId, imageId, filename }) {
   return {
     kind: 'dataset',
+    // Numeric SQLite IDs can be reused after a dataset is deleted or a backup
+    // is restored. Recovery must fail closed until the server provides the
+    // per-dataset instance UUID, or an old browser draft could reach new data.
+    draftKey: instanceId && filename
+      ? `dataset:${instanceId}:${imageId}:${encodeURIComponent(filename)}`
+      : null,
     optionsUrl: `/api/dataset/${datasetId}/caption/options`,
     promptHelp: 'Uses the saved caption method and the prompt for this dataset type. The caption format follows the training family (booru for SDXL, prose otherwise).',
     preview: (body) => postJson(
@@ -44,9 +50,14 @@ export function datasetLabSurface({ datasetId, imageId }) {
  *  recognisable wording, and DIFFERENT behaviour must not wear the same label. Calling
  *  this one "Make default" would promise a persistence the Bank does not have.
  */
-export function bankLabSurface({ bankId, imageId, onApplyRunConfig }) {
+export function bankLabSurface({ bankInstanceId, imageInstanceId, bankId, imageId, onApplyRunConfig }) {
   return {
     kind: 'bank',
+    // IDs are reusable after a delete or database replacement. Both persistent
+    // instance IDs are required before this browser is allowed to retain text.
+    draftKey: bankInstanceId && imageInstanceId
+      ? `bank:${bankInstanceId}:${imageInstanceId}`
+      : null,
     promptHelp: 'Uses the descriptive bank prompt, including visible identity features.',
     preview: (body) => postJson(
       `/api/bank/${bankId}/image/${imageId}/caption/preview`, body),

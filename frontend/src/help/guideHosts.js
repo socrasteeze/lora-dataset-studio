@@ -105,7 +105,8 @@ export const CORE_GUIDE_ANCHORS = {
     "the-lora-canvas-every-run-on-one-board",
     "undeploy-several-loras-at-once",
     "upscale-a-picture-straight-from-the-board",
-    "tips-that-save-runs"
+    "tips-that-save-runs",
+    "mobile-dataset-workflow"
   ],
   "dataset-guide": [
     "1-pick-your-model-family-first",

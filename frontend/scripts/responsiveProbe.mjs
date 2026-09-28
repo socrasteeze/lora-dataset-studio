@@ -240,6 +240,12 @@ const PAGES = {
       // `text=Images` is a SUBSTRING match and lands on "Add images" first; the
       // button is named exactly, and the hidden twin rail is excluded by :visible.
       { name: 'images', open: ['nav[aria-label="Dataset sections"]:visible >> button:has-text("Images"):not(:has-text("Add"))'] },
+      { name: 'folder-browser', open: ['nav[aria-label="Dataset sections"]:visible >> button:has-text("Import & export")',
+        'button:has-text("Import from folder")'] },
+      { name: 'caption-editor', open: ['nav[aria-label="Dataset sections"]:visible >> button:has-text("Images"):not(:has-text("Add"))',
+        { hover: '.dataset-grid-item:visible', click: '[aria-label="Expand caption editor"]:visible' }] },
+      { name: 'crop-editor', open: ['nav[aria-label="Dataset sections"]:visible >> button:has-text("Images"):not(:has-text("Add"))',
+        { hover: '.dataset-grid-item:visible', click: '[aria-label="Crop"]:visible' }] },
       { name: 'training', open: ['nav[aria-label="Dataset sections"]:visible >> button:has-text("Training")'] },
       { name: 'lightbox', open: ['nav[aria-label="Dataset sections"]:visible >> button:has-text("Images"):not(:has-text("Add"))',
         '[aria-label^="Inspect"]'] },
@@ -415,7 +421,7 @@ function parseViewports(text) {
 function parseArgs(argv) {
   const out = {
     url: 'http://127.0.0.1:5173/#/canvas',
-    viewports: DEFAULT_VIEWPORTS, states: null, json: false, quiet: false,
+    viewports: DEFAULT_VIEWPORTS, states: null, json: false, quiet: false, datasetId: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -428,6 +434,10 @@ function parseArgs(argv) {
       const h = Number(argv[++i]);
       out.viewports = out.viewports.map(([w]) => [w, h]);
     } else if (a === '--states') out.states = argv[++i].split(',').map((s) => s.trim());
+    // The dataset route ordinarily primes the first row. A fixed synthetic
+    // fixture lets a rendered check cover caption and crop controls even when
+    // another empty dataset sorts first.
+    else if (a === '--dataset-id') out.datasetId = argv[++i];
     else if (a === '--json') out.json = true;
     else if (a === '--quiet') out.quiet = true;
   }
@@ -746,7 +756,17 @@ async function main() {
         // window and renders wider than requested, which turns a "400 px proof"
         // into a cropped 500 px one.
         viewport: { width, height }, deviceScaleFactor: 1,
+        // Phone widths must exercise the touch branch too. A narrow headless
+        // desktop has a fine pointer, which hides tile actions that are present
+        // for a real phone and silently skips crop/caption coverage.
+        isMobile: width < DESKTOP_BREAKPOINT,
+        hasTouch: width < DESKTOP_BREAKPOINT,
       });
+      if (args.datasetId && route === '#/datasets') {
+        await ctx.addInitScript((datasetId) => {
+          localStorage.setItem('datasetCurrentId', datasetId);
+        }, args.datasetId);
+      }
       const page = await ctx.newPage();
 
       /* Open the workspace behind the list, ONCE per viewport. The app keeps the
@@ -754,7 +774,7 @@ async function main() {
          after this still gets its fresh load and lands straight in the workspace.
          Absence of the control is reported, never failed: the coverage line is
          where "nothing to open on this instance" has to show up. */
-      if (pageSpec.prime?.length) {
+      if (pageSpec.prime?.length && !(args.datasetId && route === '#/datasets')) {
         try {
           await page.goto('about:blank');
           await page.goto(args.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -871,8 +891,19 @@ async function main() {
              that opens a fold exists at one width and not at the other — and a
              state that demanded it everywhere would have skipped, in silence,
              at exactly the width worth measuring. */
-          const optional = raw.startsWith('?');
-          const selector = optional ? raw.slice(1) : raw;
+          const step = typeof raw === 'string' ? { click: raw } : raw;
+          const optional = step.click.startsWith('?');
+          const selector = optional ? step.click.slice(1) : step.click;
+          if (step.hover) {
+            const hoverTarget = page.locator(step.hover).first();
+            try {
+              if (!(await hoverTarget.count()) || !(await hoverTarget.isVisible())) {
+                opened = false; break;
+              }
+              await hoverTarget.hover({ timeout: 4000 });
+              await page.waitForTimeout(150);
+            } catch { opened = false; break; }
+          }
           const el = page.locator(selector).first();
           try {
             if (!(await el.count()) || !(await el.isVisible())) {
