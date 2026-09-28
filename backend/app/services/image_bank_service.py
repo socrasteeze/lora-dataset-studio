@@ -63,7 +63,7 @@ from ..models import (BankDupDistinct, BankImage, FaceDataset, FaceDatasetImage,
                       ImageBank)
 from ..utils.dbbusy import write_with_retry
 from ..utils.redact import redact_tokens, redact_user_paths
-from . import (bank_jobs, bank_queue, bank_semantic_engine,
+from . import (bank_edit_history, bank_jobs, bank_queue, bank_semantic_engine,
                bank_transfer_metadata, bank_undo, caption_origin,
                dataset_activity, face_models, image_encoding, path_guard, trash)
 # The scope vocabulary is a leaf (pass_scopes.py) so face_dataset_service never
@@ -466,13 +466,13 @@ def edited_image_path(bank_id, image_id, generation) -> Path:
     return _edited_dir(bank_id) / f'{image_id}.e{int(generation or 0)}.webp'
 
 
-def _prune_edited_generations(bank_id, image_id, keep: Path | None) -> None:
+def _prune_edited_generations(bank_id, image_id, keep: Path | None, *, retained=()) -> None:
     """Best-effort removal of every edited blob of one image except ``keep``.
     A leftover is harmless — nothing points at it once the row moved on — so a
     locked file is not an error."""
     try:
         for stale in _edited_dir(bank_id).glob(f'{image_id}.e*.webp'):
-            if keep is not None and stale == keep:
+            if stale == keep or stale in retained:
                 continue
             try:
                 stale.unlink()
@@ -492,6 +492,7 @@ def _drop_edited_blob(bank_id, row) -> None:
     row.edit_method = None
     row.edit_generation = None
     row.edit_baked_rotation = None
+    row.edit_history = None
 
 
 def _ensure_rotated(bank_id, row: BankImage, source: str) -> str:
@@ -1741,6 +1742,7 @@ def _image_dict(row: BankImage, th: dict, promoted_by, live) -> dict:
         # change on its own — it is what the grid busts that cache with.
         'edit_method': row.edit_method,
         'edit_generation': int(row.edit_generation or 0),
+        **bank_edit_history.availability(row),
         'width': width, 'height': height, 'file_size': row.file_size,
         'quality_state': row.quality_state,
         'blur_score': row.blur_score, 'noise_score': row.noise_score,
@@ -5972,10 +5974,14 @@ def rotate_images(user_id, bank_id, ids, delta, *, _bank_lease=None) -> dict:
 def _edit_state(row: BankImage) -> dict:
     """What the grid needs to re-render one edited row without a refetch: the
     marker, the generation (its cache-busting key) and the new geometry."""
+    width, height = row.width, row.height
+    if int(row.rotation or 0) % 180:
+        width, height = height, width
     return {'id': row.id, 'edit_method': row.edit_method,
+            **bank_edit_history.availability(row),
             'edit_generation': int(row.edit_generation or 0),
             'rotation': int(row.rotation or 0),
-            'width': row.width, 'height': row.height}
+            'width': width, 'height': height}
 
 
 def _measure_edited_blob(row: BankImage, blob: Path) -> None:
@@ -6046,7 +6052,8 @@ def crop_image(user_id, bank_id, image_id, x, y, w, h, *,
     src = resolved_image_path(bank, row)
     if not src or not os.path.isfile(src):
         raise ValueError('the image could not be read from its folder')
-    generation = int(row.edit_generation or 0) + 1
+    generation = bank_edit_history.next_generation(row)
+    previous_state = bank_edit_history.snapshot(row, src)
     baked = (row.edit_baked_rotation if row.edit_method
              else (int(row.rotation or 0) % 360 or None))
     try:
@@ -6056,6 +6063,8 @@ def crop_image(user_id, bank_id, image_id, x, y, w, h, *,
     except (OSError, ValueError, MemoryError, Image.DecompressionBombError,
             Image.DecompressionBombWarning) as exc:
         raise ValueError(f'the image could not be prepared for cropping: {exc}') from exc
+    bank_edit_history.remember(row, previous_state)
+    row.edit_sequence = generation
     row.edit_method = 'crop'
     row.edit_generation = generation
     row.edit_baked_rotation = baked
@@ -6065,9 +6074,57 @@ def crop_image(user_id, bank_id, image_id, x, y, w, h, *,
     db.session.commit()
     # Only once the row POINTS at the new generation: pruning first would leave a
     # crash between the two with a marker and no blob.
-    _prune_edited_generations(bank_id, row.id, dst)
+    bank_edit_history.prune(bank_id, row)
     reset_score_memo()
     return _edit_state(row)
+
+
+@_serialized_bank_mutation('edit_undo')
+def undo_edits(user_id, bank_id, image_ids=None, *, _bank_lease=None) -> dict:
+    """Undo one crop/upscale per image; refuse missing or changed inputs."""
+    import json
+
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        raise ValueError('bank not found')
+    q = BankImage.query.filter_by(bank_id=bank_id).filter(
+        BankImage.edit_history.isnot(None))
+    if image_ids:
+        ids = list(dict.fromkeys(int(i) for i in image_ids))
+        rows = [row for offset in range(0, len(ids), _SQL_IN_CHUNK)
+                for row in q.filter(BankImage.id.in_(ids[offset:offset + _SQL_IN_CHUNK])).all()]
+    else:
+        rows = q.all()
+    restored, unavailable = [], []
+    for row in rows:
+        states = bank_edit_history.history(row)
+        if not states:
+            continue
+        path = bank_edit_history.previous_path(bank, row)
+        if not path:
+            unavailable.append(row.id)
+            continue
+        state = states.pop()
+        _invalidate_effective_analysis(row)
+        for key in bank_edit_history.STATE_FIELDS:
+            setattr(row, key, state.get(key))
+        row.edit_history = json.dumps(states) if states else None
+        # The original bank may not have been analysed before its first crop.
+        # Invalidating analysis also removes rotated caches. Rebuild that view
+        # before measuring, otherwise undoing a first rotated crop loses size.
+        restored_path = resolved_image_path(bank, row)
+        if restored_path:
+            _measure_edited_blob(row, Path(restored_path))
+        if int(row.rotation or 0) % 180:
+            row.width, row.height = row.height, row.width
+        restored.append(row)
+    db.session.commit()
+    for row in restored:
+        bank_edit_history.prune(bank_id, row)
+    if restored:
+        reset_score_memo()
+    return {'restored': len(restored), 'unavailable': unavailable,
+            'images': [_edit_state(row) for row in restored]}
 
 
 @_serialized_bank_mutation('edit_revert')
@@ -10608,7 +10665,8 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
                     unreadable += 1
                     bank_jobs.bump(job)
                     continue
-                generation = int(row.edit_generation or 0) + 1
+                generation = bank_edit_history.next_generation(row)
+                previous_state = bank_edit_history.snapshot(row, src)
                 baked = (row.edit_baked_rotation if row.edit_method
                          else (int(row.rotation or 0) % 360 or None))
                 # Nothing of ours may hold a write transaction while a multi-minute
@@ -10674,6 +10732,8 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
                 # measurement below reads it. `src` still names the PREVIOUS
                 # generation — the colour reference.
                 _finish_improved_blob(engine, dst, src, row.id)
+                bank_edit_history.remember(row, previous_state)
+                row.edit_sequence = generation
                 row.edit_method = 'improve'
                 row.edit_generation = generation
                 row.edit_baked_rotation = baked
@@ -10682,7 +10742,7 @@ def _improve_job(bank_id, engine, statuses=None, ids=None):
                 _measure_edited_blob(row, dst)
                 improved += 1
                 db.session.commit()
-                _prune_edited_generations(bank_id, row.id, dst)
+                bank_edit_history.prune(bank_id, row)
                 bank_jobs.bump(job)
         finally:
             db.session.commit()
