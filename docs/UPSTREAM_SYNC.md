@@ -41,6 +41,15 @@ upstream default branch, checks identity and remotes, flags the ancestry trap,
 runs the sweep and the gates, and removes its own scratch files on exit
 (including on Ctrl-C or a red gate). It never merges, commits or pushes.
 
+Agents run test-bearing phases and responsive probes in a separate Codex cloud
+task by default, against the exact branch commit. Do not run them on the user's
+local machine without explicit permission for that local run. A clean push
+request does not itself grant local-test permission. If cloud validation cannot
+complete a required gate, report the gap and hold publication to main.
+After the attribution and sensitive-data scrub, a task branch may be pushed
+with separate source and bundle commits to give the cloud task an exact test
+target. This does not qualify the branch for main.
+
 ```powershell
 pwsh -File scripts/upstream_sync.ps1 -Phase Orient   # remotes, identity, window
 pwsh -File scripts/upstream_sync.ps1 -Phase Baseline # section 1, before any merge
@@ -441,9 +450,9 @@ prose.
 
 ## 6 · Gates — all of them, in this order
 
-Each exists because the ones before it have a documented blind spot. Run the
-isolated driver from the repository root with the pinned Python environment and
-Node 24 on PATH:
+Each exists because the ones before it have a documented blind spot. In the
+approved cloud checkout, run the isolated driver from the repository root with
+the pinned Python environment and Node 24 on PATH:
 
 ```powershell
 # During repair: no full backend run if an earlier check is red.
@@ -545,7 +554,9 @@ rebuild dist from the merged source rather than picking either side's bundle.
   engines.
 - Working tree dirty at step 0 → stop and ask.
 - No pre-merge baseline → do not merge.
-- Any gate red → do not commit dist, do not push, fix first.
+- Any gate red → do not push main; fix the failure first. A scrubbed task branch
+  may carry separate source and bundle commits solely for cloud validation.
+- A required cloud gate that did not complete → do not push main or call it passed.
 - Lint output that is not ESLint's own → gate 1 did not run.
 - About to strip an emoji → stop. That divergence is retired; this app uses
   emoji as controls and stripping them left real buttons blank.
