@@ -2680,6 +2680,29 @@ button, so you never have to go hunting for it in a file manager — which is ho
 this trap was found in the first place.
 
 
+## Manage several banks
+
+From the Bank list, choose **Select Banks**. Each bank gets its own checkbox,
+including members normally shown in a group. **Select Visible** selects the
+current search results. Selected banks hidden by a later search remain selected;
+the selection count shows this. **Clear** removes the selection.
+
+Choose **Edit Banks** to change individual names or apply literal find/replace,
+a prefix or a suffix. Review the resulting names before saving. The grouping
+option can leave grouping unchanged, keep banks separate, or group matching
+names. Changes affect bank labels and grouping, not folder names or images.
+
+Choose **Delete Banks** to review and confirm the selected names. Deletion
+removes bank records, decisions, scores and caches. External source folders and
+images stay in place. Copies created by LDS inside its managed bank storage go
+to Trash. Bank records and curation decisions are not restored by recovering
+those copies.
+
+Each batch accepts up to 500 banks. Running or queued banks are refused;
+stop or cancel their work before trying again. A batch can partly succeed.
+The dialog reports failed banks and keeps them available for retry. A stale
+selection cannot change a new bank that reused an old numeric ID.
+
 ## Two banks, one card (banks that share a name)
 
 Sometimes one collection lives in two folders — an export split across disks, a

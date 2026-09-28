@@ -322,6 +322,135 @@ def bank_delete(bank_id):
     return jsonify({'ok': True})
 
 
+_BULK_BANK_LIMIT = 500
+
+
+def _bulk_bank_items(*, edit):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ValueError('request body must be an object')
+    items = data.get('banks')
+    if not isinstance(items, list) or not items:
+        raise ValueError('banks must be a non-empty list')
+    if len(items) > _BULK_BANK_LIMIT:
+        raise ValueError(f'banks cannot contain more than {_BULK_BANK_LIMIT} items')
+    seen = set()
+    normalized = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise ValueError(f'banks[{index}] must be an object')
+        bank_id = item.get('id')
+        if (isinstance(bank_id, bool) or not isinstance(bank_id, int)
+                or bank_id < 1):
+            raise ValueError(f'banks[{index}].id must be a positive integer')
+        if bank_id in seen:
+            raise ValueError(f'duplicate bank id: {bank_id}')
+        seen.add(bank_id)
+        instance_id = item.get('instance_id')
+        if (not isinstance(instance_id, str) or not instance_id.strip()
+                or len(instance_id) > 128):
+            raise ValueError(
+                f'banks[{index}].instance_id must be a non-empty string '
+                'of at most 128 characters')
+        allowed = {'id', 'instance_id'}
+        out = {'id': bank_id, 'instance_id': instance_id}
+        if edit:
+            allowed.update(('name', 'keep_separate'))
+            if 'name' not in item and 'keep_separate' not in item:
+                raise ValueError(f'banks[{index}] has no edit fields')
+            if 'name' in item:
+                out['name'] = banks.normalize_bank_name(item['name'])
+            if 'keep_separate' in item:
+                if not isinstance(item['keep_separate'], bool):
+                    raise ValueError(
+                        f'banks[{index}].keep_separate must be a boolean')
+                out['keep_separate'] = item['keep_separate']
+        unknown = set(item) - allowed
+        if unknown:
+            raise ValueError(f'banks[{index}] contains unsupported fields')
+        normalized.append(out)
+    return normalized
+
+
+def _bulk_bank_response(results):
+    succeeded = sum(bool(row['ok']) for row in results)
+    return jsonify({'results': results, 'succeeded': succeeded,
+                    'failed': len(results) - succeeded})
+
+
+def _bulk_failure(item, error, status, *, busy_kind=None):
+    result = {'id': item['id'], 'instance_id': item['instance_id'],
+              'ok': False, 'error': error, 'status': status}
+    if busy_kind:
+        result['busy_kind'] = busy_kind
+    return result
+
+
+@bp.post('/banks/bulk-edit')
+def banks_bulk_edit():
+    try:
+        items = _bulk_bank_items(edit=True)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    results = []
+    for item in items:
+        try:
+            bank = banks.bulk_edit_bank(
+                LOCAL_USER, item['id'], item['instance_id'],
+                name=item.get('name'), keep_separate=item.get('keep_separate'))
+        except bank_jobs.BankJobBusy as e:
+            results.append(_bulk_failure(item, str(e), 409, busy_kind=e.kind))
+        except banks.BankInstanceMismatch as e:
+            results.append(_bulk_failure(item, str(e), 409))
+        except banks.BankQueued as e:
+            results.append(_bulk_failure(item, str(e), 409, busy_kind='queue'))
+        except ValueError as e:
+            results.append(_bulk_failure(item, str(e), 400))
+        except Exception:
+            current_app.logger.exception('bulk Bank edit failed: bank=%s', item['id'])
+            banks.db.session.rollback()
+            results.append(_bulk_failure(item, 'operation failed', 500))
+        else:
+            if bank is None:
+                results.append(_bulk_failure(item, 'not found', 404))
+            else:
+                results.append({'id': bank.id, 'instance_id': bank.instance_id,
+                                'ok': True, 'name': bank.name,
+                                'keep_separate': bool(bank.keep_separate)})
+    return _bulk_bank_response(results)
+
+
+@bp.post('/banks/bulk-delete')
+def banks_bulk_delete():
+    try:
+        items = _bulk_bank_items(edit=False)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    results = []
+    for item in items:
+        try:
+            deleted = banks.delete_bank(
+                LOCAL_USER, item['id'],
+                expected_instance_id=item['instance_id'], refuse_queued=True)
+        except bank_jobs.BankJobBusy as e:
+            results.append(_bulk_failure(item, str(e), 409, busy_kind=e.kind))
+        except banks.BankInstanceMismatch as e:
+            results.append(_bulk_failure(item, str(e), 409))
+        except banks.BankQueued as e:
+            results.append(_bulk_failure(item, str(e), 409, busy_kind='queue'))
+        except Exception:
+            current_app.logger.exception('bulk Bank delete failed: bank=%s', item['id'])
+            banks.db.session.rollback()
+            results.append(_bulk_failure(item, 'operation failed', 500))
+        else:
+            if deleted:
+                results.append({'id': item['id'],
+                                'instance_id': item['instance_id'], 'ok': True})
+            else:
+                results.append(_bulk_failure(item, 'not found', 404))
+    return _bulk_bank_response(results)
+
+
 @bp.post('/bank/<int:bank_id>/relocate')
 def bank_relocate(bank_id):
     """Point a bank at a new folder after the user moved it (another disk, a

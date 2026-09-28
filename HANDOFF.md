@@ -1,43 +1,40 @@
 # HANDOFF
 
-**Updated:** 2026-09-28 | **Branch:** `main` | **Deployed build:** `efe277cc7`
+**Updated:** 2026-09-28 | **Branch:** `noble/bulk-bank-management` | **Base:** `bd0c7f9d8`
 
 ## State
-Mobile workflow and origin/main are integrated, published and running.
-The full delivery gate passed. The idle-checked restart and data checks passed.
+Bulk Image Bank editing and deletion are implemented in the attached worktree.
+The full landing gate passed. Source and rebuilt frontend land as separate commits.
+The live app remains on the previously delivered mobile workflow.
 
-## Done this session
-- Mobile source: e9a242de1; isolated frontend bundle: c6ef14f5f.
-- Added in-app host-drive browsing, resumable imports, caption recovery and shared guidance.
-- Related actions use equal-width rows; 30 rows passed at five viewport sizes.
-- Preserved incoming Camera Studio, video picker, Python picker and release-contract fixes.
-- Full gate: 10,343 backend/tooling passes, 106 subtests, 244 plugin Python passes and 6,283 frontend passes.
-- Published source merge 430cf48e1 and separate frontend build efe277cc7 to origin/main.
-- Final responsive probe: 15 measured states, zero findings and zero skipped states.
-- Backed up the live database, configuration and previous frontend before activation.
-- Restart confirmed a new healthy process serving the checked-out build; database integrity, unchanged row counts and recovery identities passed.
+## Done
+- Select individual banks, including grouped members, across filtered results; show hidden selections and enforce a 500-bank limit.
+- Edit individual names, apply literal replacement/prefix/suffix, and change name grouping.
+- Confirm bulk deletion with named source paths and explicit source/Trash effects.
+- Bind requests to stable bank identities; refuse stale, queued and running banks.
+- Keep partial failures and exact-request retries in the dialogs; guard unsaved edits and browser navigation.
+- Preserve external source images; use existing Trash behavior for managed imported copies.
+- Add help, Guide, What's New, README and a Bank-list mode to the responsive probe.
 
-## Open
-1. Physical-phone, real-model training and Docker runtime qualification remain separate.
+## Verification
+- Backend and privacy: 101 passed, 2 skipped. Optional private-name coverage has no supplied list.
+- Full landing gate: 10,361 backend/tooling tests and 106 subtests passed, with 22 tests skipped; all 244 bundled Python tests passed.
+- Frontend: 5,129 core and 1,162 bundled tests passed; 4 bundled tests skipped.
+- Both linters passed with no errors; frontend retains 44 existing warnings.
+- Production build passed. Isolated compiled-browser workflow: 7 scenarios passed with no page errors.
+- Responsive probe: 15 states passed across five viewports, with zero findings or skips.
+- Button geometry: 21 rows passed across seven viewports; equal widths, aligned rows, 40px targets and no horizontal background shift.
+- Privacy scanner: no findings in tracked or publishable untracked text.
+- Logs and synthetic screenshots remain under ignored data/bulk-bank-* in the worktree.
 
-## Decisions
-- Browser folder selection works against drives visible to the host account.
-- Pending upload originals stay in the browser until completion or cancellation.
-- Persistent identities prevent stale browser data attaching to reused numeric IDs.
-- HEIC/HEIF gets conversion guidance; no new decoder is claimed.
-- AGENTS.md is canonical; CLAUDE.md is a compatibility entry point.
-- Keep rejected rental/API-engine release entries out of the fork; retain legitimate public-plugin news.
+## Delivery
+Clean publication to origin/main is authorized and the complete landing gate passed.
+Activation has not been performed for this follow-up. Do not serve the new bundle against the old backend.
+The primary checkout stays on the prior build until an authorized update and restart.
+The previous mobile wave remains deployed at build efe277cc7; main includes its bd0c7f9d8 evidence commit.
 
-## Traps
-- Preserve the pre-existing untracked upscale-tests.md in the primary checkout.
-- Tests must isolate data/config/env/plugin/extension state before create_app.
-- postForm returns parsed JSON, not Response.
-- Responsive probes need a populated --dataset-id fixture.
-- Do not copy an older generated bundle over the integrated source; rebuild it.
-- Upstream remains read-only. Only origin/main is authorized for this delivery.
-
-## Verify
-```powershell
-pwsh -File scripts/upstream_sync.ps1 -Phase Gates -KeepScratch
-& 'C:/Program Files/Git/bin/bash.exe' scripts/scan-sensitive.sh
-```
+## Boundaries
+- Preserve the primary checkout's unrelated upscale-tests.md.
+- No live data was edited or deleted by these tests.
+- Physical phone, real-model training and Docker qualification remain separate.
+- Upstream is read-only. Test instances must isolate all five LDS state paths.

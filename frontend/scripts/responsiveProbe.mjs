@@ -46,7 +46,7 @@
  *   npm run probe:responsive -- --url http://127.0.0.1:5173/#/dataset/studio/<id>
  *
  * Options: --viewports 360x800,844x390,1280x800   --states shelf,layouts
- *          --json   --quiet
+ *          --json   --quiet   --bank-list
  *
  * Exit codes are THREE, on purpose: 0 clean, 1 violations found, 2 could not
  * run. A probe that cannot run must never look like a probe that passed — the
@@ -421,7 +421,7 @@ function parseViewports(text) {
 function parseArgs(argv) {
   const out = {
     url: 'http://127.0.0.1:5173/#/canvas',
-    viewports: DEFAULT_VIEWPORTS, states: null, json: false, quiet: false, datasetId: null,
+    viewports: DEFAULT_VIEWPORTS, states: null, json: false, quiet: false, datasetId: null, bankList: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -438,6 +438,7 @@ function parseArgs(argv) {
     // fixture lets a rendered check cover caption and crop controls even when
     // another empty dataset sorts first.
     else if (a === '--dataset-id') out.datasetId = argv[++i];
+    else if (a === '--bank-list') out.bankList = true;
     else if (a === '--json') out.json = true;
     else if (a === '--quiet') out.quiet = true;
   }
@@ -732,7 +733,16 @@ async function main() {
       return hashPath === p || hashPath.startsWith(p + '/');
     })
     .sort((a, b) => b.length - a.length)[0] || null;
-  const pageSpec = (route && PAGES[route]) || UNKNOWN_PAGE;
+  if (args.bankList && route !== '#/bank') cannotRun('--bank-list requires the Bank route');
+  const pageSpec = args.bankList ? {
+    label: 'Bank management',
+    ready: 'button:has-text("Select Banks")',
+    states: [
+      { name: 'selection', open: ['button:has-text("Select Banks")', 'button:has-text("Select Visible")'] },
+      { name: 'bulk-edit', open: ['button:has-text("Select Banks")', 'button:has-text("Select Visible")', 'button:has-text("Edit Banks")'] },
+      { name: 'bulk-delete', open: ['button:has-text("Select Banks")', 'button:has-text("Select Visible")', 'button:has-text("Delete Banks")'] },
+    ],
+  } : (route && PAGES[route]) || UNKNOWN_PAGE;
   let states = pageSpec.states;
   if (args.states) states = states.filter((s) => args.states.includes(s.name));
   if (!states.length) cannotRun(`no state named "${args.states?.join(', ')}" on ${route}`);
@@ -839,7 +849,7 @@ async function main() {
           // either too short on a cold load or wasted on a warm one, and this
           // now runs thirty times instead of six.
           try {
-            await page.waitForSelector('[data-probe-chrome]', { timeout: 15000 });
+            await page.waitForSelector(pageSpec.ready || '[data-probe-chrome]', { timeout: 15000 });
           } catch (first) {
             /* ONE retry, and only for a page whose spec says chrome exists.
                The very first load of a run pays for everything at once — a cold
@@ -854,7 +864,7 @@ async function main() {
             if (!pageSpec.states || pageSpec === UNKNOWN_PAGE) throw first;
             await page.goto('about:blank');
             await page.goto(args.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-            await page.waitForSelector('[data-probe-chrome]', { timeout: 20000 });
+            await page.waitForSelector(pageSpec.ready || '[data-probe-chrome]', { timeout: 20000 });
           }
           // A page whose chrome paints BEFORE its data (the Gallery's filter
           // rail) names the element that proves the data arrived; without it
