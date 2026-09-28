@@ -907,6 +907,26 @@ def _insert_bank_images(bank_id, folder, rels, source_metadata_by_relpath=None) 
 BANK_NAME_MAX = 100             # matches ImageBank.name's column width
 
 
+class BankInstanceMismatch(ValueError):
+    """The numeric id now names a different Bank instance."""
+
+
+class BankQueued(RuntimeError):
+    """The Bank has pending queue work that must not be discarded silently."""
+
+
+def normalize_bank_name(name) -> str:
+    """Validate and normalize one Bank label without changing database state."""
+    if not isinstance(name, str):
+        raise ValueError('name is required')
+    name = name.strip()
+    if not name:
+        raise ValueError('name is required')
+    if len(name) > BANK_NAME_MAX:
+        raise ValueError(f'name is too long (max {BANK_NAME_MAX} characters)')
+    return name
+
+
 def rename_bank(user_id, bank_id, name) -> ImageBank | None:
     """Rename a bank. Returns the bank, or None when it doesn't exist.
 
@@ -918,17 +938,35 @@ def rename_bank(user_id, bank_id, name) -> ImageBank | None:
 
     ValueError on an empty name or one past the column width (a silent SQLite
     truncation would leave the UI showing something the DB doesn't hold)."""
-    name = (name or '').strip()
-    if not name:
-        raise ValueError('name is required')
-    if len(name) > BANK_NAME_MAX:
-        raise ValueError(f'name is too long (max {BANK_NAME_MAX} characters)')
+    name = normalize_bank_name(name)
     bank = get_bank(user_id, bank_id)
     if bank is None:
         return None
 
     def _apply():
         bank.name = name
+        return bank
+
+    return write_with_retry(_apply)
+
+
+@_serialized_bank_mutation('bulk_edit')
+def bulk_edit_bank(user_id, bank_id, instance_id, *, name=None,
+                   keep_separate=None, _bank_lease=None) -> ImageBank | None:
+    """Apply one prevalidated bulk edit as one database transaction."""
+    bank = get_bank(user_id, bank_id)
+    if bank is None:
+        return None
+    if bank.instance_id != instance_id:
+        raise BankInstanceMismatch('bank selection is stale')
+    if bank_queue.state_for(bank_id) is not None:
+        raise BankQueued('bank is queued')
+
+    def _apply():
+        if name is not None:
+            bank.name = normalize_bank_name(name)
+        if keep_separate is not None:
+            bank.keep_separate = keep_separate
         return bank
 
     return write_with_retry(_apply)
@@ -1510,6 +1548,7 @@ def _remove_partial_import_folder(path, *, context) -> bool:
 
 @_serialized_bank_mutation('delete')
 def delete_bank(user_id, bank_id, *, _allow_busy=False,
+                expected_instance_id=None, refuse_queued=False,
                 _bank_lease=None) -> bool:
     """Drop the bank's ROWS and working data (thumbs + face cache). A folder of the
     user's OWN and its images are never touched.
@@ -1521,6 +1560,11 @@ def delete_bank(user_id, bank_id, *, _allow_busy=False,
     bank = get_bank(user_id, bank_id)
     if not bank:
         return False
+    if (expected_instance_id is not None
+            and bank.instance_id != expected_instance_id):
+        raise BankInstanceMismatch('bank selection is stale')
+    if refuse_queued and bank_queue.state_for(bank_id) is not None:
+        raise BankQueued('bank is queued')
     imported_source = bank.source_path if _is_imported_source(bank.source_path) else None
     from . import folder_person
     folder_person.drop_for_bank(bank_id)   # children first — no relationship()
@@ -2961,7 +3005,8 @@ def list_banks(user_id, dataset_id=None) -> list:
                  .order_by(ImageBank.created_at.desc()).all()):
         base = BankImage.query.filter_by(bank_id=bank.id)
         row = {
-            'id': bank.id, 'name': bank.name, 'source_path': bank.source_path,
+            'id': bank.id, 'instance_id': bank.instance_id,
+            'name': bank.name, 'source_path': bank.source_path,
             'created_at': bank.created_at.isoformat() if bank.created_at else None,
             'total': base.count(),
             'keep': base.filter_by(status='keep').count(),

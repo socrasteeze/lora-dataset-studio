@@ -84,6 +84,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-28-z-bulk-bank-management',
+    date: '2026-09-28',
+    title: 'Manage Banks Together',
+    blurb: 'Select banks to edit names and grouping together, or review and delete a batch. Source images stay in place; LDS-managed imported copies go to Trash. Failed items stay available for retry.',
+    to: '/bank',
+  },
+  {
     id: '2026-09-28-nested-video-weights', date: '2026-09-28',
     title: 'Find Nested Weights',
     blurb: 'Video setup recognizes installed weights inside model subfolders and extra ComfyUI roots. Explicit relative paths still select the requested subfolder, including case-insensitive names.',

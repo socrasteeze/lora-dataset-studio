@@ -40,7 +40,8 @@ test('the probe reaches the Studio through its id-carrying route', () => {
   assert.match(probe, /return hashPath === p \|\| hashPath\.startsWith\(p \+ '\/'\);/);
   assert.match(probe, /\.sort\(\(a, b\) => b\.length - a\.length\)\[0\] \|\| null;/);
   // an unknown page is still measured at rest — never skipped silently
-  assert.match(probe, /const pageSpec = \(route && PAGES\[route\]\) \|\| UNKNOWN_PAGE;/);
+  assert.match(probe, /\} : \(route && PAGES\[route\]\) \|\| UNKNOWN_PAGE;/);
+  assert.match(probe, /args.bankList && route !== '#\/bank'/);
 });
 
 test('the shortcut state drives the bar the users drive', () => {

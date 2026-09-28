@@ -107,7 +107,9 @@ The cuts are measured rather than guessed: the aesthetic and near-duplicate thre
 
 </details>
 
-Point it at a messy dump of thousands of images and triage it in place. Nothing in your folder is touched unless you explicitly ask — **Delete rejected** is the only action that removes anything, and it tells you where the files will go first.
+Point it at a messy dump of thousands of images and triage it in place. Nothing in your folder is touched unless you explicitly ask — **Delete rejected** is the only action that removes anything from an external source folder, and it tells you where the files will go first.
+
+**Select Banks** lets you rename, change grouping or delete several banks together. Review names before applying a batch; failed items remain available for retry. Deleting a bank preserves external source images. LDS-managed imported copies go to Trash. [Bulk bank management](docs/guide/using-the-app.md#manage-several-banks)
 
 | Sub-feature | What it gets you |
 | :-- | :-- |

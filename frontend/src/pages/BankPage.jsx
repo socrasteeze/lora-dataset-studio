@@ -27,6 +27,9 @@ import ForgetMissingDialog from '../components/bank/ForgetMissingDialog'
 import PluginSlot from '../plugins/PluginSlot.jsx'
 import BankLaneTabs from '../components/bank/BankLaneTabs'
 import { bankListOverview } from '../components/bank/bankOverview.js'
+import BankBulkDialog from '../components/bank/BankBulkDialog.jsx'
+import BankBulkDeleteDialog from '../components/bank/BankBulkDeleteDialog.jsx'
+import { BANK_BULK_LIMIT, bankSelectionKey, selectVisibleBanks, successfulBulkKeys } from '../components/bank/bankBulk.js'
 
 const CURRENT_KEY = 'bankCurrentId'
 const SORT_KEY = 'bankListSort'
@@ -295,6 +298,9 @@ export default function BankPage() {
   // as such WHILE it is typed. The server refuses it either way — this only
   // spares the round-trip and the "why not?" (see utils/pathRelation.js).
   const [datasets, setDatasets] = useState([])
+  const [selectingBanks, setSelectingBanks] = useState(false)
+  const [selectedBanks, setSelectedBanks] = useState(() => new Set())
+  const [bulkDialog, setBulkDialog] = useState(null)
 
   // ⚠️ Plain loads do NOT re-walk the source folders any more: doing that cost a
   // full disk inventory of the whole library on every navigation to this page
@@ -419,6 +425,40 @@ export default function BankPage() {
   // still forms its group, and a group filtered down to one member correctly
   // dissolves into a loose row (bankGroups needs 2+).
   const visibleBanks = sortBanks(banks || [], sort).filter((b) => bankMatches(b, query))
+  const selectedBankRows = (banks || []).filter((bank) => selectedBanks.has(bankSelectionKey(bank)))
+  const visibleSelectedCount = visibleBanks.filter((bank) => selectedBanks.has(bankSelectionKey(bank))).length
+  const hiddenSelectedCount = selectedBankRows.length - visibleSelectedCount
+
+  const toggleBankSelection = (bank) => {
+    if (!bank.instance_id) {
+      toast.error('This bank has no stable instance identity. Refresh the list before selection.')
+      return
+    }
+    const key = bankSelectionKey(bank)
+    setSelectedBanks((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else if (next.size < BANK_BULK_LIMIT) next.add(key)
+      else toast.warning(`You can select up to ${BANK_BULK_LIMIT} banks.`)
+      return next
+    })
+  }
+
+  const applyBulkResults = (results, deleting = false) => {
+    const succeeded = successfulBulkKeys(results)
+    if (!succeeded.size) return
+    setSelectedBanks((prev) => new Set([...prev].filter((key) => !succeeded.has(key))))
+    setBanks((rows) => deleting
+      ? (rows || []).filter((bank) => !succeeded.has(bankSelectionKey(bank)))
+      : (rows || []).map((bank) => {
+        const result = results.find((row) => row.ok
+          && Number(row.id) === Number(bank.id) && String(row.instance_id) === String(bank.instance_id))
+        return result ? { ...bank,
+          ...(result.name != null ? { name: result.name } : {}),
+          ...(result.keep_separate != null ? { keep_separate: result.keep_separate } : {}),
+        } : bank
+      }))
+  }
 
   // Computed once: the row list, the "Will create N" count and the all-excluded
   // warning are three views of the same decision.
@@ -772,7 +812,39 @@ export default function BankPage() {
               {BANK_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </label>
+          <button type="button" onClick={() => {
+            setSelectingBanks((value) => !value)
+            if (selectingBanks) setSelectedBanks(new Set())
+          }} aria-pressed={selectingBanks}
+            className="min-h-10 rounded-md border border-border px-3 text-xs font-semibold text-content hover:bg-surface-raised">
+            {selectingBanks ? 'Done Selecting' : 'Select Banks'}
+          </button>
+          <HelpBadge topic="bank-bulk-manage" />
         </div>
+        {selectingBanks && (
+          <div data-probe-chrome="bank-bulk-actions"
+            className="space-y-2 rounded-lg border border-indigo-400/40 bg-indigo-500/10 p-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
+              <span>{selectedBankRows.length} selected{hiddenSelectedCount > 0 ? `, ${hiddenSelectedCount} hidden by the filter` : ''}</span>
+              <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setSelectedBanks((prev) => selectVisibleBanks(prev, visibleBanks))}
+                disabled={visibleBanks.length === 0 || selectedBankRows.length >= BANK_BULK_LIMIT}
+                className="min-h-10 rounded-md border border-border px-3 font-semibold text-content disabled:opacity-50">Select Visible</button>
+              <button type="button" onClick={() => setSelectedBanks(new Set())} disabled={!selectedBankRows.length}
+                className="min-h-10 rounded-md border border-border px-3 font-semibold text-content disabled:opacity-50">Clear</button>
+              </div>
+              <span className="sm:ml-auto">Limit {BANK_BULK_LIMIT}</span>
+            </div>
+            {selectedBankRows.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setBulkDialog('edit')}
+                  className="min-h-10 rounded-md border border-indigo-400/50 px-3 text-sm font-semibold text-indigo-200">Edit Banks</button>
+                <button type="button" onClick={() => setBulkDialog('delete')}
+                  className="min-h-10 rounded-md border border-rose-500/60 px-3 text-sm font-semibold text-rose-200">Delete Banks</button>
+              </div>
+            )}
+          </div>
+        )}
         {/* grid-cols-1 (= minmax(0,1fr)), NOT the implicit auto column: an auto
             column is sized on max-content, so the unbreakable source PATH inside
             a card stretched it past the viewport and scrolled the whole page
@@ -789,7 +861,7 @@ export default function BankPage() {
               combined counts, one queue action and one promote. A member can opt
               out ("Keep separate"), which is a property of the BANK and survives
               a rename away and back. */}
-          {groupRows(visibleBanks).map((row) => {
+          {(selectingBanks ? visibleBanks.map((bank) => ({ kind: 'bank', key: `select-${bankSelectionKey(bank)}`, bank })) : groupRows(visibleBanks)).map((row) => {
             if (row.kind === 'group') {
               return (
                 <BankGroupCard key={row.key} row={row} queueStateOf={queueStateOf}
@@ -802,17 +874,31 @@ export default function BankPage() {
             }
             const b = row.bank
             const qs = queueStateOf(b)
+            const selected = selectedBanks.has(bankSelectionKey(b))
             return (
             <li key={row.key}
-              className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+              className={`flex min-w-0 flex-col gap-2 rounded-lg border bg-surface p-4 ${selected ? 'border-indigo-400' : 'border-border'}`}>
               <div className="flex min-w-0 items-center gap-2">
+                {selectingBanks && (
+                  <label className="flex min-h-10 min-w-10 shrink-0 items-center justify-center">
+                    <input type="checkbox" checked={selected} onChange={() => toggleBankSelection(b)}
+                      disabled={!b.instance_id || (!selected && selectedBankRows.length >= BANK_BULK_LIMIT)}
+                      aria-label={`Select bank ${b.name}`}
+                      className="h-5 w-5 accent-indigo-400 disabled:opacity-50" />
+                  </label>
+                )}
                 {/* Upstream's opener is a bare <button> here; this fork wraps it
                     in BankTitle, which adds the ✎ inline rename. The probe's
                     `prime` selector — [aria-label^="Open the bank"] — travels
                     with the button INTO that component, so the label is on
                     BankTitle's open button rather than on this line. */}
-                <BankTitle bank={b} onOpen={() => open(b.id)}
-                  onRename={(newName) => rename(b, newName)} />
+                {selectingBanks ? (
+                  <button type="button" onClick={() => toggleBankSelection(b)} disabled={!b.instance_id}
+                    className="min-h-10 min-w-0 grow truncate text-left text-base font-semibold text-content disabled:opacity-50">
+                    {b.name}
+                  </button>
+                ) : <BankTitle bank={b} onOpen={() => open(b.id)}
+                  onRename={(newName) => rename(b, newName)} />}
                 {b.activity && !b.activity.finished && (
                   <span className="text-xs text-amber-300">⏳ {b.activity.kind}…</span>
                 )}
@@ -821,33 +907,33 @@ export default function BankPage() {
                     {qs.state === 'running' ? 'running' : `queued · #${qs.position}`}
                   </span>
                 )}
-                <button type="button" onClick={() => setRelocating(b)}
+                {!selectingBanks && <button type="button" onClick={() => setRelocating(b)}
                   aria-label={`Move the folder of bank ${b.name}`}
                   title="Moved this folder to another disk? Point the bank at its new location."
-                  className="ml-auto px-1.5 text-content-subtle hover:text-content"><FolderInput aria-hidden="true" className="h-4 w-4" /></button>
-                <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
-                  className="px-1.5 text-content-subtle hover:text-rose-300"><X aria-hidden="true" className="h-4 w-4" /></button>
+                  className="ml-auto px-1.5 text-content-subtle hover:text-content"><FolderInput aria-hidden="true" className="h-4 w-4" /></button>}
+                {!selectingBanks && <button type="button" onClick={() => remove(b)} aria-label={`Remove bank ${b.name}`}
+                  className="px-1.5 text-content-subtle hover:text-rose-300"><X aria-hidden="true" className="h-4 w-4" /></button>}
               </div>
               <p className="truncate font-mono text-xs text-content-subtle" title={b.source_path}>
                 {b.source_path}
               </p>
-              <BankPreviewStrip bank={b} onOpen={() => open(b.id)} />
+              {!selectingBanks && <BankPreviewStrip bank={b} onOpen={() => open(b.id)} />}
               {/* Upstream's richer bar-and-breakdown replaces the plain-text
                   count line this used to be; the two badges below carry
                   information BankListSummary does not (the last Launch-all's
                   verdict, per-pass coverage) and are kept alongside it. */}
-              <BankListSummary bank={b} />
+              {!selectingBanks && <BankListSummary bank={b} />}
               {/* The last Launch-all's verdict, ON THE CARD. A run where every
                   GPU pass was skipped for "GPU busy" used to look identical to a
                   clean one from here — and queueing banks overnight is exactly
                   when nobody is watching. A clean run gets no badge: a tick on
                   every card makes the one amber card harder to spot. */}
-              <PipelineVerdictNote report={b.pipeline_report} />
-              <PassCoverageRow coverage={b.pass_coverage} />
-              <FolderSyncNote sync={b.folder_sync}
+              {!selectingBanks && <PipelineVerdictNote report={b.pipeline_report} />}
+              {!selectingBanks && <PassCoverageRow coverage={b.pass_coverage} />}
+              {!selectingBanks && <FolderSyncNote sync={b.folder_sync}
                 onRelocate={() => setRelocating(b)}
-                onForget={() => setForgetting(b)} />
-              <div className="flex items-center gap-2">
+                onForget={() => setForgetting(b)} />}
+              {!selectingBanks && <div className="flex items-center gap-2">
                 <button type="button" onClick={() => open(b.id)}
                   className="rounded-md border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-content hover:bg-surface">
                   Open →
@@ -859,7 +945,7 @@ export default function BankPage() {
                     Launch all
                   </button>
                 )}
-              </div>
+              </div>}
             </li>
             )
           })}
@@ -872,6 +958,16 @@ export default function BankPage() {
           scope={dialogScope.kind}
           onClose={() => setDialogScope(null)}
           onLaunch={runNow} onQueue={enqueue} />
+      )}
+
+      {bulkDialog === 'edit' && (
+        <BankBulkDialog banks={selectedBankRows} onClose={() => setBulkDialog(null)}
+          onResults={(results) => applyBulkResults(results, false)} />
+      )}
+
+      {bulkDialog === 'delete' && (
+        <BankBulkDeleteDialog banks={selectedBankRows} onClose={() => setBulkDialog(null)}
+          onResults={(results) => applyBulkResults(results, true)} />
       )}
 
       {promotingGroup && (

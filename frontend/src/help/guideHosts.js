@@ -74,6 +74,7 @@ export const CORE_GUIDE_ANCHORS = {
     "fix-a-watermark-mask-or-mark-one-the-scan-missed",
     "reject-every-flagged-image-at-once",
     "a-bank-and-a-dataset-never-share-files",
+    "manage-several-banks",
     "two-banks-one-card-banks-that-share-a-name",
     "move-a-bank-folder-to-another-disk",
     "images-you-deleted-from-the-folder-yourself",
