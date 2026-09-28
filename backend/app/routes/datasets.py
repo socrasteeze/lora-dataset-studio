@@ -30,8 +30,7 @@ from ..services.face_variations import (NSFW_VARIATION_CATALOG, VARIATION_CATALO
                                         nsfw_variation_catalog, presets_for,
                                         preset_meta_for, all_catalog_labels,
                                         sanitize_custom_shots,
-                                        MAX_CUSTOM_SHOTS_PER_SUBJECT,
-                                        is_nsfw_label)
+                                        MAX_CUSTOM_SHOTS_PER_SUBJECT)
 from ..utils.comfyui import (KREA_ALLOWED_SAMPLERS, KREA_ALLOWED_SCHEDULERS,
                             KREA_SAMPLER_PRESETS, get_krea_loras)
 from ._common import (_map_error, _require_comfyui, _require_no_stalled_comfyui,
@@ -817,8 +816,10 @@ def _parse_engine_batches(data):
     # and must be refused, not silently reinterpreted as a legacy Klein request.
     if 'engine_batches' not in data:
         generator = data.get('generator') or 'klein'
-        if generator not in svc.known_engine_ids():
-            raise ValueError(f'unknown engine: {generator}')
+        if (generator not in svc.known_engine_ids()
+                and generator not in svc.LEGACY_API_ENGINE_TAGS):
+            raise ValueError(
+                f'unknown engine: {generator}; choose Klein or an enabled local plugin engine')
         return [(generator, data.get('variations') or [])]
     raw = data.get('engine_batches')
     if raw is None:
@@ -833,8 +834,10 @@ def _parse_engine_batches(data):
         variations = entry.get('variations') or []
         # Every entry is checked — not just the first one — or an unknown engine
         # could ride along behind a valid one.
-        if generator not in svc.known_engine_ids():
-            raise ValueError(f'unknown engine: {generator}')
+        if (generator not in svc.known_engine_ids()
+                and generator not in svc.LEGACY_API_ENGINE_TAGS):
+            raise ValueError(
+                f'unknown engine: {generator}; choose Klein or an enabled local plugin engine')
         if not isinstance(variations, list):
             raise ValueError('engine_batches variations must be a list')
         if variations:
@@ -847,32 +850,28 @@ def _parse_engine_batches(data):
 @bp.post('/dataset/<int:dataset_id>/generate')
 def dataset_generate(dataset_id):
     data = request.get_json(silent=True) or {}
-    generator = data.get('generator') or 'klein'
-    # Local-only fork: Klein (ComfyUI) is the sole generation engine. A stale
-    # client still sending 'nanobanana'/'chatgpt' gets one clear answer.
-    if generator != 'klein':
-        return jsonify({'ok': False,
-                        'error': 'The API engines were removed from this fork — '
-                                 'generation runs on the local Klein engine only.'}), 400
     try:
         batches = _parse_engine_batches(data)
     except ValueError as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
     multiplier = data.get('multiplier', 1)
-    # Route-level fail-closed, applied to EACH batch: NSFW variations never reach
-    # an API engine — they exist only on the local Klein path (the service
-    # re-checks, defense in depth). Refused before anything is created, so a bad
-    # entry in the middle of good ones cannot leave a half-dispatched run.
-    # On this fork svc.api_engine_ids() is always empty (Divergence 1 — no cloud
-    # engine plugin is ever loaded), so this is a live-registry restatement of
-    # the guard rather than a behaviour change: harmless now, and automatically
-    # correct if a plugin ever registers a non-local engine.
-    for generator, variations in batches:
-        if generator in svc.api_engine_ids() and any(
-                v.get('nsfw') or is_nsfw_label(v.get('label')) for v in variations):
-            return jsonify({'ok': False,
-                            'error': 'NSFW variations run on a local engine only — '
-                                     'switch the generator to Klein or Krea 2 Edit.'}), 400
+    removed_api = set(svc.LEGACY_API_ENGINE_TAGS) | set(svc.api_engine_ids())
+    blocked_api = [generator for generator, _ in batches if generator in removed_api]
+
+    def api_refusal():
+        names = ', '.join(dict.fromkeys(blocked_api))
+        return jsonify({
+            'ok': False,
+            'error': (f'unknown engine: {names}. The API engines were removed from this fork; '
+                      'generation is limited to local engines, such as Klein.'),
+        }), 400
+
+    # An API-only request is invalid independent of dataset existence. Refuse it
+    # before looking up the target so a stale client gets the actionable engine
+    # answer instead of a misleading dataset error. Mixed requests continue to
+    # the local preflights below; none of their lanes dispatch before admission.
+    if blocked_api and len(blocked_api) == len(batches):
+        return api_refusal()
     # Klein node preflight (once per request — /object_info is large, so never
     # per-tile): if the workflow needs a custom node this ComfyUI lacks, answer
     # one actionable 409 instead of a grid of tiles each failing ComfyUI
@@ -940,6 +939,13 @@ def dataset_generate(dataset_id):
                         'setup_path': f'/plugins/{exc.plugin}/settings'}), 409
     except ValueError as exc:
         return _map_error(exc)
+    # Local plugin engines share the host queue and are admitted above through
+    # their registered preflight. API engines remain excluded from this fork.
+    # Delay this refusal until every local plugin preflight has run so a mixed
+    # request cannot dispatch one lane before discovering another local lane is
+    # unprepared. No generation call has run at this point.
+    if blocked_api:
+        return api_refusal()
     created, per_engine = 0, {}
     try:
         # The per-engine calls each enforce MAX_FANOUT on their own share, which
@@ -987,7 +993,7 @@ def dataset_generate(dataset_id):
         if isinstance(e, KreaModelsMissing):   # asset or node pack absent — no auto-fetch
             return _krea_missing_response(e)
         return _map_error(e)
-    return jsonify({'ok': True, 'created': len(ids)})
+    return jsonify({'ok': True, 'created': created, 'per_engine': per_engine})
 
 
 @bp.post('/dataset/<int:dataset_id>/import')

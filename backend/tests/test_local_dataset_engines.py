@@ -118,6 +118,27 @@ def test_missing_plugin_assets_refuse_before_any_paid_or_local_dispatch(client, 
         assert FaceDatasetImage.query.filter_by(dataset_id=dataset_id).count() == 0
 
 
+def test_registered_api_engine_is_refused_before_mixed_local_dispatch(client, provider):
+    dataset_id = _dataset_with_ref(client)
+    paid_calls = []
+    registry.register(registry.EngineSpec(
+        id='api_fixture', label='API fixture', kind='api', order=90,
+        generate=lambda: paid_calls.append('called')))
+    try:
+        response = client.post(f'/api/dataset/{dataset_id}/generate', json={
+            'engine_batches': [
+                {'generator': 'api_fixture', 'variations': _shots(1)},
+                {'generator': 'local_fixture', 'variations': _shots(1)},
+            ]})
+        assert response.status_code == 400
+        assert 'limited to local engines' in response.json['error']
+        assert not paid_calls and not provider[0]
+        with client.application.app_context():
+            assert FaceDatasetImage.query.filter_by(dataset_id=dataset_id).count() == 0
+    finally:
+        registry.unregister('api_fixture')
+
+
 def test_regenerate_uses_same_provider_and_preserves_raw_prompt(client, provider, monkeypatch):
     dataset_id = _dataset_with_ref(client)
     client.post(f'/api/dataset/{dataset_id}/generate', json={

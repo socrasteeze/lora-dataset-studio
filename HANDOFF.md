@@ -1,64 +1,43 @@
 # HANDOFF
 
-**Updated:** 2026-09-28 | **Branch:** `noble/mobile-dataset-workflow` | **Base:** `d9436f78c`
+**Updated:** 2026-09-28 | **Branch:** `noble/mobile-dataset-build` | **Integration base:** `422b8085e`
 
 ## State
-Mobile workflow fixes are implemented and verified on isolated browser fixtures.
-Local commits are authorized. The compiled frontend is kept in an isolated checkout;
-live activation still awaits the user's answer.
+Mobile workflow and origin/main are integrated; the full delivery gate passed.
+Clean push and an idle-checked restart are authorized and ready to execute.
 
 ## Done this session
-- In-app host-drive browsing replaces native-first Dataset imports; shared Bank picker improved.
-- Durable per-file import queue and atomic server receipts; UUIDs reject stale recovery after ID reuse.
-- Shared caption drafts, guarded exits, touch controls and guidance for all dataset kinds.
-- AGENTS.md is canonical; CLAUDE.md points to it. Guide/help/news/fork notes updated.
-- Frontend 6,282 passed / 4 skipped; 15/15 responsive dialog states; 10/10 IndexedDB scenarios.
-- Staged build and compiled mobile workflow passed. Detailed evidence: docs/MOBILE_WORKFLOW.md.
+- Mobile source: e9a242de1; isolated frontend bundle: c6ef14f5f.
+- Added in-app host-drive browsing, resumable imports, caption recovery and shared guidance.
+- Related actions use equal-width rows; 30 rows passed at five viewport sizes.
+- Preserved incoming Camera Studio, video picker, Python picker and release-contract fixes.
+- Full gate: 10,343 backend/tooling passes, 106 subtests, 244 plugin Python passes and 6,283 frontend passes.
 
 ## Open
-1. Resolve the pending activation choice. Live LDS is running; do not silently swap its bundle or restart it.
-2. If activation is approved, verify idle state, protect the live database, install the staged bundle, restart and verify served behavior.
-3. Release qualification remains red: 35 host/backend failures and three bundled-video failures reproduce on pristine baseline. Do not claim a green gate.
-4. The 24 additional full-run failures were old table-count assertions. They now name the new receipt table; the affected 55 tests pass.
-5. Commit source on the task branch and the generated frontend as a separate child commit in the isolated build checkout. No push is authorized.
-6. Earlier V2 cutover, physical-machine training and Docker gates remain outside this verification scope.
-7. origin/main advanced by 13 commits after the reviewed base. Reconcile that work before future publication; this local commit request does not include remote integration.
+1. Commit the qualified source merge and the separately rebuilt frontend.
+2. Recheck origin/main and both clean passes, then publish without force.
+3. Verify idle state, protect the live database/configuration, update the primary checkout and restart.
+4. Verify remote parity, served frontend and backend recovery identities after restart.
+5. Physical-phone, real-model training and Docker runtime qualification remain separate.
 
 ## Decisions
-- Browser folder selection on every client; only drives visible to the host account are available.
-- File-level upload recovery, not byte-range resume. Pending originals stay in this browser and origin until sent or cancelled.
-- Dataset/Bank/image identity guards prevent stale queues or drafts attaching to reused numeric IDs.
-- HEIC/HEIF gets preflight conversion guidance; no new decoder dependency.
-- Existing generation remains available in a disclosure; imported datasets need no reference image.
-- Related buttons stay in equal-width rows where they fit; 30 rows passed checks at five viewports.
-- A running production process caused the bundle to be staged instead of replacing dist during verification.
+- Browser folder selection works against drives visible to the host account.
+- Pending upload originals stay in the browser until completion or cancellation.
+- Persistent identities prevent stale browser data attaching to reused numeric IDs.
+- HEIC/HEIF gets conversion guidance; no new decoder is claimed.
+- AGENTS.md is canonical; CLAUDE.md is a compatibility entry point.
+- Keep rejected rental/API-engine release entries out of the fork; retain legitimate public-plugin news.
 
 ## Traps
-- Do not touch the pre-existing untracked upscale-tests.md.
-- create_app changes schema; isolate data/config/env/plugin/extension paths before importing it in tests.
-- postForm already returns parsed JSON. Do not call response.json() on its result.
-- The responsive probe needs --dataset-id for a populated fixture; empty-first priming silently skips image dialogs.
-- Bank and Dataset draft keys must include durable identities; numeric IDs can be reused after deletion.
-- Bundled video tests need backend on PYTHONPATH; their three remaining failures are independently reproduced baseline failures.
+- Preserve the pre-existing untracked upscale-tests.md in the primary checkout.
+- Tests must isolate data/config/env/plugin/extension state before create_app.
+- postForm returns parsed JSON, not Response.
+- Responsive probes need a populated --dataset-id fixture.
+- Do not copy an older generated bundle over the integrated source; rebuild it.
+- Upstream remains read-only. Only origin/main is authorized for this delivery.
 
 ## Verify
 ```powershell
-# Full frontend suite, including bundled contracts:
-Push-Location frontend
-npm test
-npm run lint
-Pop-Location
-# Complete host/tooling suite with isolated test state:
-.venv/Scripts/python.exe -X utf8 -m pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile
-# Driver also executes isolated bundled Python tests. Baseline avoids replacing a live bundle:
-pwsh -File scripts/upstream_sync.ps1 -Phase Baseline -KeepScratch
-# Build into an isolated output directory while the live checkout serves dist:
-Push-Location frontend
-npm run build -- --outDir <staged-output-directory>
-npm run probe:responsive -- --url <isolated-test-url>/#/datasets --dataset-id <fixture-id> --states folder-browser,caption-editor,crop-editor --json
-Pop-Location
+pwsh -File scripts/upstream_sync.ps1 -Phase Gates -KeepScratch
+& 'C:/Program Files/Git/bin/bash.exe' scripts/scan-sensitive.sh
 ```
-Full-run and baseline-comparison logs are in ignored data/mobile-*. The staged
-bundle and browser harnesses are attached to this chat's local artifact directory.
-The baseline managed worktree is archived. Isolated validation servers are stopped;
-the existing live LDS process was left running.

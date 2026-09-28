@@ -1520,6 +1520,15 @@ def _weight_present(subfolders, filename) -> bool:
     """
     from lds_sdk.video_host import comfy_model_paths
 
+    # A workflow may carry the loader-relative name ComfyUI returned, including
+    # its family directory. Preserve that exact lookup before using the bare
+    # filename convenience scan for older callers.
+    wanted = str(filename or '').replace('\\', '/').strip('/')
+    if not wanted:
+        return False
+    wanted_base = os.path.basename(wanted)
+    basename_only = wanted == wanted_base
+
     def current(path):
         if not os.path.isfile(path):
             return False
@@ -1532,18 +1541,40 @@ def _weight_present(subfolders, filename) -> bool:
         return True
 
     for sub in subfolders:
+        # Keep the direct configured-root seam. It is the fast path for a
+        # top-level file and lets callers that provide roots directly retain
+        # the revision check below, even when the higher-level listing cache is
+        # unavailable or intentionally replaced.
         try:
             roots = comfy_model_paths.search_roots(sub)
         except Exception:
             roots = []
         for root in roots:
-            if current(os.path.join(str(root), filename)):
+            root = str(root)
+            if current(os.path.join(root, *wanted.split('/'))):
                 return True
-            try:
-                names = {n.lower(): n for n in os.listdir(str(root))}
-            except OSError:
-                continue
-            if filename.lower() in names and current(os.path.join(str(root), names[filename.lower()])):
+            if basename_only:
+                try:
+                    names = {name.lower(): name for name in os.listdir(root)}
+                except OSError:
+                    names = {}
+                matched = names.get(wanted.lower())
+                if matched and current(os.path.join(root, matched)):
+                    return True
+
+        try:
+            models = comfy_model_paths.list_models(sub)
+        except Exception:
+            models = []
+        # `list_models` mirrors ComfyUI's recursive filename list, including
+        # the subfolder relative name it gives a loader. Looking only at a root
+        # here made Setup offer a download for an installed per-family weight.
+        for rel_name, path in models:
+            relative = str(rel_name).replace('\\', '/').strip('/')
+            exact = relative.lower() == wanted.lower()
+            discovered = (basename_only
+                          and os.path.basename(relative).lower() == wanted.lower())
+            if (exact or discovered) and current(path):
                 return True
     return False
 
