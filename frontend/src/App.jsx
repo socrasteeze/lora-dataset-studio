@@ -587,6 +587,7 @@ function PageLoading() {
 
 function Shell() {
   const { pathname } = useLocation();
+  const datasetRoute = pathname === '/datasets';
   const wideWorkspaceRoute = pathname === '/canvas' || pathname === '/bank'
     || pathname === '/gallery' || pathname === '/plugins';
   /* 🖼 THE BOARD IS THE WHOLE SCREEN. The canvas is not a document with a
@@ -629,7 +630,9 @@ function Shell() {
           ? 'flex min-h-0 w-full flex-1 flex-col p-0 sm:px-3 sm:py-3'
           : wideWorkspaceRoute
             ? 'mx-auto w-full max-w-[1800px] px-3 py-4 sm:px-4 sm:py-6'
-            : 'mx-auto max-w-5xl px-4 py-6'}>
+            : datasetRoute
+              ? 'mx-auto w-full max-w-7xl px-4 py-6'
+              : 'mx-auto max-w-5xl px-4 py-6'}>
         {/* The Suspense sits INSIDE the shell on purpose: a page chunk loading
             on first navigation swaps only the content area, while the nav, the
             banners and the queue dock stay put — wrapping <Routes> instead

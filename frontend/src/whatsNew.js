@@ -84,6 +84,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-28-zz-desktop-workspace-readability', date: '2026-09-28',
+    title: 'Readable Dataset Workspace',
+    blurb: 'Dataset workspaces use the full desktop header width, with larger headings, controls, and guidance. The workspace narrows with the browser window.',
+    to: '/datasets',
+  },
+  {
     id: '2026-09-28-z-bulk-bank-management',
     date: '2026-09-28',
     title: 'Manage Banks Together',

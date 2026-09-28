@@ -45,18 +45,18 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files); }}
       onClick={() => inputRef.current?.click()}
-      className={`flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 cursor-pointer text-center
+      className={`flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 lg:p-6 cursor-pointer text-center
         ${over ? 'border-primary bg-primary/10' : 'border-border bg-surface'} ${busy ? 'opacity-50 pointer-events-none' : ''}`}
     >
-      <ImageDown aria-hidden="true" className="h-5 w-5" />
-      <span className="text-content text-xs font-medium">Import real photos</span>
-      <span className="text-content-subtle text-[0.625rem]">
+      <ImageDown aria-hidden="true" className="h-5 w-5 lg:h-6 lg:w-6" />
+      <span className="text-content text-sm font-medium lg:text-base">Import real photos</span>
+      <span className="text-content-muted text-xs lg:text-sm">
         drag and drop or click — {autoCropEnabled
           ? `auto head-crop is on (input limit: ${inputLimit})`
           : importPolicyLine(importPolicy)}
       </span>
       <span onClick={(e) => e.stopPropagation()}
-        className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[0.625rem] text-content-subtle">
+        className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-xs text-content-muted lg:text-sm">
         {autoCropEnabled ? (
           <span>Auto head-crop creates a derived WebP. Turn it off to preserve an eligible original.</span>
         ) : preservesOriginals ? (
@@ -72,7 +72,7 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
       </span>
       {cropOption && (
         <label onClick={(e) => e.stopPropagation()}
-          className="flex items-center gap-1.5 text-[0.625rem] text-content-muted cursor-pointer"
+          className="flex items-center gap-1.5 text-xs text-content-muted cursor-pointer lg:text-sm"
           title={visionBusy ? 'Auto head-crop is unavailable during local generation; photos import full-frame.' : 'ON: each photo is auto-cropped to a square head shot (vision pass, pauses ComfyUI) and stored as a derived WebP. OFF: the original file and framing are kept — use for bust/body shots.'}>
           <input type="checkbox" checked={crop} disabled={visionBusy} onChange={(e) => setCrop(e.target.checked)}
             className="accent-indigo-500 w-3 h-3" />

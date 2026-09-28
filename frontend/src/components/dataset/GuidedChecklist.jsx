@@ -9,7 +9,7 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
   return (
     <nav aria-label="Dataset progress"
       className="rounded-lg border border-border bg-surface p-2">
-      <p className="px-1.5 pb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+      <p className="px-1.5 pb-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle lg:text-xs">
         Progress
       </p>
       <ol className="flex flex-col gap-0.5">
@@ -19,15 +19,15 @@ export default function GuidedChecklist({ steps, currentId, onJump }) {
             : s.done ? 'text-emerald-400'
             : s.id === currentId ? 'text-content font-semibold'
             : 'text-content-muted';
-          const cls = `flex min-h-11 lg:min-h-0 items-center gap-1.5 w-full px-1.5 py-1 rounded text-[0.8125rem] text-left hover:bg-surface-raised transition-colors ${tone}`;
+          const cls = `flex min-h-11 lg:min-h-0 items-center gap-1.5 w-full px-1.5 py-1 rounded text-[0.8125rem] text-left hover:bg-surface-raised transition-colors lg:text-sm ${tone}`;
           const body = (
             <>
               <span aria-hidden className="w-4 shrink-0 text-center">{glyph}</span>
               <span aria-hidden className="shrink-0 tabular-nums text-content-subtle">{i + 1}.</span>
               <span className="truncate">{s.label}</span>
-              {s.optional && <span className="shrink-0 text-[0.6875rem] text-content-subtle">(opt)</span>}
+              {s.optional && <span className="shrink-0 text-[0.6875rem] text-content-subtle lg:text-xs">(opt)</span>}
               {s.subtitle && (
-                <span className="ml-auto pl-1 shrink-0 max-w-[6.5rem] truncate text-[0.6875rem] text-content-subtle">
+                <span className="ml-auto pl-1 shrink-0 max-w-[6.5rem] truncate text-[0.6875rem] text-content-subtle lg:text-xs">
                   {s.subtitle}
                 </span>
               )}
