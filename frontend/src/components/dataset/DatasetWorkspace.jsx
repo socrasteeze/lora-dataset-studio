@@ -120,9 +120,9 @@ const MENU_ITEM = 'min-h-10 lg:min-h-0 w-full flex items-center gap-2 text-left 
 function SectionHeading({ id, eyebrow, title, description, badge }) {
   return (
     <div id={id} tabIndex={-1}>
-      <p className="m-0 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">{eyebrow}</p>
-      <h2 className="m-0 mt-0.5 flex items-center gap-2 text-content text-base font-semibold">{title}{badge}</h2>
-      {description && <p className="m-0 mt-0.5 text-content-muted text-[0.75rem] leading-relaxed">{description}</p>}
+      <p className="m-0 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle lg:text-xs">{eyebrow}</p>
+      <h2 className="m-0 mt-0.5 flex items-center gap-2 text-content text-base font-semibold lg:text-xl">{title}{badge}</h2>
+      {description && <p className="m-0 mt-0.5 text-content-muted text-[0.75rem] leading-relaxed lg:text-sm">{description}</p>}
     </div>
   );
 }
@@ -982,10 +982,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
           isActive
             ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100'
             : 'border-border text-content-subtle hover:text-content'}`
-      : `relative w-full rounded-md py-1.5 pl-8 pr-3 text-left text-xs ${
+      : `relative w-full rounded-md py-1.5 pl-8 pr-3 text-left text-xs lg:text-sm ${
           isActive
             ? 'bg-indigo-500/10 text-indigo-200'
-            : 'text-content-subtle hover:bg-surface hover:text-content-muted'}`;
+            : 'text-content-muted hover:bg-surface hover:text-content'}`;
     return (
       <button type="button"
         onClick={() => navigateToPanel(sectionId, destination.id)}
@@ -1007,7 +1007,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
     const base = chip
       ? `flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
           isActive ? 'border-border-strong bg-surface-raised text-content' : 'border-border text-content-muted hover:text-content'}`
-      : `relative flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium ${
+      : `relative flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-medium lg:text-base ${
           isActive ? 'bg-surface-raised text-content' : 'text-content-muted hover:bg-surface hover:text-content'}`;
     return (
       <button type="button" onClick={() => setSection(s.id)}
@@ -1052,7 +1052,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
       className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-content-muted hover:text-content hover:bg-surface-raised transition-colors">
       <Globe aria-hidden="true" className="h-4 w-4" />
       <span className="text-sm font-medium">Scrape images from the web</span>
-      <span className="text-content-subtle text-[0.6875rem]">scan a gallery URL, pick images, import full-frame</span>
+      <span className="text-content-muted text-[0.6875rem] lg:text-sm">scan a gallery URL, pick images, import full-frame</span>
       <span aria-hidden className="ml-auto text-content-subtle">→</span>
     </button>
   );
@@ -1066,7 +1066,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   );
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 lg:gap-4">
       {/*
        * Header: dataset identity and ONE primary action, Export ZIP. Secondary configuration
        * actions (settings, fidelity) live in More. Data actions (backup, merge import, publish)
@@ -1081,7 +1081,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           className="min-h-10 lg:min-h-0 flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised text-sm transition-colors">
           <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Datasets
         </button>
-        <h1 className="text-content font-bold">{d.name}</h1>
+        <h1 className="min-w-0 break-words text-content font-bold lg:text-2xl">{d.name}</h1>
         {isStyle ? (
           <span title="This Style LoRA is always active when loaded; adjust its LoRA weight to control the effect."
             className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-[0.6875rem]">
@@ -1091,7 +1091,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           <button type="button"
             onClick={() => { try { navigator.clipboard.writeText(d.trigger_word || ''); } catch { /* ignore */ } }}
             title="Copy the trigger word (to put in your prompts)"
-            className="min-h-10 lg:min-h-0 flex items-center gap-1 px-2 py-0.5 rounded-lg border border-indigo-400/40 bg-indigo-500/10 text-[0.6875rem]">
+            className="min-h-10 lg:min-h-0 flex items-center gap-1 px-2 py-0.5 rounded-lg border border-indigo-400/40 bg-indigo-500/10 text-[0.6875rem] lg:text-sm">
             <span className="text-content-subtle">trigger:</span>
             <code className="text-indigo-300 font-semibold">{d.trigger_word || '—'}</code>
             <Copy aria-hidden="true" className="h-3 w-3 text-content-subtle" />
@@ -1150,7 +1150,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           guided Progress checklist below it for character datasets), the ACTIVE
           section's content on the right. On mobile the sidebar folds into a
           horizontal chip rail — same responsive pattern as the Settings page. */}
-      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-4 lg:items-start">
+      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
         <aside>
           {/* Mobile: horizontal chip rail.
 
@@ -1192,7 +1192,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           {/* Desktop: sticky rail + guided progress below it */}
           <div data-probe-panel="sections-rail" className="hidden lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-3">
             <nav aria-label="Dataset sections">
-              <p className="m-0 px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">Dataset</p>
+              <p className="m-0 px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle lg:text-xs">Dataset</p>
               <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
                 {visibleSections.map((s) => {
                   const isActive = s.id === section;
@@ -1217,7 +1217,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           </div>
         </aside>
 
-        <div className="flex flex-col gap-3 min-w-0 mt-1 lg:mt-0">
+        <div className="flex flex-col gap-3 min-w-0 mt-1 lg:mt-0 lg:gap-4">
           {/*
            * GLOBAL banners remain visible in every section: a GPU pass or generation batch
            * concerns the whole screen.

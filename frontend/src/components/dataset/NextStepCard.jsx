@@ -23,10 +23,10 @@ export default function NextStepCard({ step, trainMode, busy, totalImages, onAct
   const key = step.id === 'finish' ? (trainMode ? 'finish_train' : 'finish_export') : step.id;
 
   return (
-    <div role="status" className="rounded-lg border border-border bg-surface-raised px-3 py-2">
+    <div role="status" className="rounded-lg border border-border bg-surface-raised px-3 py-2 lg:px-4 lg:py-3">
       <div className="flex items-center gap-2">
         <Lightbulb aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-        <span className="text-content text-sm font-semibold">Next step: {step.label}</span>
+        <span className="text-content text-sm font-semibold lg:text-base">Next step: {step.label}</span>
         {!forceOpen && (
           <button type="button" onClick={() => setCollapsed((v) => !v)} aria-expanded={open}
             className="ml-auto text-content-subtle hover:text-content px-1"
@@ -38,9 +38,9 @@ export default function NextStepCard({ step, trainMode, busy, totalImages, onAct
       </div>
       {open && (
         <div className="mt-1 flex items-center gap-3 flex-wrap">
-          <p className="text-content-muted text-sm m-0">{step.description || COPY[key]}</p>
+          <p className="text-content-muted text-sm m-0 lg:text-base">{step.description || COPY[key]}</p>
           <button type="button" onClick={onAction} disabled={busy}
-            className="ml-auto min-h-11 px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+            className="ml-auto min-h-11 px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40 lg:text-base">
             {actionLabel}
           </button>
         </div>

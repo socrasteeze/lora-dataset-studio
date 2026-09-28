@@ -118,8 +118,8 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
       <button type="button" onClick={() => setOpen(true)} disabled={disabled}
         className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-content-muted hover:text-content hover:bg-surface-raised transition-colors disabled:opacity-50">
         <Archive aria-hidden="true" className="h-4 w-4" />
-        <span className="text-sm font-medium">Import from a bank</span>
-        <span className="text-content-subtle text-[0.6875rem]">copy the kept images of a triaged bank into this dataset</span>
+        <span className="text-sm font-medium lg:text-base">Import from a bank</span>
+        <span className="text-content-muted text-[0.6875rem] lg:text-sm">copy the kept images of a triaged bank into this dataset</span>
         <span aria-hidden className="ml-auto text-content-subtle">→</span>
       </button>
     );
