@@ -500,6 +500,10 @@ _SCHEMA_ADDITIONS = (
     ('bank_image', 'caption_origin', 'VARCHAR(16)'),
     ('face_dataset_image', 'caption_origin', 'VARCHAR(16)'),
     ('face_dataset_image', 'caption_short_origin', 'VARCHAR(16)'),
+    # Browser recovery must not attach old drafts/uploads to reused row IDs.
+    ('face_dataset', 'instance_id', 'VARCHAR(32)'),
+    ('image_bank', 'instance_id', 'VARCHAR(32)'),
+    ('bank_image', 'instance_id', 'VARCHAR(32)'),
     ('image_bank', 'pipeline_report', 'TEXT'),
     # "One bank per subfolder": the loose-files bank is rooted at the parent but
     # must NOT recurse when its live folder is re-walked (see refresh_bank).
@@ -620,6 +624,7 @@ def _apply_additive_migrations():
                 db.session.commit()
         except Exception:
             db.session.rollback()  # a failed ALTER must never block boot
+    _backfill_recovery_ids()
     # Before the engine selector there was only ``semantic_dup_group`` and its
     # space was necessarily CLIP.  Copy that visible partition into the durable
     # lane (or into SigLIP2 for Banks already switched by an intermediate build)
@@ -660,6 +665,19 @@ def _apply_additive_migrations():
             db.session.commit()
         except Exception:
             db.session.rollback()
+
+
+def _backfill_recovery_ids():
+    """Assign recovery identities once, including rows in legacy databases."""
+    from sqlalchemy import text
+    for table in ('face_dataset', 'image_bank', 'bank_image'):
+        columns = {row[1] for row in db.session.execute(text(f'PRAGMA table_info({table})'))}
+        if 'instance_id' not in columns:
+            continue
+        db.session.execute(text(
+            f'UPDATE {table} SET instance_id = lower(hex(randomblob(16))) '
+            "WHERE instance_id IS NULL OR trim(instance_id) = ''"))
+    db.session.commit()
 
 
 def _cleanup_orphaned_lora_test_images():

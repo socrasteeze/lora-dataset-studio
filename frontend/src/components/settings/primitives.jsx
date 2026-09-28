@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { postJson } from '../../api/fetchClient'
 
 export const INPUT_CLASS =
@@ -124,6 +124,8 @@ export function SecretField({
   testResults, recordTestResult, saveSecretIfPending, handleDeleteSecret,
 }) {
   const f = field
+  const [visible, setVisible] = useState(false)
+  useEffect(() => { if (!secretInputs[f.key]) setVisible(false) }, [secretInputs, f.key])
   return (
     // flex-wrap + a full-width first child under `sm`: on a phone the Test and
     // Remove buttons drop to their own line instead of squeezing the key input
@@ -136,15 +138,23 @@ export function SecretField({
         </div>
         <p className="mb-1 text-xs text-content-muted">{f.help}</p>
         {f.guide}
+        <div className="flex items-center gap-2">
         <input
           id={f.key}
-          type="password"
+          type={visible ? 'text' : 'password'}
           autoComplete="off"
           value={secretInputs[f.key] ?? ''}
           onChange={(e) => setSecretInputs((prev) => ({ ...prev, [f.key]: e.target.value }))}
           placeholder={secretsPresence[f.key] ? 'Already set — enter a new value to replace it' : 'Not set'}
-          className={INPUT_CLASS}
+          className={`${INPUT_CLASS} min-w-0`}
         />
+        <button type="button" aria-label={`${visible ? 'Hide' : 'Show'} ${f.label}`}
+          aria-pressed={visible} onClick={() => setVisible((value) => !value)}
+          disabled={!secretInputs[f.key]}
+          className="min-h-11 shrink-0 rounded-md border border-border px-3 text-sm text-content disabled:opacity-40">
+          {visible ? 'Hide' : 'Show'}
+        </button>
+        </div>
         {f.testTarget && <TestResult result={testResults[f.testTarget]} />}
       </div>
       {f.testTarget && (

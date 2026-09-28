@@ -34,7 +34,8 @@ def test_all_product_service_modules_import_with_real_sdk(host, product):
             if parts[-1] == '__init__':
                 parts.pop()
             importlib.import_module('.'.join([package, *parts]))
-    assert len(db.metadata.tables) == 33
+    assert len(db.metadata.tables) == 34
+    assert 'dataset_import_receipt' in db.metadata.tables
 
 
 def test_video_catalog_and_empty_lists_work_without_other_plugins(host):

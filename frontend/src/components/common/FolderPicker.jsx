@@ -1,21 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Folder, FolderOpen } from 'lucide-react';
-import { apiFetch, postJson } from '../../api/fetchClient'
+import { apiFetch } from '../../api/fetchClient'
 import { attemptModalSubmit } from '../../utils/submitOutcome.js'
-
-/** Ask the SERVER to open its native "choose a folder" dialog (the folder lives
- * on the machine running the app, so a browser file-picker can't reach it).
- * Resolves to the endpoint's answer — {available, path?, cancelled?, reason?} —
- * and never throws for the expected "no desktop on this server" case: the
- * endpoint replies 200 with available:false and the caller falls back to the
- * in-app browser. A genuine network error also degrades to available:false. */
-export async function pickNativeFolder(initial) {
-  try {
-    return await postJson('/api/system/pick-folder', { initial: initial || '' })
-  } catch {
-    return { available: false, reason: 'network' }
-  }
-}
+import { useFocusTrap } from '../../hooks/useFocusTrap.js'
 
 /** Read-only in-app folder browser (drives → subfolders).
  * Nothing is written; only directories are listed.
@@ -40,6 +27,19 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
   // you exactly where you are so you can pick another one).
   const [browseError, setBrowseError] = useState('')
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const dialogRef = useRef(null)
+  const listingRequest = useRef(0)
+  useFocusTrap(dialogRef)
+
+  useEffect(() => {
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      listingRequest.current += 1
+      document.body.style.overflow = overflow
+    }
+  }, [])
 
   /* ONE way out, shut only while the pick is being posted. */
   const dismiss = () => { if (!busy) onClose() }
@@ -63,39 +63,44 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
   }
 
   const load = useCallback(async (p) => {
+    const requestId = ++listingRequest.current
     setLoading(true); setBrowseError('')
     try {
       const q = p ? `?path=${encodeURIComponent(p)}` : ''
       const d = await apiFetch(`/api/system/list-folders${q}`)
+      if (requestId !== listingRequest.current) return
       setData(d)
+      setQuery('')
+      setError('')
       // Follow the browser: after a click, an Up, or a successful jump, the box
       // shows where you ARE, so the next paste replaces a real path.
       setTyped(d.path || '')
     } catch (e) {
-      // A bad starting path (e.g. a stale pasted value) shouldn't dead-end the
-      // browser — surface it and drop back to the drive list.
+      if (requestId !== listingRequest.current) return
+      // Keep the last valid folder. Drives stays available even when the
+      // initial path is missing or the server account cannot read it.
       setBrowseError(e?.message || 'Could not open that folder.')
-      if (p) load(null)
     } finally {
-      setLoading(false)
+      if (requestId === listingRequest.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => { load(initial || null) }, [load, initial])
 
-  const entries = data?.entries || []
+  const entries = (data?.entries || []).filter((entry) =>
+    entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
   const atRoot = !data || data.is_root
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Choose a folder"
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Choose a folder"
+      data-probe-chrome="folder-browser" data-probe-layer
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) dismiss() }}>
-      <div className="flex w-full max-w-lg flex-col rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl"
-        style={{ maxHeight: '80vh' }}>
-        <h2 className="flex items-center gap-2 text-base font-bold text-content"><Folder aria-hidden="true" className="h-4 w-4" /> Choose a folder</h2>
-        <p className="mt-1 text-xs text-content-muted">
-          Folders on the machine running the app. Nothing is opened or modified —
-          you're only picking a location.
+      <div className="flex w-full max-w-lg flex-col rounded-xl border border-border bg-surface-overlay p-5 shadow-2xl [@media(max-height:500px)]:p-3"
+        style={{ maxHeight: '90dvh' }}>
+        <h2 className="flex items-center gap-2 text-base font-bold text-content"><Folder aria-hidden="true" className="h-4 w-4" /> Choose Folder</h2>
+        <p className="mt-1 text-xs text-content-muted [@media(max-height:500px)]:hidden">
+          Browse drives and folders on the LDS host. Access uses the host account's permissions.
         </p>
 
         {/* An address bar, for the same reason the native dialog needed one: the
@@ -105,37 +110,47 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
             lanes that never get a native dialog at all — LAN, tablet, Linux —
             where this browser is the whole picker. Enter jumps; a path that does
             not exist reports itself in the amber box and leaves you put. */}
-        <form className="mt-3 flex items-center gap-2"
+        <form className="mt-3 flex flex-wrap items-center gap-2"
           onSubmit={(e) => { e.preventDefault(); const v = typed.trim(); if (v) load(v) }}>
+          <div className="flex w-full gap-2 sm:contents">
+          <button type="button" onClick={() => load(null)} disabled={busy || loading}
+            className="min-h-11 w-16 shrink-0 rounded-md border border-border px-2 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
+            Drives
+          </button>
           <button type="button" onClick={() => load(atRoot ? null : (data?.parent ?? null))}
-            disabled={loading || atRoot}
-            className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
+            disabled={busy || loading || atRoot}
+            className="min-h-11 w-16 shrink-0 rounded-md border border-border px-2 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
             ⬆ Up
           </button>
+          </div>
           <input
             aria-label="Folder path"
             value={typed}
+            disabled={busy}
             onChange={(e) => setTyped(e.target.value)}
             placeholder={data?.path || 'Paste or type a path'}
             spellCheck={false}
-            className="min-w-0 grow rounded-md border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-content placeholder:text-content-subtle" />
-          <button type="submit" disabled={loading || !typed.trim()}
-            className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
+            className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-content placeholder:text-content-subtle" />
+          <button type="submit" disabled={busy || loading || !typed.trim()}
+            className="min-h-11 w-16 shrink-0 rounded-md border border-border px-2 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
             Go
           </button>
         </form>
 
-        {browseError && <p className="mt-2 text-xs text-amber-300">{browseError}</p>}
+        {browseError && <p role="alert" className="mt-2 text-xs text-amber-300">{browseError}</p>}
+        <input aria-label="Filter folders" placeholder="Filter folders" value={query}
+          disabled={busy || loading} onChange={(e) => setQuery(e.target.value)}
+          className="mt-2 min-h-11 w-full shrink-0 rounded-md border border-border bg-surface-raised px-3 text-sm text-content" />
 
-        <ul className="mt-2 grow overflow-y-auto rounded-md border border-border bg-surface-raised">
+        <ul aria-busy={loading} className="mt-2 min-h-0 grow overflow-y-auto rounded-md border border-border bg-surface-raised">
           {loading ? (
             <li className="px-3 py-2 text-xs text-content-muted">Loading…</li>
           ) : entries.length === 0 ? (
-            <li className="px-3 py-2 text-xs text-content-muted">No subfolders here.</li>
+            <li className="px-3 py-2 text-xs text-content-muted">{query ? 'No matching folders.' : 'No folders available.'}</li>
           ) : entries.map((e) => (
             <li key={e.path}>
-              <button type="button" onClick={() => load(e.path)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-content hover:bg-surface">
+              <button type="button" onClick={() => load(e.path)} disabled={busy}
+                className="flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-content hover:bg-surface disabled:opacity-40">
                 <Folder aria-hidden="true" className="h-3.5 w-3.5" />
                 <span className="min-w-0 truncate">{e.name}</span>
               </button>
@@ -158,14 +173,14 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
           </div>
         )}
 
-        <div className="mt-4 flex shrink-0 justify-end gap-2">
+        <div className="mt-4 grid shrink-0 grid-cols-2 gap-2">
           <button type="button" onClick={dismiss} disabled={busy}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-content hover:bg-surface-raised disabled:opacity-50">
+            className="min-h-11 rounded-md border border-border px-3 py-1.5 text-sm text-content hover:bg-surface-raised disabled:opacity-50">
             Cancel
           </button>
           <button type="button" disabled={busy || atRoot || loading} onClick={use}
-            className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
-            {busy ? 'Using…' : 'Use this folder'}
+            className="min-h-11 rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
+            {busy ? 'Using…' : 'Use Folder'}
           </button>
         </div>
       </div>

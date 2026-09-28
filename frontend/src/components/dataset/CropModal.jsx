@@ -161,11 +161,12 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
   const s = scale();
   return (
     <div role="dialog" aria-modal="true" aria-label="Crop image"
+      data-probe-chrome="crop-editor" data-probe-layer
       className="fixed inset-0 z-[9995] bg-black/85 flex flex-col p-3 sm:p-4">
       <div className="relative flex-1 min-h-0 w-full max-w-4xl mx-auto flex items-center justify-center overflow-hidden">
         <div className="relative inline-block max-h-full max-w-full">
           <img ref={imgRef} src={imageUrl} alt="to crop" onLoad={onImgLoad} draggable={false}
-            className="max-h-[70vh] max-w-full object-contain select-none block" />
+            className="max-h-[min(70dvh,calc(100dvh-10rem))] max-w-full object-contain select-none block" />
           {box && nat && (
             <div
               className="absolute border-2 border-indigo-400 cursor-move touch-none"
@@ -176,7 +177,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
               {HANDLES.map(([name]) => (
                 <span key={name}
                   onPointerDown={(e) => startDrag(e, name)}
-                  className={`absolute w-3.5 h-3.5 rounded-full bg-indigo-400 border-2 border-white/90 touch-none ${HANDLE_POS[name]}`} />
+                  className={`absolute w-11 h-11 touch-none after:pointer-events-none after:absolute after:left-1/2 after:top-1/2 after:h-3.5 after:w-3.5 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border-2 after:border-white/90 after:bg-indigo-400 ${HANDLE_POS[name]}`} />
               ))}
               <span className="absolute -top-6 left-0 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] tabular-nums pointer-events-none">
                 {Math.round(box.w)}×{Math.round(box.h)}
@@ -187,34 +188,33 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
       </div>
       <div className="shrink-0 w-full max-w-4xl mx-auto mt-3 flex flex-col gap-2">
         {!lockSquare && (
-          <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Crop aspect ratio">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1" role="group" aria-label="Crop aspect ratio">
             <span className="text-white/60 text-xs">Ratio</span>
             {ASPECTS.map(([label, value]) => (
               <button key={label} type="button" onClick={() => pickAspect(value)}
                 aria-pressed={aspect === value}
-                className={`px-2 py-0.5 rounded text-xs font-semibold ${aspect === value
+                className={`min-h-11 w-12 min-w-12 shrink-0 px-2 py-0.5 rounded text-xs font-semibold ${aspect === value
                   ? 'bg-indigo-500 text-gray-950'
-                  : 'bg-white/10 text-gray-950/70 hover:bg-white/20'}`}>
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'}`}>
                 {label}
               </button>
             ))}
-            <span className="text-white/40 text-[10px]">free = stretch the box any way you like</span>
           </div>
         )}
-        <div className="flex gap-2 justify-end">
+        <div className="ml-auto grid w-full max-w-sm grid-flow-col auto-cols-fr gap-2">
           {onReset && (
             <button type="button" onClick={onReset}
               title="Re-run the automatic head-crop on the original image"
-              className="mr-auto px-4 py-2 rounded-lg bg-surface text-content-muted text-sm">
+              className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content-muted text-sm">
               ↺ Reset to auto
             </button>
           )}
           <button type="button" ref={cancelRef} onClick={onCancel}
-            className="px-4 py-2 rounded-lg bg-surface text-content text-sm">Cancel</button>
+            className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-surface text-content text-sm">Cancel</button>
           <button type="button" disabled={!box}
             onClick={() => onConfirm({ x: Math.round(box.x), y: Math.round(box.y),
                                        w: Math.round(box.w), h: Math.round(box.h) })}
-            className="px-4 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+            className="min-h-11 min-w-0 px-2 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
             Crop
           </button>
         </div>

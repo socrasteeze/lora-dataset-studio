@@ -1,5 +1,6 @@
 import PluginSlot from './plugins/PluginSlot.jsx'
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useFocusTrap } from './hooks/useFocusTrap.js'
 import { HashRouter, Routes, Route, Navigate, Outlet, NavLink, useLocation } from 'react-router'
 import { Archive, ArrowUp, Dumbbell, FlaskConical, FolderOpen, Images, Loader2, Menu, Settings, X } from 'lucide-react'
 import { apiFetch, postJson } from './api/fetchClient'
@@ -263,6 +264,28 @@ function NavBar() {
   // panel. Tailwind's `hidden` cannot serve here — a CSS-hidden mount still
   // POLLS, and this is the only thing in the header that would.
   const desktopNav = useMediaQuery('(min-width: 768px)')
+  const headerRef = useRef(null)
+  useFocusTrap(headerRef, open && !desktopNav)
+  useEffect(() => { setOpen(false) }, [path, desktopNav])
+  useEffect(() => {
+    if (!open || desktopNav) return undefined
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    headerRef.current?.querySelector('#mobile-navigation a')?.focus()
+    const close = (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); setOpen(false) }
+    }
+    const outside = (event) => {
+      if (!headerRef.current?.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('keydown', close)
+    document.addEventListener('pointerdown', outside)
+    return () => {
+      document.body.style.overflow = overflow
+      document.removeEventListener('keydown', close)
+      document.removeEventListener('pointerdown', outside)
+    }
+  }, [open, desktopNav])
   const machineLoad = (
     <PluginSlot slot="resource_monitor.readout" surface="header" />
   )
@@ -337,7 +360,7 @@ function NavBar() {
     </>
   )
   return (
-    <header className="app-header border-b border-border bg-surface-overlay/90 backdrop-blur-sm sticky top-0 z-40">
+    <header ref={headerRef} className="app-header border-b border-border bg-surface-overlay/90 backdrop-blur-sm sticky top-0 z-40">
       <div className="app-header-shell mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:gap-6">
         <NavLink to="/datasets" title="Back to the datasets page" onClick={goHome}
           className="shrink-0 whitespace-nowrap bg-gradient-primary bg-clip-text text-base font-bold text-transparent no-underline">

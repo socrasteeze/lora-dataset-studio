@@ -13,16 +13,13 @@ test('the field opens the in-app folder browser, not the desktop explorer', () =
   assert.match(field, /<FolderBrowserModal/);
   assert.match(field, /> Browse</);
   assert.doesNotMatch(field, /Browse…/);
-  // Native pick-folder stays exported for other callers; the field itself
-  // must not post it or the Create-bank Browse button opens Explorer.
+  // Folder selection stays in the browser on every client.
   assert.doesNotMatch(field, /pickNativeFolder/);
   assert.match(picker, /\/api\/system\/list-folders/);
 });
 
-test('pickNativeFolder never throws on the expected no-desktop case', () => {
-  // A network/endpoint failure degrades to available:false so a remaining
-  // caller (dataset folder-import) can still fall back rather than error.
-  assert.match(picker, /catch\s*\{\s*return \{ available: false/);
+test('folder selection cannot dispatch a host desktop dialog', () => {
+  assert.doesNotMatch(picker, /pickNativeFolder|\/api\/system\/pick-folder/);
 });
 
 test('the path field stays editable (pasting a path still works)', () => {
@@ -33,7 +30,7 @@ test('the in-app browser lists folders only and never writes', () => {
   // "Use this folder" is disabled at the drive roots (must descend into a dir),
   // and while the pick it already sent is in flight (ModalRefusalKeepsInput).
   assert.match(picker, /disabled=\{busy \|\| atRoot \|\| loading\}/);
-  // Only the GET listing + the native POST are called — no mutating folder call.
+  // Listing never mutates the selected directory.
   assert.doesNotMatch(picker, /\/api\/system\/(create|delete|write)/);
 });
 
@@ -44,10 +41,10 @@ test('the Image bank uses the shared field for its folder input', () => {
   assert.doesNotMatch(bank, /<input id="bank-folder"/);
 });
 
-test('dataset folder-import is native-first with the browser fallback', () => {
+test('dataset folder-import opens the same drive browser as Bank', () => {
   assert.match(dsWorkspace,
-    /import \{ pickNativeFolder, FolderBrowserModal \} from '\.\.\/common\/FolderPicker'/);
-  assert.match(dsWorkspace, /await pickNativeFolder\(\)/);
+    /import \{ FolderBrowserModal \} from '\.\.\/common\/FolderPicker'/);
+  assert.doesNotMatch(dsWorkspace, /pickNativeFolder|\/api\/system\/pick-folder/);
   assert.match(dsWorkspace, /setFolderBrowseOpen\(true\)/);
   assert.match(dsWorkspace, /<FolderBrowserModal/);
   // the old blocking window.prompt path is gone

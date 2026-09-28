@@ -38,9 +38,9 @@ function gradientFor(name = '') {
  *  on an EMPTY library: returning users know the pipeline by heart. */
 function PipelineSteps() {
   const steps = [
-    { n: 1, icon: Camera, title: 'Reference photo', text: 'Upload one clear photo of the face.' },
-    { n: 2, icon: Sparkles, title: 'Generate & curate', text: 'Synthesize varied shots, keep the best ones.' },
-    { n: 3, icon: Dna, title: 'Train the LoRA', text: 'Export or train — reuse the character anywhere.' },
+    { n: 1, icon: Camera, title: 'Add Images', text: 'Import photos, use a Bank, or generate from a reference.' },
+    { n: 2, icon: Sparkles, title: 'Curate & Caption', text: 'Keep useful images and review their captions.' },
+    { n: 3, icon: Dna, title: 'Export or Train', text: 'Download a training ZIP or train on the host.' },
   ];
   return (
     <ol className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -79,8 +79,7 @@ function EmptyState() {
     <div className="mx-auto w-full max-w-4xl flex flex-col gap-3">
       <div className="rounded-xl border border-border bg-gradient-to-br from-surface to-app/60 p-3 flex flex-col gap-2.5">
         <p className="text-content-subtle text-xs">
-          Build a consistent character: one reference photo becomes a curated,
-          captioned training set for a LoRA you can use in every generator.
+          Build a Character, Concept or Style dataset from existing photos or generated images.
         </p>
         <PipelineSteps />
       </div>
@@ -93,8 +92,8 @@ function EmptyState() {
         </div>
         <p className="text-content-muted text-sm font-medium">No datasets yet</p>
         <p className="text-content-subtle text-xs max-w-xs">
-          Create your first character with <span className="font-semibold text-content-muted">+ New dataset</span> —
-          one reference photo is enough to start generating a full training set.
+          Choose <span className="font-semibold text-content-muted">New Dataset</span>,
+          then import images or generate from a reference.
         </p>
       </div>
     </div>

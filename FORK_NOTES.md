@@ -3664,3 +3664,12 @@ merge map.
 | 2026-07-19 | `59f0529`, `c91ae08` | **PLAN.md** — the phased integration plan for the whole local stack (ComfyUI + SwarmUI + ai-toolkit + TagGUI) with LDS as the hub. |
 | 2026-07-19 | `c56790d` + dist `6677553` | **Klein model-file pins** — Settings ▸ Image engine fields (`klein.unet` / `klein.text_encoder` / `klein.vae`) to name the exact loader files, incl. files outside `klein`-named folders and `extra_model_paths.yaml` roots; missing pins fall back to auto-detect with a visible "not found" badge. |
 | 2026-07-19 | `738f2ec` + dist `035056a`, notes `b115182` | **Local-only generation** — removed the Nano Banana (Gemini) and ChatGPT (`gpt-image-2`) API engines end to end; Klein (ComfyUI) is the sole engine. Legacy API-generated rows regenerate through Klein. Divergence details in the sections below. |
+
+## Mobile workflow contract
+
+Dataset folder imports use the shared in-app host-drive browser on every client.
+Do not restore a native-dialog-first import path during a merge. Phone uploads
+use a persistent per-file browser queue and transactional server receipts.
+Caption draft recovery is shared by Bank and Dataset. Import-first guidance
+covers all dataset kinds without requiring a character reference. See
+AGENTS.md and the mobile workflow section of docs/guide/using-the-app.md.

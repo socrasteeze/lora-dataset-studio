@@ -59,7 +59,8 @@ import {
   summarizeFlagged, rejectableFlagged, rejectFlaggedConfirmText, flaggedSourceNote,
 } from './watermarkFlagged.js';
 import { useToast } from '../common/Toast';
-import { pickNativeFolder, FolderBrowserModal } from '../common/FolderPicker';
+import { FolderBrowserModal } from '../common/FolderPicker';
+import ImportQueuePanel from './ImportQueuePanel';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import InstallRunner from '../setup/InstallRunner';
 import GuidedChecklist from './GuidedChecklist';
@@ -342,7 +343,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const [notReadyAck, setNotReadyAck] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importToBankOpen, setImportToBankOpen] = useState(false);
-  const [folderBrowseOpen, setFolderBrowseOpen] = useState(false);  // in-app folder browser (native-dialog fallback)
+  const [folderBrowseOpen, setFolderBrowseOpen] = useState(false);
   // Grid tag-filter (session-only): tags whose images are hidden (exclude) or the
   // ONLY tags allowed through (include). Both are normalized (trim+lowercase).
   const [excludeTags, setExcludeTags] = useState([]);
@@ -647,10 +648,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
   ));
   const rescueGridImages = filterSmallImageRescueGrid(images);
   const rescueReviewCount = unresolvedRescuePairs.length;
-  // CONCEPT datasets hide identity/face tools: reference, variation generator, face analysis, leak
-  // badge, composition and guided flow. The flow is raw import, curation, inverse captioning, then
-  // training. Style uses the same compact layout without face/reference tools, while retaining
-  // always-on semantics and mandatory content-only captions.
+  // Concept and Style hide character-only reference, generation and face tools.
+  // All kinds share import, curation, caption and completion guidance.
   const isConcept = d.kind === 'concept';
   const isStyle = d.kind === 'style';
   const isConceptual = isConcept || isStyle;
@@ -774,6 +773,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
     let tries = 0;
     const attempt = () => {
       const el = document.getElementById(step.targetId);
+      if (el) openCollapsedAncestors(el.parentElement);
       if (!el || el.getClientRects().length === 0) {
         if (tries++ < 20) requestAnimationFrame(attempt);
         return;
@@ -792,14 +792,14 @@ export default function DatasetWorkspace({ ds, onBack }) {
   const nextAction = () => {
     if (!nextStep) return;
     if (nextStep.id === 'caption') { ds.caption(effCaptionMode); return; }
-    if (nextStep.id === 'finish' && !caps.training_visible) { ds.exportZip(); return; }
+    if (nextStep.id === 'finish' && !caps.training_visible) { exportZipGuarded(); return; }
     if (nextStep.id === 'studio') { navigate(`/studio?dataset=${d.id}`); return; }
     jumpTo(nextStep);
   };
   const nextActionLabel = !nextStep ? '' : {
-    reference: 'Go to reference', generate: 'Go to generation', curate: 'Review the grid',
-    caption: 'Caption the kept ones',
-    finish: caps.training_visible ? 'Go to training' : `Export ZIP (${kept})`,
+    reference: 'Set Reference', generate: 'Add Images', curate: 'Review Images',
+    caption: 'Caption Images',
+    finish: caps.training_visible ? 'Open Training' : `Export ZIP (${kept})`,
     studio: 'Open Studio',
   }[nextStep.id];
   // Keep the inspected image in sync with poll refreshes (label/status updates).
@@ -872,18 +872,9 @@ export default function DatasetWorkspace({ ds, onBack }) {
     if (keptUncaptioned && !window.confirm(`${keptUncaptioned} kept image(s) without a caption (trigger only). Export anyway?`)) return;
     ds.exportZip();
   };
-  // The folder lives on the machine running the app, so a browser file-picker
-  // can't reach it. Try the server's native "choose a folder" dialog first;
-  // when the server has no desktop (LAN/tablet, headless Linux) fall back to the
-  // in-app folder browser.
-  const importFolderPrompt = async () => {
-    const r = await pickNativeFolder();
-    if (r.available) {
-      if (r.path) ds.importDatasetFolder(r.path);  // r.cancelled → user backed out
-    } else {
-      setFolderBrowseOpen(true);
-    }
-  };
+  // Use the same host-drive browser on desktop and mobile. A native dialog
+  // would open on the server, beyond the reach of a remote user.
+  const importFolderPrompt = () => setFolderBrowseOpen(true);
 
   // Amber "in progress" banner text. Captioning keeps its richer live count (derived
   // from the images themselves). Otherwise, when a server-side batch is running
@@ -1194,6 +1185,10 @@ export default function DatasetWorkspace({ ds, onBack }) {
               </ul>
             </nav>
           )}
+          <details className="lg:hidden">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm text-content-muted">Dataset Progress</summary>
+            <GuidedChecklist steps={steps} currentId={nextStep ? nextStep.id : null} onJump={jumpTo} />
+          </details>
           {/* Desktop: sticky rail + guided progress below it */}
           <div data-probe-panel="sections-rail" className="hidden lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-3">
             <nav aria-label="Dataset sections">
@@ -1218,9 +1213,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 })}
               </ul>
             </nav>
-            {!isConceptual && (
-              <GuidedChecklist steps={steps} currentId={nextStep ? nextStep.id : null} onJump={jumpTo} />
-            )}
+            <GuidedChecklist steps={steps} currentId={nextStep ? nextStep.id : null} onJump={jumpTo} />
           </div>
         </aside>
 
@@ -1229,12 +1222,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
            * GLOBAL banners remain visible in every section: a GPU pass or generation batch
            * concerns the whole screen.
            */}
-          {!isConceptual && (
-            <NextStepCard step={nextStep} trainMode={!!caps.training_visible} busy={ds.busy}
-              totalImages={images.length} onAction={nextAction} actionLabel={nextActionLabel} />
-          )}
+          <NextStepCard step={nextStep} trainMode={!!caps.training_visible} busy={ds.busy}
+            totalImages={images.length} onAction={nextAction} actionLabel={nextActionLabel} />
 
-          {ds.busy && (
+          <ImportQueuePanel queue={ds.importQueue} />
+          {ds.busy && !ds.importQueue?.running && (
             <div className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2">
               <span className="inline-block w-4 h-4 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin" aria-hidden />
               <span className="text-content text-sm">{activityBanner}</span>
@@ -1338,7 +1330,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   to see all {rescueGridImages.length} again.
                 </p>
               ) : (
-                <DatasetGrid images={gridImages} datasetId={d.id} onStatus={ds.setStatus} onCaption={ds.setCaption}
+                <DatasetGrid images={gridImages} datasetId={d.id} datasetInstanceId={d.instance_id} onStatus={ds.setStatus} onCaption={ds.setCaption}
                   onCrop={setCropImg} onDelete={ds.deleteImage}
                   onMirror={ds.mirrorImage} mirroringIds={ds.mirroringIds}
                   onScoreFace={ds.scoreFace} scoringFaceIds={ds.scoringFaceIds}
@@ -1362,23 +1354,20 @@ export default function DatasetWorkspace({ ds, onBack }) {
           </div>
 
           {/*
-           * Add images: populate the dataset. Concepts use scraped sources and raw import;
-           * characters start with a reference, then generation/import.
+           * Add images: all kinds share the import path. Character generation
+           * stays available in its own disclosure below the existing-image sources.
            */}
           <div className={sectionCls('add')}>
             {heading('add')}
-            {isConceptual ? (
-              // Concepts have no reference photo or generator. Populate them through manual upload
-              // or the scraper, now in its own Scrape section linked below.
-              <div id="gf-reference" className="scroll-mt-20 flex flex-col gap-2">
-                {scrapeLink}
-                <div id="ds-add-import" tabIndex={-1} className="scroll-mt-20">
-                  <ImportDropzone onImport={(f, o) => ds.importFiles(f, { policy: o?.policy })} busy={importBusy} visionBusy={visionImportBusy} />
-                </div>
-                {bankImport}
-              </div>
-            ) : (
-              <>
+            <div id="ds-add-import" tabIndex={-1} className="scroll-mt-20">
+              <ImportDropzone key={d.id} onImport={(f, o) => ds.importFiles(f, o)}
+                busy={importBusy} visionBusy={visionImportBusy} cropOption={!isConceptual} />
+            </div>
+            {bankImport}
+            {scrapeLink}
+            {!isConceptual && (
+              <details className="rounded-lg border border-border p-3" open={!!d.ref_filename}>
+                <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-content">Generate Images</summary>
                 <div id="gf-reference" className="scroll-mt-20">
                   <div id="ds-add-reference" tabIndex={-1} className="scroll-mt-20 flex flex-col gap-1">
                     <span className="text-content-subtle text-[0.6875rem]">
@@ -1435,21 +1424,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       onSaveSubjectType={(st) => ds.updateSettings({ subject_type: st }, { quiet: true })} />
                     </Suspense>
                   </div>
-                  {/* Head-crop optional: ON tags framing='face' at import (I2); OFF keeps
-                      the original framing so bust/body photos import as-is. Body-fidelity
-                      datasets default OFF (full frames are the point) — key remounts the
-                      dropzone so the default follows a fidelity switch. */}
-                  <div id="ds-add-import" tabIndex={-1} className="scroll-mt-20">
-                    <ImportDropzone key={`${d.id}-${bodyFid}`} onImport={(f, o) => ds.importFiles(f, o)}
-                      busy={importBusy} visionBusy={visionImportBusy} cropOption defaultCrop={!bodyFid} />
-                  </div>
-                  {/* Scraper moved to its own 🕸 Scrape destination — keep a discreet
-                      link here so the build flow still surfaces it without burying the
-                      reference/generate flow under a long accordion. */}
-                  {scrapeLink}
-                  {bankImport}
                 </div>
-              </>
+              </details>
             )}
           </div>
 
@@ -2514,7 +2490,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           showShort={Boolean(d.dual_captions)}
           imageUrl={`/api/dataset/${d.id}/img/${encodeURIComponent(labImage.filename)}`}
           imageLabel={labImage.filename}
-          labSurface={datasetLabSurface({ datasetId: d.id, imageId: labImage.id })}
+          labSurface={datasetLabSurface({ instanceId: d.instance_id, datasetId: d.id, imageId: labImage.id, filename: labImage.filename })}
           captionOrigin={labImage.caption_origin} shortCaptionOrigin={labImage.caption_short_origin}
           onPickAnotherImage={() => { setLabImage(null); setLabPickerOpen(true); }}
           onClose={() => setLabImage(null)}

@@ -2635,6 +2635,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                not apply here. */
             captionPlaceholder="Caption — a plain description, used for search…"
             labSurface={bankLabSurface({
+              bankInstanceId: payload?.instance_id, imageInstanceId: labImage.instance_id,
               bankId, imageId: labImage.id, onApplyRunConfig: applyLabConfig })}
             captionOrigin={labImage.caption_origin}
             onPickAnotherImage={() => { setLabImage(null); setLabPickerOpen(true) }}

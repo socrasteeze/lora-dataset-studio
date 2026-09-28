@@ -84,6 +84,42 @@ import { registeredDescriptors } from './plugins/registry.js';
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-27-mobile-touch-controls', date: '2026-09-27',
+    title: 'Use Touch Controls',
+    blurb: 'Crop handles and grid controls have larger touch areas. The mobile menu supports Escape and focus recovery. Settings can reveal newly typed secrets and explain manual copying when clipboard access is unavailable.',
+    to: '/datasets?section=images',
+  },
+  {
+    id: '2026-09-27-mobile-import-recovery', date: '2026-09-27',
+    title: 'Recover Photo Imports',
+    blurb: 'Pending originals stay in this browser until each file finishes. Reload and choose Resume after an interruption. Server receipts prevent repeated requests from importing the same upload twice. Pause or cancel from the progress panel.',
+    to: '/datasets?section=add&panel=import',
+  },
+  {
+    id: '2026-09-27-mobile-image-formats', date: '2026-09-27',
+    title: 'Check Phone Formats',
+    blurb: 'Photo imports identify unsupported files before upload. HEIC and HEIF files need JPEG or PNG copies first. Supported photos in the same selection can continue.',
+    to: '/datasets?section=add&panel=import',
+  },
+  {
+    id: '2026-09-27-mobile-folder-browser', date: '2026-09-27',
+    title: 'Browse Host Drives',
+    blurb: 'Dataset folder imports now use an in-app browser. Choose a drive visible to the LDS host, filter folders or paste a path without opening a desktop dialog.',
+    to: '/datasets?section=export&panel=import',
+  },
+  {
+    id: '2026-09-27-mobile-dataset-guidance', date: '2026-09-27',
+    title: 'Follow Dataset Progress',
+    blurb: 'All three dataset kinds have a next-step guide and mobile progress view. Imported photos need no generation reference. Imports come first in Add Images, with generation in its own disclosure. Head cropping is now opt-in.',
+    to: '/datasets',
+  },
+  {
+    id: '2026-09-27-mobile-caption-drafts', date: '2026-09-27',
+    title: 'Keep Caption Drafts',
+    blurb: 'The expanded Bank and Dataset editor recovers local drafts after reload. Closing an edited caption offers Save, Discard or Keep Editing. If the saved caption changed, review it before restoring the old draft.',
+    to: '/datasets?section=captions',
+  },
+  {
     id: '2026-09-23-zzzzzzzz-plugin-engine-settings-save',
     date: '2026-09-23',
     title: 'Save your enabled image engines from plugin settings',

@@ -95,7 +95,7 @@ const WATERMARK_BADGE = {
  * files still refuses, and `busyReason` is the sentence it shows instead of
  * going quietly grey.
  */
-export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, onCrop, onDelete,
+export default function DatasetGridItem({ img, datasetId, datasetInstanceId = null, onStatus, onCaption, onCrop, onDelete,
                                           onMirror, mirrorBusy = false, busy = false,
                                           /* The buttons below that START a queued job read these instead of
                                              `busy`: they add a row to a queue that is already serialized, so a
@@ -217,7 +217,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
         {selected && <SelectionMark />}
         {onToggleSelect && img.filename && (
           <label
-            className="dataset-grid-item__actions absolute bottom-1 left-1 z-10 flex items-center justify-center w-6 h-6 rounded bg-black/60 cursor-pointer"
+            className="dataset-grid-item__actions dataset-grid-item__select absolute bottom-1 left-1 z-10 flex items-center justify-center w-6 h-6 rounded bg-black/60 cursor-pointer"
             title="Select for bulk actions"
             onClick={(e) => e.stopPropagation()}>
             {/* NOT gated on `busy`: ticking changes nothing on the server, and
@@ -423,7 +423,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
       )}
       {img.status === 'keep' && (
         <div className="m-1.5 mt-0 flex flex-col gap-1">
-          <div className="dataset-grid-item__actions flex items-center justify-end gap-1">
+          <div className="dataset-grid-item__actions grid grid-flow-col auto-cols-fr gap-1">
             <button type="button" onClick={() => setCaptionEditorOpen(true)}
               disabled={curationRefused}
               title={curationRefusedReason || 'Open a larger caption editor'}
@@ -479,7 +479,7 @@ export default function DatasetGridItem({ img, datasetId, onStatus, onCaption, o
       )}
       {captionEditorOpen && (
         <CaptionEditorDialog initialCaption={cap} imageUrl={url}
-          labSurface={datasetLabSurface({ datasetId, imageId: img.id })}
+          labSurface={datasetLabSurface({ instanceId: datasetInstanceId, datasetId, imageId: img.id, filename: img.filename })}
           initialShortCaption={img.caption_short || ''} showShort={dualCaptions}
           captionOrigin={img.caption_origin} shortCaptionOrigin={img.caption_short_origin}
           imageLabel={displayLabel(img.variation_label)}

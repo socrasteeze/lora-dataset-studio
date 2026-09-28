@@ -85,8 +85,13 @@ for (const [who, src] of [
   });
 
   test(`${who} cannot be dismissed out from under a request in flight`, () => {
-    assert.match(code(src), /const dismiss = \(\) => \{ if \(!busy\) /,
-      `${who} must funnel every way out through one busy-guarded dismiss()`);
+    if (who === 'CaptionEditorDialog') {
+      assert.match(code(src), /const requestExit = \(exit\) => \{\s*if \(busy\) return;/);
+      assert.match(code(src), /const dismiss = \(\) => requestExit\(onClose\)/);
+    } else {
+      assert.match(code(src), /const dismiss = \(\) => \{ if \(!busy\) /,
+        `${who} must funnel every way out through one busy-guarded dismiss()`);
+    }
     // …and busy is ALWAYS released, so a refused submit never leaves the modal
     // frozen with a disabled button and no way out.
     assert.match(code(src), /finally \{ setBusy\(false\) \}|finally \{\s*setBusy\(false\);?\s*\}/s,
@@ -103,7 +108,7 @@ test('Escape and the backdrop still close a modal that is NOT posting', () => {
     ['LaunchAllDialog', launchDialog],
     ['FolderBrowserModal', folderPicker],
   ]) {
-    assert.match(code(src), /'Escape'[\s\S]{0,80}dismiss\(\)/,
+    assert.match(code(src), /'Escape'[\s\S]{0,80}(?:dismiss\(\)|dismissRef.current\(\))/,
       `${who} must still close on Escape (through dismiss)`);
     assert.match(code(src), /currentTarget\) dismiss\(\)/,
       `${who} must still close on a backdrop click (through dismiss)`);
@@ -112,7 +117,7 @@ test('Escape and the backdrop still close a modal that is NOT posting', () => {
 
 test('the caption editor posts with the dialog open — the worst case of all', () => {
   const body = slice(captionDialog, 'const save = async ()', 'return createPortal');
-  assertPostsBeforeClosing(body, 'onClose()', 'CaptionEditorDialog');
+  assertPostsBeforeClosing(body, '(pendingExit || onClose)()', 'CaptionEditorDialog');
   // The tile is the host that actually calls the API, and it must AWAIT it:
   // an unawaited handler can never know it was refused.
   assert.match(code(gridItem), /onSave=\{async \(nextCaption, nextShort\) => \{[\s\S]{0,600}await onCaption\(/,

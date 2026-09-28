@@ -1,13 +1,25 @@
 import json
+import uuid
 from datetime import timedelta
 from .utils.timestamps import naive_utcnow
 from .extensions import db
 from sqlalchemy import Integer, String, Text, DateTime, Float
 
+
+class DatasetImportReceipt(db.Model):
+    """One browser upload's durable answer, retained after image deletion."""
+    __tablename__ = 'dataset_import_receipt'
+    dataset_id = db.Column(Integer, db.ForeignKey('face_dataset.id', ondelete='CASCADE'), primary_key=True)
+    key = db.Column(String(80), primary_key=True)
+    fingerprint = db.Column(String(64), nullable=False)
+    result = db.Column(Text, nullable=False)
+
 class FaceDataset(db.Model):
     """A named face-dataset for LoRA character training (one per character)."""
     __tablename__ = 'face_dataset'
     id = db.Column(Integer, primary_key=True)
+    instance_id = db.Column(String(32), nullable=False, unique=True,
+                            default=lambda: uuid.uuid4().hex)
     user_id = db.Column(String(36), nullable=False, index=True, default='local')
     name = db.Column(String(100), nullable=False)
     trigger_word = db.Column(String(60), nullable=False)
@@ -293,6 +305,8 @@ class ImageBank(db.Model):
     table — created by db.create_all(), no migration needed."""
     __tablename__ = 'image_bank'
     id = db.Column(Integer, primary_key=True)
+    instance_id = db.Column(String(32), nullable=False, unique=True,
+                            default=lambda: uuid.uuid4().hex)
     user_id = db.Column(String(36), nullable=False, index=True, default='local')
     name = db.Column(String(100), nullable=False)
     source_path = db.Column(Text, nullable=False)     # absolute folder, read-only
@@ -346,6 +360,8 @@ class BankImage(db.Model):
     duplicate grouping needs an O(1) read, not an O(n) disk walk."""
     __tablename__ = 'bank_image'
     id = db.Column(Integer, primary_key=True)
+    instance_id = db.Column(String(32), nullable=False, unique=True,
+                            default=lambda: uuid.uuid4().hex)
     bank_id = db.Column(
         Integer, db.ForeignKey('image_bank.id', ondelete='CASCADE'),
         nullable=False, index=True)

@@ -4728,3 +4728,46 @@ otherwise be read as a vote for the checkpoint that did not produce it.
   flexibility.
 - The next chapter — **Building a good dataset** — explains *why* behind every
   rule above. Read it once before your first serious run.
+
+## Mobile dataset workflow
+
+LDS runs on a host computer. Install its required tools and configure network
+access before connecting a phone. Settings > Server & access provides connection
+addresses and a QR code. A phone controls the host; it does not run the trainer.
+
+1. Create a Character, Concept or Style dataset.
+2. Open Add Images. Import phone photos, use a Bank selection, or open Generate
+   Images for reference-based character generation. A reference is optional for
+   an imported dataset. Automatic head cropping is off until you enable it.
+3. For existing host files, use Import & export > Import from folder. The in-app
+   browser lists drives visible to the host account. Drives returns to that list;
+   Up goes to the parent. Enter a path and choose Go to open it directly. Filter
+   folders narrows the current listing. Use Folder selects the displayed location.
+   Network drives are available only if that account can access them. A phone
+   cannot browse its own filesystem through this host-folder control.
+4. Phone uploads save pending originals in this browser's local storage database
+   before sending them. Keep LDS open while uploading. Progress is checkpointed
+   after each file. After a reload, choose Resume; an interrupted file is sent
+   again, while server receipts prevent duplicate imports. Pause After File waits
+   for the current request. Cancel Remaining removes pending browser copies and
+   does not remove images already imported. Recovery is local to this browser
+   and origin. Clearing browser data removes pending uploads.
+5. Use JPEG, PNG, WebP or BMP. HEIC/HEIF files are identified before upload; export
+   JPEG or PNG copies first. LDS does not convert HEIC/HEIF. Unsupported files are
+   listed while supported files can continue. If browser storage cannot hold the
+   selection, choose a smaller selection or import from a host folder.
+6. Curate with large tiles or the lightbox, then review captions. Dataset Progress
+   is available on phones for all three dataset kinds. Imported datasets can
+   proceed through curation, captions and export without generating new images.
+7. The expanded caption editor stores local drafts for Bank and Dataset images.
+   Save applies a caption to LDS. Closing a changed draft offers Save & Leave,
+   Discard Changes or Keep Editing. Reopening the same image restores its draft.
+   If the server caption changed, review the saved text before choosing Restore
+   Draft or Discard Draft. Recovery needs browser storage and is not a backup.
+8. Export the training ZIP or launch configured host-side training. Download
+   behavior depends on the phone browser. Open Folder actions elsewhere in LDS
+   refer to the host desktop, not the phone's file manager.
+
+The mobile navigation menu closes on navigation and Escape. Newly typed secret
+fields have Show/Hide controls; stored secrets remain write-only. When the
+browser refuses clipboard access, LDS explains how to select and copy manually.

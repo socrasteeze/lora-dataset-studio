@@ -256,7 +256,7 @@ function GridPager({ view, onGo, where }) {
   );
 }
 
-export default function DatasetGrid({ images, datasetId, onStatus, onCaption, onCrop, onDelete,
+export default function DatasetGrid({ images, datasetId, datasetInstanceId = null, onStatus, onCaption, onCrop, onDelete,
                                       onMirror, onRegenerate, onScoreFace, scoringFaceIds, onReimprove, onView, onBatch, busy,
                                       /* Queue-lane gates (GitHub #44). `busy` is every pass and still guards
                                          every WRITE; these two are only what refuses a NEW queued job, and there
@@ -601,7 +601,7 @@ export default function DatasetGrid({ images, datasetId, onStatus, onCaption, on
       <GridPager view={view} onGo={goToPage} where="top" />
       <div className={`grid ${TILE_SIZE_COLS[tileSize]} gap-2`}>
         {view.items.map((img) => (
-          <DatasetGridItem key={img.id} img={img} datasetId={datasetId} onStatus={onStatus} onCaption={onCaption}
+          <DatasetGridItem key={img.id} img={img} datasetId={datasetId} datasetInstanceId={datasetInstanceId} onStatus={onStatus} onCaption={onCaption}
             improvementState={improvementStates.get(img.id)}
             onCrop={onCrop} onDelete={onDelete} onMirror={onMirror}
             mirrorBusy={Boolean(mirroringIds?.has(img.id))} busy={bulkBusy}

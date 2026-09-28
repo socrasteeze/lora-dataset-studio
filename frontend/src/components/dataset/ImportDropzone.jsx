@@ -17,9 +17,8 @@ import {
   importPolicyLine,
   preservesOriginalFiles,
 } from './importPolicy.js';
-import { importBatchLimits } from './importBatches.js';
 
-export default function ImportDropzone({ onImport, busy, visionBusy = false, cropOption = false, defaultCrop = true }) {
+export default function ImportDropzone({ onImport, busy, visionBusy = false, cropOption = false, defaultCrop = false }) {
   const { caps } = useCapabilities();
   const inputRef = useRef(null);
   const [over, setOver] = useState(false);
@@ -28,11 +27,10 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
   const inputLimit = importInputLimitLine(importPolicy);
   // Auto head-crop (square, vision pass). OFF keeps the original file and
   // framing — a bust/body photo stays a bust/body photo (aspect kept, no padding).
-  // Body-fidelity datasets pass defaultCrop=false: full frames are the point.
+  // Head cropping is opt-in. Importing photos should preserve their framing.
   const [crop, setCrop] = useState(defaultCrop);
   const autoCropEnabled = cropOption && crop && !visionBusy;
 
-  const { maxFiles } = importBatchLimits(importPolicy);
 
   const handle = (files) => {
     if (busy) return; // drop events bypass pointer-events-none — guard here too (I2)
@@ -67,7 +65,8 @@ export default function ImportDropzone({ onImport, busy, visionBusy = false, cro
           <span>WebP normalization resizes and re-encodes eligible imports.</span>
         )}
         <span>Files larger than {inputLimit} are rejected — resize before importing, or raise the budget.</span>
-        <span>A big drop is sent in batches of {maxFiles} files.</span>
+        <span>Photos upload one at a time with recovery after each file.</span>
+        <span>For HEIC or HEIF photos, export JPEG or PNG copies first.</span>
         <SettingsLink section="captioning" focus="dataset-import-encoding">Change storage mode</SettingsLink>
         <SettingsLink section="captioning" focus="image-input-max-pixels">Change size budget</SettingsLink>
       </span>

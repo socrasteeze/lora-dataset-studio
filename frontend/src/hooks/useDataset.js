@@ -20,7 +20,7 @@ import { refreshDatasetIfActive } from '../utils/datasetRefresh';
 import { retryRequestForReferenceEdit } from '../components/dataset/referenceEdit.js';
 import { classifyResultMessage } from '../components/dataset/classifyFramingGate.js';
 import { captionResultSuffix, captionSkippedSuffix } from '../utils/captionEngines.js';
-import { importBatchProgress, oversizedFilesMessage, planImportBatches } from '../components/dataset/importBatches.js';
+import { useImportQueue } from './useImportQueue.js';
 
 function post(url, body, isForm) {
   // Routes through the shared fetchWithCsrfRetry: a token that aged out mid-session
@@ -506,44 +506,13 @@ export function useDataset() {
     await refresh();
   }), [wrap, currentId, refresh, toast]);
 
-  // A drop goes up in BATCHES the server will take — 20 files or ~64 MiB per
-  // request, whichever closes first (`policy` = the `dataset_import` capability
-  // the dropzone passes along; the figures come from the server). One request
-  // for the whole drop met a bare 413 "upload too large" from five to eight
-  // high-resolution body shots, and nothing said why (_nofaceman, Discord).
-  // Sequential, with a progress toast per batch like scrapeImport; the totals
-  // are summed so the closing toasts read as one import. A file no batch can
-  // carry is named up front rather than sinking the batch it would sit in.
-  const importFiles = useCallback((files, { crop = true, policy = null } = {}) => wrap(async () => {
-    const { batches, oversized, limits } = planImportBatches(files, policy);
-    if (oversized.length) toast.warning(oversizedFilesMessage(oversized, limits));
-    if (!batches.length) return;
-    const total = batches.reduce((n, b) => n + b.length, 0);
-    let imported = 0, failed = 0, dup = 0, small = 0, sent = 0;
-    for (const batch of batches) {
-      if (batches.length > 1) toast.info(importBatchProgress(sent, batch.length, total));
-      const fd = new FormData(); batch.forEach((f) => fd.append('files', f));
-      if (!crop) fd.append('crop', '0');   // keep the original framing (no square head-crop)
-      const d = await postJson(`/api/dataset/${currentId}/import`, fd, true);
-      if (!d.ok) {
-        toast.error(d.error || 'Unexpected error');
-        if (imported) { toast.warning(`${imported} imported before the failure.`); await refresh(); }
-        return;
-      }
-      sent += batch.length;
-      imported += d.imported || 0;
-      failed += d.failed || 0;
-      dup += d.duplicates || 0;
-      small += d.small || 0;
-    }
-    toast.success(`${imported} imported${dup ? ` · ${dup} duplicate(s) skipped` : ''}`);
-    // No numbers here on purpose: the input budget is a setting now, and a
-    // copy of it in a toast is exactly how a hint goes stale.
-    if (failed) toast.warning(`${failed} image${failed === 1 ? '' : 's'} not imported — use JPEG, PNG, WebP or BMP within the image size budget (Settings ▸ Captioning & quality ▸ Image size budget); resize a larger file, or raise the budget.`);
-    if (dup && !imported && !failed) toast.warning('All files were already in the dataset (perceptual duplicates).');
-    if (small) toast.warning(`${small} image(s) are under 768 px — training only downscales, they will stay soft.`);
-    await refresh();
-  }), [wrap, currentId, refresh, toast]);
+  // Persist pending originals locally and checkpoint each accepted file.
+  // Server receipts make retries safe after a lost response or page reload.
+  const importQueue = useImportQueue(currentId, {
+    instanceId: String(data?.id) === String(currentId) ? data?.instance_id : null,
+    refresh, toast,
+  });
+  const importFiles = importQueue.start;
 
   // Concept only: download SELECTED scanned images ({url,title}[]) directly into
   // the dataset through /scrape-import. Each synchronous request is limited to
@@ -1788,7 +1757,7 @@ export function useDataset() {
     || actKind === 'watermark_detect' || actKind === 'watermark_clean';
   const textScanningLive = localActivityRuns.has(`text:${currentId}`)
     || actKind === 'text_detect';
-  const busyLive = busy || !!activity;
+  const busyLive = busy || importQueue.running || !!activity;
   // GitHub #44 — `busyLive` is the CONSERVATIVE union and stays the gate for
   // everything that owns the dataset's rows. Starting a job that merely becomes
   // a row in the serialized image queue asks a narrower question, because the
@@ -1816,7 +1785,7 @@ export function useDataset() {
   ));
 
 
-  return { datasets, currentId, data, busy: busyLive, localBusy: busy,
+  return { datasets, currentId, data, busy: busyLive, localBusy: busy || importQueue.running, importQueue,
            generationBusy, improveBusy, curationBusy, captioning: captioningLive,
            lastCaptionRun,
            analyzing: analyzingLive, watermarking: watermarkingLive,

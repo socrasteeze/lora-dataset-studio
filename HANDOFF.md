@@ -1,52 +1,64 @@
 # HANDOFF
 
-**Updated:** 2026-09-20 · **Branch:** `main` · **Qualified code:** `aa173b437` · **Tree:** clean
+**Updated:** 2026-09-28 | **Branch:** `noble/mobile-dataset-workflow` | **Base:** `d9436f78c`
 
 ## State
-The V2 source migration is qualified on main. Live data, running services and external media have not been switched or modified.
+Mobile workflow fixes are implemented and verified on isolated browser fixtures.
+Local commits are authorized. The compiled frontend is kept in an isolated checkout;
+live activation still awaits the user's answer.
 
 ## Done this session
-- Source integration and fork fixes: `f32e6acb1`; separate source-built frontend: `aa173b437`.
-- Latest full driver gate: 9,977 host/tooling tests passed, 24 skipped, 106 subtests passed; 182 isolated bundled Python tests passed. Frontend: 6,152 passed, four skips on Node 24.
-- Both linters pass; frontend retains 40 warnings. The 46-second Quick gate now stops before expensive runs on failure; All runs one full qualification, not a duplicate baseline/gate pair.
-- Ten curated plugins boot in the extracted release ZIP without environment profile overrides; held/excluded packages are absent.
-- Eight rendered routes and the Bank Python picker passed desktop/mobile checks; the picker covered five widths with stubbed calculation results.
-- A synthetic legacy database survived two V2 starts with IDs, captions, decisions, tags and paths intact; an independent old-state rollback copy booted under old code.
+- In-app host-drive browsing replaces native-first Dataset imports; shared Bank picker improved.
+- Durable per-file import queue and atomic server receipts; UUIDs reject stale recovery after ID reuse.
+- Shared caption drafts, guarded exits, touch controls and guidance for all dataset kinds.
+- AGENTS.md is canonical; CLAUDE.md points to it. Guide/help/news/fork notes updated.
+- Frontend 6,282 passed / 4 skipped; 15/15 responsive dialog states; 10/10 IndexedDB scenarios.
+- Staged build and compiled mobile workflow passed. Detailed evidence: docs/MOBILE_WORKFLOW.md.
 
 ## Open
-1. Before live cutover, inventory and protect external media, drain work, stop writers and take a fresh complete state snapshot.
-2. Rehearse migration and rollback on an isolated copy of the actual installation, with writable paths/endpoints remapped and dispatch blocked.
-3. Verify local generation/training and owned-machine routing on the intended machines before accepting live cutover.
-4. Docker recipes and staging tests pass, but no Docker image was built locally because the CLI is unavailable.
+1. Resolve the pending activation choice. Live LDS is running; do not silently swap its bundle or restart it.
+2. If activation is approved, verify idle state, protect the live database, install the staged bundle, restart and verify served behavior.
+3. Release qualification remains red: 35 host/backend failures and three bundled-video failures reproduce on pristine baseline. Do not claim a green gate.
+4. The 24 additional full-run failures were old table-count assertions. They now name the new receipt table; the affected 55 tests pass.
+5. Commit source on the task branch and the generated frontend as a separate child commit in the isolated build checkout. No push is authorized.
+6. Earlier V2 cutover, physical-machine training and Docker gates remain outside this verification scope.
+7. origin/main advanced by 13 commits after the reviewed base. Reconcile that work before future publication; this local commit request does not include remote integration.
 
 ## Decisions
-- `fork-plugins.json` is authoritative: ten enabled sources, Civitai publisher held, API engines and rental training excluded.
-- Normal frontend build selects the fork profile; backend reads its build marker. Store archives cannot replace fork-owned sources.
-- Core repair recipes remain fallback primitives; discovered disabled owners block resolution, preflight and enqueue.
-- Core Help wording and historical news remain canonical; duplicate source-plugin guide sections cannot overwrite fork docs.
-- Mixed local tests were retained. A deleted-plugin marker is not evidence that a whole test file is obsolete.
-- The temporary Git replacement was removed; its object remains under local `refs/migration/v2-content-base`. Published commits keep real ancestry.
+- Browser folder selection on every client; only drives visible to the host account are available.
+- File-level upload recovery, not byte-range resume. Pending originals stay in this browser and origin until sent or cancelled.
+- Dataset/Bank/image identity guards prevent stale queues or drafts attaching to reused numeric IDs.
+- HEIC/HEIF gets preflight conversion guidance; no new decoder dependency.
+- Existing generation remains available in a disclosure; imported datasets need no reference image.
+- Related buttons stay in equal-width rows where they fit; 30 rows passed checks at five viewports.
+- A running production process caused the bundle to be staged instead of replacing dist during verification.
 
 ## Traps
-- `create_app()` changes schema and state. Never use production data for an import or smoke test.
-- Use `npm test`; bare Node discovery omits the SDK loader and bundled suite.
-- Core `app.services.cloud_training` is local training; deleted `lds_cloud_training` is the rental product.
-- Test direct app factories must isolate plugin and extension directories as well as database/configuration paths.
-- Use distinct short pytest basetemps; keep live services and model downloads outside test runs.
-- Upstream is read-only. Do not use its fork-refusing migration helper or carry its generated frontend.
+- Do not touch the pre-existing untracked upscale-tests.md.
+- create_app changes schema; isolate data/config/env/plugin/extension paths before importing it in tests.
+- postForm already returns parsed JSON. Do not call response.json() on its result.
+- The responsive probe needs --dataset-id for a populated fixture; empty-first priming silently skips image dialogs.
+- Bank and Dataset draft keys must include durable identities; numeric IDs can be reused after deletion.
+- Bundled video tests need backend on PYTHONPATH; their three remaining failures are independently reproduced baseline failures.
 
 ## Verify
-Use Node 24 and the pinned `.venv`. The driver isolates data/configuration, uses
-unique short scratch directories, restores environment overrides and cleans up.
 ```powershell
-# Before an upstream merge, on the untouched tree:
-pwsh -File scripts/upstream_sync.ps1 -Phase Baseline
-# During repair (not release qualification):
-pwsh -File scripts/upstream_sync.ps1 -Phase Quick
-# Freeze edits, then qualify once before landing:
-pwsh -File scripts/upstream_sync.ps1 -Phase Gates
-& 'C:/Program Files/Git/bin/bash.exe' scripts/scan-sensitive.sh
+# Full frontend suite, including bundled contracts:
+Push-Location frontend
+npm test
+npm run lint
+Pop-Location
+# Complete host/tooling suite with isolated test state:
+.venv/Scripts/python.exe -X utf8 -m pytest backend/tests scripts/tests -q -rf -n 8 --dist loadfile
+# Driver also executes isolated bundled Python tests. Baseline avoids replacing a live bundle:
+pwsh -File scripts/upstream_sync.ps1 -Phase Baseline -KeepScratch
+# Build into an isolated output directory while the live checkout serves dist:
+Push-Location frontend
+npm run build -- --outDir <staged-output-directory>
+npm run probe:responsive -- --url <isolated-test-url>/#/datasets --dataset-id <fixture-id> --states folder-browser,caption-editor,crop-editor --json
+Pop-Location
 ```
-The full host/tooling run measured 390 seconds. Small timing receipts remain under
-the checkout's Git metadata; they are not cached qualification. Details and the
-remaining profiling opportunity are in `docs/UPSTREAM_SYNC.md`.
+Full-run and baseline-comparison logs are in ignored data/mobile-*. The staged
+bundle and browser harnesses are attached to this chat's local artifact directory.
+The baseline managed worktree is archived. Isolated validation servers are stopped;
+the existing live LDS process was left running.
