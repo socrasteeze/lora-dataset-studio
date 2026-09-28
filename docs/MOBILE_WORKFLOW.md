@@ -1,8 +1,8 @@
 # Mobile dataset workflow implementation
 
-Scope: the mobile audit fixes and shared repository guidance. Work is on
-`noble/mobile-dataset-build`, integrating `422b8085e` with the mobile commits. No live dataset or GPU
-workload was used as a fixture. The live application has not been restarted.
+Scope: the mobile audit fixes and shared repository guidance. Source merge
+`430cf48e1` and frontend build `efe277cc7` are published on `origin/main` and
+active in the live application. No live dataset or GPU workload was used as a fixture.
 
 ## Implemented
 
@@ -57,10 +57,11 @@ workload was used as a fixture. The live application has not been restarted.
 
 ## Activation
 
-The user authorized a clean push to origin/main and an idle-checked restart.
-The integrated source and rebuilt frontend passed the full gate in an isolated
-checkout. Publication and live activation are the remaining delivery steps.
-Protect the live database/configuration and recheck active work before restarting.
+The clean push to origin/main and idle-checked restart completed on 2026-09-28.
+The live database, configuration and previous frontend were backed up before
+activation. The new process passed health checks and served the checked-out build.
+Database integrity passed, Dataset and Bank row counts stayed unchanged, and
+all recovery identities were populated and unique. The isolated test server was stopped.
 
 ## Preserved work
 
