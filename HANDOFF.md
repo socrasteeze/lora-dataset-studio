@@ -1,10 +1,10 @@
 # HANDOFF
 
-**Updated:** 2026-09-28 | **Branch:** `noble/mobile-dataset-build` | **Integration base:** `422b8085e`
+**Updated:** 2026-09-28 | **Branch:** `main` | **Deployed build:** `efe277cc7`
 
 ## State
-Mobile workflow and origin/main are integrated; the full delivery gate passed.
-Clean push and an idle-checked restart are authorized and ready to execute.
+Mobile workflow and origin/main are integrated, published and running.
+The full delivery gate passed. The idle-checked restart and data checks passed.
 
 ## Done this session
 - Mobile source: e9a242de1; isolated frontend bundle: c6ef14f5f.
@@ -12,13 +12,13 @@ Clean push and an idle-checked restart are authorized and ready to execute.
 - Related actions use equal-width rows; 30 rows passed at five viewport sizes.
 - Preserved incoming Camera Studio, video picker, Python picker and release-contract fixes.
 - Full gate: 10,343 backend/tooling passes, 106 subtests, 244 plugin Python passes and 6,283 frontend passes.
+- Published source merge 430cf48e1 and separate frontend build efe277cc7 to origin/main.
+- Final responsive probe: 15 measured states, zero findings and zero skipped states.
+- Backed up the live database, configuration and previous frontend before activation.
+- Restart confirmed a new healthy process serving the checked-out build; database integrity, unchanged row counts and recovery identities passed.
 
 ## Open
-1. Commit the qualified source merge and the separately rebuilt frontend.
-2. Recheck origin/main and both clean passes, then publish without force.
-3. Verify idle state, protect the live database/configuration, update the primary checkout and restart.
-4. Verify remote parity, served frontend and backend recovery identities after restart.
-5. Physical-phone, real-model training and Docker runtime qualification remain separate.
+1. Physical-phone, real-model training and Docker runtime qualification remain separate.
 
 ## Decisions
 - Browser folder selection works against drives visible to the host account.
