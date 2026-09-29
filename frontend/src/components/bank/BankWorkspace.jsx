@@ -42,6 +42,7 @@ import CoveragePanel from './BankCoveragePanel.jsx'
 // The two structural halves of the redesign: all of triage beside the grid, and
 // the eight passes behind one button instead of across the top of the screen.
 import BankFilterRail from './BankFilterRail.jsx'
+import StyleGroupsBrowser from './StyleGroupsBrowser.jsx'
 import BankPassesPanel from './BankPassesPanel.jsx'
 import {
   FLAG_HINT, FLAG_LABEL, FRAMING_BUCKETS, ORIGIN_BUCKETS, QUALITY_REJECT_FLAGS,
@@ -297,6 +298,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
      people who had just paid for the measurements. Still collapsible — the
      fold exists for the 400 px drawer, not as the resting state. */
   const [moreOpen, setMoreOpen] = useState(true)
+  const [styleBrowserOpen, setStyleBrowserOpen] = useState(false)
+  const closeStyleBrowser = useCallback(() => setStyleBrowserOpen(false), [])
   const [passesOpen, setPassesOpen] = useState(false)
   useEffect(() => {
     const onResize = () => setRailIsColumnNow(railIsColumn(window.innerWidth))
@@ -1944,8 +1947,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               sortGroups={sortGroups} setSort={setSort}
               tileSize={tileSize} setTileSize={setTileSize}
               moreOpen={moreOpen} setMoreOpen={setMoreOpen}
-              isDrawer={!railIsColumnNow} onClose={closeRail} />
+              isDrawer={!railIsColumnNow} onClose={closeRail}
+              onBrowseStyles={() => setStyleBrowserOpen(true)} />
           </div>
+        )}
+        {styleBrowserOpen && (
+          <StyleGroupsBrowser bankId={bankId} activeStyle={filter.style}
+            onPick={(id) => {
+              setF({ style: id, flag: null, cluster: null })
+              // On a phone the rail is a drawer over the grid: close it so the
+              // picked group is what the user sees.
+              if (!railIsColumnNow) closeRail()
+            }}
+            onClose={closeStyleBrowser} />
         )}
 
         {/* ── The grid, full height ── with everything that acts on a SELECTION

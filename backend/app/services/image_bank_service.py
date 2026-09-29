@@ -5567,6 +5567,46 @@ def dup_groups_payload(user_id, bank_id, offset=0, limit=50,
     return {'groups': groups, 'total': total, 'offset': max(0, int(offset))}
 
 
+_STYLE_PREVIEWS = 4
+
+
+def style_groups_payload(user_id, bank_id) -> dict | None:
+    """EVERY 🎨 style group, for the browser. The rail lists only the 40 biggest,
+    and a k-means pass makes hundreds.
+
+    Each group carries its size, its mean aesthetic score over the images that
+    have one, and up to four preview ids — the nicest non-rejected members
+    first, so a group is judged by what you would keep. One query over the
+    bank's grouped rows, aggregated here."""
+    bank = get_bank(user_id, bank_id)
+    if not bank:
+        return None
+    rows = (db.session.query(BankImage.id, BankImage.style_cluster,
+                             BankImage.aesthetic_score, BankImage.status)
+            .filter(BankImage.bank_id == bank_id,
+                    BankImage.style_cluster.isnot(None))
+            .all())
+    groups = {}
+    for image_id, cid, aesthetic, status in rows:
+        g = groups.setdefault(cid, {'id': cid, 'size': 0, 'rejected': 0,
+                                    '_aes': [], '_pick': []})
+        g['size'] += 1
+        if status == 'reject':
+            g['rejected'] += 1
+            continue
+        if aesthetic is not None:
+            g['_aes'].append(aesthetic)
+        g['_pick'].append((-(aesthetic if aesthetic is not None else -1.0), image_id))
+    out = []
+    for g in groups.values():
+        aes = g.pop('_aes')
+        g['aesthetic'] = round(sum(aes) / len(aes), 2) if aes else None
+        g['preview_ids'] = [i for _k, i in sorted(g.pop('_pick'))[:_STYLE_PREVIEWS]]
+        out.append(g)
+    out.sort(key=lambda g: (-g['size'], g['id']))
+    return {'groups': out, 'total': len(out)}
+
+
 def semantic_dup_groups_payload(user_id, bank_id, offset=0, limit=50) -> dict | None:
     """dup_groups_payload for stage 2 (semantic_dup_group)."""
     return dup_groups_payload(user_id, bank_id, offset=offset, limit=limit,

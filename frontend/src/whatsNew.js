@@ -84,6 +84,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-29-z-style-groups-browser', date: '2026-09-29',
+    title: 'Browse Every Style Group',
+    blurb: 'Browse all, next to the Bank\'s style strip, shows every style group as a grid of previews, sorted by size or aesthetic. The installed iPhone app now keeps the filters panel clear of the rounded corners and the home bar.',
+  },
+  {
     id: '2026-09-29-faster-score-pass', date: '2026-09-29',
     title: 'Score Runs About 3× Faster',
     blurb: '✨ Score prepares images on several CPU cores while the GPU works, and no longer slows down as a big bank fills its cache. Large photos up to your image size limit now score instead of failing as "too large", and one unreadable image no longer throws away the whole bank\'s style groups.',
