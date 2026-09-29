@@ -721,3 +721,120 @@ def test_a_head_failure_with_no_reason_reported_still_reads_cleanly(
     detail = client.get(f'/api/bank/{bank_id}').get_json()['activity']['detail']
     assert 'aesthetic head unavailable' in detail
     assert '()' not in detail and 'unavailable —' not in detail
+
+
+# --- 5. throughput: timed saves, reduced JPEG decode, the configured budget ---
+def test_cache_saves_follow_the_clock_not_every_fifty_images(tmp_path, monkeypatch):
+    """Each save rewrites the whole cache, so saving every 50 images made a big
+    pass quadratic. Within one save interval only the closing save may run."""
+    paths = _images(tmp_path, {f'i{i:03d}.jpg': 20 + i for i in range(120)})
+    cache = str(tmp_path / 'score_cache.npz')
+
+    def _count_saves(save_seconds):
+        for leftover in (cache, cache + '.count'):
+            if os.path.exists(leftover):
+                os.remove(leftover)
+        mod = _load_child()
+        _install_stubs(monkeypatch, mod, [])
+        monkeypatch.setattr(mod, 'CACHE_SAVE_SECONDS', save_seconds)
+        saves = []
+        real = mod._flush_cache
+        monkeypatch.setattr(mod, '_flush_cache',
+                            lambda p, c: (saves.append(len(c)), real(p, c)))
+        rc, data = _run_child(mod, monkeypatch, {'images': paths, 'cache': cache,
+                                                 'style_threshold': 0.6})
+        assert rc == 0 and data['ok'] and data['computed'] == 120
+        return saves
+
+    assert _count_saves(3600) == [120], 'only the closing save inside one interval'
+    assert _count_saves(0) == [50, 100, 120], 'an elapsed interval still saves'
+
+
+def test_large_jpegs_decode_at_a_reduced_scale_and_others_do_not(tmp_path):
+    mod = _load_child()
+    big_jpg = tmp_path / 'big.jpg'
+    big_png = tmp_path / 'big.png'
+    Image.new('RGB', (3200, 2400), (90, 90, 90)).save(str(big_jpg), 'JPEG')
+    Image.new('RGB', (3200, 2400), (90, 90, 90)).save(str(big_png), 'PNG')
+    seen = {}
+
+    def _preprocess(im):
+        return im.size
+
+    for path in (big_jpg, big_png):
+        out = mod._prepare(str(path), _preprocess, None)
+        assert out['error'] is None and out['sig'] and len(out['hash']) == 32
+        seen[path.suffix] = out['clip']
+    w, h = seen['.jpg']
+    assert (w, h) != (3200, 2400), 'a large JPEG must not decode at full size'
+    assert min(w, h) >= mod.JPEG_DRAFT_SIDE, 'never below what the models need'
+    assert seen['.png'] == (3200, 2400)
+
+
+def test_prepare_reports_failures_as_data_and_keeps_nsfw_failures_separate(tmp_path):
+    mod = _load_child()
+    good = _images(tmp_path, {'ok.jpg': 50})[0]
+
+    def _broken_proc(images=None, return_tensors=None):
+        raise RuntimeError('processor exploded')
+
+    out = mod._prepare(good, lambda im: 'clip-input', _broken_proc)
+    assert out['error'] is None and out['clip'] == 'clip-input'
+    assert isinstance(out['nsfw_error'], RuntimeError), \
+        'an NSFW preprocessing failure must not cost the image its embedding'
+
+    missing = mod._prepare(str(tmp_path / 'gone.jpg'), lambda im: im, None)
+    assert missing['error'] is not None and missing['sig'] == ''
+
+
+def test_score_worker_receives_the_configured_image_budget(
+        client, tmp_path, app, monkeypatch, scoring_available):
+    """Without it the worker's guard enforced its shipped 16 Mi-pixel cap and
+    failed every image above it that the app itself accepts."""
+    bank_id = _mkbank(client, tmp_path, {'a.jpg': _flat(30)})
+    with app.app_context():
+        import app.config as cfg
+        cfg.save_config({'image_input': {'max_pixels': 67108864, 'max_side': 16384}})
+    from app.services import image_bank_service as banks
+    script = _fake_child(
+        tmp_path,
+        'import os\n'
+        'with open(req["cache"] + ".env", "w", encoding="utf-8") as f:\n'
+        '    f.write(os.environ.get("LDS_INFER_MAX_PIXELS", "") + " "\n'
+        '            + os.environ.get("LDS_INFER_MAX_SIDE", ""))\n'
+        'out = {"ok": True, "results": {}, "clusters": {}}')
+    monkeypatch.setattr(banks, '_SCORE_SCRIPT', script)
+    assert client.post(f'/api/bank/{bank_id}/score', json={}).status_code == 202
+    with app.app_context():
+        seen = pathlib.Path(str(banks._score_cache_path(bank_id)) + '.env')
+        assert seen.read_text(encoding='utf-8') == '67108864 16384'
+
+
+def test_one_unreadable_image_does_not_discard_the_style_grouping(
+        client, tmp_path, app, monkeypatch, scoring_available):
+    """Measured on a 31 893-image bank: 2 269 images refused as too large came
+    back without a fingerprint, and the partition check read each of them as
+    'changed during the pass' — so 500 computed groups were thrown away and the
+    tail reported 2 269 images as changed that had only failed."""
+    bank_id = _mkbank(client, tmp_path, {'a.jpg': _flat(30), 'b.jpg': _flat(40),
+                                         'c.jpg': _flat(200)})
+    from app.services import image_bank_service as banks
+    script = _fake_child(
+        tmp_path,
+        'ok = sorted(images)[:2]\n'
+        'bad = sorted(images)[2]\n'
+        'res = {p: {"state": "ok", "aesthetic": 6.0, "nsfw": 0.1} for p in ok}\n'
+        'res[bad] = {"state": "error", "fingerprint": None}\n'
+        'out = {"ok": True, "results": res, "clusters": {ok[0]: 1, ok[1]: 1},\n'
+        '       "computed": 3, "reused": 0,\n'
+        '       "image_errors": ["BankImageGuardError: too large"]}')
+    monkeypatch.setattr(banks, '_SCORE_SCRIPT', script)
+    assert client.post(f'/api/bank/{bank_id}/score', json={}).status_code == 202
+
+    rows = _rows(app, bank_id)
+    assert rows['a.jpg'].style_cluster == 1 and rows['b.jpg'].style_cluster == 1
+    assert rows['c.jpg'].style_cluster is None
+    detail = client.get(f'/api/bank/{bank_id}').get_json()['activity']['detail']
+    assert 'discarded' not in detail
+    assert 'changed' not in detail, 'a failed image is not a changed one'
+    assert '1 image(s) failed' in detail

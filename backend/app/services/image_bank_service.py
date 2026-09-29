@@ -7539,16 +7539,20 @@ def _drive_infer_subprocess(job, python, script, payload, cache_path,
     except OSError:
         pass
     hint = {'shown': False, 'cached': 0, 'total': None}
+    from .input_budget import infer_worker_env
     with window:
         # Borrowed ML interpreters (notably ComfyUI portable) must not inherit
         # unrelated per-user site-packages. The readiness probe uses the same
         # ``-s`` contract; launching Score differently would turn a green GPU
         # choice into an open_clip crash once the real pass starts.
+        # The configured image budget rides along too: without it the worker's
+        # guard falls back to its shipped 16 Mi-pixel cap and refuses images
+        # the app itself imports and shows.
         proc = subprocess.Popen(
             _infer_subprocess_argv(python, script), stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding='utf-8', errors='replace',
-            env=infer_env.worker_env(python),
+            env=infer_env.worker_env(python, **infer_worker_env()),
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         killer = {'timer': None}
 
@@ -8418,7 +8422,10 @@ def _apply_score_results(job, by_path, results, interruptible, *,
             # no scalar from it may be attached to the replacement bytes.
             _restore_proven_siglip2_group(
                 row, p, preserved, selected_engine=selected_engine)
-            stale += 1
+            # An image the worker refused before hashing has no fingerprint:
+            # it FAILED (the tail counts it), it did not change under the pass.
+            if res.get('fingerprint') is not None:
+                stale += 1
             continue
         _restore_proven_siglip2_group(
             row, p, preserved, selected_engine=selected_engine,
@@ -8503,6 +8510,11 @@ def _write_style_clusters(by_path, clusters, results):
     # changed member changes the meaning of the global clustering, so unlike
     # independent scalar scores this lane is all-or-none.
     for p, image_id in by_path.items():
+        if p not in clusters:
+            # Not a member (the worker could not read it): it carries no
+            # fingerprint, and it cannot change what the groups mean. Checking
+            # it anyway let ONE unreadable file discard a whole bank's grouping.
+            continue
         result = results.get(p) or {}
         row = _live_image(image_id)
         fingerprint = result.get('fingerprint')
