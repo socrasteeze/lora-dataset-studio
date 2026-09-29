@@ -1677,30 +1677,6 @@ def _quality_env_dir():
     return cfg.data_dir() / 'envs' / 'quality'
 
 
-def _managed_env_valid(python):
-    """Verify the running Python actually belongs to this isolated venv.
-
-    Adopted from V2. The fork's _ensure_*_env helpers below tested only that the
-    interpreter FILE exists, which cannot tell an app-built venv from a system
-    Python somebody pointed the setting at -- and installing ML wheels into the
-    latter is what this whole module exists to avoid.
-    """
-    try:
-        result = subprocess.run(
-            [python, '-I', '-c', 'import sys,json,pip; '
-             'print(json.dumps([list(sys.version_info[:2]),sys.prefix,sys.base_prefix]))'],
-            capture_output=True, text=True, timeout=20,
-            env=managed_python.subprocess_env(),
-            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-        version, prefix, base = json.loads(result.stdout)
-        expected = os.path.dirname(os.path.dirname(python))
-        return (result.returncode == 0 and _VENV_PY_MIN <= tuple(version) <= _VENV_PY_MAX
-                and os.path.normcase(os.path.abspath(prefix)) == os.path.normcase(expected)
-                and os.path.normcase(prefix) != os.path.normcase(base))
-    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
-        return False
-
-
 def _ensure_managed_ml_env(action, env_dir) -> str:
     """Create/reuse only a validated LDS-owned venv; repair broken ones safely.
 
@@ -3569,7 +3545,12 @@ def install_groups() -> dict:
 
 
 def _managed_env_valid(python):
-    """Verify the running Python actually belongs to this isolated venv."""
+    """Verify the running Python actually belongs to this isolated venv.
+
+    Testing only that the interpreter FILE exists cannot tell an app-built venv
+    from a system Python somebody pointed the setting at -- and installing ML
+    wheels into the latter is what this whole module exists to avoid.
+    """
     try:
         result = subprocess.run(
             [python, '-I', '-c', 'import sys,json,pip; '
@@ -3727,6 +3708,7 @@ def _run_companion_downloads(action) -> int:
 
 def _fetch_companions(action, spec, companions) -> int:
     headers, provider = _download_auth(spec)
+    headers = {**headers, 'Accept-Encoding': 'identity'}
     for comp in companions:
         dest = _companion_dest_path(comp)
         part = dest + '.part'
@@ -3749,20 +3731,7 @@ def _fetch_companions(action, spec, companions) -> int:
                 if resp.status_code >= 400:
                     _append(action, f'HTTP {resp.status_code} on {os.path.basename(dest)}')
                     return 1
-                total = int(resp.headers.get('content-length') or 0)
-                done = 0
-                _set_progress(action, 0, total)
-                with open(part, 'wb') as fh:
-                    for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
-                        if not chunk:
-                            continue
-                        fh.write(chunk)
-                        done += len(chunk)
-                        _set_progress(action, done, total)
-            if total and done < total:
-                _append(action, f'incomplete download ({done}/{total} bytes) - retry')
-                os.remove(part)
-                return 1
+                _stream_model_download(action, resp, comp['url'], part, headers)
             if comp.get('kind') == 'json':
                 reason = _companion_unusable_reason(comp, part)
                 if reason:
@@ -3794,11 +3763,20 @@ def _discard_part(part):
         pass
 
 
+def _stream_model_download(action, response, url, part, headers):
+    from .services.model_download import stream_model
+    return stream_model(
+        response, url, part, headers=headers, timeout=network_timeout((10, 120)),
+        progress=lambda done, total: _set_progress(action, done, total),
+        log=lambda line: _append(action, line),
+    )
+
+
 def _run_primary_download(action) -> int:
     """Stream one model asset (Klein or Krea) into the validated ComfyUI tree.
     Writes to a .part file then renames (a killed download never leaves a half
     file the model scanners would pick up), then verifies the result is real
-    weights. Progress lines land in the ring log (~every 512 MB). An
+    weights. Aggregate byte progress is published for the UI. An
     access-denied host (401/403) -> actionable recovery steps for THAT provider,
     rc 1."""
     spec = model_download_spec(action)
@@ -3848,6 +3826,7 @@ def _run_primary_download(action) -> int:
         return 0
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     headers, provider = _download_auth(spec)
+    headers = {**headers, 'Accept-Encoding': 'identity'}
     _append(action, f"downloading {spec['url']}")
     _append(action, f'-> {dest}')
     part = dest + '.part'
@@ -3866,25 +3845,7 @@ def _run_primary_download(action) -> int:
             if resp.status_code >= 400:
                 _append(action, f'HTTP {resp.status_code}')
                 return 1
-            total = int(resp.headers.get('content-length') or 0)
-            done = 0
-            next_mark = 0
-            _set_progress(action, 0, total)   # show the bar from the first byte
-            with open(part, 'wb') as fh:
-                for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
-                    if not chunk:
-                        continue
-                    fh.write(chunk)
-                    done += len(chunk)
-                    _set_progress(action, done, total)   # live % for the UI bar (every chunk)
-                    if done >= next_mark:                 # coarse milestone in the text log
-                        pct = f' ({done * 100 // total}%)' if total else ''
-                        _append(action, f'{done / 1e9:.2f} / {total / 1e9:.2f} GB{pct}')
-                        next_mark = done + 512 * 1024 * 1024
-        if total and done < total:
-            _append(action, f'incomplete download ({done}/{total} bytes) - retry')
-            os.remove(part)
-            return 1
+            _stream_model_download(action, resp, spec['url'], part, headers)
         # Verify BEFORE the rename: a 200-with-a-login-page must not have already
         # taken the place of whatever was there.
         if not _verify_downloaded_model(action, part, spec, provider):
@@ -3898,127 +3859,9 @@ def _run_primary_download(action) -> int:
         return 0
     except requests.RequestException as e:
         _append(action, f'network error: {e}')
-        try:
-            os.remove(part)
-        except OSError:
-            pass
+        _discard_part(part)
         return 1
-
-
-def _run_companion_downloads(action) -> int:
-    """Fetch every companion of `action` that is absent or unusable, each to a
-    .part then renamed, verified by its own kind. Progress restarts per file;
-    the log names each. rc 1 on the first failure — a stage is whole or it is
-    not, and the branch that already landed stays."""
-    spec = model_download_spec(action)
-    companions = spec.get('companions') or ()
-    if not companions:
-        return 0
-    with _companion_lock(companions):
-        return _fetch_companions(action, spec, companions)
-
-
-def _companion_dest_path(comp) -> str:
-    return os.path.join(_comfyui_root(), 'models', *comp['dest'])
-
-
-def _companion_unusable_reason(comp, path):
-    """Why the companion at `path` cannot be kept, or None. A JSON file is
-    kept when it parses; a weight when the shared validator does not condemn
-    it — an HTML page named adapter_model.safetensors is the failure mode."""
-    if comp.get('kind') == 'json':
-        try:
-            with open(path, encoding='utf-8') as fh:
-                json.load(fh)
-            return None
-        except (OSError, ValueError) as exc:
-            return f'not a readable JSON file ({exc})'
-    return _unloadable_reason('companion', path, comp)
-
-
-def _companion_lock(companions):
-    with _lock:
-        key = tuple(sorted(tuple(item['dest']) for item in companions))
-        return _COMPANION_LOCKS.setdefault(key, threading.Lock())
-
-
-def _fetch_companions(action, spec, companions) -> int:
-    headers, provider = _download_auth(spec)
-    for comp in companions:
-        dest = _companion_dest_path(comp)
-        part = dest + '.part'
-        try:
-            if os.path.isfile(dest):
-                reason = _companion_unusable_reason(comp, dest)
-                if not reason:
-                    _append(action, f'already present: {dest}')
-                    continue
-                _append(action, f'the companion already here cannot be used: {reason} — replacing it')
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            _append(action, f"downloading {comp['url']}")
-            _append(action, f'-> {dest}')
-            with requests.get(comp['url'], stream=True, timeout=(10, 120),
-                              headers=headers, allow_redirects=True) as resp:
-                if resp.status_code in (401, 403):
-                    _log_denied(action, resp.status_code,
-                                comp.get('license_url') or spec.get('license_url'), provider)
-                    return 1
-                if resp.status_code >= 400:
-                    _append(action, f'HTTP {resp.status_code} on {os.path.basename(dest)}')
-                    return 1
-                total = int(resp.headers.get('content-length') or 0)
-                done = 0
-                _set_progress(action, 0, total)
-                with open(part, 'wb') as fh:
-                    for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
-                        if not chunk:
-                            continue
-                        fh.write(chunk)
-                        done += len(chunk)
-                        _set_progress(action, done, total)
-            if total and done < total:
-                _append(action, f'incomplete download ({done}/{total} bytes) - retry')
-                os.remove(part)
-                return 1
-            if comp.get('kind') == 'json':
-                reason = _companion_unusable_reason(comp, part)
-                if reason:
-                    _append(action, f'download verification failed: {reason}; retry the download')
-                    os.remove(part)
-                    return 1
-            elif not _verify_downloaded_model(action, part, comp, provider):
-                return 1
-            os.replace(part, dest)
-            _append(action, f'done -> {dest}')
-        except requests.RequestException as e:
-            _append(action, f'network error: {e}')
-            _discard_part(part)
-            return 1
-        except OSError as e:
-            # A filesystem refusal (a file held open, a full disk, a folder
-            # that vanished) ends the run with a readable line, not a
-            # traceback in the button.
-            _append(action, f'could not write {os.path.basename(dest)}: {e} — retry the download')
-            _discard_part(part)
-            return 1
-    return 0
-
-
-def _discard_part(part):
-    try:
-        os.remove(part)
-    except OSError:
-        pass
-
-
-def _log_denied(action, status, license_url, provider):
-    """The recovery steps for a 401/403, the same four lines whichever file of
-    an action the host refused — a companion can be gated while its main file
-    was not (the INT8 row's adapters live on another repository)."""
-    host, key_url, key_name, verb = _AUTH_RECOVERY.get(provider, _AUTH_RECOVERY['hf'])
-    _append(action, f'HTTP {status} - {host} denied access to this file.')
-    if license_url:
-        _append(action, f'1. Open {license_url} and {verb} continue')
-    _append(action, f'2. Create an API key at {key_url}')
-    _append(action, f'3. Paste it as {key_name} in Settings -> API keys, then retry')
-    _append(action, '   (or download the file manually into the folder above)')
+    except OSError as e:
+        _append(action, f'could not write {os.path.basename(dest)}: {e} — retry the download')
+        _discard_part(part)
+        return 1

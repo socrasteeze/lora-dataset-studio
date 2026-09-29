@@ -48,7 +48,9 @@ test('a running watermark scan can be stopped from its banner', () => {
 });
 
 test('the scan is polled while it runs, or the Stop would never appear', () => {
-  assert.match(hook, /if \(!localActivityRuns\.has\(`watermark:\$\{currentId\}`\) \|\| !currentId\) return undefined;/);
+  // The poller now covers every local synchronous pass; the watermark scan must stay one of them.
+  assert.match(hook, /const running = \[[^\]]*'watermark'[^\]]*\]\s*\.some\(\(kind\) => localActivityRuns\.has\(`\$\{kind\}:\$\{currentId\}`\)\);/);
+  assert.match(hook, /if \(!running \|\| !currentId\) return undefined;/);
   assert.match(hook, /\}, \[localActivityRuns, currentId, refresh\]\);/);
 });
 

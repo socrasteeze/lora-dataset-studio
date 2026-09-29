@@ -115,6 +115,30 @@ export const WHATS_NEW = [
     to: '/datasets?section=add&panel=generate',
   },
   {
+    id: '2026-09-28-segmented-model-downloads',
+    date: '2026-09-28',
+    title: 'Download large models with parallel connections',
+    blurb: 'Model preparation can now download large files through four parallel connections when the host supports it. Interrupted segments retry automatically, with a single-connection fallback and the same file checks before replacing an installed model.',
+  },
+  {
+    id: '2026-09-28-processing-stage-counters',
+    date: '2026-09-28',
+    title: 'Follow each stage of image processing',
+    blurb: 'Concept captions, text detection and face analysis now show progress while they run, including reused face measurements. Text and watermark cleanup show separate preparation, processing and saving counters, so a prepared batch no longer looks finished.',
+  },
+  {
+    id: '2026-09-28-training-progress-dataset-kind',
+    date: '2026-09-28',
+    title: 'Keep image and video training status separate',
+    blurb: 'An image dataset no longer appears to be training when a video dataset with the same number is running.',
+  },
+  {
+    id: '2026-09-28-joycaption-live-progress',
+    date: '2026-09-28',
+    title: 'Follow JoyCaption progress as images finish',
+    blurb: 'Image Bank and dataset caption counters now advance while JoyCaption is working, instead of staying at zero until the whole batch finishes.',
+  },
+  {
     id: '2026-09-27-python-picker-close',
     date: '2026-09-27',
     title: 'Close the Python picker without making a selection',

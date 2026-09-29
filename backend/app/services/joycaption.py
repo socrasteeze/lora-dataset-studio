@@ -62,7 +62,8 @@ def caption_images_joycaption(paths, prompt: str | None = None,
                               max_tokens: int = 300, timeout: int = 1800,
                               activity_token=None, should_cancel=None,
                               on_caption=None, progress=None,
-                              errors_out=None, diagnostics_out=None) -> dict:
+                              errors_out=None, diagnostics_out=None,
+                              on_progress=None) -> dict:
     """Caption an image list with one model load. Return {path: caption},
     or {} for nonfatal unavailability/failure.
 
@@ -80,7 +81,12 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     failures do not abort the batch, but their explanations must be
     available beyond server logs. Optional diagnostics_out receives the worker
     returncode, timed_out flag and last 25 stderr lines, redacted for display.
-    Both outputs preserve the existing caption return value."""
+    Both outputs preserve the existing caption return value.
+    on_caption(path, caption) and progress(handled, total) run on the CALLING
+    thread while the worker runs, so they may write the database.
+    on_progress(ready, total) reports unique successful captions as stdout arrives.
+    It runs on the reader thread: use it only for thread-safe activity updates,
+    never database writes. Failed images remain eligible for the caller's fallback."""
     if diagnostics_out is not None:
         diagnostics_out.update(returncode=None, timed_out=False, stderr_tail=[])
     paths = [p for p in (paths or []) if p and os.path.isfile(p)]
@@ -125,12 +131,15 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     cancelled = {'flag': False}
     stderr_tail: collections.deque = collections.deque(maxlen=25)
     # Reader thread → caller thread. See the docstring: the callbacks must not
-    # run on the reader, which has no app context.
+    # run on the reader, which has no app context. on_progress is the exception:
+    # it runs on the reader and may only touch thread-safe activity state.
     landed: queue.Queue = queue.Queue()
+    reported = 0
 
     def _consume_json_line(line: str) -> None:
         """Parse one stdout JSON line: a per-image {i,path,caption|error}, or the final
         {captions,errors} aggregate (merged defensively for a stale worker)."""
+        nonlocal reported
         try:
             obj = json.loads(line)
         except (ValueError, TypeError):
@@ -150,6 +159,14 @@ def caption_images_joycaption(paths, prompt: str | None = None,
                 if cap and p not in captions:
                     captions[p] = str(cap).strip()
             errors.update(obj.get('errors') or {})
+        ready = sum(bool(cap) for cap in captions.values())
+        if ready > reported:
+            reported = ready
+            if on_progress:
+                try:
+                    on_progress(ready, len(paths))
+                except Exception:  # noqa: BLE001 — UI updates must not stop pipe draining
+                    logger.warning('joycaption: progress callback failed', exc_info=True)
 
     def _drain_stdout():
         try:
@@ -223,9 +240,19 @@ def caption_images_joycaption(paths, prompt: str | None = None,
     # Deliberately still wait(), not poll(): wait(timeout=…) is the contract this
     # function already had, and switching to poll() would silently require every
     # existing and future test double to grow a method it never needed.
-    _deadline = time.monotonic() + timeout
+    budget = processing_timeout(timeout)
+    _deadline = None if budget is None else time.monotonic() + budget
     try:
-        proc.wait(timeout=processing_timeout(timeout))
+        while True:
+            left = 0.2 if _deadline is None else max(0.0, _deadline - time.monotonic())
+            try:
+                proc.wait(timeout=min(0.2, left))
+                break
+            except subprocess.TimeoutExpired:
+                _pump()
+                if _deadline is not None and time.monotonic() >= _deadline:
+                    raise
+        _pump()
     except subprocess.TimeoutExpired:
         if diagnostics_out is not None:
             diagnostics_out['timed_out'] = True

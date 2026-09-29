@@ -96,7 +96,7 @@ def _fake_lama(monkeypatch):
     monkeypatch.setattr(watermark_lama, 'is_available', lambda: True)
     monkeypatch.setattr(watermark_lama, 'resolve_device', lambda: 'cpu')
 
-    def fake_batch(jobs, device='cpu'):
+    def fake_batch(jobs, device='cpu', **_kw):
         out = {}
         for job in jobs:
             calls.append(job['image_path'])

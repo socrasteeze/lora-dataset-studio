@@ -140,7 +140,7 @@ def main() -> int:
         actual_device = 'cuda' if requested_device in ('auto', 'cuda') and cuda else 'cpu'
         lama = SimpleLama()
         results = []
-        for job in raw_jobs:
+        for index, job in enumerate(raw_jobs, 1):
             image_path = job['image_path']
             try:
                 if not image_path or not os.path.isfile(image_path):
@@ -161,6 +161,8 @@ def main() -> int:
             except Exception as e:
                 results.append({'image_path': image_path, 'ok': False,
                                 'error': f'{type(e).__name__}: {e}'})
+            if batch:
+                _log(f'[lama] {index}/{len(raw_jobs)}')
         if batch:
             print(json.dumps({'ok': True, 'device': actual_device, 'results': results}), file=_OUT)
         elif results[0]['ok']:

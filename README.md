@@ -1,6 +1,9 @@
+> [!WARNING]
+> **No affiliation with loradataset.com.** That website is not operated, endorsed, or supported by the LoRA Dataset Studio team. Any payments made to that service do not support this project. Use this repository and the links provided here to find our official downloads and community channels.
+
 # LoRA Dataset Studio V2
 
-[![CI](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml) [![Join our Discord](https://img.shields.io/discord/1525908170331914411?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/j6hnJBFtXE) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/perfectgf)
+[![CI](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/socrasteeze/lora-dataset-studio/actions/workflows/ci.yml) [![Join our Discord](https://img.shields.io/discord/1525908170331914411?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/j6hnJBFtXE) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/perfectgf) [![Patreon](https://img.shields.io/badge/Patreon-Support-FF424D?logo=patreon&logoColor=white)](https://www.patreon.com/c/Loraperfectgf)
 
 **A complete, self-hosted LoRA workflow in one browser tab:** source or generate a Character, Concept or Style dataset, curate it, caption it, clean watermarks, train it on your own GPU, then compare checkpoints before export.
 
@@ -1175,9 +1178,8 @@ Still stuck? Open the app's **Guide → Getting help** for the one-click **diagn
 
 The LDS core and the public plugins in this release have public source and are available at no charge under the project's PolyForm Noncommercial license,
 with usage statistics off by default. Additional optional paid plugins may be offered later;
-the core and these public plugins remain free. Voluntary donations and the
-[vast.ai](https://cloud.vast.ai/?ref_id=683073) referral links disclosed above help
-fund development; those links do not change the price you pay. The project is
+the core and these public plugins remain free. Voluntary donations help fund
+development; this build carries no referral or affiliate link of any kind. The project is
 built and maintained by one person, on personal time — every feature in the
 list above came out of somebody's evenings.
 

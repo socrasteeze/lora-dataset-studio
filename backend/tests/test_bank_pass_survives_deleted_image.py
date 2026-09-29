@@ -337,7 +337,7 @@ def test_the_inpaint_level_skips_an_image_deleted_under_its_batch(bank_ctx,
     bank_id, ids = bank_ctx
     _flag_watermarks(ids, manual=True)     # a hand mask routes straight to LaMa
 
-    def fake_batch(items, device='cpu'):
+    def fake_batch(items, device='cpu', **_kw):
         _delete_image(ids[1])              # deleted while the batch was running
         return {it['image_path']: (True, None) for it in items}
 
