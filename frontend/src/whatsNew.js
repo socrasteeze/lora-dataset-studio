@@ -148,15 +148,21 @@ export const WHATS_NEW = [
     blurb: 'Browse all, next to the Bank\'s style strip, shows every style group as a grid of previews, sorted by size or aesthetic. The installed iPhone app now keeps the filters panel clear of the rounded corners and the home bar.',
   },
   {
-    id: '2026-09-29-faster-score-pass', date: '2026-09-29',
-    title: 'Score Runs About 3× Faster',
-    blurb: '✨ Score prepares images on several CPU cores while the GPU works, and no longer slows down as a big bank fills its cache. Large photos up to your image size limit now score instead of failing as "too large", and one unreadable image no longer throws away the whole bank\'s style groups.',
+    id: '2026-09-29-video-plugin-startup',
+    date: '2026-09-29',
+    title: 'H3 plugins start correctly again',
+    blurb: 'Plugins using H3 can start again after the latest model update. A startup error no longer prevents enabled plugins from appearing.',
   },
   {
     id: '2026-09-29-keep-dataset-comparison',
     date: '2026-09-29',
     title: 'Keep comparing as you browse dataset images',
     blurb: 'Original and reference comparison stay selected when you move between dataset images with the arrows. Each image shows its own comparison; images without a matching original stay in single-image view until a comparison is available again.',
+  },
+  {
+    id: '2026-09-29-faster-score-pass', date: '2026-09-29',
+    title: 'Score Runs About 3× Faster',
+    blurb: '✨ Score prepares images on several CPU cores while the GPU works, and no longer slows down as a big bank fills its cache. Large photos up to your image size limit now score instead of failing as "too large", and one unreadable image no longer throws away the whole bank\'s style groups.',
   },
   {
     id: '2026-09-28-bank-edit-history',
