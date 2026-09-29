@@ -512,6 +512,22 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
               config={config} configDefaults={configDefaults} setField={setField} />
           </div>
           <div>
+            <label htmlFor="bank-style-kmeans-k" className="block text-sm font-medium text-content">
+              Style groups (k-means)
+            </label>
+            <input id="bank-style-kmeans-k" type="number" min="0" step="1"
+              value={config.bank_style?.kmeans_k ?? defaultValueAt(configDefaults, 'bank_style', 'kmeans_k')}
+              onChange={(e) => setField('bank_style', 'kmeans_k', Math.max(0, parseInt(e.target.value, 10) || 0))}
+              className={INPUT_CLASS} />
+            <p className="mt-0.5 text-xs text-content-muted">
+              0 groups by the similarity above. A number splits the bank into exactly that many
+              style groups, which avoids one giant group on a bank of look-alike images. Applies at
+              the next scoring pass.
+            </p>
+            <ResetToDefault label="Style groups (k-means)" section="bank_style" field="kmeans_k"
+              config={config} configDefaults={configDefaults} setField={setField} />
+          </div>
+          <div>
             <label htmlFor="bank-semantic-dup-threshold" className="block text-sm font-medium text-content">
               Semantic duplicate similarity
             </label>

@@ -14,12 +14,13 @@ One CLIP forward per image feeds THREE outputs, so a mixed dump can be triaged b
     the same subprocess so the pass stays one queued job.
   * style     — the CLIP image embedding itself (L2-normed), cached in the .npz and
     union-find clustered by cosine ≥ style_threshold, exactly like the face pass
-    clusters by identity. Cluster ids are 1-based, biggest first.
+    clusters by identity — or, when style_kmeans_k > 0, spherical k-means into
+    that many groups. Cluster ids are 1-based, biggest first.
 
 Protocol (same shape as face_embed_infer.py):
   stdin  : {"images": [abs paths], "models_root": path|null,
             "cache": abs path to a .npz|null, "style_threshold": 0.6,
-            "rescore": false}
+            "style_kmeans_k": 0, "rescore": false}
   stdout : ONE JSON line {"ok": bool,
             "results": {path: {state, aesthetic?, nsfw?}},
             "clusters": {path: int}|null, "computed": int, "reused": int,
@@ -299,12 +300,76 @@ def _cluster_style(order, cache, threshold, should_stop=None):
     groups = {}
     for i in range(n):
         groups.setdefault(find(i), []).append(i)
-    ordered = sorted(groups.values(), key=lambda m: (-len(m), m[0]))
+    return _number_groups(usable, groups.values())
+
+
+def _number_groups(usable, groups):
+    """{path: 1-based id}, biggest group first — the one numbering both style
+    methods hand back."""
+    ordered = sorted(groups, key=lambda m: (-len(m), m[0]))
     out = {}
     for cid, members in enumerate(ordered, start=1):
         for i in members:
             out[usable[i]] = cid
     return out
+
+
+def _kmeans_style(order, cache, k, should_stop=None, iters=50, seed=0):
+    """Same contract as ``_cluster_style``, but spherical k-means into ``k``
+    groups instead of union-find over a threshold.
+
+    Union-find is transitive: on a bank of near-neighbours a chain of similar
+    pairs merges everything into one group (measured: 25 056 of 25 058 at 0.6).
+    k-means has no chains — every image joins the centroid it is closest to — so
+    the bank always splits into k groups of mutually similar images. Seeded
+    k-means++ keeps the partition reproducible across runs over the same cache."""
+    import numpy as np
+    usable = [p for p in order
+              if p in cache and cache[p][0] == 'ok' and cache[p][3] is not None
+              and float(np.abs(cache[p][3]).sum()) > 0]
+    if not usable:
+        return {}
+    E = np.stack([cache[p][3] for p in usable]).astype('float32')
+    E /= (np.linalg.norm(E, axis=1, keepdims=True) + 1e-8)
+    n = len(usable)
+    k = max(1, min(int(k), n))
+    rng = np.random.default_rng(seed)
+    # k-means++ on cosine distance (1 - sim), so seeds start spread over styles.
+    C = np.empty((k, E.shape[1]), dtype='float32')
+    C[0] = E[rng.integers(n)]
+    dist = np.clip(1.0 - E @ C[0], 0.0, None)
+    for j in range(1, k):
+        if should_stop is not None and should_stop():
+            return None
+        total = float(dist.sum())
+        pick = (rng.choice(n, p=dist / total) if total > 0
+                else int(rng.integers(n)))
+        C[j] = E[pick]
+        dist = np.minimum(dist, np.clip(1.0 - E @ C[j], 0.0, None))
+    labels = None
+    for _ in range(iters):
+        if should_stop is not None and should_stop():
+            return None
+        sims = E @ C.T
+        new = sims.argmax(axis=1)
+        if labels is not None and np.array_equal(new, labels):
+            break
+        labels = new
+        best = sims[np.arange(n), labels]
+        for j in range(k):
+            members = labels == j
+            if members.any():
+                c = E[members].sum(axis=0)
+            else:
+                # An empty centroid restarts on the image worst served by its own.
+                far = int(best.argmin())
+                c = E[far]
+                best[far] = 1.0
+            C[j] = c / (np.linalg.norm(c) + 1e-8)
+    groups = {}
+    for i, j in enumerate(labels.tolist()):
+        groups.setdefault(j, []).append(i)
+    return _number_groups(usable, groups.values())
 
 
 # --- model heads ---------------------------------------------------------------
@@ -445,6 +510,8 @@ def main() -> int:
     cache_path = req.get('cache') or None
     cancel_file = req.get('cancel_file') or None
     style_threshold = float(req.get('style_threshold') or 0.6)
+    # > 0 → k-means into this many style groups instead of the threshold.
+    style_kmeans_k = int(req.get('style_kmeans_k') or 0)
     # The explicit "recompute everything" lane. Never the normal pass: the normal
     # pass resumes, and a button that silently ignored the cache would make every
     # relaunch cost the full bank again.
@@ -638,8 +705,10 @@ def main() -> int:
     _phase(f'grouping styles over {len(images)} image(s) — the slow tail of this '
            'pass; Stop now keeps every score already computed but discards the '
            'grouping, which can only be redone whole')
-    clusters = _cluster_style(images, cache, style_threshold,
-                              lambda: _cancel_requested(cancel_file))
+    stop = lambda: _cancel_requested(cancel_file)  # noqa: E731
+    clusters = (_kmeans_style(images, cache, style_kmeans_k, stop)
+                if style_kmeans_k > 0
+                else _cluster_style(images, cache, style_threshold, stop))
     if clusters is None:
         # Stopped inside the clustering — everything is scored and cached, only the
         # partition is missing. Say so instead of dying under the watchdog kill.

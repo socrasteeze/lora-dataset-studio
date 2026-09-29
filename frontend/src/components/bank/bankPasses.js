@@ -109,6 +109,8 @@ export const BANK_PASSES = {
     settings: [
       { name: 'Style threshold (Filter thresholds ▸ style_threshold)',
         note: 'Decides how tight the style groups are.' },
+      { name: 'Style groups, k-means (Settings ▸ Captioning ▸ bank_style.kmeans_k)',
+        note: 'Above 0, splits the bank into exactly that many groups instead.' },
       { name: 'Bank scoring models folder + Python (Setup ▸ Quality tools)' },
       { name: 'Scoring device (CPU / GPU, resolved from this machine)',
         note: 'On the GPU the pass takes the exclusive window: ComfyUI is unloaded '

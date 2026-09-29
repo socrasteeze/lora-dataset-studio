@@ -152,6 +152,34 @@ def test_style_cluster_orders_by_size():
     assert 'p6' not in out                                  # errored/zero emb → no cluster
 
 
+def test_kmeans_style_splits_a_chain_union_find_merges():
+    """A chain of near-neighbours: union-find at 0.6 merges it end to end,
+    k-means with k=2 splits it into its two ends."""
+    np = pytest.importorskip('numpy')
+    spec = importlib.util.spec_from_file_location(
+        'bank_score_infer',
+        pathlib.Path(__file__).resolve().parents[1] / 'infer' / 'bank_score_infer.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    cache = {}
+    for i in range(10):                       # 0°..90° in 10° steps: cos 10° ≈ 0.98
+        a = np.deg2rad(i * 10)
+        v = np.array([np.cos(a), np.sin(a)] + [0.0] * 766, dtype='float32')
+        cache[f'p{i}'] = ('ok', 6.0, 0.1, v)
+    cache['bad'] = ('error', None, None, np.zeros(768, dtype='float32'))
+    chained = mod._cluster_style(list(cache), cache, 0.6)
+    assert len(set(chained.values())) == 1    # the whole chain is one group
+    out = mod._kmeans_style(list(cache), cache, 2)
+    assert 'bad' not in out
+    assert sorted(set(out.values())) == [1, 2]
+    assert out['p0'] != out['p9']
+    assert out['p0'] == out['p1'] and out['p8'] == out['p9']
+    assert out == mod._kmeans_style(list(cache), cache, 2)   # reproducible
+    # k larger than the pool clamps instead of failing.
+    assert len(set(mod._kmeans_style(list(cache), cache, 50).values())) <= 10
+    assert mod._kmeans_style(list(cache), cache, 2, should_stop=lambda: True) is None
+
+
 def test_style_clusters_in_payload_and_filter(client, tmp_path, app):
     bank_id, _ = _mkbank(client, tmp_path, {
         'a.jpg': _flat(), 'b.jpg': _flat(60), 'c.jpg': _flat(200)})
