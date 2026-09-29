@@ -1571,6 +1571,14 @@ def bank_semantic_dup_groups(bank_id):
     return jsonify(payload)
 
 
+@bp.get('/bank/<int:bank_id>/style-groups')
+def bank_style_groups(bank_id):
+    payload = banks.style_groups_payload(LOCAL_USER, bank_id)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
+
+
 @bp.post('/bank/<int:bank_id>/semantic-dups/resolve')
 def bank_semantic_dups_resolve(bank_id):
     data = request.get_json(silent=True) or {}

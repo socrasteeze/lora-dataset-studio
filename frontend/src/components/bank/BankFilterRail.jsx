@@ -51,7 +51,7 @@ export default function BankFilterRail({
   live, setPassOpen,
   thresholdsOpen, setThresholdsOpen, connection, refreshPayload, refreshImages, onRunPass,
   sortGroups, setSort, tileSize, setTileSize,
-  moreOpen, setMoreOpen, isDrawer, onClose,
+  moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
 }) {
   // Which measured axes have data. The conditions are the ones the workspace
   // already used — moving a facet into the rail must not change WHEN it appears.
@@ -73,7 +73,9 @@ export default function BankFilterRail({
         /* ⚠️ `bg-surface-overlay`, NOT `bg-surface`: the tint is 4 %-alpha white
            for cards sitting ON the opaque page — painted with it, this drawer
            is a sheet of glass over the grid. Pinned in bankLayout.test.js. */
-        ? 'shadow-2xl fixed inset-y-0 left-0 z-50 w-[19rem] max-w-[88vw] overflow-y-auto border-r border-border bg-surface-overlay p-3 space-y-3'
+        /* The safe-area paddings keep the last row above the home indicator and
+           off the rounded corners of an iPhone (0 on screens without them). */
+        ? 'shadow-2xl fixed inset-y-0 left-0 z-50 w-[19rem] max-w-[88vw] overflow-y-auto border-r border-border bg-surface-overlay p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))] space-y-3'
         : 'space-y-3 self-start rounded-xl border border-border bg-surface p-3 sm:sticky sm:top-3 sm:max-h-[calc(100vh-1.5rem)] sm:overflow-y-auto'}>
       <div className="flex items-center gap-2">
         <GroupLabel>Filters</GroupLabel>
@@ -230,9 +232,16 @@ export default function BankFilterRail({
       {/* Style clusters (after the scoring pass) — group screenshots/memes vs photoreal */}
       {styleClusters.length > 0 && (
         <div className="space-y-1">
-          <GroupLabel>
-            Styles ({styleClusters.length} group{styleClusters.length > 1 ? 's' : ''} — biggest first)
-          </GroupLabel>
+          <div className="flex items-center gap-2">
+            <GroupLabel>
+              Styles ({styleClusters.length} group{styleClusters.length > 1 ? 's' : ''} — biggest first)
+            </GroupLabel>
+            {/* The strip stops at the 40 biggest; the browser shows every group. */}
+            <button type="button" onClick={onBrowseStyles}
+              className="min-h-10 lg:min-h-0 ml-auto shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
+              Browse all
+            </button>
+          </div>
           {/* `relative` makes this scroller the containing block for any
               absolutely-positioned descendant — without it, overflow-x-auto
               only clips a descendant when the scroller IS its containing

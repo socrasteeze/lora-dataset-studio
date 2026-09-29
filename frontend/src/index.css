@@ -196,6 +196,10 @@
   body {
     background-color: rgb(var(--bg-app));
     color: rgb(var(--text-base));
+    /* viewport-fit=cover (index.html) lets the page run under the notch on a
+       phone held sideways; keep the flow content beside it. 0 everywhere else. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   /* A range input claims every touch that starts on it, including the one that
      was scrolling the page — on a phone, swiping past a settings panel drags

@@ -191,6 +191,30 @@ def test_style_clusters_in_payload_and_filter(client, tmp_path, app):
     assert {i['name'] for i in r['images']} == {'a.jpg', 'b.jpg'}
 
 
+def test_style_groups_browser_lists_every_group_past_the_rail_cap(client, tmp_path, app):
+    """The rail stops at the 40 biggest groups; a k-means pass makes hundreds."""
+    files = {f'{i:02d}.jpg': _flat(64, i) for i in range(45)}
+    files.update({'best.jpg': _flat(64, 250), 'gone.jpg': _flat(64, 251)})
+    bank_id, _ = _mkbank(client, tmp_path, files)
+    scores = {f'{i:02d}.jpg': {'style_cluster': i + 1, 'aesthetic_score': 5.0}
+              for i in range(45)}
+    scores['best.jpg'] = {'style_cluster': 1, 'aesthetic_score': 8.0}
+    scores['gone.jpg'] = {'style_cluster': 1, 'aesthetic_score': 9.5, 'status': 'reject'}
+    _set_scores(app, bank_id, **scores)
+    assert len(client.get(f'/api/bank/{bank_id}').get_json()['style_clusters']) == 40
+
+    data = client.get(f'/api/bank/{bank_id}/style-groups').get_json()
+    assert data['total'] == 45 and len(data['groups']) == 45
+    first = data['groups'][0]
+    assert (first['id'], first['size'], first['rejected']) == (1, 3, 1)
+    assert first['aesthetic'] == 6.5, 'mean over non-rejected scored members'
+    by_name = {i['name']: i['id'] for i in
+               client.get(f'/api/bank/{bank_id}/images?style=1').get_json()['images']}
+    assert first['preview_ids'] == [by_name['best.jpg'], by_name['00.jpg']], \
+        'nicest kept member first; a rejected one never previews'
+    assert client.get('/api/bank/999999/style-groups').status_code == 404
+
+
 # --- subfolder scoping -------------------------------------------------------
 def test_subfolders_facet_and_filter(client, tmp_path):
     bank_id, _ = _mkbank(client, tmp_path, {
