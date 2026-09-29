@@ -33,8 +33,8 @@ Protocol (same shape as face_embed_infer.py):
 Each of the three heads degrades independently: if the aesthetic weights can't be
 fetched the pass still returns nsfw + style (aesthetic omitted), and vice-versa —
 a broken single head never sinks the whole pass. Embeddings + scores are cached in
-the .npz and written every CACHE_EVERY images, so killing the pass mid-way loses at
-most that slice.
+the .npz and written at most every CACHE_SAVE_SECONDS (and at least CACHE_EVERY
+images apart), so killing the pass mid-way loses at most that slice.
 
 RESUMING is what the cache is for, and it has two halves:
   * a successfully cached path (and unchanged on disk) is never embedded again — that
@@ -63,6 +63,9 @@ import io
 import json
 import os
 import sys
+import time
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 # A ._pth-pinned interpreter (ComfyUI portable's python_embeded) does not put
 # this script's directory on sys.path — restore it or the import below dies
 # there. See _harness.py for the whole story.
@@ -72,6 +75,16 @@ if _HERE not in sys.path:
 from _harness import _cancel_requested, _log, _write_count
 
 CACHE_EVERY = 50
+# ...and never more often than this: each save rewrites the whole cache.
+CACHE_SAVE_SECONDS = 60
+# Threads preparing images ahead of the GPU. Pillow and torch release the GIL
+# for decode and resize, so these run in parallel on real cores.
+PREP_WORKERS = max(1, min(8, (os.cpu_count() or 2) - 1))
+# JPEGs decode at a reduced DCT scale no smaller than this per side. Both
+# models see 384 px at most; measured on 120 large JPEGs of a real bank, CLIP
+# cosine to the full decode was 1.0000 median, 0.9956 at the 1st percentile,
+# and no NSFW call flipped (at 448 px one did — hence 768).
+JPEG_DRAFT_SIDE = 768
 
 # LAION improved-aesthetic-predictor (the canonical 7-layer MLP over a
 # L2-normalized CLIP ViT-L/14 image embedding). Public, ~13 MB, downloaded once.
@@ -253,6 +266,41 @@ def _salvage_cache(path):
     if not path:
         return
     npz_atomic.salvage_orphan_tmp(path, lambda p: len(_load_cache(p)), _log)
+
+
+def _prepare(path, preprocess, nsfw_proc):
+    """The CPU half of scoring one image, run on a worker thread.
+
+    Never raises: the loop that consumes this decides what a failure means, so
+    it gets the failure back as data together with the signature it needs to
+    tell "broken file" from "file replaced under us". An NSFW preprocessing
+    failure is a HEAD failure (the image still gets its embedding), so it
+    travels separately from the image error."""
+    from PIL import Image
+    out = {'sig': '', 'hash': b'', 'changed': False, 'error': None,
+           'clip': None, 'nsfw': None, 'nsfw_error': None}
+    try:
+        # The bytes were validated from the open descriptor immediately before
+        # this decode.  Never re-open the mutable Bank path.
+        out['sig'] = _file_sig(path)
+        payload = read_validated_bank_image(path)
+        out['hash'] = hashlib.sha256(payload).digest()
+        if not out['sig'] or _file_sig(path) != out['sig']:
+            out['changed'] = True
+            raise RuntimeError('image changed while it was read')
+        with Image.open(io.BytesIO(payload)) as im:
+            if im.format == 'JPEG':
+                im.draft('RGB', (JPEG_DRAFT_SIDE, JPEG_DRAFT_SIDE))
+            im = im.convert('RGB')
+            out['clip'] = preprocess(im)
+            if nsfw_proc is not None:
+                try:
+                    out['nsfw'] = nsfw_proc(images=im, return_tensors='pt')
+                except Exception as e:  # noqa: BLE001 — a head failure, not the image's
+                    out['nsfw_error'] = e
+    except Exception as e:  # noqa: BLE001 — handed to the loop, see above
+        out['error'] = e
+    return out
 
 
 # --- style clustering (union-find over cosine, testable without torch) ---------
@@ -547,7 +595,7 @@ def main() -> int:
             import numpy as np  # noqa: F401
             import open_clip
             import torch
-            from PIL import Image
+            from PIL import Image  # noqa: F401 — fail fast here, not once per image
         except Exception as e:  # noqa: BLE001 — clean JSON, never a mute traceback
             print(json.dumps({'ok': False, 'results': {}, 'clusters': {},
                               'error': import_report.import_failure(e)}), file=_OUT)
@@ -587,6 +635,7 @@ def main() -> int:
             return 1
         zero = np.zeros(768, dtype='float32')
         done_since_save = 0
+        last_save = time.monotonic()
         if _cancel_requested(cancel_file):   # cancelled during the model load
             _write_count(cache_path, reused)
             payload = {'ok': True, 'cancelled': True,
@@ -596,27 +645,42 @@ def main() -> int:
                       'clusters': None}
             print(json.dumps(payload), file=_OUT)
             return 0
-        for i, p in enumerate(work, 1):
-            # A retried entry keeps the value of any head that is STILL down —
-            # overwriting a good aesthetic score with None because the nsfw model
-            # came back would trade one hole for another.
-            keep = cache.get(p) if p in retry_set else None
-            signature = ''
-            payload_hash = b''
-            changed_while_scoring = False
-            try:
-                # The bytes were validated from the open descriptor immediately
-                # before this decode.  Never re-open the mutable Bank path.
-                signature = _file_sig(p)
-                payload = read_validated_bank_image(p)
-                payload_hash = hashlib.sha256(payload).digest()
-                if not signature or _file_sig(p) != signature:
-                    changed_while_scoring = True
-                    raise RuntimeError('image changed while it was read')
-                with Image.open(io.BytesIO(payload)) as im:
-                    im = im.convert('RGB')
+        # The CPU half of each image (read, validate, decode, both resizes) runs
+        # ahead in a thread pool while this thread feeds the GPU — one image at a
+        # time left the card idle most of the pass. Results are still consumed
+        # strictly in ``work`` order, so every per-image rule below is unchanged.
+        nsfw_proc = nsfw_bundle[1] if nsfw_ok else None
+        pool = ThreadPoolExecutor(max_workers=PREP_WORKERS)
+        pending = deque()
+        queue = iter(work)
+
+        def _fill():
+            while len(pending) < PREP_WORKERS * 2:
+                nxt = next(queue, None)
+                if nxt is None:
+                    return
+                pending.append((nxt, pool.submit(_prepare, nxt, preprocess, nsfw_proc)))
+
+        try:
+            _fill()
+            i = 0
+            while pending:
+                p, future = pending.popleft()
+                _fill()
+                i += 1
+                # A retried entry keeps the value of any head that is STILL down —
+                # overwriting a good aesthetic score with None because the nsfw
+                # model came back would trade one hole for another.
+                keep = cache.get(p) if p in retry_set else None
+                prep = future.result()
+                signature = prep['sig']
+                payload_hash = prep['hash']
+                changed_while_scoring = prep['changed']
+                try:
+                    if prep['error'] is not None:
+                        raise prep['error']
                     with torch.no_grad():
-                        tens = preprocess(im).unsqueeze(0).to(device)
+                        tens = prep['clip'].unsqueeze(0).to(device)
                         emb = clip_model.encode_image(tens)
                         emb = emb / emb.norm(dim=-1, keepdim=True)
                         emb_np = emb.cpu().numpy()[0].astype('float32')
@@ -631,65 +695,76 @@ def main() -> int:
                         nsfw = keep[2] if keep else None
                         if nsfw_ok:
                             try:
-                                model, proc, nsfw_idx = nsfw_bundle
-                                inp = proc(images=im, return_tensors='pt').to(device)
-                                logits = model(**inp).logits
+                                if prep['nsfw_error'] is not None:
+                                    raise prep['nsfw_error']
+                                model, _proc, nsfw_idx = nsfw_bundle
+                                logits = model(**prep['nsfw'].to(device)).logits
                                 probs = torch.softmax(logits, dim=-1)[0]
                                 nsfw = round(float(probs[nsfw_idx].item()), 4)
                             except Exception as e:  # noqa: BLE001 — preserve CLIP and aesthetic
                                 head_errors.setdefault('nsfw', _reason(e))
                     result = ('ok', aesthetic, nsfw, emb_np, signature, payload_hash)
-                # CLIP and the heads can take long enough for a live Bank path
-                # to be replaced.  Publish only while it still identifies the
-                # validated bytes that produced ``result``.
-                if _file_sig(p) != signature:
-                    changed_while_scoring = True
-                    raise RuntimeError('image changed while it was scored')
-                cache[p] = result
-            except Exception as e:  # noqa: BLE001 — one broken file never sinks the pass
-                reason = _reason(e)
-                if reason not in image_errors and len(image_errors) < 3:
-                    image_errors.append(reason)
-                if not signature or _file_sig(p) != signature:
-                    changed_while_scoring = True
-                # A hole-retry that fails KEEPS its entry: the embedding in it is
-                # good work, and downgrading it to ('error', zero) because the file
-                # is momentarily unreadable would drop the image out of the style
-                # partition to fix nothing.
-                if changed_while_scoring:
-                    cache.pop(p, None)
-                    if p in retry_set:
-                        reused = max(reused - 1, 0)
-                elif keep is None:
-                    cache[p] = ('error', None, None, zero, signature, payload_hash)
-                _log(f'[score] {i}/{len(work)} ERROR {e}')
-                continue
-            finally:
-                if p in todo_set and p in cache:
-                    fresh += 1
-                computed += 1
-                done_since_save += 1
-                if cache_path and done_since_save >= CACHE_EVERY:
-                    _flush_cache(cache_path, cache)
+                    # CLIP and the heads can take long enough for a live Bank path
+                    # to be replaced.  Publish only while it still identifies the
+                    # validated bytes that produced ``result``.
+                    if _file_sig(p) != signature:
+                        changed_while_scoring = True
+                        raise RuntimeError('image changed while it was scored')
+                    cache[p] = result
+                except Exception as e:  # noqa: BLE001 — one broken file never sinks the pass
+                    reason = _reason(e)
+                    if reason not in image_errors and len(image_errors) < 3:
+                        image_errors.append(reason)
+                    if not signature or _file_sig(p) != signature:
+                        changed_while_scoring = True
+                    # A hole-retry that fails KEEPS its entry: the embedding in it
+                    # is good work, and downgrading it to ('error', zero) because
+                    # the file is momentarily unreadable would drop the image out
+                    # of the style partition to fix nothing.
+                    if changed_while_scoring:
+                        cache.pop(p, None)
+                        if p in retry_set:
+                            reused = max(reused - 1, 0)
+                    elif keep is None:
+                        cache[p] = ('error', None, None, zero, signature, payload_hash)
+                    _log(f'[score] {i}/{len(work)} ERROR {e}')
+                    continue
+                finally:
+                    if p in todo_set and p in cache:
+                        fresh += 1
+                    computed += 1
+                    done_since_save += 1
+                    # Every save rewrites the WHOLE compressed cache, so a fixed
+                    # every-N schedule grows quadratically: 3.5 s per save at 30 000
+                    # images, every 50 images, halved the pass rate by mid-bank.
+                    # A clock bounds both the cost and what a crash can lose.
+                    if (cache_path and done_since_save >= CACHE_EVERY
+                            and time.monotonic() - last_save >= CACHE_SAVE_SECONDS):
+                        _flush_cache(cache_path, cache)
+                        _write_count(cache_path, reused + fresh)
+                        done_since_save = 0
+                        last_save = time.monotonic()
+                _log(f'[score] {i}/{len(work)} {cache[p][0]}')
+                if _cancel_requested(cancel_file):   # clean stop between images
+                    if cache_path:
+                        _flush_cache(cache_path, cache)
                     _write_count(cache_path, reused + fresh)
-                    done_since_save = 0
-            _log(f'[score] {i}/{len(work)} {cache[p][0]}')
-            if _cancel_requested(cancel_file):   # clean stop between images
-                if cache_path:
-                    _flush_cache(cache_path, cache)
-                _write_count(cache_path, reused + fresh)
-                # results, NOT clusters. The scores here are paid GPU work and the
-                # parent writes them; the style partition is 181 s of n² away and
-                # the parent kills us after 15 s, so asking for it would lose both.
-                payload = {
-                    'ok': True, 'cancelled': True,
-                    'cached': reused + fresh,
-                    'remaining': len(images) - reused - fresh,
-                    'computed': computed, 'reused': reused,
-                    'results': _results_from_cache(images, cache, True),
-                    'clusters': None}
-                print(json.dumps(payload), file=_OUT)
-                return 0
+                    # results, NOT clusters. The scores here are paid GPU work and
+                    # the parent writes them; the style partition is 181 s of n²
+                    # away and the parent kills us after 15 s, so asking for it
+                    # would lose both.
+                    payload = {
+                        'ok': True, 'cancelled': True,
+                        'cached': reused + fresh,
+                        'remaining': len(images) - reused - fresh,
+                        'computed': computed, 'reused': reused,
+                        'results': _results_from_cache(images, cache, True),
+                        'clusters': None}
+                    print(json.dumps(payload), file=_OUT)
+                    return 0
+        finally:
+            # A stop must not wait for images nobody will score.
+            pool.shutdown(wait=False, cancel_futures=True)
         if cache_path:
             _phase(f'saving the score cache ({len(cache)} image(s))…')
             _flush_cache(cache_path, cache)

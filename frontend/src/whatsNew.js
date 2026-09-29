@@ -84,6 +84,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-29-faster-score-pass', date: '2026-09-29',
+    title: 'Score Runs About 3× Faster',
+    blurb: '✨ Score prepares images on several CPU cores while the GPU works, and no longer slows down as a big bank fills its cache. Large photos up to your image size limit now score instead of failing as "too large", and one unreadable image no longer throws away the whole bank\'s style groups.',
+  },
+  {
     id: '2026-09-28-zzzz-kmeans-style-groups', date: '2026-09-28',
     title: 'Split Big Banks Into Style Groups',
     blurb: 'Set a number of style groups and ✨ Score splits the bank into that many sets of look-alike images, even when every image resembles its neighbours.',
