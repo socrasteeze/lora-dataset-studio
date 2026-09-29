@@ -112,6 +112,7 @@ def _writer_verdict_during_inference(file_db, make_job):
         with patch.object(banks, '_drive_infer_subprocess', fake_drive), \
              patch.object(banks.bank_jobs, 'cancelled', lambda job: False), \
              patch.object(banks.bank_jobs, 'progress', lambda job, **kw: None), \
+             patch.object(banks.bank_jobs, 'bump', lambda job, *a, **kw: None), \
              patch.object(banks.bank_jobs, 'set_stop_notice', lambda job, **kw: None), \
              patch('app.capabilities.bank_scoring_gpu_available', lambda: False), \
              patch.object(banks, '_resolve_face_device', lambda: ('cpu', False)):
@@ -367,7 +368,7 @@ def test_the_inpaint_level_lets_other_writers_through_during_its_batch(file_db):
                 raise OSError('cannot stage this one')
             return real_stage(bank_id_, row, src)
 
-        def fake_batch(items, device='cpu'):
+        def fake_batch(items, device='cpu', **_kw):
             seen['error'] = _concurrent_write(db_path)
             return {it['image_path']: (True, None) for it in items}
 
