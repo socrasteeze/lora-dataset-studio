@@ -91,13 +91,6 @@ export const WHATS_NEW = [
     to: '/bank',
   },
   {
-    id: '2026-09-28-bank-edit-history',
-    date: '2026-09-29',
-    title: 'Undo an upscale without losing your crop',
-    blurb: 'Bank now keeps the steps of new crops and upscales. Undo the last edit on one image or a selection, and compare before and after in Review. Earlier edits stay intact; versions discarded before this update cannot be recovered. Suggested by nofaceman on Discord.',
-    to: '/bank',
-  },
-  {
     id: '2026-10-01-z-bank-queue-and-tiles', date: '2026-10-01',
     title: 'Tidy the Bank Queue Without Stopping the Running Bank',
     blurb: 'The Launch-all queue now has Clear waiting, which empties the line and leaves the running bank going, and a separate Stop running. Both ask first, and the whole row lights up so you can see which bank an ✕ removes. Bank tiles now say why an image was rejected in words, give every flag its own short label, show at most three badges plus "+n", show who wrote the caption, and have finger-sized buttons on a phone. ↺ Undecide and Clear selection replace Skip and CLR, matching the dataset grid.',
@@ -158,6 +151,13 @@ export const WHATS_NEW = [
     id: '2026-09-29-faster-score-pass', date: '2026-09-29',
     title: 'Score Runs About 3× Faster',
     blurb: '✨ Score prepares images on several CPU cores while the GPU works, and no longer slows down as a big bank fills its cache. Large photos up to your image size limit now score instead of failing as "too large", and one unreadable image no longer throws away the whole bank\'s style groups.',
+  },
+  {
+    id: '2026-09-28-bank-edit-history',
+    date: '2026-09-29',
+    title: 'Undo an upscale without losing your crop',
+    blurb: 'Bank now keeps the steps of new crops and upscales. Undo the last edit on one image or a selection, and compare before / after in Review. Earlier edits stay intact; versions discarded before this update cannot be recovered. Suggested by nofaceman on Discord.',
+    to: '/bank',
   },
   {
     id: '2026-09-28-zzzz-kmeans-style-groups', date: '2026-09-28',
