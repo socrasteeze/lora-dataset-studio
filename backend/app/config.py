@@ -513,6 +513,11 @@ DEFAULTS = {
         'python': '', 'models_root': '', 'device': 'auto',
         'siglip2_semantic_dup_threshold': 0.97,
     },
+    # 🎨 style grouping method. kmeans_k 0 = union-find over bank.style_threshold
+    # (the shipped behaviour). > 0 = k-means into that many groups on the same
+    # cached CLIP embeddings — no chaining, so a big bank of look-alike images
+    # still splits. Applies at the next ✨ Score pass (no inference re-run).
+    'bank_style': {'kmeans_k': 0},
     # fp8 quantization runs `fp8_export.py` in a SUBPROCESS, because it needs
     # torch + safetensors and this app deliberately installs without them
     # (gigabytes). Empty -> the same interpreter ✨ Score uses, then ai-toolkit's,

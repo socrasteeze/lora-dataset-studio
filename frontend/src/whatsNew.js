@@ -84,6 +84,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-28-zzzz-kmeans-style-groups', date: '2026-09-28',
+    title: 'Split Big Banks Into Style Groups',
+    blurb: 'Set a number of style groups and ✨ Score splits the bank into that many sets of look-alike images, even when every image resembles its neighbours.',
+    to: '/settings/captioning',
+  },
+  {
     id: '2026-09-28-zzz-wide-datasets-page', date: '2026-09-28',
     title: 'Wider Datasets Page',
     blurb: 'The Datasets list now uses the same wide layout as Bank, so more dataset cards fit on screen at once.',

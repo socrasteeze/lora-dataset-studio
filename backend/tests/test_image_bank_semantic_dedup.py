@@ -275,6 +275,26 @@ def test_blocking_respects_config_fallback(app, tmp_path, client):
     assert _groups(app, bank_id)['a.jpg'] == _groups(app, bank_id)['b.jpg']
 
 
+def test_kmeans_style_groups_disable_blocking(app, tmp_path, client):
+    """k-means groups give no threshold guarantee, so a near-dup pair split
+    across two of them must still be found."""
+    bank_id, _ = _mkbank(client, tmp_path, {'a.jpg': _flat(10), 'b.jpg': _flat(20)})
+    _write_score_cache(app, bank_id, {
+        'a.jpg': _emb(1.0, 0.0), 'b.jpg': _emb(0.97, np.sqrt(1 - 0.97 ** 2))})
+    with app.app_context():
+        import app.config as cfg
+        from app.extensions import db
+        from app.models import BankImage
+        cfg.save_config({'bank_style': {'kmeans_k': 2}})
+        rows = BankImage.query.filter_by(bank_id=bank_id).all()
+        rows[0].style_cluster, rows[1].style_cluster = 1, 2
+        db.session.commit()
+        from app.services import image_bank_service as banks
+        n = banks.rebuild_semantic_dup_groups(bank_id)
+    assert n == 1
+    assert _groups(app, bank_id)['a.jpg'] == _groups(app, bank_id)['b.jpg']
+
+
 def test_siglip2_dedup_is_global_and_preserves_clip_analysis_lanes(
         app, tmp_path, client):
     """SigLIP2 must find a pair across unrelated CLIP style blocks, while its

@@ -274,6 +274,15 @@ def thresholds() -> dict:
     return out
 
 
+def style_kmeans_k() -> int:
+    """``bank_style.kmeans_k`` sanitized: > 0 = k-means into that many style
+    groups, 0 (or anything unusable) = union-find over style_threshold."""
+    try:
+        return max(0, int(float(cfg.get('bank_style.kmeans_k', 0) or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
 # --- storage helpers --------------------------------------------------------
 def _bank_dir(bank_id) -> Path:
     return cfg.banks_root() / str(bank_id)
@@ -5389,7 +5398,10 @@ def rebuild_semantic_dup_groups(bank_id, threshold=None, *,
         return None
     th = thresholds()
     t = _semantic_dup_threshold(engine, threshold)
-    block_by_style = engine == 'clip' and th['style_threshold'] <= t
+    # k-means groups carry no threshold guarantee — a pair above t can straddle
+    # two of them — so blocking is only sound over the union-find partition.
+    block_by_style = (engine == 'clip' and style_kmeans_k() == 0
+                      and th['style_threshold'] <= t)
     rows = (BankImage.query.filter_by(bank_id=bank_id)
             .order_by(BankImage.id.asc()).all())
     path_by_id = {row.id: analysis_image_path(bank, row) for row in rows}
@@ -8578,6 +8590,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
             return
         _bank_dir(bank_id).mkdir(parents=True, exist_ok=True)
         th = thresholds()
+        kmeans_k = style_kmeans_k()
         cache_path = _score_cache_path(bank_id)
         if device_id:
             # The whole pass moves to the peer as ONE job (chunking would break
@@ -8590,6 +8603,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
                 data = bank_remote.run_remote_pass(
                     job, device_id, script=_SCORE_SCRIPT, by_path=by_path,
                     extra_payload={'style_threshold': th['style_threshold'],
+                                   'style_kmeans_k': kmeans_k,
                                    'rescore': bool(rescore)},
                     cache_path=cache_path, progress_re=_SCORE_PROGRESS_RE,
                     detail_label='scoring pass', required_cap='bank_scoring',
@@ -8607,6 +8621,7 @@ def _score_job(bank_id, device_id=None, rescore=False):
                 'cache': str(cache_path),
                 'cancel_file': str(cache_path) + '.cancel',
                 'style_threshold': th['style_threshold'],
+                'style_kmeans_k': kmeans_k,
                 'rescore': bool(rescore),
             })
             python = cfg.get('bank_scoring.python') or sys.executable
@@ -8729,10 +8744,15 @@ def _score_job(bank_id, device_id=None, rescore=False):
             missing.append('aesthetic')
         if ok and any('nsfw' not in r for r in ok):
             missing.append('NSFW')
-        detail = (f'done — scored {scored} image(s), '
-                  + group_summary(sizes.values(), 'style group',
-                                  th['style_threshold'],
-                                  '🎚 Filter thresholds ▸ style_threshold'))
+        if kmeans_k:
+            biggest = max(sizes.values(), default=0)
+            grouping = (f'{len(sizes)} k-means style group(s) '
+                        f'(the biggest holds {biggest} of {len(clusters)} images)')
+        else:
+            grouping = group_summary(sizes.values(), 'style group',
+                                     th['style_threshold'],
+                                     '🎚 Filter thresholds ▸ style_threshold')
+        detail = f'done — scored {scored} image(s), ' + grouping
         if not style_written:
             detail += ' (style grouping discarded: an image changed during write-back)'
         # Where the work went. Both numbers count images HANDED to the pass, so
