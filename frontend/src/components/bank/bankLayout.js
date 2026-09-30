@@ -80,6 +80,44 @@ export function saveRailOpen(open, store = defaultStore()) {
   return !!open;
 }
 
+/* ── Remembered folds ───────────────────────────────────────────────────────
+   Which Bank blocks the user left open or closed. Before this they reset on
+   every visit, and the defaults put the first image below the fold at
+   1440×900. Keys are stored identifiers — never rename one. */
+export const FOLD_KEYS = {
+  more: 'lds.bank.fold.more',        // rail ▸ More filters
+  curate: 'lds.bank.fold.curate',    // ③ Curate block above the grid
+};
+
+/** A remembered boolean, or `fallback` when nothing (valid) is stored. */
+export function loadFold(key, fallback, store = defaultStore()) {
+  try {
+    const raw = store?.getItem(key);
+    if (raw === 'open') return true;
+    if (raw === 'closed') return false;
+  } catch { /* fall through */ }
+  return fallback;
+}
+
+export function saveFold(key, open, store = defaultStore()) {
+  try { store?.setItem(key, open ? 'open' : 'closed'); } catch { /* keep session state */ }
+  return !!open;
+}
+
+/** The finished_at of the Launch-all report this bank's user dismissed, so a
+ *  dismissed report stays dismissed until a NEW run replaces it. */
+export function loadDismissedReport(bankId, store = defaultStore()) {
+  try {
+    const n = Number(store?.getItem(`lds.bank.${bankId}.reportDismissed`));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch { return null; }
+}
+
+export function saveDismissedReport(bankId, finishedAt, store = defaultStore()) {
+  try { store?.setItem(`lds.bank.${bankId}.reportDismissed`, String(finishedAt)); } catch { /* ignore */ }
+  return finishedAt;
+}
+
 /* ── The facet groups ───────────────────────────────────────────────────────
    All of triage lives in the rail. The split is by HOW OFTEN a facet is
    reached, not by which pass produced it: Status and Quality are the everyday

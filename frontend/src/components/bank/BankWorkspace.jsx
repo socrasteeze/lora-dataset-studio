@@ -49,7 +49,8 @@ import {
 } from './bankFacets.js'
 // Structure B's own logic — rail folding, facet groups, the passes panel.
 import {
-  loadRailOpen, passesButtonLabel, passesPanelStartsOpen, railIsColumn, saveRailOpen,
+  FOLD_KEYS, loadDismissedReport, loadFold, loadRailOpen, passesButtonLabel,
+  passesPanelStartsOpen, railIsColumn, saveDismissedReport, saveFold, saveRailOpen,
 } from './bankLayout.js'
 import PromoteDialog from './PromoteDialog'
 import DeleteRejectedDialog from './DeleteRejectedDialog'
@@ -273,7 +274,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   // for ✨ Score, 'semantic' for the SigLIP 2 index) or '' for none. One dialog
   // serves both — the profile decides the endpoint and the wording.
   const [pythonPickerFor, setPythonPickerFor] = useState('')
-  const [dismissedReportAt, setDismissedReportAt] = useState(null)
+  // Remembered per bank: a dismissed report used to return on every visit and
+  // took ~300 px above the grid until a new run replaced it.
+  const [dismissedReportAt, setDismissedReportAt] = useState(() => loadDismissedReport(bankId))
   const [relocating, setRelocating] = useState(false)
   const [forgettingMissing, setForgettingMissing] = useState(false)
   const [openingSourceFolder, setOpeningSourceFolder] = useState(false)
@@ -296,7 +299,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
      the passes were run FOR, and a closed disclosure hid them from exactly the
      people who had just paid for the measurements. Still collapsible — the
      fold exists for the 400 px drawer, not as the resting state. */
-  const [moreOpen, setMoreOpen] = useState(true)
+  const [moreOpen, setMoreOpenState] = useState(() => loadFold(FOLD_KEYS.more, true))
+  const setMoreOpen = (v) => setMoreOpenState((prev) => saveFold(FOLD_KEYS.more, typeof v === 'function' ? v(prev) : v))
+  // ③ Curate folds to one row by default and remembers the user's choice: open,
+  // its six buttons pushed the first image below the fold at 1440×900.
+  const [curateShown, setCurateShownState] = useState(() => loadFold(FOLD_KEYS.curate, false))
+  const toggleCurate = () => setCurateShownState((prev) => saveFold(FOLD_KEYS.curate, !prev))
   const [styleBrowserOpen, setStyleBrowserOpen] = useState(false)
   const closeStyleBrowser = useCallback(() => setStyleBrowserOpen(false), [])
   const [passesOpen, setPassesOpen] = useState(false)
@@ -1854,7 +1862,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       {!live && payload?.pipeline_report
         && payload.pipeline_report.finished_at !== dismissedReportAt && (
         <PipelineReport report={payload.pipeline_report}
-          onDismiss={() => setDismissedReportAt(payload.pipeline_report.finished_at)} />
+          onDismiss={() => setDismissedReportAt(
+            saveDismissedReport(bankId, payload.pipeline_report.finished_at))} />
       )}
 
       {/* ⚙ The analysis passes, opened on demand. All eight are here with their
@@ -1999,14 +2008,14 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               the tile click stays the bulk-selection gesture it has always been. */}
           <button type="button" onClick={() => openReview(null)} disabled={reviewLoading}
             title="Review the images of this filter one at a time, full size: ✓ Keep / ✕ Reject / ⏭ Skip (K/R/S) each move to the next. Optional random order."
-            className="rounded-md border border-indigo-400/60 bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30">
+            className="inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border border-indigo-400/60 bg-indigo-500/20 px-2.5 text-xs font-semibold text-indigo-200 disabled:opacity-50 hover:bg-indigo-500/30">
             {reviewLoading ? '▶ Preparing…' : '▶ Review'}
           </button>
           <span aria-hidden className="h-4 w-px bg-border" />
           <span className="text-content-muted">{selected.size} selected</span>
           <button type="button" onClick={selectAllCurrent}
             title="Selects every image the current filters show — all pages, not just the tiles on screen"
-            className="rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
+            className="inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border border-border px-2 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
             Select all
           </button>
           {/* Bulk-reject undecided images by quality flag — a triage shortcut that
@@ -2015,7 +2024,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             <button type="button" onClick={() => setShowAutoReject((v) => !v)} disabled={live}
               aria-expanded={showAutoReject}
               title="Bulk-reject the still-undecided images carrying the chosen quality flags"
-              className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2 py-0.5 text-xs text-content disabled:opacity-50 hover:bg-surface">
+              className="inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border border-border bg-surface-raised px-2 text-xs text-content disabled:opacity-50 hover:bg-surface">
               <Wand2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Auto-reject
             </button>
             {showAutoReject && (
@@ -2100,7 +2109,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               title={showSelected
                 ? 'Back to the full grid with its filters'
                 : 'Show only the selected images (as their own view), so a scattered curation/similarity result is visible in one place'}
-              className={`rounded-md border px-2 py-0.5 text-xs font-medium ${showSelected
+              className={`inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-md border px-2 text-xs font-medium ${showSelected
                 ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
                 : 'border-border text-content-muted hover:text-content hover:bg-surface-raised'}`}>
               {showSelected ? <><Undo2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show all</> : <><Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Show selected ({selected.size})</>}
@@ -2116,8 +2125,17 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             selected semantic index. Diversity coverage + reference similarity, both
             producing a SELECTION the user reviews above. */}
         <div className="space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Curate</span>
-          <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={toggleCurate} aria-expanded={curateShown}
+            aria-controls="bank-curate"
+            className="min-h-10 lg:min-h-0 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-content-subtle hover:text-content">Curate<span aria-hidden>{curateShown ? '▾' : '▸'}</span>
+            {!curateShown && (
+              <span className="font-normal normal-case tracking-normal">
+                — pick diverse, balanced, similar, find by text, coverage advice
+              </span>
+            )}
+          </button>
+          {curateShown && (
+          <div id="bank-curate" className="grid grid-cols-2 gap-2">
           <div className="relative min-w-0">
             <button type="button" disabled={live || !semanticReady || diverseBusy}
               onClick={() => setCurateOpen((v) => (v === 'diverse' ? null : 'diverse'))}
@@ -2412,7 +2430,8 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             <BarChart3 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Coverage advice{coverageOpen ? ' ▲' : ' ▼'}
           </button>
           </div>
-          {!semanticReady && (
+          )}
+          {curateShown && !semanticReady && (
             <span className="text-xs text-content-subtle">{semanticBlocked}</span>
           )}
         </div>
