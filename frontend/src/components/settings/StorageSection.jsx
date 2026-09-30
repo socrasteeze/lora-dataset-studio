@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, postJson } from '../../api/fetchClient'
-import { Card, INPUT_CLASS } from './primitives'
+import { Card, INPUT_CLASS, SIDE_BUTTON_CLASS } from './primitives'
 import { SettingsGroup, SettingsGroupsToc, useSettingsGroupProps } from './SettingsGroupsView'
 import { STORAGE_GROUPS } from './settingsGroups'
 import ResetToDefault from './ResetToDefault'
@@ -106,14 +106,15 @@ function LocationEditor({
         <label htmlFor={id} className="block text-sm font-medium text-content">
           Folder (leave empty for the default)
         </label>
-        {/* Column on a phone: a path field and two buttons never share 400 px. */}
-        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+        {/* Column on a phone: a path field and two buttons never share 400 px.
+            sm:items-end: side by side, field and button share one height. */}
+        <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-end">
           <input id={id} type="text" value={draft} disabled={busy}
             onChange={(e) => { setDraft(e.target.value); setCheck(null) }}
             placeholder="Defaults to the app’s data folder"
             className={`${INPUT_CLASS} sm:flex-1`} />
           <button type="button" onClick={validate} disabled={checking || busy}
-            className="shrink-0 rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium text-content hover:bg-surface-raised disabled:opacity-50">
+            className={`${SIDE_BUTTON_CLASS} shrink-0`}>
             {checking ? 'Checking…' : 'Check folder'}
           </button>
         </div>

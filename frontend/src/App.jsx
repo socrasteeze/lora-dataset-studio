@@ -364,7 +364,10 @@ function NavBar() {
               </NavLink>
             ))}
           </div>
-          <div className="app-header-tools ml-auto flex shrink-0 items-center gap-1">
+          {/* The machine-load readout is a plugin's; its two buttons (toggle,
+              free memory) carry a data-testid, the Help badge beside them does
+              not. On a desktop they stand at the 32 px of the icon buttons. */}
+          <div className="app-header-tools ml-auto flex shrink-0 items-center gap-1 lg:[&_[data-testid=header-system-stats]>button[data-testid]]:h-8 lg:[&_[data-testid=header-system-stats]>button[data-testid]]:min-w-8">
             {desktopNav && machineLoad}
             <HeaderMenu triggerLabel={<span aria-hidden>?</span>}
               triggerTitle="Help & guide" active={helpMenuActive}>

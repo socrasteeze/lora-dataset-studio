@@ -93,7 +93,7 @@ export default function PluginCard({ plugin, release, mediaKey, updateAvailable,
         {plugin.error && <p className="mt-1 text-xs text-amber-500">{plugin.error}</p>}
         {installed && pluginActive(plugin) && !capsKnown && <p className="text-xs text-content-muted">Checking configured components…</p>}
         {readiness.length > 0 && <details className="mt-2 text-sm" data-plugin-readiness>
-          <summary className="min-h-10 cursor-pointer py-2 font-medium">Configured components · {readiness.filter(row => row.state === 'ready').length}/{readiness.length} ready</summary>
+          <summary className="min-h-10 cursor-pointer py-2 font-medium lg:min-h-0">Configured components · {readiness.filter(row => row.state === 'ready').length}/{readiness.length} ready</summary>
           <ul className="space-y-2 rounded-md border border-border p-3">
             {readiness.map((row, index) => <li key={index}>
               <span className="font-medium">{row.label}</span>{' · '}
@@ -108,7 +108,7 @@ export default function PluginCard({ plugin, release, mediaKey, updateAvailable,
           <p className="mt-1 text-xs text-content-muted">Off because it needs: {plugin.disabled_by.join(', ')}</p>
         )}
         {(details?.setup_hint || requires.length > 0 || plugin.permissions?.length > 0 || release) && <details className="text-sm">
-          <summary className="min-h-10 cursor-pointer py-2 font-medium">Details and requirements</summary>
+          <summary className="min-h-10 cursor-pointer py-2 font-medium lg:min-h-0">Details and requirements</summary>
           <div className="space-y-2 rounded-lg border border-border p-3 text-content-muted">
             {details?.setup_hint && <p>{details.setup_hint}</p>}
             {details?.surfaces?.length > 0 && <p>Included in: {details.surfaces.join(', ')}.</p>}

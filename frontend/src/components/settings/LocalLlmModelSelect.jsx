@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { postJson } from '../../api/fetchClient'
-import { INPUT_CLASS } from './primitives'
+import { INPUT_CLASS, SIDE_BUTTON_CLASS } from './primitives'
 
 export default function LocalLlmModelSelect({ id, label, provider, url, value, onChange, refreshKey }) {
   const [revision, setRevision] = useState(0)
@@ -38,7 +38,8 @@ export default function LocalLlmModelSelect({ id, label, provider, url, value, o
   return (
     <div className="min-w-0">
       <label htmlFor={id} className="block text-sm font-medium text-content">{label}</label>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* items-end: the select's mt-1 must not push it below Refresh. */}
+      <div className="flex flex-wrap items-end gap-2">
         <select id={id} value={current} onChange={event => onChange(event.target.value)}
           disabled={loading} aria-busy={loading} aria-describedby={hintId}
           className={`${INPUT_CLASS} min-w-0 flex-1`}>
@@ -51,7 +52,7 @@ export default function LocalLlmModelSelect({ id, label, provider, url, value, o
         </select>
         <button type="button" disabled={loading} onClick={() => setRevision(n => n + 1)}
           aria-label={`Refresh ${server} models`}
-          className="mt-1 min-h-10 rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-content hover:bg-surface-raised disabled:opacity-50">
+          className={SIDE_BUTTON_CLASS}>
           {loading ? 'Loading…' : 'Refresh'}
         </button>
       </div>

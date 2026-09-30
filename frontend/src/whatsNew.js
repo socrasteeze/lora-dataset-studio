@@ -84,6 +84,16 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-29-zzzzzz-even-control-rows', date: '2026-09-29',
+    title: 'Buttons in a Row Now Line Up',
+    blurb: 'On a desktop, the buttons, dropdowns and fields that share a row now stand at one height: Train the LoRA, Generate, the caption and watermark tools, the Gallery filters and the Settings fields. Icons sit beside their labels instead of above them, and engine cards in a row match in height.',
+  },
+  {
+    id: '2026-09-29-zzzzz-phone-fields-and-copy', date: '2026-09-29',
+    title: 'Steadier on an iPhone',
+    blurb: 'Tapping a field no longer zooms the page in on an iPhone. Copy buttons now work when you open the app from your phone over your home network, and every code block in the Guide has its own Copy button. Links to a section stop landing under the top bar, the Guide and Settings menus stay in view while you scroll, and the datasets list says when it is loading or could not load instead of claiming you have none.',
+  },
+  {
     id: '2026-09-29-zzzz-nothing-phones-home', date: '2026-09-29',
     title: 'Nothing Leaves Your Machine Unless You Ask',
     blurb: 'The app no longer checks GitHub for updates on its own; press Check for updates when you want to know. Fonts now load from the app itself, and the plugin store is switched off. Bundled plugins keep working.',
@@ -107,11 +117,6 @@ export const WHATS_NEW = [
     id: '2026-09-29-z-style-groups-browser', date: '2026-09-29',
     title: 'Browse Every Style Group',
     blurb: 'Browse all, next to the Bank\'s style strip, shows every style group as a grid of previews, sorted by size or aesthetic. The installed iPhone app now keeps the filters panel clear of the rounded corners and the home bar.',
-  },
-  {
-    id: '2026-09-29-q-phone-fields-and-copy', date: '2026-09-29',
-    title: 'Steadier on an iPhone',
-    blurb: 'Tapping a field no longer zooms the page in on an iPhone. Copy buttons now work when you open the app from your phone over your home network, and every code block in the Guide has its own Copy button. Links to a section stop landing under the top bar, the Guide and Settings menus stay in view while you scroll, and the datasets list says when it is loading or could not load instead of claiming you have none.',
   },
   {
     id: '2026-09-29-faster-score-pass', date: '2026-09-29',

@@ -33,12 +33,14 @@ export function SettingsGroupsToc({ sectionId, groups }) {
   return (
     <nav aria-label="Section contents"
       className="rounded-xl border border-border bg-surface p-2">
-      <ul className="m-0 grid list-none grid-cols-1 gap-1 p-0 sm:grid-cols-2">
+      {/* items-stretch + h-full: a tile whose blurb wraps to two lines sets
+          the height of its whole row, instead of standing taller alone. */}
+      <ul className="m-0 grid list-none grid-cols-1 items-stretch gap-1 p-0 sm:grid-cols-2">
         {groups.map((g) => (
           <li key={g.id} className="m-0">
             <button type="button" onClick={() => jump(g.id)}
               data-testid={`settings-toc-${g.id}`}
-              className="min-h-10 lg:min-h-0 flex w-full items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-raised">
+              className="min-h-10 lg:min-h-0 flex h-full w-full items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-raised">
               <g.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-content">{g.title}</span>
