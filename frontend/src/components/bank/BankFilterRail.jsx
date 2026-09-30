@@ -52,6 +52,8 @@ export default function BankFilterRail({
   thresholdsOpen, setThresholdsOpen, connection, refreshPayload, refreshImages, onRunPass,
   sortGroups, setSort, tileSize, setTileSize,
   moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
+  tagFiltersShown, tagGroups, tagTruncated, wd14Tags, facetValue, setFacetTag,
+  toggleWd14Tag, clearWd14Tags,
 }) {
   // Which measured axes have data. The conditions are the ones the workspace
   // already used — moving a facet into the rail must not change WHEN it appears.
@@ -76,7 +78,10 @@ export default function BankFilterRail({
         /* The safe-area paddings keep the last row above the home indicator and
            off the rounded corners of an iPhone (0 on screens without them). */
         ? 'shadow-2xl fixed inset-y-0 left-0 z-50 w-[19rem] max-w-[88vw] overflow-y-auto border-r border-border bg-surface-overlay p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))] space-y-3'
-        : 'space-y-3 self-start rounded-xl border border-border bg-surface p-3 sm:sticky sm:top-3 sm:max-h-[calc(100vh-1.5rem)] sm:overflow-y-auto'}>
+        /* No sticky/max-height/overflow of its own: the #bank-filter-rail
+           wrapper in BankWorkspace already pins and scrolls the column. With
+           both, the panel was a scroller inside a scroller — two scrollbars. */
+        : 'space-y-3 self-start rounded-xl border border-border bg-surface p-3'}>
       <div className="flex items-center gap-2">
         <GroupLabel>Filters</GroupLabel>
         {isDrawer && (
@@ -111,12 +116,15 @@ export default function BankFilterRail({
             <button key={s.label} type="button"
               onClick={s.set || (() => setF({ status: filter.status === s.id ? null : s.id }))}
               aria-pressed={active}
-              className={`min-h-10 lg:min-h-0 rounded-md border px-2.5 py-1.5 text-sm font-semibold transition-colors ${active
+              /* One line, one height: label left, count right. Allowed to wrap,
+                 "✕ Rejected 116" broke onto two lines beside a one-line
+                 "All 135" and the four tiles stopped being a grid. */
+              className={`flex min-h-10 lg:min-h-0 lg:h-9 min-w-0 items-center justify-between gap-2 whitespace-nowrap rounded-md border px-2.5 text-sm font-semibold transition-colors ${active
                 ? s.on
                 : 'border-border bg-surface-raised text-content-muted hover:text-content hover:bg-surface'}`}>
-              {s.label}
+              <span className="truncate">{s.label}</span>
               {typeof s.n === 'number' && (
-                <span className="ml-1.5 text-xs font-normal tabular-nums opacity-80">
+                <span className="text-xs font-normal tabular-nums opacity-80">
                   {s.n.toLocaleString()}
                 </span>
               )}
@@ -238,7 +246,7 @@ export default function BankFilterRail({
             </GroupLabel>
             {/* The strip stops at the 40 biggest; the browser shows every group. */}
             <button type="button" onClick={onBrowseStyles}
-              className="min-h-10 lg:min-h-0 ml-auto shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
+              className="min-h-10 lg:min-h-0 lg:h-7 ml-auto shrink-0 rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
               Browse all
             </button>
           </div>
@@ -338,6 +346,56 @@ export default function BankFilterRail({
         </FilterGroup>
       </div>
 
+      {/* 🔖 WD14 tags. Restored: the Encre merge (f7543f826) moved every other
+          filter into this rail and dropped this block, leaving the server filter
+          and the workspace's handlers wired to nothing. Every facet is one
+          <select> of the same size, two to a row, so the block reads as a grid;
+          picking a value REPLACES that facet's previous pick (setFacetTag). */}
+      {tagFiltersShown && (
+        <section aria-label="Tag filters" className="border-t border-border pt-2">
+          <div className="flex items-center gap-2">
+            <GroupLabel>🔖 Tags</GroupLabel>
+            {wd14Tags.length > 0 && (
+              <button type="button" onClick={clearWd14Tags}
+                className="min-h-10 lg:min-h-0 lg:h-7 ml-auto rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
+                Clear ({wd14Tags.length})
+              </button>
+            )}
+          </div>
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+            {tagGroups.facets.map((facet) => (
+              <select key={facet.id} value={facetValue(facet)} aria-label={facet.label}
+                onChange={(e) => setFacetTag(facet, e.target.value)}
+                className={`min-h-10 lg:min-h-0 lg:h-8 w-full min-w-0 truncate rounded-md border bg-surface px-2 text-xs ${facetValue(facet)
+                  ? 'border-indigo-400/60 text-indigo-200' : 'border-border text-content'}`}>
+                <option value="">{facet.label}</option>
+                {facet.options.map((o) => (
+                  <option key={o.name} value={o.name}>{o.label} ({o.count})</option>
+                ))}
+              </select>
+            ))}
+          </div>
+          {/* Every tag the facets above do NOT claim — the curated groups are
+              partial by design, and this is where nothing is seen to be dropped. */}
+          {tagGroups.other.length > 0 && (
+            <details className="mt-1.5">
+              <summary className="min-h-10 lg:min-h-0 flex cursor-pointer items-center text-xs text-content-subtle hover:text-content">
+                All other tags ({tagGroups.other.length}{tagTruncated ? '+, long tail trimmed' : ''})
+              </summary>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {tagGroups.other.slice(0, 120).map((o) => (
+                  <Chip key={o.name} active={wd14Tags.includes(o.name)}
+                    onClick={() => toggleWd14Tag(o.name)}
+                    title={`Filter the grid to images tagged "${o.name}"`}>
+                    {o.label} {o.count}
+                  </Chip>
+                ))}
+              </div>
+            </details>
+          )}
+        </section>
+      )}
+
       {/* The six MEASURED axes, folded into one disclosure. Expanded they were a
           wall; hidden without a count they would be a disclosure nobody opens,
           so the button says how many it holds. */}
@@ -427,8 +485,9 @@ export default function BankFilterRail({
                     <p className="m-0 pl-1 text-[11px] leading-snug text-content-subtle">{angleState.note}</p>
                   )}
                   {angleState.offer && (
+                    /* The why is the button's tooltip; printed beside it too, it
+                       said the same thing twice. */
                     <p className="m-0 flex flex-wrap items-center gap-2 pl-1 text-[11px] leading-snug text-content-subtle">
-                      <span>{angleState.offer.why}</span>
                       <button type="button" onClick={() => setPassOpen('angles')} disabled={!!live}
                         title={angleState.offer.why}
                         className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2 py-0.5 text-[11px] text-content transition-colors hover:bg-surface disabled:opacity-50">
@@ -488,11 +547,10 @@ export default function BankFilterRail({
           aria-expanded={thresholdsOpen} aria-controls="bank-thresholds-panel"
           className="min-h-10 lg:min-h-0 flex w-full items-center gap-1.5 text-left text-xs text-content-muted hover:text-content">
           <SlidersVertical aria-hidden="true" className="h-3.5 w-3.5" />
-          <span className="font-medium">Filter thresholds</span>
-          {/* The gloss is the first thing to go on a phone: the label already
-              says what it opens, and a wrapped subtitle costs two lines. */}
-          <span className="hidden text-content-subtle sm:inline">
-            — what the chips above count as blurry, small, duplicate…
+          {/* No subtitle: in the rail it wrapped the row to three lines beside
+              one-line neighbours. What it opens is said in the tooltip. */}
+          <span className="font-medium" title="What the chips above count as blurry, small, duplicate…">
+            Filter thresholds
           </span>
           <span aria-hidden className="ml-auto text-content-subtle">{thresholdsOpen ? '▲' : '▼'}</span>
         </button>
@@ -535,7 +593,7 @@ export default function BankFilterRail({
           <select value={filter.sort} onChange={(e) => setSort(e.target.value)}
             title="Order the grid by anything the passes measured — resolution, size, aesthetic, NSFW, sharpness, noise, contrast, detail, bars, JPEG quality, face confidence. Images a pass never reached sink to the end. Remembered for this bank."
             aria-label="Sort the grid"
-            className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-content">
+            className="min-h-10 lg:min-h-0 lg:h-7 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-xs text-content">
             {sortGroups.map((g) => (g.group ? (
               <optgroup key={g.group} label={g.group}>
                 {g.options.map((o) => (
@@ -552,7 +610,7 @@ export default function BankFilterRail({
           </select>
         </label>
         <button type="button" onClick={() => setTileSize((s) => (s === 'M' ? 'S' : 'M'))}
-          className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
+          className="min-h-10 lg:min-h-0 lg:h-7 whitespace-nowrap rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
           {tileSize === 'M' ? 'Small tiles' : 'Medium tiles'}
         </button>
       </div>

@@ -69,13 +69,13 @@ export default function DescribeFilterBar({ bankId, onApply }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 text-xs text-content-muted"><MessagesSquare aria-hidden="true" className="h-3.5 w-3.5" /> Describe the set you want</span>
         <input
-          className="w-full min-w-[11rem] flex-1 rounded-md border border-border bg-surface px-2 py-1 text-sm"
+          className="w-full min-w-[11rem] flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
           placeholder="an amateur photo set, least polished first"
           value={text} maxLength={400} disabled={busy}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') run() }} />
         <button type="button" onClick={run} disabled={busy || !text.trim()}
-          className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1 text-xs font-medium
+          className="min-h-10 lg:min-h-0 lg:h-7 whitespace-nowrap rounded-md border border-border px-2 text-xs font-medium
             text-content-muted hover:bg-surface-raised hover:text-content
             disabled:opacity-50">
           {busy ? 'Reading…' : 'Set the filters'}

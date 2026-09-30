@@ -15,7 +15,7 @@
  * reason in the commit message. */
 export const BANK_SURFACES = [
   [
-    "— what the chips above count as blurry, small, duplicate…",
+    "What the chips above count as blurry, small, duplicate…",
     1
   ],
   [

@@ -19,7 +19,9 @@
 export function Chip({ active, onClick, children, title }) {
   return (
     <button type="button" onClick={onClick} title={title}
-      className={`min-h-10 lg:min-h-0 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${active
+      /* A fixed height and no wrapping: a chip whose label wraps is twice the
+         height of its neighbours and breaks the row. */
+      className={`inline-flex min-h-10 lg:min-h-0 lg:h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition-colors ${active
         ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
         : 'border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised'}`}>
       {children}

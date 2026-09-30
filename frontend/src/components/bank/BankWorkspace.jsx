@@ -1893,7 +1893,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           Below `sm` it cannot share this row, so it becomes a drawer OVER the
           grid instead of squeezing it: at 400 px both would be unusable. */}
       <div className={`grid gap-3 ${railOpen && railIsColumnNow
-        ? 'lg:grid-cols-[17rem_minmax(0,1fr)]' : 'grid-cols-1'}`}>
+        ? 'lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]' : 'grid-cols-1'}`}>
         {railOpen && !railIsColumnNow && (
           <div className="fixed inset-0 z-40 bg-black/60" onClick={closeRail} aria-hidden />
         )}
@@ -1948,7 +1948,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               tileSize={tileSize} setTileSize={setTileSize}
               moreOpen={moreOpen} setMoreOpen={setMoreOpen}
               isDrawer={!railIsColumnNow} onClose={closeRail}
-              onBrowseStyles={() => setStyleBrowserOpen(true)} />
+              onBrowseStyles={() => setStyleBrowserOpen(true)}
+              tagFiltersShown={tagFiltersShown} tagGroups={grouped}
+              tagTruncated={!!tagFacets?.truncated} wd14Tags={filter.wd14Tags}
+              facetValue={facetValue} setFacetTag={setFacetTag}
+              toggleWd14Tag={toggleWd14Tag} clearWd14Tags={() => setF({ wd14Tags: [] })} />
           </div>
         )}
         {styleBrowserOpen && (

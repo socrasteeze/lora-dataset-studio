@@ -2557,6 +2557,10 @@ def _bp_counts(base, total, todo_keep, todo_pending, todo_reject,
         # (so the UI can show "scored 0/9000" and enable the threshold facets).
         'scored': base.filter(or_(BankImage.aesthetic_score.isnot(None),
                                   BankImage.nsfw_score.isnot(None))).count(),
+        # 🔖 The workspace shows the tag filter, and fetches the tag vocabulary,
+        # once this is non-zero. It was only ever counted for the pipeline
+        # report, so the filter could never appear.
+        'tagged': base.filter(BankImage.tags_state == 'ok').count(),
         'watermark_scanned': base.filter(
             BankImage.watermark_state.isnot(None),
             ~_watermark_history_inactive_clause()).count(),

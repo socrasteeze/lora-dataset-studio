@@ -28,7 +28,7 @@ export default function SubfolderPersonPanel({
         className="rounded-md border border-border px-2 py-1 font-semibold text-content hover:bg-white/10 disabled:opacity-50 min-h-10 lg:min-h-0">
         {offer.label}
       </button>
-      <span>{offer.note}</span>
+      {/* offer.note is the button's tooltip; it is not printed a second time. */}
     </div>
   ) : null
   if (subfolder == null) return scan

@@ -45,7 +45,9 @@ test('the rail sits beside the grid, and folds instead of squeezing it', () => {
      rail stays a drawer until the grid keeps a workable width. Pinning the
      literal here keeps it in step with RAIL_SIDE_BY_SIDE_PX, which the layout
      module tests on the same reasoning. */
-  assert.match(workspace, /lg:grid-cols-\[17rem_minmax\(0,1fr\)\]/)
+  // 20rem, widening to 22rem from xl: at 17rem the rail's controls wrapped
+  // onto uneven second lines. 1024 - 320 still leaves the grid 704 px.
+  assert.match(workspace, /lg:grid-cols-\[20rem_minmax\(0,1fr\)\] xl:grid-cols-\[22rem_minmax\(0,1fr\)\]/)
   // …and it really does collapse to one column rather than shrinking the grid.
   assert.match(workspace, /railOpen && railIsColumnNow/)
   assert.match(workspace, /: 'grid-cols-1'/)
