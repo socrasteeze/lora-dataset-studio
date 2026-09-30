@@ -1,39 +1,50 @@
 # HANDOFF
 
-**Updated:** 2026-09-28 · **Branch:** main · **Base:** 41637af13 (+ this handoff commit) · **Tree:** clean
+**Updated:** 2026-09-29 · **Branch:** main · **Base:** c49e5b67e · **Tree:** clean
 
 ## State
-Fork is 0 behind `upstream/v2` (tip `d13337c`) and main carries the merge plus its rebuilt dist.
-Full Gates passed locally on the merged tree; nothing is activated on a running instance.
+`origin/main` holds this session's Bank phone header and outbound lockdown (FORK_NOTES.md D12), with another session's 8 commits on top.
+No tests ran on the tip, and the final lockdown commit ran none locally at all; Gates run separately on another machine.
 
 ## Done this session
-- Upstream sync `4fb77a1..d13337c`, all six source commits adopted — FORK_NOTES.md changelog row 2026-09-28.
-- Restored JoyCaption's live caption landing lost in the 2026-09-22 merge — backend/app/services/joycaption.py.
-- Removed eight duplicated function definitions that shadowed live code — backend/app/setup_installer.py.
-- Replaced the README vast.ai referral link with the fork's no-referral statement (D4 invariant).
-- Deleted the merged remote branches `noble/affectionate-thompson-ev89j8` and `noble/desktop-workspace-readability`.
+- Bank header at 360×800 went from 234 px to 123 px: counters fold into ⚙ Passes below `sm`, and action buttons never shrink or wrap — `frontend/src/components/bank/BankWorkspace.jsx`.
+- Update checks run only on click; the upstream-ahead check is deleted; the plugin store is off — FORK_NOTES.md D12.
+- Google Fonts replaced by bundled `@fontsource` fonts — `frontend/src/main.jsx`.
+- Startup no longer resumes vast.ai rentals or runs `pip` for Pillow — `backend/app/__init__.py`, `backend/run.py`.
+- Outbound review gate with an exact-match inventory — `backend/tests/test_fork_outbound_gate.py`, `fork_outbound_inventory.json`.
 
 ## Open
-1. Activate on the live instance (Settings ▸ Update & restart); not performed. Do not serve the new bundle against an old backend.
-2. Re-shoot `docs/screenshots/training/runs-hub.png` and `advanced-options.png` on a fork instance; both still show the rental lane — FORK_NOTES.md D4, "The third instance".
-3. Physical-phone, real-model training and Docker qualification remain separate, unrun gates.
+1. Run Gates at `c49e5b67e` on the other machine. The full backend suite has not run for any D12 commit.
+2. Re-run the Bank probe: `883467b46` ("first images above the fold", another session) changed the header after the 123 px measurement.
+3. Activate on the live instance: pull, then restart. The update badge no longer checks by itself; press Check for updates. Do not serve the new bundle against an old backend.
+4. Remove or reword the "usage statistics" What's New entry and the Settings search terms that point at it; no code implements it — `frontend/src/whatsNew.js:335`, `frontend/src/components/settings/registry.js:48-50`.
+5. Drop the store's "Retry catalog" button; it can only return the store-off message — `frontend/src/pages/store/Catalog.jsx:56`.
+6. Re-shoot `docs/screenshots/training/runs-hub.png` and `advanced-options.png` on a fork instance; both still show the rental lane — FORK_NOTES.md D4.
+7. Physical-phone, real-model training and Docker qualification remain separate, unrun gates.
 
 ## Decisions
-- Kept BOTH JoyCaption hooks (caller-thread `on_caption`/`progress` and reader-thread `on_progress`) over either alone — the fork persists live, upstream's new test needs a reader-thread counter.
-- Fixed upstream's red tests by widening doubles (`**_kw`) and stubbing `bank_jobs.bump`, never by narrowing the product call.
-- Folded upstream's Patreon badge into the fork's badge row over adding a second Discord badge.
-- CHANGELOG.md left untouched: its header freezes it; release notes come from whatsNew.js.
+- Exact-match review gate over a runtime egress block — the user's choice; a block would break click-driven HF export, the scraper and downloads.
+- Store switched off by `store_switched_off()` returning a literal `True`, with a conftest override for the 8 upstream store suites, over deleting store code — keeps syncs conflict-free.
+- Kept `legacy_cloud_recovery.start` and `ensure_pillow_consistent`, uncalled, over deleting them — upstream tests exercise them; the gate pins that startup never calls them.
+- An update check without `force` returns the last explicit answer or `ok:false`, not `ok:true` — otherwise the UI reads "up to date" without having checked.
+- Bank counters moved into ⚙ Passes rather than hidden — they stay one tap away. The action row stays one scrolling line because two rows measure about 27% of the fold.
+- Pushed to main without local tests, on the user's instruction.
 
 ## Traps
-- ruff F811 does NOT catch duplicated top-level defs here; run the AST scan in FORK_NOTES.md D9 after any sync touching long modules.
-- A stale `.venv` or `node_modules` produces thousands of setup errors (missing `tuf`, `parse5`); sync both from the manifests before trusting a baseline.
-- `upstream_sync.ps1` stops at the first red step, so a red frontend hides the backend baseline entirely.
-- Upstream commits marked "tests intentionally not run" arrive with their own suite red; expect test-double fixes.
+- ruff F811 misses duplicated top-level defs; run the AST scan in FORK_NOTES.md D9 after syncs that touch long modules.
+- Worktrees have no `.venv`: `scripts/scan-sensitive.sh` exits 127 there, so run its heredoc with the main checkout's interpreter. `npm install` re-sorts devDependencies in both `package.json` and the lockfile; restore the order. Several sources are CRLF in the repo; preserve line endings.
+- `upstream_sync.ps1` stops at the first red step, so a red frontend hides the backend baseline. Upstream commits marked "tests intentionally not run" arrive red.
+- Update-check tests must stub `is_git_checkout`: the checkout is a git repo, so `?force=1` would run a real `git fetch`.
+- The runtime outbound test only sees sockets in the TESTING app. It misses subprocesses (git, pip, inference) and production-only boot threads; the inventory is the only cover there.
+- Probe coverage of the Bank caption-lab states changes between runs on identical code; a skipped state there is timing, not a regression.
 
 ## Verify
 ```powershell
 pwsh -File scripts/upstream_sync.ps1 -Phase Quick
 pwsh -File scripts/upstream_sync.ps1 -Phase Gates
 .venv/Scripts/python.exe -m ruff check .
+.venv/Scripts/python.exe -m pytest backend/tests/test_fork_outbound_gate.py -q
+.venv/Scripts/python.exe backend/tests/fork_outbound_scan.py --write   # only after reviewing a gate diff
 cd frontend; npm run lint; npm test
+cd frontend; npm run probe:responsive -- --url http://127.0.0.1:5173/#/bank   # isolated backend + LDS_DEV_API_TARGET, see AGENTS.md
 ```
