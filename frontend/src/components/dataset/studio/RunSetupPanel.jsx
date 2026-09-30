@@ -316,9 +316,12 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
           {/* A dead button that does not say why is what this replaces: the
               canvas passes the real reason (mixed families, nothing picked) and
               it is shown right under the button, not only in a tooltip. */}
-          {launchHint && (
-            <p className={'m-0 text-[0.6875rem] ' + (launchBlocked ? 'text-amber-200' : 'text-content-muted')}
-              role={launchBlocked ? 'status' : undefined}>
+          {/* Otherwise the hint is only the button's tooltip: printed under it
+              as well, it repeated itself. A BLOCKED launch keeps it visible — a
+              disabled button shows no tooltip on a phone, and "why can't I
+              launch" must not depend on hovering. */}
+          {launchHint && launchBlocked && (
+            <p className="m-0 text-[0.6875rem] text-amber-200" role="status">
               {launchHint}
             </p>
           )}

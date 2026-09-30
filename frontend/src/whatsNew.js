@@ -84,6 +84,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-29-zz-bank-tag-filter-back', date: '2026-09-29',
+    title: 'Filter a Tagged Bank by Tags Again',
+    blurb: 'After 🔖 Tags, the Bank\'s filters offer hair, clothing, setting and other tag dropdowns plus every other tag as a chip. The filters panel is wider, and its buttons keep one line and one height.',
+  },
+  {
     id: '2026-09-29-z-style-groups-browser', date: '2026-09-29',
     title: 'Browse Every Style Group',
     blurb: 'Browse all, next to the Bank\'s style strip, shows every style group as a grid of previews, sorted by size or aesthetic. The installed iPhone app now keeps the filters panel clear of the rounded corners and the home bar.',

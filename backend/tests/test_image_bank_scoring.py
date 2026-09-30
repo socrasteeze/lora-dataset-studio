@@ -191,6 +191,17 @@ def test_style_clusters_in_payload_and_filter(client, tmp_path, app):
     assert {i['name'] for i in r['images']} == {'a.jpg', 'b.jpg'}
 
 
+def test_bank_payload_counts_tagged_images_for_the_tag_filter(client, tmp_path, app):
+    """The workspace shows the 🔖 tag filter only when counts.tagged > 0; the
+    payload never carried it, so a tagged bank never offered the filter."""
+    bank_id, _ = _mkbank(client, tmp_path, {'a.jpg': _flat(), 'b.jpg': _flat(60),
+                                            'c.jpg': _flat(200)})
+    assert client.get(f'/api/bank/{bank_id}').get_json()['counts']['tagged'] == 0
+    _set_scores(app, bank_id, **{'a.jpg': {'tags_state': 'ok', 'tags': '1girl'},
+                                 'b.jpg': {'tags_state': 'error'}})
+    assert client.get(f'/api/bank/{bank_id}').get_json()['counts']['tagged'] == 1
+
+
 def test_style_groups_browser_lists_every_group_past_the_rail_cap(client, tmp_path, app):
     """The rail stops at the 40 biggest groups; a k-means pass makes hundreds."""
     files = {f'{i:02d}.jpg': _flat(64, i) for i in range(45)}
