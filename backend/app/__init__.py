@@ -1062,5 +1062,5 @@ def _start_workers(app):
     # at the single moment nothing is in flight.
     from .plugins.loader import run_boot_hooks
     run_boot_hooks(app)
-    from .services.legacy_cloud_recovery import start as recover_legacy_cloud
-    recover_legacy_cloud(app)
+    # Fork Divergence 12: upstream resumes pre-plugin vast.ai rentals here
+    # (legacy_cloud_recovery.start), calling vast.ai at every boot. Not called.

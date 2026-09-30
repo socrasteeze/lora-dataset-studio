@@ -2839,7 +2839,7 @@ dependency downloads the operator starts are allowed; offline mode is not a goal
 **What the gate cannot see.** Network use inside a subprocess (git, pip,
 gallery-dl, the inference scripts) shows only as its call site in the inventory,
 not at runtime. A background job that `TESTING` apps never start, such as the
-bank-queue resume or legacy cloud-run recovery, is covered only by the
+bank-queue resume, is covered only by the
 inventory. A frontend `fetch(variable)` to an outside URL is not matched; every
 frontend request today goes through `/api`.
 
@@ -2855,13 +2855,18 @@ upstream store suites (`_STORE_MACHINERY_SUITES`), which exercise it against
 loopback fixtures. **When a sync adds a store suite, add it to that set; when
 it adds an update-check test on the bare path, move it to `?force=1`.**
 
+**Two startup paths are not called:** `create_app` no longer runs
+`legacy_cloud_recovery.start` (it resumed pre-plugin vast.ai rentals at every
+boot when old run rows and `VAST_API_KEY` existed), and `run.py` no longer runs
+`ensure_pillow_consistent` (a `pip` reinstall of a mixed Pillow). `run.py` only
+detects the mix and prints the repair command. Both functions stay, uncalled,
+because upstream's tests exercise them; `test_startup_neither_resumes_rentals_nor_runs_pip`
+fails if a merge calls either again.
+
 **Still reaching out, deliberately, and only on a click:** Hugging Face dataset
 export (consent box plus a write token), the scraper sources, the Civitai
 browser, model and node-pack downloads, Setup installs, local-network peers you
-entered, and the explicit update check. Two startup paths remain and are
-conditional: legacy cloud-run recovery (only with old run rows and
-`VAST_API_KEY` set) and the Pillow self-repair (`pip`, only when Pillow is
-broken).
+entered, and the explicit update check.
 
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 
