@@ -1,9 +1,10 @@
 /* WHAT IS CURRENTLY FILTERING THE BANK GRID, IN WORDS.
  *
- * The filter panel (BankWorkspace.jsx, ② Triage) folds behind a one-line
- * summary on a narrow screen — see bankFilterPanelOpen.js for when. The moment
- * the chips are out of sight the grid stops explaining itself: a bank showing
- * 412 of 9,004 images looks exactly like a bank that LOST 8,592 of them. The
+ * The filter rail (BankFilterRail.jsx) heads itself with this one-line
+ * summary; below `lg` the rail is a drawer, closed most of the time, and the
+ * ☰ Filters button carries the count instead. The moment the chips are out of
+ * sight the grid stops explaining itself: a bank showing 412 of 9,004 images
+ * looks exactly like a bank that LOST 8,592 of them. The
  * app already treats this as a real failure mode elsewhere — the 🚫 Exclude
  * words box is deliberately never persisted between visits because "images
  * missing from a grid for a reason you set last week reads as data loss"

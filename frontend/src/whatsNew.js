@@ -94,6 +94,11 @@ export const WHATS_NEW = [
     blurb: 'On a phone the Bank\'s top bar is half its old height. Its buttons keep one line and scroll sideways, and the image and pass counters now sit at the top of ⚙ Passes.',
   },
   {
+    id: '2026-09-29-zzz-bank-why-and-clear-all-back', date: '2026-09-29',
+    title: 'See Why Images Were Rejected, and Clear Every Filter at Once',
+    blurb: 'Pick ✕ Rejected in the Bank\'s filters and the ✕ Why chips are back: one per reason, each with its count, so you can check exactly what a pass took before 🗑 Delete rejected. The filters now name what is narrowing the grid on their first line, with ✕ Clear all beside it, and on a phone ☰ Filters shows how many are on.',
+  },
+  {
     id: '2026-09-29-zz-bank-tag-filter-back', date: '2026-09-29',
     title: 'Filter a Tagged Bank by Tags Again',
     blurb: 'After 🔖 Tags, the Bank\'s filters offer hair, clothing, setting and other tag dropdowns plus every other tag as a chip. The filters panel is wider, and its buttons keep one line and one height.',

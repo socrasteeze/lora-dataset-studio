@@ -1839,21 +1839,22 @@ set last week reads as data loss.
 
 ## Filter a bank on a small screen
 
-The bank's filter panel — the search boxes, every chip row, the 🔖 tag facets and
-the 🎚 thresholds — is a lot of controls on a phone: roughly fifteen wrapped rows
-before the first thumbnail. It now opens **folded** on a small screen (and
-**expanded** on a desktop), behind one line that names every filter currently
-narrowing the grid, e.g. *"✓ Kept · 🌫 Blurry · 1–2 MP +2 more"*. Tap the header to
-open or close it — the choice is remembered for next time, across every bank.
+The bank's filters — the search boxes, every chip row, the 🔖 tag facets and
+the 🎚 thresholds — sit in a rail beside the grid on a desktop. On a phone or a
+narrow window there is no room beside the grid, so the rail becomes a drawer:
+**☰ Filters** opens it, ✕ closes it.
 
-A folded panel never hides *what* it is doing: the summary line is built from
-the same list of active facets as the "N shown of M" count above the grid, so
-the two can never disagree, and the full list is always available in the
-header's tooltip. **✕ Clear all** appears next to it whenever something is
-active, and turns every filter off in one tap — search, exclude, status,
-quality/score/group flags, resolution, origin, framing and both kinds of tag
-filter. It leaves the **sort order** alone: a ranking is not a filter, and
-resetting it on every "start over" would be a second, unrelated surprise.
+The rail never hides *what* it is doing. Its first line names every filter
+currently narrowing the grid, e.g. *"✓ Kept · 🌫 Blurry · 1–2 MP +2 more"*, with
+the full list in its tooltip. While the drawer is closed, **☰ Filters** shows how
+many filters are on, with the same list in its tooltip. Both are built from the
+same list of active facets as the "N shown of M" count above the grid, so they
+can never disagree. **✕ Clear all** appears next to the summary whenever
+something is active, and turns every filter off in one tap — search, exclude,
+status, ✕ Why, quality/score/group flags, resolution, origin, framing, medium,
+angle and both kinds of tag filter. It leaves the **sort order** alone: a
+ranking is not a filter, and resetting it on every "start over" would be a
+second, unrelated surprise.
 
 Selecting thumbnails and deciding on them used to mean opposite ends of the
 page — tap tiles at the bottom, then scroll all the way back up past the filter
