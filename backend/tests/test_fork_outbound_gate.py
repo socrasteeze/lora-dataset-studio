@@ -150,6 +150,18 @@ def test_the_plugin_store_switch_is_hardwired_off(tmp_path, monkeypatch):
     assert store_client.load_private_configs() == []
 
 
+def test_startup_neither_resumes_rentals_nor_runs_pip():
+    """Two boot paths upstream runs unasked: resuming pre-plugin vast.ai rentals
+    (legacy_cloud_recovery.start) and repairing Pillow with pip
+    (ensure_pillow_consistent). The fork keeps both functions, uncalled."""
+    boot = (REPO / 'backend' / 'app' / '__init__.py').read_text(encoding='utf-8')
+    run = (REPO / 'backend' / 'run.py').read_text(encoding='utf-8')
+    code = lambda text: '\n'.join(scan._code_lines(text, '#'))
+    assert not re.search(r'legacy_cloud_recovery\s+import|recover_legacy_cloud', code(boot))
+    assert 'ensure_pillow_consistent' not in code(run)
+    assert 'incompatible_pillow_plugins()' in code(run)
+
+
 def test_the_frontend_never_checks_on_its_own():
     src = REPO / 'frontend' / 'src'
     for path in list(src.rglob('*.js')) + list(src.rglob('*.jsx')):

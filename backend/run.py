@@ -54,12 +54,18 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-from bootstrap_dependencies import ensure_pillow_consistent
+from bootstrap_dependencies import _pinned_pillow_version, incompatible_pillow_plugins
 
-# Must run before importing ``app`` (which eventually imports PIL).  This fixes
+# Must run before importing ``app`` (which eventually imports PIL). Detects
 # Windows installs left half-upgraded by versions of the in-app updater that ran
 # pip while Pillow files were still loaded and locked by the Flask process.
-ensure_pillow_consistent()
+# Fork Divergence 12: upstream repairs it here with pip (ensure_pillow_consistent),
+# a download at startup. The fork only says how.
+_pil_version, _pil_mixed = incompatible_pillow_plugins()
+if _pil_version and _pil_mixed:
+    print('[LDS] mixed Pillow install detected. Repair it with: '
+          f'{sys.executable} -m pip install --force-reinstall --no-deps '
+          f'Pillow=={_pinned_pillow_version() or _pil_version}', flush=True)
 
 from app import create_app
 from port_utils import find_available_port
