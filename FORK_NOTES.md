@@ -25,7 +25,7 @@ same commit as any change that adds a new divergence.
 
 | Section | Answers |
 |---|---|
-| Divergences 1–9 (below) | what differs, why, and what must never come back |
+| Divergences 1–12 (below) | what differs, why, and what must never come back |
 | Merge diagnostics | how a past sync went wrong, so it does not repeat |
 | Merge routine | the short form of the procedure |
 | Fork changelog (at the end) | what shipped, wave by wave — a record, not a checklist |
@@ -2799,6 +2799,69 @@ Three consequences, and the first two retire instructions written above:
   at `upstream/main` after it. **Check the tree, not the message** —
   `git ls-tree -r --name-only upstream/main | grep <feature file>` and
   `git show upstream/main:<file> | grep <route>` settle it in one line each.
+
+## Divergence 12: nothing leaves the machine unless the operator asks (2026-09-29)
+
+**Rule.** The app reaches another machine only after an explicit click, and never
+sends the operator's data or config anywhere new without review. Model and
+dependency downloads the operator starts are allowed; offline mode is not a goal.
+
+**What was switched off, and where:**
+
+| Upstream behaviour | Fork state | Where |
+|---|---|---|
+| Update check on every page load, then hourly (`/api/update/check?auto=1`, a `git fetch` or the GitHub releases API) | Only `?force=1` (the Check for updates click) reaches the network. Any other call returns the last explicit answer, or `ok: false, auto_check: false`. The three frontend auto-callers are gone. | `routes/settings.py` `update_check`, `App.jsx`, `MaintenanceSection.jsx` |
+| "Upstream is N commits ahead" line: asks `perfectgf`'s GitHub compare API whenever Settings ▸ Maintenance opens | Deleted: route `/api/update/upstream-check`, `updater.upstream_ahead_status`, `UPSTREAM_REPO`, `upstreamAheadLabel`, and their tests. `scripts/upstream_sync.ps1` answers that question on the operator's command. | same files, `updateStatus.js` |
+| Plugin store: catalog, previews, installs and purchases from `perfectgf`'s TUF repository on GitHub | Off at every network door: `load_config`, `load_private_configs`, `StoreSession`, `load_commerce_config`, `CommerceClient`. `client.store_switched_off()` returns a literal `True`; no setting, file or environment variable reaches it. | `plugins/store/client.py`, `commerce.py` |
+| Google Fonts `<link>` in `index.html` | Archivo and IBM Plex Mono bundled from `@fontsource/*` (OFL-1.1), same weights | `index.html`, `main.jsx`, `package.json` |
+
+**The review gate.** `backend/tests/test_fork_outbound_gate.py` fails on:
+
+1. **Any change to the outbound inventory.** `fork_outbound_scan.py` counts, per
+   shipped file, every HTTP/socket/upload call site and git network subcommand,
+   and lists every non-local host. `fork_outbound_inventory.json` is the
+   reviewed baseline and must match exactly. A merge that adds one fails with a
+   per-file diff. Read the new call: if it runs without a click, or sends data or
+   config somewhere new, remove it. Otherwise refresh the baseline with
+   `.venv/Scripts/python.exe backend/tests/fork_outbound_scan.py --write` and
+   say why in the commit.
+2. **Any outside DNS lookup, TCP connection or UDP datagram** while the test app
+   boots and answers the routes the UI calls on page load (`PAGE_LOAD_ROUTES`).
+   A UDP `connect()` alone is allowed: the LAN and Tailscale address probes in
+   `routes/settings.py` use it to read the local route, and it sends nothing.
+3. **The store switch** becoming anything but `return True`, or a config file or
+   environment variable changing its answer.
+4. **`update/check?auto` or `upstream-check`** reappearing in `frontend/src`, a
+   CDN `src`/`href` in `index.html` or `dist/index.html`, or a CDN `url()` in
+   the served CSS.
+5. **`git push`** anywhere in shipped code or launchers.
+
+**What the gate cannot see.** Network use inside a subprocess (git, pip,
+gallery-dl, the inference scripts) shows only as its call site in the inventory,
+not at runtime. A background job that `TESTING` apps never start, such as the
+bank-queue resume or legacy cloud-run recovery, is covered only by the
+inventory. A frontend `fetch(variable)` to an outside URL is not matched; every
+frontend request today goes through `/api`.
+
+**Carried test edits (a D5 carrier family).** `test_settings_api.py` update-check
+tests now use `?force=1` and stub `is_git_checkout` (the checkout under test is
+a git repo, and a real `git fetch` must not run). Its three upstream-check tests,
+five in `test_updater.py`, the `upstreamAheadLabel` test in `updateStatus.test.js`
+and the informational-line test in `dockerModeUi.test.js` were replaced by
+removal guards. `frontend/tests/offline-quiet-polling-contract.test.mjs` pins
+check-on-click (`?force=1`) instead of check-on-mount (`?auto=1`), and its
+timer-poll list no longer names `App.jsx`. `conftest.py` switches the store back on for exactly the eight
+upstream store suites (`_STORE_MACHINERY_SUITES`), which exercise it against
+loopback fixtures. **When a sync adds a store suite, add it to that set; when
+it adds an update-check test on the bare path, move it to `?force=1`.**
+
+**Still reaching out, deliberately, and only on a click:** Hugging Face dataset
+export (consent box plus a write token), the scraper sources, the Civitai
+browser, model and node-pack downloads, Setup installs, local-network peers you
+entered, and the explicit update check. Two startup paths remain and are
+conditional: legacy cloud-run recovery (only with old run rows and
+`VAST_API_KEY` set) and the Pillow self-repair (`pip`, only when Pillow is
+broken).
 
 ## Merge diagnostics (read BEFORE resolving a single conflict)
 

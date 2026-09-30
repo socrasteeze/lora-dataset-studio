@@ -1,0 +1,532 @@
+{
+ "javascript": {},
+ "launchers": {
+  "install.js": {
+   "calls": 2,
+   "hosts": []
+  },
+  "pinokio.js": {
+   "calls": 0,
+   "hosts": [
+    "github.com",
+    "pinokio.computer"
+   ]
+  },
+  "start.bat": {
+   "calls": 3,
+   "hosts": [
+    "www.python.org"
+   ]
+  },
+  "update.js": {
+   "calls": 2,
+   "hosts": []
+  }
+ },
+ "python": {
+  "backend/app/capabilities.py": {
+   "calls": 6,
+   "hosts": [
+    "console.vast.ai"
+   ]
+  },
+  "backend/app/plugins/environment.py": {
+   "calls": 0,
+   "hosts": [
+    "pypi.org"
+   ]
+  },
+  "backend/app/plugins/restart.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/plugins/store/client.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/plugins/store/commerce.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/routes/backup.py": {
+   "calls": 0,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/app/routes/cluster.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/routes/settings.py": {
+   "calls": 1,
+   "hosts": [
+    "api.github.com",
+    "github.com"
+   ]
+  },
+  "backend/app/scrape/netfetch.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/scrape/sources/civitai.py": {
+   "calls": 1,
+   "hosts": [
+    "civitai.red"
+   ]
+  },
+  "backend/app/scrape/sources/erome.py": {
+   "calls": 0,
+   "hosts": [
+    "www.erome.com"
+   ]
+  },
+  "backend/app/scrape/sources/instagram.py": {
+   "calls": 0,
+   "hosts": [
+    "www.instagram.com"
+   ]
+  },
+  "backend/app/scrape/sources/pexels.py": {
+   "calls": 1,
+   "hosts": [
+    "api.pexels.com"
+   ]
+  },
+  "backend/app/scrape/sources/picazor.py": {
+   "calls": 0,
+   "hosts": [
+    "picazor.com"
+   ]
+  },
+  "backend/app/scrape/sources/reddit.py": {
+   "calls": 3,
+   "hosts": [
+    "github.com",
+    "oauth.reddit.com",
+    "www.reddit.com"
+   ]
+  },
+  "backend/app/scrape/sources/redgifs.py": {
+   "calls": 1,
+   "hosts": [
+    "api.redgifs.com",
+    "www.redgifs.com"
+   ]
+  },
+  "backend/app/scrape/sources/sexcom.py": {
+   "calls": 0,
+   "hosts": [
+    "imagex1.sx.cdn.live",
+    "www.sex.com"
+   ]
+  },
+  "backend/app/services/aitoolkit_remote.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/services/backend_worker.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/services/civitai_browser.py": {
+   "calls": 1,
+   "hosts": [
+    "civitai.com"
+   ]
+  },
+  "backend/app/services/cloud_training.py": {
+   "calls": 6,
+   "hosts": [
+    "huggingface.co",
+    "krea.ai"
+   ]
+  },
+  "backend/app/services/cluster.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/services/comfyui_console.py": {
+   "calls": 2,
+   "hosts": []
+  },
+  "backend/app/services/comfyui_control.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/services/comfyui_node_install.py": {
+   "calls": 1,
+   "hosts": [
+    "pypi.org"
+   ]
+  },
+  "backend/app/services/comfyui_node_recipes.py": {
+   "calls": 0,
+   "hosts": [
+    "codeload.github.com"
+   ]
+  },
+  "backend/app/services/comfyui_service.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/services/hf_base_push.py": {
+   "calls": 3,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "backend/app/services/hf_publish.py": {
+   "calls": 5,
+   "hosts": [
+    "github.com",
+    "huggingface.co"
+   ]
+  },
+  "backend/app/services/klein_edit_helper.py": {
+   "calls": 0,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/app/services/krea_edit_helper.py": {
+   "calls": 0,
+   "hosts": [
+    "civitai.com",
+    "github.com",
+    "huggingface.co"
+   ]
+  },
+  "backend/app/services/lanpaint_helper.py": {
+   "calls": 0,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/app/services/lmstudio_control.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/services/lmstudio_download.py": {
+   "calls": 1,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "backend/app/services/lora_test_studio.py": {
+   "calls": 0,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/app/services/lora_training.py": {
+   "calls": 0,
+   "hosts": [
+    "www.reddit.com"
+   ]
+  },
+  "backend/app/services/managed_python.py": {
+   "calls": 2,
+   "hosts": [
+    "api.github.com",
+    "github.com"
+   ]
+  },
+  "backend/app/services/memory_release.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/app/services/model_download.py": {
+   "calls": 2,
+   "hosts": []
+  },
+  "backend/app/services/neural_render.py": {
+   "calls": 2,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/app/services/ollama_control.py": {
+   "calls": 1,
+   "hosts": [
+    "ollama.com"
+   ]
+  },
+  "backend/app/services/ollama_gpu_fence.py": {
+   "calls": 2,
+   "hosts": []
+  },
+  "backend/app/services/peer_worker.py": {
+   "calls": 6,
+   "hosts": []
+  },
+  "backend/app/services/seedvr2_helper.py": {
+   "calls": 0,
+   "hosts": [
+    "github.com",
+    "huggingface.co"
+   ]
+  },
+  "backend/app/services/trained_image_models.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "backend/app/services/training_diagnostics.py": {
+   "calls": 0,
+   "hosts": [
+    "download.pytorch.org",
+    "huggingface.co"
+   ]
+  },
+  "backend/app/services/training_state_identity.py": {
+   "calls": 3,
+   "hosts": []
+  },
+  "backend/app/services/updater.py": {
+   "calls": 4,
+   "hosts": [
+    "api.github.com",
+    "github.com"
+   ]
+  },
+  "backend/app/services/vast_client.py": {
+   "calls": 1,
+   "hosts": [
+    "console.vast.ai"
+   ]
+  },
+  "backend/app/services/video_test_studio.py": {
+   "calls": 1,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/app/services/vision_lmstudio.py": {
+   "calls": 5,
+   "hosts": []
+  },
+  "backend/app/services/vision_ollama.py": {
+   "calls": 4,
+   "hosts": []
+  },
+  "backend/app/services/wd14_tagger.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "backend/app/setup_installer.py": {
+   "calls": 8,
+   "hosts": [
+    "civitai.com",
+    "codeload.github.com",
+    "download.pytorch.org",
+    "github.com",
+    "huggingface.co"
+   ]
+  },
+  "backend/app/utils/comfy_fs.py": {
+   "calls": 2,
+   "hosts": []
+  },
+  "backend/app/utils/comfyui.py": {
+   "calls": 12,
+   "hosts": [
+    "civitai.com",
+    "github.com"
+   ]
+  },
+  "backend/app/utils/trained_image_workflows.py": {
+   "calls": 0,
+   "hosts": [
+    "github.com",
+    "huggingface.co"
+   ]
+  },
+  "backend/infer/bank_score_infer.py": {
+   "calls": 1,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/infer/wd14_infer.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/lds_sdk/h3_downloads.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "backend/lds_sdk/h3_reference_catalog.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "backend/lds_sdk/h3_render.py": {
+   "calls": 2,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "backend/run.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "backend/single_instance.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "bundled/camera_angles/lds_camera_angles/__init__.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "bundled/civitai_publish/lds_civitai_publish/publish.py": {
+   "calls": 1,
+   "hosts": [
+    "civitai.com",
+    "github.com"
+   ]
+  },
+  "bundled/dlss5/lds_dlss5/neural_render.py": {
+   "calls": 2,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "bundled/hf_publish/lds_hf_publish/publish.py": {
+   "calls": 4,
+   "hosts": [
+    "github.com",
+    "huggingface.co"
+   ]
+  },
+  "bundled/qwen_dataset/lds_qwen_dataset/assets.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/civitai.py": {
+   "calls": 1,
+   "hosts": [
+    "civitai.com",
+    "civitai.red"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/erome.py": {
+   "calls": 0,
+   "hosts": [
+    "v22.erome.com",
+    "www.erome.com"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/instagram.py": {
+   "calls": 0,
+   "hosts": [
+    "www.instagram.com"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/pexels.py": {
+   "calls": 1,
+   "hosts": [
+    "api.pexels.com"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/picazor.py": {
+   "calls": 0,
+   "hosts": [
+    "picazor.com"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/reddit.py": {
+   "calls": 3,
+   "hosts": [
+    "github.com",
+    "oauth.reddit.com",
+    "www.reddit.com"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/redgifs.py": {
+   "calls": 1,
+   "hosts": [
+    "api.redgifs.com",
+    "www.redgifs.com"
+   ]
+  },
+  "bundled/scrape/lds_scrape/sources/sexcom.py": {
+   "calls": 0,
+   "hosts": [
+    "imagex1.sx.cdn.live",
+    "www.sex.com"
+   ]
+  },
+  "bundled/seedvr2/authoring/build_antlr.py": {
+   "calls": 1,
+   "hosts": [
+    "files.pythonhosted.org"
+   ]
+  },
+  "bundled/seedvr2/lds_seedvr2/downloads.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "bundled/seedvr2/lds_seedvr2/seedvr2_helper.py": {
+   "calls": 0,
+   "hosts": [
+    "github.com",
+    "huggingface.co"
+   ]
+  },
+  "bundled/video/infer/_aesthetic_head.py": {
+   "calls": 1,
+   "hosts": [
+    "github.com"
+   ]
+  },
+  "bundled/video/lds_video/clipproj.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "bundled/video/lds_video/downloads.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "bundled/video/lds_video/performance_install.py": {
+   "calls": 1,
+   "hosts": [
+    "raw.githubusercontent.com"
+   ]
+  },
+  "bundled/video/lds_video/video_reference_prompt.py": {
+   "calls": 0,
+   "hosts": [
+    "huggingface.co"
+   ]
+  },
+  "bundled/video/lds_video/video_result_recovery.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "packaging/docker/healthcheck.py": {
+   "calls": 1,
+   "hosts": []
+  },
+  "packaging/launcher.py": {
+   "calls": 1,
+   "hosts": []
+  }
+ }
+}

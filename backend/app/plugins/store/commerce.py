@@ -21,7 +21,8 @@ from ... import config as cfg
 from ..admin import is_admin, require_admin
 from ..install import MAX_TOTAL_BYTES, _entry_relpath
 from ..storage import managed_path, _write_bytes
-from .client import StoreError, StoreNotConfigured
+from . import client as store_client
+from .client import STORE_OFF, StoreError, StoreNotConfigured
 
 MAX_RESPONSE = 256 * 1024
 _SECRET = re.compile(r'[A-Za-z0-9_-]{43}\Z')
@@ -49,6 +50,8 @@ def _origin(value):
 
 
 def load_commerce_config():
+    if store_client.store_switched_off():  # fork Divergence 12
+        raise StoreNotConfigured(STORE_OFF)
     path = Path(os.environ.get('LDS_STORE_COMMERCE_CONFIG') or cfg.REPO_ROOT / 'store/commerce.json')
     if not path.is_file():
         raise StoreNotConfigured('Purchases and license activation are not connected on this installation.')
@@ -85,6 +88,8 @@ def _dpapi(value, *, decrypt=False):
 
 class CommerceClient:
     def __init__(self, config=None):
+        if store_client.store_switched_off():  # fork Divergence 12
+            raise StoreNotConfigured(STORE_OFF)
         self.config = config or load_commerce_config()
         self.origin = _origin(self.config['service_url'])
         self.checkout_origin = _origin(self.config['checkout_origin'])

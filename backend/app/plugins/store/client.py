@@ -42,6 +42,20 @@ class StoreNotConfigured(StoreError):
     pass
 
 
+# Fork Divergence 12: this fork never contacts a plugin store. Plugins ship with
+# the repository (fork-plugins.json) or come from a ZIP the operator picks. The
+# switch sits on every door to the network: the catalog configuration, the
+# private catalog list, the one session that downloads anything, and the
+# purchase client. No setting, file or environment variable reaches it; only the
+# upstream store tests replace it, to keep exercising the machinery offline.
+STORE_OFF = ('The plugin store is switched off in this fork. '
+             'Installed and bundled plugins keep working.')
+
+
+def store_switched_off():
+    return True
+
+
 def _base_url(value):
     if not isinstance(value, str):
         raise StoreError('The store URL is invalid.')
@@ -111,6 +125,8 @@ class StoreConfig:
 
 
 def load_config():
+    if store_switched_off():
+        raise StoreNotConfigured(STORE_OFF)
     path = Path(os.environ.get('LDS_STORE_CONFIG') or cfg.REPO_ROOT / 'store' / 'bootstrap.json')
     if not path.is_file():
         raise StoreNotConfigured('The store has not been connected to a trusted catalog yet.')
@@ -140,6 +156,8 @@ def _read_config(data, directory, *, external_ids=frozenset(), scoped_ids=frozen
 
 def load_private_configs():
     """Explicit operator roots and scopes; private catalogs cannot grant themselves rights."""
+    if store_switched_off():
+        return []
     path = cfg.data_dir() / 'plugin-store' / 'sources.json'
     if not path.exists():
         return []
@@ -227,6 +245,8 @@ class _Fetcher(FetcherInterface):
 class StoreSession:
     """One fresh TUF update under the cache lock, never shared across requests."""
     def __init__(self, config=None):
+        if store_switched_off():
+            raise StoreNotConfigured(STORE_OFF)
         self.config = config or load_config()
         self.updater = None
         self.cache_lock = None

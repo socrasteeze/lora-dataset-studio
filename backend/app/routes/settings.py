@@ -603,39 +603,13 @@ def test_connection(target):
     return jsonify(probe_fn())
 
 
-# Update check: compares the latest GitHub release tag to the local version.
-# Cached 6 h so the SPA banner can call it freely. Degrades to
-# update_available=False with a reason when the feed is unreachable (offline,
-# repo private, no release yet) — never an error, never a blocker.
-_UPDATE_TTL = 6 * 3600           # GitHub releases feed (packaged builds; rare)
-_GIT_CHECK_TTL = 3600            # git commits-behind check — the project moves fast
+# Update check: compares the latest GitHub release tag (or, for a git checkout,
+# the configured branch) to the local version. Degrades to update_available=False
+# with a reason when the feed is unreachable (offline, repo private, no release
+# yet) — never an error, never a blocker. Only an explicit check reaches the
+# network (fork Divergence 12); these caches hold its last answer.
 _update_cache = {'ts': 0.0, 'data': None}
-# Auto-detection (nav badge): the git fetch is allowed but CACHED — the SPA
-# asks on every load, the network is hit at most once per TTL.
 _git_check_cache = {'ts': 0.0, 'data': None}
-# Separate cache, separate question: "is upstream ahead of me" vs. "does my own
-# fork have a release". Never shares state/TTL with the two above.
-_UPSTREAM_CHECK_TTL = 3600
-_upstream_check_cache = {'ts': 0.0, 'data': None}
-
-
-@bp.get('/update/upstream-check')
-def upstream_check():
-    """How many commits upstream's main has that this checkout doesn't —
-    informational only (Settings -> Maintenance), never a download/restart
-    offer. Cached ~1h: an uncached mount-time fetch on every SPA load would
-    spend the GitHub API's unauthenticated rate limit on a line most sessions
-    never look at."""
-    import time
-    from ..services import updater
-    now = time.time()
-    if (_upstream_check_cache['data'] is not None
-            and (now - _upstream_check_cache['ts']) < _UPSTREAM_CHECK_TTL):
-        return jsonify(_upstream_check_cache['data'])
-    status = updater.upstream_ahead_status()
-    out = status if status is not None else {'ok': True, 'ahead_by': None, 'compare_url': None}
-    _upstream_check_cache.update(ts=now, data=out)
-    return jsonify(out)
 
 
 @bp.get('/update/check')
@@ -645,18 +619,22 @@ def update_check():
     from ..version import APP_VERSION
     from ..services import updater
     force = bool(request.args.get('force'))
-    auto = bool(request.args.get('auto'))
     docker_runtime = updater.is_docker_runtime()
+    # Fork Divergence 12: only an explicit "Check for updates" (force) may reach
+    # the network. Every other caller (?auto=1, the bare path) is answered from
+    # the last explicit result, whatever its age, or told that checks are off.
+    if not force:
+        cached = _git_check_cache['data'] or _update_cache['data']
+        if cached is not None:
+            return jsonify(cached)
+        return jsonify({'ok': False, 'current': APP_VERSION, 'latest': None,
+                        'update_available': False, 'auto_check': False,
+                        'reason': 'Automatic update checks are off. Press Check for updates.'})
     # A git checkout: the meaningful signal is commits-behind-origin (the user pushes
     # commits to a branch, not tagged releases — a release-only check reads "up to date"
-    # while the tree is many commits behind). The fetch runs on an explicit check
-    # (force, always fresh) or an auto check (nav badge — served from a TTL cache so
-    # SPA loads don't hammer the network); never from the bare passive path.
-    if (force or auto) and not docker_runtime and updater.is_git_checkout():
+    # while the tree is many commits behind).
+    if not docker_runtime and updater.is_git_checkout():
         now = time.time()
-        if auto and not force and _git_check_cache['data'] is not None \
-                and (now - _git_check_cache['ts']) < _GIT_CHECK_TTL:
-            return jsonify(_git_check_cache['data'])
         gs = updater.git_update_status()
         if gs is not None:
             # Pinokio: the commits-behind answer stays true and useful (its
@@ -666,9 +644,6 @@ def update_check():
             _git_check_cache.update(ts=now, data=gs)
             return jsonify(gs)
     now = time.time()
-    if (_update_cache['data'] is not None and (now - _update_cache['ts']) < _UPDATE_TTL
-            and not force):
-        return jsonify(_update_cache['data'])
     repo = cfg.get('updates.repo') or 'socrasteeze/lora-dataset-studio'
     out = {'ok': True, 'current': APP_VERSION, 'latest': None,
            'update_available': False, 'url': f'https://github.com/{repo}/releases'}

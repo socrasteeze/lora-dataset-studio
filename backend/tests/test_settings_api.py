@@ -608,11 +608,9 @@ def _reset_update_cache():
     from app.routes import settings as sroutes
     sroutes._update_cache.update(ts=0.0, data=None)
     sroutes._git_check_cache.update(ts=0.0, data=None)
-    sroutes._upstream_check_cache.update(ts=0.0, data=None)
     yield
     sroutes._update_cache.update(ts=0.0, data=None)
     sroutes._git_check_cache.update(ts=0.0, data=None)
-    sroutes._upstream_check_cache.update(ts=0.0, data=None)
 
 
 class _FakeResp:
@@ -623,40 +621,18 @@ class _FakeResp:
         return self._body
 
 
-def test_upstream_check_reports_ahead_by(client, monkeypatch, _reset_update_cache):
-    from app.services import updater
-    monkeypatch.setattr(updater, 'upstream_ahead_status', lambda root=None, timeout=6: {
-        'ok': True, 'sha': 'abc1234', 'ahead_by': 5, 'behind_by': 0,
-        'compare_url': f'https://github.com/{updater.UPSTREAM_REPO}/compare/abc1234...main'})
-    d = client.get('/api/update/upstream-check').get_json()
-    assert d['ok'] is True and d['ahead_by'] == 5
-
-
-def test_upstream_check_absent_for_non_git_install(client, monkeypatch, _reset_update_cache):
-    from app.services import updater
-    monkeypatch.setattr(updater, 'upstream_ahead_status', lambda root=None, timeout=6: None)
-    d = client.get('/api/update/upstream-check').get_json()
-    assert d['ok'] is True and d['ahead_by'] is None
-
-
-def test_upstream_check_is_cached(client, monkeypatch, _reset_update_cache):
-    from app.services import updater
-    calls = []
-
-    def fake(root=None, timeout=6):
-        calls.append(1)
-        return {'ok': True, 'ahead_by': 1}
-    monkeypatch.setattr(updater, 'upstream_ahead_status', fake)
-    client.get('/api/update/upstream-check')
-    client.get('/api/update/upstream-check')
-    assert len(calls) == 1
+def test_upstream_check_route_is_gone(client):
+    """Fork Divergence 12: nothing asks upstream's GitHub about this checkout."""
+    assert client.get('/api/update/upstream-check').status_code == 404
 
 
 def test_update_check_detects_newer_release(client, monkeypatch, _reset_update_cache):
     import requests
+    from app.services import updater
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
     monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(200, {
         'tag_name': 'v9999.12.31', 'html_url': 'https://github.com/x/releases/tag/v9999.12.31'}))
-    d = client.get('/api/update/check').get_json()
+    d = client.get('/api/update/check?force=1').get_json()
     assert d['update_available'] is True and d['latest'] == '9999.12.31'
     assert d['url'].endswith('v9999.12.31')
 
@@ -728,7 +704,7 @@ def test_update_check_pinokio_never_advertises_a_zip_apply(
                     'browser_download_url': 'https://x/win'}],
     }))
 
-    d = client.get('/api/update/check').get_json()
+    d = client.get('/api/update/check?force=1').get_json()
 
     assert d['update_available'] is True
     assert d['install_mode'] == 'pinokio' and d['can_apply'] is False
@@ -757,21 +733,38 @@ def test_update_apply_pinokio_refuses_before_touching_git(client, monkeypatch):
     ]
 
 
-def test_update_check_same_version_and_cache(client, monkeypatch, _reset_update_cache):
+def test_update_check_same_version_then_serves_the_explicit_answer(
+        client, monkeypatch, _reset_update_cache):
     import requests
+    from app.services import updater
     from app.version import APP_VERSION
     calls = []
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
     monkeypatch.setattr(requests, 'get',
                         lambda *a, **k: calls.append(1) or _FakeResp(200, {'tag_name': f'v{APP_VERSION}'}))
-    d = client.get('/api/update/check').get_json()
+    d = client.get('/api/update/check?force=1').get_json()
     assert d['update_available'] is False and d['latest'] == APP_VERSION
-    client.get('/api/update/check')          # second call served from the 6h cache
+    assert client.get('/api/update/check?auto=1').get_json() == d   # no network
     assert len(calls) == 1
 
 
-def test_update_check_auto_fetches_git_then_serves_cache(client, monkeypatch, _reset_update_cache):
-    """auto=1 (nav badge): the git-aware check RUNS (unlike the bare passive
-    path) but is served from a TTL cache — SPA loads cost one fetch per 6 h."""
+def test_update_check_never_reaches_the_network_on_its_own(
+        client, monkeypatch, _reset_update_cache):
+    """Fork Divergence 12: ?auto=1 and the bare path touch neither git nor
+    GitHub. Before any explicit check they say automatic checks are off."""
+    import requests
+    from app.services import updater
+    boom = lambda *a, **k: (_ for _ in ()).throw(AssertionError('network call'))
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: True)
+    monkeypatch.setattr(updater, 'git_update_status', boom)
+    monkeypatch.setattr(requests, 'get', boom)
+    for url in ('/api/update/check', '/api/update/check?auto=1'):
+        d = client.get(url).get_json()
+        assert d['ok'] is False and d['update_available'] is False
+        assert d['auto_check'] is False and 'off' in d['reason']
+
+
+def test_update_check_force_fetches_git_every_time(client, monkeypatch, _reset_update_cache):
     from app.services import updater
     calls = []
     monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: True)
@@ -779,42 +772,31 @@ def test_update_check_auto_fetches_git_then_serves_cache(client, monkeypatch, _r
                         lambda root=None: calls.append(1) or {
                             'ok': True, 'is_git': True, 'update_available': True,
                             'behind': 2, 'current': '1.0'})
-    d = client.get('/api/update/check?auto=1').get_json()
+    d = client.get('/api/update/check?force=1').get_json()
     assert d['update_available'] is True and d['behind'] == 2
-    client.get('/api/update/check?auto=1')       # second auto call -> cache
-    assert len(calls) == 1
-    # a manual force check is always fresh AND refreshes the cache
+    assert client.get('/api/update/check?auto=1').get_json() == d   # cached answer
     client.get('/api/update/check?force=1')
     assert len(calls) == 2
 
 
-def test_update_check_bare_passive_never_fetches_git(client, monkeypatch, _reset_update_cache):
-    """The bare passive path (no force, no auto) must not run the git check."""
-    import requests
-    from app.services import updater
-    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: True)
-    monkeypatch.setattr(updater, 'git_update_status',
-                        lambda root=None: (_ for _ in ()).throw(
-                            AssertionError('git check must not run')))
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(404))
-    d = client.get('/api/update/check').get_json()
-    assert d['ok'] is True
-
-
 def test_update_check_degrades_when_feed_unreachable(client, monkeypatch, _reset_update_cache):
     import requests
+    from app.services import updater
     def boom(*a, **k):
         raise requests.ConnectionError('offline')
     monkeypatch.setattr(requests, 'get', boom)
-    d = client.get('/api/update/check').get_json()
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
+    d = client.get('/api/update/check?force=1').get_json()
     assert d['ok'] is True and d['update_available'] is False
     assert 'unreachable' in d['reason']
 
 
 def test_update_check_private_repo_404(client, monkeypatch, _reset_update_cache):
     import requests
+    from app.services import updater
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
     monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(404))
-    d = client.get('/api/update/check').get_json()
+    d = client.get('/api/update/check?force=1').get_json()
     assert d['update_available'] is False and '404' in d['reason']
 
 
@@ -1041,11 +1023,13 @@ def test_update_check_reports_can_apply_for_zip_release(client, monkeypatch, _re
     """A release with a ZIP asset -> can_apply True, so a packaged install can
     update in-app instead of only linking to the releases page."""
     import requests
+    from app.services import updater
+    monkeypatch.setattr(updater, 'is_git_checkout', lambda root=None: False)
     monkeypatch.setattr(requests, 'get', lambda *a, **k: _FakeResp(200, {
         'tag_name': 'v9999.12.31',
         'assets': [{'name': 'LoRA-Dataset-Studio-windows.zip',
                     'browser_download_url': 'https://x/win'}]}))
-    d = client.get('/api/update/check').get_json()
+    d = client.get('/api/update/check?force=1').get_json()
     assert d['update_available'] is True and d['can_apply'] is True
 
 
