@@ -120,6 +120,8 @@ test('a new engine reuses the main checkbox control without assuming a core engi
   assert.match(html, /role="checkbox"/)
   assert.match(html, /aria-label="Custom engine"/)
   assert.match(html, /aria-checked="true"/)
+  // A bare card IS its grid cell: full height, so a row of cards stands level.
+  assert.match(html, /^<button[^>]*class="[^"]*\bh-full\b/)
 })
 
 test('the shared bank switch does not hardcode a Video route while plugins are off', () => {

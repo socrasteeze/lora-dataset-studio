@@ -37,6 +37,18 @@ test('an unprepared engine leaves its settings link outside the disabled checkbo
   assert.doesNotMatch(html, /NSFW OK/)
 })
 
+test('the settings link sits inside the card frame, which fills its grid row', () => {
+  // Measured before: the link hung BELOW the card, and the card stood 100 px
+  // beside its 117.5-px neighbours in the same row.
+  const root = parseFragment(card({})).childNodes[0]
+  const cls = node => (node.attrs.find(attr => attr.name === 'class')?.value || '').split(/\s+/)
+  assert.equal(root.tagName, 'div')
+  for (const c of ['h-full', 'border', 'rounded-xl']) assert.ok(cls(root).includes(c), `frame lacks ${c}`)
+  const button = root.childNodes.find(node => node.tagName === 'button')
+  assert.ok(cls(button).includes('flex-1'), 'the checkbox fills the frame above the link')
+  assert.ok(!cls(button).includes('border'), 'one border, drawn by the frame')
+})
+
 test('a disabled engine points to its plugin settings engine toggle', () => {
   const html = card({ enabledInSettings: false })
   assert.match(html, /href="#\/plugins\/qwen_dataset\/settings\?focus=plugin-enabled-engines"/)
