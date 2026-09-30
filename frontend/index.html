@@ -20,9 +20,17 @@
     <meta name="theme-color" content="#0a0a0f" />
     <title>LoRA Dataset Studio</title>
     <meta name="description" content="Build, caption, and curate LoRA training datasets — generation, face scoring, masking, and ai-toolkit training in one workspace." />
+    <!-- Inline on purpose: this has to paint before the bundled stylesheet loads. -->
+    <style>
+      html, body { margin: 0; background: #161617; }
+      .boot-loading { display: flex; min-height: 100vh; align-items: center; justify-content: center; color: #98968f; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    </style>
   </head>
   <body class="font-sans">
-    <div id="root"></div>
+    <!-- Shown until React mounts: main.jsx waits for the plugin list before its
+         first render, and without this the page is blank for that whole wait.
+         React replaces everything inside #root on mount. -->
+    <div id="root"><div class="boot-loading" role="status">Loading LoRA Dataset Studio…</div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { postJson } from '../../api/fetchClient'
 import { useToast } from '../common/Toast'
+import { copyText } from '../../utils/copyText'
 import { INPUT_CLASS, Card } from './primitives'
 import ResetToDefault from './ResetToDefault'
 
@@ -147,19 +148,15 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
   }
 
   const copyToken = async () => {
-    try {
-      await navigator.clipboard.writeText(config.server.access_token || '')
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch { toast.info('Copy is unavailable here. Select the token and copy it manually.'); }
+    const res = await copyText(config.server.access_token || '')
+    if (res.ok) { setCopied(true); setTimeout(() => setCopied(false), 1500) }
+    else toast.info('Copy is unavailable here. Select the token and copy it manually.')
   }
 
   const copyUrl = async (key, url) => {
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedUrl(key)
-      setTimeout(() => setCopiedUrl(null), 1500)
-    } catch { toast.info('Copy is unavailable here. Select the address and copy it manually.'); }
+    const res = await copyText(url)
+    if (res.ok) { setCopiedUrl(key); setTimeout(() => setCopiedUrl(null), 1500) }
+    else toast.info('Copy is unavailable here. Select the address and copy it manually.')
   }
 
   return (

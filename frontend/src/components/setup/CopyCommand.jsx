@@ -1,13 +1,14 @@
 import { useState } from 'react'
+import { copyText } from '../../utils/copyText'
 
 export default function CopyCommand({ command }) {
   const [copied, setCopied] = useState(false)
+  const [failed, setFailed] = useState(false)
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(command)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard blocked — the command is visible to copy by hand */ }
+    const res = await copyText(command)
+    // A refusal is said on the button; the command is visible to copy by hand.
+    if (res.ok) { setCopied(true); setTimeout(() => setCopied(false), 1500) }
+    else { setFailed(true); setTimeout(() => setFailed(false), 2500) }
   }
   return (
     <div className="flex items-center gap-2">
@@ -16,7 +17,7 @@ export default function CopyCommand({ command }) {
       </code>
       <button type="button" onClick={copy}
         className="shrink-0 rounded-md border border-border-strong px-2 py-1 text-[11px] text-content hover:bg-surface-raised">
-        {copied ? 'Copied' : 'Copy'}
+        {copied ? 'Copied' : failed ? 'Copy failed' : 'Copy'}
       </button>
     </div>
   )

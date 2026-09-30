@@ -505,8 +505,32 @@ function NewDatasetForm({ onCreate, onClose }) {
   );
 }
 
+/** Shown in place of the empty state while the list has not been loaded. */
+function ListStatusNotice({ status, onRetry }) {
+  if (status === 'error') {
+    return (
+      <div role="alert"
+        className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-red-500/40 bg-red-500/5 px-4 py-8 text-center">
+        <p className="text-sm text-content-muted">Could not load your datasets.</p>
+        {onRetry && (
+          <button type="button" onClick={onRetry}
+            className="min-h-10 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content hover:bg-surface-raised lg:min-h-0">
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <p role="status"
+      className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-8 text-center text-sm text-content-muted">
+      Loading datasets…
+    </p>
+  );
+}
+
 export default function DatasetListPanel({
-  datasets, onOpen, onCreate, onDelete, onRename, onRestore, onExportZip, onExportBackup, backup,
+  datasets, listStatus = 'ready', onRetryList, onOpen, onCreate, onDelete, onRename, onRestore, onExportZip, onExportBackup, backup,
 }) {
   // Library-first: the creation form stays folded behind "+ New dataset" so the
   // page opens on the collection — except on an empty library, where creating
@@ -544,7 +568,12 @@ export default function DatasetListPanel({
     return next;
   });
   const empty = datasets.length === 0;
-  const formOpen = creating || empty;
+  // An empty list that has not been LOADED (still loading, or the load failed)
+  // is not an empty library: say so instead of "No datasets yet", and do not
+  // push the creation form at someone whose datasets simply have not arrived.
+  const pending = empty && listStatus !== 'ready';
+  const soleForm = empty && !pending;
+  const formOpen = creating || soleForm;
   // One-time tip: once the library is sizeable, point out tile sizing / folding /
   // filtering. Gated at ≥6 so it never fires for a first-time, near-empty library.
   useEffect(() => { if (datasets.length >= 6) requestHelpTip('library-browse'); }, [datasets.length]);
@@ -570,13 +599,13 @@ export default function DatasetListPanel({
           <div className="ml-auto flex items-center gap-2">
             <button type="button"
               onClick={() => {
-                if (empty) document.getElementById('new-dataset-name')?.focus();
+                if (soleForm) document.getElementById('new-dataset-name')?.focus();
                 else setCreating((v) => !v);
               }}
-              aria-expanded={empty ? undefined : formOpen}
-              aria-controls={empty ? undefined : 'new-dataset-form'}
+              aria-expanded={soleForm ? undefined : formOpen}
+              aria-controls={soleForm ? undefined : 'new-dataset-form'}
               className="rounded-lg bg-gradient-primary px-3.5 py-1.5 text-sm font-semibold text-gray-950 transition-transform hover:-translate-y-px">
-              {!empty && creating
+              {!soleForm && creating
                 ? <span className="inline-flex items-center gap-1"><X aria-hidden="true" className="h-4 w-4" /> Close</span>
                 : <span className="inline-flex items-center gap-1"><Plus aria-hidden="true" className="h-4 w-4" /> New dataset</span>}
             </button>
@@ -637,10 +666,12 @@ export default function DatasetListPanel({
 
       {formOpen && (
         <NewDatasetForm onCreate={onCreate}
-          onClose={empty ? null : () => setCreating(false)} />
+          onClose={soleForm ? null : () => setCreating(false)} />
       )}
 
-      {empty ? (
+      {pending ? (
+        <ListStatusNotice status={listStatus} onRetry={onRetryList} />
+      ) : empty ? (
         <EmptyState />
       ) : groups.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-app/30 px-4 py-8 text-center text-sm text-content-muted">

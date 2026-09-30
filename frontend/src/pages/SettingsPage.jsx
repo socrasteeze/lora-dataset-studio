@@ -492,7 +492,9 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
         <PluginSettingsGroups pluginId={plugin.id} groups={groups} {...sectionProps} />
       </div> : <>
       <div className="lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-8">
-        <aside>
+        {/* lg:self-stretch: see the Guide — the grid is items-start, so without it
+            the aside is only as tall as its nav and the sticky rail cannot move. */}
+        <aside className="lg:self-stretch">
           {/* Mobile: horizontal chip rail. `relative` makes the scroller the
               containing block for any absolutely positioned descendant — see
               the long note on the same rail in DatasetWorkspace. This one is
@@ -503,7 +505,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
             {visibleSections.map((s) => navItem(s, true))}
           </nav>
           {/* Desktop: sticky LED rail */}
-          <nav aria-label="Settings sections" className="hidden lg:sticky lg:top-20 lg:block">
+          <nav aria-label="Settings sections" className="hidden lg:block lg:sticky lg:top-[calc(var(--app-header-h)+1rem)] lg:max-h-[calc(100vh-var(--app-header-h)-2rem)] lg:overflow-y-auto">
             <p className="px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">Settings</p>
             <input
               type="search"
@@ -546,7 +548,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
           </nav>
         </aside>
 
-        <div ref={panelRef} className="mt-2 scroll-mt-20 space-y-6 lg:mt-0">
+        <div ref={panelRef} className="mt-2 space-y-6 lg:mt-0">
           <SectionHeader eyebrow={active.eyebrow} title={active.title}
             badge={<HelpBadge topic={`settings-${activeId}`} />} />
           <ActiveSection {...sectionProps} />

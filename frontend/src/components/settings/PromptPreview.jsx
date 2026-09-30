@@ -23,6 +23,7 @@
    what you last saved. */
 import { useEffect, useState } from 'react'
 import { postJson } from '../../api/fetchClient'
+import { copyText } from '../../utils/copyText'
 
 /* Divergence 1: local engines only. Mirrors ENGINES in
    dataset/engineSelection.js and LOCAL_ENGINES in face_dataset_service.py.
@@ -49,6 +50,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
 
   const body = JSON.stringify(identityPrompts || {})
   useEffect(() => {
@@ -70,11 +72,10 @@ export default function PromptPreview({ subject, identityPrompts }) {
   const text = data?.prompt || ''
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard blocked (http origin / permissions) — the text is selectable */ }
+    const res = await copyText(text)
+    // A refusal is said on the button; the text is selectable.
+    if (res.ok) { setCopied(true); setTimeout(() => setCopied(false), 1500) }
+    else { setCopyFailed(true); setTimeout(() => setCopyFailed(false), 2500) }
   }
 
   return (
@@ -146,7 +147,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
               disabled={!text}
               className="rounded-md border border-border-strong px-2 py-1 text-xs font-medium text-content hover:bg-surface-raised disabled:opacity-50"
             >
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? 'Copied' : copyFailed ? 'Copy failed' : 'Copy'}
             </button>
           </div>
           {/* THE 400px CASE: 1000 characters of prose. `whitespace-pre-wrap` +

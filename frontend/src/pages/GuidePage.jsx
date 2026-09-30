@@ -122,7 +122,10 @@ export default function GuidePage({ helpOnly = false }) {
     <div className={helpOnly
       ? 'mx-auto max-w-5xl xl:grid xl:grid-cols-[minmax(0,1fr)_190px] xl:items-start xl:gap-7'
       : 'lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:items-start lg:gap-7 xl:grid-cols-[210px_minmax(0,1fr)_190px]'}>
-      {!helpOnly && <aside>
+      {/* lg:self-stretch: the grid is items-start, which shrinks the aside to the
+          height of its nav — a sticky child has no room to travel in a parent
+          exactly its own height. Stretching makes the aside as tall as the page. */}
+      {!helpOnly && <aside className="lg:self-stretch">
         {/* Mobile: horizontal chapter chips. `relative` for the same reason as
             the Settings and Dataset rails — an absolutely positioned descendant
             (an `.sr-only` label is one) escapes an unpositioned scroller and
@@ -131,7 +134,7 @@ export default function GuidePage({ helpOnly = false }) {
           {chapters.map((c) => navItem(c, true))}
         </nav>
         {/* Desktop: sticky numbered chapter rail */}
-        <nav aria-label="Guide chapters" className="hidden lg:sticky lg:top-20 lg:block">
+        <nav aria-label="Guide chapters" className="hidden lg:block lg:sticky lg:top-[calc(var(--app-header-h)+1rem)] lg:max-h-[calc(100vh-var(--app-header-h)-2rem)] lg:overflow-y-auto">
           <p className="px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">Field manual</p>
           <div className="flex flex-col gap-0.5">
             {chapters.map((c) => navItem(c, false))}
@@ -139,7 +142,7 @@ export default function GuidePage({ helpOnly = false }) {
         </nav>
       </aside>}
 
-      <main className={`min-w-0 max-w-4xl pb-10 ${helpOnly ? 'mx-auto' : 'mt-2 lg:mt-0'}`}>
+      <article className={`min-w-0 max-w-4xl pb-10 ${helpOnly ? 'mx-auto' : 'mt-2 lg:mt-0'}`}>
         <header className="relative mb-4 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-5 sm:px-6 sm:py-6">
           <div aria-hidden className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="relative">
@@ -189,10 +192,10 @@ export default function GuidePage({ helpOnly = false }) {
             </Link>
           ) : <span />}
         </div>}
-      </main>
+      </article>
 
-      <aside className="hidden xl:block">
-        <nav aria-label="On this page" className="sticky top-20 border-l border-border pl-4">
+      <aside className="hidden xl:block xl:self-stretch">
+        <nav aria-label="On this page" className="sticky top-[calc(var(--app-header-h)+1rem)] max-h-[calc(100vh-var(--app-header-h)-2rem)] overflow-y-auto border-l border-border pl-4">
           <p className="m-0 mb-2 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-content-subtle">On this page</p>
           <div className="flex flex-col gap-0.5">
             {headings.map((item) => (

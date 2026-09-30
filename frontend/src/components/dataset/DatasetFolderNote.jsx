@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Folder } from 'lucide-react';
+import { copyText } from '../../utils/copyText'
 
 /** Where this dataset's images live on disk — shown, and copyable.
  *
@@ -17,13 +18,13 @@ import { Folder } from 'lucide-react';
  * pushing the row sideways. */
 export default function DatasetFolderNote({ path }) {
   const [copied, setCopied] = useState(false)
+  const [failed, setFailed] = useState(false)
   if (!path) return null
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(path)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard denied — the path is still readable on screen */ }
+    const res = await copyText(path)
+    // A refusal is said on the button; the path is still readable on screen.
+    if (res.ok) { setCopied(true); setTimeout(() => setCopied(false), 1500) }
+    else { setFailed(true); setTimeout(() => setFailed(false), 2500) }
   }
   return (
     <div className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs lg:text-sm">
@@ -35,7 +36,7 @@ export default function DatasetFolderNote({ path }) {
         <button type="button" onClick={copy}
           aria-label="Copy the dataset's images folder path"
           className="shrink-0 rounded border border-border px-2 py-0.5 text-content-muted hover:bg-surface-raised hover:text-content">
-          {copied ? '✓ Copied' : '⧉ Copy'}
+          {copied ? '✓ Copied' : failed ? 'Copy failed' : '⧉ Copy'}
         </button>
       </div>
       <p className="mt-1 text-content-muted">

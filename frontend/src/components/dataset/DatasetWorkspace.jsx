@@ -59,6 +59,7 @@ import {
   summarizeFlagged, rejectableFlagged, rejectFlaggedConfirmText, flaggedSourceNote,
 } from './watermarkFlagged.js';
 import { useToast } from '../common/Toast';
+import { copyText } from '../../utils/copyText';
 import { FolderBrowserModal } from '../common/FolderPicker';
 import ImportQueuePanel from './ImportQueuePanel';
 import { useCapabilities } from '../../context/CapabilitiesContext';
@@ -1097,7 +1098,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           </span>
         ) : (
           <button type="button"
-            onClick={() => { try { navigator.clipboard.writeText(d.trigger_word || ''); } catch { /* ignore */ } }}
+            onClick={async () => { const res = await copyText(d.trigger_word || ''); if (!res.ok) toast.error(`Could not copy the trigger word — ${res.reason}.`); }}
             title="Copy the trigger word (to put in your prompts)"
             className="min-h-10 lg:min-h-0 flex items-center gap-1 px-2 py-0.5 rounded-lg border border-indigo-400/40 bg-indigo-500/10 text-[0.6875rem] lg:text-sm">
             <span className="text-content-subtle">trigger:</span>

@@ -22,7 +22,7 @@ export default function DatasetPage() {
           {/* onRename is the fork's and upstream's call site does not pass it —
               taking their side verbatim would silently remove dataset renaming
               while leaving renameDataset live in useDataset. */}
-          <DatasetListPanel datasets={ds.datasets} onOpen={ds.open} onCreate={ds.create}
+          <DatasetListPanel datasets={ds.datasets} listStatus={ds.listStatus} onRetryList={ds.retryList} onOpen={ds.open} onCreate={ds.create}
             onDelete={ds.deleteDataset} onRename={ds.renameDataset} onRestore={ds.importBackup}
             onExportZip={ds.exportZipFor} onExportBackup={ds.exportBackupFor}
             backup={{

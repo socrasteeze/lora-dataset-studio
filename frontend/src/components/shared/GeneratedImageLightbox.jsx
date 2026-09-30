@@ -9,6 +9,7 @@ import { useImageDownload } from '../../hooks/useImageDownload';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { postJson } from '../../api/fetchClient';
 import { canImproveCanvasImage } from '../../utils/canvasImprove';
+import { copyText } from '../../utils/copyText';
 import { lightboxImproveButtons } from '../../utils/improveEngines';
 import ImprovePreparationLinks from '../common/ImprovePreparationLinks';
 import { canRestoreImproveSettings } from '../../utils/improveSettingsRestore';
@@ -57,28 +58,28 @@ import {
    Everything the panel decides (which facts, in which order, what folds) is in
    utils/generatedImageFacts.js, where `node --test` can reach it. */
 
-/** A copy button that says it worked. Clipboard access fails on a plain-http
- *  remote origin; the value stays selectable, so the failure is a button that
- *  does nothing visible rather than an error the user cannot act on. */
+/** A copy button that says whether it worked. copyText falls back to
+ *  execCommand on a plain-http remote origin; if that fails too the button says
+ *  so, and the value stays selectable. */
 function CopyButton({ value, label, className = '' }) {
   const [done, setDone] = useState(false);
+  const [failed, setFailed] = useState(false);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
   const copy = useCallback(async (e) => {
     e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(String(value));
-      setDone(true);
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => setDone(false), 1400);
-    } catch { /* clipboard blocked — the text is selectable */ }
+    const res = await copyText(String(value));
+    clearTimeout(timer.current);
+    setDone(res.ok);
+    setFailed(!res.ok);
+    timer.current = setTimeout(() => { setDone(false); setFailed(false); }, res.ok ? 1400 : 2500);
   }, [value]);
   return (
     <button type="button" onClick={copy} title={`Copy ${label}`}
-      aria-label={done ? `${label} copied` : `Copy ${label}`}
+      aria-label={done ? `${label} copied` : failed ? `${label} could not be copied` : `Copy ${label}`}
       className={'shrink-0 rounded border border-white/25 px-1.5 py-0.5 text-[0.625rem] '
         + 'text-white/70 hover:border-white/50 hover:text-white ' + className}>
-      {done ? '✓ Copied' : '⧉ Copy'}
+      {done ? '✓ Copied' : failed ? 'Copy failed' : '⧉ Copy'}
     </button>
   );
 }
