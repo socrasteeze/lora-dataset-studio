@@ -29,7 +29,10 @@ function fmtWhen(ts) {
 }
 
 export default function PipelineReport({ report, onDismiss }) {
-  const [open, setOpen] = useState(true)
+  // One line by default; opened only when the run needs a look (a pass errored
+  // or the run was stopped). Open, it was ~300 px above the grid on every visit.
+  const [open, setOpen] = useState(() => !!report?.cancelled
+    || (Array.isArray(report?.steps) && report.steps.some((s) => s.status === 'error')))
   if (!report || !Array.isArray(report.steps)) return null
   // A pass re-run since counts as covered, and drops the 🛑 with it: this banner
   // used to keep announcing "cancelled before it ran" over a standalone run that
