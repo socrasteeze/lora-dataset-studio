@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '../../common/Toast';
+import { copyText } from '../../../utils/copyText';
 import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { HelpBadge } from '../../../help/HelpMode';
 import { datasetThumbUrl } from '../../../utils/datasetThumbUrl';
@@ -47,12 +48,9 @@ export function SavedPromptsPanel({
 
   const total = Array.isArray(items) ? items.length : 0;
   const copyPrompt = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success('Prompt copied');
-    } catch {
-      toast.error('Could not copy — select the text and copy it manually.');
-    }
+    const res = await copyText(text);
+    if (res.ok) toast.success('Prompt copied');
+    else toast.error('Could not copy — select the text and copy it manually.');
   };
   const toggleExpand = (p) => setExpanded((cur) => {
     const next = new Set(cur);

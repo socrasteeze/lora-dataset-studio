@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { clipboardUnavailableReason, copyText, writeFailureReason } from './copyText.js'
+import { clipboardUnavailableReason, copyText, execCommandCopy, writeFailureReason } from './copyText.js'
 
 const secure = (writeText) => ({ isSecureContext: true, navigator: { clipboard: { writeText } } })
 
@@ -65,4 +65,75 @@ test('non-string input is coerced rather than crashing the write', async () => {
   assert.equal(written, '42')
   await copyText(null, secure(async (s) => { written = s }))
   assert.equal(written, '')
+})
+
+// A DOM double: records what the fallback did to the page.
+function fakeDocument({ execResult = true, execThrows = false } = {}) {
+  const log = { appended: [], removed: 0, copied: null, focusedBack: false }
+  const previous = { focus: () => { log.focusedBack = true } }
+  const doc = {
+    activeElement: previous,
+    body: { appendChild: (el) => { log.appended.push(el) } },
+    createElement: () => {
+      const el = {
+        style: {}, attrs: {}, value: '',
+        setAttribute(k, v) { this.attrs[k] = v },
+        focus() {}, select() { log.selected = this.value }, setSelectionRange() {},
+        remove() { log.removed += 1 },
+      }
+      return el
+    },
+    execCommand: (cmd) => {
+      if (execThrows) throw new Error('nope')
+      log.copied = { cmd, value: log.appended[0]?.value }
+      return execResult
+    },
+  }
+  return { doc, log }
+}
+
+test('plain http falls back to execCommand and reports success', async () => {
+  const { doc, log } = fakeDocument()
+  const env = { isSecureContext: false, navigator: {}, document: doc }
+  assert.deepEqual(await copyText('lan text', env), { ok: true })
+  assert.deepEqual(log.copied, { cmd: 'copy', value: 'lan text' })
+  assert.equal(log.removed, 1, 'the hidden textarea is removed again')
+  assert.equal(log.focusedBack, true, 'focus goes back to where it was')
+})
+
+test('a rejected clipboard write falls back to execCommand', async () => {
+  const { doc, log } = fakeDocument()
+  const err = new Error('denied')
+  err.name = 'NotAllowedError'
+  const env = { isSecureContext: true, navigator: { clipboard: { writeText: async () => { throw err } } }, document: doc }
+  assert.deepEqual(await copyText('x', env), { ok: true })
+  assert.equal(log.copied.value, 'x')
+})
+
+test('a working clipboard API never touches the DOM', async () => {
+  const { doc, log } = fakeDocument()
+  const env = { isSecureContext: true, navigator: { clipboard: { writeText: async () => {} } }, document: doc }
+  assert.deepEqual(await copyText('x', env), { ok: true })
+  assert.equal(log.appended.length, 0)
+})
+
+test('when the fallback fails too, the API reason is what the caller gets', async () => {
+  const { doc, log } = fakeDocument({ execResult: false })
+  const env = { isSecureContext: false, navigator: {}, document: doc }
+  const out = await copyText('x', env)
+  assert.equal(out.ok, false)
+  assert.match(out.reason, /HTTPS or localhost/)
+  assert.equal(log.removed, 1, 'cleans up after a refused copy')
+})
+
+test('an execCommand that throws is a failure, not an exception', async () => {
+  const { doc, log } = fakeDocument({ execThrows: true })
+  const env = { isSecureContext: false, navigator: {}, document: doc }
+  assert.equal((await copyText('x', env)).ok, false)
+  assert.equal(log.removed, 1)
+})
+
+test('execCommandCopy is false without a document', () => {
+  assert.equal(execCommandCopy('x', {}), false)
+  assert.equal(execCommandCopy('x', { document: {} }), false)
 })

@@ -143,6 +143,11 @@ function summarizeClean(d) {
 export function useDataset() {
   const toast = useToast();
   const [datasets, setDatasets] = useState([]);
+  // 'loading' until the first answer, 'error' when the first load failed, then
+  // 'ready'. A later refetch that fails keeps the last list (and 'ready'): only
+  // a list that was never loaded may not pass for an empty library.
+  const [listStatus, setListStatus] = useState('loading');
+  const listLoadedRef = useRef(false);
   // Persist the open dataset so a page reload returns to its workspace, not the list.
   const [currentId, setCurrentIdState] = useState(() => {
     try { const v = localStorage.getItem('datasetCurrentId'); return v ? Number(v) : null; }
@@ -232,10 +237,17 @@ export function useDataset() {
   const [, bumpReferenceEditRetryRevision] = useState(0);
 
   const fetchList = useCallback(async () => {
+    if (!listLoadedRef.current) setListStatus('loading');
     try {
       const r = await fetch('/api/dataset/list', { credentials: 'include' });
-      if (r.ok) setDatasets((await r.json()).datasets || []);
-    } catch { /* transient network error — keep the last list */ }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setDatasets((await r.json()).datasets || []);
+      listLoadedRef.current = true;
+      setListStatus('ready');
+    } catch {
+      // Transient network error: keep the last list; a list never loaded says so.
+      if (!listLoadedRef.current) setListStatus('error');
+    }
   }, []);
 
   const refresh = useCallback(async (id) => {
@@ -1784,7 +1796,7 @@ export function useDataset() {
   ));
 
 
-  return { datasets, currentId, data, busy: busyLive, localBusy: busy || importQueue.running, importQueue,
+  return { datasets, listStatus, retryList: fetchList, currentId, data, busy: busyLive, localBusy: busy || importQueue.running, importQueue,
            generationBusy, improveBusy, curationBusy, captioning: captioningLive,
            lastCaptionRun,
            analyzing: analyzingLive, watermarking: watermarkingLive,

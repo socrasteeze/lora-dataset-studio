@@ -9,7 +9,9 @@
 // Shared slugifier — lives in utils/headingId.js so the help registry and the
 // node --test contract can import it without pulling JSX/Vite in. Re-exported
 // here because GuidePage (and other callers) import it from this module.
+import { useEffect, useRef, useState } from 'react'
 import { markdownHeadingId } from '../../utils/headingId'
+import { copyText } from '../../utils/copyText'
 export { markdownHeadingId }
 
 // ---- inline: **bold**, *italic*, `code`, [text](url) ----
@@ -37,6 +39,33 @@ function renderInline(text, keyBase = 'i') {
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
+}
+
+// ---- code fence with a Copy button ----
+// The commands in the Guide are meant to be pasted somewhere else. On a phone,
+// selecting a code block by long-press is fiddly, and the button also works over
+// plain http on a LAN address (copyText falls back to execCommand there).
+function CodeBlock({ body }) {
+  const [state, setState] = useState('idle');   // idle | copied | failed
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = async () => {
+    const res = await copyText(body);
+    setState(res.ok ? 'copied' : 'failed');
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState('idle'), 1800);
+  };
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex justify-end">
+        <button type="button" onClick={copy} aria-label="Copy this code block"
+          className="inline-flex min-h-10 items-center rounded-md border border-border px-2.5 text-xs text-content-muted hover:bg-surface-raised hover:text-content lg:min-h-0 lg:py-0.5">
+          <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy'}</span>
+        </button>
+      </div>
+      <pre className="m-0 rounded-lg border border-border bg-app/60 p-3 overflow-x-auto text-[0.8125rem] text-content-muted font-mono">{body}</pre>
+    </div>
+  );
 }
 
 // ---- blocs ----
@@ -103,7 +132,7 @@ function renderBlock(b, idx, guide = false) {
   const key = `b${idx}`;
   switch (b.t) {
           case 'h1': return <h1 key={key} className="m-0 mt-2 text-content font-bold text-2xl">{renderInline(b.body, key)}</h1>;
-          case 'h2': return <h2 key={key} id={guide ? undefined : markdownHeadingId(b.body)} className={`${guide ? 'text-xl' : 'mt-4 border-b border-border pb-1.5 text-lg'} m-0 scroll-mt-24 text-content font-bold`}>{renderInline(b.body, key)}</h2>;
+          case 'h2': return <h2 key={key} id={guide ? undefined : markdownHeadingId(b.body)} className={`${guide ? 'text-xl' : 'mt-4 border-b border-border pb-1.5 text-lg'} m-0 text-content font-bold`}>{renderInline(b.body, key)}</h2>;
           case 'h3': return <h3 key={key} className="m-0 mt-2 text-content font-semibold text-base">{renderInline(b.body, key)}</h3>;
           case 'hr': return <hr key={key} className="border-border my-2" />;
           case 'quote': return (
@@ -111,9 +140,7 @@ function renderBlock(b, idx, guide = false) {
               {renderInline(b.body, key)}
             </blockquote>
           );
-          case 'code': return (
-            <pre key={key} className="m-0 rounded-lg border border-border bg-app/60 p-3 overflow-x-auto text-[0.8125rem] text-content-muted font-mono">{b.body}</pre>
-          );
+          case 'code': return <CodeBlock key={key} body={b.body} />;
           case 'table': return (
             <div key={key} className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-sm border-collapse">
@@ -193,7 +220,7 @@ export default function Markdown({ source, variant = 'default', sectionActions =
           const action = sectionActions ? sectionActions[headingId] : null;
           return (
           <section key={`section-${index}`} id={headingId}
-            className="scroll-mt-24 rounded-xl border border-border bg-surface px-4 py-4 shadow-sm shadow-black/10 sm:px-5 sm:py-5">
+            className="rounded-xl border border-border bg-surface px-4 py-4 shadow-sm shadow-black/10 sm:px-5 sm:py-5">
             <div className="mb-4 flex items-start gap-3 border-b border-border pb-3">
               <span aria-hidden className="mt-1 h-5 w-1 shrink-0 rounded-full bg-gradient-primary" />
               <div className="min-w-0 flex-1">{renderBlock(heading, index, true)}</div>

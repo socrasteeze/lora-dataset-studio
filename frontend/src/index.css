@@ -180,7 +180,9 @@
   --accent: 225 134 31;            /* #E1861F */
 
   /* Height of the sticky top bar (App.jsx `<header className="… sticky top-0">`),
-     measured at 57 px on every width where it is the desktop bar.
+     measured at ~65 px (64.8) on a phone (< 768 px); the taller two-row bar at
+     768 px and up is measured at ~102 px (101.6) and overrides this in the
+     `:root[data-theme="dark"]` rules above.
      Anything else that pins itself to the top of the viewport has to clear it,
      or it slides UNDER the bar and loses its own header — which is what the
      Bank's filter rail did before this existed.
@@ -188,11 +190,17 @@
      bar growing (the suite runs on `node --test`, which has no layout engine).
      If you change the bar's padding or type size, change this with it — this is
      the single place that has to move. */
-  --app-header-h: 57px;
+  --app-header-h: 65px;
 }
 
 
 @layer base {
+  /* The sticky app bar covers the top --app-header-h of the viewport, so an
+     anchor jump (#hash link, scrollIntoView) would land under it. This keeps
+     every target clear of the bar; a per-element `scroll-mt-*` only adds to it. */
+  html {
+    scroll-padding-top: var(--app-header-h);
+  }
   body {
     background-color: rgb(var(--bg-app));
     color: rgb(var(--text-base));
@@ -231,24 +239,6 @@
     font-style: normal;
     font-weight: 600;
   }
-  /* iOS Safari auto-zooms the page on focusing any text-like input whose
-     EFFECTIVE font-size is under 16px — and the zoom-in/zoom-out transition
-     is how a pre-existing horizontal overflow elsewhere on the page (an
-     absolutely-positioned element escaping a `position: static` scroller, a
-     popover anchored with no left/right offset — see
-     tests/mobile-rail-containing-block.test.mjs and the Bank curate-popover
-     fix) gets "stuck" as a persistently scrollable page: the browser
-     recomputes its fit-to-width scale during the transition, using whatever
-     the document's width happens to be at that moment. Belt-and-suspenders:
-     even with every known overflow source fixed, this stops the TRIGGER
-     itself below the app's own `sm` breakpoint (640px), so a future overflow
-     slip can't reproduce the same stuck-zoom symptom. Desktop keeps every
-     existing text-xs/text-sm control exactly as it is today. */
-  @media (max-width: 639px) {
-    input, select, textarea {
-      font-size: 16px;
-    }
-  }
   ::-webkit-scrollbar {
     @apply w-1.5;
   }
@@ -268,6 +258,31 @@
      every call site — lucide always puts its "lucide" class on the svg. */
   svg.lucide {
     stroke-width: 1.5;
+  }
+}
+
+/* iOS Safari auto-zooms the page on focusing any text-like input whose
+   EFFECTIVE font-size is under 16px — and the zoom-in/zoom-out transition
+   is how a pre-existing horizontal overflow elsewhere on the page (an
+   absolutely-positioned element escaping a `position: static` scroller, a
+   popover anchored with no left/right offset — see
+   tests/mobile-rail-containing-block.test.mjs and the Bank curate-popover
+   fix) gets "stuck" as a persistently scrollable page: the browser
+   recomputes its fit-to-width scale during the transition, using whatever
+   the document's width happens to be at that moment. Belt-and-suspenders:
+   even with every known overflow source fixed, this stops the TRIGGER
+   itself below the app's own `sm` breakpoint (640px), so a future overflow
+   slip can't reproduce the same stuck-zoom symptom.
+   This sits OUTSIDE `@layer base` and is `!important` on purpose. Inside the
+   base layer an element selector (specificity 0,0,1) loses to every Tailwind
+   `text-xs` / `text-sm` class (0,1,0) on the input, so nearly every field in
+   the app kept its small size on a phone and still triggered the zoom. Source
+   order alone cannot fix that (specificity comes first), hence `!important`.
+   It only applies below 640px: from `sm` up, every text-xs/text-sm control is
+   exactly as it was. */
+@media (max-width: 639px) {
+  input, select, textarea {
+    font-size: 16px !important;
   }
 }
 

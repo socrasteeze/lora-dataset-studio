@@ -109,6 +109,11 @@ export const WHATS_NEW = [
     blurb: 'Browse all, next to the Bank\'s style strip, shows every style group as a grid of previews, sorted by size or aesthetic. The installed iPhone app now keeps the filters panel clear of the rounded corners and the home bar.',
   },
   {
+    id: '2026-09-29-q-phone-fields-and-copy', date: '2026-09-29',
+    title: 'Steadier on an iPhone',
+    blurb: 'Tapping a field no longer zooms the page in on an iPhone. Copy buttons now work when you open the app from your phone over your home network, and every code block in the Guide has its own Copy button. Links to a section stop landing under the top bar, the Guide and Settings menus stay in view while you scroll, and the datasets list says when it is loading or could not load instead of claiming you have none.',
+  },
+  {
     id: '2026-09-29-faster-score-pass', date: '2026-09-29',
     title: 'Score Runs About 3× Faster',
     blurb: '✨ Score prepares images on several CPU cores while the GPU works, and no longer slows down as a big bank fills its cache. Large photos up to your image size limit now score instead of failing as "too large", and one unreadable image no longer throws away the whole bank\'s style groups.',

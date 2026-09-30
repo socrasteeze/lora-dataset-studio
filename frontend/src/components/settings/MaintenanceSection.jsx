@@ -7,6 +7,7 @@ import PinokioUpdateInstructions from '../common/PinokioUpdateInstructions'
 import { Card } from './primitives'
 import { installMode, zipUpdateHeadline, progressLabel, progressPercent } from './updateStatus'
 import { versionLabel } from '../../utils/versionLabel'
+import { copyText } from '../../utils/copyText'
 
 /* In-app updater: "Check for updates" hits the git-aware check (commits-behind for a
    clone, release tag for a packaged build). "Update & restart" pulls (git) or downloads
@@ -238,7 +239,11 @@ function LogViewer() {
     const id = setInterval(load, 5000)
     return () => clearInterval(id)
   }, [open])
-  const copy = () => { try { navigator.clipboard.writeText(lines.join('\n')) } catch { /* ignore */ } }
+  const [copyFailed, setCopyFailed] = useState(false)
+  const copy = async () => {
+    const res = await copyText(lines.join('\n'))
+    if (!res.ok) { setCopyFailed(true); setTimeout(() => setCopyFailed(false), 2500) }
+  }
   return (
     <section className="rounded-xl border border-border bg-surface p-5">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
@@ -259,7 +264,7 @@ function LogViewer() {
             </button>
             <button type="button" onClick={copy} disabled={!lines.length}
               className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs text-content disabled:opacity-40">
-              📋 Copy all
+              {copyFailed ? 'Copy failed — select the log below' : '📋 Copy all'}
             </button>
           </div>
           <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-app/60 p-2 text-[11px] leading-snug text-content-muted">
