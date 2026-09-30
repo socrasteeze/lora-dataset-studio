@@ -1695,6 +1695,27 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       ? filter.wd14Tags.filter((t) => t !== name)
       : [...filter.wd14Tags, name],
   })
+  // Rendered twice: in the header from sm up, and at the top of ⚙ Passes below
+  // it (see the header's counter row for why).
+  const counterStats = counts && (
+    <>
+      <Stat label="images" value={counts.total} />
+      <Stat label="scanned" value={counts.scanned} />
+      {scored > 0 && <Stat label="scored" value={scored} />}
+      {semanticState.hasStatus && (
+        <Stat label={`${semanticState.label} semantic-ready`}
+          value={semanticState.total > 0
+            ? `${semanticIndexed.toLocaleString()}/${semanticState.total.toLocaleString()}`
+            : semanticIndexed}
+          tone={semanticReady ? 'emerald' : undefined} />
+      )}
+      {watermarkScanned > 0 && <Stat label="watermark-checked" value={watermarkScanned} />}
+      <Stat label="undecided" value={counts.pending} />
+      <Stat label="kept" value={counts.keep} tone="emerald" />
+      <Stat label="rejected" value={counts.reject} tone="rose" />
+      <Stat label="promoted" value={counts.promoted} tone="indigo" />
+    </>
+  )
 
 
   return (
@@ -1751,28 +1772,20 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           )}
         </div>
         {counts && (
-          /* One scrolling line below sm: eight counters wrapping to four rows were
-             a quarter of a phone's fold, before a single image. */
-          <div className="flex flex-nowrap items-baseline gap-x-4 gap-y-1 overflow-x-auto border-t border-border pt-2 text-sm sm:flex-wrap sm:overflow-visible [@media(max-height:500px)]:hidden">
-            <Stat label="images" value={counts.total} />
-            <Stat label="scanned" value={counts.scanned} />
-            {scored > 0 && <Stat label="scored" value={scored} />}
-            {semanticState.hasStatus && (
-              <Stat label={`${semanticState.label} semantic-ready`}
-                value={semanticState.total > 0
-                  ? `${semanticIndexed.toLocaleString()}/${semanticState.total.toLocaleString()}`
-                  : semanticIndexed}
-                tone={semanticReady ? 'emerald' : undefined} />
-            )}
-            {watermarkScanned > 0 && <Stat label="watermark-checked" value={watermarkScanned} />}
-            <Stat label="undecided" value={counts.pending} />
-            <Stat label="kept" value={counts.keep} tone="emerald" />
-            <Stat label="rejected" value={counts.reject} tone="rose" />
-            <Stat label="promoted" value={counts.promoted} tone="indigo" />
+          /* Folded into ⚙ Passes below sm. Eight counters wrapping to four rows
+             were a quarter of a phone's fold; even as one scrolling line they
+             pushed the header to 32 % of a 360×800 fold, over the 28 % budget.
+             They are mostly pass coverage, and the rail's status tiles repeat
+             the undecided / kept / rejected counts. */
+          <div className="hidden items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm sm:flex sm:flex-wrap [@media(max-height:500px)]:!hidden">
+            {counterStats}
           </div>
         )}
         {/* The decisive actions. ⚙ Passes opens the analysis panel; the other
-            three are the ones that change what leaves this bank. */}
+            three are the ones that change what leaves this bank. Each button is
+            shrink-0 + whitespace-nowrap: allowed to shrink, the scrolling line
+            squeezed them instead and "Delete rejected from disk" wrapped to five
+            lines, a 123-px row on a 360-px phone. */}
         <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto border-t border-border pt-2 sm:flex-wrap sm:overflow-visible [@media(max-height:500px)]:ml-auto [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:border-t-0 [@media(max-height:500px)]:pt-0">
           {/* ☰ exists only where the rail cannot sit beside the grid — at 400 px
               it is the ONLY way back to the filters, so it is a real button and
@@ -1780,19 +1793,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {!railIsColumnNow && (
             <button type="button" onClick={openRail}
               aria-expanded={railOpen} aria-controls="bank-filter-rail"
-              className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+              className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
               ☰ Filters
             </button>
           )}
           <button type="button" onClick={togglePasses}
             aria-expanded={passesOpen} aria-controls="bank-passes-panel"
             title="Open the analysis passes — scan, score, group by person, framing, medium, crops, watermarks and captions."
-            className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
+            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
             {passesButtonLabel(live)}
           </button>
           <button type="button" onClick={() => setLaunchOpen(true)} disabled={live || !(counts?.total > 0)}
             title={`Run the whole triage in one go — scan, auto-reject, Score${semanticState.engine === 'siglip2' ? ', SigLIP 2 semantic index' : ''}, crops/variants, watermarks, group by person and (optionally) caption. Start it and walk away. If the person pass is in, it checks your folders first and asks once, before the run.`}
-            className="min-h-10 lg:min-h-0 rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-gray-950 shadow disabled:opacity-50">
+            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md bg-gradient-primary px-4 py-2 text-sm font-bold text-gray-950 shadow disabled:opacity-50">
             <Rocket aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Launch all
           </button>
           <span className="ml-auto" />
@@ -1800,7 +1813,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             title={canPromote
               ? 'Copy the kept selection into a dataset — or into a brand-new bank, to keep working on a shortlist apart'
               : 'Keep some images first'}
-            className="min-h-10 lg:min-h-0 rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
+            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
             ⬆ Promote
           </button>
           {/* Disabled outright when this bank's folder belongs to a dataset: the
@@ -1813,7 +1826,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               : (counts?.reject > 0)
                 ? 'Delete the rejected images from your disk (OS trash when available). Irreversible — asks you to type DELETE first. Kept images are untouched.'
                 : 'No rejected images to delete'}
-            className="min-h-10 lg:min-h-0 rounded-md border border-rose-500/50 px-3 py-1.5 text-sm text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+            className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md border border-rose-500/50 px-3 py-1.5 text-sm text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
             <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete rejected from disk{(counts?.reject > 0) ? ` (${counts.reject})` : ''}
           </button>
         </div>
@@ -1857,6 +1870,11 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
            truncation and fill, and charged to no fold budget. Plain comment: this
            is an EXPRESSION position (inside `{passesOpen && ( … )}`). */
         <div id="bank-passes-panel" data-probe-chrome="passes" data-probe-panel="passes" data-probe-reading>
+          {counts && (
+            <div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm sm:hidden">
+              {counterStats}
+            </div>
+          )}
           {/* Silent in every normal state; it appears exactly where the "GPU busy"
               refusal does, and only when the server says nothing backs that flag up.
               Recovering from a leftover flag used to mean restarting the app. */}

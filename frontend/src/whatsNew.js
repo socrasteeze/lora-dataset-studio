@@ -84,6 +84,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-29-zzz-bank-phone-header', date: '2026-09-29',
+    title: 'More of Your Bank on a Phone Screen',
+    blurb: 'On a phone the Bank\'s top bar is half its old height. Its buttons keep one line and scroll sideways, and the image and pass counters now sit at the top of ⚙ Passes.',
+  },
+  {
     id: '2026-09-29-zz-bank-tag-filter-back', date: '2026-09-29',
     title: 'Filter a Tagged Bank by Tags Again',
     blurb: 'After 🔖 Tags, the Bank\'s filters offer hair, clothing, setting and other tag dropdowns plus every other tag as a chip. The filters panel is wider, and its buttons keep one line and one height.',
