@@ -8,7 +8,7 @@ import { useCurationLanes } from './useCurationLanes'
 import { useToast } from '../common/Toast'
 import { useCapabilities } from '../../context/CapabilitiesContext'
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
-import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker'
+import { loadSavedDeviceId } from '../common/DevicePicker'
 import { stepGate } from './passDeviceGate.js'
 import GpuBusyNotice from '../common/GpuBusyNotice'
 import BankDecisionBar from './BankDecisionBar.jsx'
@@ -16,7 +16,6 @@ import BankDecisionBar from './BankDecisionBar.jsx'
 // this fork's (peer dispatch, the 🔖 Tags pass, the filter summary) and it did not
 // move into upstream's new components, so its imports belong here still.
 import { idsFromResponse } from './bankIds.js'
-import { initialFiltersOpen, loadFiltersOpen, saveFiltersOpen } from './bankFilterPanelOpen.js'
 import { scoreGpuHoldNote } from './bankScoreDevice.js'
 import { bankFilterSummary, bankFilterCount } from './bankFilterSummary.js'
 import { showTagFilters, tagsButtonLabel, tagsButtonState } from './wd14Gate.js'
@@ -36,7 +35,7 @@ const CaptionEditorDialog = lazy(() => import('../dataset/CaptionEditorDialog'))
 // The surface-inventory contract scans the whole Bank TREE, so moving a button
 // between these files is free and losing one is loud (see bankSurfaces.js).
 import { Stat } from './BankAtoms.jsx'
-import { ProgressBar, UndoBar } from './BankProgress.jsx'
+import { ProgressBar } from './BankProgress.jsx'
 import Tile from './BankTile.jsx'
 import CoveragePanel from './BankCoveragePanel.jsx'
 // The two structural halves of the redesign: all of triage beside the grid, and
@@ -325,14 +324,6 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   const [showSelected, setShowSelected] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [tileSize, setTileSize] = useState('M')
-  // 🔎 The filter panel folds behind a one-line summary on a narrow screen.
-  // Decided ONCE at mount (see bankFilterPanelOpen.js for why) — a stored
-  // chevron choice always wins, and with none yet it opens wide, folds narrow.
-  const [filtersOpen, setFiltersOpen] = useState(() => initialFiltersOpen({
-    stored: loadFiltersOpen(),
-    viewportWidth: typeof window === 'undefined' ? undefined : window.innerWidth,
-  }))
-  const toggleFilters = () => setFiltersOpen((v) => { const next = !v; saveFiltersOpen(next); return next })
   // Which machine runs a pass clicked on its own. Its own remembered value, not
   // the inpaint picker's — both render on this screen and one key for both let
   // a ComfyUI backend picked for Klein decide where a bank pass ran.
@@ -1791,10 +1782,15 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               it is the ONLY way back to the filters, so it is a real button and
               never a CSS-hidden one. */}
           {!railIsColumnNow && (
+            /* The closed drawer hides the rail's summary line, so the button
+               keeps the count and the full list rides in its tooltip. */
             <button type="button" onClick={openRail}
               aria-expanded={railOpen} aria-controls="bank-filter-rail"
+              title={filterSummary.count ? filterSummary.title : undefined}
               className="min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content hover:bg-surface">
-              ☰ Filters
+              ☰ Filters{filterSummary.count > 0 && (
+                <span className="ml-1.5 tabular-nums text-indigo-300">{filterSummary.count}</span>
+              )}
             </button>
           )}
           <button type="button" onClick={togglePasses}
@@ -1970,7 +1966,9 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               tagFiltersShown={tagFiltersShown} tagGroups={grouped}
               tagTruncated={!!tagFacets?.truncated} wd14Tags={filter.wd14Tags}
               facetValue={facetValue} setFacetTag={setFacetTag}
-              toggleWd14Tag={toggleWd14Tag} clearWd14Tags={() => setF({ wd14Tags: [] })} />
+              toggleWd14Tag={toggleWd14Tag} clearWd14Tags={() => setF({ wd14Tags: [] })}
+              filterSummary={filterSummary} clearAllFilters={clearAllFilters}
+              shownReasons={shownReasons} reasonCounts={reasonCounts} reasonHint={reasonHint} />
           </div>
         )}
         {styleBrowserOpen && (

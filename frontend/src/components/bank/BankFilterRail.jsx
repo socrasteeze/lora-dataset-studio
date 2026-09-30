@@ -54,6 +54,7 @@ export default function BankFilterRail({
   moreOpen, setMoreOpen, isDrawer, onClose, onBrowseStyles,
   tagFiltersShown, tagGroups, tagTruncated, wd14Tags, facetValue, setFacetTag,
   toggleWd14Tag, clearWd14Tags,
+  filterSummary, clearAllFilters, shownReasons, reasonCounts, reasonHint,
 }) {
   // Which measured axes have data. The conditions are the ones the workspace
   // already used — moving a facet into the rail must not change WHEN it appears.
@@ -82,11 +83,27 @@ export default function BankFilterRail({
            wrapper in BankWorkspace already pins and scrolls the column. With
            both, the panel was a scroller inside a scroller — two scrollbars. */
         : 'space-y-3 self-start rounded-xl border border-border bg-surface p-3'}>
-      <div className="flex items-center gap-2">
+      {/* What is filtering, in words, and one way back to the whole bank.
+          Restored: the Encre merge (f7543f826) dropped the old panel header
+          that carried both, and left bankFilterSummary.js and clearAllFilters
+          wired to nothing — a bank showing 412 of 9,004 said nothing about why.
+          One line: the summary truncates, the full list is its tooltip. */}
+      <div className="flex min-w-0 items-center gap-2">
         <GroupLabel>Filters</GroupLabel>
+        <span title={filterSummary.title}
+          className={`min-w-0 flex-1 truncate text-xs ${filterSummary.count ? 'text-content' : 'text-content-subtle'}`}>
+          {filterSummary.text}
+        </span>
+        {filterSummary.count > 0 && (
+          <button type="button" onClick={clearAllFilters}
+            title="Clear every filter and show the whole bank again. The grid ORDER is a separate, remembered preference and is left alone."
+            className="min-h-10 lg:min-h-0 lg:h-7 shrink-0 whitespace-nowrap rounded-md border border-border px-2 text-xs text-content-muted hover:text-content">
+            ✕ Clear all
+          </button>
+        )}
         {isDrawer && (
           <button type="button" onClick={onClose} aria-label="Close the filters"
-            className="min-h-10 lg:min-h-0 ml-auto rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
+            className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content">
             ✕
           </button>
         )}
@@ -132,6 +149,25 @@ export default function BankFilterRail({
           )
         })}
       </div>
+
+      {/* ✕ Why — which rule rejected each image, from reject_reason. Restored:
+          the Encre merge (f7543f826) dropped this row with the old panel.
+          Without it an auto-rejected duplicate has no handle at all once its
+          cluster resolves (the ≈ chip drops to 0). Read-only — nothing here
+          un-rejects. Shown while ✕ Rejected is on AND whenever a reason is
+          still set, so switching status never leaves a filter narrowing the
+          grid with no chip left to clear it. */}
+      {(filter.status === 'reject' || filter.reason) && shownReasons.length > 0 && (
+        <FilterGroup label="✕ Why">
+          {shownReasons.map((b) => (
+            <Chip key={b.id} active={filter.reason === b.id}
+              onClick={() => setF({ reason: filter.reason === b.id ? null : b.id })}
+              title={reasonHint(b.id, FLAG_HINT)}>
+              {b.label} {reasonCounts[b.id] ?? 0}
+            </Chip>
+          ))}
+        </FilterGroup>
+      )}
 
       {/* Say it in words; the app sets its own chips and the counters below —
           measured, not the model — say what that lands on. At the TOP of the
