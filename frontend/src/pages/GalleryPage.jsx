@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Images, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import { apiFetch, postJson } from '../api/fetchClient';
 import GeneratedImageLightbox from '../components/shared/GeneratedImageLightbox';
+import { btnShape, fieldClass } from '../components/common/controls';
 import { isCameraView, poseLabel } from '../utils/cameraAngles';
 import { useCanvasImageImprove } from '../hooks/useCanvasImageImprove';
 import { useRestoreImproveSettings } from '../hooks/useRestoreImproveSettings';
@@ -54,8 +55,8 @@ const QUEUE_POLL_MS = 6000;
    turning a finished job into a permanent poller. */
 const QUEUE_DRAIN_READS = 3;
 
-const FILTER_BTN =
-  'min-h-10 lg:min-h-0 rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors';
+// One control height across the filter row (select, kind chips, Liked).
+const FILTER_BTN = `${btnShape({ size: 'sm' })} border font-medium`;
 
 export default function GalleryPage() {
   const [filters, setFilters] = useState({ datasetId: '', kind: '', liked: false });
@@ -389,7 +390,7 @@ export default function GalleryPage() {
           <select value={filters.datasetId}
             onChange={(e) => setFilter({ datasetId: e.target.value })}
             aria-label="Show one dataset's images"
-            className="min-h-10 lg:min-h-0 min-w-0 max-w-full rounded-md border border-border bg-surface-raised px-2 py-1 text-[0.75rem] text-content focus:outline-none focus:border-primary/60">
+            className={`${fieldClass({ size: 'sm' })} min-w-0 max-w-full focus:outline-none focus:border-primary/60`}>
             {datasetFilterOptions(feed.datasets,
               feed.datasets.reduce((n, d) => n + (d.count || 0), 0))
               .map((o) => (

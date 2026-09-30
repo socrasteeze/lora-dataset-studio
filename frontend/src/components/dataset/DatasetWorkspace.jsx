@@ -61,6 +61,7 @@ import {
 import { useToast } from '../common/Toast';
 import { copyText } from '../../utils/copyText';
 import { FolderBrowserModal } from '../common/FolderPicker';
+import { btnClass, btnShape, controlHeight, fieldClass } from '../common/controls';
 import ImportQueuePanel from './ImportQueuePanel';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import InstallRunner from '../setup/InstallRunner';
@@ -1086,21 +1087,22 @@ export default function DatasetWorkspace({ ds, onBack }) {
        * menu's z-20 would remain trapped below later siblings.
        */}
       <div data-probe-chrome="header" className="relative z-30 flex items-center gap-x-2 gap-y-1 flex-wrap">
+        {/* One control height across the header: back, trigger chip, Export, More. */}
         <button type="button" onClick={onBack}
-          className="min-h-10 lg:min-h-0 flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised text-sm transition-colors">
+          className={`${btnShape()} border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised`}>
           <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Datasets
         </button>
         <h1 className="min-w-0 break-words text-content font-bold lg:text-2xl">{d.name}</h1>
         {isStyle ? (
           <span title="This Style LoRA is always active when loaded; adjust its LoRA weight to control the effect."
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-[0.6875rem]">
+            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-[0.6875rem]`}>
             always-on style · no trigger
           </span>
         ) : (
           <button type="button"
             onClick={async () => { const res = await copyText(d.trigger_word || ''); if (!res.ok) toast.error(`Could not copy the trigger word — ${res.reason}.`); }}
             title="Copy the trigger word (to put in your prompts)"
-            className="min-h-10 lg:min-h-0 flex items-center gap-1 px-2 py-0.5 rounded-lg border border-indigo-400/40 bg-indigo-500/10 text-[0.6875rem] lg:text-sm">
+            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-indigo-400/40 bg-indigo-500/10 text-[0.6875rem] lg:text-sm`}>
             <span className="text-content-subtle">trigger:</span>
             <code className="text-indigo-300 font-semibold">{d.trigger_word || '—'}</code>
             <Copy aria-hidden="true" className="h-3 w-3 text-content-subtle" />
@@ -1108,8 +1110,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
         )}
         <div className="ml-auto flex items-center gap-2">
           <button type="button" disabled={!kept} onClick={exportZipGuarded}
-            className="min-h-10 lg:min-h-0 px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-            <Download aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Export ZIP ({kept})
+            className={btnClass({ variant: 'primary' })}>
+            <Download aria-hidden="true" className="h-4 w-4" />Export ZIP ({kept})
           </button>
           {/*
            * display:flex removes the native summary marker; items stay mounted because details
@@ -1118,7 +1120,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           <details className="relative">
             <summary
               title="More dataset actions — edit settings, body fidelity"
-              className="min-h-10 lg:min-h-0 flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised text-sm cursor-pointer select-none">
+              className={`${btnShape()} border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised cursor-pointer select-none`}>
               ⋯ More
             </summary>
             <div data-probe-chrome="more-menu" data-probe-panel="more-menu"
@@ -1495,8 +1497,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <button type="button" data-workspace-focus onClick={() => setWmScanOpen(true)}
                   disabled={ds.busy}
                   title="Opens the launch window: try a sample, tune the detector threshold, then scan — each mark's position is recorded so 🧽 Clean can crop or repaint it (deletes nothing)"
-                  className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
-                  <Eraser aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />
+                  className={btnClass()}>
+                  <Eraser aria-hidden="true" className="h-4 w-4" />
                   {ds.watermarking
                     ? `Scanning…${act?.kind === 'watermark_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
                     : 'Find watermarks…'}
@@ -1539,7 +1541,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   title={caps.video_text
                     ? 'Opens the launch window: try a sample, tune the sensitivity, then scan — zones land in the mask 🧽 Clean repaints (deletes nothing, CPU only)'
                     : 'Reads burned-in text on the kept images. Install "Burned-in text" from Setup first.'}
-                  className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
+                  className={btnClass()}>
                   🔤 {ds.textScanning
                     ? `Reading…${act?.kind === 'text_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
                     : 'Find text…'}
@@ -1570,11 +1572,11 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       Klein is greyed until ComfyUI + the Klein models are ready
                       (caps.watermark_klein). */}
                   <div role="group" aria-label="Watermark inpaint method"
-                    className="flex items-center rounded-lg border border-border bg-surface p-0.5 text-xs">
+                    className={`${controlHeight()} flex items-stretch rounded-md border border-border bg-surface p-0.5 text-xs`}>
                     <button type="button" aria-pressed={watermarkMethod === 'lama'}
                       onClick={() => setWatermarkMethod('lama')} disabled={ds.busy}
                       title="LaMa: fast, non-generative. Crops border marks, repaints small off-center marks; on-subject marks go to manual review."
-                      className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${watermarkMethod === 'lama'
+                      className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkMethod === 'lama'
                         ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                       LaMa <span className="font-normal opacity-70">fast</span>
                     </button>
@@ -1584,7 +1586,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         ? kleinCleanTitle(caps)
                         : (localEngineUnavailableReason('klein', caps)
                           || 'Klein inpaint needs ComfyUI running + the Klein models installed (Setup ▸ ComfyUI).')}
-                      className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${watermarkMethod === 'klein'
+                      className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkMethod === 'klein'
                         ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                       Klein <span className="font-normal opacity-70">quality</span>
                     </button>
@@ -1595,25 +1597,25 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       bank panel. */}
                   {textFlaggedDetected > 0 && (
                     <div role="group" aria-label="What to clean"
-                      className="flex items-center rounded-lg border border-border bg-surface p-0.5 text-xs">
+                      className={`${controlHeight()} flex items-stretch rounded-md border border-border bg-surface p-0.5 text-xs`}>
                       <button type="button" aria-pressed={watermarkTarget === 'all'}
                         onClick={() => setWatermarkTarget('all')} disabled={ds.busy}
                         title="Repaint every flagged page — text and watermarks alike."
-                        className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'all'
+                        className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'all'
                           ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                         Both
                       </button>
                       <button type="button" aria-pressed={watermarkTarget === 'text'}
                         onClick={() => setWatermarkTarget('text')} disabled={ds.busy}
                         title="Only pages 🔤 Find text flagged. A page carrying both a watermark and text counts here — one page is never split between two runs."
-                        className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'text'
+                        className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'text'
                           ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                         🔤 Text
                       </button>
                       <button type="button" aria-pressed={watermarkTarget === 'watermark'}
                         onClick={() => setWatermarkTarget('watermark')} disabled={ds.busy}
                         title="Only pages 🚩 flagged with no text flag on them."
-                        className={`px-2.5 py-1 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'watermark'
+                        className={`inline-flex items-center gap-1 px-2.5 rounded-md font-semibold disabled:opacity-40 ${watermarkTarget === 'watermark'
                           ? 'bg-amber-500/25 text-amber-100' : 'text-content-subtle hover:text-content'}`}>
                         🚩 Marks
                       </button>
@@ -1667,7 +1669,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     title={allowAutoCrop
                       ? 'Auto-crop ON: watermarks in a border are cropped off (no invented pixels). Click to repaint them instead. Saved as a preference.'
                       : 'Auto-crop OFF: border watermarks are repainted (LaMa/Klein) instead of cropped. Click to allow cropping again. Saved as a preference.'}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold disabled:opacity-40 ${allowAutoCrop
+                    className={`${btnShape()} border font-semibold ${allowAutoCrop
                       ? 'border-border bg-surface text-content-subtle hover:text-content'
                       : 'border-amber-400/50 bg-amber-500/10 text-amber-200'}`}>
                     <Scissors aria-hidden="true" className="h-3.5 w-3.5" />{allowAutoCrop ? "Auto-crop on" : "Auto-crop off"}
@@ -1684,8 +1686,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         ? 'Removes them: border marks are cropped, small off-center marks are inpainted (LaMa), on-subject marks are flagged for manual review'
                         : 'Auto-crop off: border marks are repainted (LaMa) instead of cropped; large/on-subject marks are flagged for manual review')
                       : 'Removes border marks by cropping. Inpainting (LaMa) needs a one-time install — use Install inpainting next to this button; off-center marks are skipped until then'}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-sm font-semibold disabled:opacity-40">
-                    <Eraser aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Clean ({cleanTargetCount})
+                    className={`${btnShape()} bg-amber-500/15 border border-amber-400/40 text-amber-200 font-semibold`}>
+                    <Eraser aria-hidden="true" className="h-4 w-4" />Clean ({cleanTargetCount})
                   </button>
                   </>
                 )}
@@ -1698,8 +1700,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     disabled={ds.busy}
                     onClick={() => setReviewQueue(images.filter((i) => i.watermark_state === 'detected'))}
                     title="Step through the flagged images one by one — see each detected box and Clean, dismiss a false positive, or reject"
-                    className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40 scroll-mt-20">
-                    <Search aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Review flagged ({watermarkDetected})
+                    className={`${btnClass()} scroll-mt-20`}>
+                    <Search aria-hidden="true" className="h-4 w-4" />Review flagged ({watermarkDetected})
                   </button>
                 )}
                 {/* The shortcut past that review, because it was asked for — and
@@ -1723,8 +1725,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         : '');
                     }}
                     title="The detector is a review flag, not a verdict — it does flag clean images sometimes, which is what Review flagged is for. This rejects them all at once instead; rejected images stay on disk and can be brought back."
-                    className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm disabled:opacity-40 scroll-mt-20">
-                    <X aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Reject all flagged ({flagged.rejectable})
+                    className={`${btnShape()} bg-red-500/10 border border-red-500/30 text-red-300 scroll-mt-20`}>
+                    <X aria-hidden="true" className="h-4 w-4" />Reject all flagged ({flagged.rejectable})
                   </button>
                 )}
                 {/* Two numbers that differ must never be shown as one. */}
@@ -1755,7 +1757,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <button type="button" disabled={ds.busy}
                     onClick={() => ds.findWatermarks({ includeDismissed: true })}
                     title="Re-examines the images you ruled false positives too. Use it after changing the watermark detector — a normal scan skips them forever."
-                    className="px-3 py-1.5 rounded-lg bg-surface border border-dashed border-border text-content-subtle text-sm disabled:opacity-40 hover:text-content">
+                    className={`${btnShape()} bg-surface border border-dashed border-border text-content-subtle hover:text-content`}>
                     ⟲ Rescan incl. dismissed ({flagged.dismissed})
                   </button>
                 )}
@@ -1851,15 +1853,15 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     title={d.train_type === 'anima'
                       ? "Caption style — Anima reads BOTH: booru tags and natural language are first-class on this model. Prose is only the default; switching to Booru tags trains fine and is never flagged as a mismatch."
                       : "Caption style — Prose (Z-Image) or Booru tags (SDXL booru-native, e.g. bigLove). Defaults to auto based on the dataset's type."}
-                    className="px-2 py-1.5 rounded-lg bg-surface border border-border text-content text-[0.8125rem] disabled:opacity-40">
+                    className={fieldClass()}>
                     <option value="prose">Prose</option>
                     <option value="booru">Booru tags</option>
                   </select>
                 )}
                 <button type="button" data-workspace-focus
                   onClick={() => ds.caption(effCaptionMode)} disabled={ds.busy}
-                  className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-                  <Sparkles aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />
+                  className={btnClass({ variant: 'primary' })}>
+                  <Sparkles aria-hidden="true" className="h-4 w-4" />
                   {ds.captioning ? `${keptCaptioned}/${kept} captioned…` : 'Caption the kept ones'}
                 </button>
                 <HelpBadge topic="action-caption-generate" />
@@ -1874,14 +1876,14 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     : isStyle
                       ? "Re-generates every caption as content-only text without naming the aesthetic"
                       : "Re-generates every caption without describing identity (face/hair)"}
-                  className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
-                  <RefreshCw aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Re-caption
+                  className={btnClass()}>
+                  <RefreshCw aria-hidden="true" className="h-4 w-4" />Re-caption
                 </button>
                 <button type="button" data-workspace-focus
                   onClick={() => setCaptionOptionsOpen(true)} disabled={ds.busy}
                   title="Choose the caption engine, Ollama model and vocabulary, pull a new model, and add custom instructions — for this dataset"
-                  className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border">
-                  <Settings aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Options
+                  className={btnClass()}>
+                  <Settings aria-hidden="true" className="h-4 w-4" />Options
                 </button>
                 <HelpBadge topic="action-caption-options" />
                 {/* Caption-leak badge — KIND-aware. character: identity words
@@ -1909,7 +1911,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         : (isConcept
                             ? "These captions name the concept → it won't bind to the trigger. Click to see what's watched and fix them here."
                             : "These captions mention hair/face/skin → identity won't bind to the trigger. Click to see what's watched and fix them here.")}
-                      className={`ml-auto text-[0.8125rem] underline decoration-dashed scroll-mt-20 ${
+                      className={`${controlHeight()} inline-flex items-center ml-auto text-[0.8125rem] underline decoration-dashed scroll-mt-20 ${
                         d.caption_leak.leaking === 0
                           ? 'text-emerald-400 decoration-emerald-400/40'
                           : 'text-amber-400 decoration-amber-400/50'}`}>
@@ -1923,7 +1925,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                       onClick={toggleLeakReview}
                       aria-expanded={showLeaks}
                       title={`The ${isConcept ? 'concept' : 'identity'}-leak scan runs on captions. Caption the kept images first. Click to learn what it checks.`}
-                      className="ml-auto text-content-subtle text-[0.8125rem] underline decoration-dashed decoration-border scroll-mt-20">
+                      className={`${controlHeight()} inline-flex items-center ml-auto text-content-subtle text-[0.8125rem] underline decoration-dashed decoration-border scroll-mt-20`}>
                       {isConcept ? 'concept' : 'identity'}-leak scan: no captions yet {showLeaks ? '▴' : '▾'}
                     </button>
                   ) : null

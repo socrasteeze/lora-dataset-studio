@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react'
 import { postJson } from '../../api/fetchClient'
+import { btnShape } from '../common/controls'
 
+/* A single-line field stands at the shared control height (common/controls.js):
+   40 px to a finger, 32 px on a desktop, so a Test, Show or Refresh button
+   beside it lines up. `:not(textarea)` because plugins reuse this class on
+   multi-line fields, which must keep growing with their rows. */
 export const INPUT_CLASS =
   'mt-1 w-full rounded-md border border-border-strong bg-surface-raised px-3 py-2 text-sm text-content ' +
-  'placeholder:text-content-subtle focus:border-primary focus:outline-none'
+  'placeholder:text-content-subtle focus:border-primary focus:outline-none ' +
+  '[&:not(textarea)]:min-h-10 lg:[&:not(textarea)]:min-h-0 lg:[&:not(textarea)]:h-8 lg:[&:not(textarea)]:py-0'
+
+/* The outlined button that sits beside a settings field (Test, Show, Refresh,
+   Check folder): the same height as INPUT_CLASS. */
+export const SIDE_BUTTON_CLASS =
+  `${btnShape()} border border-border-strong font-medium text-content hover:bg-surface-raised`
 
 /* Section heading: a small mono "rack tag" eyebrow above the title keeps every
    settings/guide section labeled the same way without shouting. */
@@ -72,7 +83,7 @@ export function TestButton({ target, onResult, beforeTest }) {
       type="button"
       onClick={run}
       disabled={busy}
-      className="shrink-0 rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-content hover:bg-surface-raised disabled:opacity-50"
+      className={`${SIDE_BUTTON_CLASS} shrink-0`}
     >
       {busy ? 'Testing…' : 'Test'}
     </button>
@@ -138,7 +149,8 @@ export function SecretField({
         </div>
         <p className="mb-1 text-xs text-content-muted">{f.help}</p>
         {f.guide}
-        <div className="flex items-center gap-2">
+        {/* items-end: the input's mt-1 must not push it below the button. */}
+        <div className="flex items-end gap-2">
         <input
           id={f.key}
           type={visible ? 'text' : 'password'}
@@ -151,7 +163,7 @@ export function SecretField({
         <button type="button" aria-label={`${visible ? 'Hide' : 'Show'} ${f.label}`}
           aria-pressed={visible} onClick={() => setVisible((value) => !value)}
           disabled={!secretInputs[f.key]}
-          className="min-h-11 shrink-0 rounded-md border border-border px-3 text-sm text-content disabled:opacity-40">
+          className={`${btnShape({ noShrink: true })} border border-border text-content`}>
           {visible ? 'Hide' : 'Show'}
         </button>
         </div>
@@ -166,7 +178,7 @@ export function SecretField({
           type="button"
           onClick={() => handleDeleteSecret(f.key, f.label)}
           title={`Remove the saved ${f.label}`}
-          className="shrink-0 rounded-md border border-rose-500/40 px-3 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/10"
+          className={`${btnShape({ noShrink: true })} border border-rose-500/40 font-medium text-rose-300 hover:bg-rose-500/10`}
         >
           Remove
         </button>

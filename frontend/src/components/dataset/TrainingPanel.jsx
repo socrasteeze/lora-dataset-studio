@@ -71,6 +71,7 @@ import {
   memoryRiskLine, memoryStateLabel,
 } from './memorySavingAdvice';
 import SettingsLink from '../common/SettingsLink';
+import { btnClass, btnShape, fieldClass } from '../common/controls';
 import { DatasetVersionChip, RunIdChip } from './RunIdentityBadges';
 import {
   cloudGroupsFrom, localRunIdentity, runRowDomId,
@@ -1851,7 +1852,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           disabled={trainTypeBusy || presetBusy || trainingModeBusy}
           aria-label="Training model family"
           title="Z-Image (prose, Qwen3 encoder) ~20 img · SDXL (ComfyUI checkpoints) ~30 img · Krea 2 (prose, fixed Turbo base) ~20 img · FLUX.1-dev (prose, gated HF, local-only) ~20 img · FLUX.2 Klein (prose, gated HF, 4B local / 9B cloud) ~20 img · Anima (prose OR booru tags — both native, Qwen LLM encoder, anime, public base, local-only) ~20 img"
-          className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-50">
+          className={fieldClass()}>
           <option value="zimage">Z-Image (~20 img)</option>
           <option value="sdxl">SDXL (~30 img)</option>
           <option value="krea">Krea 2 (~20 img)</option>
@@ -1865,8 +1866,11 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             this fork — so the control could only ever fail. The mode plumbing
             below stays upstream-shaped (dormant backend is allowed; a dead
             BUTTON is not), which keeps the next merge's surface small. */}
+        {/* The picker owns its select; the row sets its height so the whole
+            launch row stands at one control height. */}
         {!fullMode && <TrainingMachinePicker value={machineId} onChange={onMachineChange}
-          onConfigured={setPeerConfigured} disabled={peerActive} />}
+          onConfigured={setPeerConfigured} disabled={peerActive}
+          className="[&_select]:min-h-10 lg:[&_select]:min-h-0 lg:[&_select]:h-8" />}
         {!fullMode && <button type="button" disabled={!status.installed || belowFloor || status.in_progress || peerActive || baseBlocksTrain || sdxlNeedsBase || customWeightsEmpty || sliderPromptsMissing}
           title={baseBlocksTrain ? baseBlockTitle
             : customWeightsEmpty ? 'Enter the path to your custom weights .safetensors'
@@ -1930,7 +1934,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             await trainWithConfirms({ ...common, fresh: mode === 'fresh' });
             refreshStatus();
           }}
-          className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+          className={btnClass({ variant: 'primary' })}>
           <Rocket aria-hidden="true" className="h-4 w-4" /> Train the LoRA
         </button>}
         {!fullMode && <HelpBadge topic="action-training-launch" />}
@@ -1957,7 +1961,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 await ds.stopTraining();
                 refreshStatus();
               }}
-              className="px-3 py-1.5 rounded-lg bg-red-600/80 text-white text-sm font-semibold">
+              className={btnClass({ variant: 'danger' })}>
               ⏹ Stop training
             </button>
             <HelpBadge topic="action-training-stop" />
@@ -1968,7 +1972,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             title={baseBlocksTrain
               ? baseBlockTitle
               : `Train THIS dataset on “${baseLabel}” once the current training finishes`}
-            className="px-3 py-1.5 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-sm font-semibold disabled:opacity-40">
+            className={`${btnShape()} bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 font-semibold`}>
             {queued ? '✓ Queued' : `➕ Add to queue (${baseLabel})`}
           </button>
         )}

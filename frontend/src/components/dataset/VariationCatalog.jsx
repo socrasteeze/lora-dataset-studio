@@ -6,6 +6,7 @@ import DevicePicker, { loadSavedDeviceId } from '../common/DevicePicker';
 import GlobalModelPicker from '../shared/GlobalModelPicker';
 import { useToast } from '../common/Toast';
 import SettingsLink from '../common/SettingsLink';
+import { btnClass, fieldClass } from '../common/controls';
 import { useCapabilities } from '../../context/CapabilitiesContext';
 import { apiFetch, putJson } from '../../api/fetchClient';
 import ShotIllustration, { contextEmoji } from './ShotIllustration';
@@ -1108,8 +1109,9 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           reason upstream capped its own wider grid at three: these cards live
           in the workspace column next to the sidebar, so the VIEWPORT-based
           breakpoints overstate the room available. One column on a phone
-          (nothing is clipped at 400 px), two from sm, three from xl. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+          (nothing is clipped at 400 px), two from sm, three from xl.
+          items-stretch + each card's h-full: one row, one card height. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 items-stretch">
         <EngineCard id="klein" checked={isKlein} available={klAvailable} generating={generating}
           onToggle={toggleEngine} share={engineShare('klein')}
           icon={<GpuIcon className={`w-9 h-9 shrink-0 ${isKlein ? ENGINE_ACCENTS.klein.icon : 'text-content-subtle'}`} />}
@@ -1997,7 +1999,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
         <span className="text-content-muted text-[0.6875rem]">{selected.size} selected</span>
         {selected.size > 0 && (
           <button type="button" onClick={() => setSelected(new Set())}
-            className="text-content-subtle text-[0.6875rem] underline decoration-border hover:text-content"
+            className={btnClass({ variant: 'ghost' })}
             title="Clear the whole selection (presets and shots)">
             ✕ Deselect all
           </button>
@@ -2006,12 +2008,14 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           title="Generate each selected shot this many times">×
           <select value={multiplier} onChange={(e) => setMultiplier(+e.target.value)}
             aria-label="Variation multiplier"
-            className="bg-app/60 border border-border rounded px-1 py-0.5 text-content ml-1">
+            className={`${fieldClass()} ml-1`}>
             {[1, 2, 3, 5, 10, 20].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
+        {/* The picker owns its select; the row sets its height, so every
+            control of the Generate row stands at one height. */}
         <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy"
-          className="text-[0.6875rem]" />
+          className="text-[0.6875rem] [&_select]:min-h-10 lg:[&_select]:min-h-0 lg:[&_select]:h-8 lg:[&_select]:py-0" />
         {!hasRef && (
           <span className="text-amber-300 text-[0.6875rem]">Set a reference photo first</span>
         )}
@@ -2027,7 +2031,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
             visible reason. */}
         <button type="button" onClick={go} disabled={busy || !hasRef || !!blockedReason}
           title={generating ? 'A generation batch is already running' : (blockedReason || undefined)}
-          className="ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
+          className={`${btnClass({ variant: 'primary' })} ml-auto`}>
           {busy
             ? (generating
                 ? `Generating…${generating.total ? ` ${generating.done}/${generating.total}` : ''}`
