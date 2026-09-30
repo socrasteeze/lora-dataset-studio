@@ -12,9 +12,9 @@ import { engineAccent, engineLabel } from '../../engines/catalog.js';
    brought it. */
 
 /** The tag pills every card wears: a fact about the price or the machine. */
-export const TAG_CLASS = 'px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-[0.625rem]';
+export const TAG_CLASS = 'px-1.5 py-px rounded-full bg-app/60 border border-border text-content-muted text-2xs';
 /** Green stays a statement about the PRICE, never a selection state. */
-export const FREE_TAG_CLASS = 'px-1.5 py-px rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[0.625rem]';
+export const FREE_TAG_CLASS = 'px-1.5 py-px rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-2xs';
 
 export default function EngineCard({ id, checked, available, generating, onToggle, icon, title, tags, hint, footer }) {
   const accent = engineAccent(id);
@@ -34,7 +34,7 @@ export default function EngineCard({ id, checked, available, generating, onToggl
         ? `flex-1 ${hover}`
         : `h-full border ${look} ${hover}`}`}>
       <span aria-hidden="true"
-        className={`absolute top-2 right-2 w-4 h-4 rounded border grid place-items-center text-[0.625rem] font-bold ${checked
+        className={`absolute top-2 right-2 w-4 h-4 rounded border grid place-items-center text-2xs font-bold ${checked
           ? `${accent.pill} border-transparent` : 'border-border text-transparent'}`}>✓</span>
       {icon}
       <span className="flex flex-col gap-1 min-w-0">

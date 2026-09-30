@@ -61,8 +61,8 @@ export default function OverviewSection({ caps }) {
                       Studio") did not say it was where test IMAGES are made —
                       read from a phone, 2026-09-03. Wraps rather than truncates:
                       the second half of the sentence is the point. */}
-                  {s.what && <span className="block text-[11px] leading-snug text-content-subtle">{s.what}</span>}
-                  {s.note && <span className="block truncate text-[11px] text-amber-300/80">{s.note}</span>}
+                  {s.what && <span className="block text-2xs leading-snug text-content-subtle">{s.what}</span>}
+                  {s.note && <span className="block truncate text-2xs text-amber-300/80">{s.note}</span>}
                 </span>
                 <span aria-hidden
                   className="shrink-0 text-content-subtle opacity-0 transition-opacity group-hover:opacity-100

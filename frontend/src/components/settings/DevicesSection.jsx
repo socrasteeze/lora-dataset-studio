@@ -202,7 +202,7 @@ export default function DevicesSection({ config, setField, handleSave, configDef
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
         {status?.node_id && (
-          <p className="mt-2 font-mono text-[11px] text-content-subtle">
+          <p className="mt-2 font-mono text-2xs text-content-subtle">
             node id · {status.node_id}
           </p>
         )}

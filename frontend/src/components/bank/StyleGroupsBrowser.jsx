@@ -90,7 +90,7 @@ export default function StyleGroupsBrowser({ bankId, activeStyle, onPick, onClos
                         loading="lazy" className="h-full w-full object-cover" />
                     ) : <span key={k} className="bg-surface" />))}
                   </span>
-                  <span className="flex items-center gap-1 px-2 py-1 text-[11px] text-content-muted">
+                  <span className="flex items-center gap-1 px-2 py-1 text-2xs text-content-muted">
                     <Palette aria-hidden="true" className="h-3 w-3 shrink-0" />
                     <span className="font-semibold text-content">{g.id}</span>
                     <span>· {g.size - g.rejected}</span>

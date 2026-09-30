@@ -98,13 +98,13 @@ export default function LineageDiffPanel({ a, b, onClose }) {
 
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-md border border-border bg-app/50 px-2 py-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">Run A</div>
+          <div className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">Run A</div>
           <div className="break-words font-mono text-content">
             {data?.a ? sideLabel(data.a) : `#${a.record_id}`}
           </div>
         </div>
         <div className="rounded-md border border-border bg-surface-raised px-2 py-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">Run B</div>
+          <div className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">Run B</div>
           <div className="break-words font-mono text-content">
             {data?.b ? sideLabel(data.b) : `#${b.record_id}`}
           </div>
@@ -113,7 +113,7 @@ export default function LineageDiffPanel({ a, b, onClose }) {
 
       {/* --- what this comparison cannot know ----------------------------- */}
       {(data?.notes || []).length > 0 && (
-        <ul className="mt-3 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px] leading-snug text-amber-100/90">
+        <ul className="mt-3 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-2xs leading-snug text-amber-100/90">
           {data.notes.map((n) => <li key={n}>{n}</li>)}
         </ul>
       )}
@@ -128,13 +128,13 @@ export default function LineageDiffPanel({ a, b, onClose }) {
         ) : (
           <>
             <div className="flex items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">
+              <div className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
                 {changedCount === 0 ? 'No differences' : `${changedCount} change${changedCount > 1 ? 's' : ''}`}
               </div>
               {unchangedCount > 0 && (
                 <button type="button"
                   onClick={() => setShowUnchanged((v) => !v)}
-                  className="shrink-0 text-[10px] text-content-subtle underline decoration-dotted hover:text-content">
+                  className="shrink-0 text-2xs text-content-subtle underline decoration-dotted hover:text-content">
                   {showUnchanged ? 'Hide' : 'Show'} {unchangedCount} unchanged
                 </button>
               )}
@@ -174,7 +174,7 @@ export default function LineageDiffPanel({ a, b, onClose }) {
         )}
         {state === 'ready' && images && (
           <>
-            <p className="mt-1 text-[11px] text-content-subtle">
+            <p className="mt-1 text-2xs text-content-subtle">
               {images.total_a} → {images.total_b} images · {images.kept} in both
             </p>
             {chips.length === 0 ? (
@@ -189,7 +189,7 @@ export default function LineageDiffPanel({ a, b, onClose }) {
                   <button key={c.key} type="button"
                     onClick={() => setOpen((v) => (v === c.key ? '' : c.key))}
                     aria-expanded={open === c.key}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                    className={`rounded-full border px-2 py-0.5 text-2xs transition-colors ${
                       open === c.key
                         ? 'border-amber-400/60 bg-amber-500/20 text-amber-100'
                         : 'border-border bg-app/50 text-content hover:border-amber-400/40'}`}>
@@ -228,7 +228,7 @@ export default function LineageDiffPanel({ a, b, onClose }) {
 
 function SectionTitle({ children }) {
   return (
-    <h4 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-content-subtle">
+    <h4 className="mb-1 text-2xs font-semibold uppercase tracking-wide text-content-subtle">
       {children}
     </h4>
   );
@@ -250,17 +250,17 @@ function ImageList({ kind, items, withheld }) {
               <img src={it.thumb} alt="" loading="lazy"
                 className="h-14 w-14 shrink-0 rounded object-cover" />
             ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded border border-dashed border-border p-1 text-center text-[9px] leading-tight text-content-subtle">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded border border-dashed border-border p-1 text-center text-2xs leading-tight text-content-subtle">
                 no copy kept
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <div className="font-mono text-[10px] text-content-subtle">
+              <div className="font-mono text-2xs text-content-subtle">
                 #{it.id}{it.engine ? ` · ${it.engine}` : ''}{it.origin ? ` · ${it.origin}` : ''}
               </div>
               {kind === 'caption_changed' ? (
                 it.text_recorded ? (
-                  <p className="mt-0.5 break-words text-[11px] leading-snug text-content">
+                  <p className="mt-0.5 break-words text-2xs leading-snug text-content">
                     {captionWordDiff(it.before, it.after).map((seg, i) => (
                       <span key={`${seg.type}-${i}`}
                         className={seg.type === 'removed'
@@ -271,13 +271,13 @@ function ImageList({ kind, items, withheld }) {
                     ))}
                   </p>
                 ) : (
-                  <p className="mt-0.5 text-[11px] italic text-content-subtle">
+                  <p className="mt-0.5 text-2xs italic text-content-subtle">
                     The caption changed, but neither run recorded its text.
                   </p>
                 )
               ) : (
                 it.caption && (
-                  <p className="mt-0.5 line-clamp-3 break-words text-[11px] leading-snug text-content-subtle">
+                  <p className="mt-0.5 line-clamp-3 break-words text-2xs leading-snug text-content-subtle">
                     {it.caption}
                   </p>
                 )
@@ -287,7 +287,7 @@ function ImageList({ kind, items, withheld }) {
         </div>
       ))}
       {withheld > 0 && (
-        <p className="text-[11px] italic text-content-subtle">
+        <p className="text-2xs italic text-content-subtle">
           …and {withheld} more not shown.
         </p>
       )}

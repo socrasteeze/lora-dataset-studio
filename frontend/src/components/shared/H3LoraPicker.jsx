@@ -30,7 +30,7 @@ import SliderLock, { useSliderLock } from './SliderLock.jsx';
 const ROW = 'flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left min-h-10 lg:min-h-0';
 const ROW_IDLE = 'border-border bg-surface-raised hover:border-primary/50';
 const ROW_ON = 'border-primary bg-primary/10';
-const PILL = 'rounded-full border px-2 py-0.5 text-[0.6875rem] min-h-10 lg:min-h-0 lg:py-0.5';
+const PILL = 'rounded-full border px-2 py-0.5 text-2xs min-h-10 lg:min-h-0 lg:py-0.5';
 
 export default function H3LoraPicker({ value, onChange, strength, onStrength, apiBase, lockKey = 'h3.lock.loraStrength' }) {
   const strengthLock = useSliderLock(lockKey);
@@ -139,7 +139,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
         <div className={`${ROW} ${value ? ROW_ON : ROW_IDLE} cursor-default`}>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm text-content" title={value || ''}>{selectedName}</span>
-            <span className="block truncate text-[0.6875rem] text-content-subtle">
+            <span className="block truncate text-2xs text-content-subtle">
               {value
                 ? (selectedGroup ? `trained here — run #${selectedGroup.run_id}` : 'from ComfyUI’s folder')
                 : 'The comparison point: the same seed without your LoRA.'}
@@ -154,14 +154,14 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
             className={`${ROW} ${!value ? ROW_ON : ROW_IDLE}`}>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm text-content">No LoRA — the base model alone</span>
-              <span className="block truncate text-[0.6875rem] text-content-subtle">
+              <span className="block truncate text-2xs text-content-subtle">
                 The comparison point: the same seed without your LoRA.
               </span>
             </span>
           </button>
 
           {groups.length > 0 && (
-            <p className="mt-1 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-content-subtle">
+            <p className="mt-1 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">
               Trained here
             </p>
           )}
@@ -172,7 +172,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
                 className={`flex w-full flex-col gap-1.5 rounded-lg border px-2.5 py-2 ${chosen ? ROW_ON : 'border-border bg-surface-raised'}`}>
                 <div className="flex min-w-0 items-baseline gap-2">
                   <span className="min-w-0 flex-1 truncate text-sm text-content">{g.name}</span>
-                  <span className="shrink-0 text-[0.6875rem] text-content-subtle">run #{g.run_id}</span>
+                  <span className="shrink-0 text-2xs text-content-subtle">run #{g.run_id}</span>
                 </div>
                 {/* One pill per checkpoint: the result first, the moments before
                     it after. A pill that is not in ComfyUI yet says so with the
@@ -203,7 +203,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
           })}
 
           {candidates.length > 0 && (
-            <p className="mt-1 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-content-subtle">
+            <p className="mt-1 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">
               Already in ComfyUI
             </p>
           )}
@@ -213,7 +213,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
               className={`${ROW} ${value === d.filename ? ROW_ON : ROW_IDLE}`}>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-content">{shortLoraName(d.filename)}</span>
-                <span className="block truncate text-[0.6875rem] text-content-subtle">{d.filename}</span>
+                <span className="block truncate text-2xs text-content-subtle">{d.filename}</span>
               </span>
             </button>
           ))}
@@ -224,7 +224,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
               candidate. */}
           {parts.length > 0 && (
             <details className="mt-1 rounded-lg border border-border">
-              <summary className="cursor-pointer px-2.5 py-1.5 text-[0.6875rem] text-content-subtle min-h-10 lg:min-h-0 flex items-center">
+              <summary className="cursor-pointer px-2.5 py-1.5 text-2xs text-content-subtle min-h-10 lg:min-h-0 flex items-center">
                 Engine parts in the folder ({parts.length}) — turbo, camera, ref2v: grafted by the options, not LoRAs to test
               </summary>
               <div className="flex flex-col gap-1 border-t border-border p-1.5">
@@ -272,7 +272,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
                     e.target.value = '';
                   }} />
               </label>
-              <p className="text-[0.6875rem] leading-snug text-content-subtle">
+              <p className="text-2xs leading-snug text-content-subtle">
                 Copied into ComfyUI’s h3 folder, where the loader reads it. A
                 different file already under that name is never overwritten —
                 rename yours, so the two stay tellable apart.
@@ -308,7 +308,7 @@ export default function H3LoraPicker({ value, onChange, strength, onStrength, ap
         </label>
       )}
       {value && (
-        <p className="text-[0.6875rem] text-content-subtle">
+        <p className="text-2xs text-content-subtle">
           1.3 is where identity came through on the runs measured here; past 2 a
           rank-16 LoRA destroys the shot before it expresses anything.
         </p>

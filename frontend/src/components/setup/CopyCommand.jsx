@@ -12,11 +12,11 @@ export default function CopyCommand({ command }) {
   }
   return (
     <div className="flex items-center gap-2">
-      <code className="flex-1 overflow-x-auto rounded-md border border-border bg-surface-raised px-2 py-1 text-[11px] text-content">
+      <code className="flex-1 overflow-x-auto rounded-md border border-border bg-surface-raised px-2 py-1 text-2xs text-content">
         {command}
       </code>
       <button type="button" onClick={copy}
-        className="shrink-0 rounded-md border border-border-strong px-2 py-1 text-[11px] text-content hover:bg-surface-raised">
+        className="shrink-0 rounded-md border border-border-strong px-2 py-1 text-2xs text-content hover:bg-surface-raised">
         {copied ? 'Copied' : failed ? 'Copy failed' : 'Copy'}
       </button>
     </div>

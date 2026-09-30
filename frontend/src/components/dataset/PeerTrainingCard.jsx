@@ -64,7 +64,7 @@ export default function PeerTrainingCard({ datasetId, postJson, onChange, enable
               title="Dismiss this notice. The run itself is already over."
               onClick={() => setDismissed((prev) => new Set(prev).add(run.id))}
               aria-label="Dismiss this training failure"
-              className="ml-auto px-2 py-1 rounded-lg border border-border text-content-muted text-[0.75rem]">
+              className="ml-auto px-2 py-1 rounded-lg border border-border text-content-muted text-xs">
               ✕ Dismiss
             </button>
           )}
@@ -86,7 +86,7 @@ export default function PeerTrainingCard({ datasetId, postJson, onChange, enable
                   load();
                 }
               }}
-              className="ml-auto px-3 py-1 rounded-lg bg-red-600/80 text-white text-[0.75rem] font-semibold disabled:opacity-40">
+              className="ml-auto px-3 py-1 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
               {run.stop_requested ? 'Stopping…' : '⏹ Stop'}
             </button>
           )}

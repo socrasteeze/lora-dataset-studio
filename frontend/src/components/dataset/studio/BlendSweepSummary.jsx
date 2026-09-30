@@ -13,7 +13,7 @@ export default function BlendSweepSummary({ configCount, count = 1, batchMult = 
 
   return (
     <p data-testid="blend-sweep-summary"
-      className={'m-0 rounded-lg border px-2.5 py-1.5 text-[0.6875rem] '
+      className={'m-0 rounded-lg border px-2.5 py-1.5 text-2xs '
         + (cost.warn
           ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
           : 'border-border bg-surface text-content-muted')}

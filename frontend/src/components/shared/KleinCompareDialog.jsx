@@ -108,7 +108,7 @@ export default function KleinCompareDialog({
           <figure className="space-y-1">
             <img src={`data:image/jpeg;base64,${before.image}`} alt="Before — the flagged image"
               className="max-h-64 w-auto rounded-md border border-border" />
-            <figcaption className="text-[0.6875rem] text-content-subtle">
+            <figcaption className="text-2xs text-content-subtle">
               Before — <span className="font-mono">{before.label}</span>
             </figcaption>
           </figure>
@@ -118,7 +118,7 @@ export default function KleinCompareDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             {results.map((r) => (
               <figure key={r.model} className="space-y-1 rounded-md border border-border p-2">
-                <figcaption className="flex flex-wrap items-center justify-between gap-1 text-[0.6875rem] text-content-muted">
+                <figcaption className="flex flex-wrap items-center justify-between gap-1 text-2xs text-content-muted">
                   <span className="font-mono break-all">{r.model}</span>
                   {r.ok && Number.isFinite(r.seconds) && <span>{r.seconds}s</span>}
                 </figcaption>

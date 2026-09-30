@@ -111,7 +111,7 @@ export default function ExportGridModal({ open, onClose, datasetId, family, run,
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close"
             className="w-8 h-8 rounded-lg border border-border bg-app text-content-muted hover:text-content disabled:opacity-40">×</button>
         </div>
-        <p className="text-content-subtle text-[0.6875rem] leading-snug">
+        <p className="text-content-subtle text-2xs leading-snug">
           {canvasMode
             ? `Composes these ${imageIds.length} Canvas images into one grid, in their current order.`
             : 'Composes this run into one labelled image (checkpoints × strengths) — ready to post.'}
@@ -119,9 +119,9 @@ export default function ExportGridModal({ open, onClose, datasetId, family, run,
 
         {/* Format block */}
         {!canvasMode && <label className="flex flex-col gap-1">
-          <span className="text-content-muted text-[0.625rem] uppercase">Format block</span>
+          <span className="text-content-muted text-2xs uppercase">Format block</span>
           <select value={aspect} onChange={(e) => setAspect(e.target.value)}
-            className="rounded-lg border border-border bg-app px-2 py-1.5 text-[0.75rem] text-content">
+            className="rounded-lg border border-border bg-app px-2 py-1.5 text-xs text-content">
             <option value="all">All formats (stacked)</option>
             {(aspects || []).map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
@@ -129,11 +129,11 @@ export default function ExportGridModal({ open, onClose, datasetId, family, run,
 
         {/* Tile size */}
         <div className="flex flex-col gap-1">
-          <span className="text-content-muted text-[0.625rem] uppercase">Tile size</span>
+          <span className="text-content-muted text-2xs uppercase">Tile size</span>
           <div className="flex gap-2">
             {[512, 768].map((sz) => (
               <button key={sz} type="button" onClick={() => setCellSize(sz)}
-                className={`px-3 py-1.5 rounded-lg border text-[0.75rem] ${cellSize === sz
+                className={`px-3 py-1.5 rounded-lg border text-xs ${cellSize === sz
                   ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-200'
                   : 'border-border bg-app text-content-muted hover:text-content'}`}>
                 {sz}px
@@ -144,11 +144,11 @@ export default function ExportGridModal({ open, onClose, datasetId, family, run,
 
         {/* File format */}
         <div className="flex flex-col gap-1">
-          <span className="text-content-muted text-[0.625rem] uppercase">File format</span>
+          <span className="text-content-muted text-2xs uppercase">File format</span>
           <div className="flex gap-2">
             {[['jpeg', 'JPEG (small)'], ['png', 'PNG (large)']].map(([v, lbl]) => (
               <button key={v} type="button" onClick={() => setFileFormat(v)}
-                className={`px-3 py-1.5 rounded-lg border text-[0.75rem] ${fileFormat === v
+                className={`px-3 py-1.5 rounded-lg border text-xs ${fileFormat === v
                   ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-200'
                   : 'border-border bg-app text-content-muted hover:text-content'}`}>
                 {lbl}
@@ -161,29 +161,29 @@ export default function ExportGridModal({ open, onClose, datasetId, family, run,
         {!canvasMode && <label className="flex items-start gap-2 cursor-pointer">
           <input type="checkbox" checked={includePrompt}
             onChange={(e) => setIncludePrompt(e.target.checked)} className="mt-0.5" />
-          <span className="text-[0.75rem] text-content">Include the prompt
-            <span className="block text-content-subtle text-[0.625rem]">Off by default — prompts can be personal or NSFW.</span>
+          <span className="text-xs text-content">Include the prompt
+            <span className="block text-content-subtle text-2xs">Off by default — prompts can be personal or NSFW.</span>
           </span>
         </label>}
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={footer}
             onChange={(e) => setFooter(e.target.checked)} />
-          <span className="text-[0.75rem] text-content">“Made with LoRA Dataset Studio” footer</span>
+          <span className="text-xs text-content">“Made with LoRA Dataset Studio” footer</span>
         </label>
 
         {willDownscale && (
-          <p className="text-amber-300/90 text-[0.625rem] rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1.5">
+          <p className="text-amber-300/90 text-2xs rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1.5">
             Large grid — the image will be downscaled to fit an {MAX_CANVAS_SIDE}px cap.
           </p>
         )}
 
         <div className="flex items-center justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} disabled={busy}
-            className="px-3 py-1.5 rounded-lg border border-border bg-app text-content-muted text-[0.75rem] hover:text-content disabled:opacity-40">
+            className="px-3 py-1.5 rounded-lg border border-border bg-app text-content-muted text-xs hover:text-content disabled:opacity-40">
             Cancel
           </button>
           <button type="button" onClick={doExport} disabled={busy}
-            className="px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-[0.75rem] font-semibold disabled:opacity-60">
+            className="px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-xs font-semibold disabled:opacity-60">
             {busy ? 'Composing…' : '⬇ Export'}
           </button>
         </div>

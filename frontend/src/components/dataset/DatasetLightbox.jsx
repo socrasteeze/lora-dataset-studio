@@ -71,7 +71,7 @@ const REFERENCE_COMPARE_HELP = 'Show the dataset\'s reference photo next to this
 function ComparePane({ label, url, alt, accent }) {
   return (
     <figure className="m-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-white/15">
-      <figcaption className={`shrink-0 border-b border-white/10 bg-black/70 px-2 py-1 text-[11px] font-semibold ${
+      <figcaption className={`shrink-0 border-b border-white/10 bg-black/70 px-2 py-1 text-2xs font-semibold ${
         accent ? 'text-indigo-200' : 'text-white/80'}`}>
         {label}
       </figcaption>
@@ -647,7 +647,7 @@ export default function DatasetLightbox({
               seen everything?", which arrows alone cannot give. It counts the
               images the grid SHOWS, so it moves when a filter does. */}
           {canNavigate && (
-            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] tabular-nums text-white/80"
+            <span className="rounded bg-white/10 px-1.5 py-0.5 text-2xs tabular-nums text-white/80"
               title={`Image ${nav.position} of the images the current filters show — ← → to move`}>
               {nav.position}
             </span>
@@ -658,17 +658,17 @@ export default function DatasetLightbox({
               that happens to be the last of the list. Same words and colours as
               the Bank's review chips. */}
           {VERDICT_CHIP[img.status] && (
-            <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${VERDICT_CHIP[img.status].cls}`}
+            <span className={`rounded px-1.5 py-0.5 text-2xs font-semibold ${VERDICT_CHIP[img.status].cls}`}
               title="The status this image carries in the dataset — only kept images are captioned, exported and trained on.">
               {VERDICT_CHIP[img.status].text}
             </span>
           )}
-          <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/80">
+          <span className="px-1.5 py-0.5 rounded text-2xs bg-white/10 text-white/80">
             {img.source === 'import' ? 'real' : 'generated'}{img.framing ? ` · ${img.framing}` : ''}
           </span>
           <SourceAttribution metadata={img.source_metadata}
-            className="text-[11px] text-white/70" />
-          <span className="text-white/50 text-[11px]">
+            className="text-2xs text-white/70" />
+          <span className="text-white/50 text-2xs">
             {/* Zoom is OFF in both comparisons, and says so. What the two panes
                 GUARANTEE is not the same in both, and this line must not claim
                 otherwise: against the original, equal boxes plus a preserved
@@ -719,7 +719,7 @@ export default function DatasetLightbox({
           </div>
         )}
         {onStatus && (
-          <p className={`text-[11px] text-white/45 ${rail || sheet ? 'w-full' : ''}`}>
+          <p className={`text-2xs text-white/45 ${rail || sheet ? 'w-full' : ''}`}>
             {REVIEW_SHORTCUT_HINT} · ← → move without deciding · Esc close
           </p>
         )}
@@ -753,7 +753,7 @@ export default function DatasetLightbox({
         )}
         {refCompare && !refCompare.available && (
           <span role="note"
-            className="max-w-full break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100">
+            className="max-w-full break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-2xs text-amber-100">
             <span aria-hidden>⚠ </span>{refCompare.reason}
           </span>
         )}
@@ -762,7 +762,7 @@ export default function DatasetLightbox({
              "there is no compare button here" is otherwise indistinguishable
              from a bug. */
           <span role="note"
-            className="max-w-full break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100">
+            className="max-w-full break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-2xs text-amber-100">
             <span aria-hidden>⚠ </span>{compare.reason}
           </span>
         )}
@@ -875,8 +875,8 @@ export default function DatasetLightbox({
             <dl className="m-0 mt-1.5 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5">
               {madeWithRows.map((r) => (
                 <div key={r.key} className="contents">
-                  <dt className="m-0 text-[0.6875rem] text-white/45">{r.label}</dt>
-                  <dd className="m-0 break-words text-[0.6875rem] tabular-nums text-white/80">{r.value}</dd>
+                  <dt className="m-0 text-2xs text-white/45">{r.label}</dt>
+                  <dd className="m-0 break-words text-2xs tabular-nums text-white/80">{r.value}</dd>
                 </div>
               ))}
             </dl>

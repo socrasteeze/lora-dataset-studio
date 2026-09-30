@@ -30,7 +30,7 @@ export default function CivitaiBrowserButton({ prompt, onPrompt, picks = null, o
     <>
       <button type="button" onClick={() => setOpen(true)}
         title="Browse top Civitai images and reuse their prompts"
-        className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-[0.625rem] hover:text-content">
+        className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-2xs hover:text-content">
         🌐 Civitai{picked > 0 ? ` · ${picked}` : ''}
       </button>
       {open && (

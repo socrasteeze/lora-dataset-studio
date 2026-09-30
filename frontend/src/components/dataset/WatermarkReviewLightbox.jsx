@@ -548,7 +548,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
       <div onClick={(e) => e.stopPropagation()}
         className="shrink-0 flex items-center gap-2 px-3 py-2 bg-black/60 border-b border-white/10">
         <span className="text-white font-semibold text-sm tabular-nums">{idx + 1} / {total}</span>
-        <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/80">
+        <span className="px-1.5 py-0.5 rounded text-2xs bg-white/10 text-white/80">
           {item?.source === 'import' ? 'real' : 'generated'}{item?.framing ? ` · ${item.framing}` : ''}
         </span>
         <span className="text-white/70 text-xs truncate">{alt}</span>
@@ -776,7 +776,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
             <button type="button" onClick={doRestore} disabled={working}
               title="Undo the clean — bring the watermarked original back so you can re-clean it (e.g. with the other engine) — shortcut r"
               className={`${btn} bg-sky-500/20 border border-sky-400/50 text-sky-100 hover:bg-sky-500/30`}>
-              {restoring ? '↩ Restoring…' : <>↩ Restore original <kbd className="text-[10px] text-white/50">r</kbd></>}
+              {restoring ? '↩ Restoring…' : <>↩ Restore original <kbd className="text-2xs text-white/50">r</kbd></>}
             </button>
           ) : (
             <button type="button" onClick={doClean} disabled={cleanDisabled}
@@ -792,7 +792,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
                       ? 'Save correction zones before cleaning'
                 : "Apply this image's watermark removal now (crop / inpaint / manual review) — shortcut c"}
               className={`${btn} bg-amber-500/20 border border-amber-400/50 text-amber-100 hover:bg-amber-500/30`}>
-              <Eraser aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{cleaning ? 'Cleaning…' : <>Clean <kbd className="text-[10px] text-white/50">c</kbd></>}
+              <Eraser aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{cleaning ? 'Cleaning…' : <>Clean <kbd className="text-2xs text-white/50">c</kbd></>}
             </button>
           )}
           {/* ✦ REPAIR opens the SAME fullscreen dialog the generated-image lane
@@ -812,12 +812,12 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
           <button type="button" onClick={doDismiss} disabled={actionBlocked}
             title="This is NOT a watermark (false positive) — clears the flag, future scans skip it — shortcut d"
             className={`${btn} bg-emerald-600/20 border border-emerald-400/40 text-emerald-100 hover:bg-emerald-600/30`}>
-            ✓ Not a watermark <kbd className="text-[10px] text-white/50">d</kbd>
+            ✓ Not a watermark <kbd className="text-2xs text-white/50">d</kbd>
           </button>
           <button type="button" onClick={doReject} disabled={actionBlocked}
             title="Reject this image — it leaves the kept set (for watermarks that can't be recovered) — shortcut x"
             className={`${btn} bg-red-600/20 border border-red-400/40 text-red-100 hover:bg-red-600/30`}>
-            ✕ Reject <kbd className="text-[10px] text-white/50">x</kbd>
+            ✕ Reject <kbd className="text-2xs text-white/50">x</kbd>
           </button>
         </div>
 
@@ -825,7 +825,7 @@ export default function WatermarkReviewLightbox({ datasetId, queue, caps, nonces
           <button type="button" onClick={() => go(-1)} disabled={idx <= 0 || actionBlocked}
             title="Previous (←)" aria-label="Previous image"
             className="px-3 min-h-[2.5rem] rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm disabled:opacity-30">← Prev</button>
-          <span className="text-white/40 text-[11px] text-center hidden sm:block">
+          <span className="text-white/40 text-2xs text-center hidden sm:block">
             ← → navigate · <kbd>c</kbd> clean · <kbd>r</kbd> restore · <kbd>d</kbd> dismiss · <kbd>x</kbd> reject · Esc close
           </span>
           {allDone ? (

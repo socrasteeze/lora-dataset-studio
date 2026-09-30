@@ -142,7 +142,7 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
       ref={dialogRef}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-white">✦ Repair an area</span>
-        <span className="text-[0.6875rem] text-white/60">
+        <span className="text-2xs text-white/60">
           Draw the zone, say what should be there. Everything outside it is left untouched.
         </span>
         <button type="button" onClick={() => onClose()} disabled={busy}
@@ -154,7 +154,7 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
       {/* ONE row, and it only appears where it means something. The brush
           controls are the brush's own; showing them next to a box editor that
           cannot use them would be the clutter this dialog exists to avoid. */}
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-[0.6875rem] text-white/70">
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-2xs text-white/70">
         <div role="group" aria-label="Repair shape"
           className="flex items-center rounded-lg border border-white/15 bg-white/5 p-0.5">
           <button type="button" aria-pressed={!brush} disabled={busy}
@@ -224,13 +224,13 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
 
       <div className="mt-2 flex flex-col gap-2">
         {done && !error && (
-          <p role="status" className="m-0 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-1.5 text-[0.75rem] text-sky-100">
+          <p role="status" className="m-0 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-100">
             ✦ Repaired — everything outside your zone is untouched. Not right? Change the
             description and repair again, or ↩ undo.
           </p>
         )}
         {error && (
-          <p role="alert" className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-[0.75rem] text-red-200">
+          <p role="alert" className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-xs text-red-200">
             {error}
           </p>
         )}

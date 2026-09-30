@@ -38,7 +38,7 @@ export default function BankSemanticEngine({ state, disabled = false,
               onChange={() => onChange(option.id)} className="mt-0.5 accent-primary" />
             <span>
               <span className="font-medium">{option.label}</span>
-              <span className="block text-[11px] text-content-subtle">{option.hint}</span>
+              <span className="block text-2xs text-content-subtle">{option.hint}</span>
             </span>
           </label>
         ))}

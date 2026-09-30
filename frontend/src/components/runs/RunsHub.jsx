@@ -315,17 +315,17 @@ const renderRunCard = (run, i) => {
             </button>
             <StatusBadge status={run.status} />
             {fullModel && (
-              <span className="rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-0.5 text-sky-100 text-[0.625rem] font-semibold uppercase">
+              <span className="rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-0.5 text-sky-100 text-2xs font-semibold uppercase">
                 full model · experimental
               </span>
             )}
             <AutoRetryBadges run={run} />
-            <span className="ml-auto whitespace-nowrap text-content-subtle text-[0.625rem]">
+            <span className="ml-auto whitespace-nowrap text-content-subtle text-2xs">
               {timeAgo(run.finished_at || run.created_at)}
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-content-muted">
-            <span className="text-[0.625rem] uppercase tracking-wide">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-content-muted">
+            <span className="text-2xs uppercase tracking-wide">
               {famLabel(run.train_type)}{variantLabel ? ` · ${variantLabel}` : ''}
             </span>
             {/* Official bases are already spelled by the family·variant above;
@@ -336,7 +336,7 @@ const renderRunCard = (run, i) => {
               <button type="button"
                 onClick={() => run.record_id != null && toggleLineage(run.record_id)}
                 title="This run resumed from an earlier checkpoint — open its lineage"
-                className="rounded border border-border px-1 py-0.5 text-content-subtle text-[0.5625rem] hover:text-content">
+                className="rounded border border-border px-1 py-0.5 text-content-subtle text-2xs hover:text-content">
                 ↳ from step {run.resumed_from}
               </button>
             )}
@@ -374,7 +374,7 @@ const renderRunCard = (run, i) => {
               shows on a phone — where this was reported. Newlines are real, hence
               whitespace-pre-line; clamped so a stack trace cannot take over the page. */}
           {run.error && (run.status === 'error' || run.status === 'error_pod_kept') && (
-            <p className="m-0 whitespace-pre-line line-clamp-5 text-rose-300/90 text-[0.6875rem]"
+            <p className="m-0 whitespace-pre-line line-clamp-5 text-rose-300/90 text-2xs"
               title={run.error}>
               {run.error}
             </p>
@@ -388,7 +388,7 @@ const renderRunCard = (run, i) => {
             // own error string), so the first one that answers is rendered.
             const failure = podBootFailureView(run) || uploadStallFailureView(run);
             return failure && (
-              <div className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-[0.6875rem] leading-snug">
+              <div className="rounded border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-2xs leading-snug">
                 <div className="font-semibold">{failure.title}</div>
                 <p className="m-0 mt-0.5 break-words text-amber-200/90">{failure.message}</p>
               </div>
@@ -401,7 +401,7 @@ const renderRunCard = (run, i) => {
               onFetch={fetchFullModel} fetching={!!run.dense_fetch_active} />
           )}
           {line && (
-            <p className="m-0 truncate text-content-subtle text-[0.625rem]"
+            <p className="m-0 truncate text-content-subtle text-2xs"
               title="The effective ai-toolkit settings this launch used">
               ⚙ {line}
             </p>
@@ -518,7 +518,7 @@ const renderRunCard = (run, i) => {
     <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="m-0 flex items-center gap-2 text-content text-xl font-bold">
+          <h1 className="m-0 flex items-center gap-2 text-xl font-semibold text-content">
             <Dumbbell aria-hidden="true" className="h-4 w-4" /> Training runs
           </h1>
           {cloud?.headerExtra}
@@ -542,7 +542,7 @@ const renderRunCard = (run, i) => {
                 className="text-content font-semibold text-sm hover:underline">
                 {data.local_active.current.name || `Dataset #${data.local_active.current.dataset_id}`}
               </button>
-              <span className="rounded border border-violet-400/40 bg-violet-500/10 px-1.5 py-0.5 text-violet-200 text-[0.625rem] uppercase">
+              <span className="rounded border border-violet-400/40 bg-violet-500/10 px-1.5 py-0.5 text-violet-200 text-2xs uppercase">
                 local · training
               </span>
               {/* A live local run with no custom base IS the family's official
@@ -553,7 +553,7 @@ const renderRunCard = (run, i) => {
                 variant: data.local_active.current.variant,
               })} />
               {data.local_active.error && (
-                <span className="text-rose-300 text-[0.625rem]">{data.local_active.error}</span>
+                <span className="text-rose-300 text-2xs">{data.local_active.error}</span>
               )}
               <span className="ml-auto flex items-center gap-2">
                 {canStopLocalRun(data.local_active) && (
@@ -605,14 +605,14 @@ const renderRunCard = (run, i) => {
               <button type="button" onClick={() => setRecentCollapsed((v) => !v)}
                 aria-expanded={!recentCollapsed}
                 className="flex items-center gap-1.5 text-content-muted hover:text-content text-xs font-semibold uppercase tracking-wide">
-                <span aria-hidden className="text-[0.625rem] leading-none">{recentCollapsed ? '▸' : '▾'}</span>
+                <span aria-hidden className="text-2xs leading-none">{recentCollapsed ? '▸' : '▾'}</span>
                 Recent{recent.length ? ` (${recent.length})` : ''}
                 <span className="sr-only">{recentCollapsed ? ' — collapsed' : ' — expanded'}</span>
               </button>
             </h2>
             {/* the fold must not hide an active billing warning entirely */}
             {recentCollapsed && recent.some((r) => r.status === 'error_pod_kept') && (
-              <span className="text-amber-300 text-[0.6875rem]">
+              <span className="text-amber-300 text-2xs">
                 ⚠ a kept pod is still billing — expand for details
               </span>
             )}
@@ -636,23 +636,23 @@ const renderRunCard = (run, i) => {
                       aria-expanded={!collapsed}
                       title={collapsed ? 'Show the runs of this dataset' : 'Fold the runs of this dataset'}
                       className="flex min-w-0 items-center gap-1.5 text-content-muted hover:text-content text-xs">
-                      <span aria-hidden className="text-[0.625rem] leading-none">{collapsed ? '▸' : '▾'}</span>
+                      <span aria-hidden className="text-2xs leading-none">{collapsed ? '▸' : '▾'}</span>
                       <span className="truncate font-semibold text-content">{name}</span>
                       <span className="whitespace-nowrap text-content-subtle">
                         · {group.runs.length} run{group.runs.length > 1 ? 's' : ''}
                       </span>
                     </button>
                     {collapsed && group.runs.some((r) => r.status === 'error_pod_kept') && (
-                      <span className="whitespace-nowrap text-amber-300 text-[0.625rem]">⚠ kept pod billing</span>
+                      <span className="whitespace-nowrap text-amber-300 text-2xs">⚠ kept pod billing</span>
                     )}
                     <button type="button" onClick={() => openDataset(group.datasetId)}
-                      className="ml-auto whitespace-nowrap rounded-lg px-2 py-0.5 text-content-muted hover:text-content text-[0.6875rem]">
+                      className="ml-auto whitespace-nowrap rounded-lg px-2 py-0.5 text-content-muted hover:text-content text-2xs">
                       Open dataset ↗
                     </button>
                     {testRun && group.datasetId != null && (
                       <button type="button" onClick={() => openTestStudio(group.datasetId, testRun.train_type)}
                         title="Open Test Studio with this run's dataset selected"
-                        className="whitespace-nowrap rounded-lg px-2 py-0.5 text-indigo-200 hover:bg-indigo-500/10 hover:text-indigo-100 text-[0.6875rem] font-semibold">
+                        className="whitespace-nowrap rounded-lg px-2 py-0.5 text-indigo-200 hover:bg-indigo-500/10 hover:text-indigo-100 text-2xs font-semibold">
                         <FlaskConical aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Test in Studio
                       </button>
                     )}

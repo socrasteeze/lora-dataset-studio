@@ -12,7 +12,7 @@
 export default function ShortcutKey({ children }) {
   return (
     <kbd aria-hidden="true"
-      className="ml-1 rounded border border-white/25 px-1 text-[10px] font-mono text-white/70">
+      className="ml-1 rounded border border-white/25 px-1 text-2xs font-mono text-white/70">
       {children}
     </kbd>
   );

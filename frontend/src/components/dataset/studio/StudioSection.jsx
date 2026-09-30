@@ -45,10 +45,10 @@ export default function StudioSection({ title, defaultOpen = true, storageKey, a
         aria-controls={bodyId}
         className="flex w-full items-center justify-between gap-2 text-left"
       >
-        <span className="text-content-muted text-[0.625rem] uppercase tracking-wide font-semibold">
+        <span className="text-content-muted text-2xs uppercase tracking-wide font-semibold">
           {title}
         </span>
-        <span aria-hidden className="text-content-muted text-[0.75rem] leading-none">
+        <span aria-hidden className="text-content-muted text-xs leading-none">
           {open ? '▼' : '▶'}
         </span>
       </button>

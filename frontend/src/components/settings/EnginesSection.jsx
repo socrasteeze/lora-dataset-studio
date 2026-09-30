@@ -145,7 +145,7 @@ function LoraPresetCard({ preset, index, presets, save, loraScan,
             {/* w-full inside the WRAPPING flex row = its own line under the
                 controls, without re-nesting (and re-indenting) the whole row. */}
             {duplicate && (
-              <p role="alert" className="w-full pl-6 text-[0.6875rem] text-amber-400">
+              <p role="alert" className="w-full pl-6 text-2xs text-amber-400">
                 {fixedLoraDuplicateWarning(engineId)}
               </p>
             )}
@@ -199,13 +199,13 @@ function DefaultPresetField({ id, engineLabel, presets, value, onChange }) {
         <option value="">None</option>
         {names.map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
-      <p className="mt-1 text-[0.6875rem] text-content-subtle">
+      <p className="mt-1 text-2xs text-content-subtle">
         Which preset the {engineLabel} tuning panel starts on when you open a dataset.
         “None” is the shipped default and keeps today’s behaviour exactly. You can still
         pick another preset — or None — for a single run without changing this setting.
       </p>
       {stale && (
-        <p role="alert" className="mt-1 text-[0.6875rem] text-amber-400">
+        <p role="alert" className="mt-1 text-2xs text-amber-400">
           “{current}” is no longer one of your presets, so runs start on None. Pick a
           preset above to set a new default.
         </p>
@@ -315,7 +315,7 @@ function KleinModelSlotRow({ spec, config, setField, override }) {
         placeholder={placeholder || 'Empty = auto-detect'}
         {...scan}
       />
-      <p className="mt-1 text-[0.6875rem] text-content-subtle">{hint}</p>
+      <p className="mt-1 text-2xs text-content-subtle">{hint}</p>
     </div>
   )
 }
@@ -379,7 +379,7 @@ function KleinGenerationCard({ config, setField, configDefaults }) {
             e.target.value === '' ? shipped : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           {shipped} = the shipped value. More steps = slower, usually cleaner; 1–{KLEIN_GENERATION_STEPS_MAX}.
           Applies to variations, regenerations and the small-image rescue — not to
           the optional Improve &amp; upscale plug-in, which owns its own Steps.
@@ -402,7 +402,7 @@ function KleinGenerationCard({ config, setField, configDefaults }) {
             e.target.value === '' ? editLoraShipped : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           0 = off. The workflow carries a detail LoRA (klein/realistic.safetensors) at
           0.8, and until now nothing turned it down on an edit — it pulled results
           away from the instruction you typed. Raise it to add its detail on purpose.
@@ -473,7 +473,7 @@ function KreaCard({ config, setField, configDefaults, caps }) {
           onChange={(e) => setField('krea', 'grounding_px', Number(e.target.value))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           The resolution your reference is shown to the model&rsquo;s vision encoder at — the
           consistency ↔ prompt dial. At the low end it follows the shot description (more
           variety in pose, outfit and scene, looser likeness). <b>Higher</b> = it resembles
@@ -501,7 +501,7 @@ function KreaCard({ config, setField, configDefaults, caps }) {
             e.target.value === '' ? dflt('steps') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           {stepsDescription(steps)}. {dflt('steps')} is the value the model&rsquo;s own
           reference workflow uses. More is slower and rarely better on this pipeline.
         </p>
@@ -527,7 +527,7 @@ function KreaCard({ config, setField, configDefaults, caps }) {
             clampRefBoost(e.target.value, dflt('ref_boost')))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           {refBoostDescription(refBoost)}. How hard the source latent is pushed back into the
           model at every denoising step — the lever for &ldquo;the subject does not look enough
           like my reference&rdquo;. High values also recopy the composition, pose and outfit the
@@ -553,7 +553,7 @@ function KreaCard({ config, setField, configDefaults, caps }) {
             clampIdentityStrength(e.target.value, dflt('identity_lora_strength')))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           {identityStrengthDescription(identityStrength)}. The weight of the Krea 2
           identity-edit LoRA itself — the piece that carries the face across. Below 1 loosens
           the likeness, 0 disables the face transfer, above 1 is past what the file was
@@ -575,10 +575,10 @@ function KreaCard({ config, setField, configDefaults, caps }) {
           placeholder="auto — finds a Krea 2 Turbo/Raw build"
           {...baseScan}
         />
-        <p className={`mt-1 font-mono text-[0.6875rem] ${KREA_BASE_NOTE_CLASS[baseNote.tone]}`}>
+        <p className={`mt-1 font-mono text-2xs ${KREA_BASE_NOTE_CLASS[baseNote.tone]}`}>
           {baseNote.text}
         </p>
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Leave blank unless you own several Krea builds. Blank = the app picks a Krea 2
           Turbo then Raw model from your ComfyUI. The list is what the app would actually
           elect from: non-Krea-2 checkpoints that merely carry &ldquo;krea&rdquo; in their name are
@@ -604,7 +604,7 @@ function KreaCard({ config, setField, configDefaults, caps }) {
           placeholder="blank = find krea2_identity_edit automatically"
           {...identityScan}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           Blank = the app searches your LoRA folders for a krea2_identity_edit file, so a
           renamed download still works. Name one here and that is the LoRA it loads — if it
           is not on disk, Krea refuses to run instead of substituting another face transfer.
@@ -674,7 +674,7 @@ function KreaHiresCard({ config, setField, configDefaults }) {
           onChange={(e) => setField('krea_hires', 'scale', Number(e.target.value))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           {hiresScaleNote(scale)} {on ? '' : 'Slide right to turn it on. '}
           1.5x is the value the reference workflow this was ported from uses.
         </p>
@@ -699,7 +699,7 @@ function KreaHiresCard({ config, setField, configDefaults }) {
           onChange={(e) => setField('krea_hires', 'denoise', Number(e.target.value))}
           className="mt-1 w-full accent-violet-500"
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           The dial of the whole feature. Near 1 the second pass ignores the first and
           renders a <b>different</b> picture at the larger size; too low and it costs a
           full extra pass to change nothing. {dflt('denoise')} keeps the composition and
@@ -724,7 +724,7 @@ function KreaHiresCard({ config, setField, configDefaults }) {
             e.target.value === '' ? dflt('steps') : Number(e.target.value))}
           className={INPUT_CLASS}
         />
-        <p className="mt-1 text-[0.6875rem] text-content-subtle">
+        <p className="mt-1 text-2xs text-content-subtle">
           0 inherits the first pass&rsquo;s count, which is the sane default: at a denoise
           below 1 the pass only walks part of the schedule anyway.
         </p>

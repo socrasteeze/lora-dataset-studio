@@ -59,15 +59,15 @@ export default function StudioPreflightBanner({ missing, archMismatch, onDismiss
 
       {files.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-red-200/80 text-[0.6875rem] uppercase tracking-wide">
+          <span className="text-red-200/80 text-2xs uppercase tracking-wide">
             Missing model file{files.length > 1 ? 's' : ''} — place at
           </span>
           <ul className="m-0 flex flex-col gap-0.5">
             {files.map((f) => (
               <li key={f.path} className="flex flex-col gap-0.5">
                 <span className="flex flex-wrap items-baseline gap-x-2">
-                  <code className="text-red-100 text-[0.6875rem] break-all">{f.path}</code>
-                  <span className="text-red-200/60 text-[0.625rem]">({f.kind})</span>
+                  <code className="text-red-100 text-2xs break-all">{f.path}</code>
+                  <span className="text-red-200/60 text-2xs">({f.kind})</span>
                 </span>
                 {/*
                  * hint reports what the resolver actually searched: accepted names and scanned
@@ -75,7 +75,7 @@ export default function StudioPreflightBanner({ missing, archMismatch, onDismiss
                  * mandatory despite multiple accepted spellings. (bobba84, GitHub #18)
                  */}
                 {f.hint && (
-                  <span className="text-red-200/60 text-[0.625rem] leading-snug">{f.hint}</span>
+                  <span className="text-red-200/60 text-2xs leading-snug">{f.hint}</span>
                 )}
               </li>
             ))}

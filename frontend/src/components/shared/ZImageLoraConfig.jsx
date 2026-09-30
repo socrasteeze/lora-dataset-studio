@@ -89,7 +89,7 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
 
   if (!loras.length) {
     return (
-      <p className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 m-0 text-left">
+      <p className="normal-case tracking-normal text-2xs text-content-muted/70 m-0 text-left">
         {emptyHint || (<>No Z-Image LoRA — drop your .safetensors into{' '}
         <code className="text-content-muted">ComfyUI/models/loras/z image/</code></>)}
       </p>
@@ -111,7 +111,7 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
     <div className="flex flex-col gap-1.5 text-left normal-case tracking-normal">
       {/* Null/empty label omits the inner title; the parent Collapsible supplies it. */}
       {label && (
-        <span className="text-[0.6875rem] text-content-muted uppercase tracking-wide">
+        <span className="text-2xs text-content-muted uppercase tracking-wide">
           {label}
         </span>
       )}
@@ -142,13 +142,13 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
               </label>
               {c.enabled && (
                 <>
-                  <span className="text-content-muted text-[0.6875rem] tabular-nums">
+                  <span className="text-content-muted text-2xs tabular-nums">
                     {(c.strength ?? 1.0).toFixed(2)}
                   </span>
                   <button type="button" onClick={() => toggleLock(l.filename)}
                     aria-pressed={!!c.locked}
                     title={c.locked ? 'Strength locked — click to unlock' : 'Lock the strength (prevents accidental changes)'}
-                    className={`px-1 py-0.5 rounded text-[0.75rem] border leading-none ${c.locked ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : 'border-border bg-surface text-content-muted hover:text-content'}`}>
+                    className={`px-1 py-0.5 rounded text-xs border leading-none ${c.locked ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : 'border-border bg-surface text-content-muted hover:text-content'}`}>
                     {c.locked ? '●' : '○'}
                   </button>
                 </>
@@ -165,12 +165,12 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
               );
             })()}
             {c.enabled && l.triggerWord && (
-              <span className="text-content-subtle text-[0.625rem]">
+              <span className="text-content-subtle text-2xs">
                 trigger: <code className="text-content-muted">{l.triggerWord}</code> (added automatically)
               </span>
             )}
             {c.enabled && batchToggle && (
-              <label className="flex items-center gap-1.5 cursor-pointer text-[0.625rem] text-content-muted"
+              <label className="flex items-center gap-1.5 cursor-pointer text-2xs text-content-muted"
                 title="Checked: this LoRA becomes a test AXIS — each config runs once WITHOUT it and once WITH it, instead of applying to every cell.">
                 <input type="checkbox" checked={!!c.batch}
                   onChange={() => setCfg((cur) => ({
@@ -205,12 +205,12 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
                 {anyFav && <span aria-hidden className="shrink-0 text-amber-300 text-[0.85rem] leading-none">★</span>}
                 <span className="flex-1 min-w-0 truncate text-content text-[0.8125rem]">{key}</span>
                 {active ? (
-                  <span className="shrink-0 whitespace-nowrap text-content-muted text-[0.6875rem]">
+                  <span className="shrink-0 whitespace-nowrap text-content-muted text-2xs">
                     using {stepLabel(active)}{enabledItems.length > 1 ? ` (+${enabledItems.length - 1})` : ''}
                     {' · '}<span className="tabular-nums">{(cfg[active.filename]?.strength ?? 1.0).toFixed(2)}</span>
                   </span>
                 ) : (
-                  <span className="shrink-0 whitespace-nowrap text-content-subtle text-[0.6875rem]">{items.length} checkpoints</span>
+                  <span className="shrink-0 whitespace-nowrap text-content-subtle text-2xs">{items.length} checkpoints</span>
                 )}
               </button>
               {open && (
@@ -226,13 +226,13 @@ export default function ZImageLoraConfig({ loras = [], onChange, zModel = '', is
         return (
           <>
             {both && (
-              <span className="text-[0.625rem] text-content-subtle uppercase tracking-wide mt-0.5">
+              <span className="text-2xs text-content-subtle uppercase tracking-wide mt-0.5">
                 Character LoRAs
               </span>
             )}
             {characterGroups.map(renderGroup)}
             {both && (
-              <span className="text-[0.625rem] text-content-subtle uppercase tracking-wide mt-1.5">
+              <span className="text-2xs text-content-subtle uppercase tracking-wide mt-1.5">
                 Style / utility LoRAs
               </span>
             )}

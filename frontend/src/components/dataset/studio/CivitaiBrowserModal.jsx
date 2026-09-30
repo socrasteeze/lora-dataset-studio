@@ -115,7 +115,7 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
     return next;
   });
 
-  const sel = 'rounded border border-border bg-app/60 px-1.5 py-1 text-content text-[0.6875rem]';
+  const sel = 'rounded border border-border bg-app/60 px-1.5 py-1 text-content text-2xs';
 
   /*
    * Portal to document.body is required. StudioRunSetup mounts this modal inside
@@ -160,7 +160,7 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
             {LEVELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           {hasKey !== false && (
-            <label className="flex items-center gap-1.5 text-content-muted text-[0.6875rem]">
+            <label className="flex items-center gap-1.5 text-content-muted text-2xs">
               <input type="checkbox" checked={withPrompt}
                 onChange={(e) => setWithPrompt(e.target.checked)} />
               Only images with a prompt
@@ -169,7 +169,7 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
         </div>
 
         {hasKey === false && (
-          <p className="m-0 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-[0.6875rem] leading-snug text-amber-300/90">
+          <p className="m-0 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-2xs leading-snug text-amber-300/90">
             Browsing works without a key, but reading the prompts needs a free
             Civitai API key.{' '}
             <Link to="/settings/scraping" onClick={onClose}
@@ -180,14 +180,14 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
           </p>
         )}
         {keyRejected && (
-          <p className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300 text-[0.6875rem]" role="alert">
+          <p className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300 text-2xs" role="alert">
             Civitai refused the API key — check it in{' '}
             <Link to="/settings/scraping" onClick={onClose}
               className="underline decoration-dotted">Settings → Scraping &amp; sources</Link>.
           </p>
         )}
         {error && (
-          <p className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300 text-[0.6875rem]" role="alert">
+          <p className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300 text-2xs" role="alert">
             {error}
           </p>
         )}
@@ -201,7 +201,7 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
                   className="w-28 sm:w-36 h-40 sm:h-48 object-cover rounded-lg border border-border" />
               </a>
               <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.625rem] text-content-subtle">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-content-subtle">
                   <span title="Reactions">❤️ {c.reactions}</span>
                   <span title="Comments">💬 {c.comments}</span>
                   {c.nsfw_level && c.nsfw_level !== 'None' && (
@@ -212,25 +212,25 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
                 {c.prompt ? (
                   <button type="button" onClick={() => toggleExpand(c.id)}
                     title={expanded.has(c.id) ? 'Collapse the prompt' : 'Show the full prompt'}
-                    className={`m-0 text-left text-content text-[0.75rem] leading-snug whitespace-pre-wrap break-words ${
+                    className={`m-0 text-left text-content text-xs leading-snug whitespace-pre-wrap break-words ${
                       expanded.has(c.id) ? '' : 'line-clamp-5'}`}>
                     {c.prompt}
                   </button>
                 ) : (
-                  <p className="m-0 text-content-subtle text-[0.75rem] italic">
+                  <p className="m-0 text-content-subtle text-xs italic">
                     No prompt published for this image.
                   </p>
                 )}
                 <div className="mt-auto flex flex-wrap items-center gap-1.5">
                   {c.model && (
-                    <span className="rounded bg-app/60 border border-border px-1.5 py-0.5 text-[0.625rem] text-content-muted max-w-[10rem] truncate"
+                    <span className="rounded bg-app/60 border border-border px-1.5 py-0.5 text-2xs text-content-muted max-w-[10rem] truncate"
                       title={`Model: ${c.model}`}>{c.model}</span>
                   )}
                   {c.steps != null && (
-                    <span className="text-[0.625rem] text-content-subtle">{c.steps} steps</span>
+                    <span className="text-2xs text-content-subtle">{c.steps} steps</span>
                   )}
                   {c.cfg != null && (
-                    <span className="text-[0.625rem] text-content-subtle">CFG {c.cfg}</span>
+                    <span className="text-2xs text-content-subtle">CFG {c.cfg}</span>
                   )}
                   {c.prompt && (
                     <span className="ml-auto flex items-center gap-1.5">
@@ -243,7 +243,7 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
                             title={inBatch
                               ? 'Remove this prompt from the batch'
                               : 'Add this prompt to the batch — one more pass of the next run, the field stays as it is'}
-                            className={`px-2 py-1 min-h-10 lg:min-h-0 rounded border text-[0.6875rem] ${inBatch
+                            className={`px-2 py-1 min-h-10 lg:min-h-0 rounded border text-2xs ${inBatch
                               ? 'border-purple-400 bg-purple-500/25 text-purple-100'
                               : 'border-border bg-app text-content-muted hover:text-content'}`}>
                             {inBatch ? '☑ In batch' : '☐ Batch'}
@@ -252,12 +252,12 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
                       })()}
                       <button type="button" onClick={() => copyPrompt(c.prompt)}
                         title="Copy this prompt"
-                        className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-content-muted text-[0.6875rem] hover:text-content">
+                        className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-content-muted text-2xs hover:text-content">
                         📋 Copy
                       </button>
                       <button type="button" onClick={() => onUse(c.prompt)}
                         title="Use this prompt as the test prompt"
-                        className="px-2.5 py-1 min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary text-gray-950 text-[0.6875rem] font-semibold">
+                        className="px-2.5 py-1 min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary text-gray-950 text-2xs font-semibold">
                         ⤵ Use prompt
                       </button>
                     </span>
@@ -268,14 +268,14 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
           ))}
 
           {!loading && !error && items.length === 0 && (
-            <p className="m-0 rounded-lg border border-border bg-surface px-3 py-6 text-center text-content-subtle text-[0.75rem]">
+            <p className="m-0 rounded-lg border border-border bg-surface px-3 py-6 text-center text-content-subtle text-xs">
               Nothing to show — Civitai returned no{withPrompt && hasKey ? ' prompt-bearing' : ''} images
               for these filters. Try a longer period{withPrompt && hasKey ? ' or untick “Only images with a prompt”' : ''}.
             </p>
           )}
 
           {loading && (
-            <p className="m-0 flex items-center justify-center gap-2 py-4 text-content-subtle text-[0.75rem]" role="status">
+            <p className="m-0 flex items-center justify-center gap-2 py-4 text-content-subtle text-xs" role="status">
               <span className="inline-block w-4 h-4 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" aria-hidden />
               Reading Civitai…
             </p>
@@ -283,7 +283,7 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
 
           {!loading && !exhausted && items.length > 0 && (
             <button type="button" onClick={() => load(false)}
-              className="self-center px-4 py-1.5 min-h-10 lg:min-h-0 rounded-lg border border-border bg-surface text-content-muted text-[0.75rem] hover:text-content">
+              className="self-center px-4 py-1.5 min-h-10 lg:min-h-0 rounded-lg border border-border bg-surface text-content-muted text-xs hover:text-content">
               Load more
             </button>
           )}
@@ -295,14 +295,14 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
         {batchable && picked.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2"
             data-testid="civitai-batch-footer">
-            <span className="text-[0.75rem] text-content">
+            <span className="text-xs text-content">
               <span className="rounded bg-purple-500/20 px-1.5 py-0.5 font-semibold text-purple-200 tabular-nums">
                 {picked.length} prompt{picked.length === 1 ? '' : 's'}
               </span>
               {' '}in the batch — one pass each on the next run
             </span>
             <button type="button" onClick={onClose}
-              className="px-3 py-1 min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary text-gray-950 text-[0.6875rem] font-semibold">
+              className="px-3 py-1 min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary text-gray-950 text-2xs font-semibold">
               Done
             </button>
           </div>

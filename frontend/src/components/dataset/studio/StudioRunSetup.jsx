@@ -114,11 +114,11 @@ export default function StudioRunSetup({
       <div className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="studio-run-prompt" className="text-content-muted text-[0.625rem] uppercase">
+            <label htmlFor="studio-run-prompt" className="text-content-muted text-2xs uppercase">
               Prompt (optional)
             </label>
             {onInjectTrigger && (
-              <label className="flex items-center gap-1 text-content-subtle text-[0.625rem] cursor-pointer"
+              <label className="flex items-center gap-1 text-content-subtle text-2xs cursor-pointer"
                 title="Prefix each LoRA's trigger word to this prompt when generating. Uncheck to send the prompt exactly as written — useful when a render keeps typing the trigger back (speech bubbles, signs) or for pure style/scene tests.">
                 <input type="checkbox" checked={injectTrigger}
                   onChange={(e) => onInjectTrigger(e.target.checked)} />
@@ -131,7 +131,7 @@ export default function StudioRunSetup({
             <EnhancePromptButton prompt={prompt} onResult={onPrompt} />
           <button type="button" onClick={() => setDescribeOpen(true)}
             title="Describe an image into a test prompt (vision model)"
-            className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-[0.625rem] hover:text-content">
+            className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-2xs hover:text-content">
             🔎 Describe
           </button>
           <CivitaiBrowserButton prompt={prompt} onPrompt={onPrompt}
@@ -146,7 +146,7 @@ export default function StudioRunSetup({
         onResult={applyDescription} />
 
       {Array.isArray(civitaiPicks) && civitaiPicks.length > 0 && (
-        <p className="m-0 flex flex-wrap items-center gap-1.5 text-content-subtle text-[0.5625rem]">
+        <p className="m-0 flex flex-wrap items-center gap-1.5 text-content-subtle text-2xs">
           <span className="rounded bg-purple-500/20 px-1.5 py-0.5 font-semibold text-purple-200 tabular-nums">
             🌐 {civitaiPicks.length} Civitai prompt{civitaiPicks.length === 1 ? '' : 's'} in the batch
           </span>
@@ -167,7 +167,7 @@ export default function StudioRunSetup({
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
-        <label className="flex items-center gap-1.5 text-content-muted text-[0.6875rem]">
+        <label className="flex items-center gap-1.5 text-content-muted text-2xs">
           <span className="uppercase">Seed</span>
           <span className="tabular-nums text-content px-2 py-0.5 rounded border border-border bg-app/60">{seed}</span>
           <button type="button" onClick={onReroll} aria-label="New random seed"
@@ -175,7 +175,7 @@ export default function StudioRunSetup({
             className="px-2 py-0.5 rounded border border-border bg-surface text-content hover:bg-surface-raised"><Dices aria-hidden="true" className="h-3.5 w-3.5" /></button>
         </label>
 
-        <label className="flex items-center gap-1.5 text-content-muted text-[0.6875rem]">
+        <label className="flex items-center gap-1.5 text-content-muted text-2xs">
           <span className="uppercase">Images / config</span>
           <select value={count} onChange={(e) => onCount(Number(e.target.value))}
             aria-label="Number of images per configuration"
@@ -186,7 +186,7 @@ export default function StudioRunSetup({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-content-subtle text-[0.6875rem]"
+        <span className="text-content-subtle text-2xs"
           title={combine
             ? `GPU cost: ${configCount} weight combination(s) of ${selectionCount} LoRAs × images per config`
             : `GPU cost: checked LoRAs × strengths × images per config${batchMult > 1 ? ` × ${batchMult} (⚖ batch axis: without + with each checked LoRA)` : ''}${axisTotal > 1 ? ` × ${axisTotal} (🎛 CFG / steps axes)` : ''}${picked.length > 1 ? ` × ${picked.length} (📝 prompt batch: one image set per ticked prompt)` : ''}`}>
@@ -220,16 +220,16 @@ export default function StudioRunSetup({
       </div>
       {cost.heavy && (
         <p data-testid="heavy-run-notice"
-          className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-[0.6875rem] text-amber-200"
+          className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-2xs text-amber-200"
           role="status">
           <span aria-hidden>⏱</span> {heavyRunNotice(cost)}
         </p>
       )}
       {selectionCount === 0 && (
-        <p className="m-0 text-amber-300 text-[0.6875rem]">Check at least one LoRA above.</p>
+        <p className="m-0 text-amber-300 text-2xs">Check at least one LoRA above.</p>
       )}
       {combineBlocked && (
-        <p className="m-0 text-amber-300 text-[0.6875rem]" role="status">{combineBlocked}</p>
+        <p className="m-0 text-amber-300 text-2xs" role="status">{combineBlocked}</p>
       )}
     </div>
   );

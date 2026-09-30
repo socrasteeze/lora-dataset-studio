@@ -9,13 +9,13 @@ export default function BestPresetCard({ preset, onMemorize, fmt }) {
       <div className="flex items-center gap-2 flex-wrap">
         <span aria-hidden>🏆</span>
         <span className="text-content text-sm font-semibold">Best setting (based on your votes)</span>
-        <span className="text-emerald-300 text-[0.6875rem] tabular-nums"
+        <span className="text-emerald-300 text-2xs tabular-nums"
           title={`+${preset.likes} / −${preset.dislikes} on ${preset.images} image(s)`}>
           score +{preset.score} (👍{preset.likes} 👎{preset.dislikes})
           {preset.like_rate != null ? ` · ${Math.round(preset.like_rate * 100)}% 👍 on ${preset.voted} vote(s)` : ''}
         </span>
         {preset.low_confidence && (
-          <span className="text-amber-300 text-[0.625rem] inline-flex items-center gap-1"
+          <span className="text-amber-300 text-2xs inline-flex items-center gap-1"
             title="Recommendation based on few votes — keep voting to make it more reliable">
             ⚠ low sample
           </span>
@@ -26,7 +26,7 @@ export default function BestPresetCard({ preset, onMemorize, fmt }) {
           ★ Save
         </button>
       </div>
-      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[0.6875rem]">
+      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-2xs">
         <span className="text-content-subtle">LoRA</span>
         <span className="text-content">{preset.label}</span>
         <span className="text-content-subtle">Strength</span>

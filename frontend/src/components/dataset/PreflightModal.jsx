@@ -64,7 +64,7 @@ export default function PreflightModal({ report, datasetId, ds, onResolve }) {
                 <textarea defaultValue={li.caption} rows={2}
                   aria-label={`Caption of image ${li.id}`}
                   onBlur={(e) => { if (e.target.value !== li.caption) ds.setCaption(li.id, e.target.value); }}
-                  className="flex-1 bg-app/60 border border-amber-400/30 rounded px-2 py-1 text-[0.6875rem] text-content resize-y" />
+                  className="flex-1 bg-app/60 border border-amber-400/30 rounded px-2 py-1 text-2xs text-content resize-y" />
               </div>
             ))}
           </div>
@@ -85,12 +85,12 @@ export default function PreflightModal({ report, datasetId, ds, onResolve }) {
                       <img src={imgUrl(im.filename)} alt={`image ${im.id}`} loading="lazy"
                         className={`w-20 h-20 rounded object-cover bg-black ${rejected[im.id] ? 'ring-2 ring-red-500 grayscale' : ''}`} />
                       <button type="button" disabled={resolved} onClick={() => reject(im.id)}
-                        className="px-2 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-300 text-[0.625rem] disabled:opacity-40">
+                        className="px-2 py-0.5 rounded bg-red-500/15 border border-red-500/40 text-red-300 text-2xs disabled:opacity-40">
                         {rejected[im.id] ? '✕ rejected' : 'Reject this'}
                       </button>
                     </div>
                   ))}
-                  {resolved && <span className="text-emerald-400 text-[0.6875rem]">✓ resolved</span>}
+                  {resolved && <span className="text-emerald-400 text-2xs">✓ resolved</span>}
                 </div>
               );
             })}

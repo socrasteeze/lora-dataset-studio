@@ -20,7 +20,7 @@ export default function RunSelector({
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <button type="button" onClick={onToggleResults} aria-expanded={showResults}
-        className="flex items-center gap-1.5 text-left text-content-muted text-[0.625rem] uppercase">
+        className="flex items-center gap-1.5 text-left text-content-muted text-2xs uppercase">
         <span aria-hidden>📊</span> Results
         <span className="text-content-subtle normal-case">{displayedCount} img</span>
         <span aria-hidden>{showResults ? '▾' : '▸'}</span>
@@ -28,26 +28,26 @@ export default function RunSelector({
       {unvotedCount > 0 && (
         <button type="button" onClick={onStartVote}
           title="Quickly vote on all unrated images (swipe or 👍/👎)"
-          className="px-2.5 py-1 rounded-lg bg-gradient-primary text-gray-950 text-[0.6875rem] font-semibold">
+          className="px-2.5 py-1 rounded-lg bg-gradient-primary text-gray-950 text-2xs font-semibold">
           🗳 Vote ({unvotedCount})
         </button>
       )}
       {greenCount > 0 && (
         <button type="button" onClick={onStartReVote}
           title="2nd pass: re-vote ONLY the 👍 to narrow down (👎 = remove, 👍 = reconfirm, skip = unchanged)"
-          className="px-2.5 py-1 rounded-lg border border-green-400/60 bg-green-500/15 text-green-200 text-[0.6875rem] font-semibold">
+          className="px-2.5 py-1 rounded-lg border border-green-400/60 bg-green-500/15 text-green-200 text-2xs font-semibold">
           ♻ Re-vote ({greenCount})
         </button>
       )}
       <button type="button" onClick={onExport} disabled={!canExport}
         title={canExport ? 'Compose this run into one shareable image (checkpoints × strengths)' : 'No finished image to export yet'}
-        className="px-2.5 py-1 rounded-lg border border-border bg-surface text-content-muted text-[0.6875rem] font-semibold hover:text-content disabled:opacity-40 disabled:cursor-not-allowed">
+        className="px-2.5 py-1 rounded-lg border border-border bg-surface text-content-muted text-2xs font-semibold hover:text-content disabled:opacity-40 disabled:cursor-not-allowed">
         🖼 Export grid
       </button>
       {runs.length > 1 && (
         <select value={activeRunKey || ''} onChange={(e) => onSelect(e.target.value)}
           aria-label="Choose the test run to display"
-          className="ml-auto rounded-lg border border-border bg-surface px-2 py-1 text-[0.6875rem] text-content max-w-[280px]">
+          className="ml-auto rounded-lg border border-border bg-surface px-2 py-1 text-2xs text-content max-w-[280px]">
           {runs.map((r, i) => {
             // Positive-vote rate within the run, likes divided by votes, matching per-cell
             // percentages. Hide with no votes to avoid division by zero.

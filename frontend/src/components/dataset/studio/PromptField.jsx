@@ -35,9 +35,9 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-content-muted text-[0.625rem] uppercase">Test prompt</span>
+          <span className="text-content-muted text-2xs uppercase">Test prompt</span>
           {onInjectTrigger && (
-            <label className="flex items-center gap-1 text-content-subtle text-[0.625rem] cursor-pointer"
+            <label className="flex items-center gap-1 text-content-subtle text-2xs cursor-pointer"
               title="Prefix the dataset's trigger word to this prompt when generating. Uncheck to send the prompt exactly as written — useful when a render keeps typing the trigger back (speech bubbles, signs) or for pure style/scene tests.">
               <input type="checkbox" checked={injectTrigger}
                 onChange={(e) => onInjectTrigger(e.target.checked)} />
@@ -50,7 +50,7 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
           <EnhancePromptButton prompt={value} onResult={onChange} />
           <button type="button" onClick={() => setDescribeOpen(true)}
             title="Describe an image into a test prompt (vision model)"
-            className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-[0.625rem] hover:text-content">
+            className="px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-2xs hover:text-content">
             <Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Describe
           </button>
           <CivitaiBrowserButton prompt={value} onPrompt={onChange}
@@ -62,7 +62,7 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
        * empty on a new dataset. An invisible batch would launch blindly.
        */}
       {Array.isArray(civitaiPicks) && civitaiPicks.length > 0 && (
-        <p className="m-0 flex flex-wrap items-center gap-1.5 text-[0.625rem] text-content-subtle"
+        <p className="m-0 flex flex-wrap items-center gap-1.5 text-2xs text-content-subtle"
           data-testid="civitai-batch-count">
           <span className="rounded bg-purple-500/20 px-1.5 py-0.5 font-semibold text-purple-200 tabular-nums">
             🌐 {civitaiPicks.length} Civitai prompt{civitaiPicks.length === 1 ? '' : 's'} in the batch
@@ -82,11 +82,11 @@ export default function PromptField({ value, placeholder, onChange, onReset, isC
         rows={5}
         placeholder={placeholder}
         aria-label="LoRA test prompt"
-        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[0.75rem] text-content resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-content resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
       />
       {isCustom && (
         <button type="button" onClick={onReset}
-          className="self-start px-2 py-0.5 rounded bg-surface text-content-subtle text-[0.625rem] hover:text-content"
+          className="self-start px-2 py-0.5 rounded bg-surface text-content-subtle text-2xs hover:text-content"
           title="Revert to the default identity prompt">
           ↺ default
         </button>

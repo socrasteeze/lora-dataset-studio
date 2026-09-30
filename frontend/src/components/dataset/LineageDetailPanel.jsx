@@ -133,7 +133,7 @@ export default function LineageDetailPanel({ node, onClose, onNodeChanged, onNod
       </div>
 
       <section className="mt-3">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">Config</div>
+        <div className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">Config</div>
         {rows.length === 0 ? (
           <p className="mt-1 text-xs italic text-content-subtle">Config not recorded for this run.</p>
         ) : (
@@ -151,7 +151,7 @@ export default function LineageDetailPanel({ node, onClose, onNodeChanged, onNod
       </section>
 
       <section className="mt-4">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">Run note</div>
+        <div className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">Run note</div>
         <textarea
           value={runNote}
           onChange={(e) => setRunNote(e.target.value)}
@@ -163,11 +163,11 @@ export default function LineageDetailPanel({ node, onClose, onNodeChanged, onNod
 
       {checkpoints.length > 0 && (
         <section className="mt-4">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">Checkpoint notes</div>
+          <div className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">Checkpoint notes</div>
           <ul className="mt-1 flex flex-col gap-1.5">
             {checkpoints.map((c) => (
               <li key={c.step} className="flex items-center gap-2">
-                <span className="w-12 shrink-0 text-right text-[0.625rem] tabular-nums text-content-muted">
+                <span className="w-12 shrink-0 text-right text-2xs tabular-nums text-content-muted">
                   {c.step >= 1000 && c.step % 1000 === 0 ? `${c.step / 1000}k` : c.step}
                 </span>
                 <input
@@ -189,21 +189,21 @@ export default function LineageDetailPanel({ node, onClose, onNodeChanged, onNod
             className="w-full rounded-md border border-rose-500/40 bg-rose-600/10 px-2 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-600/20 disabled:opacity-50">
             {deleting ? 'Removing…' : 'Remove this run'}
           </button>
-          <p className="mt-1 text-[0.625rem] leading-snug text-content-subtle">
+          <p className="mt-1 text-2xs leading-snug text-content-subtle">
             No checkpoints left on disk. No LoRA file is deleted.
           </p>
           {/* The same truth as the confirmation, visible before clicking. Wraps
               instead of scrolling sideways so it stays readable in the narrow
               drawer of a phone. */}
           {runDeletionLosses(impact).length > 0 && (
-            <ul className="mt-1 space-y-0.5 break-words text-[0.625rem] leading-snug text-content-subtle">
+            <ul className="mt-1 space-y-0.5 break-words text-2xs leading-snug text-content-subtle">
               {runDeletionLosses(impact).map((line) => (
                 <li key={line}>• {line}</li>
               ))}
             </ul>
           )}
           {runDeletionKeeps(impact).map((line) => (
-            <p key={line} className="mt-1 break-words text-[0.625rem] leading-snug text-content-subtle">
+            <p key={line} className="mt-1 break-words text-2xs leading-snug text-content-subtle">
               {line}
             </p>
           ))}

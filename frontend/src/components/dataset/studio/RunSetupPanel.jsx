@@ -262,7 +262,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
             fmt={fmt}
           />
           {modelError && (
-            <p className="m-0 text-[0.6875rem] text-amber-200" role="alert">
+            <p className="m-0 text-2xs text-amber-200" role="alert">
               {modelError}{' '}
               {!d.generation_readiness?.config_error && d.z_models?.length > 0 && (
                 <button type="button" onClick={form.resetModels} className="underline">
@@ -321,7 +321,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
               disabled button shows no tooltip on a phone, and "why can't I
               launch" must not depend on hovering. */}
           {launchHint && launchBlocked && (
-            <p className="m-0 text-[0.6875rem] text-amber-200" role="status">
+            <p className="m-0 text-2xs text-amber-200" role="status">
               {launchHint}
             </p>
           )}
@@ -331,7 +331,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
            */}
           {cost.heavy && (
             <p data-testid="heavy-run-notice"
-              className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-[0.6875rem] text-amber-200"
+              className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-2xs text-amber-200"
               role="status">
               <span aria-hidden>⏱</span> {heavyRunNotice(cost)}
             </p>

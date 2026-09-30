@@ -162,7 +162,7 @@ function FullTransformerAdvancedRecipe({ stepsOverride, setStepsOverride, disabl
   const factClass = 'rounded-lg border border-sky-400/20 bg-app/45 px-2.5 py-2';
   return (
     <section aria-label="Locked Krea 2 full-model recipe"
-      className="rounded-xl border border-sky-400/35 bg-sky-500/[0.07] p-3 text-[0.75rem]">
+      className="rounded-xl border border-sky-400/35 bg-sky-500/[0.07] p-3 text-xs">
       <div className="flex flex-col gap-1">
         <span className="font-semibold text-sky-100">Recipe sent to AI Toolkit</span>
         <span className="text-sky-200/85 leading-relaxed">
@@ -173,27 +173,27 @@ function FullTransformerAdvancedRecipe({ stepsOverride, setStepsOverride, disabl
 
       <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div className={factClass}>
-          <dt className="text-content-subtle text-[0.625rem] uppercase">Model</dt>
+          <dt className="text-content-subtle text-2xs uppercase">Model</dt>
           <dd className="m-0 mt-0.5 text-content">Official Krea 2 Raw · full transformer · unquantized</dd>
         </div>
         <div className={factClass}>
-          <dt className="text-content-subtle text-[0.625rem] uppercase">Compute</dt>
+          <dt className="text-content-subtle text-2xs uppercase">Compute</dt>
           <dd className="m-0 mt-0.5 text-content">1024 px · batch 1 · bf16</dd>
         </div>
         <div className={factClass}>
-          <dt className="text-content-subtle text-[0.625rem] uppercase">Optimization</dt>
+          <dt className="text-content-subtle text-2xs uppercase">Optimization</dt>
           <dd className="m-0 mt-0.5 text-content">Adafactor · learning rate 1e-6</dd>
         </div>
         <div className={factClass}>
-          <dt className="text-content-subtle text-[0.625rem] uppercase">Memory</dt>
+          <dt className="text-content-subtle text-2xs uppercase">Memory</dt>
           <dd className="m-0 mt-0.5 text-content">Gradient checkpointing · cached latents + text embeddings</dd>
         </div>
         <div className={factClass}>
-          <dt className="text-content-subtle text-[0.625rem] uppercase">Checkpoints</dt>
+          <dt className="text-content-subtle text-2xs uppercase">Checkpoints</dt>
           <dd className="m-0 mt-0.5 text-content">Checkpoint + preview every 250 steps · keep 1 checkpoint</dd>
         </div>
         <div className={factClass}>
-          <dt className="text-content-subtle text-[0.625rem] uppercase">Cloud requirements</dt>
+          <dt className="text-content-subtle text-2xs uppercase">Cloud requirements</dt>
           <dd className="m-0 mt-0.5 text-content">80 GB VRAM GPU · at least 200 GB disk</dd>
         </div>
       </dl>
@@ -209,7 +209,7 @@ function FullTransformerAdvancedRecipe({ stepsOverride, setStepsOverride, disabl
         <span className="text-sky-100/80">
           {explicitSteps ? `${explicitSteps} target steps` : 'empty = server-calculated adaptive target'}
         </span>
-        <span className="basis-full text-sky-200/70 text-[0.6875rem]">
+        <span className="basis-full text-sky-200/70 text-2xs">
           The only editable setting in this full-model recipe.
         </span>
       </label>
@@ -1705,21 +1705,21 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           <GraduationCap aria-hidden="true" className="h-4 w-4" /> {fullMode ? 'Full-model training' : 'LoRA Training'} ({typeLabel})
         </span>
         {!status.installed && (
-          <span className="text-amber-300 text-[0.6875rem]">ai-toolkit not ready — point to its Python (its venv/Scripts/python.exe) in Settings › Local tools</span>
+          <span className="text-amber-300 text-2xs">ai-toolkit not ready — point to its Python (its venv/Scripts/python.exe) in Settings › Local tools</span>
         )}
         {status.in_progress
           ? <span className="ml-auto flex items-center gap-2">
-              <span aria-live="polite" className="text-indigo-300 text-[0.6875rem]">
+              <span aria-live="polite" className="text-indigo-300 text-2xs">
                 <span aria-hidden>⏳</span> {status.current?.name ? `“${status.current.name}” running` : 'running'} — ComfyUI paused
               </span>
               {/* Full progress bar, loss curve and samples live on the Runs hub —
                   this panel's own TrainingProgress only covers THIS dataset. */}
               <Link to="/cloud" title="Open the Runs page — full progress, loss curve and samples"
-                className="min-h-10 lg:min-h-0 inline-flex items-center px-1 py-0.5 text-indigo-300 hover:text-indigo-200 text-[0.6875rem] font-medium underline decoration-indigo-300/40">
+                className="min-h-10 lg:min-h-0 inline-flex items-center px-1 py-0.5 text-indigo-300 hover:text-indigo-200 text-2xs font-medium underline decoration-indigo-300/40">
                 View in Runs ↗
               </Link>
             </span>
-          : <span aria-live="polite" className="ml-auto text-content-subtle text-[0.6875rem]">{keptCount} image(s) kept</span>}
+          : <span aria-live="polite" className="ml-auto text-content-subtle text-2xs">{keptCount} image(s) kept</span>}
       </div>
 
       <div className="contents" ref={setCloudProgressHost} />
@@ -1732,7 +1732,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       {status.error && (!status.error.dataset_id || status.error.dataset_id === ds.currentId) && (() => {
         const view = failureView(status.error);
         return (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-200 text-[0.6875rem]">
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-200 text-2xs">
           <div className="font-semibold">⚠ {view.title}</div>
           {/* WHICH Python ai-toolkit was run with. A path that exists and runs but
               has no torch passes every folder check, so the run dies on
@@ -1745,7 +1745,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             <div className="mt-1.5 rounded border border-amber-400/40 bg-amber-500/10 p-2 text-amber-100">
               <div className="font-semibold">{view.interpreter.title}</div>
               <p className="m-0 mt-0.5 break-words text-amber-200/90">{view.interpreter.message}</p>
-              <div className="mt-1 break-all font-mono text-[0.625rem] text-amber-100">
+              <div className="mt-1 break-all font-mono text-2xs text-amber-100">
                 {view.interpreter.python}
               </div>
               <a href="#/settings/local-tools?focus=aitoolkit-python"
@@ -1772,7 +1772,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {view.gpuArch.command && (
                 <>
                   <div className="mt-1 text-amber-200/80">Run this once, then Train again:</div>
-                  <pre className="mt-0.5 overflow-x-auto whitespace-pre-wrap break-all rounded bg-black/40 p-1.5 font-mono text-[0.625rem] text-amber-100">
+                  <pre className="mt-0.5 overflow-x-auto whitespace-pre-wrap break-all rounded bg-black/40 p-1.5 font-mono text-2xs text-amber-100">
                     {view.gpuArch.command}
                   </pre>
                 </>
@@ -1804,7 +1804,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </div>
           )}
           {view.excerpt && (
-            <pre className={`mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-1.5 font-mono text-[0.625rem] ${
+            <pre className={`mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-black/30 p-1.5 font-mono text-2xs ${
               view.tone === 'error' ? 'text-red-300/90' : 'text-content-muted'}`}>
               {view.excerpt}
             </pre>
@@ -1820,7 +1820,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               onClick={() => postTrain(`/api/dataset/${ds.currentId}/train/open-folder`,
                 { target: 'run' })}
               title="Open the folder of the run that just failed — training.log is in it"
-              className="shrink-0 px-2 py-1 rounded-lg bg-red-500/20 border border-red-400/40 text-red-100 text-[0.6875rem] font-semibold">
+              className="shrink-0 px-2 py-1 rounded-lg bg-red-500/20 border border-red-400/40 text-red-100 text-2xs font-semibold">
               <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Open run folder
             </button>
             <span className="min-w-0 text-red-300/80">{view.note}</span>
@@ -1844,7 +1844,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
        * scheduling stay in Advanced options below, collapsed by default but one click away.
        */}
       <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2">
-        <span className="text-content-muted text-[0.625rem] uppercase">Model family</span>
+        <span className="text-content-muted text-2xs uppercase">Model family</span>
         <SettingsLink section="training" focus="training-default-family" className="order-last ml-auto">
           Training defaults
         </SettingsLink>
@@ -1980,7 +1980,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
          * Readable summary of the next run's configuration; the editable settings live in Advanced
          * options.
          */}
-        <span className="ml-auto text-content-subtle text-[0.625rem]"
+        <span className="ml-auto text-content-subtle text-2xs"
           title="The configuration the next run will use — change it in Advanced options below">
           {fullMode ? (
             <>Full model · official Krea 2 Raw · cloud · {stepsOverride.trim() ? `${stepsN} steps` : 'adaptive steps'}</>
@@ -1996,7 +1996,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           dataset (one shared column). The run ignores it — say so, once, rather
           than let the summary above advertise weights nobody will load. */}
       {baseInfo?.base_family_mismatch && (
-        <p className="m-0 mt-1 text-amber-300 text-[0.6875rem]">
+        <p className="m-0 mt-1 text-amber-300 text-2xs">
           ⚠ {baseInfo.base_family_mismatch}
         </p>
       )}
@@ -2011,20 +2011,20 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         sliderOn ? 'border-purple-400/50 bg-purple-500/5' : 'border-border bg-surface'}`}>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-content"><SlidersHorizontal aria-hidden="true" className="h-4 w-4" /> Slider LoRA</span>
-          <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-[0.625rem] font-semibold uppercase tracking-wide">Beta</span>
+          <span className="px-1.5 py-0.5 rounded border border-amber-400/50 bg-amber-500/10 text-amber-300 text-2xs font-semibold uppercase tracking-wide">Beta</span>
           <button type="button" role="switch" aria-checked={sliderOn}
             disabled={sliderBusy || status.in_progress}
             onClick={toggleSliderMode}
             title={status.in_progress ? 'Wait for the current training to finish'
               : sliderOn ? 'Turn slider mode off — back to normal LoRA training'
                 : 'Turn slider mode on for this dataset'}
-            className={`ml-auto px-2.5 py-1 rounded-lg border text-[0.75rem] font-semibold transition-colors disabled:opacity-50 ${
+            className={`ml-auto px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${
               sliderOn ? 'border-purple-400/60 bg-purple-500/20 text-purple-200'
                 : 'border-border bg-surface text-content-muted'}`}>
             {sliderOn ? 'ON' : 'OFF'}
           </button>
         </div>
-        <p className="m-0 text-content-subtle text-[0.6875rem]">
+        <p className="m-0 text-content-subtle text-2xs">
           Trains a <b>bipolar concept slider</b> from a prompt pair (no captions, no masks —
           the kept images are only a denoising substrate). Test it at negative and positive
           strengths in the Test Studio. Experimental: expect to iterate.
@@ -2033,76 +2033,76 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           <>
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex flex-col gap-1">
-                <span className="text-content-muted text-[0.625rem] uppercase">Positive prompt *</span>
+                <span className="text-content-muted text-2xs uppercase">Positive prompt *</span>
                 <input type="text" value={sliderDraft.positive}
                   onChange={(e) => setSliderDraft((d) => ({ ...d, positive: e.target.value }))}
                   onBlur={saveSliderField('positive')}
                   placeholder="e.g. very muscular body, defined muscles"
                   title="What +strength amplifies (and −strength removes). Describe the EXTREME of the trait."
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-content-muted text-[0.625rem] uppercase">Negative prompt *</span>
+                <span className="text-content-muted text-2xs uppercase">Negative prompt *</span>
                 <input type="text" value={sliderDraft.negative}
                   onChange={(e) => setSliderDraft((d) => ({ ...d, negative: e.target.value }))}
                   onBlur={saveSliderField('negative')}
                   placeholder="e.g. skinny, frail body, thin arms"
                   title="The polar opposite of the positive prompt — what −strength amplifies."
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-content-muted text-[0.625rem] uppercase">Target class</span>
+                <span className="text-content-muted text-2xs uppercase">Target class</span>
                 <input type="text" value={sliderDraft.target_class}
                   onChange={(e) => setSliderDraft((d) => ({ ...d, target_class: e.target.value }))}
                   onBlur={saveSliderField('target_class')}
                   placeholder="e.g. person — empty affects everything"
                   title="The base concept whose representation slides (e.g. 'person'). Leave empty for a global slider (detail, lighting…)."
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-content-muted text-[0.625rem] uppercase">Anchor prompt</span>
+                <span className="text-content-muted text-2xs uppercase">Anchor prompt</span>
                 <input type="text" value={sliderDraft.anchor}
                   onChange={(e) => setSliderDraft((d) => ({ ...d, anchor: e.target.value }))}
                   onBlur={saveSliderField('anchor')}
                   placeholder="optional — e.g. a photo of a person"
                   title="A nearby concept held in place while training — the paper's fix against the slider bleeding into everything. Empty = no anchor (faster, less protected)."
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
               </label>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              <label className="flex items-center gap-1.5 text-[0.6875rem] text-content-muted"
+              <label className="flex items-center gap-1.5 text-2xs text-content-muted"
                 title="How hard the training pushes along the positive↔negative direction (trainer default 3). Higher = stronger effect per strength unit, higher collapse risk.">
                 Guidance strength
                 <select value={String(slider?.guidance ?? 3)} disabled={sliderBusy}
                   onChange={(e) => saveSlider({ guidance: Number(e.target.value) })}
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   {[1, 2, 3, 4, 5, 6, 8].map((v) => (
                     <option key={v} value={String(v)}>{v}{v === 3 ? ' (default)' : ''}</option>
                   ))}
                 </select>
               </label>
-              <label className="flex items-center gap-1.5 text-[0.6875rem] text-content-muted"
+              <label className="flex items-center gap-1.5 text-2xs text-content-muted"
                 title="Weight of the anchor loss (trainer default 1). Only used when an anchor prompt is set.">
                 Anchor strength
                 <select value={String(slider?.anchor_strength ?? 1)} disabled={sliderBusy || !(slider?.anchor || '').trim()}
                   onChange={(e) => saveSlider({ anchor_strength: Number(e.target.value) })}
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-50">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs disabled:opacity-50">
                   {[0.25, 0.5, 1, 2, 4].map((v) => (
                     <option key={v} value={String(v)}>{v}{v === 1 ? ' (default)' : ''}</option>
                   ))}
                 </select>
               </label>
-              <span className="text-content-subtle text-[0.625rem]"
+              <span className="text-content-subtle text-2xs"
                 title="Slider defaults: low rank (public sliders ship at rank 4-8) and a fixed step target — both editable in Advanced options.">
                 rank {advEffRank} · ~{stepsInfo?.steps ?? 1000} steps · previews at −2/−1/+1/+2
               </span>
             </div>
             {sliderPromptsMissing && (
-              <p className="m-0 text-amber-300 text-[0.6875rem]">
+              <p className="m-0 text-amber-300 text-2xs">
                 ⚠ Both prompts are required — they define the two ends of the slider.
               </p>
             )}
-            <p className="m-0 text-content-subtle text-[0.625rem]">
+            <p className="m-0 text-content-subtle text-2xs">
               {SLIDER_FAMILY_NOTES[trainType] || ''}
               {trainType !== 'krea' ? ' Krea 2 is the reference family for sliders — switch the LoRA type above to start there.' : ''}
             </p>
@@ -2117,7 +2117,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           launch failure. See animeFamilyNote.js — it also keeps quiet when this
           machine cannot run Anima at all. */}
       {animeNote && (
-        <p className="m-0 text-sky-300/90 text-[0.6875rem]">
+        <p className="m-0 text-sky-300/90 text-2xs">
           ℹ {animeNote}
         </p>
       )}
@@ -2129,7 +2129,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
        * is not hidden.
        */}
       {(baseBlocksTrain || sdxlNeedsBase) && (
-        <p className="m-0 text-amber-300 text-[0.6875rem]">
+        <p className="m-0 text-amber-300 text-2xs">
           ⚠ {baseNotTrainable
             ? 'The selected base cannot be loaded for training — open Advanced options below to pick another one.'
             : sdxlNeedsBase
@@ -2148,14 +2148,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {fullMode ? (
             <>
               ⚙️ Locked full-model recipe · steps
-              <span className="ml-2 font-normal text-sky-200/80 text-[0.6875rem]">
+              <span className="ml-2 font-normal text-sky-200/80 text-2xs">
                 Krea 2 Raw · 1024 · cloud
               </span>
             </>
           ) : (
             <>
               ⚙️ Advanced options
-              <span className="ml-2 font-normal text-content-subtle text-[0.6875rem]">
+              <span className="ml-2 font-normal text-content-subtle text-2xs">
                 base &amp; variant · rank · resolution · masked · steps · scheduling · presets
               </span>
             </>
@@ -2177,10 +2177,10 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            * compatibility.
            */}
           <div className="flex items-center gap-1.5 flex-wrap rounded-lg border border-border bg-app/40 px-2 py-1.5">
-            <span className="text-content-muted text-[0.625rem] uppercase">Presets</span>
+            <span className="text-content-muted text-2xs uppercase">Presets</span>
             <select value={presetSel} onChange={(e) => setPresetSel(e.target.value)}
               aria-label="Training preset"
-              className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] max-w-[220px]">
+              className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs max-w-[220px]">
               <option value="">— pick a preset —</option>
               {/* Built-ins are read-only and versioned with the app. Evidence-backed
                   recipes and source-labelled community starters stay visibly separate;
@@ -2214,29 +2214,29 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             <button type="button" onClick={applyPreset}
               disabled={!selPreset || presetBusy || trainTypeBusy}
               title="Replace this dataset's advanced settings with the selected preset"
-              className="px-2.5 py-1 rounded-lg bg-primary/20 border border-primary/40 text-white text-[0.75rem] font-semibold disabled:opacity-40">
+              className="px-2.5 py-1 rounded-lg bg-primary/20 border border-primary/40 text-white text-xs font-semibold disabled:opacity-40">
               Apply
             </button>
             <span className="mx-0.5 text-content-subtle" aria-hidden>·</span>
             <button type="button" onClick={savePreset} disabled={presetBusy || trainTypeBusy}
               title="Save this dataset's current advanced settings as a named preset"
-              className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-[0.75rem] disabled:opacity-40">
+              className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs disabled:opacity-40">
               <Save aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Save current…
             </button>
             <button type="button" onClick={() => presetFileRef.current?.click()}
               disabled={presetBusy || trainTypeBusy}
               title="Import a preset from a JSON file (exported from any app version — unknown options are ignored at apply time)"
-              className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-[0.75rem] disabled:opacity-40">
+              className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs disabled:opacity-40">
               ⬆ Import
             </button>
             <button type="button" onClick={exportPreset} disabled={!selPreset || presetBusy}
               title="Download the selected preset as a shareable JSON file"
-              className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-[0.75rem] disabled:opacity-40">
+              className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs disabled:opacity-40">
               ⬇ Export
             </button>
             <button type="button" onClick={deletePreset} disabled={!selPreset || selPreset.builtin || presetBusy}
               title={selPreset?.builtin ? 'Built-in presets ship with the app and cannot be deleted' : 'Delete the selected preset'}
-              className="px-2 py-1 rounded-lg bg-red-500/15 border border-red-500/40 text-red-300 text-[0.75rem] disabled:opacity-40">
+              className="px-2 py-1 rounded-lg bg-red-500/15 border border-red-500/40 text-red-300 text-xs disabled:opacity-40">
               <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
             </button>
             <input ref={presetFileRef} type="file" accept=".json,application/json" className="hidden"
@@ -2246,7 +2246,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 e.target.value = '';
               }} />
             {selPreset && (
-              <span role="status" className="basis-full text-content-subtle text-[0.625rem] leading-relaxed">
+              <span role="status" className="basis-full text-content-subtle text-2xs leading-relaxed">
                 {selPreset.builtin
                   ? selPreset.community
                     ? '◌ reported community starting point — not a result guarantee'
@@ -2267,7 +2267,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-content-muted text-[0.625rem] uppercase">
+              <span className="text-content-muted text-2xs uppercase">
                 Base{status.in_progress ? ' (next queued job)' : ''}
               </span>
               <select value={customBase ? CUSTOM_BASE_SENTINEL : base}
@@ -2278,7 +2278,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 }}
                 disabled={trainingModeBusy}
                 aria-label="Base model"
-                className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] max-w-[230px]">
+                className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs max-w-[230px]">
                 {(currentBases.length ? currentBases
                   : [{ value: '', label: trainType === 'sdxl' ? (comfyConfigured ? 'No SDXL checkpoint found' : 'ComfyUI not configured') : trainType === 'krea' ? 'Official — Krea 2' : trainType === 'flux' ? 'Official — FLUX.1-dev' : trainType === 'flux2klein' ? 'Official — FLUX.2 Klein' : trainType === 'anima' ? 'Official — Anima' : trainType === 'qwenimage21' ? 'Official — Qwen-Image 2.1' : 'Official — Z-Image-Turbo' }]).map((b) => (
                   <option key={b.value} value={b.value}>
@@ -2298,7 +2298,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   disabled={trainingModeBusy}
                   aria-label="Z-Image training recipe"
                   title="Z-Image training recipe — Turbo requires the v2 training adapter; Base and De-Turbo use separate non-distilled repositories without that adapter."
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   <option value="turbo">Turbo · adapter v2</option>
                   <option value="base">Base · non-distilled</option>
                   <option value="deturbo">De-Turbo · no adapter</option>
@@ -2314,7 +2314,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   disabled={trainingModeBusy}
                   aria-label="Krea 2 training base"
                   title="Krea 2 training base — Raw is the official recommendation (best quality; the LoRA transfers to Turbo at inference). Turbo+adapter is the VRAM-friendly alternative. First Raw training downloads the Raw weights (~24 GB) and runs longer."
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   <option value="base">Raw (recommended)</option>
                   <option value="turbo">Turbo (w/ adapter)</option>
                 </select>
@@ -2327,7 +2327,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   disabled={trainingModeBusy}
                   aria-label="FLUX.2 Klein model size"
                   title="FLUX.2 Klein model size — 4B fits a 16-24 GB local GPU (recommended); 9B needs 32-48 GB VRAM. Both bases are gated on Hugging Face: accept the license and set a HF token before the first run."
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   <option value="4b">4B (16-24 GB)</option>
                   <option value="9b">9B (32-48 GB)</option>
                 </select>
@@ -2342,7 +2342,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             {baseNote && (
               <div
                 aria-label="Selected base precision"
-                className={`flex flex-col gap-1 rounded-md border px-2.5 py-2 text-[0.6875rem] leading-relaxed ${
+                className={`flex flex-col gap-1 rounded-md border px-2.5 py-2 text-2xs leading-relaxed ${
                   baseNote.level === 'error'
                     ? 'border-rose-400/40 bg-rose-500/[0.08] text-rose-200'
                     : 'border-amber-400/40 bg-amber-500/[0.08] text-amber-200'}`}>
@@ -2355,7 +2355,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               </div>
             )}
             {zimageRecipe && (
-              <div className="flex flex-col gap-1 rounded-md border border-sky-400/30 bg-sky-500/[0.08] px-2.5 py-2 text-[0.6875rem]"
+              <div className="flex flex-col gap-1 rounded-md border border-sky-400/30 bg-sky-500/[0.08] px-2.5 py-2 text-2xs"
                 aria-label="Effective Z-Image training recipe">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sky-200 font-semibold">Effective Z-Image recipe</span>
@@ -2395,8 +2395,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     ? 'C:\\path\\to\\your-sdxl-checkpoint.safetensors'
                     : `C:\\path\\to\\your-${typeLabel.toLowerCase().replace(/[^a-z0-9]+/g, '')}-model.safetensors`}
                   aria-label="Custom weights path"
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] font-mono w-full max-w-[520px]" />
-                <span className="text-content-subtle text-[0.625rem] leading-relaxed">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs font-mono w-full max-w-[520px]" />
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   Local path to a <b className="text-content-muted font-medium">{typeLabel}</b> .safetensors
                   (same architecture). The file is checked at launch (exists, valid, arch signature);
                   an unrecognized file asks for confirmation. Local training only.
@@ -2411,59 +2411,59 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
              */}
             {!comfyConfigured && !['flux2klein', 'anima', 'qwenimage21'].includes(trainType) && (
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-amber-300 text-[0.625rem]">
+                <span className="text-amber-300 text-2xs">
                   ⚠️ ComfyUI folder not set — training bases can't be listed{trainType === 'sdxl' ? '' : trainType === 'krea' ? ' (the official Krea 2 base still works)' : ' (the official Z-Image base still works)'}.
                 </span>
                 <a href="#/setup"
-                  className="px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-[0.6875rem] font-semibold">
+                  className="px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-2xs font-semibold">
                   Point the app at ComfyUI →
                 </a>
               </div>
             )}
             {needsConversion && !baseConverted && !convertRunning && (
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-amber-300 text-[0.625rem]">⚠ Base must be converted before training (~12 GB, a few min, one time only).</span>
+                <span className="text-amber-300 text-2xs">⚠ Base must be converted before training (~12 GB, a few min, one time only).</span>
                 <button type="button" onClick={doPrepareBase}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-[0.6875rem] font-semibold">
+                  className="px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-2xs font-semibold">
                   ⚙️ Convert the base
                 </button>
               </div>
             )}
             {convertRunning && (
-              <span className="text-indigo-300 text-[0.625rem] flex items-center gap-1.5">
+              <span className="text-indigo-300 text-2xs flex items-center gap-1.5">
                 <span className="inline-block w-3 h-3 border-2 border-indigo-400/40 border-t-indigo-400 rounded-full animate-spin" aria-hidden />
                 Converting the base… (~a few minutes)
               </span>
             )}
             {baseConverted && (
-              <span className="text-green-400/80 text-[0.625rem]">✓ Base ready — training will produce a LoRA native to this model.</span>
+              <span className="text-green-400/80 text-2xs">✓ Base ready — training will produce a LoRA native to this model.</span>
             )}
             {convertError && (
-              <span className="text-red-300 text-[0.625rem] break-words">❌ Conversion failed: {convertError}</span>
+              <span className="text-red-300 text-2xs break-words">❌ Conversion failed: {convertError}</span>
             )}
             {/* SDXL-only: separate VAE / text-encoder overrides. SDXL is the one
                 family where ai-toolkit honours these top-level (every other family
                 bundles its TE/VAE) — the server refuses them elsewhere. Optional. */}
             {vaeTeSupported && (
               <div className="flex flex-col gap-1.5 mt-1 pt-2 border-t border-white/[0.07]">
-                <span className="text-content-muted text-[0.625rem] uppercase">
+                <span className="text-content-muted text-2xs uppercase">
                   SDXL overrides (optional)
                 </span>
                 <label className="flex flex-col gap-0.5">
-                  <span className="text-content text-[0.6875rem]">VAE path</span>
+                  <span className="text-content text-2xs">VAE path</span>
                   <input type="text" value={vaePath} onChange={(e) => setVaePath(e.target.value)}
                     spellCheck={false} placeholder="leave empty to use the checkpoint's own VAE"
                     aria-label="SDXL VAE path"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] font-mono w-full max-w-[520px]" />
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs font-mono w-full max-w-[520px]" />
                 </label>
                 <label className="flex flex-col gap-0.5">
-                  <span className="text-content text-[0.6875rem]">Text encoder path or repo</span>
+                  <span className="text-content text-2xs">Text encoder path or repo</span>
                   <input type="text" value={tePath} onChange={(e) => setTePath(e.target.value)}
                     spellCheck={false} placeholder="leave empty to use the checkpoint's own text encoders"
                     aria-label="SDXL text encoder path or HF repo"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] font-mono w-full max-w-[520px]" />
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs font-mono w-full max-w-[520px]" />
                 </label>
-                <span className="text-content-subtle text-[0.625rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   Leave both empty to use the checkpoint's own VAE/text encoders. A VAE is a local
                   .safetensors; the text encoder may be a local folder or a Hugging Face repo id.
                   Checked at launch. These are SDXL-only and for local training.
@@ -2475,24 +2475,24 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {/* Model & training knobs — researched defaults (see the Research note),
               editable per dataset. Each carries a plain-English "why / how". */}
           <div className="flex flex-col rounded-lg border border-border bg-app/30 p-2.5 divide-y divide-white/[0.07] [&>*]:py-2.5 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
-            <div className="flex items-center gap-1.5 text-indigo-300/80 text-[0.625rem] font-semibold uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-indigo-300/80 text-2xs font-semibold uppercase tracking-wider">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-indigo-400/60" /> Model &amp; training
             </div>
 
             {!fullMode && (<div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">LoRA rank</span>
+                <span className="text-content text-xs w-28 shrink-0">LoRA rank</span>
                 <select value={String(advRankChoice)}
                   onChange={(e) => saveAdv({ rank: e.target.value === 'auto' ? 'auto' : Number(e.target.value) })}
                   aria-label="LoRA rank"
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   <option value="auto">Auto ({advDefaultRank})</option>
                   <option value="8">8</option><option value="16">16</option><option value="24">24</option>
                   <option value="32">32</option><option value="48">48</option><option value="64">64</option>
                 </select>
-                <span className="text-content-subtle text-[0.625rem] tabular-nums">→ rank {advEffRank} / alpha {advEffAlpha}</span>
+                <span className="text-content-subtle text-2xs tabular-nums">→ rank {advEffRank} / alpha {advEffAlpha}</span>
               </div>
-              <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 <b className="text-content-muted font-medium">Why:</b> how much capacity the LoRA has to learn the
                 target — identity, concept, or visual style. <b className="text-content-muted font-medium">How:</b> use
                 Auto or the researched preset for this family; higher ranks can capture broader, more complex variation
@@ -2502,16 +2502,16 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Resolution</span>
+                <span className="text-content text-xs w-28 shrink-0">Resolution</span>
                 <select value={advRes} onChange={(e) => saveAdv({ resolution: e.target.value })}
                   aria-label="Training resolution"
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   <option value="768,1024">768 + 1024 (multi-scale)</option>
                   <option value="1024">1024 only</option>
                   <option value="768">768 only (low VRAM)</option>
                 </select>
               </div>
-              <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 <b className="text-content-muted font-medium">Why:</b> the size(s) images are trained at — and the #1
                 VRAM lever. <b className="text-content-muted font-medium">How:</b> multi-scale trains at two sizes so
                 the LoRA holds up from a close-up face to a full-body shot; single 1024 is a bit faster.
@@ -2529,16 +2529,16 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Save checkpoint</span>
+                <span className="text-content text-xs w-28 shrink-0">Save checkpoint</span>
                 <select value={String(advSave)} onChange={(e) => saveAdv({ save_every: Number(e.target.value) })}
                   aria-label="Checkpoint frequency"
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   <option value="250">every 250 steps</option>
                   <option value="500">every 500 steps</option>
                   <option value="1000">every 1000 steps</option>
                 </select>
               </div>
-              <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 <b className="text-content-muted font-medium">Why:</b> how often a checkpoint is written.
                 <b className="text-content-muted font-medium"> How:</b> finer (250) gives more epochs to pick the
                 least-overfit one in the Test Studio; coarser saves disk.
@@ -2547,11 +2547,11 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Saves kept</span>
+                <span className="text-content text-xs w-28 shrink-0">Saves kept</span>
                 <select value={String(adv?.max_step_saves ?? 4)}
                   onChange={(e) => saveAdv({ max_step_saves: Number(e.target.value) })}
                   aria-label="Maximum intermediate saves kept"
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   <option value="2">last 2</option>
                   <option value="3">last 3</option>
                   <option value="4">last 4</option>
@@ -2559,7 +2559,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   <option value="10">last 10</option>
                 </select>
               </div>
-              <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 <b className="text-content-muted font-medium">Why:</b> older intermediate saves are deleted by
                 ai-toolkit itself (local and cloud) past this count — the old default of 10 piled up ~10 GB per
                 Krea run. <b className="text-content-muted font-medium">How:</b> 4 is plenty to pick the best
@@ -2569,10 +2569,10 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Preview every</span>
+                <span className="text-content text-xs w-28 shrink-0">Preview every</span>
                 <select value={String(advSampleEvery)} onChange={(e) => saveAdv({ sample_every: Number(e.target.value) })}
                   aria-label="Preview sample frequency"
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                   {advSampleEveryChoices.map((n) => (
                     <option key={n} value={String(n)}>every {n} steps</option>
                   ))}
@@ -2581,7 +2581,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
               <div className="flex flex-col gap-0.5 mt-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">Preview quality</span>
+                  <span className="text-content text-xs w-28 shrink-0">Preview quality</span>
                   <label className="flex items-center gap-1.5">
                     <input type="number" min={advSampleStepsRange[0]} max={advSampleStepsRange[1]} step="1"
                       value={sampleStepsDraft}
@@ -2590,8 +2590,8 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                       placeholder={String(advSampleStepsDefault)}
                       aria-label="Preview steps"
-                      className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
-                    <span className="text-content-muted text-[0.6875rem]">steps</span>
+                      className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
+                    <span className="text-content-muted text-2xs">steps</span>
                   </label>
                   <label className="flex items-center gap-1.5">
                     <input type="number" min={advSampleGuidanceRange[0]} max={advSampleGuidanceRange[1]} step="0.5"
@@ -2601,18 +2601,18 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                       placeholder={String(advSampleGuidanceDefault)}
                       aria-label="Preview guidance scale"
-                      className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
-                    <span className="text-content-muted text-[0.6875rem]">CFG</span>
+                      className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
+                    <span className="text-content-muted text-2xs">CFG</span>
                   </label>
                   {advSampleQualityOverridden && (
                     <button type="button"
                       onClick={() => saveAdv({ sample_steps: null, sample_guidance: null })}
-                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content-muted text-[0.6875rem] hover:text-content">
+                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content-muted text-2xs hover:text-content">
                       Auto
                     </button>
                   )}
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> previews only — this never touches the
                   weights. Leave both empty to follow {advFamilyLabel} ({advSampleStepsDefault} steps, CFG{' '}
                   {advSampleGuidanceDefault}); the default follows the base you picked, and a distilled one wants
@@ -2622,21 +2622,21 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 </span>
               </div>
               <label className="flex flex-col gap-1 mt-1">
-                <span className="text-content text-[0.75rem]">Preview prompts</span>
+                <span className="text-content text-xs">Preview prompts</span>
                 <textarea value={samplePromptsText}
                   onChange={(e) => setSamplePromptsText(e.target.value)}
                   onBlur={saveSamplePrompts}
                   rows={4}
                   placeholder={advSampleDefault.length ? advSampleDefault.join('\n') : 'one prompt per line'}
                   aria-label="Preview sample prompts, one per line"
-                  className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content text-[0.75rem] font-mono leading-relaxed resize-y placeholder:text-content-subtle" />
+                  className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content text-xs font-mono leading-relaxed resize-y placeholder:text-content-subtle" />
               </label>
               <div className="flex items-center gap-1.5 mt-1">
                 <UseDatasetCaptionsButton images={datasetImages} max={advMaxPrompts}
                   onPick={applySamplePrompts} />
                 <HelpBadge topic="training.sample_prompts_from_dataset" />
               </div>
-              <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 <b className="text-content-muted font-medium">Why:</b> these are the test images ai-toolkit renders
                 during the run so you can watch the LoRA learn (and later pick the best epoch).
                 <b className="text-content-muted font-medium"> How:</b> one prompt per line, up to {advMaxPrompts}. {isStyle
@@ -2651,7 +2651,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {/* Expert — last-mile levers. Collapsed by default; every control defaults
               to the current behaviour, so a newcomer who never opens this is unaffected. */}
           {!fullMode && (<details className="group rounded-lg border border-indigo-400/40 border-l-[3px] border-l-indigo-400 bg-indigo-500/[0.14] transition-colors hover:bg-indigo-500/20">
-            <summary className="flex items-center gap-2 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden px-2.5 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-indigo-100 hover:text-white">
+            <summary className="flex items-center gap-2 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden px-2.5 py-2.5 text-2xs font-semibold uppercase tracking-wider text-indigo-100 hover:text-white">
               <span aria-hidden className="text-indigo-300 transition-transform group-open:rotate-90">▸</span>
               <Microscope aria-hidden="true" className="h-3.5 w-3.5" />
               <span>Expert — last-mile levers</span>
@@ -2663,31 +2663,31 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   mirrors the timestep pattern for a future family that can't run it. */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">Network</span>
+                  <span className="text-content text-xs w-28 shrink-0">Network</span>
                   <select value={advNetworkType} onChange={(e) => saveAdv({ network_type: e.target.value })}
                     aria-label="Network type"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                     {advNetworkChoices.map((n) => <option key={n} value={n}>{n === 'lora' ? 'LoRA (default)' : 'LoKr'}</option>)}
                   </select>
                   {advNetworkType === 'lokr' && !advNetworkSupported && (
-                    <span className="text-amber-300 text-[0.625rem]" title={`LoKr isn't supported for ${trainType} — this run would fall back to LoRA.`}>⚠ not supported for {trainType}</span>
+                    <span className="text-amber-300 text-2xs" title={`LoKr isn't supported for ${trainType} — this run would fall back to LoRA.`}>⚠ not supported for {trainType}</span>
                   )}
                 </div>
                 {advNetworkType === 'lokr' && (
                   <div className="flex items-center gap-2 flex-wrap mt-1">
-                    <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+                    <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
                       LoKr factor<HelpBadge topic="training.lokr_factor" />
                     </span>
                     <select value={advLokrFactor == null ? 'auto' : String(advLokrFactor)}
                       onChange={(e) => saveAdv({ lokr_factor: e.target.value === 'auto' ? 'auto' : Number(e.target.value) })}
                       aria-label="LoKr decomposition factor"
-                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                       <option value="auto">Auto (ai-toolkit)</option>
                       {advLokrFactorChoices.map((factor) => <option key={factor} value={String(factor)}>{factor}</option>)}
                     </select>
                   </div>
                 )}
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> LoRA is the standard adapter; LoKr factorises
                   the update differently. <b className="text-content-muted font-medium">How:</b> keep LoRA unless you are
                   deliberately comparing it. The Krea Raw community starter below pins LoKr factor 16, but a network type
@@ -2700,36 +2700,36 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {advKreaRecipeSupported && (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+                    <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
                       Krea community recipe<HelpBadge topic="training.krea_community_recipe" />
                     </span>
-                    <span className="text-amber-200 text-[0.6875rem] leading-relaxed">
+                    <span className="text-amber-200 text-2xs leading-relaxed">
                       Community starting point, not a likeness promise — compare your own checkpoints.
                     </span>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-content text-[0.75rem] w-28 shrink-0">Content / style</span>
+                    <span className="text-content text-xs w-28 shrink-0">Content / style</span>
                     <select value={advContentOrStyle ?? 'auto'}
                       onChange={(e) => saveAdv({ content_or_style: e.target.value === 'auto' ? 'auto' : e.target.value })}
                       aria-label="Krea content or style balance"
-                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                       <option value="auto">Auto ({advContentOrStyleDefault})</option>
                       {advContentOrStyleChoices.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
                     </select>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <label className="flex items-center gap-2 flex-wrap cursor-pointer">
-                      <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+                      <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
                         Differential guidance<HelpBadge topic="training.krea_community_recipe" />
                       </span>
                       <input type="checkbox" checked={advDifferentialGuidance}
                         onChange={(e) => saveAdv({ do_differential_guidance: e.target.checked })}
                         aria-label="Enable Krea differential guidance"
                         className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
-                      <span className="text-content-muted text-[0.75rem]">enable</span>
+                      <span className="text-content-muted text-xs">enable</span>
                     </label>
                     <label className="flex items-center gap-2">
-                      <span className="text-content-muted text-[0.6875rem]">scale</span>
+                      <span className="text-content-muted text-2xs">scale</span>
                       <input type="number" min="0.1" max="10" step="0.1"
                         value={differentialGuidanceScaleDraft}
                         disabled={!advDifferentialGuidance}
@@ -2737,10 +2737,10 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                         onBlur={saveDifferentialGuidanceScale}
                         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                         aria-label="Krea differential guidance scale"
-                        className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:cursor-not-allowed disabled:opacity-50" />
+                        className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs disabled:cursor-not-allowed disabled:opacity-50" />
                     </label>
                   </div>
-                  <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                  <span className="text-content-subtle text-2xs leading-relaxed">
                     <b className="text-content-muted font-medium">Reported starter:</b> Balanced plus differential
                     guidance at scale 3 is what the Krea 2 Raw · LoKr likeness preset applies. Change one variable at a
                     time and keep the intermediate saves that actually work for your dataset.
@@ -2750,16 +2750,16 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {/* EMA — exponential moving average of the weights */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">EMA</span>
+                  <span className="text-content text-xs w-28 shrink-0">EMA</span>
                   <select value={String(advEma)}
                     onChange={(e) => saveAdv({ ema: e.target.value === '0' ? 'off' : Number(e.target.value) })}
                     aria-label="EMA (exponential moving average)"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                     <option value="0">Off (default)</option>
                     {advEmaChoices.map((d) => <option key={d} value={String(d)}>{d}</option>)}
                   </select>
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> exponential moving average of the weights —
                   smoother, often better checkpoints. <b className="text-content-muted font-medium">How:</b> Off by
                   default; 0.99 averages faster, 0.999 is slower and steadier. Test it as a separate variable: it is
@@ -2769,24 +2769,24 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {/* Dual captions — train each image with a long AND a short caption */}
               <div className="flex flex-col gap-0.5">
                 <label className="flex items-center gap-2 flex-wrap cursor-pointer">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+                  <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
                     Dual captions<HelpBadge topic="training.dual_captions" />
                   </span>
                   <input type="checkbox" checked={advDualCaptions}
                     onChange={(e) => saveAdv({ dual_captions: e.target.checked })}
                     aria-label="Dual long + short captions"
                     className="h-4 w-4 rounded border-border bg-surface accent-indigo-500" />
-                  <span className="text-content-muted text-[0.75rem]">long + short (local training only)</span>
+                  <span className="text-content-muted text-xs">long + short (local training only)</span>
                 </label>
                 {/* Issue #22 (1Tomber): Krea 2 / Anima cache their text embeddings, so the
                     short caption can never be encoded. Say it here rather than let the user
                     believe two wordings are training. Wraps at 400 px — no fixed width. */}
                 {advDualCaptions && !dualCaptionsSupport(trainType).supported && (
-                  <span className="text-amber-400 text-[0.6875rem] leading-relaxed">
+                  <span className="text-amber-400 text-2xs leading-relaxed">
                     Ignored here: {dualCaptionsSupport(trainType).note}
                   </span>
                 )}
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> trains each image with both a full and a brief
                   caption (text-side augmentation) so the LoRA leans less on any single wording.
                   <b className="text-content-muted font-medium"> How:</b> the short variant is derived from the long one
@@ -2812,16 +2812,16 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   default keeps an untouched-again dataset byte-identical. */}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+                  <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
                     Memory saving<HelpBadge topic="training.memory_saving" />
                   </span>
-                  <span className="text-content-subtle text-[0.6875rem]">
+                  <span className="text-content-subtle text-2xs">
                     {advMemStateLabel}
                   </span>
                   {advMemTouched && (
                     <button type="button"
                       onClick={() => saveAdv(Object.fromEntries(MEMORY_KEYS.map((k) => [k, 'auto'])))}
-                      className="ml-auto text-[0.625rem] text-content-subtle hover:text-content underline underline-offset-2">
+                      className="ml-auto text-2xs text-content-subtle hover:text-content underline underline-offset-2">
                       Reset to default
                     </button>
                   )}
@@ -2833,7 +2833,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                         onChange={(e) => saveAdv(memoryPatchFor(k, e.target.checked, advMemDefault))}
                         aria-label={MEMORY_LABELS[k]}
                         className="h-4 w-4 shrink-0 rounded border-border bg-surface accent-indigo-500" />
-                      <span className="text-content-muted text-[0.75rem] truncate">{MEMORY_LABELS[k]}</span>
+                      <span className="text-content-muted text-xs truncate">{MEMORY_LABELS[k]}</span>
                     </label>
                   ))}
                 </div>
@@ -2842,12 +2842,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     off IS the default) and the family then changed. Wraps at
                     400 px: no fixed width, no truncation. */}
                 {advMemRiskLine && (
-                  <span className={`text-[0.6875rem] leading-relaxed ${
+                  <span className={`text-2xs leading-relaxed ${
                     adv?.memory_risk?.verdict === 'can_disable' ? 'text-content-muted' : 'text-amber-300'}`}>
                     {adv?.memory_risk?.verdict === 'can_disable' ? '' : '⚠ '}{advMemRiskLine}
                   </span>
                 )}
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> the recipes are tuned so a 12B model fits in
                   24 GB — quantisation costs precision and low-VRAM loading costs start-up time. If your card is
                   bigger than the target, you are paying for nothing.
@@ -2860,32 +2860,32 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   decide what it costs in memory. */}
               <div className="flex flex-col gap-1" data-testid="adv-speed">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+                  <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
                     Speed<HelpBadge topic="training.speed" />
                   </span>
-                  <span className="text-content-subtle text-[0.6875rem]">
+                  <span className="text-content-subtle text-2xs">
                     batch {advBatch}{advGradCkpt ? '' : ' · no checkpointing'}{advCompile ? ' · compiled' : ''}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-content-muted text-[0.75rem] w-28 shrink-0">Batch size</span>
+                    <span className="text-content-muted text-xs w-28 shrink-0">Batch size</span>
                     <select value={String(advBatch)}
                       onChange={(e) => saveAdv({ batch_size: Number(e.target.value) })}
                       aria-label="Training batch size"
-                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                       {advBatchChoices.map((b) => (
                         <option key={b} value={String(b)}>{b === 1 ? '1 (default)' : b}</option>
                       ))}
                     </select>
-                    <span className="text-content-subtle text-[0.625rem]">images per step</span>
+                    <span className="text-content-subtle text-2xs">images per step</span>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-content-muted text-[0.75rem] w-28 shrink-0">Quantisation</span>
+                    <span className="text-content-muted text-xs w-28 shrink-0">Quantisation</span>
                     <select value={advQtype} disabled={!advQuantOn}
                       onChange={(e) => saveAdv({ qtype: e.target.value || 'auto' })}
                       aria-label="Quantisation backend"
-                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-50">
+                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs disabled:opacity-50">
                         <option value="">Auto ({trainType === 'qwenimage21' ? 'convrot8' : 'qfloat8'})</option>
                       {advQtypeChoices.map((q) => (
                         <option key={q} value={q}>
@@ -2894,7 +2894,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       ))}
                     </select>
                     {!advQuantOn && (
-                      <span className="text-content-subtle text-[0.625rem]">quantisation is off above</span>
+                      <span className="text-content-subtle text-2xs">quantisation is off above</span>
                     )}
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer min-w-0">
@@ -2902,19 +2902,19 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       onChange={(e) => saveAdv({ gradient_checkpointing: e.target.checked })}
                       aria-label="Gradient checkpointing"
                       className="h-4 w-4 shrink-0 rounded border-border bg-surface accent-indigo-500" />
-                    <span className="text-content-muted text-[0.75rem] truncate">Gradient checkpointing</span>
+                    <span className="text-content-muted text-xs truncate">Gradient checkpointing</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer min-w-0">
                     <input type="checkbox" checked={advCompile}
                       onChange={(e) => saveAdv({ compile: e.target.checked })}
                       aria-label="Compile the model (experimental)"
                       className="h-4 w-4 shrink-0 rounded border-border bg-surface accent-indigo-500" />
-                    <span className="text-content-muted text-[0.75rem] truncate">
+                    <span className="text-content-muted text-xs truncate">
                       Compile the model <span className="text-amber-300">(experimental)</span>
                     </span>
                   </label>
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> the recipes are tuned to FIT, not to be
                   fast. Three of the four defaults here are the price of fitting a 12B model in 24 GB, and on a
                   bigger card you are paying it for nothing.
@@ -2934,17 +2934,17 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {/* Decoupled alpha */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">Alpha</span>
+                  <span className="text-content text-xs w-28 shrink-0">Alpha</span>
                   <select value={String(advAlphaChoice)}
                     onChange={(e) => saveAdv({ alpha: e.target.value === 'auto' ? 'auto' : Number(e.target.value) })}
                     aria-label="LoRA alpha"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                     <option value="auto">Auto (= {advDefaultAlpha})</option>
                     {advAlphaChoices.map((a) => <option key={a} value={String(a)}>{a}</option>)}
                   </select>
-                  <span className="text-content-subtle text-[0.625rem] tabular-nums">→ scale {(advEffAlpha / Math.max(1, advEffRank)).toFixed(2)}×</span>
+                  <span className="text-content-subtle text-2xs tabular-nums">→ scale {(advEffAlpha / Math.max(1, advEffRank)).toFixed(2)}×</span>
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> alpha ÷ rank is the LoRA&apos;s effective strength while
                   training — a soft learning-rate lever that isn&apos;t the LR. <b className="text-content-muted font-medium">How:</b> Auto
                   ties alpha to rank (scale 1.0); a lower alpha (e.g. ½ rank) softens the fit — a clean way to stop a tiny
@@ -2954,16 +2954,16 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {/* Network dropout */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">Network dropout</span>
+                  <span className="text-content text-xs w-28 shrink-0">Network dropout</span>
                   <select value={String(advDropout)}
                     onChange={(e) => saveAdv({ dropout: e.target.value === '0' ? 'off' : Number(e.target.value) })}
                     aria-label="Network dropout"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                     <option value="0">Off</option>
                     {advDropoutChoices.map((d) => <option key={d} value={String(d)}>{d}</option>)}
                   </select>
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> this is <i>network</i> dropout: it randomly drops
                   adapter updates to reduce memorisation. It is separate from caption dropout. <b className="text-content-muted font-medium">How:</b> follow
                   the preset; 0.05 is gentle, while larger values can underfit. Krea&apos;s text-embedding cache affects caption
@@ -2974,15 +2974,15 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {advTimestepSupported && (
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-content text-[0.75rem] w-28 shrink-0">Timestep weighting</span>
+                    <span className="text-content text-xs w-28 shrink-0">Timestep weighting</span>
                     <select value={advTimestep} onChange={(e) => saveAdv({ timestep_type: e.target.value })}
                       aria-label="Timestep weighting"
-                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                       <option value="auto">Auto ({advTimestepDefault})</option>
                       {advTimestepChoices.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
-                  <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                  <span className="text-content-subtle text-2xs leading-relaxed">
                     <b className="text-content-muted font-medium">Why:</b> which noise levels the loss emphasises — the
                     detail-versus-global-structure balance for flow-matching models. <b className="text-content-muted font-medium">How:</b> Auto
                     uses the family recipe ({advTimestepDefault}); use the researched Style preset unless you are deliberately
@@ -2993,14 +2993,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {/* Optimizer */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">Optimizer</span>
+                  <span className="text-content text-xs w-28 shrink-0">Optimizer</span>
                   <select value={advOptimizer} onChange={(e) => saveAdv({ optimizer: e.target.value })}
                     aria-label="Optimizer"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                     {advOptimizerChoices.map((o) => <option key={o} value={o}>{o}{o === 'adamw8bit' ? ' (default)' : ''}</option>)}
                   </select>
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> how the weights are updated — the biggest training
                   lever after the dataset. <b className="text-content-muted font-medium">How:</b> <i>adamw8bit</i> (default)
                   is fast and VRAM-light; <i>adafactor</i> uses less memory and auto-scales; <i>automagic</i>/<i>automagic2</i>
@@ -3013,21 +3013,21 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {/* LR schedule (+ warmup, only for the warmup schedule) */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">LR schedule</span>
+                  <span className="text-content text-xs w-28 shrink-0">LR schedule</span>
                   <select value={advLrSched} onChange={(e) => saveAdv({ lr_scheduler: e.target.value })}
                     aria-label="Learning-rate schedule"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                     {advLrSchedChoices.map((s) => <option key={s} value={s}>{LR_SCHED_LABELS[s] || s}</option>)}
                   </select>
                   {advLrSched === 'constant_with_warmup' && (
                     <select value={String(advWarmup || 100)} onChange={(e) => saveAdv({ warmup: Number(e.target.value) })}
                       aria-label="Warmup steps"
-                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                      className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                       {advWarmupChoices.map((w) => <option key={w} value={String(w)}>{w} warmup</option>)}
                     </select>
                   )}
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> how the learning rate moves over the run.
                   <b className="text-content-muted font-medium"> How:</b> <i>Constant</i> (default) holds it flat;
                   <i> Warmup → constant</i> ramps it up over the first N steps (a gentler start that avoids early
@@ -3038,14 +3038,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {/* Gradient accumulation (effective batch) */}
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-content text-[0.75rem] w-28 shrink-0">Effective batch</span>
+                  <span className="text-content text-xs w-28 shrink-0">Effective batch</span>
                   <select value={String(advGradAccum)} onChange={(e) => saveAdv({ grad_accum: Number(e.target.value) })}
                     aria-label="Gradient accumulation"
-                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                     {advGradAccumChoices.map((g) => <option key={g} value={String(g)}>{g === 1 ? '1 (default)' : `${g} × accum`}</option>)}
                   </select>
                 </div>
-                <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+                <span className="text-content-subtle text-2xs leading-relaxed">
                   <b className="text-content-muted font-medium">Why:</b> averages the gradient over N micro-batches before
                   each update — a larger <i>effective</i> batch with no extra VRAM. <b className="text-content-muted font-medium">How:</b> 1
                   (default); 2–4 smooths the noisy gradients a tiny dataset produces (steadier training), at the cost of a
@@ -3055,7 +3055,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </div>
           </details>)}
 
-          <label className="flex items-center gap-1.5 text-[0.6875rem] text-content-muted cursor-pointer"
+          <label className="flex items-center gap-1.5 text-2xs text-content-muted cursor-pointer"
             title={sliderOn
               ? 'Slider mode ignores masks: the slider loss never reads the masked-loss path, so the server trains unmasked regardless of this toggle.'
               : isStyle
@@ -3092,7 +3092,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               and dropping it silently would start paying for a mask pass nobody
               asked for. Neither happens: the user answers, once. */}
           {maskedCarryOver && (
-            <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 flex flex-col gap-2 text-[0.6875rem]">
+            <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 flex flex-col gap-2 text-2xs">
               <span className="text-content leading-relaxed">
                 <b>Masked training is now a dataset setting</b>, shared across your
                 browsers and devices instead of living in this one. This browser had it
@@ -3112,17 +3112,17 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           )}
 
           {!status.in_progress && keptCount >= 10 && (
-            <label className="flex items-center gap-1.5 text-content-subtle text-[0.6875rem]"
+            <label className="flex items-center gap-1.5 text-content-subtle text-2xs"
               title={stepsInfo?.rationale
                 ? `${stepsInfo.rationale} Leave empty to use it; applies to Train, Add to queue and Schedule.`
                 : `Target training steps. Leave empty for the backend's ${typeLabel} / ${checkpointVariantLabel(trainType, variant)} adaptive recipe. Applies to Train, Add to queue and Schedule.`}>
-              <span className="uppercase text-content-muted text-[0.625rem]">Steps</span>
+              <span className="uppercase text-content-muted text-2xs">Steps</span>
               <input type="number" min={500} step={100}
                 value={stepsOverride}
                 onChange={(e) => setStepsOverride(e.target.value)}
                 placeholder={stepsInfo?.steps != null ? String(stepsInfo.steps) : 'adaptive'}
                 aria-label="Target training steps (leave empty for adaptive)"
-                className="w-[4.5rem] rounded border border-border bg-app/60 px-1.5 py-0.5 text-content tabular-nums text-[0.75rem]" />
+                className="w-[4.5rem] rounded border border-border bg-app/60 px-1.5 py-0.5 text-content tabular-nums text-xs" />
               <span>{stepsOverride.trim()
                 ? 'target'
                 : stepsInfo?.steps != null
@@ -3131,7 +3131,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             </label>
           )}
           {zimageTurboLongRun && (
-            <p role="status" className="m-0 rounded-md border border-amber-400/35 bg-amber-400/[0.08] px-2 py-1.5 text-amber-200 text-[0.6875rem] leading-relaxed">
+            <p role="status" className="m-0 rounded-md border border-amber-400/35 bg-amber-400/[0.08] px-2 py-1.5 text-amber-200 text-2xs leading-relaxed">
               ⚠ Turbo long-run warning — the effective target is {effectiveTargetSteps} steps
               (over {ZIMAGE_TURBO_LONG_RUN_STEPS}). Turbo is distilled and can degrade or overfit on a long run;
               this does not block launch, but a lower cap plus best-checkpoint selection is safer.
@@ -3148,7 +3148,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 className="px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-sm font-semibold disabled:opacity-40">
                 {queued ? '✓ Queued' : '⏰ Schedule'}
               </button>
-              <span className="text-content-subtle text-[0.625rem]">
+              <span className="text-content-subtle text-2xs">
                 run this training later, at a day &amp; time you pick
               </span>
             </div>
@@ -3156,14 +3156,14 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
 
           {!fullMode && showSched && !queued && (
             <div className="flex items-center gap-2 flex-wrap rounded-lg border border-amber-400/30 bg-amber-500/5 px-3 py-2">
-              <label className="flex items-center gap-2 text-content-muted text-[0.6875rem]">
+              <label className="flex items-center gap-2 text-content-muted text-2xs">
                 <span className="uppercase">Start at</span>
                 <input type="datetime-local" value={schedAt}
                   onChange={(e) => setSchedAt(e.target.value)}
                   aria-label="Scheduled training date and time"
                   className="rounded border border-border bg-app/60 px-2 py-1 text-content text-[0.8125rem]" />
               </label>
-              <span className="text-content-subtle text-[0.625rem]">
+              <span className="text-content-subtle text-2xs">
                 Base “{baseLabel}” — if another training is running at that time, it waits in the queue.
               </span>
               <button type="button" onClick={schedule} disabled={!schedAt}
@@ -3181,9 +3181,9 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       {Array.isArray(status.queue) && status.queue.length > 0 && (
         <div id="ds-training-queue" tabIndex={-1} data-workspace-focus
           className="flex flex-col gap-1 rounded-lg border border-indigo-400/30 bg-indigo-500/5 px-3 py-2 scroll-mt-20">
-          <span className="text-content-muted text-[0.625rem] uppercase">Training queue ({status.queue.length})</span>
+          <span className="text-content-muted text-2xs uppercase">Training queue ({status.queue.length})</span>
           {status.queue.map((q, i) => (
-            <div key={q.dataset_id} className="flex items-center gap-2 text-[0.6875rem]">
+            <div key={q.dataset_id} className="flex items-center gap-2 text-2xs">
               <span className="text-content-subtle tabular-nums">{i + 1}.</span>
               <span className="text-content">{q.name}</span>
               {q.base_label ? <span className="text-indigo-300/80">· {q.base_label}</span> : null}
@@ -3205,27 +3205,27 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
       )}
 
       {enqErr && (
-        <p className="m-0 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-red-300 text-[0.6875rem]">
+        <p className="m-0 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-red-300 text-2xs">
           ⚠ Enqueue refused: {enqErr}
         </p>
       )}
 
       {fullMode
         ? (
-          <p className="m-0 text-content-subtle text-[0.625rem]">
+          <p className="m-0 text-content-subtle text-2xs">
             Full model: a small LoRA-sized dataset is only a smoke test; quality requires a much
             larger, more varied, deduplicated collection.
           </p>
         )
         : sliderOn
         ? keptCount < TRAIN_MIN_SLIDER[1] && (
-          <p className="m-0 text-content-subtle text-[0.625rem]">
+          <p className="m-0 text-content-subtle text-2xs">
             Slider mode: minimum {TRAIN_MIN_SLIDER[0]} substrate images,{' '}
             {TRAIN_MIN_SLIDER[1]}+ varied ones recommended — you have {keptCount}.
           </p>
         )
         : keptCount < (TRAIN_MIN[trainType]?.[1] ?? 20) && (
-          <p className="m-0 text-content-subtle text-[0.625rem]">
+          <p className="m-0 text-content-subtle text-2xs">
             {typeLabel}: minimum {TRAIN_MIN[trainType]?.[0] ?? 12} kept images,{' '}
             {TRAIN_MIN[trainType]?.[1] ?? 20} recommended — you have {keptCount}.
           </p>
@@ -3252,7 +3252,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             : togglePanel('checkpoints', checkpointsOpen, setCheckpointsOpen)}
           className="cursor-pointer select-none px-3 py-2 text-sm text-content font-semibold">
           <Package aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Checkpoints &amp; trained LoRAs
-          <span className="ml-2 font-normal text-content-subtle text-[0.6875rem]">
+          <span className="ml-2 font-normal text-content-subtle text-2xs">
             {ckLoaded
               ? `${checkpoints.length} checkpoint(s) · ${imported.length} in ComfyUI${diskUsage?.total_bytes ? ` · ${fmtBytes(diskUsage.total_bytes)} on disk` : ''}`
               : 'the files your training runs produce'}
@@ -3260,10 +3260,10 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
         </summary>
         <div className="px-3 pt-1 flex flex-col gap-2">
           <div className="flex items-center gap-2 rounded-lg border border-border bg-app px-3 py-2 flex-wrap">
-            <span className="text-content-muted text-[0.625rem] uppercase">Browse results</span>
+            <span className="text-content-muted text-2xs uppercase">Browse results</span>
             <select value={checkpointTrainType} onChange={(event) => onCheckpointTypeChange(event.target.value)}
               aria-label="LoRA family to browse"
-              className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+              className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
               <option value="zimage">Z-Image</option>
               <option value="sdxl">SDXL</option>
               <option value="krea">Krea 2</option>
@@ -3275,7 +3275,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             {checkpointBaseOptions.length > 0 ? (
               <select value={checkpointBase} onChange={(event) => setCheckpointBase(event.target.value)}
                 aria-label="Training base to browse"
-                className="min-w-0 max-w-full px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                className="min-w-0 max-w-full px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                 {checkpointBaseOptions.map((item) => (
                   <option key={`${checkpointTrainType}-${item.value}`} value={item.value}>{item.label}</option>
                 ))}
@@ -3287,13 +3287,13 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               <select value={checkpointVariant}
                 onChange={(event) => setCheckpointVariant(event.target.value)}
                 aria-label="Training variant to browse"
-                className="min-w-0 max-w-full px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+                className="min-w-0 max-w-full px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
                 {checkpointVariants.map((item) => (
                   <option key={`${checkpointTrainType}-${item.value}`} value={item.value}>{item.label}</option>
                 ))}
               </select>
             )}
-            <span className="ml-auto text-content-subtle text-[0.625rem]">
+            <span className="ml-auto text-content-subtle text-2xs">
               Independent from the next Training configuration
             </span>
           </div>
@@ -3302,7 +3302,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
            * training run, because listed checkpoints no longer reflect the current state.
            */}
           {datasetState?.registered && (datasetState.changed ? (
-            <p className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-200 text-[0.6875rem]">
+            <p className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-200 text-2xs">
               ⚠ The dataset has <b>changed since v{datasetState.version}</b>
               {datasetState.diff && (
                 <>
@@ -3319,7 +3319,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {' '}— these checkpoints reflect the old state; the next training becomes <b>v{datasetState.version + 1}</b>.
             </p>
           ) : (
-            <p className="m-0 text-content-subtle text-[0.625rem]">
+            <p className="m-0 text-content-subtle text-2xs">
               Dataset version: <span className="text-content font-semibold">v{datasetState.version}</span> — unchanged since the last training.
             </p>
           ))}
@@ -3371,7 +3371,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               className="px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold">
               <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Run folder
             </button>
-            <span className="text-content-subtle text-[0.625rem]">
+            <span className="text-content-subtle text-2xs">
               import the checkpoint you like into ComfyUI to use (and test) the LoRA
             </span>
           </div>
@@ -3382,12 +3382,12 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {checkpointsView === 'graph' && (
             <div className="flex flex-col gap-2">
               {(!datasetGraph || datasetGraph.loading) && (
-                <div className="flex items-center gap-2 text-content-subtle text-[0.75rem]">
+                <div className="flex items-center gap-2 text-content-subtle text-xs">
                   <span aria-hidden className="h-3 w-3 animate-spin rounded-full border-2 border-border-strong border-t-indigo-400" />
                   Building the graph…
                 </div>
               )}
-              {datasetGraph?.error && <p className="m-0 text-rose-300/80 text-[0.75rem]">{datasetGraph.error}</p>}
+              {datasetGraph?.error && <p className="m-0 text-rose-300/80 text-xs">{datasetGraph.error}</p>}
               {datasetGraph?.tree && (
                 Array.isArray(datasetGraph.tree.nodes) && datasetGraph.tree.nodes.length
                   ? <RunLineageGraph tree={datasetGraph.tree}
@@ -3413,7 +3413,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                         loadCheckpoints(checkpointBase, checkpointTrainType, checkpointVariant);
                         return tree;
                       }} />
-                  : <p className="m-0 text-content-subtle text-[0.75rem]">
+                  : <p className="m-0 text-content-subtle text-xs">
                       No training runs recorded for this family yet — train once and its runs will appear here.
                     </p>
               )}
@@ -3431,13 +3431,13 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 return (
                   <div className="flex items-center gap-2 flex-wrap rounded-md border border-violet-500/25 bg-violet-500/5 px-2 py-1">
                     {li && <RunIdChip source={li.source} recordId={li.recordId} cloudId={li.cloudId} />}
-                    <span className="text-content-muted text-[0.6875rem]">
+                    <span className="text-content-muted text-2xs">
                       <b className="text-content">Active set</b> — used by Studio / Continue / Import; cloud epochs are mirrored here.
                     </span>
                     {li && (
                       <Link to={`/cloud#${runRowDomId(li.source, li.id)}`}
                         title="Jump to this run on the Runs page"
-                        className="ml-auto min-h-10 lg:min-h-0 inline-flex items-center px-1 py-0.5 text-violet-300 hover:text-violet-200 text-[0.6875rem] font-medium underline decoration-violet-300/40">
+                        className="ml-auto min-h-10 lg:min-h-0 inline-flex items-center px-1 py-0.5 text-violet-300 hover:text-violet-200 text-2xs font-medium underline decoration-violet-300/40">
                         View in Runs ↗
                       </Link>
                     )}
@@ -3445,13 +3445,13 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 );
               })()}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content-muted text-[0.625rem] uppercase">
+                <span className="text-content-muted text-2xs uppercase">
                   {checkpointTypeLabel} checkpoints — base “{checkpointBaseLabel}” · {checkpointVariantDisplay} (pick the earliest one that holds the identity)
                 </span>
                 <button type="button" disabled={bestEpochBusy}
                   onClick={findBestEpoch}
                   title="Scores every training sample vs the reference photo (face similarity, CPU) and recommends the checkpoint that holds the identity best — needs the Quality tools (ML extras)."
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-[0.6875rem] font-semibold disabled:opacity-40">
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-2xs font-semibold disabled:opacity-40">
                   <Trophy aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{bestEpochBusy ? 'Scoring samples…' : 'Find best epoch'}
                 </button>
                 {/* A local training in flight no longer locks this button: the
@@ -3466,7 +3466,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     : status.in_progress
                       ? 'A training is running here — continue this run in the cloud instead'
                       : 'Resume from any of this run’s checkpoints — pick where it runs, the step count, the checkpoint, and the safe settings'}
-                  className="ml-auto px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-[0.6875rem] font-semibold disabled:opacity-40">
+                  className="ml-auto px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-2xs font-semibold disabled:opacity-40">
                   ▶ Continue training…
                 </button>
               </div>
@@ -3474,7 +3474,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   button: no hover, no reason, and the report is "it does nothing".
                   State it in the panel, like the Find-best-epoch lines just below. */}
               {!checkpointMatchesTraining && (
-                <p className="m-0 text-amber-300 text-[0.625rem]">
+                <p className="m-0 text-amber-300 text-2xs">
                   ▶ Continue is off: these checkpoints come from a different LoRA family,
                   base or variant than the one selected in Training above. Match them to
                   continue this run.
@@ -3482,23 +3482,23 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               )}
               {checkpointMatchesTraining && status.in_progress
                 && !continueLanes.cloud.available && (
-                <p className="m-0 text-amber-300 text-[0.625rem]">
+                <p className="m-0 text-amber-300 text-2xs">
                   ▶ Continue is off while a training runs on this machine.
                   {' '}{continueLanes.cloud.reason}
                 </p>
               )}
               {bestEpoch && !bestEpoch.available && (
-                <p className="m-0 text-amber-300 text-[0.625rem]"><Trophy aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />{bestEpoch.reason}</p>
+                <p className="m-0 text-amber-300 text-2xs"><Trophy aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />{bestEpoch.reason}</p>
               )}
               {bestEpoch?.available && (
-                <p className="m-0 text-amber-200 text-[0.625rem]">
+                <p className="m-0 text-amber-200 text-2xs">
                   <Trophy aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />Best identity at <span className="font-semibold">step {bestEpoch.best_step}</span>
                   {' '}({(bestEpoch.steps.find((s) => s.step === bestEpoch.best_step)?.mean_sim ?? 0).toFixed(2)} mean similarity)
                   {' '}— per step: {bestEpoch.steps.map((s) => `${s.step}:${s.mean_sim.toFixed(2)}`).join(' · ')}
                 </p>
               )}
               {checkpoints.map((c) => (
-                <div key={c.filename} className="flex items-center gap-2 text-[0.6875rem]">
+                <div key={c.filename} className="flex items-center gap-2 text-2xs">
                   <span className={c.final ? 'text-green-400 font-semibold' : 'text-content'}>
                     {c.final ? '✓ final (training complete)' : `step ${c.step}`}
                   </span>
@@ -3559,10 +3559,10 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                     loadCheckpoints(checkpointBase, checkpointTrainType, checkpointVariant);
                   }}
                   title="Keep the final (+ the best-epoch pick if scored) and move every other checkpoint of this run to the trash"
-                  className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-[0.6875rem] font-semibold">
+                  className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-2xs font-semibold">
                   <Eraser aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Clean up this run
                 </button>
-                <span className="text-content-subtle text-[0.625rem]">
+                <span className="text-content-subtle text-2xs">
                   keeps final{bestEpoch?.available ? ' + best' : ''} — the rest goes to the trash
                 </span>
               </div>
@@ -3572,7 +3572,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           {/* Files already saved on this computer remain core history, including their cloud provenance. */}
           {cloudGroups.length > 0 && (
             <div className="flex flex-col gap-2">
-              <span className="text-content-muted text-[0.625rem] uppercase">
+              <span className="text-content-muted text-2xs uppercase">
                 ☁ Cloud checkpoints (synced locally — every epoch harvested from the pod)
               </span>
               {cloudGroups.map((g) => (
@@ -3588,18 +3588,18 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                         — while every other surface named the run differently. */}
                     {g.run_id != null
                       ? <RunIdChip source="cloud" recordId={g.record_id} cloudId={g.run_id} />
-                      : <span className="text-sky-200 text-[0.6875rem]" aria-hidden>☁ run unknown</span>}
-                    <span className="text-content-subtle text-[0.625rem] uppercase">{groupFamLabel(g.train_type)}</span>
+                      : <span className="text-sky-200 text-2xs" aria-hidden>☁ run unknown</span>}
+                    <span className="text-content-subtle text-2xs uppercase">{groupFamLabel(g.train_type)}</span>
                     <DatasetVersionChip version={g.version} />
                     {g.status && (
-                      <span className={`rounded border px-1.5 py-0.5 text-[0.625rem] ${g.active
+                      <span className={`rounded border px-1.5 py-0.5 text-2xs ${g.active
                         ? 'text-sky-300 border-sky-400/40 bg-sky-500/10'
                         : g.status === 'done' ? 'text-emerald-300 border-emerald-400/40 bg-emerald-500/10'
                         : 'text-content-muted border-border bg-surface'}`}>
                         {g.status}
                       </span>
                     )}
-                    <span className="text-content-muted text-[0.625rem] tabular-nums">
+                    <span className="text-content-muted text-2xs tabular-nums">
                       {[timeAgo(g.finished_at || g.created_at), g.gpu,
                         g.cost_estimate != null ? `$${g.cost_estimate}` : null]
                         .filter(Boolean).join(' · ')}
@@ -3620,7 +3620,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                         <button type="button" data-testid="ckpt-run-details"
                           onClick={() => openRunDetails(g.record_id)}
                           title="Open this run's full recipe — rank, learning rate, optimizer, resolution, notes"
-                          className="min-h-10 lg:min-h-0 rounded border border-white/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-content hover:border-white/35">
+                          className="min-h-10 lg:min-h-0 rounded border border-white/15 px-1.5 py-0.5 text-2xs font-medium text-content hover:border-white/35">
                           ⚙ Details
                         </button>
                         {/* ⇄ Two picks open the SAME two-run diff as the graph:
@@ -3630,7 +3630,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                           aria-pressed={ckptDiffIds.includes(g.record_id)}
                           onClick={() => toggleRunCompare(g.record_id)}
                           title="Pick this run for comparison — pick two to see what changed between them (recipe, dataset images and captions, machine)"
-                          className={`min-h-10 lg:min-h-0 rounded border px-1.5 py-0.5 text-[0.6875rem] font-medium ${ckptDiffIds.includes(g.record_id)
+                          className={`min-h-10 lg:min-h-0 rounded border px-1.5 py-0.5 text-2xs font-medium ${ckptDiffIds.includes(g.record_id)
                             ? 'border-indigo-400/70 bg-indigo-500/25 text-indigo-100'
                             : 'border-white/15 text-content hover:border-white/35'}`}>
                           ⇄ Compare{ckptDiffIds.includes(g.record_id) ? ' ✓' : ''}
@@ -3638,19 +3638,19 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                         </>)}
                         <Link to={`/cloud#${runRowDomId('cloud', g.run_id)}`}
                           title="Jump to this run on the Runs page"
-                          className="min-h-10 lg:min-h-0 inline-flex items-center px-1 py-0.5 text-sky-300 hover:text-sky-200 text-[0.6875rem] font-medium underline decoration-sky-300/40">
+                          className="min-h-10 lg:min-h-0 inline-flex items-center px-1 py-0.5 text-sky-300 hover:text-sky-200 text-2xs font-medium underline decoration-sky-300/40">
                           View in Runs ↗
                         </Link>
                       </span>
                     )}
                   </div>
                   {g.checkpoints.map((c) => (
-                    <div key={`cr${c.run_id}-${c.filename}`} className="flex items-center gap-2 text-[0.6875rem] pl-1">
+                    <div key={`cr${c.run_id}-${c.filename}`} className="flex items-center gap-2 text-2xs pl-1">
                       <span className={c.final ? 'text-green-400 font-semibold' : 'text-content'}>
                         {c.final ? '✓ final (training complete)' : `step ${c.step}`}
                       </span>
                       {c.active && (
-                        <span className="text-sky-300/80 text-[0.625rem]">· run in progress</span>
+                        <span className="text-sky-300/80 text-2xs">· run in progress</span>
                       )}
                       {renderDeployControl(c, {
                         onImport: async () => {
@@ -3690,7 +3690,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
           )}
 
           {ckLoaded && checkpoints.length === 0 && cloudCkpts.length === 0 && !status.in_progress && (
-            <p className="m-0 text-content-subtle text-[0.625rem]">
+            <p className="m-0 text-content-subtle text-2xs">
               No {checkpointTypeLabel} checkpoint for base “{checkpointBaseLabel}” · {checkpointVariantDisplay} — run this exact recipe first.
             </p>
           )}
@@ -3704,19 +3704,19 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               file carrying an arch-mismatch warning (never hidden). */}
           {otherImported.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="text-content-muted text-[0.625rem] uppercase"
+              <span className="text-content-muted text-2xs uppercase"
                 title="Deployed LoRAs that none of the checkpoints above accounts for — imported before run tagging, or copied into the folder by hand">
                 Also in ComfyUI ({checkpointLorasLabel}) — not from a checkpoint listed above
               </span>
               {otherImported.map((c) => (
-                <div key={c.filename} className="flex items-center gap-2 text-[0.6875rem]">
+                <div key={c.filename} className="flex items-center gap-2 text-2xs">
                   {/* Source run of this deployed file: two look-alike LoRAs from
                       different runs are now distinguishable at a glance. Files
                       imported before run tagging carry no id → "run unknown". */}
                   {c.run_id != null
                     ? <RunIdChip source={c.run_source} recordId={c.record_id}
                         cloudId={c.run_source === 'cloud' ? c.run_id : null} />
-                    : <span className="text-content-subtle text-[0.625rem]"
+                    : <span className="text-content-subtle text-2xs"
                         title="Imported before run tagging — its source run is unknown">run ?</span>}
                   <span className="text-content break-all">{c.label}</span>
                   {/* Retrofit signal: the file's REAL arch (read from its header)

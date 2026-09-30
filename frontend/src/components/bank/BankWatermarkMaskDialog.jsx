@@ -179,7 +179,7 @@ export default function BankWatermarkMaskDialog({ bankId, image, onSaved, onClos
           </span>
         </div>
 
-        <p className="text-center text-[11px] text-white/45">
+        <p className="text-center text-2xs text-white/45">
           Drag a zone to move it, its corners to resize. Your own file is never modified —
           cleaning writes a separate copy inside the bank.
           {image?.rotation

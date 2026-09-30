@@ -120,13 +120,13 @@ export default function BankEditPanel({
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 p-3 text-left">
         <span className="text-sm font-semibold text-content">✂ Edits</span>
-        <span className="text-[0.6875rem] text-content-subtle">{editSummary(payload)}</span>
+        <span className="text-2xs text-content-subtle">{editSummary(payload)}</span>
         <HelpBadge topic="action-bank-crop" />
         <span aria-hidden className="ml-auto text-xs text-content-subtle">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
         <div className="space-y-2 px-3 pb-3">
-          <p className="text-[0.6875rem] text-content-subtle">
+          <p className="text-2xs text-content-subtle">
             crop and upscale here, re-analyse, then promote — your original files are
             never modified
           </p>
@@ -144,17 +144,17 @@ export default function BankEditPanel({
           <div className="rounded-lg border border-border bg-app/40 p-2.5 space-y-1.5">
             <div className="flex items-baseline gap-1.5">
               <span className="text-sm font-semibold text-content">✨ Upscale &amp; improve</span>
-              <span className="text-[0.6875rem] text-content-subtle">
+              <span className="text-2xs text-content-subtle">
                 {todo == null
                   ? 'counting…'
                   : (todo ? `${todo} image(s) in this scope` : 'nothing left in this scope')}
               </span>
             </div>
-            <p className="text-[0.6875rem] leading-snug text-content-subtle">
+            <p className="text-2xs leading-snug text-content-subtle">
               Re-renders each image at a higher resolution. {BANK_IMPROVE_PROMISE}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+              <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
                 Engine
               </span>
               <div className="flex items-center gap-1 rounded-lg border border-border bg-app/60 p-0.5 text-xs">
@@ -179,7 +179,7 @@ export default function BankEditPanel({
               className="min-h-10 rounded-lg border border-sky-400/40 bg-sky-500/15 px-3 py-1.5 text-sm font-semibold text-sky-200 disabled:opacity-40 lg:min-h-0">
               ✨ Upscale &amp; improve…
             </button>
-            <p className="text-[0.6875rem] text-content-subtle">
+            <p className="text-2xs text-content-subtle">
               {picked?.disabled
                 ? picked.reason
                 : 'One ComfyUI round-trip per image — minutes apiece on a modest card. '
@@ -198,7 +198,7 @@ export default function BankEditPanel({
                 className="rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-40">
                 ↩ Revert {selectedIds.length ? `selection (${selectedIds.length})` : `all (${counts.total})`}
               </button>
-              <span className="text-[0.6875rem] text-content-subtle">
+              <span className="text-2xs text-content-subtle">
                 Deletes only copies the app made. The measurements taken from the edited
                 pixels go with them, so those images are analysed again.
               </span>

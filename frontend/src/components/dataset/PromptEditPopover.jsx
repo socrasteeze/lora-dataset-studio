@@ -55,7 +55,7 @@ export default function PromptEditPopover({ initialPrompt = '', onSubmit, onClos
       <div role="dialog" aria-modal="true" aria-label="Edit prompt & regenerate"
         className="w-full max-w-[20rem] max-h-[85vh] overflow-y-auto rounded-lg border border-border bg-surface-overlay p-3 shadow-2xl flex flex-col gap-2"
         onClick={(e) => e.stopPropagation()}>
-        <span className="text-[0.625rem] uppercase text-content-muted">Edit prompt &amp; regenerate</span>
+        <span className="text-2xs uppercase text-content-muted">Edit prompt &amp; regenerate</span>
         <textarea ref={areaRef} value={text} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') { e.preventDefault(); dismiss(); }
@@ -63,27 +63,27 @@ export default function PromptEditPopover({ initialPrompt = '', onSubmit, onClos
           }}
           rows={4} placeholder="describe the shot (the face is kept automatically)…"
           aria-label="Edit the generation prompt"
-          className="text-[11px] bg-app/60 border border-border rounded p-1.5 text-content resize-none" />
+          className="text-2xs bg-app/60 border border-border rounded p-1.5 text-content resize-none" />
         {/* shrink-0: this is a flex column with a max height, so the box would
             otherwise be squashed to a clipped sliver. */}
         {error && (
           <div role="alert"
             className="shrink-0 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 max-h-24 overflow-y-auto">
-            <span className="block whitespace-pre-wrap break-words text-[11px] leading-relaxed text-red-200">
+            <span className="block whitespace-pre-wrap break-words text-2xs leading-relaxed text-red-200">
               {error}
             </span>
-            <span className="mt-0.5 block text-[10px] text-content-subtle">
+            <span className="mt-0.5 block text-2xs text-content-subtle">
               Your prompt is kept — adjust and try again.
             </span>
           </div>
         )}
         <div className="flex gap-1.5 justify-end">
           <button type="button" onClick={dismiss} disabled={busy}
-            className="px-2 py-1 rounded text-[11px] bg-surface border border-border text-content-muted disabled:opacity-40">
+            className="px-2 py-1 rounded text-2xs bg-surface border border-border text-content-muted disabled:opacity-40">
             Cancel
           </button>
           <button type="button" onClick={submit} disabled={busy || !text.trim()}
-            className="px-3 py-1 rounded text-[11px] bg-gradient-primary text-gray-950 font-semibold disabled:opacity-40">
+            className="px-3 py-1 rounded text-2xs bg-gradient-primary text-gray-950 font-semibold disabled:opacity-40">
             {busy ? '…' : 'OK'}
           </button>
         </div>

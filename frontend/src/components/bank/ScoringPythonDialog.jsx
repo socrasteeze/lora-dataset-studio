@@ -17,7 +17,7 @@ const TONE = {
 function Badge({ status }) {
   const { tone, label } = statusBadge(status)
   return (
-    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide ${TONE[tone]}`}>
+    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ${TONE[tone]}`}>
       {label}
     </span>
   )
@@ -31,7 +31,7 @@ function DepChips({ deps }) {
     <ul className="flex flex-wrap gap-1">
       {deps.map((d) => (
         <li key={d.label}
-          className={`rounded border px-1.5 py-0.5 text-[0.625rem] ${d.present
+          className={`rounded border px-1.5 py-0.5 text-2xs ${d.present
             ? 'border-emerald-500/40 text-emerald-300/90'
             : 'border-amber-400/50 text-amber-300'}`}>
           {d.present ? '✓' : '✗'} {d.label}
@@ -182,7 +182,7 @@ export default function ScoringPythonDialog({ onClose, onChanged,
             <p className="font-semibold">⚠ {failure.title}</p>
             <p className="text-xs text-amber-200/90">{failure.text}</p>
             {failure.detail && (
-              <p className="break-all font-mono text-[0.625rem] text-amber-200/70">
+              <p className="break-all font-mono text-2xs text-amber-200/70">
                 {failure.detail}
               </p>
             )}
@@ -213,12 +213,12 @@ export default function ScoringPythonDialog({ onClose, onChanged,
                     <span className="text-sm font-semibold text-content">{r.label}</span>
                     <Badge status={r.status} />
                     {r.selected && (
-                      <span className="rounded border border-emerald-500/50 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-emerald-300">
+                      <span className="rounded border border-emerald-500/50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-300">
                         In use
                       </span>
                     )}
                   </div>
-                  <p className="break-all font-mono text-[0.6875rem] text-content-subtle" title={r.path}>
+                  <p className="break-all font-mono text-2xs text-content-subtle" title={r.path}>
                     {r.path}
                   </p>
                   <p className="text-xs text-content-muted">
@@ -233,16 +233,16 @@ export default function ScoringPythonDialog({ onClose, onChanged,
                         We will not install into an environment we did not create. To add
                         {` ${missing.join(', ')}`} yourself, run:
                       </p>
-                      <code className="block overflow-x-auto whitespace-pre rounded bg-surface-raised px-2 py-1 font-mono text-[0.6875rem] text-content-muted">
+                      <code className="block overflow-x-auto whitespace-pre rounded bg-surface-raised px-2 py-1 font-mono text-2xs text-content-muted">
                         {r.install_command}
                       </code>
                     </div>
                   )}
                   {cost && (
                     <div className="rounded border border-border bg-surface-raised p-2 space-y-1">
-                      <p className="text-[0.6875rem] text-content-muted">⚡ {cost.text}</p>
+                      <p className="text-2xs text-content-muted">⚡ {cost.text}</p>
                       {cost.comfyui && (
-                        <p className="text-[0.6875rem] text-amber-300/90">{cost.comfyui}</p>
+                        <p className="text-2xs text-amber-300/90">{cost.comfyui}</p>
                       )}
                     </div>
                   )}
@@ -291,12 +291,12 @@ export default function ScoringPythonDialog({ onClose, onChanged,
             </button>
           </div>
           {entered ? (
-            <p className={`text-[0.6875rem] ${entered.tone === 'warn'
+            <p className={`text-2xs ${entered.tone === 'warn'
               ? 'text-amber-300' : 'text-content-muted'}`}>
               {entered.text}
             </p>
           ) : (
-            <p className="text-[0.6875rem] text-content-subtle">
+            <p className="text-2xs text-content-subtle">
               An interpreter, or the folder holding it — a venv, a conda env, a portable
               bundle, anywhere on any disk. Checked and added to the list above; it is
               only used once you pick it.

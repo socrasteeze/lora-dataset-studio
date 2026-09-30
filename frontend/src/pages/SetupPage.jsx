@@ -713,7 +713,7 @@ export default function SetupPage() {
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <p className="mb-1 text-[0.6875rem] text-content-muted">
+                      <p className="mb-1 text-2xs text-content-muted">
                         Klein 9B KV (fp8) → <span className="font-mono">models/unet/klein/</span>
                         <span className="block text-content-subtle">
                           Direct public download — no token needed. The FLUX Non-Commercial License governs use.
@@ -722,19 +722,19 @@ export default function SetupPage() {
                       {installBtn('klein_model', '⬇ Download Klein model')}
                     </div>
                     <div>
-                      <p className="mb-1 text-[0.6875rem] text-content-muted">
+                      <p className="mb-1 text-2xs text-content-muted">
                         Consistency LoRA (331 MB) → <span className="font-mono">models/loras/klein/</span>
                       </p>
                       {installBtn('klein_lora', '⬇ Download consistency LoRA')}
                     </div>
                     <div>
-                      <p className="mb-1 text-[0.6875rem] text-content-muted">
+                      <p className="mb-1 text-2xs text-content-muted">
                         Text encoder (~8.7 GB) → <span className="font-mono">models/text_encoders/</span>
                       </p>
                       {installBtn('klein_text_encoder', '⬇ Download text encoder')}
                     </div>
                     <div>
-                      <p className="mb-1 text-[0.6875rem] text-content-muted">
+                      <p className="mb-1 text-2xs text-content-muted">
                         VAE (336 MB) → <span className="font-mono">models/vae/</span>
                       </p>
                       {installBtn('klein_vae', '⬇ Download VAE')}
@@ -1744,7 +1744,7 @@ export default function SetupPage() {
                       </span>
                       <span className={r.state === 'ready' ? 'text-content' : 'text-content-muted'}>{r.label}</span>
                       {r.optional && (
-                        <span className="rounded bg-surface-raised px-1.5 py-px text-[10px] font-medium text-content-subtle">optional</span>
+                        <span className="rounded bg-surface-raised px-1.5 py-px text-2xs font-medium text-content-subtle">optional</span>
                       )}
                     </span>
                     <span className="flex min-w-0 max-w-full items-center gap-1.5 pl-6 sm:pl-0">
@@ -1814,7 +1814,7 @@ export default function SetupPage() {
                       <span aria-hidden="true" className={rowOk ? 'text-emerald-400' : 'text-content-subtle'}>{rowOk ? '✓' : '✗'}</span>
                       <span className="flex min-w-0 flex-col">
                         <span>{s.label}{noteEl}</span>
-                        {s.what && <span className="text-[11px] text-content-subtle">{s.what}</span>}
+                        {s.what && <span className="text-2xs text-content-subtle">{s.what}</span>}
                       </span>
                     </SettingsLink>
                   </li>
@@ -1826,7 +1826,7 @@ export default function SetupPage() {
                     <span aria-hidden="true" className={rowOk ? 'text-emerald-400' : 'text-content-subtle'}>{rowOk ? '✓' : '✗'}</span>
                     <span className="flex min-w-0 flex-col">
                       <span>{s.label}{noteEl}</span>
-                      {s.what && <span className="text-[11px] text-content-subtle">{s.what}</span>}
+                      {s.what && <span className="text-2xs text-content-subtle">{s.what}</span>}
                     </span>
                   </li>
                 )
@@ -1841,7 +1841,7 @@ export default function SetupPage() {
                       <span aria-hidden="true" className={rowOk ? 'text-emerald-400' : 'text-content-subtle'}>{rowOk ? '✓' : '✗'}</span>
                       <span className="flex min-w-0 flex-col">
                       <span>{s.label}{noteEl}</span>
-                      {s.what && <span className="text-[11px] text-content-subtle">{s.what}</span>}
+                      {s.what && <span className="text-2xs text-content-subtle">{s.what}</span>}
                     </span>
                     </span>
                     <span aria-hidden="true" className={`text-xs ${s.ok ? 'text-content-subtle/60' : 'text-content-subtle'}`}>›</span>
@@ -1910,9 +1910,9 @@ export default function SetupPage() {
       <section className="rounded-xl border border-border bg-surface p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold text-content">
+            <h1 className="text-xl font-semibold text-content">
               {step.title}
-              <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Optional</span>
+              <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-2xs font-medium text-primary">Optional</span>
               <HelpBadge topic="page-setup" className="ml-2" />
             </h1>
             <p className="mt-1 text-xs text-content-muted">Unlocks: {step.unlocks.join(' · ')}</p>

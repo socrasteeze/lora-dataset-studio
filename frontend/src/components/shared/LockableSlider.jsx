@@ -62,7 +62,7 @@ export default function LockableSlider({
         {...rangeProps}
         className={`w-full ${accent} ${rangeProps.className}`}
       />
-      <div className="flex justify-between text-content-muted text-[0.6875rem] mt-0.5">
+      <div className="flex justify-between text-content-muted text-2xs mt-0.5">
         <span>{min}</span>
         <span>{max}</span>
       </div>

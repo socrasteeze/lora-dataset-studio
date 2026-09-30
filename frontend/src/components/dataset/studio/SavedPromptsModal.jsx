@@ -86,24 +86,24 @@ export function SavedPromptsPanel({
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
             aria-label="Search saved prompts"
             placeholder="Search your prompts… (e.g. bathroom mirror)"
-            className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-app/60 px-2.5 py-1.5 text-content text-[0.75rem] lg:min-h-0" />
-          <span className="text-content-subtle text-[0.6875rem] tabular-nums" role="status">
+            className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-app/60 px-2.5 py-1.5 text-content text-xs lg:min-h-0" />
+          <span className="text-content-subtle text-2xs tabular-nums" role="status">
             {query.trim() ? `${shown.length} of ${total}` : `${total} prompts`}
           </span>
           {batchable && picked.length > 0 && (
             <span className="flex items-center gap-1.5">
-              <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-[0.6875rem] font-semibold text-purple-200 tabular-nums">
+              <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-2xs font-semibold text-purple-200 tabular-nums">
                 {picked.length} selected
               </span>
               <button type="button" onClick={onClearBatch}
-                className="inline-flex min-h-10 items-center px-1 text-content-subtle text-[0.6875rem] underline decoration-dotted hover:text-content lg:min-h-0 lg:px-0">
+                className="inline-flex min-h-10 items-center px-1 text-content-subtle text-2xs underline decoration-dotted hover:text-content lg:min-h-0 lg:px-0">
                 Clear
               </button>
             </span>
           )}
         </div>
         {batchable && (
-          <p className="m-0 text-content-subtle text-[0.6875rem] leading-snug">
+          <p className="m-0 text-content-subtle text-2xs leading-snug">
             Tick several prompts to generate them all in one run — same checkpoints,
             same settings, one image set per prompt. Ticking writes nothing into the
             prompt field; “⤵ Use prompt” does that.
@@ -132,12 +132,12 @@ export function SavedPromptsPanel({
                   // No thumbnail means this prompt never produced an image or its images were
                   // deleted. A large question mark adds no information; give the space to the
                   // remaining signal, the text.
-                  <div className="w-28 sm:w-36 h-40 sm:h-48 shrink-0 rounded-lg border border-dashed border-border bg-app/40 flex items-center justify-center px-2 text-center text-content-subtle text-[0.625rem] leading-snug">
+                  <div className="w-28 sm:w-36 h-40 sm:h-48 shrink-0 rounded-lg border border-dashed border-border bg-app/40 flex items-center justify-center px-2 text-center text-content-subtle text-2xs leading-snug">
                     No image yet
                   </div>
                 )}
                 <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.625rem] text-content-subtle">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-content-subtle">
                     {p.count > 0
                       ? <span className="tabular-nums">{p.count} test image{p.count > 1 ? 's' : ''}</span>
                       : <span className="rounded border border-border bg-app/60 px-1.5 py-px">never run</span>}
@@ -151,7 +151,7 @@ export function SavedPromptsPanel({
                    */}
                   <button type="button" onClick={() => toggleExpand(p.prompt)}
                     title={isOpen ? 'Collapse the prompt' : 'Show the full prompt'}
-                    className="m-0 min-h-10 text-left text-content text-[0.75rem] leading-snug lg:min-h-0">
+                    className="m-0 min-h-10 text-left text-content text-xs leading-snug lg:min-h-0">
                     <span className={`whitespace-pre-wrap break-words ${isOpen ? '' : 'line-clamp-5'}`}>
                       {p.prompt}
                     </span>
@@ -161,7 +161,7 @@ export function SavedPromptsPanel({
                       <button type="button" role="checkbox" aria-checked={inBatch}
                         onClick={() => onToggleBatch(p.prompt)}
                         title={inBatch ? 'Remove this prompt from the batch' : 'Add this prompt to the batch'}
-                        className={`px-2 py-1 min-h-10 lg:min-h-0 rounded border text-[0.6875rem] ${
+                        className={`px-2 py-1 min-h-10 lg:min-h-0 rounded border text-2xs ${
                           inBatch
                             ? 'border-purple-400 bg-purple-500/25 text-purple-200'
                             : 'border-border bg-app text-content-muted hover:text-content'}`}>
@@ -170,7 +170,7 @@ export function SavedPromptsPanel({
                     )}
                     <button type="button" onClick={() => copyPrompt(p.prompt)}
                       title="Copy this prompt"
-                      className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-content-muted text-[0.6875rem] hover:text-content">
+                      className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-content-muted text-2xs hover:text-content">
                       📋 Copy
                     </button>
                     {onDelete && (
@@ -181,13 +181,13 @@ export function SavedPromptsPanel({
                         }}
                         title="Delete this saved prompt (and its test images)"
                         aria-label="Delete this saved prompt"
-                        className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-red-300/70 text-[0.6875rem] hover:text-red-300 hover:bg-red-500/15">
+                        className="px-2 py-1 min-h-10 lg:min-h-0 rounded border border-border bg-app text-red-300/70 text-2xs hover:text-red-300 hover:bg-red-500/15">
                         🗑 Delete
                       </button>
                     )}
                     <button type="button" onClick={() => use(p.prompt)}
                       title="Load this prompt into the prompt field"
-                      className="ml-auto px-2.5 py-1 min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary text-gray-950 text-[0.6875rem] font-semibold">
+                      className="ml-auto px-2.5 py-1 min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary text-gray-950 text-2xs font-semibold">
                       ⤵ Use prompt
                     </button>
                   </div>
@@ -197,7 +197,7 @@ export function SavedPromptsPanel({
           })}
 
           {shown.length === 0 && (
-            <p className="m-0 rounded-lg border border-border bg-surface px-3 py-6 text-center text-content-subtle text-[0.75rem]">
+            <p className="m-0 rounded-lg border border-border bg-surface px-3 py-6 text-center text-content-subtle text-xs">
               {total === 0
                 ? 'No saved prompts yet — the prompts you launch a test with are kept here.'
                 : `No saved prompt contains every word of “${query.trim()}”.`}

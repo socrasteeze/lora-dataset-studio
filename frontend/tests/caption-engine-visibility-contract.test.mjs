@@ -46,5 +46,5 @@ test('the line is scoped to the dataset it describes', () => {
     && captions.indexOf('lastCaptionEngines') < captions.indexOf('id="ds-captions-generate"'),
   'the engine line belongs in the Captions section, above the generate row')
   // 400px: the sentence names two engines and must be allowed to wrap.
-  assert.match(src, /break-words[^"]*text-\[0\.75rem\][^"]*text-content-muted" title=\{CAPTION_ENGINE_WHY\}|title=\{CAPTION_ENGINE_WHY\}[\s\S]{0,200}break-words/)
+  assert.match(src, /break-words[^"]*text-xs[^"]*text-content-muted" title=\{CAPTION_ENGINE_WHY\}|title=\{CAPTION_ENGINE_WHY\}[\s\S]{0,200}break-words/)
 })

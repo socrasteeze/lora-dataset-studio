@@ -75,13 +75,13 @@ export default function TrainingReadiness({ datasetId, trainType, variant, refre
         className="w-full flex items-center gap-2 px-3 py-2 text-left">
         <v.icon aria-hidden="true" className={`h-4 w-4 shrink-0 ${v.iconCls}`} />
         <span className="text-content text-sm font-semibold">{v.label}</span>
-        <span className="text-content-subtle text-[0.6875rem]">{subtitle}</span>
+        <span className="text-content-subtle text-2xs">{subtitle}</span>
         <span aria-hidden className="ml-auto text-content-subtle text-xs">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
         <ul className="m-0 px-3 pb-2.5 flex flex-col gap-1 list-none">
           {data.checks.map((c) => (
-            <li key={c.id} className="flex items-start gap-2 text-[0.75rem]">
+            <li key={c.id} className="flex items-start gap-2 text-xs">
               <span aria-hidden className={`w-4 shrink-0 text-center font-bold ${ROW_CLS[c.status]}`}>
                 {ROW_ICON[c.status]}
               </span>
@@ -89,7 +89,7 @@ export default function TrainingReadiness({ datasetId, trainType, variant, refre
               <span className="text-content-subtle">— {c.detail}</span>
               {c.status !== 'ok' && c.target && (
                 <button type="button" onClick={() => onJump?.(c.target)}
-                  className="ml-auto shrink-0 px-1.5 py-0.5 rounded border border-border text-content-muted hover:text-content hover:bg-surface-raised text-[0.6875rem]">
+                  className="ml-auto shrink-0 px-1.5 py-0.5 rounded border border-border text-content-muted hover:text-content hover:bg-surface-raised text-2xs">
                   Fix →
                 </button>
               )}
@@ -104,7 +104,7 @@ export default function TrainingReadiness({ datasetId, trainType, variant, refre
        * collapsed details while a bypassable blocker exists.
        */}
       {data.can_override && (
-        <div className="flex items-start gap-1 px-3 pb-2.5 pt-1 text-[0.75rem]">
+        <div className="flex items-start gap-1 px-3 pb-2.5 pt-1 text-xs">
           <label className="flex items-start gap-2 cursor-pointer">
             <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)}
               className="accent-red-400 w-3.5 h-3.5 mt-0.5 shrink-0" />

@@ -67,13 +67,13 @@ function Facts({ images, img }) {
     <div className="flex flex-wrap items-center justify-center gap-1">
       {twins && (
         <span title="Same dimensions and the same weight — this is the identical file. Keeping either one keeps the same pixels."
-          className="rounded bg-sky-500/25 px-1.5 py-px text-[11px] font-medium text-sky-100">
+          className="rounded bg-sky-500/25 px-1.5 py-px text-2xs font-medium text-sky-100">
           ≡ same file as {twins.join(', ')}
         </span>
       )}
       {facts.map((f) => (
         <span key={f.key} title={f.win ? `Top of this group on ${f.label}` : f.label}
-          className={`rounded px-1.5 py-px text-[11px] font-medium ${f.win
+          className={`rounded px-1.5 py-px text-2xs font-medium ${f.win
             ? 'bg-emerald-500/25 text-emerald-100' : 'bg-white/10 text-white/70'}`}>
           {f.win ? '▲ ' : ''}{f.text}
         </span>
@@ -265,7 +265,7 @@ export default function DupCompareLightbox({
     <>
       {im.id === group?.best_id && (
         <span title={bestReasonText(images, group.best_id)}
-          className="absolute left-1 top-1 rounded bg-emerald-500/90 px-1.5 py-px text-[10px] font-bold text-white">
+          className="absolute left-1 top-1 rounded bg-emerald-500/90 px-1.5 py-px text-2xs font-bold text-white">
           BEST
         </span>
       )}
@@ -299,7 +299,7 @@ export default function DupCompareLightbox({
           </span>
         )}
         {settled && (
-          <span className="rounded bg-emerald-500/25 px-1.5 py-px text-[11px] font-semibold text-emerald-100">
+          <span className="rounded bg-emerald-500/25 px-1.5 py-px text-2xs font-semibold text-emerald-100">
             settled in this run
           </span>
         )}
@@ -388,11 +388,11 @@ export default function DupCompareLightbox({
                   <img src={fileUrl(im)} alt={im.name}
                     className="absolute inset-0 h-full w-full select-none object-contain" />
                   {badges(im)}
-                  <span className="absolute right-1 top-1 rounded bg-black/70 px-1.5 py-px text-[10px] font-bold text-white/90">
+                  <span className="absolute right-1 top-1 rounded bg-black/70 px-1.5 py-px text-2xs font-bold text-white/90">
                     {i + 1}
                   </span>
                 </button>
-                <p className="truncate text-center text-[11px] text-white/55" title={im.name}>{im.name}</p>
+                <p className="truncate text-center text-2xs text-white/55" title={im.name}>{im.name}</p>
                 <Facts images={images} img={im} />
                 <div className="flex flex-wrap items-center justify-center gap-1.5">
                   <button type="button" disabled={busy || live || dead}
@@ -491,7 +491,7 @@ export default function DupCompareLightbox({
               ⏭ Skip group{shortcut('S')}
             </button>
           </div>
-          <p className="text-center text-[11px] text-white/45">
+          <p className="text-center text-2xs text-white/45">
             {COMPARE_HINT}. Losers are rejected, never deleted — undo any of it from the ✕ Rejected filter.
           </p>
         </div>

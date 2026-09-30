@@ -100,7 +100,7 @@ function DatasetCaptionDialog({ open, onClose, onChoose }) {
             <h2 id="caption-dataset-title" className="text-sm font-semibold text-content">
               <Dices aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Pick a caption source
             </h2>
-            <p className="mt-1 text-[0.6875rem] leading-snug text-content-subtle">
+            <p className="mt-1 text-2xs leading-snug text-content-subtle">
               A dataset or a bank. The choice stays locked for future runs; selecting one
               draws a random kept caption now.
             </p>
@@ -112,24 +112,24 @@ function DatasetCaptionDialog({ open, onClose, onChoose }) {
         </div>
 
         {loading && (
-          <p className="m-0 flex items-center gap-2 rounded-lg border border-border bg-app/60 px-3 py-2 text-[0.75rem] text-content-muted" role="status">
+          <p className="m-0 flex items-center gap-2 rounded-lg border border-border bg-app/60 px-3 py-2 text-xs text-content-muted" role="status">
             <span className="inline-block h-4 w-4 rounded-full border-2 border-purple-400/40 border-t-purple-400 animate-spin" aria-hidden />
             Loading your datasets and banks…
           </p>
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-[0.75rem] text-red-200" role="alert">
+          <div className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200" role="alert">
             <p className="m-0">{error}</p>
             <button type="button" onClick={loadSources}
-              className="mt-2 rounded border border-red-300/40 px-2 py-1 text-[0.6875rem] font-semibold hover:bg-red-500/10">
+              className="mt-2 rounded border border-red-300/40 px-2 py-1 text-2xs font-semibold hover:bg-red-500/10">
               Try again
             </button>
           </div>
         )}
 
         {!loading && !error && datasets.length === 0 && banks.length === 0 && (
-          <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[0.75rem] text-amber-200" role="status">
+          <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" role="status">
             No datasets or banks yet. Caption some kept images in either one before using
             this shortcut.
           </p>
@@ -144,7 +144,7 @@ function DatasetCaptionDialog({ open, onClose, onChoose }) {
             {[[DATASET, datasets], [BANK, banks]].map(([kind, rows]) => (
               rows.length === 0 ? null : (
                 <section key={kind} className="flex flex-col gap-2">
-                  <h3 className="m-0 flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+                  <h3 className="m-0 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-content-subtle">
                     <span aria-hidden>{SOURCE_ICON[kind]}</span>
                     {SOURCE_LABEL[kind]}s
                     <span className="font-normal normal-case tracking-normal opacity-70">
@@ -164,9 +164,9 @@ function DatasetCaptionDialog({ open, onClose, onChoose }) {
                           <span className="text-base" aria-hidden>🔒</span>
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-semibold text-content">{choice.name}</span>
-                            {meta && <span className="block truncate text-[0.6875rem] text-content-subtle">{meta}</span>}
+                            {meta && <span className="block truncate text-2xs text-content-subtle">{meta}</span>}
                           </span>
-                          <span className="shrink-0 text-[0.6875rem] font-semibold text-purple-200">Use &amp; draw</span>
+                          <span className="shrink-0 text-2xs font-semibold text-purple-200">Use &amp; draw</span>
                         </button>
                       );
                     })}
@@ -179,7 +179,7 @@ function DatasetCaptionDialog({ open, onClose, onChoose }) {
 
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose}
-            className="rounded-lg border border-border bg-app px-3 py-1.5 text-[0.75rem] text-content-muted hover:text-content">
+            className="rounded-lg border border-border bg-app px-3 py-1.5 text-xs text-content-muted hover:text-content">
             Cancel
           </button>
         </div>
@@ -270,20 +270,20 @@ export default function DatasetCaptionControl({ onCaption }) {
           title={lockedDataset
             ? 'Draw a random kept caption from ' + lockedLabel(lockedDataset)
             : 'Choose a dataset or a bank, then draw a random caption'}
-          className="min-h-7 rounded-l border border-border bg-surface px-2 py-0.5 text-[0.625rem] text-content-subtle hover:text-content disabled:opacity-50">
+          className="min-h-7 rounded-l border border-border bg-surface px-2 py-0.5 text-2xs text-content-subtle hover:text-content disabled:opacity-50">
           <Dices aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{drawing ? 'Drawing…' : 'Caption'}
         </button>
         <button type="button" onClick={openPicker} disabled={drawing}
           aria-label="Choose or change the caption source" aria-haspopup="dialog"
           aria-expanded={pickerOpen}
           title={lockedDataset ? 'Change caption source' : 'Choose caption source'}
-          className="-ml-1 min-h-7 rounded-r border border-border bg-surface px-1.5 py-0.5 text-[0.625rem] text-content-subtle hover:text-content disabled:opacity-50">
+          className="-ml-1 min-h-7 rounded-r border border-border bg-surface px-1.5 py-0.5 text-2xs text-content-subtle hover:text-content disabled:opacity-50">
           <span aria-hidden>▾</span>
         </button>
       </span>
 
       {lockedDataset && (
-        <span className="inline-flex max-w-full items-center gap-1 rounded border border-purple-400/30 bg-purple-500/10 px-1.5 py-0.5 text-[0.625rem] text-purple-100"
+        <span className="inline-flex max-w-full items-center gap-1 rounded border border-purple-400/30 bg-purple-500/10 px-1.5 py-0.5 text-2xs text-purple-100"
           title={'Caption source locked — ' + lockedLabel(lockedDataset)} aria-live="polite">
           <span aria-hidden>{SOURCE_ICON[lockedDataset.kind]}</span>
           <span className="max-w-36 truncate">{lockedDataset.name}</span>
@@ -291,7 +291,7 @@ export default function DatasetCaptionControl({ onCaption }) {
       )}
 
       {error && (
-        <span className="basis-full rounded-lg border border-red-400/40 bg-red-500/10 px-2 py-1.5 text-[0.6875rem] leading-snug text-red-200" role="alert">
+        <span className="basis-full rounded-lg border border-red-400/40 bg-red-500/10 px-2 py-1.5 text-2xs leading-snug text-red-200" role="alert">
           {error.message}{' '}
           <button type="button" onClick={retry}
             className="font-semibold underline underline-offset-2 hover:text-white">

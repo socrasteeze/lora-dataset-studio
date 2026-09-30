@@ -122,9 +122,9 @@ const MENU_ITEM = 'min-h-10 lg:min-h-0 w-full flex items-center gap-2 text-left 
 function SectionHeading({ id, eyebrow, title, description, badge }) {
   return (
     <div id={id} tabIndex={-1}>
-      <p className="m-0 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle lg:text-xs">{eyebrow}</p>
+      <p className="m-0 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle lg:text-xs">{eyebrow}</p>
       <h2 className="m-0 mt-0.5 flex items-center gap-2 text-content text-base font-semibold lg:text-xl">{title}{badge}</h2>
-      {description && <p className="m-0 mt-0.5 text-content-muted text-[0.75rem] leading-relaxed lg:text-sm">{description}</p>}
+      {description && <p className="m-0 mt-0.5 text-content-muted text-xs leading-relaxed lg:text-sm">{description}</p>}
     </div>
   );
 }
@@ -141,7 +141,7 @@ function NavBadge({ badge }) {
     : 'border-border bg-surface-raised text-content-subtle';
   return (
     <span
-      className={`ml-auto shrink-0 rounded-full border px-1.5 py-px text-[0.625rem] font-semibold tabular-nums ${cls} ${badge.pulse ? 'animate-pulse' : ''}`}>
+      className={`ml-auto shrink-0 rounded-full border px-1.5 py-px text-2xs font-semibold tabular-nums ${cls} ${badge.pulse ? 'animate-pulse' : ''}`}>
       <span aria-hidden>{badge.n}</span>
       <span className="sr-only"> — {badge.srLabel}</span>
     </span>
@@ -163,7 +163,7 @@ function GridStatusFilter({ value, counts, onChange }) {
         return (
           <button key={f.id} type="button" onClick={() => onChange(f.id)}
             aria-pressed={on} title={f.title}
-            className={`min-h-10 lg:min-h-0 px-2 py-0.5 rounded-full border text-[0.6875rem] font-semibold tabular-nums ${
+            className={`min-h-10 lg:min-h-0 px-2 py-0.5 rounded-full border text-2xs font-semibold tabular-nums ${
               on ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100'
                 : 'border-border bg-surface text-content-muted hover:text-content'}`}>
             {f.label} ({counts[f.id] ?? 0})
@@ -195,7 +195,7 @@ function GridSortSelect({ value, images, onChange }) {
       <select value={value} onChange={(e) => onChange(e.target.value)}
         aria-label="Sort the grid"
         title="Order the images by face similarity to your reference, or group them by shot type. Images the pass never reached sink to the end."
-        className="max-w-[13rem] rounded-md border border-border bg-surface px-2 py-0.5 text-[0.6875rem] text-content">
+        className="max-w-[13rem] rounded-md border border-border bg-surface px-2 py-0.5 text-2xs text-content">
         {datasetSortOptions(images).map((o) => (
           <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
             {o.label}
@@ -226,7 +226,7 @@ function GridFilterBar({
       <div className="flex items-center gap-1.5 flex-wrap">
         {statusLabel && (
           <span
-            className="inline-flex items-center gap-1 rounded-full border border-amber-400/50 bg-amber-500/15 pl-2 pr-1 py-0.5 text-[0.6875rem] text-amber-100">
+            className="inline-flex items-center gap-1 rounded-full border border-amber-400/50 bg-amber-500/15 pl-2 pr-1 py-0.5 text-2xs text-amber-100">
             <span aria-hidden>◧</span> {statusLabel} only
             <button type="button" onClick={onRemoveStatus}
               aria-label="Show images with any decision again"
@@ -235,7 +235,7 @@ function GridFilterBar({
         )}
         {coverageLabel && (
           <span
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/50 bg-emerald-500/15 pl-2 pr-1 py-0.5 text-[0.6875rem] text-emerald-100">
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/50 bg-emerald-500/15 pl-2 pr-1 py-0.5 text-2xs text-emerald-100">
             <Search aria-hidden="true" className="h-3 w-3" /> {coverageLabel}
             <button type="button" onClick={onRemoveCoverage}
               aria-label="Stop showing only the images from that coverage chip"
@@ -244,7 +244,7 @@ function GridFilterBar({
         )}
         {excludes.map((t) => (
           <span key={`x-${t}`}
-            className="inline-flex items-center gap-1 rounded-full border border-rose-400/50 bg-rose-500/15 pl-2 pr-1 py-0.5 text-[0.6875rem] text-rose-200">
+            className="inline-flex items-center gap-1 rounded-full border border-rose-400/50 bg-rose-500/15 pl-2 pr-1 py-0.5 text-2xs text-rose-200">
             <span aria-hidden>⊘</span> {t}
             <button type="button" onClick={() => onRemoveExclude(t)}
               aria-label={`Stop hiding images tagged ${t}`}
@@ -253,7 +253,7 @@ function GridFilterBar({
         ))}
         {includes.map((t) => (
           <span key={`i-${t}`}
-            className="inline-flex items-center gap-1 rounded-full border border-indigo-400/50 bg-indigo-500/15 pl-2 pr-1 py-0.5 text-[0.6875rem] text-indigo-200">
+            className="inline-flex items-center gap-1 rounded-full border border-indigo-400/50 bg-indigo-500/15 pl-2 pr-1 py-0.5 text-2xs text-indigo-200">
             <span aria-hidden>◉</span> only {t}
             <button type="button" onClick={() => onRemoveInclude(t)}
               aria-label={`Stop isolating images tagged ${t}`}
@@ -1034,7 +1034,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
         <s.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
         <span>{s.title}</span>
         <NavBadge badge={navBadges[s.id]} />
-        {!chip && <span aria-hidden className="text-content-subtle text-[0.625rem]">{isActive ? '▾' : '▸'}</span>}
+        {!chip && <span aria-hidden className="text-content-subtle text-2xs">{isActive ? '▾' : '▸'}</span>}
       </button>
     );
   };
@@ -1062,7 +1062,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
       className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-content-muted hover:text-content hover:bg-surface-raised transition-colors">
       <Globe aria-hidden="true" className="h-4 w-4" />
       <span className="text-sm font-medium">Scrape images from the web</span>
-      <span className="text-content-muted text-[0.6875rem] lg:text-sm">scan a gallery URL, pick images, import full-frame</span>
+      <span className="text-content-muted text-2xs lg:text-sm">scan a gallery URL, pick images, import full-frame</span>
       <span aria-hidden className="ml-auto text-content-subtle">→</span>
     </button>
   );
@@ -1092,17 +1092,17 @@ export default function DatasetWorkspace({ ds, onBack }) {
           className={`${btnShape()} border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised`}>
           <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Datasets
         </button>
-        <h1 className="min-w-0 break-words text-content font-bold lg:text-2xl">{d.name}</h1>
+        <h1 className="min-w-0 break-words text-xl font-semibold text-content">{d.name}</h1>
         {isStyle ? (
           <span title="This Style LoRA is always active when loaded; adjust its LoRA weight to control the effect."
-            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-[0.6875rem]`}>
+            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-2xs`}>
             always-on style · no trigger
           </span>
         ) : (
           <button type="button"
             onClick={async () => { const res = await copyText(d.trigger_word || ''); if (!res.ok) toast.error(`Could not copy the trigger word — ${res.reason}.`); }}
             title="Copy the trigger word (to put in your prompts)"
-            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-indigo-400/40 bg-indigo-500/10 text-[0.6875rem] lg:text-sm`}>
+            className={`${controlHeight()} inline-flex items-center gap-1 px-2 rounded-md border border-indigo-400/40 bg-indigo-500/10 text-2xs lg:text-sm`}>
             <span className="text-content-subtle">trigger:</span>
             <code className="text-indigo-300 font-semibold">{d.trigger_word || '—'}</code>
             <Copy aria-hidden="true" className="h-3 w-3 text-content-subtle" />
@@ -1129,7 +1129,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 title={isStyle ? 'Edit the Style dataset name and review its always-on behavior.' : 'Edit the dataset name, trigger word, and (for concept datasets) the concept description that drives the caption avoid-list.'}
                 className={MENU_ITEM}>
                 <Settings aria-hidden="true" className="h-4 w-4" /> Edit settings
-                <span className="ml-auto text-content-subtle text-[0.625rem]">
+                <span className="ml-auto text-content-subtle text-2xs">
                   {isStyle ? 'name · always-on' : `name · trigger${isConcept ? ' · concept' : ''}`}
                 </span>
               </button>
@@ -1141,7 +1141,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     : 'Face-only fidelity (default): the LoRA learns the face; body shape follows the prompt. Click for FULL-BODY fidelity (body shape & marks bind to the trigger too).'}
                   className={`${MENU_ITEM} ${bodyFid ? 'text-emerald-300' : ''}`}>
                   <PersonStanding aria-hidden="true" className="h-4 w-4" /> Body fidelity
-                  <span className={`ml-auto text-[0.625rem] ${bodyFid ? 'text-emerald-300 font-semibold' : 'text-content-subtle'}`}>
+                  <span className={`ml-auto text-2xs ${bodyFid ? 'text-emerald-300 font-semibold' : 'text-content-subtle'}`}>
                     {bodyFid ? '✓ on' : 'off'}
                   </span>
                 </button>
@@ -1203,7 +1203,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           {/* Desktop: sticky rail + guided progress below it */}
           <div data-probe-panel="sections-rail" className="hidden lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-3">
             <nav aria-label="Dataset sections">
-              <p className="m-0 px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle lg:text-xs">Dataset</p>
+              <p className="m-0 px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle lg:text-xs">Dataset</p>
               <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
                 {visibleSections.map((s) => {
                   const isActive = s.id === section;
@@ -1282,7 +1282,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     ? `${act.done}/${act.total} improvement(s) queued — ${pending} generating…`
                     : `${pending} generation(s) in progress…`}
                 </span>
-                <span className="text-content-subtle text-[0.6875rem]">
+                <span className="text-content-subtle text-2xs">
                   {act?.kind === 'improve'
                     ? 'Runs on the server — you can close this tab. Stop ends the whole batch, not just what is in flight.'
                     : 'First results look wrong? Stop now — the remaining API calls are skipped (not billed).'}
@@ -1302,7 +1302,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           {/* ============ Images — la grille : triage ✓/✕, filtres, tri auto. */}
           <div className={sectionCls('images')}>
             {heading('images')}
-            <p className="m-0 text-content-subtle text-[0.75rem] tabular-nums">
+            <p className="m-0 text-content-subtle text-xs tabular-nums">
               {rescueGridImages.length} image(s) · {kept} kept
               {triage > 0 ? <> · <span className="text-amber-300">{triage} awaiting ✓/✕</span></> : ''}
               {rescueReviewCount > 0
@@ -1381,7 +1381,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-content">Generate Images</summary>
                 <div id="gf-reference" className="scroll-mt-20">
                   <div id="ds-add-reference" tabIndex={-1} className="scroll-mt-20 flex flex-col gap-1">
-                    <span className="text-content-subtle text-[0.6875rem]">
+                    <span className="text-content-subtle text-2xs">
                       one clear photo of the face — every generated variation starts from it
                     </span>
                     <ReferencePanel refFilename={d.ref_filename} datasetId={d.id} onSetRef={ds.setRef}
@@ -1482,7 +1482,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     When the reason is a missing install, the sentence is also the
                     way OUT: a link to the Setup step that installs it. */}
                 {!isConceptual && faceAnalysis.blocked && (
-                  <p className="m-0 basis-full text-sky-300/90 text-[0.6875rem]">
+                  <p className="m-0 basis-full text-sky-300/90 text-2xs">
                     ℹ {faceAnalysis.reason}
                     {faceAnalysis.setupRoute && (
                       <> — <a href={faceAnalysis.setupRoute} className="underline">open Setup</a></>
@@ -1731,20 +1731,20 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 )}
                 {/* Two numbers that differ must never be shown as one. */}
                 {flagged.rejectable > 0 && flagged.heldBack > 0 && (
-                  <p className="m-0 basis-full text-content-subtle text-[0.6875rem]">
+                  <p className="m-0 basis-full text-content-subtle text-2xs">
                     {flagged.rejectable} of {flagged.flagged} flagged can be rejected in bulk —
                     the rest are small-image rescue pairs or failed rows, settled in their own review.
                   </p>
                 )}
                 {rejectFlaggedNote && (
-                  <p className="m-0 basis-full text-emerald-300/90 text-[0.6875rem]">
+                  <p className="m-0 basis-full text-emerald-300/90 text-2xs">
                     {rejectFlaggedNote}
                   </p>
                 )}
                 {/* Who judged, and how many carry no position. Silent on the
                     ordinary run (one source, every flag located). */}
                 {flaggedNote && (
-                  <p className="m-0 basis-full text-content-subtle text-[0.6875rem]">
+                  <p className="m-0 basis-full text-content-subtle text-2xs">
                     ℹ {flaggedNote}
                   </p>
                 )}
@@ -1773,7 +1773,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     title="Install the watermark-inpainting package (LaMa) so off-center marks can be repainted instead of only cropped. One-time download (~hundreds of MB)."
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-amber-400/50 bg-amber-500/5 text-amber-200/90 text-sm hover:bg-amber-500/10">
                     <Download aria-hidden="true" className="h-4 w-4" /> Install inpainting
-                    <span className="text-content-subtle text-[0.625rem] font-normal">one-time · ~hundreds of MB</span>
+                    <span className="text-content-subtle text-2xs font-normal">one-time · ~hundreds of MB</span>
                     <span aria-hidden className="text-content-subtle text-xs">{installInpaintOpen ? '▴' : '▾'}</span>
                   </button>
                 )}
@@ -1791,7 +1791,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     <Eraser aria-hidden="true" className="h-5 w-5 shrink-0 text-amber-300" />
                     <div className="flex flex-col">
                       <span className="text-amber-200 text-sm font-semibold">Install watermark inpainting (LaMa)</span>
-                      <span className="text-content-subtle text-[0.6875rem]">
+                      <span className="text-content-subtle text-2xs">
                         Adds the <code className="text-amber-200/90">simple-lama-inpainting</code> package
                         (pulls a CPU torch — one-time download, ~hundreds of MB). No restart, no GPU:
                         once done, the Clean pass inpaints small off-center marks instead of skipping them.
@@ -1821,7 +1821,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm disabled:opacity-40">
                     <Trash2 aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Purge rejected/failed ({unused})
                   </button>
-                  <span className="text-content-subtle text-[0.6875rem]">
+                  <span className="text-content-subtle text-2xs">
                     frees disk space — rejected images never train either way
                   </span>
                 </div>
@@ -1842,7 +1842,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   readable at 400px. In-session only; it disappears on reload. */}
               {lastCaptionEngines && (
                 <p title={CAPTION_ENGINE_WHY}
-                  className="break-words rounded-lg border border-border bg-surface px-3 py-1.5 text-[0.75rem] text-content-muted">
+                  className="break-words rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-content-muted">
                   <PenLine aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Last pass: {ds.lastCaptionRun.captioned} caption(s) — {lastCaptionEngines}
                 </p>
               )}
@@ -1939,7 +1939,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   editable IN PLACE (saves on blur, like the grid). Style sets have no leak
                   concept, so the panel only opens for character/concept. */}
               {showLeaks && !isStyle && (
-                <div className="rounded-lg border border-border bg-surface-raised p-3 flex flex-col gap-3 text-[0.75rem]">
+                <div className="rounded-lg border border-border bg-surface-raised p-3 flex flex-col gap-3 text-xs">
                   <div className="flex items-start gap-2">
                     <Drama aria-hidden="true" className="h-5 w-5 shrink-0 text-content-muted" />
                     <div className="flex flex-col gap-1">
@@ -2001,7 +2001,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                              'jawline · eyebrows · facial features', 'face shape',
                              ...(bodyFid ? ['tattoos · scars · piercings (body fidelity)'] : [])]
                         ).map((c) => (
-                          <span key={c} className="rounded-full bg-surface border border-border px-2 py-0.5 text-content-muted text-[0.6875rem]">{c}</span>
+                          <span key={c} className="rounded-full bg-surface border border-border px-2 py-0.5 text-content-muted text-2xs">{c}</span>
                         ))}
                       </div>
                     )}
@@ -2045,7 +2045,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                 title={isConcept
                                   ? 'Re-generate every leaking caption while keeping the concept unspoken'
                                   : 'Re-generate every leaking caption without describing identity (face/hair)'}
-                                className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-200 text-[0.75rem] font-semibold border border-amber-400/40 hover:bg-amber-500/25 disabled:opacity-40">
+                                className="shrink-0 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-200 text-xs font-semibold border border-amber-400/40 hover:bg-amber-500/25 disabled:opacity-40">
                                 <RefreshCw aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Re-caption all leaking ({leakingImages.length})
                               </button>
                             )}
@@ -2067,7 +2067,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                   if (e.target.value !== (img.caption || '')) ds.setCaption(img.id, e.target.value);
                                 }}
                                 aria-label={`Caption of image ${img.id}`}
-                                className="w-full bg-app/60 border border-amber-400/30 rounded px-2 py-1 text-[0.6875rem] text-content resize-y" />
+                                className="w-full bg-app/60 border border-amber-400/30 rounded px-2 py-1 text-2xs text-content resize-y" />
                               {/* WHO WROTE THE LEAKING SENTENCE. This list is read
                                   caption by caption to decide what to redo, and the
                                   'auto' backend chains two engines inside one run —
@@ -2075,7 +2075,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                   and was not. Silent when the author was never
                                   recorded (that is not "a model wrote it"). */}
                               {captionOriginInfo(img.caption_origin).known && (
-                                <span className="text-[0.625rem] text-content-subtle"
+                                <span className="text-2xs text-content-subtle"
                                   title={captionOriginInfo(img.caption_origin).title}>
                                   {captionOriginInfo(img.caption_origin).short}
                                 </span>
@@ -2086,7 +2086,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                 title={isConcept
                                   ? 'Re-generate this caption while keeping the concept unspoken'
                                   : 'Re-generate this caption without describing identity (face/hair)'}
-                                className="self-start px-2 py-0.5 rounded-lg bg-surface text-content text-[0.6875rem] border border-border hover:bg-surface-raised disabled:opacity-40">
+                                className="self-start px-2 py-0.5 rounded-lg bg-surface text-content text-2xs border border-border hover:bg-surface-raised disabled:opacity-40">
                                 {rowBusy
                                   ? <><Loader2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px] animate-spin" />Re-captioning…</>
                                   : <><RefreshCw aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Re-caption</>}
@@ -2137,7 +2137,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onOpenChange={(open) => onRevealOpenChange('tools', open, setCaptionToolsOpen)} />
               </div>
               {filtersActive && (
-                <p className="m-0 text-content-subtle text-[0.6875rem]">
+                <p className="m-0 text-content-subtle text-2xs">
                   <Filter aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />A grid filter is active — the filtered grid lives in{' '}
                   <button type="button" onClick={() => setSection('images')}
                     className="underline hover:text-content">Images</button>
@@ -2154,7 +2154,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
           <div className={sectionCls('export')}>
             {heading('export')}
             <div id="gf-export" className="scroll-mt-20 flex flex-col gap-2">
-              <span className="text-content-subtle text-[0.625rem] uppercase tracking-wide">Bring images in</span>
+              <span className="text-content-subtle text-2xs uppercase tracking-wide">Bring images in</span>
               <div id="ds-export-import" tabIndex={-1}
                 className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-surface px-3 py-2 scroll-mt-20">
                 <button type="button" data-workspace-focus
@@ -2168,7 +2168,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
                   <FolderOpen aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Import from folder…
                 </button>
-                <span className="text-content-subtle text-[0.6875rem]">
+                <span className="text-content-subtle text-2xs">
                   merges images + same-name .txt captions in — duplicates are skipped
                 </span>
               </div>
@@ -2178,7 +2178,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   being dropped with its duplicate (see _merge_training_images).
                   Reported by Qeeyana (Reddit). */}
               <p id="ds-caption-elsewhere" tabIndex={-1}
-                className="scroll-mt-20 rounded-lg border border-border bg-surface px-3 py-2 text-[0.6875rem] text-content-muted">
+                className="scroll-mt-20 rounded-lg border border-border bg-surface px-3 py-2 text-2xs text-content-muted">
                 <span className="font-medium text-content">Want to caption in another tool?</span>{' '}
                 Export the ZIP below, caption it wherever you like, then bring the same
                 folder back through Import dataset: images already here are not
@@ -2192,7 +2192,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   e.target.value = '';
                 }} />
 
-              <span className="text-content-subtle text-[0.625rem] uppercase tracking-wide">Get this dataset out</span>
+              <span className="text-content-subtle text-2xs uppercase tracking-wide">Get this dataset out</span>
               <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2">
                 <div id="ds-export-training-zip" tabIndex={-1}
                   className="flex items-center gap-2 flex-wrap scroll-mt-20">
@@ -2201,7 +2201,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
                     <Download aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Export ZIP ({kept})
                   </button>
-                  <span className="text-content-subtle text-[0.6875rem]">
+                  <span className="text-content-subtle text-2xs">
                     kept images + captions, training-ready (kohya layout)
                   </span>
                 </div>
@@ -2214,7 +2214,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     plugin's row keep working. Do NOT make this a controlled
                     <details> without teaching `land` about it. */}
                 <details className="rounded-lg border border-border bg-surface-raised">
-                  <summary className="flex items-center gap-2 px-2.5 py-1.5 text-[0.6875rem] text-content-muted hover:text-content cursor-pointer select-none">
+                  <summary className="flex items-center gap-2 px-2.5 py-1.5 text-2xs text-content-muted hover:text-content cursor-pointer select-none">
                     More ways out
                     <span className="text-content-subtle">
                       bank · portable backup{exportActionSummary}
@@ -2229,7 +2229,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
                         <ArrowUp aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Import to bank
                       </button>
-                      <span className="text-content-subtle text-[0.6875rem]">
+                      <span className="text-content-subtle text-2xs">
                         both choices keep Dataset metadata — restore compatible analysis, or start fresh analysis
                       </span>
                     </div>
@@ -2240,7 +2240,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                         className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm">
                         <Save aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Backup
                       </button>
-                      <span className="text-content-subtle text-[0.6875rem]">
+                      <span className="text-content-subtle text-2xs">
                         portable copy — restore it on any machine from the Datasets page
                       </span>
                     </div>
@@ -2304,7 +2304,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
                   <span className="text-content font-semibold text-sm">LoRA testing studio</span>
                   {d.best_settings && (
-                    <span className="text-amber-300 text-[0.6875rem]" title="Saved winning settings">
+                    <span className="text-amber-300 text-2xs" title="Saved winning settings">
                       ★ {fmt(d.best_settings.strength)}
                     </span>
                   )}

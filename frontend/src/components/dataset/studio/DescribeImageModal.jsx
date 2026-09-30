@@ -110,7 +110,7 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close"
             className="w-8 h-8 rounded-lg border border-border bg-app text-content-muted hover:text-content disabled:opacity-40">×</button>
         </div>
-        <p className="text-content-subtle text-[0.6875rem] leading-snug">
+        <p className="text-content-subtle text-2xs leading-snug">
           The vision model turns the image into a test prompt (scene, pose, framing, outfit).
           It never names the person or adds the trigger word — the Studio handles those.
         </p>
@@ -130,14 +130,14 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
           {busy ? (
             <>
               <span className="inline-block w-6 h-6 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" aria-hidden />
-              <span className="text-content text-[0.75rem]">Describing{fileName ? ` “${fileName}”` : ''}…</span>
-              <span className="text-content-subtle text-[0.625rem]">The vision model may be loading — this can take a few seconds.</span>
+              <span className="text-content text-xs">Describing{fileName ? ` “${fileName}”` : ''}…</span>
+              <span className="text-content-subtle text-2xs">The vision model may be loading — this can take a few seconds.</span>
             </>
           ) : (
             <>
               <span className="text-2xl" aria-hidden>🖼️</span>
-              <span className="text-content text-[0.75rem]">Drop an image here, or click to choose</span>
-              <span className="text-content-subtle text-[0.625rem]">webp, png or jpg · up to {MAX_BYTES / (1024 * 1024)} MB</span>
+              <span className="text-content text-xs">Drop an image here, or click to choose</span>
+              <span className="text-content-subtle text-2xs">webp, png or jpg · up to {MAX_BYTES / (1024 * 1024)} MB</span>
             </>
           )}
         </button>
@@ -145,7 +145,7 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
           onChange={(e) => { describe(e.target.files?.[0]); e.target.value = ''; }} />
 
         {error && (
-          <p className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300 text-[0.6875rem]" role="alert">
+          <p className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-red-300 text-2xs" role="alert">
             {error}
           </p>
         )}
@@ -154,7 +154,7 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
 
         <div className="flex items-center justify-end pt-1">
           <button type="button" onClick={onClose} disabled={busy}
-            className="px-3 py-1.5 rounded-lg border border-border bg-app text-content-muted text-[0.75rem] hover:text-content disabled:opacity-40">
+            className="px-3 py-1.5 rounded-lg border border-border bg-app text-content-muted text-xs hover:text-content disabled:opacity-40">
             Cancel
           </button>
         </div>

@@ -167,7 +167,7 @@ export function FolderBrowserModal({ initial, onPick, onClose }) {
             <span className="block whitespace-pre-wrap break-words text-xs leading-relaxed text-red-200">
               {error}
             </span>
-            <span className="mt-1 block text-[0.625rem] text-content-subtle">
+            <span className="mt-1 block text-2xs text-content-subtle">
               You are still where you were — pick another folder and try again.
             </span>
           </div>

@@ -295,13 +295,13 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
 
   return (
     <>
-    <div className="mb-1.5 flex items-center justify-end gap-2 text-[0.625rem] text-content-subtle">
+    <div className="mb-1.5 flex items-center justify-end gap-2 text-2xs text-content-subtle">
       {/* 🔍 Big-preview mode: enlarge the generated tiles to compare epochs at a
           glance (ComfyUI-style), no clicking each. Persisted; default compact. */}
       <button type="button" onClick={toggleBigPreviews}
         aria-pressed={bigPreviews}
         title={bigPreviews ? 'Back to compact pills' : 'Enlarge the generated previews to compare checkpoints at a glance'}
-        className={'mr-auto rounded-md border px-2 py-0.5 text-[0.625rem] font-semibold transition-colors '
+        className={'mr-auto rounded-md border px-2 py-0.5 text-2xs font-semibold transition-colors '
           + (bigPreviews
             ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-100 '
             : 'border-border bg-app/60 text-content-muted hover:text-content ')}>
@@ -325,7 +325,7 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
         Disabled with an honest reason when the picks aren't deployable. */}
     {selectedCk.size > 0 && (
       <div className="lds-lgen mb-2 rounded-xl border border-indigo-400/40 bg-indigo-500/5 p-2.5">
-        <div className="mb-1.5 flex items-center gap-2 text-[0.6875rem]">
+        <div className="mb-1.5 flex items-center gap-2 text-2xs">
           <span className="font-semibold text-content">🎨 Generate previews</span>
           <span className="text-content-muted">{sel.testableCount} checkpoint{sel.testableCount !== 1 ? 's' : ''}, one shared prompt + seed, strength 1.0</span>
           <button type="button" onClick={() => setSelectedCk(new Set())}
@@ -333,24 +333,24 @@ export default function RunLineageGraph({ tree, onSelect, onContinueCheckpoint,
         </div>
         <textarea value={genPrompt} onChange={(e) => setGenPrompt(e.target.value)}
           rows={2} placeholder="Shared prompt — leave blank to use the dataset's identity prompt (trigger)"
-          className="w-full resize-y rounded-md border border-border bg-app/60 px-2 py-1.5 text-[0.6875rem] text-content placeholder:text-content-subtle focus:border-indigo-400/60 focus:outline-none" />
+          className="w-full resize-y rounded-md border border-border bg-app/60 px-2 py-1.5 text-2xs text-content placeholder:text-content-subtle focus:border-indigo-400/60 focus:outline-none" />
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1 text-[0.625rem] text-content-muted">
+          <label className="flex items-center gap-1 text-2xs text-content-muted">
             Seed
             <input value={genSeed} onChange={(e) => setGenSeed(e.target.value)}
               inputMode="numeric" placeholder="random"
-              className="w-24 rounded-md border border-border bg-app/60 px-1.5 py-1 text-[0.6875rem] tabular-nums text-content placeholder:text-content-subtle focus:border-indigo-400/60 focus:outline-none" />
+              className="w-24 rounded-md border border-border bg-app/60 px-1.5 py-1 text-2xs tabular-nums text-content placeholder:text-content-subtle focus:border-indigo-400/60 focus:outline-none" />
           </label>
           <button type="button" onClick={handleGenerate} disabled={!sel.enabled || gen.busy}
-            className={'rounded-md px-3 py-1 text-[0.6875rem] font-semibold '
+            className={'rounded-md px-3 py-1 text-2xs font-semibold '
               + (sel.enabled && !gen.busy
                 ? 'bg-indigo-500 text-gray-950 hover:bg-indigo-400 '
                 : 'cursor-not-allowed bg-app/60 text-content-subtle ')}>
             {gen.busy ? 'Generating…' : 'Generate'}
           </button>
-          {sel.hint && <span className="text-[0.625rem] text-amber-200/90">{sel.hint}</span>}
-          {gen.error && <span className="text-[0.625rem] text-red-300">{gen.error}</span>}
-          {gen.note && !gen.error && <span className="text-[0.625rem] text-emerald-300">{gen.note}</span>}
+          {sel.hint && <span className="text-2xs text-amber-200/90">{sel.hint}</span>}
+          {gen.error && <span className="text-2xs text-red-300">{gen.error}</span>}
+          {gen.note && !gen.error && <span className="text-2xs text-emerald-300">{gen.note}</span>}
         </div>
       </div>
     )}

@@ -25,11 +25,11 @@ export default function BankGroupCard({
     <li className="flex min-w-0 flex-col gap-2 rounded-lg border border-indigo-400/40 bg-surface p-4">
       <div className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 truncate text-sm font-semibold text-content">{row.name}</span>
-        <span className="shrink-0 rounded bg-indigo-500/15 px-1.5 py-px text-[10px] font-semibold text-indigo-300">
+        <span className="shrink-0 rounded bg-indigo-500/15 px-1.5 py-px text-2xs font-semibold text-indigo-300">
           {row.members.length} banks
         </span>
         {queued > 0 && (
-          <span className="shrink-0 rounded bg-indigo-500/15 px-1.5 py-px text-[10px] font-semibold text-indigo-300">
+          <span className="shrink-0 rounded bg-indigo-500/15 px-1.5 py-px text-2xs font-semibold text-indigo-300">
             {queued} in the queue
           </span>
         )}
@@ -71,7 +71,7 @@ export default function BankGroupCard({
               <li key={m.id} className="min-w-0 space-y-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="min-w-0 truncate text-xs font-medium text-content">{m.name}</span>
-                  <span className="shrink-0 text-[10px] text-content-subtle">
+                  <span className="shrink-0 text-2xs text-content-subtle">
                     {m.total} · {m.keep} kept
                   </span>
                   <button type="button" onClick={() => onRename?.(m)}
@@ -85,21 +85,21 @@ export default function BankGroupCard({
                     aria-label={`Remove bank ${m.name}`}
                     className="px-1 text-content-subtle hover:text-rose-300">✕</button>
                 </div>
-                <p className="truncate font-mono text-[10px] text-content-subtle" title={m.source_path}>
+                <p className="truncate font-mono text-2xs text-content-subtle" title={m.source_path}>
                   {m.source_path}
                 </p>
                 {badge && (
                   <p title={badge.title}
-                    className={`text-[10px] ${badge.tone === 'error' ? 'text-rose-300' : 'text-amber-300'}`}>
+                    className={`text-2xs ${badge.tone === 'error' ? 'text-rose-300' : 'text-amber-300'}`}>
                     {badge.label} in its last 🚀 Launch all
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => onOpen?.(m.id)}
-                    className="rounded border border-border px-2 py-0.5 text-[10px] font-semibold text-content hover:bg-surface-raised">
+                    className="rounded border border-border px-2 py-0.5 text-2xs font-semibold text-content hover:bg-surface-raised">
                     Open →
                   </button>
-                  <label className="flex items-center gap-1 text-[10px] text-content-muted">
+                  <label className="flex items-center gap-1 text-2xs text-content-muted">
                     <input type="checkbox" checked={Boolean(m.keep_separate)}
                       onChange={(e) => onKeepSeparate?.(m, e.target.checked)} />
                     Keep separate

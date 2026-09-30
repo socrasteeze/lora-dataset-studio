@@ -365,11 +365,11 @@ export default function GalleryPage() {
             itself has been stable for weeks, but 📷 Camera angles ships today and
             brings a second 20 GB engine with it. Same amber chip as the ◉ Canvas
             and the Slider trainer, so "beta" means one thing across the app. */}
-        <h1 className="m-0 flex items-center gap-2 text-lg font-bold text-content">
+        <h1 className="m-0 flex items-center gap-2 text-xl font-semibold text-content">
           <Images aria-hidden="true" className="h-4 w-4" /> Gallery
-          <span className="rounded border border-amber-400/50 bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-300">Beta</span>
+          <span className="rounded border border-amber-400/50 bg-amber-500/10 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-300">Beta</span>
         </h1>
-        <p className="m-0 text-content-muted text-[0.75rem]">
+        <p className="m-0 text-content-muted text-xs">
           {status === 'ready'
             ? gallerySummaryLine({ count: feed.count, shown: images.length })
             : ''}
@@ -385,7 +385,7 @@ export default function GalleryPage() {
           grid-toolbar, and it is what proves to the probe the page painted. */}
       <div data-probe-chrome="gallery-filters"
         className="flex flex-wrap items-center gap-2">
-        <label className="flex min-w-0 items-center gap-1.5 text-[0.75rem] text-content-muted">
+        <label className="flex min-w-0 items-center gap-1.5 text-xs text-content-muted">
           <span className="sr-only">Dataset</span>
           <select value={filters.datasetId}
             onChange={(e) => setFilter({ datasetId: e.target.value })}
@@ -418,7 +418,7 @@ export default function GalleryPage() {
 
       {notice && (
         <p role={notice.kind === 'ok' ? undefined : 'alert'}
-          className={`m-0 rounded-lg border px-2 py-1.5 text-[0.6875rem] ${
+          className={`m-0 rounded-lg border px-2 py-1.5 text-2xs ${
             notice.kind === 'error'
               ? 'border-rose-400/50 bg-rose-500/10 text-rose-100'
               : notice.kind === 'warn'
@@ -429,10 +429,10 @@ export default function GalleryPage() {
       )}
 
       {status === 'loading' && (
-        <p className="m-0 text-content-subtle text-[0.75rem]">Loading…</p>
+        <p className="m-0 text-content-subtle text-xs">Loading…</p>
       )}
       {status === 'error' && (
-        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-[0.75rem]">
+        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-xs">
           {error}
         </p>
       )}
@@ -472,7 +472,7 @@ export default function GalleryPage() {
                 </button>
                 {picking && (
                   <span aria-hidden
-                    className={`pointer-events-none absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[0.75rem] ${isPicked
+                    className={`pointer-events-none absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-xs ${isPicked
                       ? 'border-rose-300 bg-rose-500 text-white'
                       : 'border-white/60 bg-black/50 text-transparent'}`}>✓</span>
                 )}
@@ -495,13 +495,13 @@ export default function GalleryPage() {
                     title={isCameraView(img)
                       ? `Camera view — ${poseLabel(img.camera_pose) || 'another angle'}`
                       : 'Upscale & improve result'}
-                    className="pointer-events-none absolute bottom-0.5 left-1 text-[0.625rem]">
+                    className="pointer-events-none absolute bottom-0.5 left-1 text-2xs">
                     {isCameraView(img) ? '📷' : '✨'}
                   </span>
                 )}
                 {isCameraView(img) && poseLabel(img.camera_pose) && (
                   <span aria-hidden
-                    className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-1 pb-0.5 pt-2 text-center text-[0.55rem] leading-tight text-white/85">
+                    className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-1 pb-0.5 pt-2 text-center text-2xs leading-tight text-white/85">
                     {poseLabel(img.camera_pose)}
                   </span>
                 )}
@@ -532,7 +532,7 @@ export default function GalleryPage() {
             aria-pressed={bar.togglePressed}
             aria-label={picking ? 'Leave selection mode' : 'Select images to delete or download'}
             title={picking ? 'Leave selection mode' : 'Select images to delete or download'}
-            className={`min-h-10 lg:min-h-0 shrink-0 rounded-md border px-3 py-1.5 text-[0.75rem] font-semibold ${picking
+            className={`min-h-10 lg:min-h-0 shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold ${picking
               ? 'border-indigo-300 bg-indigo-500/40 text-white'
               : 'border-indigo-400/70 bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/25'}`}>
             <span aria-hidden>{picking ? '✓' : '☑'}</span> {bar.toggleLabel}
@@ -540,7 +540,7 @@ export default function GalleryPage() {
           {picking && zipBtn.shown && (
             <button type="button" data-testid="gallery-download-zip"
               onClick={runZip} disabled={zipBtn.disabled} title={zipBtn.title}
-              className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-[0.75rem] hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
+              className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
               {zipBtn.label}
             </button>
           )}
@@ -556,7 +556,7 @@ export default function GalleryPage() {
               onClick={runFiles} disabled={!!filesProgress}
               aria-busy={!!filesProgress}
               title="Save each selected image as its own file — no archive to unpack; your browser may ask once to allow multiple downloads"
-              className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-[0.75rem] hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
+              className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
               {filesProgress
                 ? `Saving ${Math.min(filesProgress.done + 1, filesProgress.total)}/${filesProgress.total}…`
                 : `⬇ Files (${selected.size})`}
@@ -564,19 +564,19 @@ export default function GalleryPage() {
           )}
           {bar.showsDelete && (
             <>
-              <span className="text-content-muted text-[0.6875rem] tabular-nums">
+              <span className="text-content-muted text-2xs tabular-nums">
                 {selected.size} selected
               </span>
               <button type="button"
                 onClick={() => setSelected(selected.size === images.length
                   ? new Set() : allGalleryImageIds(images))}
-                className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1.5 text-content-muted text-[0.6875rem] hover:text-content">
+                className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1.5 text-content-muted text-2xs hover:text-content">
                 {bar.selectAllLabel}
               </button>
               <button type="button" data-testid="gallery-delete"
                 disabled={bar.deleteDisabled}
                 onClick={() => setConfirming(true)}
-                className="ml-auto min-h-10 lg:min-h-0 rounded-md border border-rose-500/50 px-3 py-1.5 text-[0.75rem] text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+                className="ml-auto min-h-10 lg:min-h-0 rounded-md border border-rose-500/50 px-3 py-1.5 text-xs text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
                 <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Delete{selected.size ? ` (${selected.size})` : ''}
               </button>
             </>
@@ -590,22 +590,22 @@ export default function GalleryPage() {
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-3">
           <div className="w-full max-w-sm rounded-xl border border-border bg-surface-overlay p-4 shadow-xl">
             <h4 className="m-0 mb-2 text-sm font-semibold text-content">{confirmation.title}</h4>
-            <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-[0.75rem]">
+            <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-xs">
               {confirmation.lines.map((line) => <li key={line}>{line}</li>)}
             </ul>
             {confirmation.destructive && (
-              <p className="m-0 mb-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-rose-100 text-[0.6875rem]">
+              <p className="m-0 mb-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-rose-100 text-2xs">
                 This cannot be undone.
               </p>
             )}
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" autoFocus onClick={() => setConfirming(false)}
-                className="rounded-md border border-border px-3 py-2 text-content-muted text-[0.75rem] hover:text-content">
+                className="rounded-md border border-border px-3 py-2 text-content-muted text-xs hover:text-content">
                 Cancel
               </button>
               <button type="button" data-testid="gallery-confirm-delete"
                 disabled={busy} onClick={runDelete}
-                className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-[0.75rem] text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
+                className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-xs text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
                 {busy ? 'Deleting…' : `Delete ${selected.size}`}
               </button>
             </div>

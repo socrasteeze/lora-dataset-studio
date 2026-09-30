@@ -189,7 +189,7 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
           <div role="tooltip"
             className="absolute z-50 top-full left-2 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface-overlay p-3 shadow-xl flex flex-col gap-1.5">
             {AUTO_TRIAGE_HELP.map((line) => (
-              <p key={line} className="text-[11px] leading-snug text-content-muted">{line}</p>
+              <p key={line} className="text-2xs leading-snug text-content-muted">{line}</p>
             ))}
           </div>
         </>
@@ -496,7 +496,7 @@ export default function DatasetGrid({ images, datasetId, datasetInstanceId = nul
           which pass, and a title is not readable on a touch screen at all. */}
       {busyReason && (
         <p role="status" aria-live="polite"
-          className="rounded-lg border border-amber-400/30 bg-amber-400/5 px-2.5 py-1.5 text-[11px] leading-snug text-amber-100/90">
+          className="rounded-lg border border-amber-400/30 bg-amber-400/5 px-2.5 py-1.5 text-2xs leading-snug text-amber-100/90">
           <span aria-hidden="true">🔒 </span>{READS_STAY_OPEN}
         </p>
       )}

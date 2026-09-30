@@ -34,24 +34,24 @@ export default function RecentPrompts({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span className="text-content-subtle text-[0.5625rem] uppercase">
+        <span className="text-content-subtle text-2xs uppercase">
           Saved prompts — click a card to reload it · thumbnail = an image you liked
         </span>
         {batchable && <HelpBadge topic="studio-prompt-batch" />}
         {batchable && picked.length > 0 && (
           <span className="flex items-center gap-1.5">
-            <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-[0.5625rem] font-semibold text-purple-200 tabular-nums">
+            <span className="rounded bg-purple-500/20 px-1.5 py-0.5 text-2xs font-semibold text-purple-200 tabular-nums">
               {picked.length} selected
             </span>
             <button type="button" onClick={onClearBatch}
-              className="inline-flex min-h-10 items-center px-1 text-content-subtle text-[0.5625rem] underline decoration-dotted hover:text-content lg:min-h-0 lg:px-0">
+              className="inline-flex min-h-10 items-center px-1 text-content-subtle text-2xs underline decoration-dotted hover:text-content lg:min-h-0 lg:px-0">
               Clear
             </button>
           </span>
         )}
       </div>
       {batchable && (
-        <p className="m-0 text-content-subtle text-[0.5625rem]">
+        <p className="m-0 text-content-subtle text-2xs">
           Tick several prompts to generate them all in one run — same checkpoints,
           same settings, one image set per prompt.
         </p>
@@ -84,12 +84,12 @@ export default function RecentPrompts({
                       alt="" loading="lazy" decoding="async"
                       className="block h-32 w-24 object-cover" />
                   ) : (
-                    <span className="flex h-32 w-24 items-center justify-center bg-app/60 px-1 text-center text-[0.5625rem] leading-snug text-content-subtle">
+                    <span className="flex h-32 w-24 items-center justify-center bg-app/60 px-1 text-center text-2xs leading-snug text-content-subtle">
                       No image yet
                     </span>
                   )}
                   {p.count > 0 && (
-                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[0.5625rem] tabular-nums text-white/90">
+                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-2xs tabular-nums text-white/90">
                       {p.count}{p.liked ? ' 👍' : ''}
                     </span>
                   )}
@@ -102,7 +102,7 @@ export default function RecentPrompts({
                  * lines make an exact line boundary, preventing clipping through letters despite
                  * browser rounding.
                  */}
-                <span className={`h-9 px-1 py-1 text-[0.625rem] leading-[0.875rem] line-clamp-2 ${
+                <span className={`h-9 px-1 py-1 text-2xs leading-[0.875rem] line-clamp-2 ${
                   sel ? 'text-purple-200' : 'text-content-muted'}`}>
                   {p.prompt}
                 </span>
@@ -112,7 +112,7 @@ export default function RecentPrompts({
                   onClick={() => onToggleBatch(p.prompt)}
                   title={inBatch ? 'Remove this prompt from the batch' : 'Add this prompt to the batch'}
                   aria-label={inBatch ? 'Remove this prompt from the batch' : 'Add this prompt to the batch'}
-                  className={`absolute left-1 top-1 flex h-10 w-10 items-center justify-center rounded bg-black/60 text-[0.6875rem] lg:h-5 lg:w-5 ${
+                  className={`absolute left-1 top-1 flex h-10 w-10 items-center justify-center rounded bg-black/60 text-2xs lg:h-5 lg:w-5 ${
                     inBatch ? 'text-purple-200' : 'text-white/70 hover:text-white'}`}>
                   <span aria-hidden>{inBatch ? '☑' : '☐'}</span>
                 </button>
@@ -125,7 +125,7 @@ export default function RecentPrompts({
                   }}
                   title="Delete this saved prompt (and its test images)"
                   aria-label="Delete this saved prompt"
-                  className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded bg-black/60 text-[0.6875rem] text-red-300/80 hover:bg-red-500/40 hover:text-red-200 lg:h-5 lg:w-5">
+                  className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded bg-black/60 text-2xs text-red-300/80 hover:bg-red-500/40 hover:text-red-200 lg:h-5 lg:w-5">
                   🗑
                 </button>
               )}
@@ -135,12 +135,12 @@ export default function RecentPrompts({
 
         <button type="button" onClick={() => setBrowserOpen(true)}
           title="Search, read in full and manage every prompt you have launched a test with"
-          className="flex min-h-[10rem] w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-surface px-1 text-center text-[0.625rem] leading-snug text-content-muted hover:border-purple-400/60 hover:text-content">
+          className="flex min-h-[10rem] w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-surface px-1 text-center text-2xs leading-snug text-content-muted hover:border-purple-400/60 hover:text-content">
           <span aria-hidden className="text-base">📚</span>
           Browse all
           <span className="tabular-nums font-semibold">{total}</span>
           {total > INLINE && (
-            <span className="text-[0.5625rem] text-content-subtle">
+            <span className="text-2xs text-content-subtle">
               +{total - INLINE} more
             </span>
           )}

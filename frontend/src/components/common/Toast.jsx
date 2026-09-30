@@ -116,7 +116,7 @@ function ToastContainer({ toasts, onRemove }) {
           <span className="text-sm flex-1 break-words">{t.message}</span>
           {(t.count || 1) > 1 && (
             <span aria-hidden="true"
-              className="flex-shrink-0 self-start rounded-full bg-black/25 px-1.5 py-px text-[0.6875rem] font-semibold tabular-nums">
+              className="flex-shrink-0 self-start rounded-full bg-black/25 px-1.5 py-px text-2xs font-semibold tabular-nums">
               {t.count}×
             </span>
           )}

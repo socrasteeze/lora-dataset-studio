@@ -120,7 +120,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
         </div>
 
         {style ? (
-          <div className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-[0.75rem] text-cyan-100">
+          <div className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
             <b>Always-on Style:</b> no activation trigger is written into captions or prompts.
             Control the effect with the LoRA weight; when combining with a character LoRA,
             tune the two weights independently.
@@ -130,7 +130,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             <span className="text-content-muted text-xs">Trigger word</span>
             <input value={trigger} onChange={(e) => setTrigger(e.target.value)}
               placeholder="e.g. myTrigger" className={`${FIELD} font-mono`} />
-            <span className="text-content-subtle text-[0.6875rem]">
+            <span className="text-content-subtle text-2xs">
               The word you put in prompts to summon this LoRA. Safe to change anytime —
               it&apos;s added at export, so existing captions don&apos;t need redoing.
             </span>
@@ -143,7 +143,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2}
               placeholder="e.g. a mirror selfie / a specific pose / an art style"
               className={`${FIELD} resize-y`} />
-            <span className="text-content-subtle text-[0.6875rem]">
+            <span className="text-content-subtle text-2xs">
               This is the thing the LoRA learns. Captions describe everything <b>except</b> this,
               so it binds to the trigger. Editing it rebuilds the auto avoid-list —
               <b> re-caption</b> to apply it to images already captioned.
@@ -177,7 +177,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
                   </label>
                 ))}
               </div>
-              <span className="text-content-subtle text-[0.6875rem]">
+              <span className="text-content-subtle text-2xs">
                 Free text added to every <b>generated</b> variation — the identity lock is
                 untouched. A framing suffix applies to that shot type first, then the global
                 one. Applied at generation time: safe to change anytime, existing images
@@ -190,7 +190,7 @@ export default function DatasetSettingsModal({ d, busy, onSave, onClose }) {
         {/* Honest confirmation: what a kind switch changes and what it keeps. Only
             shown once the pill actually differs from the stored kind. */}
         {switchSummary && (
-          <div className="rounded-lg border border-amber-400/40 bg-amber-500/5 px-3 py-2.5 flex flex-col gap-2 text-[0.75rem]">
+          <div className="rounded-lg border border-amber-400/40 bg-amber-500/5 px-3 py-2.5 flex flex-col gap-2 text-xs">
             <div className="text-amber-200 font-semibold flex items-center gap-1.5">
               ⚠ Changing kind: {KIND_LABELS[switchSummary.from]} → {KIND_LABELS[switchSummary.to]}
             </div>

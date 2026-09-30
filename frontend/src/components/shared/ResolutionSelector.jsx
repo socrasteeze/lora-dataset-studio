@@ -88,8 +88,8 @@ export default function ResolutionSelector({
                   : 'border-white/10 bg-white/[0.04] text-content-muted'
                 }`}
             >
-              <span className="text-[0.6875rem] font-semibold">{t.label}</span>
-              <span className="text-[0.625rem] opacity-60 tabular-nums">{w}×{h}</span>
+              <span className="text-2xs font-semibold">{t.label}</span>
+              <span className="text-2xs opacity-60 tabular-nums">{w}×{h}</span>
             </button>
           );
         })}
@@ -97,7 +97,7 @@ export default function ResolutionSelector({
 
       {/* Multiplier — enlarges the chosen preset linearly. Default 1.0 = unchanged. */}
       <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between text-[0.625rem] uppercase tracking-wide text-content-muted">
+        <div className="flex items-center justify-between text-2xs uppercase tracking-wide text-content-muted">
           <span>Resolution multiplier</span>
           <span className={`tabular-nums font-semibold ${overTrain ? 'text-amber-400' : 'text-content'}`}>
             ×{m.toFixed(1)}
@@ -110,13 +110,13 @@ export default function ResolutionSelector({
           aria-label="Resolution multiplier"
           className={`w-full h-1.5 rounded-full appearance-none cursor-pointer ${overTrain ? 'accent-amber-500' : 'accent-primary'}`}
         />
-        <span className="text-[0.625rem] text-content-muted/70 tabular-nums normal-case tracking-normal">
+        <span className="text-2xs text-content-muted/70 tabular-nums normal-case tracking-normal">
           {enlarged
             ? `${bw}×${bh} → ${fw}×${fh}`
             : `${bw}×${bh} · slide to enlarge past the training resolution`}
         </span>
         {overTrain && (
-          <span className="text-[0.625rem] text-amber-400/90 normal-case tracking-normal leading-snug">
+          <span className="text-2xs text-amber-400/90 normal-case tracking-normal leading-snug">
             Beyond ~1.5× the training resolution, Krea/Z-Image may soften, duplicate or OOM on the GPU.
           </span>
         )}

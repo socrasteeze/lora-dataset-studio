@@ -13,18 +13,18 @@ export default function TextZonesGallery({
   if (!items.length) {
     if (live) {
       return (
-        <p className="m-0 text-[11px] leading-snug text-content-subtle">
+        <p className="m-0 text-2xs leading-snug text-content-subtle">
           Scanning — nothing flagged yet. Pages appear here as they are flagged.
         </p>
       )
     }
     return emptyLine
-      ? <p className="m-0 text-[11px] leading-snug text-content-subtle">{emptyLine}</p>
+      ? <p className="m-0 text-2xs leading-snug text-content-subtle">{emptyLine}</p>
       : null
   }
   return (
     <div className="space-y-1">
-      <p className="m-0 text-[11px] leading-snug text-content-subtle">
+      <p className="m-0 text-2xs leading-snug text-content-subtle">
         <span className="font-medium text-content">Flagged pages and their zones</span>
         {galleryHeadline(items.length, total)}
         {reviewHint ? `. ${reviewHint}` : '.'}
@@ -43,7 +43,7 @@ export default function TextZonesGallery({
                   style={zoneStyle(zone)} />
               ))}
             </a>
-            <p className="m-0 mt-0.5 text-center text-[10px] text-content-subtle">#{it.id}</p>
+            <p className="m-0 mt-0.5 text-center text-2xs text-content-subtle">#{it.id}</p>
           </li>
         ))}
       </ul>

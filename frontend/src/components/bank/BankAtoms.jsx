@@ -48,7 +48,7 @@ export function Stat({ label, value, tone }) {
  *  passes toolbar) so dense rows read as grouped rather than as a flat wall. */
 export function GroupLabel({ children }) {
   return (
-    <span className="text-[10px] font-semibold uppercase tracking-wide text-content-subtle">{children}</span>
+    <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">{children}</span>
   )
 }
 

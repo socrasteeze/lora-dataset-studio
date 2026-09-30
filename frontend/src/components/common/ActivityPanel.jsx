@@ -123,7 +123,7 @@ export default function ActivityPanel({ onClose }) {
                       {stall && <span className={TONE[stall.tone]}>⚠ {stall.label}</span>}
                     </div>
                     {r.detail && (
-                      <p className="mt-0.5 text-[0.6875rem] text-content-subtle">{r.detail}</p>
+                      <p className="mt-0.5 text-2xs text-content-subtle">{r.detail}</p>
                     )}
                   </li>
                 )
@@ -131,7 +131,7 @@ export default function ActivityPanel({ onClose }) {
             </ul>
           )}
           {queued.length > 0 && (
-            <p className="text-[0.6875rem] text-content-subtle">
+            <p className="text-2xs text-content-subtle">
               Waiting: {queued.map((q) => (
                 q.device_id && q.device_id !== 'local' ? `#${q.bank_id} (remote)` : `#${q.bank_id}`
               )).join(', ')} — one at a time per machine.
@@ -145,7 +145,7 @@ export default function ActivityPanel({ onClose }) {
             Log
           </p>
           <div ref={feed} onScroll={onScroll}
-            className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border bg-app/60 p-2 font-mono text-[0.6875rem] leading-relaxed">
+            className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border bg-app/60 p-2 font-mono text-2xs leading-relaxed">
             {events.length === 0 ? (
               <p className="text-content-subtle">
                 Nothing yet — this fills up as passes start, finish and fail.

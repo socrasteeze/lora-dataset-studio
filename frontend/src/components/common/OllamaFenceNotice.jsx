@@ -16,7 +16,7 @@ export default function OllamaFenceNotice({ fence, onUnload, onStop, className =
   const waiting = model.tone === 'waiting' || model.tone === 'busy';
   return (
     <div role="status" aria-live="polite"
-      className={`rounded-lg border px-3 py-2 text-[0.6875rem] ${waiting
+      className={`rounded-lg border px-3 py-2 text-2xs ${waiting
         ? 'border-amber-400/40 bg-amber-500/10'
         : 'border-rose-400/40 bg-rose-500/10'} ${className}`}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

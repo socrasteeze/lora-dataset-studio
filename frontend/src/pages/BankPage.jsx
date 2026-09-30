@@ -121,7 +121,7 @@ function BankPreviewStrip({ bank, onOpen }) {
         </div>
       ))}
       {extra > 0 && (
-        <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[0.625rem] font-semibold text-white">
+        <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-black/60 px-1 text-2xs font-semibold text-white">
           +{extra}
         </span>
       )}
@@ -184,9 +184,9 @@ function QueuePanel({ queue, nameOf, onCancel, onClear }) {
             <span className="w-5 text-right text-content-subtle">{it.position}.</span>
             <span className="min-w-0 truncate font-medium text-content">{nameOf(it.bank_id)}</span>
             {it.state === 'running' ? (
-              <span className="rounded bg-emerald-500/15 px-1.5 py-px text-[10px] font-semibold text-emerald-300">running</span>
+              <span className="rounded bg-emerald-500/15 px-1.5 py-px text-2xs font-semibold text-emerald-300">running</span>
             ) : (
-              <span className="rounded bg-surface-raised px-1.5 py-px text-[10px] font-semibold text-content-muted">waiting</span>
+              <span className="rounded bg-surface-raised px-1.5 py-px text-2xs font-semibold text-content-muted">waiting</span>
             )}
             {/* Which machine, and why it hasn't started. The snapshot has
                 published both all along and this panel dropped them: twelve
@@ -196,12 +196,12 @@ function QueuePanel({ queue, nameOf, onCancel, onClear }) {
                 the app despite snapshot()'s own comment saying it was shown
                 here — so a queue stalled on a stuck GPU flag looked dead. */}
             {it.device_label && (
-              <span className="truncate rounded bg-surface-raised px-1.5 py-px text-[10px] text-content-muted">
+              <span className="truncate rounded bg-surface-raised px-1.5 py-px text-2xs text-content-muted">
                 on {it.device_label}
               </span>
             )}
             {it.state !== 'running' && it.waiting_for && (
-              <span className="min-w-0 truncate text-[10px] text-amber-300" title={it.waiting_for}>
+              <span className="min-w-0 truncate text-2xs text-amber-300" title={it.waiting_for}>
                 {it.waiting_for}
               </span>
             )}
@@ -232,15 +232,15 @@ function BankListSummary({ bank }) {
           ))}
         </div>
       ) : summary.total === 0
-        ? <p className="text-[11px] text-content-subtle">No images.</p>
-        : <p className="text-[11px] text-amber-300/90">Curation totals unavailable.</p>}
-      <ul className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-content-muted">
+        ? <p className="text-2xs text-content-subtle">No images.</p>
+        : <p className="text-2xs text-amber-300/90">Curation totals unavailable.</p>}
+      <ul className="flex flex-wrap gap-x-2 gap-y-0.5 text-2xs text-content-muted">
         {summary.status.map((row) => (
           <li key={row.id} className="tabular-nums">{row.label} <span className="text-content">{row.value ?? '—'}</span>
             {row.percent != null && <span className="text-content-subtle"> · {row.percent}%</span>}</li>
         ))}
       </ul>
-      <div className="flex items-center gap-2 text-[11px]">
+      <div className="flex items-center gap-2 text-2xs">
         <span className="text-content-muted">Quality</span>
         <span className={summary.scanPercent == null ? 'text-amber-300/90' : 'text-content-subtle'}>
           {summary.scanText}
@@ -654,7 +654,7 @@ export default function BankPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center gap-2">
         {/* Beta chip retired here — it now marks the LoRA Canvas instead. */}
-        <h1 className="flex items-center gap-2 text-xl font-bold text-content"><Archive aria-hidden="true" className="h-5 w-5" /> Image bank</h1>
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-content"><Archive aria-hidden="true" className="h-5 w-5" /> Image bank</h1>
         <HelpBadge topic="page-bank" />
         {/* The kind of bank you are making, said WHERE you make one. Until now a
             .mp4 dropped in this folder was skipped in silence — this is the only
@@ -903,7 +903,7 @@ export default function BankPage() {
                   <span className="text-xs text-amber-300">⏳ {b.activity.kind}…</span>
                 )}
                 {qs && (
-                  <span className="rounded bg-indigo-500/15 px-1.5 py-px text-[10px] font-semibold text-indigo-300">
+                  <span className="rounded bg-indigo-500/15 px-1.5 py-px text-2xs font-semibold text-indigo-300">
                     {qs.state === 'running' ? 'running' : `queued · #${qs.position}`}
                   </span>
                 )}

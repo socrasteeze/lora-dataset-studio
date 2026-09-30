@@ -49,10 +49,10 @@ function PipelineSteps() {
           <span className="grid place-items-center w-8 h-8 shrink-0 rounded-full bg-primary/15 border border-primary/40 text-base"
             aria-hidden="true"><s.icon className="h-4 w-4" /></span>
           <span className="min-w-0">
-            <span className="block text-content text-[0.75rem] font-semibold">
+            <span className="block text-content text-xs font-semibold">
               <span className="text-indigo-300 mr-1">{s.n}.</span>{s.title}
             </span>
-            <span className="block text-content-subtle text-[0.6875rem] leading-snug">{s.text}</span>
+            <span className="block text-content-subtle text-2xs leading-snug">{s.text}</span>
           </span>
           {i < steps.length - 1 && (
             <span className="hidden sm:block absolute -right-2 top-1/2 -translate-y-1/2 text-content-subtle z-10"
@@ -170,12 +170,12 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
             </span>
           )}
           {d.kind === 'concept' && (
-            <span className="absolute left-1.5 top-1.5 rounded border border-fuchsia-400/40 bg-black/50 px-1.5 py-px text-[0.5625rem] font-semibold uppercase text-fuchsia-300 backdrop-blur-sm inline-flex items-center gap-1">
+            <span className="absolute left-1.5 top-1.5 rounded border border-fuchsia-400/40 bg-black/50 px-1.5 py-px text-2xs font-semibold uppercase text-fuchsia-300 backdrop-blur-sm inline-flex items-center gap-1">
               <Lightbulb aria-hidden="true" className="h-2.5 w-2.5" /> Concept
             </span>
           )}
           {d.kind === 'style' && (
-            <span className="absolute left-1.5 top-1.5 rounded border border-cyan-400/40 bg-black/50 px-1.5 py-px text-[0.5625rem] font-semibold uppercase text-cyan-300 backdrop-blur-sm inline-flex items-center gap-1">
+            <span className="absolute left-1.5 top-1.5 rounded border border-cyan-400/40 bg-black/50 px-1.5 py-px text-2xs font-semibold uppercase text-cyan-300 backdrop-blur-sm inline-flex items-center gap-1">
               <Palette aria-hidden="true" className="h-2.5 w-2.5" /> Style
             </span>
           )}
@@ -186,17 +186,17 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
             {(d.trained_families || []).map((f) => {
               const [lbl, cls] = familyBadge(f);
               return (
-                <span key={f} className={`shrink-0 rounded border px-1.5 py-px text-[0.5625rem] font-semibold uppercase ${cls}`}
+                <span key={f} className={`shrink-0 rounded border px-1.5 py-px text-2xs font-semibold uppercase ${cls}`}
                   title={`A ${lbl} LoRA has been trained from this dataset`}>
                   {lbl}
                 </span>
               );
             })}
           </span>
-          <span className={`truncate text-[0.6875rem] ${d.kind === 'style' ? 'text-cyan-300' : 'font-mono text-indigo-300'}`}>
+          <span className={`truncate text-2xs ${d.kind === 'style' ? 'text-cyan-300' : 'font-mono text-indigo-300'}`}>
             {d.kind === 'style' ? 'always-on · no activation trigger' : (d.trigger_word || '—')}
           </span>
-          <span className="text-[0.6875rem] text-content-subtle">{tileStats(d)}</span>
+          <span className="text-2xs text-content-subtle">{tileStats(d)}</span>
         </div>
       </button>
       <div className="library-card__actions grid grid-cols-2 gap-1.5 border-t border-border px-2 py-2">
@@ -207,14 +207,14 @@ function DatasetTile({ d, onOpen, onDelete, onRename, onExportZip, onExportBacku
             ? 'Download the kept images and captions as a training-ready ZIP'
             : 'Keep at least one image before exporting a training ZIP'}
           aria-label={`Export training ZIP for ${d.name}`}
-          className="rounded-md border border-border bg-app/50 px-2 py-1 text-[0.6875rem] font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-app/50 disabled:hover:text-content-muted inline-flex items-center justify-center gap-1">
+          className="rounded-md border border-border bg-app/50 px-2 py-1 text-2xs font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-app/50 disabled:hover:text-content-muted inline-flex items-center justify-center gap-1">
           <Download aria-hidden="true" className="h-3 w-3" /> ZIP
         </button>
         <button type="button"
           onClick={() => onExportBackup?.(d.id)}
           title="Download a portable backup with all images, captions and settings"
           aria-label={`Export portable backup for ${d.name}`}
-          className="rounded-md border border-border bg-app/50 px-2 py-1 text-[0.6875rem] font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content inline-flex items-center justify-center gap-1">
+          className="rounded-md border border-border bg-app/50 px-2 py-1 text-2xs font-semibold text-content-muted transition-colors hover:border-primary/40 hover:bg-surface-raised hover:text-content inline-flex items-center justify-center gap-1">
           <Save aria-hidden="true" className="h-3 w-3" /> Backup
         </button>
       </div>
@@ -269,7 +269,7 @@ function DatasetRow({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup
           <span className="flex min-w-0 items-center gap-1.5">
             {kind !== 'character' && (
               <span title={kind === 'concept' ? 'Concept dataset' : 'Style dataset'} aria-hidden="true"
-                className="shrink-0 text-[0.6875rem]">{kind === 'concept'
+                className="shrink-0 text-2xs">{kind === 'concept'
                   ? <Lightbulb aria-hidden="true" className="h-3 w-3" />
                   : <Palette aria-hidden="true" className="h-3 w-3" />}</span>
             )}
@@ -284,7 +284,7 @@ function DatasetRow({ d, onOpen, onDelete, onRename, onExportZip, onExportBackup
               );
             })}
           </span>
-          <span className="truncate text-[0.625rem] text-content-subtle">
+          <span className="truncate text-2xs text-content-subtle">
             <span className={kind === 'style' ? 'text-cyan-300' : 'font-mono text-indigo-300'}>
               {kind === 'style' ? 'always-on' : (d.trigger_word || '—')}
             </span>
@@ -408,14 +408,14 @@ function NewDatasetForm({ onCreate, onClose }) {
           ))}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <label className={`flex flex-col gap-1 text-[0.6875rem] text-content-muted ${style ? 'sm:col-span-2' : ''}`}>
+        <label className={`flex flex-col gap-1 text-2xs text-content-muted ${style ? 'sm:col-span-2' : ''}`}>
           {concept ? 'Concept name' : style ? 'Style name' : 'Character name'}
           <input id="new-dataset-name" value={name} onChange={(e) => setName(e.target.value)}
             placeholder={concept ? 'e.g. cim' : style ? 'e.g. ink-wash' : 'e.g. Emma'}
             className="bg-app/60 border border-border rounded px-2 py-1.5 text-sm text-content" />
         </label>
         {!style && (
-          <label className="flex flex-col gap-1 text-[0.6875rem] text-content-muted">
+          <label className="flex flex-col gap-1 text-2xs text-content-muted">
             Trigger word
             <input value={trigger} onChange={(e) => setTrigger(e.target.value)}
               placeholder={concept ? 'e.g. cim_act' : 'e.g. zchar_emma'}
@@ -424,7 +424,7 @@ function NewDatasetForm({ onCreate, onClose }) {
                 model's existing vocabulary — the identity bleeds into that word
                 everywhere. A unique token (prefix/underscore/digits) binds cleanly. */}
             {trigger.trim() && /^[a-z]{1,7}$/i.test(trigger.trim()) && (
-              <span className="text-amber-300 text-[0.625rem]">
+              <span className="text-amber-300 text-2xs">
                 <AlertTriangle aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />“{trigger.trim()}” looks like a common word — the base model already has a meaning
                 for it. Prefer a unique token like <span className="font-mono">zchar_{trigger.trim().toLowerCase()}</span>.
               </span>
@@ -437,7 +437,7 @@ function NewDatasetForm({ onCreate, onClose }) {
        * accepting either; otherwise prose) and the menu section. Editable later in the training
        * panel.
        */}
-      <label className="flex flex-col gap-1 text-[0.6875rem] text-content-muted">
+      <label className="flex flex-col gap-1 text-2xs text-content-muted">
         Target model <span className="text-content-subtle normal-case">— sets the caption style &amp; groups the menu (changeable later)</span>
         <select value={trainType} onChange={(e) => setTrainType(e.target.value)}
           className="bg-app/60 border border-border rounded px-2 py-1.5 text-sm text-content">
@@ -455,7 +455,7 @@ function NewDatasetForm({ onCreate, onClose }) {
        * markings from captions so they bind to the trigger, and targets more bust/body shots.
        */}
       {!concept && !style && (
-        <div className="flex flex-col gap-1 text-[0.6875rem] text-content-muted">
+        <div className="flex flex-col gap-1 text-2xs text-content-muted">
           <span>Fidelity <span className="text-content-subtle normal-case">— what the LoRA must reproduce (changeable later)</span></span>
           <div className="flex gap-1.5">
             {[['face', Smile, 'Face', 'Identity = the face. Body shape may vary with the prompt.'],
@@ -477,7 +477,7 @@ function NewDatasetForm({ onCreate, onClose }) {
        * caption/refinement/ban-list prompts. Describe the ACTION, not the subject.
        */}
       {concept && (
-        <label className="flex flex-col gap-1 text-[0.6875rem] text-content-muted">
+        <label className="flex flex-col gap-1 text-2xs text-content-muted">
           What is the recurring concept? <span className="text-fuchsia-300">(required — it will be omitted from every caption)</span>
           <textarea value={conceptDesc} onChange={(e) => setConceptDesc(e.target.value)} rows={2}
             placeholder="Describe the recurring act/effect itself, not the people — e.g. “a tongue licking an ice-cream cone”"
@@ -485,7 +485,7 @@ function NewDatasetForm({ onCreate, onClose }) {
         </label>
       )}
       <div className="flex items-center gap-2 flex-wrap">
-        <p className="text-content-subtle text-[0.6875rem]">
+        <p className="text-content-subtle text-2xs">
           {concept
             ? 'The trigger word is the token you type to summon this concept. Import raw images of it, then caption and train.'
             : style
@@ -588,7 +588,7 @@ export default function DatasetListPanel({
       {/* Header: the page IS the library. Row 1 = title + primary actions;
           row 2 (below, non-empty library only) = search + filters + size. */}
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">library</p>
+        <p className="font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">library</p>
         {/*
          * relative z-30 creates a stacking context; otherwise the Backup menu panel's z-20 would
          * remain trapped below the tiles.
@@ -631,7 +631,7 @@ export default function DatasetListPanel({
                   <button key={k} type="button"
                     onClick={() => setKindFilter(k)}
                     aria-pressed={kindFilter === k}
-                    className={`rounded-full border px-2.5 py-1 text-[0.6875rem] font-semibold transition-colors ${
+                    className={`rounded-full border px-2.5 py-1 text-2xs font-semibold transition-colors ${
                       kindFilter === k
                         ? 'border-primary/60 bg-primary/15 text-content'
                         : 'border-border bg-surface text-content-muted hover:bg-surface-raised'}`}>
@@ -647,7 +647,7 @@ export default function DatasetListPanel({
                 onClick={() => setShowPreviews((visible) => !visible)}
                 aria-pressed={showPreviews}
                 title={showPreviews ? 'Hide image previews' : 'Show image previews'}
-                className={`flex h-6 items-center gap-1 rounded-md border px-1.5 text-[0.6875rem] font-semibold transition-colors ${
+                className={`flex h-6 items-center gap-1 rounded-md border px-1.5 text-2xs font-semibold transition-colors ${
                   showPreviews
                     ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
                     : 'border-border bg-surface text-content-muted hover:bg-surface-raised'}`}>
@@ -693,9 +693,9 @@ export default function DatasetListPanel({
                     title={filterActive
                       ? 'Sections stay open while a search or filter is active'
                       : (open ? `Collapse the ${label} section` : `Expand the ${label} section`)}
-                    className="flex w-full items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-content-subtle transition-colors hover:text-content disabled:cursor-default disabled:hover:text-content-subtle">
+                    className="flex w-full items-center gap-2 font-mono text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle transition-colors hover:text-content disabled:cursor-default disabled:hover:text-content-subtle">
                     <span aria-hidden="true"
-                      className={`text-[0.625rem] transition-transform ${open ? 'rotate-90' : ''} ${filterActive ? 'opacity-40' : ''}`}>
+                      className={`text-2xs transition-transform ${open ? 'rotate-90' : ''} ${filterActive ? 'opacity-40' : ''}`}>
                       ▶
                     </span>
                     <GroupIcon aria-hidden="true" className="h-3.5 w-3.5" /> {label}

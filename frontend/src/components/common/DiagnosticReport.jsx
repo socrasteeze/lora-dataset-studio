@@ -60,7 +60,7 @@ export default function DiagnosticReport() {
           </p>
           <textarea ref={box} readOnly value={fallback} rows={10} spellCheck={false}
             onFocus={(e) => e.target.select()}
-            className="mt-2 w-full resize-y rounded-md border border-border bg-app/60 p-2 font-mono text-[11px] text-content" />
+            className="mt-2 w-full resize-y rounded-md border border-border bg-app/60 p-2 font-mono text-2xs text-content" />
           <button type="button" onClick={() => setFallback(null)}
             className="mt-2 text-xs text-content-muted underline">Hide</button>
         </div>

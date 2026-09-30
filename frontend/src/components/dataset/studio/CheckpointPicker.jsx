@@ -29,10 +29,10 @@ export default function CheckpointPicker({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-1">
-        <span className="text-content-muted text-[0.625rem] uppercase">Checkpoints to test</span>
+        <span className="text-content-muted text-2xs uppercase">Checkpoints to test</span>
         <div className="flex flex-wrap gap-2">
           {checkpoints.map((c) => (
-            <label key={c.filename} className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border bg-surface cursor-pointer text-[0.75rem] text-content">
+            <label key={c.filename} className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border bg-surface cursor-pointer text-xs text-content">
               <input type="checkbox" checked={chosen.includes(c.filename)}
                 onChange={() => onToggle(c.filename)} aria-label={`Test ${c.label}`} />
               {c.label}
@@ -46,7 +46,7 @@ export default function CheckpointPicker({
         open={theirsOpen}
         onToggle={(e) => setTheirsOpen(e.currentTarget.open)}
       >
-        <summary className="flex cursor-pointer select-none items-center gap-1.5 text-[0.6875rem] font-medium text-cyan-200">
+        <summary className="flex cursor-pointer select-none items-center gap-1.5 text-2xs font-medium text-cyan-200">
           Compare with other LoRAs
           {guests.length > 0 && (
             <span className="font-normal text-cyan-100/80">({guests.length})</span>
@@ -54,14 +54,14 @@ export default function CheckpointPicker({
           <HelpBadge topic="studio-guest-checkpoints" />
         </summary>
         <div className="mt-1.5 flex flex-col gap-1.5">
-          <span className="text-content-subtle text-[0.625rem]">
+          <span className="text-content-subtle text-2xs">
             Compare a LoRA you did not train here — same prompt and seed, its own row.
           </span>
           {guests.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {guests.map((g) => (
                 <label key={g.filename}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-cyan-400/40 bg-cyan-500/10 cursor-pointer text-[0.75rem] text-cyan-100">
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-cyan-400/40 bg-cyan-500/10 cursor-pointer text-xs text-cyan-100">
                   <input type="checkbox" checked={chosen.includes(g.filename)}
                     onChange={() => onToggleGuest(g.filename)}
                     aria-label={`Test ${g.label}`} />
@@ -81,11 +81,11 @@ export default function CheckpointPicker({
             engineLabel={engineLabel} placeholder="path/to/lora.safetensors" />
           <button type="button" onClick={add}
             disabled={!pickText.trim() || atCap}
-            className="rounded-md border border-cyan-400/50 bg-cyan-500/10 px-2 py-1.5 text-[0.6875rem] font-semibold text-cyan-100 disabled:opacity-40">
+            className="rounded-md border border-cyan-400/50 bg-cyan-500/10 px-2 py-1.5 text-2xs font-semibold text-cyan-100 disabled:opacity-40">
             Add
           </button>
           {atCap && (
-            <p className="m-0 text-[0.625rem] text-amber-300">
+            <p className="m-0 text-2xs text-amber-300">
               Limit of {MAX_GUEST_CHECKPOINTS} reached — remove one to add another.
             </p>
           )}

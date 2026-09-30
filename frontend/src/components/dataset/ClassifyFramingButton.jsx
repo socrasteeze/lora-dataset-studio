@@ -25,13 +25,13 @@ export default function ClassifyFramingButton({
         </button>
         <HelpBadge topic="action-classify-framing" className="self-center" />
         {!s.running && (
-          <span className="text-content-subtle text-[0.6875rem] min-w-0">
+          <span className="text-content-subtle text-2xs min-w-0">
             no shot type yet — imported without one, or cropped since they were last classified
           </span>
         )}
       </div>
       {s.blocked && (
-        <p className="m-0 text-amber-300/90 text-[0.6875rem]">
+        <p className="m-0 text-amber-300/90 text-2xs">
           ⚠ {s.blockedReason}{' '}
           <Link to="/settings/local-tools" className="underline hover:text-amber-200">Open Local tools</Link>
         </p>

@@ -33,6 +33,15 @@ const baseConfig = {
         sans: ['Archivo', ...defaultTheme.fontFamily.sans],
         mono: ['"IBM Plex Mono"', ...defaultTheme.fontFamily.mono],
       },
+      // The type scale: 2xs 11 · xs 12 · sm 14 · base 16 · xl 20 · 2xl 24.
+      // `2xs` replaces the old 10 px and 11 px one-offs (text-[10px],
+      // text-[0.625rem], text-[11px], text-[0.6875rem]) — two spellings of two
+      // near-identical sizes had grown into ~1,100 uses — for eyebrows, badges,
+      // tile chips and micro-labels. Explicit line height, so it stops
+      // inheriting 1.5 and producing 16.5 px lines.
+      fontSize: {
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
+      },
       colors: {
         primary: {
           DEFAULT: safelight[500],

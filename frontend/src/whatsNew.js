@@ -84,6 +84,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-29-zzzzzzz-one-type-scale', date: '2026-09-29',
+    title: 'One Set of Text Sizes Across the App',
+    blurb: 'Small labels, badges and tile chips now share one size instead of four near-identical ones, every page title matches, and the Bank opens with its first images near the top of the screen: the last Launch-all report and the Curate tools fold to one line and remember how you left them.',
+  },
+  {
     id: '2026-09-29-zzzzzz-even-control-rows', date: '2026-09-29',
     title: 'Buttons in a Row Now Line Up',
     blurb: 'On a desktop, the buttons, dropdowns and fields that share a row now stand at one height: Train the LoRA, Generate, the caption and watermark tools, the Gallery filters and the Settings fields. Icons sit beside their labels instead of above them, and engine cards in a row match in height.',

@@ -311,7 +311,7 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
          */}
         {baseNote && (
           <p className="m-0 rounded-lg border border-amber-400/30 bg-amber-400/5 px-3 py-2
-                        text-[0.6875rem] leading-snug text-amber-300/80 break-words">
+                        text-2xs leading-snug text-amber-300/80 break-words">
             {baseNote}
           </p>
         )}
@@ -322,7 +322,7 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
          */}
         {baseModels.length > 0 && (
           <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-3">
-            <span className="text-content-muted text-[0.625rem] uppercase">
+            <span className="text-content-muted text-2xs uppercase">
               Base model ({FAMILY_LABELS[runType] || runType})
             </span>
             <select

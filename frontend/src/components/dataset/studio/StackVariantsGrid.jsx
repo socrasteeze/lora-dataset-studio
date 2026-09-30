@@ -22,12 +22,12 @@ export default function StackVariantsGrid({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-content-muted text-[0.6875rem] uppercase">
+        <span className="text-content-muted text-2xs uppercase">
           🧬 Weight variants of this stack ({list.length})
         </span>
         <HelpBadge topic="studio-stack-results" />
         {list.length === 1 && (
-          <span className="text-content-subtle text-[0.6875rem]">
+          <span className="text-content-subtle text-2xs">
             Change the weights on the left and run again — the next run lands here as a
             second column.
           </span>
@@ -41,17 +41,17 @@ export default function StackVariantsGrid({
           </caption>
           <thead>
             <tr>
-              <th scope="col" className="px-1 text-left text-content-subtle text-[0.625rem] font-normal">
+              <th scope="col" className="px-1 text-left text-content-subtle text-2xs font-normal">
                 LoRA \ run
               </th>
               {list.map((v) => (
                 <th key={variantKey(v)} scope="col"
                   title={comboLabelText(v.weights)}
-                  className={`px-1.5 py-1 text-[0.6875rem] font-semibold rounded ${v.active
+                  className={`px-1.5 py-1 text-2xs font-semibold rounded ${v.active
                     ? 'bg-sky-500/15 text-sky-200 border border-sky-400/50'
                     : 'text-content border border-transparent'}`}>
                   <span className="tabular-nums">{weightVectorText(v.weights)}</span>
-                  {v.active && <span className="ml-1 font-normal text-[0.625rem]">(shown)</span>}
+                  {v.active && <span className="ml-1 font-normal text-2xs">(shown)</span>}
                 </th>
               ))}
             </tr>
@@ -60,7 +60,7 @@ export default function StackVariantsGrid({
             {members.map((m, i) => (
               <tr key={`${m.dataset_id}:${m.filename}`}>
                 <th scope="row"
-                  className="max-w-[9rem] truncate px-1 text-left text-content-muted text-[0.6875rem] font-normal"
+                  className="max-w-[9rem] truncate px-1 text-left text-content-muted text-2xs font-normal"
                   title={`${m.label}${m.trigger ? ` — trigger ${m.trigger}` : ''}`}>
                   {i + 1}. {m.label}
                 </th>
@@ -68,7 +68,7 @@ export default function StackVariantsGrid({
                   const row = alignWeights(members, v.weights, v.active ? null : activeWeights)[i];
                   return (
                     <td key={variantKey(v)}
-                      className={`px-1.5 py-0.5 text-center text-[0.6875rem] tabular-nums rounded ${row.changed
+                      className={`px-1.5 py-0.5 text-center text-2xs tabular-nums rounded ${row.changed
                         ? 'bg-amber-400/15 text-amber-200 font-semibold'
                         : 'text-content-muted'}`}
                       title={row.changed
@@ -86,7 +86,7 @@ export default function StackVariantsGrid({
               </tr>
             ))}
             <tr>
-              <th scope="row" className="px-1 text-left text-content-subtle text-[0.625rem] font-normal">
+              <th scope="row" className="px-1 text-left text-content-subtle text-2xs font-normal">
                 images
               </th>
               {list.map((v) => (
@@ -101,19 +101,19 @@ export default function StackVariantsGrid({
                       ))}
                     </div>
                   ) : (
-                    <span className="text-content-subtle text-[0.625rem]">—</span>
+                    <span className="text-content-subtle text-2xs">—</span>
                   )}
                 </td>
               ))}
             </tr>
             <tr>
-              <th scope="row" className="px-1 text-left text-content-subtle text-[0.625rem] font-normal">
+              <th scope="row" className="px-1 text-left text-content-subtle text-2xs font-normal">
                 votes
               </th>
               {list.map((v) => {
                 const s = variantSummary(v);
                 return (
-                  <td key={variantKey(v)} className="px-1.5 py-0.5 text-center text-[0.6875rem] tabular-nums">
+                  <td key={variantKey(v)} className="px-1.5 py-0.5 text-center text-2xs tabular-nums">
                     <span className="text-green-300">👍 {s.likes}</span>{' '}
                     <span className="text-red-300">👎 {s.dislikes}</span>
                     <span className="ml-1 text-content-subtle"
@@ -130,13 +130,13 @@ export default function StackVariantsGrid({
                 <td key={variantKey(v)} className="px-1 py-1">
                   <div className="flex flex-col gap-1">
                     <button type="button" disabled={v.active} onClick={() => onSelectRun?.(v.run_id)}
-                      className="rounded border border-border bg-surface px-1.5 py-0.5 text-[0.625rem] text-content disabled:opacity-40">
+                      className="rounded border border-border bg-surface px-1.5 py-0.5 text-2xs text-content disabled:opacity-40">
                       {v.active ? 'Shown' : 'Open this run'}
                     </button>
                     <button type="button"
                       onClick={() => onUseWeights?.(weightsIntoStackMap(members, v.weights))}
                       title="Load these weights back into the sliders, then run again"
-                      className="rounded border border-sky-400/40 bg-sky-400/10 px-1.5 py-0.5 text-[0.625rem] text-sky-200">
+                      className="rounded border border-sky-400/40 bg-sky-400/10 px-1.5 py-0.5 text-2xs text-sky-200">
                       Use these weights
                     </button>
                   </div>
@@ -147,7 +147,7 @@ export default function StackVariantsGrid({
         </table>
       </div>
 
-      <p className="m-0 text-content-subtle text-[0.625rem] leading-relaxed">
+      <p className="m-0 text-content-subtle text-2xs leading-relaxed">
         Votes are counted per variant, so the column with the best net score is the
         weight set to keep. Older relaunches of this stack are found by their LoRAs, and
         only the most recent ones are listed.

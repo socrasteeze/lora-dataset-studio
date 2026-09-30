@@ -25,10 +25,10 @@ import PluginSlot from '../../plugins/PluginSlot.jsx';
    (`checkpoint.action`): a plugin row asks its host-mounted layer for a dialog
    and closes the popover, so the dialog outlives it. */
 
-const ROW = 'flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.6875rem] font-medium';
+const ROW = 'flex items-center gap-1.5 rounded-md border px-2 py-1 text-2xs font-medium';
 // Disabled rows are TEXT, not buttons: a greyed-out button invites the click it
 // will not honour. This states the situation and gets out of the way.
-const MUTED = 'rounded-md border border-border bg-app/40 px-2 py-1 text-content-subtle text-[0.625rem]';
+const MUTED = 'rounded-md border border-border bg-app/40 px-2 py-1 text-content-subtle text-2xs';
 
 export default function CheckpointActionsPopover({
   node, pill, runLabel = null, surface = 'graph',
@@ -48,14 +48,14 @@ export default function CheckpointActionsPopover({
       aria-label={a.isRun ? 'Run actions' : `Checkpoint step ${a.step} actions`}
       onPointerDown={(e) => e.stopPropagation()}>
       <div className="mb-1.5 flex items-center gap-1.5">
-        <span className="min-w-0 truncate text-content text-[0.6875rem] font-semibold tabular-nums">
+        <span className="min-w-0 truncate text-content text-2xs font-semibold tabular-nums">
           {a.isRun ? (runLabel || 'This run') : `Step ${Number(a.step).toLocaleString()}`}
         </span>
         {a.final && (
           <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-px text-emerald-200 text-[0.5rem] font-semibold uppercase">final</span>
         )}
         <button type="button" onClick={onClose}
-          className="ml-auto shrink-0 text-content-subtle hover:text-content text-[0.75rem]"
+          className="ml-auto shrink-0 text-content-subtle hover:text-content text-xs"
           aria-label="Close">✕</button>
       </div>
 
@@ -131,7 +131,7 @@ export default function CheckpointActionsPopover({
         {a.del && (
           <button type="button" disabled={deleting}
             onClick={() => onDelete(node, pill)} title={a.del.title}
-            className="mt-1 flex items-center gap-1.5 border-t border-border px-2 pt-1.5 pb-0.5 text-left text-content-subtle text-[0.625rem] hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-50">
+            className="mt-1 flex items-center gap-1.5 border-t border-border px-2 pt-1.5 pb-0.5 text-left text-content-subtle text-2xs hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-50">
             <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> {deleting ? 'Deleting…' : a.del.label}
           </button>
         )}

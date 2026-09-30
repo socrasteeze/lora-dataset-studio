@@ -216,10 +216,10 @@ export default function DupGroupsPanel({ bankId, live, onChanged, kind = 'exact'
                     <img src={`/api/bank/${bankId}/thumb/${img.id}`} alt={img.name}
                       loading="lazy" className="aspect-[3/4] w-full object-cover" />
                     {img.id === g.best_id && (
-                      <span className="absolute left-1 top-1 rounded bg-emerald-500/90 px-1 text-[10px] font-bold text-white">BEST</span>
+                      <span className="absolute left-1 top-1 rounded bg-emerald-500/90 px-1 text-2xs font-bold text-white">BEST</span>
                     )}
                   </button>
-                  <p className="mt-0.5 truncate text-[10px] text-content-subtle" title={img.name}>
+                  <p className="mt-0.5 truncate text-2xs text-content-subtle" title={img.name}>
                     {img.width || '?'}×{img.height || '?'} · {img.name}
                   </p>
                 </li>

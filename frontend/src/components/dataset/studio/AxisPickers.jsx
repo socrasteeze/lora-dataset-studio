@@ -8,7 +8,7 @@ function StepChoices({ choices, selected, onToggle, label, amber = false }) {
   const buttonClass = 'min-h-10 min-w-10 rounded-lg border px-2.5 py-1 text-xs tabular-nums transition-colors';
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-content-muted text-[0.625rem] uppercase">{label}</span>
+      <span className="text-content-muted text-2xs uppercase">{label}</span>
       <div role="group" aria-label={label} className="flex items-center gap-2">
         <button type="button" aria-label="Show lower step counts" title="Show lower step counts"
           disabled={start === 0} onClick={() => setPosition(start - 1)}
@@ -30,7 +30,7 @@ function StepChoices({ choices, selected, onToggle, label, amber = false }) {
           +
         </button>
       </div>
-      <span className="text-[0.6875rem] text-content-muted break-words" aria-live="polite">
+      <span className="text-2xs text-content-muted break-words" aria-live="polite">
         Selected: {selected.join(', ')}
       </span>
     </div>
@@ -62,7 +62,7 @@ export default function AxisPickers({
   return (
     <>
       {baseNote && (
-        <p className="m-0 text-[0.6875rem] leading-snug text-amber-300/80 break-words">
+        <p className="m-0 text-2xs leading-snug text-amber-300/80 break-words">
           {baseNote}
         </p>
       )}
@@ -73,12 +73,12 @@ export default function AxisPickers({
            * Generic label: each FAMILY supplies its own list (Z-Image, SDXL checkpoints, or
            * official/local Krea UNETs).
            */}
-          <span className="text-content-muted text-[0.625rem] uppercase">Base model (multi)</span>
+          <span className="text-content-muted text-2xs uppercase">Base model (multi)</span>
           <div className="flex gap-2 flex-wrap">
             {zModels.map((m) => (
               <button key={m.value} type="button" onClick={() => onToggleModel(m.value)}
                 aria-pressed={effectiveModels.includes(m.value)}
-                className={`px-2.5 py-1 rounded-lg border text-[0.75rem] transition-colors ${
+                className={`px-2.5 py-1 rounded-lg border text-xs transition-colors ${
                   effectiveModels.includes(m.value)
                     ? 'border-purple-400/60 bg-purple-500/20 text-purple-200 font-semibold'
                     : 'border-border bg-surface text-content-muted'}`}>
@@ -91,12 +91,12 @@ export default function AxisPickers({
 
       {Array.isArray(aspects) && aspects.length > 1 && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-muted text-[0.625rem] uppercase">Image formats (multi)</span>
+          <span className="text-content-muted text-2xs uppercase">Image formats (multi)</span>
           <div className="flex gap-2 flex-wrap">
             {aspects.map((a) => (
               <button key={a} type="button" onClick={() => onToggleAspect(a)}
                 aria-pressed={effectiveAspects.includes(a)}
-                className={`px-2.5 py-1 rounded-lg border text-[0.75rem] tabular-nums transition-colors ${
+                className={`px-2.5 py-1 rounded-lg border text-xs tabular-nums transition-colors ${
                   effectiveAspects.includes(a)
                     ? 'border-purple-400/60 bg-purple-500/20 text-purple-200 font-semibold'
                     : 'border-border bg-surface text-content-muted'}`}>
@@ -108,7 +108,7 @@ export default function AxisPickers({
       )}
 
       {mixedDefaults && (
-        <p className="m-0 text-[0.625rem] leading-snug text-amber-300/80">
+        <p className="m-0 text-2xs leading-snug text-amber-300/80">
           The selected base models want different sampler settings (a distilled
           “Turbo” build runs at CFG 1 / 8 steps; a non-distilled “Base” build needs
           higher guidance and far more steps). The CFG and steps axes below apply to
@@ -118,12 +118,12 @@ export default function AxisPickers({
 
       {Array.isArray(cfgChoices) && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-muted text-[0.625rem] uppercase">CFG (multi) — default {fmt(defaultCfg ?? 1.0)}</span>
+          <span className="text-content-muted text-2xs uppercase">CFG (multi) — default {fmt(defaultCfg ?? 1.0)}</span>
           <div className="flex gap-2 flex-wrap">
             {cfgChoices.map((v) => (
               <button key={v} type="button" onClick={() => onToggleCfg(v)}
                 aria-pressed={effectiveCfgs.includes(v)}
-                className={`px-2.5 py-1 rounded-lg border text-[0.75rem] tabular-nums transition-colors ${
+                className={`px-2.5 py-1 rounded-lg border text-xs tabular-nums transition-colors ${
                   effectiveCfgs.includes(v)
                     ? 'border-purple-400/60 bg-purple-500/20 text-purple-200 font-semibold'
                     : 'border-border bg-surface text-content-muted'}`}>

@@ -148,13 +148,13 @@ export default function InstallRunner({ action, buttonLabel, onDone }) {
         )}
       </div>
       {state === 'queued' && (
-        <p className="text-[11px] text-content-muted">
+        <p className="text-2xs text-content-muted">
           Another install is running — this one starts automatically when it finishes.
         </p>
       )}
       {running && progress && (
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-[11px] text-content-muted tabular-nums">
+          <div className="flex items-center justify-between text-2xs text-content-muted tabular-nums">
             <span>{progress.pct != null ? `Downloading ${progress.pct}%` : 'Downloading…'}</span>
             <span>{fmtSize(progress.done)}{progress.total ? ` / ${fmtSize(progress.total)}` : ' downloaded'}</span>
           </div>
@@ -169,7 +169,7 @@ export default function InstallRunner({ action, buttonLabel, onDone }) {
       {!busy && <InstallRuntimeNotice result={repairResult}
         onChoose={() => setPythonPicker(repairResult.profile)} />}
       {(log.length > 0 || running) && (
-        <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-raised p-2 text-[11px] text-content-muted">
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-raised p-2 text-2xs text-content-muted">
           {log.slice(-40).join('\n') || 'starting…'}
         </pre>
       )}

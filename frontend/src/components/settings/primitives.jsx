@@ -21,7 +21,7 @@ export const SIDE_BUTTON_CLASS =
 export function SectionHeader({ eyebrow, title, description, badge }) {
   return (
     <div>
-      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">{eyebrow}</p>
+      <p className="font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">{eyebrow}</p>
       <h1 className="mt-1 flex items-center gap-2 text-xl font-semibold text-content">
         {title}{badge}
       </h1>
