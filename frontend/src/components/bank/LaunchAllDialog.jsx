@@ -205,15 +205,15 @@ export default function LaunchAllDialog({
                       (disabled), its tool is missing but it will still be
                       recorded as skipped (amber), or we simply don't know yet. */}
                   {gates[s.key]?.blocked ? (
-                    <span className="ml-1.5 rounded bg-red-500/15 px-1.5 py-px text-[10px] font-semibold text-red-300">
+                    <span className="ml-1.5 rounded bg-red-500/15 px-1.5 py-px text-2xs font-semibold text-red-300">
                       {gates[s.key].reason}
                     </span>
                   ) : !ready[s.key] ? (
-                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold text-amber-300">
+                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-2xs font-semibold text-amber-300">
                       {s.needs} not ready — will skip
                     </span>
                   ) : gates[s.key]?.warn ? (
-                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-[10px] font-semibold text-amber-300">
+                    <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-2xs font-semibold text-amber-300">
                       {gates[s.key].warn}
                     </span>
                   ) : null}
@@ -242,7 +242,7 @@ export default function LaunchAllDialog({
                     ))}
                   </div>
                   {rejectNote && (
-                    <p className="m-0 text-[0.6875rem] leading-snug text-amber-200">
+                    <p className="m-0 text-2xs leading-snug text-amber-200">
                       ⚠ {rejectNote}
                     </p>
                   )}
@@ -303,7 +303,7 @@ export default function LaunchAllDialog({
             <span className="block whitespace-pre-wrap break-words text-xs leading-relaxed text-red-200">
               {error}
             </span>
-            <span className="mt-1 block text-[0.625rem] text-content-subtle">
+            <span className="mt-1 block text-2xs text-content-subtle">
               Your selection is kept — adjust and try again.
             </span>
           </div>
@@ -314,9 +314,9 @@ export default function LaunchAllDialog({
             silently applies to less than it implies is worse than none. */}
         <div className="flex flex-wrap items-center gap-2">
           <DevicePicker value={deviceId} onChange={setDeviceId} onDevice={setDevice}
-            kind="bank-pass" className="text-[0.6875rem]" />
+            kind="bank-pass" className="text-2xs" />
           {remote && (
-            <span className="text-[0.6875rem] text-content-subtle">
+            <span className="text-2xs text-content-subtle">
               ✨ Score, 👥 Group by person, 🚩 Watermarks, 📐 Framing and 🏷️ Captions
               can run there — each one only if that machine reports the stack for
               it; the ones it can&apos;t do are greyed out above.

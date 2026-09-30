@@ -76,11 +76,11 @@ function StudioBody({ datasetId, family, onFamilyChange, initialBase = null }) {
       <FamilySelector families={d.available_families} active={d.family} onSelect={onFamilyChange} />
       {d?.trigger_word && (
         <div className="flex items-center gap-2 flex-wrap">
-          <code className="px-2 py-0.5 rounded-lg border border-indigo-400/40 bg-indigo-500/10 text-indigo-300 text-[0.6875rem] font-semibold">
+          <code className="px-2 py-0.5 rounded-lg border border-indigo-400/40 bg-indigo-500/10 text-indigo-300 text-2xs font-semibold">
             {d.trigger_word}
           </code>
           {d?.best_settings && (
-            <span className="text-amber-300 text-[0.6875rem]" title="Saved winning settings">
+            <span className="text-amber-300 text-2xs" title="Saved winning settings">
               ★ {fmt(d.best_settings.strength)}
             </span>
           )}

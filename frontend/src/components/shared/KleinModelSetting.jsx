@@ -68,7 +68,7 @@ export default function KleinModelSetting({ datasetId = null, className = '', on
   const canChoose = canChooseModel({ datasetId, choices: state.choices });
 
   return (
-    <div className={`min-w-0 space-y-1 text-[0.6875rem] leading-relaxed ${className}`}>
+    <div className={`min-w-0 space-y-1 text-2xs leading-relaxed ${className}`}>
       {/* break-words: a model file name is arbitrary user content and this sits
           in flex rows that a single long word would widen past a 400 px screen. */}
       <p className={`break-words ${line.tone === 'warn' ? 'text-amber-300' : 'text-content-subtle'}`}>
@@ -84,7 +84,7 @@ export default function KleinModelSetting({ datasetId = null, className = '', on
             value={selectValue(state)}
             onChange={(e) => save(e.target.value)}
             className="min-w-0 max-w-full flex-1 bg-white/[0.03] border border-white/10 rounded-md
-                       px-2 py-1 text-[0.6875rem] text-content focus:outline-none
+                       px-2 py-1 text-2xs text-content focus:outline-none
                        focus:border-primary/60 disabled:opacity-50"
           >
             <option value="" className="bg-surface-overlay">Auto (detected)</option>

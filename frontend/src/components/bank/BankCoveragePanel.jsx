@@ -28,7 +28,7 @@ function FramingBar({ framing }) {
             title={`${b.label}: ${framing[b.id]}`} />
         ))}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-content-subtle">
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-content-subtle">
         {FRAMING_BUCKETS.map((b) => (framing[b.id] || 0) > 0 && (
           <span key={b.id}>{b.label} {framing[b.id]}</span>
         ))}
@@ -51,11 +51,11 @@ function VisualSpread({ visual, total, semanticEngine }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] uppercase tracking-wide text-content-muted">Visual spread</span>
-        <span className={`rounded-full border px-2 py-0.5 text-[11px] ${tone}`}>{r.label}</span>
+        <span className="text-2xs uppercase tracking-wide text-content-muted">Visual spread</span>
+        <span className={`rounded-full border px-2 py-0.5 text-2xs ${tone}`}>{r.label}</span>
       </div>
-      <p className="m-0 text-[11px] text-content-subtle">{r.detail}</p>
-      {note && <p className="m-0 text-[11px] text-content-subtle">{note}</p>}
+      <p className="m-0 text-2xs text-content-subtle">{r.detail}</p>
+      {note && <p className="m-0 text-2xs text-content-subtle">{note}</p>}
     </div>
   )
 }
@@ -73,8 +73,8 @@ function VarietyAxes({ variety }) {
       {variety.axes.map((axis) => (
         <div key={axis.id} className="flex flex-col gap-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-[11px] uppercase tracking-wide text-content-muted">{axis.label}</span>
-            {axis.hint && <span className="text-[11px] text-content-subtle">{axis.hint}</span>}
+            <span className="text-2xs uppercase tracking-wide text-content-muted">{axis.label}</span>
+            {axis.hint && <span className="text-2xs text-content-subtle">{axis.hint}</span>}
           </div>
           {/* The chips decorate a sentence a screen reader can read out; the
               sentence is the carrier, never the colour.
@@ -92,7 +92,7 @@ function VarietyAxes({ variety }) {
               <span key={r.id}
                 title={r.count ? `${r.count} caption${r.count === 1 ? '' : 's'} mention this`
                   : (r.state === 'gap' ? 'No caption mentions this' : 'Not mentioned (optional)')}
-                className={`rounded-full border px-2 py-0.5 text-[11px] ${chip[r.state]}`}>
+                className={`rounded-full border px-2 py-0.5 text-2xs ${chip[r.state]}`}>
                 {r.label}<span className="opacity-60"> {r.count}</span>
               </span>
             ))}
@@ -116,7 +116,7 @@ export default function CoveragePanel({ coverage, semanticEngine, semanticLabel,
         <span className="text-xs text-content-subtle">
           {coverage.total.toLocaleString()} {poolWord} image{coverage.total === 1 ? '' : 's'}
         </span>
-        <span className="ml-auto rounded border border-indigo-400/40 px-1.5 py-px text-[10px] uppercase tracking-wide text-indigo-300"
+        <span className="ml-auto rounded border border-indigo-400/40 px-1.5 py-px text-2xs uppercase tracking-wide text-indigo-300"
           title="Community idea by @antonp">idea by @antonp</span>
         <button type="button" onClick={onClose} aria-label="Hide coverage advice"
           className="rounded-md border border-border px-1.5 py-0.5 text-xs text-content-subtle hover:text-content">✕</button>
@@ -145,11 +145,11 @@ export default function CoveragePanel({ coverage, semanticEngine, semanticLabel,
           ⚖️ Pick a balanced set
         </button>
         {!onBalance && balanceReason && (
-          <span className="text-[11px] text-content-subtle">{balanceReason}</span>
+          <span className="text-2xs text-content-subtle">{balanceReason}</span>
         )}
       </div>
       <VarietyAxes variety={coverage.variety} />
-      <p className="text-[11px] text-content-subtle">
+      <p className="text-2xs text-content-subtle">
         Advice only — nothing is kept or rejected. Based on what the passes already computed:
         the labels, your captions (words, not pixels — a shot the captioner never described is
         invisible here, and “not smiling” still counts as a smile) and the {semanticLabel} semantic index.

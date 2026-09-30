@@ -163,7 +163,7 @@ function HelpModeToggle({ onToggle }) {
       className={`${NAV_ITEM_BASE} inline-flex items-center gap-1.5 leading-none ${enabled
         ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-inset ring-indigo-400/50'
         : 'text-content-muted hover:text-content hover:bg-surface-raised'}`}>
-      <span aria-hidden className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-current text-[9px] font-bold leading-none">?</span>
+      <span aria-hidden className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-current text-2xs font-bold leading-none">?</span>
       <span>Help mode</span>
     </button>
   )
@@ -186,7 +186,7 @@ function PeerWorkingChip({ activity }) {
   if (!working) return null
   return (
     <span role="status" title={title} aria-label={title}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[0.6875rem] font-medium text-emerald-200">
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-2xs font-medium text-emerald-200">
       <span aria-hidden className="relative inline-flex h-2 w-2">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />

@@ -39,7 +39,7 @@ function PreviewProgress({ job }) {
   const percent = previewPercent(job);
   return (
     <div className="mt-1.5">
-      <p aria-live="polite" className="text-[0.6875rem] text-content-muted">
+      <p aria-live="polite" className="text-2xs text-content-muted">
         {previewStatusLabel(job)}
       </p>
       <div
@@ -89,13 +89,13 @@ function SamplePreview({ datasetId, sample, expand }) {
         ))}
         {!boxes.length && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="rounded-lg bg-black/75 px-2 py-1 text-[0.6875rem] font-semibold text-amber-200">
+            <span className="rounded-lg bg-black/75 px-2 py-1 text-2xs font-semibold text-amber-200">
               no face found
             </span>
           </div>
         )}
       </div>
-      <figcaption className="mt-1 text-[0.625rem] leading-tight text-content-subtle">
+      <figcaption className="mt-1 text-2xs leading-tight text-content-subtle">
         {!boxes.length
           ? 'Trains unmasked — nothing was detected here.'
           : tooLarge
@@ -174,15 +174,15 @@ export default function ConceptFaceMaskField({
     return (
       <div className="flex flex-col gap-0.5">
         <label className="flex items-center gap-2 flex-wrap">
-          <span className="text-content-muted text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+          <span className="text-content-muted text-xs w-28 shrink-0 inline-flex items-center gap-1">
             Mask faces<HelpBadge topic="training.mask_faces" />
           </span>
           <input type="checkbox" checked={false} disabled readOnly
             aria-label="Mask faces while training this concept"
             className="h-4 w-4 rounded border-border bg-surface accent-indigo-500 opacity-40" />
-          <span className="text-content-subtle text-[0.75rem]">concept datasets only</span>
+          <span className="text-content-subtle text-xs">concept datasets only</span>
         </label>
-        <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+        <span className="text-content-subtle text-2xs leading-relaxed">
           A character LoRA has to learn the face, and a style LoRA has to learn how faces
           are rendered — weighing faces down would amputate the very thing being trained.
           This lever only applies to a <b className="text-content-muted font-medium">concept</b> dataset,
@@ -231,14 +231,14 @@ export default function ConceptFaceMaskField({
   return (
     <div className="flex flex-col gap-0.5">
       <label className="flex items-center gap-2 flex-wrap cursor-pointer">
-        <span className="text-content text-[0.75rem] w-28 shrink-0 inline-flex items-center gap-1">
+        <span className="text-content text-xs w-28 shrink-0 inline-flex items-center gap-1">
           Mask faces<HelpBadge topic="training.mask_faces" />
         </span>
         <input type="checkbox" checked={Boolean(enabled)} disabled={faceCapability === false}
           onChange={(e) => onToggle(e.target.checked)}
           aria-label="Mask faces while training this concept"
           className="h-4 w-4 rounded border-border bg-surface accent-indigo-500 disabled:opacity-40" />
-        <span className="text-content-muted text-[0.75rem]">keep the act, drop the identities</span>
+        <span className="text-content-muted text-xs">keep the act, drop the identities</span>
       </label>
 
       {/* The dependency is DECLARED where it is ticked, and installable from here.
@@ -251,7 +251,7 @@ export default function ConceptFaceMaskField({
             detection is an optional extra this install doesn't have yet." />
       )}
 
-      <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+      <span className="text-content-subtle text-2xs leading-relaxed">
         <b className="text-content-muted font-medium">Why:</b> a concept LoRA also picks up the
         faces it was trained on, and then pulls against a character LoRA over whose face to
         render. This weighs the detected faces down in the training loss, so the concept
@@ -264,7 +264,7 @@ export default function ConceptFaceMaskField({
 
       {/* The maintainers' answer, stated where the decision is taken. Without it we
           ship a patch people reach for INSTEAD of fixing the dataset. */}
-      <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+      <span className="text-content-subtle text-2xs leading-relaxed">
         <b className="text-content-muted font-medium">Worth knowing:</b> the people who maintain
         these trainers consider dataset variety to matter more than masking here. A concept shown
         by ten different people already dilutes identity; with two, the faces are as constant as
@@ -273,7 +273,7 @@ export default function ConceptFaceMaskField({
       </span>
 
       {conceptConflict && (
-        <span className="text-amber-300 text-[0.6875rem] leading-relaxed">
+        <span className="text-amber-300 text-2xs leading-relaxed">
           ⚠ Your concept description mentions the face, mouth or gaze. If the face is where your
           concept actually happens, masking it can erase the thing you are teaching. Preview it
           before you train — you know your dataset, so this is a heads-up, not a block.
@@ -287,12 +287,12 @@ export default function ConceptFaceMaskField({
               squeezed next to Stop. */}
           <div className="flex flex-wrap items-center gap-1.5">
             <button type="button" onClick={runPreview} disabled={running}
-              className="min-h-8 rounded-lg border border-border bg-surface px-2.5 text-[0.6875rem] font-semibold text-content hover:bg-surface-raised disabled:opacity-50">
+              className="min-h-8 rounded-lg border border-border bg-surface px-2.5 text-2xs font-semibold text-content hover:bg-surface-raised disabled:opacity-50">
               {running ? 'Looking for faces…' : previewStartLabel(resume, Boolean(preview))}
             </button>
             {running && (
               <button type="button" onClick={stopPreview} disabled={Boolean(job && job.stopping)}
-                className="min-h-8 rounded-lg border border-border bg-surface px-2.5 text-[0.6875rem] font-semibold text-amber-200 hover:bg-surface-raised disabled:opacity-50">
+                className="min-h-8 rounded-lg border border-border bg-surface px-2.5 text-2xs font-semibold text-amber-200 hover:bg-surface-raised disabled:opacity-50">
                 {previewStopLabel(job)}
               </button>
             )}
@@ -301,18 +301,18 @@ export default function ConceptFaceMaskField({
               while the pass runs, which is exactly why it cannot be a one-off
               confirmation dialog. */}
           {running && (
-            <p className="mt-1 text-[0.625rem] leading-tight text-content-subtle">
+            <p className="mt-1 text-2xs leading-tight text-content-subtle">
               {previewStopCost(job)}
             </p>
           )}
           {!running && previewStoppedNotice(job, resume) && (
-            <p role="status" className="mt-1 text-[0.6875rem] leading-relaxed text-content-muted">
+            <p role="status" className="mt-1 text-2xs leading-relaxed text-content-muted">
               {previewStoppedNotice(job, resume)}
             </p>
           )}
           {running && <PreviewProgress job={job} />}
           {err && !running && (
-            <p role="alert" className="mt-1 text-amber-300 text-[0.6875rem] leading-relaxed">
+            <p role="alert" className="mt-1 text-amber-300 text-2xs leading-relaxed">
               ⚠ {err}
             </p>
           )}
@@ -330,18 +330,18 @@ export default function ConceptFaceMaskField({
                   in the run. So it is kept visible and clearly labelled, never
                   quietly. */}
               {preview.stale && (
-                <p role="status" className="mb-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-[0.6875rem] leading-relaxed text-amber-300">
+                <p role="status" className="mb-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-2xs leading-relaxed text-amber-300">
                   ⚠ Your kept images changed since this preview ran, so it no longer
                   describes what would be trained. Refresh it.
                 </p>
               )}
               {cov && cov.total === 0 && (
-                <p className="text-[0.6875rem] text-content-muted">
+                <p className="text-2xs text-content-muted">
                   No kept images to look at yet — keep a few shots first, then preview.
                 </p>
               )}
               {cov && cov.total > 0 && (
-                <p className={`text-[0.6875rem] ${partial ? 'text-amber-300' : 'text-content-muted'}`}>
+                <p className={`text-2xs ${partial ? 'text-amber-300' : 'text-content-muted'}`}>
                   {partial && '⚠ '}
                   Masked on {cov.masked} of {cov.total} image{cov.total > 1 ? 's' : ''}
                   {cov.no_face > 0 && ` · ${cov.no_face} with no face found`}
@@ -352,7 +352,7 @@ export default function ConceptFaceMaskField({
                 </p>
               )}
               {samples.length > 0 && (
-              <label className="mt-2 flex items-center gap-2 flex-wrap text-[0.6875rem] text-content-muted">
+              <label className="mt-2 flex items-center gap-2 flex-wrap text-2xs text-content-muted">
                 <span className="shrink-0">Head coverage</span>
                 <input type="range" min="1" max="3" step="0.1" value={expand}
                   onChange={(e) => { expandTouched.current = true; setExpand(parseFloat(e.target.value)); }}
@@ -372,7 +372,7 @@ export default function ConceptFaceMaskField({
                       <SamplePreview key={s.image_id} datasetId={datasetId} sample={s} expand={expand} />
                     ))}
                   </div>
-                  <p className="mt-1.5 text-[0.625rem] leading-tight text-content-subtle">
+                  <p className="mt-1.5 text-2xs leading-tight text-content-subtle">
                     Images where no face was found are shown first — those are the ones worth looking at.
                   </p>
                 </>

@@ -263,7 +263,7 @@ export default function BankFilterRail({
                     <img src={`/api/bank/${bankId}/thumb/${c.cover_image_id}`} alt={`Person ${c.id}`}
                       loading="lazy" className="h-16 w-16 object-cover" />
                   )}
-                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-center text-[10px] font-semibold text-white">
+                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-center text-2xs font-semibold text-white">
                     #{c.id} · {c.size}
                   </span>
                 </button>
@@ -302,7 +302,7 @@ export default function BankFilterRail({
                     <img src={`/api/bank/${bankId}/thumb/${c.cover_image_id}`} alt={`Style ${c.id}`}
                       loading="lazy" className="h-16 w-16 object-cover" />
                   )}
-                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-center text-[10px] font-semibold text-white">
+                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-center text-2xs font-semibold text-white">
                     <Palette aria-hidden="true" className="mr-0.5 inline h-3 w-3 align-[-1px]" />{c.id} · {c.size}
                   </span>
                 </button>
@@ -316,7 +316,7 @@ export default function BankFilterRail({
           the row says so: a count that silently changed meaning would be worse
           than the bank-wide one it replaces. */}
       {chipsFiltered && (
-        <p className="m-0 text-[11px] leading-snug text-content-subtle">
+        <p className="m-0 text-2xs leading-snug text-content-subtle">
           Counts below follow the active filters. Each chip is counted with the
           others applied and its own value lifted, so you can always switch to
           a neighbour.
@@ -346,7 +346,7 @@ export default function BankFilterRail({
               "nothing is blurry" — the flags only see the scanned slice, and
               only this row knows that. */}
           {(payload?.counts?.unscanned_scannable ?? 0) > 0 && (
-            <p className="m-0 pl-1 text-[11px] leading-snug text-amber-300/90">
+            <p className="m-0 pl-1 text-2xs leading-snug text-amber-300/90">
               Only {(payload.counts.scanned ?? 0).toLocaleString()} of{' '}
               {(payload.counts.total ?? 0).toLocaleString()} images are scanned —
               these flags only see that part.{' '}
@@ -497,7 +497,7 @@ export default function BankFilterRail({
                     ))}
                   </FilterGroup>
                   {mediumNote && (
-                    <p className="m-0 pl-1 text-[11px] leading-snug text-content-subtle">{mediumNote}</p>
+                    <p className="m-0 pl-1 text-2xs leading-snug text-content-subtle">{mediumNote}</p>
                   )}
                 </div>
               )}
@@ -518,15 +518,15 @@ export default function BankFilterRail({
                     ))}
                   </FilterGroup>
                   {angleState.note && (
-                    <p className="m-0 pl-1 text-[11px] leading-snug text-content-subtle">{angleState.note}</p>
+                    <p className="m-0 pl-1 text-2xs leading-snug text-content-subtle">{angleState.note}</p>
                   )}
                   {angleState.offer && (
                     /* The why is the button's tooltip; printed beside it too, it
                        said the same thing twice. */
-                    <p className="m-0 flex flex-wrap items-center gap-2 pl-1 text-[11px] leading-snug text-content-subtle">
+                    <p className="m-0 flex flex-wrap items-center gap-2 pl-1 text-2xs leading-snug text-content-subtle">
                       <button type="button" onClick={() => setPassOpen('angles')} disabled={!!live}
                         title={angleState.offer.why}
-                        className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2 py-0.5 text-[11px] text-content transition-colors hover:bg-surface disabled:opacity-50">
+                        className="min-h-10 lg:min-h-0 rounded-md border border-border bg-surface-raised px-2 py-0.5 text-2xs text-content transition-colors hover:bg-surface disabled:opacity-50">
                         ⤢ {angleState.offer.label}
                       </button>
                     </p>

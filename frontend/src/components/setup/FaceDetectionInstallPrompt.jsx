@@ -32,7 +32,7 @@ export default function FaceDetectionInstallPrompt({ why, compact = false, onIns
   // the prompt only ever appears next to the option the user just reached for).
   if (state.status === 'loading' || state.status === 'ready') return null
 
-  const text = compact ? 'text-[0.6875rem]' : 'text-xs'
+  const text = compact ? 'text-2xs' : 'text-xs'
   return (
     <div
       role="status"

@@ -143,7 +143,7 @@ export function QueueDockBody({ listing, open = false, pending = null, sharing =
               moving, and this is what is holding the GPU instead. */}
           {paused && (
             <div className="border-b border-border bg-amber-400/10 px-3 py-2">
-              <p className="text-content text-[0.6875rem] leading-snug">{paused}</p>
+              <p className="text-content text-2xs leading-snug">{paused}</p>
               {/* A hold that can be ANSWERED says so here, and nowhere else: the
                   offer belongs next to the sentence that explains the wait. */}
               {action && <ShareGpuOffer action={action} busy={sharing} onShare={onShare} />}
@@ -196,7 +196,7 @@ function ShareGpuOffer({ action, busy, onShare }) {
   const [confirming, setConfirming] = useState(false)
   // Finger-sized below lg, unchanged on a desktop — kept together in one string
   // so the pair stays readable as the rule it is.
-  const button = 'min-h-10 lg:min-h-0 rounded px-2 py-1 text-[0.6875rem]'
+  const button = 'min-h-10 lg:min-h-0 rounded px-2 py-1 text-2xs'
     + ' disabled:cursor-not-allowed disabled:opacity-40'
   if (!confirming) {
     return (
@@ -209,7 +209,7 @@ function ShareGpuOffer({ action, busy, onShare }) {
   }
   return (
     <div className="mt-1.5">
-      <p className="text-content-subtle text-[0.6875rem] leading-snug">{action.confirm}</p>
+      <p className="text-content-subtle text-2xs leading-snug">{action.confirm}</p>
       <div className="mt-1 flex flex-wrap gap-1.5">
         <button type="button" disabled={busy}
           onClick={() => { setConfirming(false); onShare?.() }}
@@ -236,7 +236,7 @@ function QueueRow({ job, busy, onPromote, onCancel }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-content text-sm">{jobLabel(job)}</p>
-          <p className="truncate text-content-subtle text-[0.6875rem]">
+          <p className="truncate text-content-subtle text-2xs">
             {jobOrigin(job)}
             {job.since ? ` · ${elapsedLabel(job.since)}` : ''}
             {job.promoted ? ' · moved up' : ''}
@@ -253,7 +253,7 @@ function QueueRow({ job, busy, onPromote, onCancel }) {
             disabled={busy || !job.promotable || !!promoteBlocked}
             title={promoteBlocked || 'Run this one next'}
             aria-label={promoteBlocked || `Run ${jobLabel(job)} next`}
-            className="grid min-h-7 min-w-7 place-items-center rounded bg-app/60 text-[11px] text-content disabled:cursor-not-allowed disabled:opacity-40">
+            className="grid min-h-7 min-w-7 place-items-center rounded bg-app/60 text-2xs text-content disabled:cursor-not-allowed disabled:opacity-40">
             <span aria-hidden="true">↑</span>
           </button>
           <button type="button" onClick={() => onCancel?.(job)}
@@ -262,12 +262,12 @@ function QueueRow({ job, busy, onPromote, onCancel }) {
               ? 'Cancel this job — its tile is left marked failed, and Retry re-queues it'
               : note || 'This job cannot be cancelled from here'}
             aria-label={job.cancellable ? `Cancel ${jobLabel(job)}` : note || 'Cannot be cancelled here'}
-            className="grid min-h-7 min-w-7 place-items-center rounded bg-app/60 text-[11px] text-content disabled:cursor-not-allowed disabled:opacity-40">
+            className="grid min-h-7 min-w-7 place-items-center rounded bg-app/60 text-2xs text-content disabled:cursor-not-allowed disabled:opacity-40">
             <span aria-hidden="true">✕</span>
           </button>
         </div>
       </div>
-      {note && <p className="text-content-subtle text-[0.625rem] leading-snug">{note}</p>}
+      {note && <p className="text-content-subtle text-2xs leading-snug">{note}</p>}
     </li>
   )
 }

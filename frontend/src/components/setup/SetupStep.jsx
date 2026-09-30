@@ -15,7 +15,7 @@ export default function SetupStep({ step, index, effectiveStatus, onSkip, onUnsk
           <h2 className="text-base font-semibold text-content">
             {index}. {step.title}
             {step.recommended && (
-              <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-2xs font-medium text-primary">
                 Recommended
               </span>
             )}

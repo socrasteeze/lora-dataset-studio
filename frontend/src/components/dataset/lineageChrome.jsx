@@ -46,7 +46,7 @@ export function SavesChip({ node }) {
   if (node.checkpoint_ready === true) {
     const n = node.saves;
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200 text-[0.5625rem] font-medium"
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200 text-2xs font-medium"
         title={n ? `${n} checkpoint${n > 1 ? 's' : ''} still on disk` : 'LoRA on disk'}>
         {n ? `${n} on disk` : 'on disk'}
       </span>
@@ -54,7 +54,7 @@ export function SavesChip({ node }) {
   }
   if (node.checkpoint_ready === false) {
     return (
-      <span className="inline-flex items-center rounded-full border border-border px-1.5 py-0.5 text-content-subtle text-[0.5625rem] font-medium"
+      <span className="inline-flex items-center rounded-full border border-border px-1.5 py-0.5 text-content-subtle text-2xs font-medium"
         title="This run's checkpoint is no longer on disk (set aside by a later resume, or deleted)">
         gone
       </span>

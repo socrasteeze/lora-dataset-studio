@@ -116,22 +116,22 @@ export default function RunDeleteSection({ recordId, datasetId, onDeleted, onClo
   return (
     <section data-testid="run-delete-section"
       className="mt-4 border-t border-border pt-2">
-      <h4 className="m-0 mb-1 text-content-subtle text-[0.625rem] font-semibold uppercase tracking-wide">
+      <h4 className="m-0 mb-1 text-content-subtle text-2xs font-semibold uppercase tracking-wide">
         Danger zone
       </h4>
       <button type="button" data-testid="run-delete-open" ref={openerRef}
         disabled={!!blocked}
         onClick={() => { setError(null); setOpen(true); }}
         title={blocked || 'Delete this run, its checkpoints and the images it produced'}
-        className="rounded-md border border-rose-500/40 px-2 py-1.5 text-rose-300/90 text-[0.625rem] hover:bg-rose-500/10 disabled:opacity-40">
+        className="rounded-md border border-rose-500/40 px-2 py-1.5 text-rose-300/90 text-2xs hover:bg-rose-500/10 disabled:opacity-40">
         Delete run &amp; its files…
       </button>
-      <p className="m-0 mt-1 break-words text-content-subtle text-[0.625rem] leading-snug">
+      <p className="m-0 mt-1 break-words text-content-subtle text-2xs leading-snug">
         {blocked || 'Removes the checkpoints and generated images too. Runs that '
           + 'continued from it are kept.'}
       </p>
       {error && (
-        <p className="m-0 mt-1 break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-[0.625rem]">
+        <p className="m-0 mt-1 break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-2xs">
           {error}
         </p>
       )}
@@ -145,42 +145,42 @@ export default function RunDeleteSection({ recordId, datasetId, onDeleted, onClo
               {confirmation.title}
             </h4>
             {confirmation.unknown ? (
-              <p className="m-0 mb-3 text-content-muted text-[0.75rem]">
+              <p className="m-0 mb-3 text-content-muted text-xs">
                 What this run holds could not be counted. It will still delete its
                 checkpoints and the images it produced.
               </p>
             ) : (
               <>
-                <p className="m-0 mb-1 text-content-subtle text-[0.6875rem]">This deletes:</p>
-                <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-[0.75rem]">
+                <p className="m-0 mb-1 text-content-subtle text-2xs">This deletes:</p>
+                <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-xs">
                   {confirmation.losses.length
                     ? confirmation.losses.map((l) => <li key={l}>{l}</li>)
                     : <li>the run entry only — nothing else is attached to it</li>}
                 </ul>
               </>
             )}
-            <p className="m-0 mb-1 text-content-subtle text-[0.6875rem]">Kept:</p>
-            <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-[0.75rem]">
+            <p className="m-0 mb-1 text-content-subtle text-2xs">Kept:</p>
+            <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-xs">
               {confirmation.keeps.map((l) => <li key={l}>{l}</li>)}
             </ul>
-            <p className="m-0 mb-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-rose-100 text-[0.6875rem]">
+            <p className="m-0 mb-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-rose-100 text-2xs">
               Files go to the recycle bin / the app Trash. The run itself cannot be
               brought back.
             </p>
             {error && (
-              <p className="m-0 mb-3 break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-[0.6875rem]">
+              <p className="m-0 mb-3 break-words rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-2xs">
                 {error}
               </p>
             )}
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" ref={cancelRef}
                 onClick={() => { setOpen(false); openerRef.current?.focus(); }}
-                className="rounded-md border border-border px-3 py-2 text-content-muted text-[0.75rem] hover:text-content">
+                className="rounded-md border border-border px-3 py-2 text-content-muted text-xs hover:text-content">
                 Cancel
               </button>
               <button type="button" data-testid="run-delete-confirm-go"
                 disabled={busy} onClick={doDelete}
-                className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-[0.75rem] text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
+                className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-xs text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
                 {busy ? 'Deleting…' : 'Delete run'}
               </button>
             </div>

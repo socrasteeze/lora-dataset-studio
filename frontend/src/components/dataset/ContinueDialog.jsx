@@ -220,7 +220,7 @@ export default function ContinueDialog({
         <div className="flex items-center gap-2">
           <span className="text-indigo-300 font-semibold"><span aria-hidden>▶</span> Continue training</span>
           <HelpBadge topic="continue-training" />
-          {context && <span className="text-content-subtle text-[0.75rem] truncate">{context}</span>}
+          {context && <span className="text-content-subtle text-xs truncate">{context}</span>}
           <button type="button" onClick={dismiss} disabled={busy}
             className="ml-auto text-content-subtle hover:text-content disabled:opacity-40" aria-label="Cancel">✕</button>
         </div>
@@ -233,7 +233,7 @@ export default function ContinueDialog({
         {lanes && (
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-content text-[0.75rem] w-28 shrink-0">Run it</span>
+              <span className="text-content text-xs w-28 shrink-0">Run it</span>
               <div role="radiogroup" aria-label="Where to run the continuation"
                 className="flex items-center gap-1 rounded-lg border border-border bg-surface p-0.5">
                 {[['local', '💻 Local'], ['cloud', '☁ Cloud']].map(([id, label]) => {
@@ -243,7 +243,7 @@ export default function ContinueDialog({
                     <button key={id} type="button" role="radio" aria-checked={lane === id}
                       disabled={off} onClick={() => setLane(id)}
                       title={off ? st.reason || undefined : `Continue on the ${id === 'cloud' ? 'rented cloud GPU' : 'local GPU'}`}
-                      className={'px-2.5 py-1 rounded-md text-[0.75rem] font-semibold '
+                      className={'px-2.5 py-1 rounded-md text-xs font-semibold '
                         + (lane === id
                           ? 'bg-indigo-500/25 text-indigo-100 border border-indigo-400/50 '
                           : 'text-content-muted hover:text-content border border-transparent ')
@@ -255,7 +255,7 @@ export default function ContinueDialog({
               </div>
             </div>
             {laneState(lane).reason && (
-              <span className="text-amber-300/90 text-[0.6875rem] leading-relaxed">
+              <span className="text-amber-300/90 text-2xs leading-relaxed">
                 {laneState(lane).reason}
               </span>
             )}
@@ -265,17 +265,17 @@ export default function ContinueDialog({
         {/* Resume FROM which checkpoint. */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-content text-[0.75rem] w-28 shrink-0">Resume from</span>
+            <span className="text-content text-xs w-28 shrink-0">Resume from</span>
             <select value={String(fromStep)} onChange={(e) => setFromStep(Number(e.target.value))}
               aria-label="Checkpoint to resume from"
-              className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]">
+              className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs">
               {steps.length === 0 && <option value="0">no checkpoint</option>}
               {steps.slice().reverse().map((s) => (
                 <option key={s} value={String(s)}>{stepLabel(s)}</option>
               ))}
             </select>
           </div>
-          <span className="text-content-subtle text-[0.6875rem] leading-relaxed">
+          <span className="text-content-subtle text-2xs leading-relaxed">
             <b className="text-content-muted font-medium">Why:</b> a later epoch can be over-cooked — resume from the
             one that held up best (the 🏆 <b>best</b> tag, when scored).
           </span>
@@ -285,10 +285,10 @@ export default function ContinueDialog({
             every legacy/corrupt/cloud case visibly falls back to weights-only
             with the concrete reason, never by implication. */}
         <div className="flex flex-col gap-1">
-          <span className="text-content text-[0.75rem]">Resume mode</span>
+          <span className="text-content text-xs">Resume mode</span>
           <div role="radiogroup" aria-label="Training state to restore"
             className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-raised p-2.5">
-            <label className={'flex items-start gap-2 text-[0.75rem] '
+            <label className={'flex items-start gap-2 text-xs '
               + (fullStateAvailable ? 'text-content' : 'text-content-subtle')}>
               <input type="radio" name="resume-mode" value="full_state"
                 checked={resumeMode === 'full_state'}
@@ -298,14 +298,14 @@ export default function ContinueDialog({
                 <b>Full state</b> — weights, optimizer, scheduler, RNG and next batch
               </span>
             </label>
-            <label className="flex items-start gap-2 text-content text-[0.75rem]">
+            <label className="flex items-start gap-2 text-content text-xs">
               <input type="radio" name="resume-mode" value="weights_only"
                 checked={resumeMode === 'weights_only'}
                 onChange={() => setResumeMode('weights_only')} />
               <span><b>Weights only</b> — starts fresh optimizer/scheduler state</span>
             </label>
             {fullStateReason && (
-              <span className="text-amber-300/90 text-[0.6875rem] leading-relaxed">
+              <span className="text-amber-300/90 text-2xs leading-relaxed">
                 {fullStateReason}
               </span>
             )}
@@ -315,17 +315,17 @@ export default function ContinueDialog({
         {/* How many more steps. */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-content text-[0.75rem] w-28 shrink-0">Extra steps</span>
+            <span className="text-content text-xs w-28 shrink-0">Extra steps</span>
             <input type="number" min="100" step="100" value={extra}
               onChange={(e) => setExtra(e.target.value)}
               aria-label="Additional steps to train"
-              className="w-28 px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] tabular-nums" />
-            <span className="text-content-muted text-[0.6875rem] tabular-nums">
+              className="w-28 px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs tabular-nums" />
+            <span className="text-content-muted text-2xs tabular-nums">
               → target step {target}
             </span>
           </div>
           {isEarlier && (
-            <span className="text-amber-300/90 text-[0.6875rem] leading-relaxed">
+            <span className="text-amber-300/90 text-2xs leading-relaxed">
               {lane === 'cloud'
                 ? `Restarts from step ${fromStep} on a fresh pod: this checkpoint is uploaded and`
                   + ' trained further — every save you have here stays exactly where it is.'
@@ -339,13 +339,13 @@ export default function ContinueDialog({
         {/* Optional, folded: the settings a resume can safely change. */}
         <div className="flex flex-col gap-1">
           <button type="button" onClick={() => setShowSettings((v) => !v)}
-            className="self-start text-indigo-300 hover:text-indigo-200 text-[0.75rem] font-medium">
+            className="self-start text-indigo-300 hover:text-indigo-200 text-xs font-medium">
             {showSettings ? '▾' : '▸'} Adjust settings (optional)
           </button>
           {showSettings && (
             <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-surface-raised p-2.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Save checkpoint</span>
+                <span className="text-content text-xs w-28 shrink-0">Save checkpoint</span>
                 <select value={String(trajectoryLocked ? inheritedSave : saveEvery)}
                   onChange={(e) => setSaveEvery(Number(e.target.value))}
                   disabled={trajectoryLocked}
@@ -353,13 +353,13 @@ export default function ContinueDialog({
                   title={trajectoryLocked
                     ? 'Full state preserves the checkpoint save cadence'
                     : undefined}
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-40">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs disabled:opacity-40">
                   {SAVE_CHOICES.map((n) => <option key={n} value={String(n)}>every {n} steps</option>)}
                 </select>
-                <span className="text-content-subtle text-[0.625rem]">how often a checkpoint is written</span>
+                <span className="text-content-subtle text-2xs">how often a checkpoint is written</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Preview every</span>
+                <span className="text-content text-xs w-28 shrink-0">Preview every</span>
                 <select value={String(trajectoryLocked ? inheritedSampleEvery : sampleEvery)}
                   onChange={(e) => setSampleEvery(Number(e.target.value))}
                   disabled={trajectoryLocked}
@@ -367,60 +367,60 @@ export default function ContinueDialog({
                   title={trajectoryLocked
                     ? 'Full state preserves the checkpoint preview cadence'
                     : undefined}
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-40">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs disabled:opacity-40">
                   {SAMPLE_EVERY_CHOICES.map((n) => <option key={n} value={String(n)}>every {n} steps</option>)}
                 </select>
-                <span className="text-content-subtle text-[0.625rem]">preview images cadence</span>
+                <span className="text-content-subtle text-2xs">preview images cadence</span>
               </div>
               <label className="flex flex-col gap-1">
-                <span className="text-content text-[0.75rem]">Preview prompts</span>
+                <span className="text-content text-xs">Preview prompts</span>
                 <textarea value={prompts} onChange={(e) => setPrompts(e.target.value)} rows={3}
                   placeholder={inheritedPrompts || 'one prompt per line — blank keeps the run’s prompts'}
                   aria-label="Preview sample prompts, one per line"
-                  className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content text-[0.6875rem] font-mono leading-relaxed resize-y placeholder:text-content-subtle" />
-                <span className="text-content-subtle text-[0.625rem]">test images only — never affects the weights</span>
+                  className="px-2 py-1.5 rounded-lg border border-border bg-surface text-content text-2xs font-mono leading-relaxed resize-y placeholder:text-content-subtle" />
+                <span className="text-content-subtle text-2xs">test images only — never affects the weights</span>
               </label>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Preview quality</span>
+                <span className="text-content text-xs w-28 shrink-0">Preview quality</span>
                 <label className="flex items-center gap-1.5">
                   <input type="number" min="1" max="60" step="1" value={sampleSteps}
                     onChange={(e) => setSampleSteps(e.target.value)}
                     placeholder="keep"
                     aria-label="Preview steps"
-                    className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
-                  <span className="text-content-muted text-[0.625rem]">steps</span>
+                    className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
+                  <span className="text-content-muted text-2xs">steps</span>
                 </label>
                 <label className="flex items-center gap-1.5">
                   <input type="number" min="1" max="20" step="0.5" value={sampleGuidance}
                     onChange={(e) => setSampleGuidance(e.target.value)}
                     placeholder="keep"
                     aria-label="Preview guidance scale"
-                    className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem]" />
-                  <span className="text-content-muted text-[0.625rem]">CFG</span>
+                    className="w-16 px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
+                  <span className="text-content-muted text-2xs">CFG</span>
                 </label>
-                <span className="text-content-subtle text-[0.625rem]">preview rendering only — allowed even on full state</span>
+                <span className="text-content-subtle text-2xs">preview rendering only — allowed even on full state</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Timestep weighting</span>
+                <span className="text-content text-xs w-28 shrink-0">Timestep weighting</span>
                 <select value={timestep} onChange={(e) => setTimestep(e.target.value)}
                   disabled={trajectoryLocked}
                   aria-label="Timestep weighting for the continuation"
                   title={trajectoryLocked
                     ? 'Full state preserves the checkpoint training trajectory'
                     : undefined}
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-40">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs disabled:opacity-40">
                   <option value="">keep current</option>
                   {TIMESTEP_CHOICES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <span className="text-content-subtle text-[0.625rem]">advanced — SDXL ignores it</span>
+                <span className="text-content-subtle text-2xs">advanced — SDXL ignores it</span>
               </div>
-              <span className="text-content-subtle text-[0.625rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 <b className="text-content-muted font-medium">Why timestep:</b> a known two-phase recipe trains balanced
                 first, then continues with a different noise-level emphasis to polish fine texture — changing it here is
                 a deliberate recipe change for the extra steps, applied via this dataset&apos;s settings.
               </span>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-content text-[0.75rem] w-28 shrink-0">Learning rate</span>
+                <span className="text-content text-xs w-28 shrink-0">Learning rate</span>
                 <select value={String(lrFactor)} onChange={(e) => setLrFactor(Number(e.target.value))}
                   disabled={isAdaptiveLR || trajectoryLocked}
                   aria-label="Learning rate for the continuation"
@@ -429,16 +429,16 @@ export default function ContinueDialog({
                     : (isAdaptiveLR
                       ? 'Prodigy adapts the learning rate itself (lr=1) — there is no base rate to scale'
                       : undefined)}
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] disabled:opacity-40">
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs disabled:opacity-40">
                   {LR_FACTOR_CHOICES.map((c) => <option key={c.value} value={String(c.value)}>{c.label}</option>)}
                 </select>
-                <span className="text-content-muted text-[0.625rem] tabular-nums">
+                <span className="text-content-muted text-2xs tabular-nums">
                   {isAdaptiveLR
                     ? 'Prodigy — adaptive'
                     : (lrFactor === 1 ? `keeps ${fmtLR(currentLR)}` : `→ ${fmtLR(currentLR * lrFactor)}`)}
                 </span>
               </div>
-              <span className="text-content-subtle text-[0.625rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 <b className="text-content-muted font-medium">Why LR:</b> resume the epoch that held up best and finish
                 gentler — a smaller rate polishes texture without moving the identity, the LR pendant of the low-noise
                 timestep recipe. The values are factors of this run&apos;s current rate.
@@ -447,7 +447,7 @@ export default function ContinueDialog({
                   enforces. Naming the actual rank makes it checkable at a glance
                   — the Estelle run continued a rank-64 LoRA while the dataset had
                   been edited to rank 32, and nothing on screen said which won. */}
-              <span className="text-content-subtle text-[0.625rem] leading-relaxed">
+              <span className="text-content-subtle text-2xs leading-relaxed">
                 {trajectoryLocked
                   ? 'Full state keeps the learning rate, timestep trajectory and save/preview cadence exact; only preview prompts can change. '
                   : 'Weights-only resume may also change timestep weighting and learning rate. '}
@@ -464,7 +464,7 @@ export default function ContinueDialog({
             The blocked lane already prints its reason above; this covers the
             state that printed none at all. */}
         {blockedReason && (
-          <span className="text-amber-300/90 text-[0.6875rem] leading-relaxed">{blockedReason}</span>
+          <span className="text-amber-300/90 text-2xs leading-relaxed">{blockedReason}</span>
         )}
 
         {/* The LAST attempt's refusal, right above the button that produced it —
@@ -479,10 +479,10 @@ export default function ContinueDialog({
                child is free to be SQUASHED — with the settings unfolded the
                message rendered as a 20-px sliver of clipped text (measured). */
             className="shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 max-h-28 overflow-y-auto">
-            <span className="block text-red-200 text-[0.6875rem] leading-relaxed whitespace-pre-wrap break-words">
+            <span className="block text-red-200 text-2xs leading-relaxed whitespace-pre-wrap break-words">
               {error}
             </span>
-            <span className="block text-content-subtle text-[0.625rem] mt-1">
+            <span className="block text-content-subtle text-2xs mt-1">
               Your choices are kept — adjust and try again.
             </span>
           </div>

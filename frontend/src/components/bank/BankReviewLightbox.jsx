@@ -61,7 +61,7 @@ function Facts({ img }) {
   if (!img) return <span className="text-xs text-white/40">Reading image details…</span>
   const chip = (key, text, cls, title) => (
     <span key={key} title={title}
-      className={`rounded px-1.5 py-px text-[11px] font-medium ${cls}`}>{text}</span>
+      className={`rounded px-1.5 py-px text-2xs font-medium ${cls}`}>{text}</span>
   )
   const detail = detailSummary(img)
   const origin = originLabel(img)
@@ -70,7 +70,7 @@ function Facts({ img }) {
     <div className="flex flex-wrap items-center justify-center gap-1.5">
       <span className="max-w-[22rem] truncate text-xs text-white/70" title={img.name}>{img.name}</span>
       <SourceAttribution metadata={img.source_metadata}
-        className="text-[11px] text-white/70" />
+        className="text-2xs text-white/70" />
       {chip('res', `${img.width || '?'}×${img.height || '?'}`, 'bg-white/10 text-white/80')}
       {detail && chip('detail', detail.soft ? `~${detail.real} px real` : 'full detail',
         detail.soft ? 'bg-amber-500/20 text-amber-100' : 'bg-white/10 text-white/60',
@@ -461,7 +461,7 @@ export default function BankReviewLightbox({
               ⏭ Skip{shortcut('S')}
             </button>
           </div>
-          <p className="text-center text-[11px] text-white/45">
+          <p className="text-center text-2xs text-white/45">
             {REVIEW_SHORTCUT_HINT} · [ ] rotate · C crop · M watermark mask · ← → move
             without deciding · Esc close. Decisions are saved one by one — closing loses nothing.
           </p>

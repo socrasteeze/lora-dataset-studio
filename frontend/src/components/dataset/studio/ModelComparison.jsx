@@ -10,12 +10,12 @@ export default function ModelComparison({ items }) {
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-2">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-        className="flex items-center gap-2 text-left text-content-muted text-[0.625rem] uppercase">
+        className="flex items-center gap-2 text-left text-content-muted text-2xs uppercase">
         <span aria-hidden>{open ? '▾' : '▸'}</span>
         Base model comparison ({items.length})
       </button>
       {open && (
-        <table className="w-full text-[0.6875rem]">
+        <table className="w-full text-2xs">
           <thead>
             <tr className="text-content-subtle text-left">
               <th className="font-normal py-0.5">Model</th>

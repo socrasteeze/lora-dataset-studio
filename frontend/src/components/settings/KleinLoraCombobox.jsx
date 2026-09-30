@@ -41,7 +41,7 @@ function ArchBadge({ compatible, label, engineLabel }) {
   const b = compatBadge(compatible, label, engineLabel)
   return (
     <span title={b.title}
-      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${BADGE_TONE[b.tone]}`}>
+      className={`shrink-0 rounded border px-1.5 py-0.5 text-2xs font-medium ${BADGE_TONE[b.tone]}`}>
       {b.text}
     </span>
   )
@@ -151,7 +151,7 @@ export default function KleinLoraCombobox({
             {selected && <ArchBadge compatible={selected.compatible} label={selected.label} engineLabel={engineLabel} />}
             {notFound && (
               <span title="No file with this name was found under ComfyUI's models/loras — it may be renamed, not downloaded yet, or in a config the scan can't see. It's kept as typed."
-                className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                className="shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-2xs font-medium text-amber-300">
                 not on disk
               </span>
             )}
@@ -182,7 +182,7 @@ export default function KleinLoraCombobox({
             <ul role="listbox">
               {compatible.length > 0 && (
                 <>
-                  <li className="sticky top-0 bg-surface-overlay px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                  <li className="sticky top-0 bg-surface-overlay px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-emerald-300">
                     {engineLabel}-compatible
                   </li>
                   {compatible.map(renderRow)}
@@ -190,14 +190,14 @@ export default function KleinLoraCombobox({
               )}
               {other.length > 0 && (
                 <>
-                  <li className="sticky top-0 bg-surface-overlay px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-content-muted">
+                  <li className="sticky top-0 bg-surface-overlay px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-content-muted">
                     Other arch (loads as a no-op in the {engineLabel} graph)
                   </li>
                   {other.map(renderRow)}
                 </>
               )}
               {hiddenCount > 0 && (
-                <li className="px-2 py-1.5 text-[11px] text-content-subtle">
+                <li className="px-2 py-1.5 text-2xs text-content-subtle">
                   +{hiddenCount} more — keep typing to narrow the list.
                 </li>
               )}

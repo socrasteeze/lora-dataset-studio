@@ -42,7 +42,7 @@ function Block({ title, subtitle, children }) {
     <section className="rounded-lg border border-border bg-surface p-3 space-y-2">
       <div>
         <h3 className="text-xs font-bold uppercase tracking-wide text-content-muted">{title}</h3>
-        {subtitle && <p className="mt-0.5 text-[11px] leading-snug text-content-subtle">{subtitle}</p>}
+        {subtitle && <p className="mt-0.5 text-2xs leading-snug text-content-subtle">{subtitle}</p>}
       </div>
       {children}
     </section>
@@ -54,7 +54,7 @@ function Block({ title, subtitle, children }) {
  *  absent one twice on this screen. */
 function DisabledNote({ children }) {
   return (
-    <span className="mt-0.5 block text-[11px] leading-snug text-amber-300/90">{children}</span>
+    <span className="mt-0.5 block text-2xs leading-snug text-amber-300/90">{children}</span>
   )
 }
 
@@ -173,7 +173,7 @@ export default function PassDialog({
                     Your selection — up to {selectionSize} image(s)
                   </span>
                   {selection.ok ? (
-                    <span className="block text-[11px] leading-snug text-content-subtle">
+                    <span className="block text-2xs leading-snug text-content-subtle">
                       “Up to”, because the selection is narrowed by what this pass still
                       has to do — never widened.
                     </span>
@@ -197,7 +197,7 @@ export default function PassDialog({
                     {passScopeLineLabel(payload, passId, r.id, redo)}
                   </span>
                   {r.ok ? (
-                    <span className="block text-[11px] leading-snug text-content-subtle">{r.hint}</span>
+                    <span className="block text-2xs leading-snug text-content-subtle">{r.hint}</span>
                   ) : <DisabledNote>{r.reason}</DisabledNote>}
                 </span>
               </label>
@@ -220,7 +220,7 @@ export default function PassDialog({
                 <span className="min-w-0">
                   <span className="font-medium text-content">{spec.redo.label}</span>
                   {spec.redo.note && (
-                    <span className="block text-[11px] leading-snug text-content-subtle">
+                    <span className="block text-2xs leading-snug text-content-subtle">
                       {spec.redo.note}
                     </span>
                   )}
@@ -230,7 +230,7 @@ export default function PassDialog({
 
             {binWarning && (
               <p role="note"
-                className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-200">
+                className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-2xs leading-snug text-amber-200">
                 ⚠ {binWarning}
               </p>
             )}
@@ -246,7 +246,7 @@ export default function PassDialog({
           <Block title="Settings this pass reads"
             subtitle="Only what the CALCULATION uses. These are global — the same for every bank — unless a line says otherwise.">
             {wmRoute && (
-              <p className="m-0 rounded-md border border-indigo-400/40 bg-indigo-500/10 px-2 py-1.5 text-[11px] leading-snug text-content-muted">
+              <p className="m-0 rounded-md border border-indigo-400/40 bg-indigo-500/10 px-2 py-1.5 text-2xs leading-snug text-content-muted">
                 {wmRoute.route}
               </p>
             )}
@@ -260,7 +260,7 @@ export default function PassDialog({
                   <li key={s.name}>
                     <span className="text-content">{s.name}</span>
                     {s.note && (
-                      <span className="block text-[11px] leading-snug text-content-subtle">{s.note}</span>
+                      <span className="block text-2xs leading-snug text-content-subtle">{s.note}</span>
                     )}
                   </li>
                 ))}
@@ -288,13 +288,13 @@ export default function PassDialog({
               <span className="block whitespace-pre-wrap break-words text-xs leading-relaxed text-red-200">
                 {error}
               </span>
-              <span className="mt-1 block text-[0.625rem] text-content-subtle">
+              <span className="mt-1 block text-2xs text-content-subtle">
                 Your choices are kept — adjust and try again.
               </span>
             </div>
           )}
           {blocked && !error && (
-            <p className="m-0 text-[11px] leading-snug text-amber-300/90">{blocked}</p>
+            <p className="m-0 text-2xs leading-snug text-amber-300/90">{blocked}</p>
           )}
           {typeof secondary === 'function'
             ? secondary({ scope, redo, busy, close: onClose, fail: setError })

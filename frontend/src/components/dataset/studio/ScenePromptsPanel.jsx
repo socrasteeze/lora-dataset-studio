@@ -75,10 +75,10 @@ export default function ScenePromptsPanel({ value, onChange }) {
   const nPicked = picked.length;
   return (
     <details className="rounded-lg border border-border bg-app/30 open:pb-2" onToggle={(e) => { if (e.currentTarget.open) openList(kind); }}>
-      <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[0.75rem] text-content font-semibold">
+      <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs text-content font-semibold">
         🎬 Scenes from a bank or dataset
         <HelpBadge topic="studio-scene-prompts" />
-        <span className="ml-2 font-normal text-content-subtle text-[0.625rem]">
+        <span className="ml-2 font-normal text-content-subtle text-2xs">
           {scenes.length
             ? `${nPicked} of ${scenes.length} scene(s) picked from “${source?.name || 'a source'}” — one pass each, in order`
             : 'run a bank’s or a dataset’s captions in order — one pass per ticked scene'}
@@ -91,7 +91,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
           {SCENE_SOURCES.map((s) => (
             <button key={s.kind} type="button" onClick={() => pickKind(s.kind)}
               aria-pressed={kind === s.kind}
-              className={'rounded-lg border px-2 py-0.5 text-[0.625rem] font-semibold transition-colors '
+              className={'rounded-lg border px-2 py-0.5 text-2xs font-semibold transition-colors '
                 + (kind === s.kind
                   ? 'border-primary/50 bg-primary/20 text-white'
                   : 'border-border bg-app/40 text-content-muted hover:bg-surface-raised')}>
@@ -102,7 +102,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <select value={sourceId} onChange={(e) => setSourceId(e.target.value)}
             aria-label={`${src.label.replace(/^\S+\s/, '')} to load scenes from`}
-            className="max-w-56 rounded border border-border bg-app/60 px-1 py-1 text-[0.6875rem] text-content">
+            className="max-w-56 rounded border border-border bg-app/60 px-1 py-1 text-2xs text-content">
             <option value="">
               {options === undefined ? 'Loading…' : (options.length ? src.pick : src.empty)}
             </option>
@@ -111,18 +111,18 @@ export default function ScenePromptsPanel({ value, onChange }) {
             ))}
           </select>
           <button type="button" onClick={load} disabled={!sourceId || busy}
-            className="rounded-lg bg-gradient-primary px-2.5 py-1 text-[0.6875rem] font-semibold text-gray-950 disabled:opacity-40">
+            className="rounded-lg bg-gradient-primary px-2.5 py-1 text-2xs font-semibold text-gray-950 disabled:opacity-40">
             {busy ? 'Loading…' : scenes.length ? '⟳ Reload' : '⬇ Load scenes'}
           </button>
           {scenes.length > 0 && (
             <>
               <button type="button"
                 onClick={() => onChange({ ...value, picked: scenes.map((_, i) => i) })}
-                className="rounded border border-border px-1.5 py-0.5 text-[0.625rem] text-content-muted hover:bg-surface-raised">
+                className="rounded border border-border px-1.5 py-0.5 text-2xs text-content-muted hover:bg-surface-raised">
                 Select all
               </button>
               <button type="button" onClick={() => onChange({ ...value, picked: [] })}
-                className="rounded border border-border px-1.5 py-0.5 text-[0.625rem] text-content-muted hover:bg-surface-raised">
+                className="rounded border border-border px-1.5 py-0.5 text-2xs text-content-muted hover:bg-surface-raised">
                 None
               </button>
             </>
@@ -145,7 +145,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
                   <button type="button"
                     onClick={() => onChange({ ...value, picked: toggleSceneIndex(picked, i) })}
                     aria-pressed={on} title={joinScenePrompt(s.prompt, extra)}
-                    className={'flex items-start gap-1.5 px-1.5 py-1 text-left text-[0.625rem] '
+                    className={'flex items-start gap-1.5 px-1.5 py-1 text-left text-2xs '
                       + (on ? 'text-white' : 'text-content-muted')}>
                     {thumb && (
                       <img src={thumb}
@@ -170,7 +170,7 @@ export default function ScenePromptsPanel({ value, onChange }) {
                       })}
                       placeholder="✏️ Custom prompt added to this scene (optional)"
                       aria-label={`Custom prompt appended to scene ${i + 1}`}
-                      className="mx-1.5 mb-1 min-h-10 lg:min-h-0 rounded border border-border bg-app/60 px-1.5 py-0.5 text-[0.625rem] text-content placeholder:text-content-subtle" />
+                      className="mx-1.5 mb-1 min-h-10 lg:min-h-0 rounded border border-border bg-app/60 px-1.5 py-0.5 text-2xs text-content placeholder:text-content-subtle" />
                   )}
                 </div>
               );

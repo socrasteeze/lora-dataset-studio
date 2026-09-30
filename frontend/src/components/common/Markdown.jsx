@@ -172,7 +172,7 @@ function renderBlock(b, idx, guide = false) {
                   if (task) {
                     return (
                       <li key={ii} className="list-none -ml-5 flex items-start gap-2">
-                        <span aria-hidden className={`mt-0.5 grid place-items-center w-4 h-4 shrink-0 rounded border text-[0.625rem] ${task[1] === ' ' ? 'border-border-strong text-transparent' : 'border-emerald-400/60 bg-emerald-500/15 text-emerald-300'}`}>✓</span>
+                        <span aria-hidden className={`mt-0.5 grid place-items-center w-4 h-4 shrink-0 rounded border text-2xs ${task[1] === ' ' ? 'border-border-strong text-transparent' : 'border-emerald-400/60 bg-emerald-500/15 text-emerald-300'}`}>✓</span>
                         <span>{renderInline(task[2], `${key}i${ii}`)}</span>
                       </li>
                     );
@@ -180,7 +180,7 @@ function renderBlock(b, idx, guide = false) {
                   if (guide && b.ordered) {
                     return (
                       <li key={ii} className="flex gap-3 rounded-lg border border-border bg-app px-3 py-3 leading-relaxed">
-                        <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-indigo-500/15 font-mono text-[0.6875rem] font-bold text-indigo-300">{String(ii + 1).padStart(2, '0')}</span>
+                        <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-indigo-500/15 font-mono text-2xs font-bold text-indigo-300">{String(ii + 1).padStart(2, '0')}</span>
                         <span>{renderInline(it, `${key}i${ii}`)}</span>
                       </li>
                     );

@@ -119,7 +119,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
         className="flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-content-muted hover:text-content hover:bg-surface-raised transition-colors disabled:opacity-50">
         <Archive aria-hidden="true" className="h-4 w-4" />
         <span className="text-sm font-medium lg:text-base">Import from a bank</span>
-        <span className="text-content-muted text-[0.6875rem] lg:text-sm">copy the kept images of a triaged bank into this dataset</span>
+        <span className="text-content-muted text-2xs lg:text-sm">copy the kept images of a triaged bank into this dataset</span>
         <span aria-hidden className="ml-auto text-content-subtle">→</span>
       </button>
     );
@@ -132,11 +132,11 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
         <Archive aria-hidden="true" className="h-4 w-4" />
         <span className="text-sm font-medium text-content">Import from a bank</span>
         <button type="button" onClick={() => setOpen(false)}
-          className="ml-auto text-content-subtle text-[0.6875rem] hover:text-content">
+          className="ml-auto text-content-subtle text-2xs hover:text-content">
           close
         </button>
       </div>
-      <p className="text-content-subtle text-[0.6875rem]">
+      <p className="text-content-subtle text-2xs">
         Only KEPT images are copied, and only those not already here. Their bytes and
         Bank analysis travel together; near-duplicates are skipped. The bank and its
         source folder are left untouched.
@@ -155,7 +155,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
       ) : (
         <>
           <div>
-            <label htmlFor="ds-bank-import-select" className="block text-content-muted text-[0.6875rem]">
+            <label htmlFor="ds-bank-import-select" className="block text-content-muted text-2xs">
               Source bank
             </label>
             <select id="ds-bank-import-select" value={chosen} disabled={busy}
@@ -170,7 +170,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
             </select>
           </div>
           {current && (
-            <p className={`text-[0.6875rem] ${current.ready ? 'text-emerald-300' : 'text-amber-300'}`}>
+            <p className={`text-2xs ${current.ready ? 'text-emerald-300' : 'text-amber-300'}`}>
               {current.hint}
               {!current.ready && current.reason !== 'loading' && (
                 <>
@@ -189,7 +189,7 @@ export default function BankImportPanel({ datasetId, onImported, disabled = fals
               {watching != null ? 'Importing…' : starting ? 'Starting…' : 'Import'}
             </button>
             {watching != null && (
-              <span className="text-content-subtle text-[0.6875rem]">
+              <span className="text-content-subtle text-2xs">
                 running in the background — the grid fills in when it ends
               </span>
             )}

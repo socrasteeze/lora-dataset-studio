@@ -99,7 +99,7 @@ export default function BankBulkDeleteDialog({ banks, onClose, onResults }) {
             {pending.map((bank) => (
               <li key={bankSelectionKey(bank)} className="min-w-0">
                 <span className="font-semibold text-content">{bank.name}</span>
-                <span className="block break-all font-mono text-[0.6875rem] text-content-subtle">{bank.source_path}</span>
+                <span className="block break-all font-mono text-2xs text-content-subtle">{bank.source_path}</span>
               </li>
             ))}
           </ul>

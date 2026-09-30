@@ -57,7 +57,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
         onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex items-center gap-2 w-full text-left text-content text-sm font-semibold">
         <span aria-hidden>📝</span> Caption tools
-        <span className="text-content-subtle text-[0.6875rem] font-normal">
+        <span className="text-content-subtle text-2xs font-normal">
           find/replace · {categoryCopy.frequencyTitle.toLowerCase()} ({captioned.length} captioned)
         </span>
         <span aria-hidden className="ml-auto text-content-subtle">{open ? '▾' : '▸'}</span>
@@ -67,7 +67,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
           {/* Plain-language primer: what captions are and what these tools do —
               a newcomer shouldn't need to guess why find/replace or tag frequency
               matter for training. */}
-          <p className="m-0 text-content-subtle text-[0.6875rem] leading-relaxed">
+          <p className="m-0 text-content-subtle text-2xs leading-relaxed">
             Captions are the text the LoRA reads each image by. These tools edit{' '}
             <span className="text-content-muted font-medium">every kept caption at once</span> — use them to
             fix a word that slipped into all of them, or to strip/rename a tag that keeps repeating.
@@ -77,7 +77,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
             comma-separated tags and matches a whole tag (best for booru / SDXL).
             {' '}<SettingsLink section="captioning" focus="captioning-backend">Which model writes them, and how</SettingsLink>
           </p>
-          <span className="text-content-subtle text-[0.625rem] uppercase tracking-wide">Find &amp; replace</span>
+          <span className="text-content-subtle text-2xs uppercase tracking-wide">Find &amp; replace</span>
           <div className="flex items-center gap-2 flex-wrap">
             <input value={find} onChange={(e) => setFind(e.target.value)}
               placeholder={tagMode ? 'tag to replace/remove' : 'text to find'}
@@ -104,10 +104,10 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
               what's left to do (community's #1 request). Multi-exclusions cumulate;
               active filters show as loud chips above the grid. Session-only (they
               reset on reload / dataset switch — a transient view, not dataset state). */}
-          <span className="text-content-subtle text-[0.625rem] uppercase tracking-wide">
+          <span className="text-content-subtle text-2xs uppercase tracking-wide">
             Filter the grid by {categoryCopy.frequencyItem}
           </span>
-          <p className="m-0 text-content-subtle text-[0.6875rem] leading-relaxed">
+          <p className="m-0 text-content-subtle text-2xs leading-relaxed">
             <span className="text-content-muted font-medium">Exclude</span> hides images already tagged with a
             word — walk a captioning checklist without re-checking what's done.{' '}
             <span className="text-content-muted font-medium">Only&nbsp;with</span> does the inverse (isolate the
@@ -134,10 +134,10 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
           </div>
           {freq.length > 0 && (
             <div className="flex flex-col gap-1">
-              <span className="text-content-subtle text-[0.625rem] uppercase tracking-wide">
+              <span className="text-content-subtle text-2xs uppercase tracking-wide">
                 {categoryCopy.frequencyTitle}
               </span>
-              <p className="m-0 text-content-subtle text-[0.6875rem] leading-relaxed">
+              <p className="m-0 text-content-subtle text-2xs leading-relaxed">
                 {categoryCopy.frequencyHelp}{' '}
                 Click a {categoryCopy.frequencyItem} to load it into Find
                 {mode === 'booru' ? ' (tag mode)' : ' (text mode)'}; leave Replace empty to strip it from every caption. The{' '}
@@ -154,7 +154,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                       <button type="button"
                         onClick={() => { setFind(tag); setTagMode(mode === 'booru'); }}
                         title={`"${tag}" appears in ${n} caption(s) — click to fill Find (${mode === 'booru' ? 'tag' : 'text'} mode)`}
-                        className="px-1.5 py-0.5 bg-app/60 text-[0.6875rem] text-content-muted hover:text-content hover:bg-surface-raised">
+                        className="px-1.5 py-0.5 bg-app/60 text-2xs text-content-muted hover:text-content hover:bg-surface-raised">
                         {tag} <span className="text-content-subtle">×{n}</span>
                       </button>
                       {onExclude && (
@@ -165,7 +165,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                           title={isExcluded
                             ? `Hiding images tagged "${tag}" — click to show them again`
                             : `Hide images already tagged "${tag}" from the grid`}
-                          className={`px-1.5 border-l text-[0.6875rem] ${
+                          className={`px-1.5 border-l text-2xs ${
                             isExcluded ? 'bg-rose-500/25 border-rose-400/50 text-rose-200'
                               : 'bg-app/40 border-border text-content-subtle hover:text-rose-200 hover:bg-rose-500/15'}`}>
                           ⊘
@@ -182,7 +182,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
               straight from the dataset folder — no ZIP download needed. */}
           {onWriteFiles && (
             <div className="flex flex-col gap-1">
-              <span className="text-content-subtle text-[0.625rem] uppercase tracking-wide">Caption files on disk</span>
+              <span className="text-content-subtle text-2xs uppercase tracking-wide">Caption files on disk</span>
               <div className="flex items-center gap-2 flex-wrap">
                 <button type="button" onClick={onWriteFiles} disabled={busy}
                   title="Writes <image>.txt next to each kept image in the dataset folder — same format as the ZIP export, for external tools"
@@ -197,7 +197,7 @@ export default function CaptionToolsBar({ images, kind = 'character', mode = 'bo
                     <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
                 )}
-                <span className="text-content-subtle text-[0.6875rem]">
+                <span className="text-content-subtle text-2xs">
                   {kind === 'style'
                     ? 'content-only sidecars · no activation trigger · overwrites existing .txt'
                     : 'kohya-style sidecar captions, trigger included — overwrites existing .txt'}

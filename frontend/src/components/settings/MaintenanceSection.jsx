@@ -267,7 +267,7 @@ function LogViewer() {
               {copyFailed ? 'Copy failed — select the log below' : '📋 Copy all'}
             </button>
           </div>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-app/60 p-2 text-[11px] leading-snug text-content-muted">
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-app/60 p-2 text-2xs leading-snug text-content-muted">
             {lines.length ? lines.join('\n') : 'Log is empty.'}
           </pre>
         </div>

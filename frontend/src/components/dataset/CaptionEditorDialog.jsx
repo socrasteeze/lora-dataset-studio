@@ -146,11 +146,11 @@ export default function CaptionEditorDialog({
                   title={dirty
                     ? 'You have an unsaved caption on this image — save it or clear the edit first'
                     : 'Pick another image to bench captions on'}
-                  className="m-0 inline-flex min-h-10 items-center text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-content-subtle hover:text-content disabled:opacity-40 lg:min-h-0">
+                  className="m-0 inline-flex min-h-10 items-center text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle hover:text-content disabled:opacity-40 lg:min-h-0">
                   ‹ Another image
                 </button>
               ) : (
-                <p className="m-0 text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-content-subtle">Dataset image</p>
+                <p className="m-0 text-2xs font-semibold uppercase tracking-[0.18em] text-content-subtle">Dataset image</p>
               )}
               <h2 id="caption-editor-title" className="m-0 mt-0.5 text-lg font-semibold text-content">
                 {mode === 'lab' ? 'Caption Lab' : 'Edit caption'}
@@ -196,18 +196,18 @@ export default function CaptionEditorDialog({
           <div ref={panelRef} className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <label htmlFor="expanded-caption" className="text-sm font-semibold text-content">Caption text</label>
-              <span className="font-mono text-[0.6875rem] text-content-subtle" aria-live="polite">
+              <span className="font-mono text-2xs text-content-subtle" aria-live="polite">
                 {captionCharacterLabel(draft)}
               </span>
             </div>
             {authorshipNote(draft, initialCaption, captionOrigin) && (
-              <p className="m-0 text-[0.6875rem] leading-relaxed text-content-subtle"
+              <p className="m-0 text-2xs leading-relaxed text-content-subtle"
                 title={authorshipNote(draft, initialCaption, captionOrigin).title}>
                 {authorshipNote(draft, initialCaption, captionOrigin).text}
               </p>
             )}
             {isLikelyTruncatedCaption(initialCaption) && (
-              <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[0.6875rem] leading-relaxed text-amber-200">
+              <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-2xs leading-relaxed text-amber-200">
                 This caption is exactly 800 characters and ends mid-sentence — an earlier
                 version of the app capped captions there. The cut-off text can’t be recovered;
                 re-caption this image to regenerate the full description.
@@ -233,13 +233,13 @@ export default function CaptionEditorDialog({
               <div className="rounded-xl border border-border bg-surface">
                 <button type="button" onClick={() => setShortOpen((open) => !open)}
                   aria-expanded={shortOpen}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[0.75rem] font-semibold text-content-muted hover:text-content">
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold text-content-muted hover:text-content">
                   <span>{shortOpen ? '▾' : '▸'} Short caption <span className="font-normal text-content-subtle">· dual-caption training</span></span>
-                  <span className="font-mono text-[0.6875rem] text-content-subtle">{captionCharacterLabel(shortDraft)}</span>
+                  <span className="font-mono text-2xs text-content-subtle">{captionCharacterLabel(shortDraft)}</span>
                 </button>
                 {shortOpen && (
                   <div className="flex flex-col gap-1.5 px-3 pb-3">
-                    <p className="m-0 text-[0.6875rem] leading-relaxed text-content-subtle">
+                    <p className="m-0 text-2xs leading-relaxed text-content-subtle">
                       A brief alternative, trained alongside the long caption. Same rules apply
                       (no trigger, keep the identity/concept/aesthetic out). Leave empty to reuse
                       the long caption; (re-)captioning regenerates it automatically.
@@ -248,7 +248,7 @@ export default function CaptionEditorDialog({
                         sides (this box types it, the dual-caption pass derives it),
                         so the long caption's stamp cannot answer for it. */}
                     {authorshipNote(shortDraft, initialShortCaption, shortCaptionOrigin) && (
-                      <p className="m-0 text-[0.6875rem] leading-relaxed text-content-subtle"
+                      <p className="m-0 text-2xs leading-relaxed text-content-subtle"
                         title={authorshipNote(shortDraft, initialShortCaption,
                                               shortCaptionOrigin).title}>
                         {authorshipNote(shortDraft, initialShortCaption,
@@ -307,17 +307,17 @@ export default function CaptionEditorDialog({
             {error && (
               <div role="alert"
                 className="shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 max-h-28 overflow-y-auto">
-                <span className="block whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-red-200">
+                <span className="block whitespace-pre-wrap break-words text-2xs leading-relaxed text-red-200">
                   {error}
                 </span>
-                <span className="mt-1 block text-[0.625rem] text-content-subtle">
+                <span className="mt-1 block text-2xs text-content-subtle">
                   Your caption is kept — adjust and try again.
                 </span>
               </div>
             )}
 
             <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-[0.6875rem] text-content-subtle">Esc to close · Ctrl/⌘ + Enter to save</span>
+              <span className="text-2xs text-content-subtle">Esc to close · Ctrl/⌘ + Enter to save</span>
               <div className="grid w-full grid-cols-2 gap-2 sm:w-64 sm:shrink-0">
                 <button type="button" onClick={dismiss} disabled={busy}
                   className="min-h-11 min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-content-muted hover:text-content disabled:opacity-40">

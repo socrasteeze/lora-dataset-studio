@@ -36,7 +36,7 @@ function LossSparkline({ curve }) {
   };
   return (
     <div className="flex flex-col gap-0.5">
-      <div className="flex items-center gap-2 text-[0.625rem] text-content-subtle">
+      <div className="flex items-center gap-2 text-2xs text-content-subtle">
         <span className="uppercase text-content-muted">Loss</span>
         <span className="tabular-nums">min {minL.toExponential(2)} · max {maxL.toExponential(2)}</span>
         {hover && (
@@ -74,7 +74,7 @@ function DownloadProgress({ download }) {
   return (
     <div className="flex flex-col gap-1">
       {/* 400 px: the figures wrap under the label instead of overflowing. */}
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[0.6875rem]">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-2xs">
         <span className="text-content font-semibold tabular-nums">{d.headline}</span>
         {d.detail && <span className="text-content-muted tabular-nums">{d.detail}</span>}
       </div>
@@ -123,7 +123,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant,
   // mask pass crashed). Warn loudly — a multi-hour run training the wrong way is
   // exactly the kind of silent failure worth surfacing.
   const masksWarn = prog?.masks_skipped ? (
-    <p className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-200 text-[0.625rem]">
+    <p className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-amber-200 text-2xs">
       ⚠ Training <b>UNMASKED</b> — masks were requested but couldn&apos;t be generated (rembg missing or the mask pass failed), so the background isn&apos;t down-weighted for this run. Install the ML extras from the Setup tab, then re-run to train masked.
     </p>
   ) : null;
@@ -141,11 +141,11 @@ export default function TrainingProgress({ datasetId, base, trainType, variant,
         {cloud && showLaunch && prog?.launch ? (
           <LaunchProgress launch={prog.launch} />
         ) : cloud && prog?.phase && prog.active !== false ? (
-          <p className="m-0 text-sky-300 text-[0.625rem]">
+          <p className="m-0 text-sky-300 text-2xs">
             ☁ {prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}
           </p>
         ) : (!cloud || prog?.active !== false) ? (
-          <p className="m-0 text-content-subtle text-[0.625rem]">
+          <p className="m-0 text-content-subtle text-2xs">
             Starting up… (the log appears once ai-toolkit begins writing)
           </p>
         ) : null}
@@ -158,12 +158,12 @@ export default function TrainingProgress({ datasetId, base, trainType, variant,
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2">
       {masksWarn}
       {cloud && showLaunch && prog.launch ? <LaunchProgress launch={prog.launch} /> : cloud && prog.phase && (
-        <p className="m-0 text-sky-300 text-[0.625rem]">{prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}</p>
+        <p className="m-0 text-sky-300 text-2xs">{prog.phase}{prog.phase_detail ? ` — ${prog.phase_detail}` : ''}</p>
       )}
       <DownloadProgress download={prog.download} />
       {pct != null && (
         <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-[0.6875rem] text-content-muted flex-wrap">
+          <div className="flex items-center gap-2 text-2xs text-content-muted flex-wrap">
             <span className="text-content font-semibold tabular-nums">{prog.step} / {prog.total} steps ({pct}%)</span>
             {prog.loss != null && <span className="tabular-nums">loss {prog.loss.toExponential(3)}</span>}
             {prog.speed && <span className="tabular-nums">{prog.speed}</span>}
@@ -179,7 +179,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant,
       <LossSparkline curve={prog.loss_curve} />
       {samples.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-content-muted text-[0.625rem] uppercase">
+          <span className="text-content-muted text-2xs uppercase">
             Samples (auto-generated during the run — newest first)
           </span>
           <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -196,7 +196,7 @@ export default function TrainingProgress({ datasetId, base, trainType, variant,
                   className="relative shrink-0 w-20 h-20 rounded border border-border overflow-hidden hover:border-indigo-400">
                   <img src={url} alt={`Training sample at step ${s.step}`} loading="lazy"
                     className="w-full h-full object-cover" />
-                  <span className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[0.5625rem] text-center tabular-nums">
+                  <span className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-2xs text-center tabular-nums">
                     step {s.step}
                   </span>
                 </a>

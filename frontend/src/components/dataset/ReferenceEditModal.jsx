@@ -178,7 +178,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
         </div>
 
         {liveNote && (
-          <p className="text-[0.6875rem] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+          <p className="text-2xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
             {liveNote}
           </p>
         )}
@@ -195,14 +195,14 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                     className="rounded-lg bg-surface-raised border border-border px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-content text-xs font-semibold">{label}</span>
-                      <span className={`text-[0.6875rem] ${candidate.status === 'failed'
+                      <span className={`text-2xs ${candidate.status === 'failed'
                         ? 'text-red-300'
                         : candidate.status === 'ready' ? 'text-emerald-300' : 'text-indigo-300'}`}>
                         {candidate.status === 'ready' ? 'Ready' : candidate.status === 'failed' ? 'Failed' : 'Running'}
                       </span>
                     </div>
                     {candidate.error && (
-                      <p className="text-red-300 text-[0.6875rem] mt-1">{candidate.error}</p>
+                      <p className="text-red-300 text-2xs mt-1">{candidate.error}</p>
                     )}
                   </div>
                 );
@@ -210,7 +210,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                 <p className="text-content-muted text-xs text-center sm:col-span-2">Starting engines…</p>
               )}
             </div>
-            <p className="text-content-muted text-[0.6875rem] text-center">
+            <p className="text-content-muted text-2xs text-center">
               This runs on the server — you can close this tab and come back; the Before/After will be here.
             </p>
             <button type="button" onClick={() => discard(true)} disabled={busy}
@@ -239,7 +239,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                     </figcaption>
                     <img src={afterUrl} alt={`edited candidate from ${label}`}
                       className="w-full rounded-lg bg-black object-contain max-h-[45vh]" />
-                    <p className="text-[0.6875rem] text-content-muted">
+                    <p className="text-2xs text-content-muted">
                       {editKeepNote(candidate.engine)}
                     </p>
                     <button type="button" onClick={() => keep(candidate.engine)} disabled={busy}
@@ -259,9 +259,9 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                       className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-content text-xs font-semibold">{label}</span>
-                        <span className="text-red-300 text-[0.6875rem]">Failed</span>
+                        <span className="text-red-300 text-2xs">Failed</span>
                       </div>
-                      <p className="text-red-300 text-[0.6875rem] mt-1">
+                      <p className="text-red-300 text-2xs mt-1">
                         {candidate.error || 'This engine did not produce a candidate.'}
                       </p>
                     </div>
@@ -270,7 +270,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
               </div>
             )}
             {!canRetryExact && (
-              <p className="text-[0.6875rem] text-content-subtle">
+              <p className="text-2xs text-content-subtle">
                 Retry keeps temporary reference files only for this browser session. After reopening
                 this page, use Try another prompt to attach them again.
               </p>
@@ -329,7 +329,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
             </div>
             {engines.length === 0 && (
               <p role="alert"
-                className="text-[0.6875rem] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+                className="text-2xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
                 Select at least one engine.
               </p>
             )}
@@ -339,18 +339,18 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                 it. Greying it out silently was the failure mode this replaces. */}
             {selectedBlocked.map((option) => (
               <p key={option.engine}
-                className="text-[0.6875rem] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+                className="text-2xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
                 {option.label}: {option.blocked}
               </p>
             ))}
 
             {localRefNotes.map((note) => (
-              <p key={note} className="text-[0.6875rem] text-content-muted">{note}</p>
+              <p key={note} className="text-2xs text-content-muted">{note}</p>
             ))}
             {/* Only worth saying when the selection actually splits: one engine
                 reads these bytes and another does not. */}
             {canAddRefs && selectedLocalEngines.some((e) => !acceptsExtraEditRefs(e)) && (
-              <p className="text-[0.6875rem] text-sky-300 bg-sky-500/10 border border-sky-500/30 rounded-lg px-2.5 py-1.5">
+              <p className="text-2xs text-sky-300 bg-sky-500/10 border border-sky-500/30 rounded-lg px-2.5 py-1.5">
                 Images added below go to the engines that read them. The rest use the
                 reference support described above.
               </p>
@@ -368,7 +368,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                   <button type="button" disabled={busy}
                     onClick={() => setEditRefs((cur) => cur.filter((_, j) => j !== i))}
                     aria-label="Remove this reference image"
-                    className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl bg-black/70 text-white text-[0.625rem] leading-none disabled:opacity-40">✕</button>
+                    className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl bg-black/70 text-white text-2xs leading-none disabled:opacity-40">✕</button>
                 </div>
               ))}
               {editRefs.length < maxRefs && (
@@ -382,7 +382,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
             )}
 
             {phase === 'failed' && (failedCandidates.length > 0 || referenceEdit?.error) && (
-              <div className="flex flex-col gap-2 text-[0.6875rem] bg-red-500/10 border border-red-500/30 rounded-lg px-2.5 py-1.5">
+              <div className="flex flex-col gap-2 text-2xs bg-red-500/10 border border-red-500/30 rounded-lg px-2.5 py-1.5">
                 {failedCandidates.length > 0 ? failedCandidates.map((candidate) => {
                   const label = engineLabel(candidate.engine);
                   return (
@@ -396,7 +396,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                 }) : <p className="text-red-300">{referenceEdit.error}</p>}
               </div>
             )}
-            <p className="text-[0.6875rem] text-content-muted">{editCostNote(engines)}</p>
+            <p className="text-2xs text-content-muted">{editCostNote(engines)}</p>
             {/* The reference is what the whole dataset is anchored on, and this
                 lane runs on the dataset's Klein model like every other one — so
                 say which, and let it be changed from here. Klein only: the other

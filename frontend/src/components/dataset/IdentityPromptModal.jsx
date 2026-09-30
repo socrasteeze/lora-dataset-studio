@@ -110,7 +110,7 @@ export default function IdentityPromptModal({ onClose, subjectType = 'human' }) 
           <span className="text-indigo-300 font-semibold min-w-0">
             <span aria-hidden>✎</span> Identity instruction — multiple references
           </span>
-          <span className="rounded-full border border-indigo-400/50 bg-indigo-500/15 px-2 py-0.5 text-[0.625rem] font-semibold text-indigo-200">
+          <span className="rounded-full border border-indigo-400/50 bg-indigo-500/15 px-2 py-0.5 text-2xs font-semibold text-indigo-200">
             {stLabel} subject
           </span>
           <HelpBadge topic="action-edit-identity-prompt" />
@@ -143,7 +143,7 @@ export default function IdentityPromptModal({ onClose, subjectType = 'human' }) 
             defaultText={defaults[f.key]}
             onChange={(v) => setPrompts((p) => writeIdentityPrompt(p, st, f.key, v))}
             badge={f.key === activeKey ? (
-              <span className="rounded-full border border-indigo-400/50 bg-indigo-500/15 px-2 py-0.5 text-[0.625rem] font-semibold text-indigo-200">
+              <span className="rounded-full border border-indigo-400/50 bg-indigo-500/15 px-2 py-0.5 text-2xs font-semibold text-indigo-200">
                 used by your current engine
               </span>
             ) : null}

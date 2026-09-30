@@ -437,14 +437,14 @@ export default function CaptionOptionsPopover({ datasetId, trainType, kind, onCl
                       className="flex items-center justify-between gap-2 rounded-lg border border-border bg-app/40 px-2 py-1.5">
                       <div className="min-w-0">
                         <div className="text-sm text-content">{fam.label}</div>
-                        <div className="text-[0.6875rem] text-content-subtle">{fam.hint}</div>
+                        <div className="text-2xs text-content-subtle">{fam.hint}</div>
                       </div>
                       <div className="flex shrink-0 rounded-md border border-border overflow-hidden">
                         {['omit', 'describe'].map((state) => (
                           <button key={state} type="button"
                             aria-pressed={value === state}
                             onClick={() => flipAppearance(fam.id, state)}
-                            className={`px-2 py-1 text-[0.6875rem] font-semibold capitalize ${
+                            className={`px-2 py-1 text-2xs font-semibold capitalize ${
                               value === state
                                 ? 'bg-surface-raised text-content'
                                 : 'bg-transparent text-content-muted hover:text-content'

@@ -16,13 +16,13 @@ export default function ResultsGrid({ gridRows, gridCols, variantsInData, showPr
         // Keep the full prompt in title, but the visible label must fit one line even at 400 px.
         // Test prompts contain hundreds of characters and would otherwise push the grid off
         // screen.
-        <span className="text-content text-[0.6875rem] font-medium truncate max-w-full"
+        <span className="text-content text-2xs font-medium truncate max-w-full"
           title={variant.prompt}>
           <span aria-hidden>📝</span> {promptLabel(variant.prompt)}
         </span>
       )}
       {variantsInData.length > 1 && (
-        <span className="text-content-muted text-[0.625rem] uppercase">
+        <span className="text-content-muted text-2xs uppercase">
           {variant.zModelLabel ? `${variant.zModelLabel} · ` : ''}Format {variant.aspect || '—'}{variant.cfg != null ? ` · CFG ${fmt(variant.cfg)}` : ''}{variant.steps != null ? ` · ${variant.steps}${variant.steps2 != null ? '/' + variant.steps2 : ''} steps` : ''}
         </span>
       )}
@@ -38,16 +38,16 @@ export default function ResultsGrid({ gridRows, gridCols, variantsInData, showPr
           </caption>
           <thead>
             <tr>
-              <th scope="col" className="text-content-subtle text-[0.625rem] font-normal text-left px-1">ckpt \ strength</th>
+              <th scope="col" className="text-content-subtle text-2xs font-normal text-left px-1">ckpt \ strength</th>
               {gridCols.map((s) => (
-                <th key={s} scope="col" className="text-content-muted text-[0.6875rem] tabular-nums px-1">{fmt(s)}</th>
+                <th key={s} scope="col" className="text-content-muted text-2xs tabular-nums px-1">{fmt(s)}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {gridRows.map((row) => (
               <tr key={row.filename}>
-                <th scope="row" className="text-content text-[0.6875rem] font-medium text-left px-1 whitespace-nowrap">{row.label}</th>
+                <th scope="row" className="text-content text-2xs font-medium text-left px-1 whitespace-nowrap">{row.label}</th>
                 {gridCols.map((s) => (
                   <ResultCell key={s} row={row} strength={s} variant={variant}
                     cellList={cellList} scoreMap={scoreMap} best={best} datasetId={datasetId}

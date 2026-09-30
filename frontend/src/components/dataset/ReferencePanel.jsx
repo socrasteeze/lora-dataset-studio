@@ -43,12 +43,12 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
               <button type="button" onClick={onEditRef} disabled={busy}
                 title="Open the edit to compare it with the current reference, then Keep or Discard"
                 className="px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10
-                           text-amber-300 text-[0.625rem] font-medium disabled:opacity-40">
+                           text-amber-300 text-2xs font-medium disabled:opacity-40">
                 ✦ {waiting} →
               </button>
             )}
           </div>
-          <span className="text-content-subtle text-[0.6875rem]">source of Klein variations — crop with ✂ after upload</span>
+          <span className="text-content-subtle text-2xs">source of Klein variations — crop with ✂ after upload</span>
           <div className="flex gap-1.5 items-center flex-wrap">
             <button type="button" onClick={() => inp.current?.click()} disabled={importBusy}
               className="px-2.5 py-1 rounded-lg bg-surface-raised text-content text-xs disabled:opacity-40">
@@ -63,7 +63,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
                 title={`Edit the reference with a prompt (${editEngineNames()}) — compare before/after, then Keep or Discard`}
                 className="px-2.5 py-1 rounded-lg bg-surface-raised text-content text-xs disabled:opacity-40">✦ Edit</button>
             )}
-            <label className="flex items-center gap-1 text-[0.625rem] text-content-muted cursor-pointer"
+            <label className="flex items-center gap-1 text-2xs text-content-muted cursor-pointer"
               title={visionBusy ? 'Auto head-crop is unavailable during local generation; the reference imports with a centered crop.' : 'ON: a vision pass finds the head and crops around it (slower, pauses ComfyUI). OFF (default): instant centered square — adjust with ✂ Crop, usually faster.'}>
               <input type="checkbox" checked={autoCrop} disabled={visionBusy} onChange={(e) => setAutoCrop(e.target.checked)}
                 className="accent-indigo-500 w-3 h-3" />
@@ -82,7 +82,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
           par une (✂ sur la vignette) ; le scoring reste sur la principale. */}
       {refFilename && (
         <div className="flex items-center gap-2 flex-wrap border-t border-border pt-2">
-          <span className="text-content-subtle text-[0.6875rem]">
+          <span className="text-content-subtle text-2xs">
             Extra refs <span className="opacity-70">(more angles of this face — identity lock)</span>
           </span>
           {extraRefs.map((fn) => (
@@ -91,7 +91,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
               <button type="button" onClick={() => onRemoveExtraRef?.(fn)} disabled={busy}
                 aria-label="Remove this extra reference"
                 title="Remove this extra reference"
-                className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl bg-black/70 text-white text-[0.625rem] leading-none disabled:opacity-40">
+                className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center rounded-bl bg-black/70 text-white text-2xs leading-none disabled:opacity-40">
                 ✕
               </button>
               {/* ✂ in the OPPOSITE corner of ✕: the tile is 48 px, two 16 px targets
@@ -99,7 +99,7 @@ export default function ReferencePanel({ refFilename, datasetId, onSetRef, onCro
               <button type="button" onClick={() => onCropExtraRef?.(fn)} disabled={busy}
                 aria-label="Crop this extra reference"
                 title="Crop this extra reference — the full frame stays kept, so you can widen it back out later"
-                className="absolute bottom-0 left-0 w-4 h-4 flex items-center justify-center rounded-tr bg-black/70 text-white text-[0.625rem] leading-none disabled:opacity-40">
+                className="absolute bottom-0 left-0 w-4 h-4 flex items-center justify-center rounded-tr bg-black/70 text-white text-2xs leading-none disabled:opacity-40">
                 ✂
               </button>
             </div>

@@ -73,7 +73,7 @@ export function WhatsNewButton() {
       {has && (
         <span
           aria-hidden
-          className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-gray-950"
+          className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-semibold leading-none text-gray-950"
         >
           {count > 9 ? '9+' : count}
         </span>
@@ -177,7 +177,7 @@ export function WhatsNewModal() {
                 <li key={e.id} className="py-4">
                   <div className="flex items-baseline justify-between gap-3">
                     <h3 className="text-sm font-semibold text-content">{e.title}</h3>
-                    <time dateTime={e.date} className="shrink-0 text-[11px] text-content-subtle">
+                    <time dateTime={e.date} className="shrink-0 text-2xs text-content-subtle">
                       {formatDate(e.date)}
                     </time>
                   </div>

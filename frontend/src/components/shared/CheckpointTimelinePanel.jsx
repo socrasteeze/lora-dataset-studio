@@ -542,7 +542,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
             <h2 id="checkpoint-timeline-title" className="m-0 text-base font-semibold text-content">
               <span aria-hidden>🎞</span> Checkpoint timeline · run #{recordId}
             </h2>
-            <p className="m-0 mt-1 text-[0.6875rem] text-content-muted">
+            <p className="m-0 mt-1 text-2xs text-content-muted">
               Visual crossfade only — LoRA weights are never interpolated.
             </p>
           </div>
@@ -564,7 +564,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
               <p role="alert" className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
                 {state.error}
               </p>
-              <p className="m-0 mt-2 text-[0.75rem] text-content-subtle">
+              <p className="m-0 mt-2 text-xs text-content-subtle">
                 The run is unchanged. Check the connection, then try loading its timeline again.
               </p>
               <button type="button" onClick={() => setRequestVersion((value) => value + 1)}
@@ -577,7 +577,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
           {state.status === 'ready' && state.series.length === 0 && (
             <div className="mx-auto flex min-h-64 max-w-lg flex-col items-center justify-center text-center">
               <p className="m-0 text-sm font-semibold text-content">No timeline frames yet.</p>
-              <p className="m-0 mt-2 text-[0.75rem] text-content-muted">
+              <p className="m-0 mt-2 text-xs text-content-muted">
                 Generate previews from at least 2 checkpoints in the same launch with the same prompt,
                 seed, and settings.
               </p>
@@ -585,7 +585,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
           )}
 
           {state.status === 'ready' && state.limitMessage && (
-            <p role="status" className="mx-auto mb-3 max-w-4xl rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[0.6875rem] text-amber-100">
+            <p role="status" className="mx-auto mb-3 max-w-4xl rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-2xs text-amber-100">
               Timeline safety limit: {state.limitMessage}
             </p>
           )}
@@ -593,11 +593,11 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
           {state.status === 'ready' && selectedSeries && (
             <div className="mx-auto max-w-4xl">
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                <label className="min-w-0 flex-1 text-[0.6875rem] font-semibold text-content-muted">
+                <label className="min-w-0 flex-1 text-2xs font-semibold text-content-muted">
                   Preview series
                   <select value={String(selectedSeries.id)} onChange={chooseSeries}
                     aria-label="Timeline preview series"
-                    className="mt-1 block w-full rounded-md border border-border bg-app px-2 py-2 text-[0.75rem] text-content">
+                    className="mt-1 block w-full rounded-md border border-border bg-app px-2 py-2 text-xs text-content">
                     {state.series.map((series, index) => (
                       <option key={series.id ?? index} value={String(series.id)}>
                         {timelineSeriesLabel(series, index)}
@@ -605,14 +605,14 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                     ))}
                   </select>
                 </label>
-                <div className="shrink-0 text-[0.6875rem] text-content-subtle sm:text-right">
+                <div className="shrink-0 text-2xs text-content-subtle sm:text-right">
                   <div>{selectedSeries.steps.length} checkpoint step{selectedSeries.steps.length === 1 ? '' : 's'}</div>
                   {seriesDate && <div>{seriesDate}</div>}
                 </div>
               </div>
 
               {selectedSeries.truncated && (
-                <p role="status" className="m-0 mb-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[0.6875rem] text-amber-100">
+                <p role="status" className="m-0 mb-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-2xs text-amber-100">
                   Showing {frames.length} of {selectedSeries.frame_count} frames. The server capped this series;
                   the player and exports use only the frames listed here.
                 </p>
@@ -645,11 +645,11 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                     )}
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-8 text-white">
                       <span className="text-sm font-semibold tabular-nums">{timelineStepLabel(currentFrame?.step)}</span>
-                      <span className="text-[0.75rem] tabular-nums">{frameIndex + 1} / {frames.length}</span>
+                      <span className="text-xs tabular-nums">{frameIndex + 1} / {frames.length}</span>
                     </div>
                   </div>
 
-                  <label className="mt-3 block text-[0.6875rem] font-semibold text-content-muted">
+                  <label className="mt-3 block text-2xs font-semibold text-content-muted">
                     Scrub timeline
                     <input type="range" min="0" max={Math.max(0, frames.length - 1)} value={frameIndex}
                       onChange={(event) => { setPlaying(false); transitionTo(Number(event.target.value)); }}
@@ -667,7 +667,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                           ? 'border-indigo-300 ring-2 ring-indigo-400/60'
                           : 'border-border hover:border-indigo-400/60'}`}>
                         <img src={frame.url} alt="" loading="lazy" className="h-full w-full object-contain" />
-                        <span aria-hidden className="absolute inset-x-0 bottom-0 bg-black/75 px-1 py-0.5 text-[0.5625rem] text-white tabular-nums">
+                        <span aria-hidden className="absolute inset-x-0 bottom-0 bg-black/75 px-1 py-0.5 text-2xs text-white tabular-nums">
                           {frame.step == null ? '?' : Number(frame.step).toLocaleString('en-US')}
                         </span>
                       </button>
@@ -680,7 +680,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                         className="rounded-md border border-border px-3 py-2 text-content hover:border-indigo-400/60">◀</button>
                       <button type="button" onClick={() => setPlaying((value) => !value)}
                         aria-label={playing ? 'Pause timeline' : 'Play timeline'} aria-pressed={playing}
-                        className="min-w-20 rounded-md border border-indigo-400/60 bg-indigo-500/15 px-3 py-2 text-[0.75rem] font-semibold text-indigo-100 hover:bg-indigo-500/25">
+                        className="min-w-20 rounded-md border border-indigo-400/60 bg-indigo-500/15 px-3 py-2 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/25">
                         {playing ? '❚❚ Pause' : '▶ Play'}
                       </button>
                       <button type="button" onClick={() => move(1)} aria-label="Next frame"
@@ -692,14 +692,14 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                         ? TIMELINE_PLAYBACK_MODES.PING_PONG : TIMELINE_PLAYBACK_MODES.LOOP); setPlayDirection(1); }}
                       aria-label={`Playback mode: ${playMode === TIMELINE_PLAYBACK_MODES.LOOP ? 'loop' : 'ping-pong'}`}
                       title="Toggle loop or ping-pong playback"
-                      className="rounded-md border border-border px-2.5 py-2 text-[0.6875rem] text-content-muted hover:border-indigo-400/60 hover:text-content">
+                      className="rounded-md border border-border px-2.5 py-2 text-2xs text-content-muted hover:border-indigo-400/60 hover:text-content">
                       {playMode === TIMELINE_PLAYBACK_MODES.LOOP ? '↻ Loop' : '↔ Ping-pong'}
                     </button>
 
                     <div role="group" aria-label="Playback speed" className="flex items-center rounded-md border border-border p-0.5">
                       {TIMELINE_SPEEDS.map((rate) => (
                         <button key={rate} type="button" onClick={() => setSpeed(rate)} aria-pressed={speed === rate}
-                          className={`rounded px-2 py-1.5 text-[0.6875rem] ${speed === rate
+                          className={`rounded px-2 py-1.5 text-2xs ${speed === rate
                             ? 'bg-indigo-500/30 font-semibold text-indigo-100'
                             : 'text-content-subtle hover:text-content'}`}>
                           {rate}×
@@ -710,7 +710,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                     <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                       <button type="button" onClick={downloadGif}
                         aria-disabled={gifBusy || exportState.busy}
-                        className="rounded-md border border-border px-3 py-2 text-[0.75rem] text-content-muted hover:border-indigo-400/60 hover:text-content aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+                        className="rounded-md border border-border px-3 py-2 text-xs text-content-muted hover:border-indigo-400/60 hover:text-content aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
                         aria-label="Download timeline as GIF">
                         {gifBusy ? 'Rendering GIF…' : 'Download GIF'}
                       </button>
@@ -718,24 +718,24 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                         disabled={!exportSupport}
                         aria-disabled={!exportSupport || exportState.busy || gifBusy}
                         title={exportDisabledReason || 'Render this timeline locally and download a WebM video'}
-                        className="rounded-md border border-border px-3 py-2 text-[0.75rem] text-content-muted hover:border-indigo-400/60 hover:text-content disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40">
+                        className="rounded-md border border-border px-3 py-2 text-xs text-content-muted hover:border-indigo-400/60 hover:text-content disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40">
                         {exportState.busy ? `Exporting ${exportState.progress}%…` : 'Export WebM'}
                       </button>
                     </div>
                   </div>
 
                   {exportDisabledReason && (
-                    <p className="m-0 mt-2 text-right text-[0.625rem] text-content-subtle">
+                    <p className="m-0 mt-2 text-right text-2xs text-content-subtle">
                       {exportDisabledReason}
                     </p>
                   )}
                   {(exportState.busy || exportState.message) && (
-                    <p role="status" aria-live="polite" className="m-0 mt-2 text-right text-[0.6875rem] text-content-muted">
+                    <p role="status" aria-live="polite" className="m-0 mt-2 text-right text-2xs text-content-muted">
                       {exportState.message}
                     </p>
                   )}
                   {exportState.error && (
-                    <p role="alert" className="m-0 mt-2 rounded-md border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-right text-[0.6875rem] text-rose-100">
+                    <p role="alert" className="m-0 mt-2 rounded-md border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-right text-2xs text-rose-100">
                       {exportState.error}
                     </p>
                   )}

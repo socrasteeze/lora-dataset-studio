@@ -23,7 +23,7 @@ export default function StrengthPicker({ choices, selected, onToggle, fmt,
   const chip = (s) => (
     <button key={s} type="button" onClick={() => onToggle(s)}
       aria-pressed={selected.includes(s)}
-      className={`px-2.5 py-1 rounded-lg border text-[0.75rem] tabular-nums transition-colors ${
+      className={`px-2.5 py-1 rounded-lg border text-xs tabular-nums transition-colors ${
         selected.includes(s)
           ? 'border-purple-400/60 bg-purple-500/20 text-purple-200 font-semibold'
           : 'border-border bg-surface text-content-muted'}`}>
@@ -33,7 +33,7 @@ export default function StrengthPicker({ choices, selected, onToggle, fmt,
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-content-muted text-[0.625rem] uppercase">Strengths</span>
+      <span className="text-content-muted text-2xs uppercase">Strengths</span>
       <div className="flex gap-2 flex-wrap items-center">
         {hasNegative && (
           <button type="button" onClick={() => setNegExpanded((v) => !v)}
@@ -45,7 +45,7 @@ export default function StrengthPicker({ choices, selected, onToggle, fmt,
               ? 'A negative strength is selected — deselect it to collapse'
               : negOpen ? 'Hide negative strengths'
                 : 'Show negative strengths (down to -2.0) — pulls the LoRA the other way (slider LoRAs)'}
-            className={`px-2.5 py-1 rounded-lg border text-[0.75rem] leading-none tabular-nums transition-colors disabled:opacity-60 ${
+            className={`px-2.5 py-1 rounded-lg border text-xs leading-none tabular-nums transition-colors disabled:opacity-60 ${
               negOpen
                 ? 'border-purple-400/40 bg-purple-500/10 text-purple-200'
                 : 'border-border bg-surface text-content-muted'}`}>
@@ -62,7 +62,7 @@ export default function StrengthPicker({ choices, selected, onToggle, fmt,
             title={forced
               ? 'A strength above 2.0 is selected — deselect it to collapse'
               : open ? 'Hide strengths above 2.0' : 'Show strengths above 2.0 (up to 4.0)'}
-            className={`px-2.5 py-1 rounded-lg border text-[0.75rem] leading-none tabular-nums transition-colors disabled:opacity-60 ${
+            className={`px-2.5 py-1 rounded-lg border text-xs leading-none tabular-nums transition-colors disabled:opacity-60 ${
               open
                 ? 'border-purple-400/40 bg-purple-500/10 text-purple-200'
                 : 'border-border bg-surface text-content-muted'}`}>
@@ -73,7 +73,7 @@ export default function StrengthPicker({ choices, selected, onToggle, fmt,
       {hasNegative && negOpen && (
         <div id="strength-negative" className="flex gap-2 flex-wrap items-center">
           {negativeChoices.map(chip)}
-          <span className="text-content-muted text-[0.625rem]">
+          <span className="text-content-muted text-2xs">
             negative = LoRA pulled the other way (slider LoRAs)
           </span>
         </div>

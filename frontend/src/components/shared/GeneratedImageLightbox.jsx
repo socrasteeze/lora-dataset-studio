@@ -77,7 +77,7 @@ function CopyButton({ value, label, className = '' }) {
   return (
     <button type="button" onClick={copy} title={`Copy ${label}`}
       aria-label={done ? `${label} copied` : failed ? `${label} could not be copied` : `Copy ${label}`}
-      className={'shrink-0 rounded border border-white/25 px-1.5 py-0.5 text-[0.625rem] '
+      className={'shrink-0 rounded border border-white/25 px-1.5 py-0.5 text-2xs '
         + 'text-white/70 hover:border-white/50 hover:text-white ' + className}>
       {done ? '✓ Copied' : failed ? 'Copy failed' : '⧉ Copy'}
     </button>
@@ -91,10 +91,10 @@ function PromptBlock({ block }) {
   return (
     <section className="mt-3 border-t border-white/10 pt-2">
       <div className="mb-1 flex items-center gap-2">
-        <h4 className="m-0 text-[0.6875rem] font-semibold text-white/80">{block.label}</h4>
+        <h4 className="m-0 text-2xs font-semibold text-white/80">{block.label}</h4>
         <CopyButton value={block.text} label={block.label.toLowerCase()} className="ml-auto" />
       </div>
-      <p className={'m-0 whitespace-pre-wrap break-words text-[0.75rem] leading-relaxed text-white/70 '
+      <p className={'m-0 whitespace-pre-wrap break-words text-xs leading-relaxed text-white/70 '
         + (fold.collapsed
           // A fixed clamp, not a scroll: collapsed means "you can see there is
           // more", and a scrollbar inside a collapsed block invites scrolling a
@@ -108,7 +108,7 @@ function PromptBlock({ block }) {
       {fold.foldable && (
         <button type="button" onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="mt-1 rounded text-[0.6875rem] text-indigo-300 underline decoration-dotted hover:text-indigo-200">
+          className="mt-1 rounded text-2xs text-indigo-300 underline decoration-dotted hover:text-indigo-200">
           {fold.label}
         </button>
       )}
@@ -162,7 +162,7 @@ function ImproveActions({ img, onImprove, improvePending, improveReady, busy,
           /* Full width under `sm`: this column is 27rem at its widest, so two
              engine buttons beside a Download would each be a 5rem stub on a
              400 px phone. Same class the dataset lightbox uses. */
-          className="min-h-9 w-full rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-1.5 text-[0.75rem] font-semibold text-indigo-100 hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto">
+          className="min-h-9 w-full rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto">
           {btn.label}
         </button>
       ))}
@@ -383,7 +383,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
           onClick={(e) => { e.stopPropagation(); zoom.reset(); }}
           title="Back to the whole picture (double-tap it, or press Esc)"
           aria-label="Reset the zoom"
-          className="absolute right-24 top-3 z-10 flex h-9 items-center rounded-full bg-white/10 px-3 text-[0.75rem] font-semibold leading-none text-white hover:bg-white/20">
+          className="absolute right-24 top-3 z-10 flex h-9 items-center rounded-full bg-white/10 px-3 text-xs font-semibold leading-none text-white hover:bg-white/20">
           <span aria-hidden className="mr-1">⤾</span>{Math.round(zoom.view.scale * 100)}%
         </button>
       )}
@@ -442,7 +442,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
             {head.map((f) => (
               <span key={f.key} data-testid={`fact-${f.key}`}
                 className="flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1">
-                <span className="text-[0.5625rem] uppercase tracking-wide text-white/45">{f.label}</span>
+                <span className="text-2xs uppercase tracking-wide text-white/45">{f.label}</span>
                 <span className="text-[0.8125rem] font-semibold tabular-nums text-white">{f.value}</span>
                 {f.copy && <CopyButton value={f.copy} label="seed" />}
               </span>
@@ -451,7 +451,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
 
           {settings.length > 0 && (
             <section className="mt-3 border-t border-white/10 pt-2">
-              <h4 className="m-0 mb-1 text-[0.6875rem] font-semibold text-white/80">
+              <h4 className="m-0 mb-1 text-2xs font-semibold text-white/80">
                 <span aria-hidden>⚙</span> Made with
               </h4>
               {/* A grid, not a sentence: these are looked UP, one at a time,
@@ -460,8 +460,8 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
               <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5">
                 {settings.map((r) => (
                   <div key={r.key} className="contents">
-                    <dt className="m-0 text-[0.6875rem] text-white/45">{r.label}</dt>
-                    <dd className="m-0 break-words text-[0.6875rem] tabular-nums text-white/80">{r.value}</dd>
+                    <dt className="m-0 text-2xs text-white/45">{r.label}</dt>
+                    <dd className="m-0 break-words text-2xs tabular-nums text-white/80">{r.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -485,7 +485,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
               disabled={dl.busy || img.id == null}
               onClick={(e) => { e.stopPropagation(); dl.download(img.id); }}
               title="Download this image — the file name keeps its dataset, run, step and seed"
-              className="rounded-md border border-white/25 px-3 py-1.5 text-[0.75rem] font-semibold text-white/85 hover:border-white/50 hover:text-white disabled:opacity-40">
+              className="rounded-md border border-white/25 px-3 py-1.5 text-xs font-semibold text-white/85 hover:border-white/50 hover:text-white disabled:opacity-40">
               <span aria-hidden>⬇</span> {dl.busy ? 'Downloading…' : 'Download'}
             </button>
             {/* ✨ Beside ⬇, because they are the two things you do once a render
@@ -506,7 +506,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
                 onClick={(e) => { e.stopPropagation(); onUseImproveSettings(img); }}
                 disabled={busy}
                 title="Make the next ✨ improves use what THIS image was made with — its instruction and LoRA preset become the app-wide improve settings"
-                className="rounded-md border border-emerald-400/50 bg-emerald-500/15 px-3 py-1.5 text-[0.75rem] font-semibold text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-40">
+                className="rounded-md border border-emerald-400/50 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-40">
                 <span aria-hidden>↩</span> Use these improve settings
               </button>
             )}
@@ -519,7 +519,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
                 onClick={(e) => { e.stopPropagation(); setRepairOpen(true); }}
                 disabled={busy}
                 title="Repaint one area of this image from your own description — draw the zone, say what should be there, and everything outside it stays byte-identical"
-                className="rounded-md border border-sky-400/50 bg-sky-500/20 px-3 py-1.5 text-[0.75rem] font-semibold text-sky-50 hover:bg-sky-500/30 disabled:opacity-40">
+                className="rounded-md border border-sky-400/50 bg-sky-500/20 px-3 py-1.5 text-xs font-semibold text-sky-50 hover:bg-sky-500/30 disabled:opacity-40">
                 <span aria-hidden>✦</span> Repair
               </button>
             )}
@@ -536,7 +536,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
           </div>
           {dl.error && (
             <p role="alert" data-testid="lightbox-download-error"
-              className="m-0 mt-1.5 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-[0.6875rem] text-amber-100">
+              className="m-0 mt-1.5 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-2xs text-amber-100">
               {dl.error}
             </p>
           )}

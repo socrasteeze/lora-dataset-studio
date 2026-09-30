@@ -12,8 +12,8 @@ function ImagePane({ datasetId, image, nonce, label, tone, fallback, onPreview }
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-app/50">
       <div className="flex min-h-8 items-center justify-between gap-1 border-b border-border px-2 py-1">
-        <span className={`truncate text-[0.6875rem] font-semibold ${tone}`}>{label}</span>
-        <span className="shrink-0 text-[0.625rem] text-content-subtle">
+        <span className={`truncate text-2xs font-semibold ${tone}`}>{label}</span>
+        <span className="shrink-0 text-2xs text-content-subtle">
           {image?.status || 'pending'}
         </span>
       </div>
@@ -26,7 +26,7 @@ function ImagePane({ datasetId, image, nonce, label, tone, fallback, onPreview }
             <img src={url} alt={label} loading="lazy"
               className="h-full w-full select-none object-contain" />
             <span aria-hidden
-              className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[0.6875rem] text-white opacity-80 group-hover:opacity-100">
+              className="absolute bottom-1.5 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-2xs text-white opacity-80 group-hover:opacity-100">
               ⛶
             </span>
           </button>
@@ -37,7 +37,7 @@ function ImagePane({ datasetId, image, nonce, label, tone, fallback, onPreview }
             ) : (
               <span aria-hidden className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-300/30 border-t-indigo-300" />
             )}
-            <span className={`max-w-full break-words text-[0.6875rem] leading-relaxed ${
+            <span className={`max-w-full break-words text-2xs leading-relaxed ${
               image?.status === 'failed' ? 'text-rose-300' : 'text-content-subtle'}`}>
               {fallback}
             </span>
@@ -86,12 +86,12 @@ export default function SmallImageRescueReview({
           <h3 id="small-image-rescue-title" className="m-0 text-sm font-semibold text-content">
             ✨ Small-image rescue review
           </h3>
-          <p className="m-0 mt-0.5 max-w-3xl text-[0.6875rem] leading-relaxed text-content-subtle">
+          <p className="m-0 mt-0.5 max-w-3xl text-2xs leading-relaxed text-content-subtle">
             Klein is generative: compare identity, textures and small details. Both versions stay out
             of training until you make one atomic choice; the original is never overwritten.
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-indigo-400/40 bg-indigo-500/10 px-2 py-0.5 text-[0.6875rem] font-semibold text-indigo-200">
+        <span className="shrink-0 rounded-full border border-indigo-400/40 bg-indigo-500/10 px-2 py-0.5 text-2xs font-semibold text-indigo-200">
           {pairs.length} to review
         </span>
       </div>
@@ -111,12 +111,12 @@ export default function SmallImageRescueReview({
               className="min-w-0 rounded-lg border border-border bg-surface p-2.5">
               <div className="mb-2 flex min-w-0 flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-content">Pair {index + 1}</span>
-                <span className={`min-w-0 break-words text-[0.6875rem] ${
+                <span className={`min-w-0 break-words text-2xs ${
                   phase === 'failed' ? 'text-rose-300' : phase === 'queued' ? 'text-indigo-200' : 'text-emerald-300'}`}>
                   {phase === 'failed' ? '⚠ ' : phase === 'queued' ? '… ' : '✓ '}{detail}
                 </span>
                 {resolving && (
-                  <span role="status" className="ml-auto text-[0.6875rem] text-content-subtle">
+                  <span role="status" className="ml-auto text-2xs text-content-subtle">
                     Saving choice…
                   </span>
                 )}

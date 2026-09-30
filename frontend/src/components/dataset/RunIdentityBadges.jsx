@@ -32,7 +32,7 @@ export function RunIdChip({ source, recordId, cloudId, className = '' }) {
     <span
       title={title}
       className={'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 '
-        + 'text-[0.625rem] font-semibold tabular-nums '
+        + 'text-2xs font-semibold tabular-nums '
         + (cloud
           ? 'border-sky-400/50 bg-sky-500/10 text-sky-200'
           : 'border-violet-400/50 bg-violet-500/10 text-violet-200')
@@ -54,7 +54,7 @@ export function BaseModelChip({ label, className = '' }) {
     <span
       title={label.title}
       className={'inline-flex min-w-0 max-w-[11rem] items-center gap-1 rounded border '
-        + 'px-1.5 py-0.5 text-[0.625rem] '
+        + 'px-1.5 py-0.5 text-2xs '
         + (label.custom
           ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
           : 'border-border bg-surface-raised text-content-subtle')
@@ -71,7 +71,7 @@ export function DatasetVersionChip({ version, className = '' }) {
     <span
       title="Dataset version at training time"
       className={'inline-flex items-center rounded border border-border '
-        + 'bg-surface-raised px-1.5 py-0.5 text-[0.625rem] text-content-subtle '
+        + 'bg-surface-raised px-1.5 py-0.5 text-2xs text-content-subtle '
         + (className ? ` ${className}` : '')}>
       v{version}
     </span>

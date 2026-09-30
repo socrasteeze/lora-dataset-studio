@@ -46,7 +46,7 @@ export function HelpBadge({ topic, className = '' }) {
       aria-label={`Help: ${t.title}`}
       title={`Help: ${t.title}`}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(href) }}
-      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/15 align-middle text-[10px] font-bold leading-none text-indigo-300 transition-colors hover:bg-indigo-500/30 hover:text-indigo-200 ${className}`}
+      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/15 align-middle text-2xs font-bold leading-none text-indigo-300 transition-colors hover:bg-indigo-500/30 hover:text-indigo-200 ${className}`}
     >
       ?
     </button>

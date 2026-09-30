@@ -474,7 +474,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
             : 'text-content-muted hover:bg-surface hover:text-content'}`}>
         <span aria-hidden className="text-content-subtle">›</span>
         <span className="truncate">{t.title}</span>
-        <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-content-subtle">{t.kind}</span>
+        <span className="ml-auto shrink-0 text-2xs uppercase tracking-wide text-content-subtle">{t.kind}</span>
       </button>
     )
   }
@@ -506,7 +506,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
           </nav>
           {/* Desktop: sticky LED rail */}
           <nav aria-label="Settings sections" className="hidden lg:block lg:sticky lg:top-[calc(var(--app-header-h)+1rem)] lg:max-h-[calc(100vh-var(--app-header-h)-2rem)] lg:overflow-y-auto">
-            <p className="px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">Settings</p>
+            <p className="px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">Settings</p>
             <input
               type="search"
               value={query}
@@ -519,7 +519,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
             {q ? (
               <div className="space-y-3">
                 <div>
-                  <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-content-subtle" role="status">
+                  <p className="px-3 pb-1 text-2xs uppercase tracking-wide text-content-subtle" role="status">
                     Sections ({visibleSections.length})
                   </p>
                   <div className="flex flex-col gap-0.5">
@@ -528,7 +528,7 @@ export default function SettingsPage({ plugin = null, groups = [] }) {
                 </div>
                 {settingResults.length > 0 && (
                   <div>
-                    <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-content-subtle">
+                    <p className="px-3 pb-1 text-2xs uppercase tracking-wide text-content-subtle">
                       Settings ({settingResults.length})
                     </p>
                     <div className="flex flex-col gap-0.5">

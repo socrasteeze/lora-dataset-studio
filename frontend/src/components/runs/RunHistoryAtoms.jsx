@@ -45,7 +45,7 @@ export function StatusBadge({ status }) {
   if (!status) return null;
   return (
     <span className={'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 '
-      + `text-[0.625rem] font-semibold uppercase tracking-wide ${statusStyle(status)}`}>
+      + `text-2xs font-semibold uppercase tracking-wide ${statusStyle(status)}`}>
       <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
       {STATUS_LABEL[status] || status}
     </span>
@@ -87,7 +87,7 @@ export function RunThumb({ run, broken, onBroken }) {
     <div aria-hidden
       className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-app/60 text-content-subtle">
       <ImageIcon aria-hidden="true" className="h-4 w-4 opacity-50" />
-      <span className="px-1 text-center text-[0.5625rem] uppercase tracking-wide leading-tight">
+      <span className="px-1 text-center text-2xs uppercase tracking-wide leading-tight">
         {FAMILY_SHORT[run.train_type] || 'LoRA'}
       </span>
     </div>
@@ -97,7 +97,7 @@ export function RunThumb({ run, broken, onBroken }) {
 export function PodKeptNote({ fullModel = false }) {
   return (
     <div role="alert"
-      className="w-full rounded-md border border-amber-400/40 bg-amber-500/10 px-2.5 py-2 text-amber-200 text-[0.6875rem] leading-relaxed">
+      className="w-full rounded-md border border-amber-400/40 bg-amber-500/10 px-2.5 py-2 text-amber-200 text-2xs leading-relaxed">
       <span className="font-semibold">⚠ Pod kept for manual checkpoint recovery</span> — it keeps
       billing until reaped. {fullModel
         ? 'Verify or recover the full-model weights on Hugging Face before the recovery window expires.'
@@ -119,7 +119,7 @@ function DenseLocalStatus({ run, onFetch, fetching = false }) {
   const canFetch = canFetchDenseLocally(run) && !!onFetch;
   return (
     <div role={view.tone === 'warning' ? 'alert' : 'status'}
-      className={`w-full rounded-md border px-2.5 py-2 text-[0.6875rem] leading-relaxed ${FULL_ARTIFACT_TONE[view.tone]}`}>
+      className={`w-full rounded-md border px-2.5 py-2 text-2xs leading-relaxed ${FULL_ARTIFACT_TONE[view.tone]}`}>
       <span className="font-semibold">{view.label}</span>
       <span className="block opacity-90">{view.detail}</span>
       {view.dir && (
@@ -164,7 +164,7 @@ export function FullArtifactStatus({ run, onRecheck, rechecking = false,
     <>
       <DenseLocalStatus run={run} onFetch={onFetch} fetching={fetching} />
       <div role={view.tone === 'error' || view.tone === 'warning' ? 'alert' : 'status'}
-        className={`w-full rounded-md border px-2.5 py-2 text-[0.6875rem] leading-relaxed ${FULL_ARTIFACT_TONE[view.tone]}`}>
+        className={`w-full rounded-md border px-2.5 py-2 text-2xs leading-relaxed ${FULL_ARTIFACT_TONE[view.tone]}`}>
         <span className="font-semibold">{view.label}</span>
         <span className="block opacity-90">{view.detail}</span>
         {/* Which of the delivered files to take. Without this the repository shows
@@ -212,14 +212,14 @@ export function AutoRetryBadges({ run }) {
     <>
       {run.auto_retry_of != null && (
         <span
-          className="rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-0.5 text-sky-200 text-[0.625rem]"
+          className="rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-0.5 text-sky-200 text-2xs"
           title={`Automatic retry of cloud run #${run.auto_retry_of}`}>
           ↻ automatic retry {run.auto_retry_count || 1}/1
         </span>
       )}
       {run.auto_retry_run_id != null && (
         <span
-          className="rounded border border-violet-400/40 bg-violet-500/10 px-1.5 py-0.5 text-violet-200 text-[0.625rem]"
+          className="rounded border border-violet-400/40 bg-violet-500/10 px-1.5 py-0.5 text-violet-200 text-2xs"
           title={`Automatically relaunched as cloud run #${run.auto_retry_run_id}`}>
           ↻ auto-retried as #{run.auto_retry_run_id}
         </span>
@@ -233,7 +233,7 @@ export function RecipeWarning({ run }) {
   const replayBlocked = isTrainingRecipeReplayBlocked(run);
   return (
     <div role="alert"
-      className="w-full rounded-md border border-amber-400/40 bg-amber-500/10 px-2.5 py-2 text-amber-200 text-[0.6875rem] leading-relaxed">
+      className="w-full rounded-md border border-amber-400/40 bg-amber-500/10 px-2.5 py-2 text-amber-200 text-2xs leading-relaxed">
       <span className="font-semibold">⚠ Z-Image recipe warning:</span> {run.recipe_warning}
       {replayBlocked && (
         <span className="font-semibold"> Retry and Continue are disabled; start a fresh validated run.</span>

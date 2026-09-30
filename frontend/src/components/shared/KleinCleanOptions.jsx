@@ -68,7 +68,7 @@ export default function KleinCleanOptions({ caps = {}, disabled = false, classNa
   };
 
   return (
-    <div className={`min-w-0 space-y-2 text-[11px] text-content-subtle ${className}`}>
+    <div className={`min-w-0 space-y-2 text-2xs text-content-subtle ${className}`}>
       <label className="block min-w-0">
         <span className="font-medium text-content">Prompt sent to Klein</span>
         {' — stored: the other surface reads the same value.'}

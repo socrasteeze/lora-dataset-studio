@@ -41,7 +41,7 @@ export default function WatermarkEngineChoice({ caps = {}, disabled = false, onC
   };
 
   return (
-    <label className="block text-[11px] text-content-subtle">
+    <label className="block text-2xs text-content-subtle">
       <span className="font-medium text-content">Detection engine</span>
       {' — stored: the other surface reads the same value.'}
       <span className="mt-1 flex flex-wrap items-center gap-2">

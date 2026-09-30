@@ -91,7 +91,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
           three-across row of selects is what overflows a phone card. */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label htmlFor="prompt-preview-engine" className="block text-[0.6875rem] font-medium text-content-muted">
+          <label htmlFor="prompt-preview-engine" className="block text-2xs font-medium text-content-muted">
             Engine
           </label>
           <select
@@ -104,7 +104,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
           </select>
         </div>
         <div>
-          <label htmlFor="prompt-preview-framing" className="block text-[0.6875rem] font-medium text-content-muted">
+          <label htmlFor="prompt-preview-framing" className="block text-2xs font-medium text-content-muted">
             Shot
           </label>
           <select
@@ -136,7 +136,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
       ) : (
         <>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[0.6875rem] text-content-subtle">
+            <span className="text-2xs text-content-subtle">
               {data
                 ? <>Shot <strong className="text-content-muted">{data.shot_label || data.shot_id}</strong> · {data.length} characters</>
                 : 'Composing…'}
@@ -158,7 +158,7 @@ export default function PromptPreview({ subject, identityPrompts }) {
           <pre
             aria-live="polite"
             className="mt-1 max-h-48 overflow-y-auto overflow-x-hidden rounded-md border border-border-strong
-                       bg-surface-raised px-3 py-2 font-mono text-[0.6875rem] leading-relaxed text-content
+                       bg-surface-raised px-3 py-2 font-mono text-2xs leading-relaxed text-content
                        whitespace-pre-wrap break-words sm:max-h-72 sm:text-xs"
           >
             {text || ' '}

@@ -37,12 +37,12 @@ export default function LoraComparisonGrid({ loras, cells, onRate, onOpen }) {
         </caption>
         <thead>
           <tr>
-            <th scope="col" className="text-content-subtle text-[0.625rem] font-normal text-left px-1">
+            <th scope="col" className="text-content-subtle text-2xs font-normal text-left px-1">
               strength \ LoRA
             </th>
             {loras.map((l) => (
               <th key={l.dataset_id} scope="col"
-                className="text-content text-[0.6875rem] font-semibold px-1 max-w-[160px] truncate"
+                className="text-content text-2xs font-semibold px-1 max-w-[160px] truncate"
                 title={`${l.lora_label} — ${l.dataset_name || ''}`}>
                 {l.lora_label}
               </th>
@@ -52,7 +52,7 @@ export default function LoraComparisonGrid({ loras, cells, onRate, onOpen }) {
         <tbody>
           {strengths.map((s) => (
             <tr key={s}>
-              <th scope="row" className="text-content-muted text-[0.6875rem] tabular-nums text-left px-1 whitespace-nowrap">
+              <th scope="row" className="text-content-muted text-2xs tabular-nums text-left px-1 whitespace-nowrap">
                 {fmt(s)}
               </th>
               {loras.map((l) => {
@@ -60,7 +60,7 @@ export default function LoraComparisonGrid({ loras, cells, onRate, onOpen }) {
                 return (
                   <td key={l.dataset_id} className="align-top p-1">
                     {list.length === 0 ? (
-                      <span className="text-content-subtle text-[0.625rem]">—</span>
+                      <span className="text-content-subtle text-2xs">—</span>
                     ) : (
                       <div className="flex items-start gap-1 flex-wrap">
                         {list.map((c) => (

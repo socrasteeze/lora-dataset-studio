@@ -29,7 +29,7 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
   // in the readout cluster, not among the actions.
   const edited = editBadge(img)
   const badge = (txt, cls, key) => (
-    <span key={key} className={`rounded px-1 py-px text-[10px] font-semibold leading-none ${cls}`}>{txt}</span>
+    <span key={key} className={`rounded px-1 py-px text-2xs font-semibold leading-none ${cls}`}>{txt}</span>
   )
   return (
     <li className={`relative overflow-hidden rounded-lg border border-border bg-surface ${STATUS_RING[img.status] || ''}`}>
@@ -91,7 +91,7 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
             the promise the whole feature rests on: your own file was not touched. */}
         {edited && (
           <span title={edited.title} aria-label={edited.label}
-            className="rounded bg-sky-500/80 px-1 py-px text-[10px] font-semibold leading-none text-white">
+            className="rounded bg-sky-500/80 px-1 py-px text-2xs font-semibold leading-none text-white">
             {edited.text}
           </span>
         )}
@@ -136,7 +136,7 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
         <button type="button" onClick={onTags}
           title={`Filter the bank by this image's tags — ${img.caption}`}
           aria-label={`Use the tags of ${img.name} as a filter`}
-          className="absolute bottom-1 right-11 rounded bg-black/60 px-1 text-[11px] text-emerald-200 hover:bg-black/80"><Tag aria-hidden="true" className="h-3 w-3" /></button>
+          className="absolute bottom-1 right-11 rounded bg-black/60 px-1 text-2xs text-emerald-200 hover:bg-black/80"><Tag aria-hidden="true" className="h-3 w-3" /></button>
       ) : (
         <span
           title={img.caption
@@ -145,12 +145,12 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
           aria-label={img.caption
             ? 'Tags unavailable: this caption has no word worth filtering on'
             : 'Tags unavailable: this image has no caption yet'}
-          className="absolute bottom-1 right-11 rounded bg-black/40 px-1 text-[11px] text-white/35"><Tag aria-hidden="true" className="h-3 w-3" /></span>
+          className="absolute bottom-1 right-11 rounded bg-black/40 px-1 text-2xs text-white/35"><Tag aria-hidden="true" className="h-3 w-3" /></span>
       )}
       <button type="button" onClick={onReview}
         title="Review from this image — full size, one at a time, with Keep/Reject/Skip"
         aria-label={`Review from ${img.name}`}
-        className="absolute bottom-1 right-6 rounded bg-black/60 px-1 text-[11px] text-white hover:bg-black/80">▶</button>
+        className="absolute bottom-1 right-6 rounded bg-black/60 px-1 text-2xs text-white hover:bg-black/80">▶</button>
       {/* ⛶ serves what the bank RESOLVES for this image, and on an edited row that
           is the crop/upscale — so the tooltip stops calling it "the original file",
           which a ✂ crop makes visibly false, and the version key travels with it
@@ -161,7 +161,7 @@ export default function Tile({ img, bankId, selected, onToggle, onReview, onTags
         target="_blank" rel="noreferrer"
         title="Open this image full size, as the Bank shows it — your own file on disk is never modified"
         aria-label={`Open ${img.name} full size`}
-        className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[11px] text-white no-underline hover:bg-black/80">⛶</a>
+        className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-2xs text-white no-underline hover:bg-black/80">⛶</a>
     </li>
   )
 }

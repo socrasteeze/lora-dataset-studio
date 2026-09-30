@@ -54,17 +54,17 @@ function LevelCard({ index, title, blurb, state, onRun }) {
   return (
     <div className="flex-1 min-w-[15rem] rounded-lg border border-border bg-app/40 p-2.5 space-y-1.5">
       <div className="flex items-baseline gap-1.5">
-        <span className="text-[0.625rem] font-bold uppercase tracking-wide text-content-subtle">
+        <span className="text-2xs font-bold uppercase tracking-wide text-content-subtle">
           Level {index}
         </span>
         <span className="text-sm font-semibold text-content">{title}</span>
       </div>
-      <p className="text-[0.6875rem] leading-snug text-content-subtle">{blurb}</p>
+      <p className="text-2xs leading-snug text-content-subtle">{blurb}</p>
       <button type="button" onClick={onRun} disabled={state.disabled} title={state.reason || title}
         className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-sm font-semibold text-amber-200 disabled:opacity-40">
         {state.label}
       </button>
-      <p className="text-[0.6875rem] text-content-subtle">
+      <p className="text-2xs text-content-subtle">
         {state.done > 0 ? `${state.done} already handled here. ` : ''}
         {state.reason || state.note || `${state.remaining} image(s) waiting.`}
       </p>
@@ -214,20 +214,20 @@ export default function BankWatermarkPanel({
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 p-3 text-left">
         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-content"><Flag aria-hidden="true" className="h-4 w-4" /> Watermarks</span>
-        <span className="text-[0.6875rem] text-content-subtle">{headline}</span>
-        {note && <span aria-hidden className="text-[0.6875rem] text-amber-300/90">⚠️</span>}
+        <span className="text-2xs text-content-subtle">{headline}</span>
+        {note && <span aria-hidden className="text-2xs text-amber-300/90">⚠️</span>}
         <span aria-hidden className="ml-auto text-xs text-content-subtle">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
       <div className="space-y-2 px-3 pb-3">
-      <p className="text-[0.6875rem] text-content-subtle">
+      <p className="text-2xs text-content-subtle">
         find them, then clear them in two manual steps — your original files are never modified
       </p>
       <p className="text-xs text-content-subtle">{progressSummary(levels)}</p>
       {/* WHO ruled, and who will rule next. Wraps onto its own line at 400 px
           rather than being truncated — the source is the actionable half of a
           flag the user disagrees with. */}
-      {source && <p className="text-[0.6875rem] text-content-subtle">🔎 {source}</p>}
+      {source && <p className="text-2xs text-content-subtle">🔎 {source}</p>}
       {note && <p className="text-xs text-amber-300/90">⚠️ {note}</p>}
       {masks && <p className="text-xs text-content-subtle">{masks}</p>}
 
@@ -256,15 +256,15 @@ export default function BankWatermarkPanel({
           with its own picker below). One "Run on" per question, or the label
           would have to lie about which level it governs. */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+        <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
           Level 1 scan
         </span>
         <DevicePicker value={scanDevice} onChange={setScanDevice} kind="bank-pass"
-          className="text-[0.6875rem]" />
+          className="text-2xs" />
       </div>
 
       {inpaint.remoteNote && (
-        <p className="text-[0.6875rem] text-content-subtle">🖥️ {inpaint.remoteNote}</p>
+        <p className="text-2xs text-content-subtle">🖥️ {inpaint.remoteNote}</p>
       )}
 
       {/* The detector's device, SAID — and fixable in place. The Setup install
@@ -292,7 +292,7 @@ export default function BankWatermarkPanel({
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+        <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
           Level 3 engine
         </span>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-app/60 p-0.5 text-xs">
@@ -318,7 +318,7 @@ export default function BankWatermarkPanel({
             has no peers/backends; LaMa ignores it (it never travels), which the
             state helper says whenever the pick actually changes behaviour. */}
         <DevicePicker value={deviceId} onChange={setDeviceId} kind="comfy"
-          className="text-[0.6875rem]" />
+          className="text-2xs" />
         {/* WHICH Klein model is about to repaint these images. A bank has no
             dataset to inherit a choice from, so there is nothing to pick here —
             but "no choice" was never a reason to stay silent about the model.
@@ -339,7 +339,7 @@ export default function BankWatermarkPanel({
               ⚖ Compare models…
             </button>
             {kleinRunModel && (
-              <span className="text-[0.6875rem] text-amber-200">
+              <span className="text-2xs text-amber-200">
                 Next Klein clean runs on <span className="font-mono break-all">{kleinRunModel}</span>{' '}
                 <button type="button" onClick={() => setKleinRunModel(null)}
                   className="underline text-content-muted hover:text-content">use auto</button>
@@ -361,7 +361,7 @@ export default function BankWatermarkPanel({
             one and the control would be a dead dial. */}
         {c.textFound > 0 && (
           <>
-            <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-content-subtle">
               What to clean
             </span>
             <div role="group" aria-label="What to clean"
@@ -473,7 +473,7 @@ export default function BankWatermarkPanel({
                authorities for one value is how they drift — but a window that
                named no engine would hide the single biggest difference between
                two runs of this level. */
-            <p className="m-0 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-[11px] leading-snug text-content-muted">
+            <p className="m-0 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-2xs leading-snug text-content-muted">
               Engine: <span className="font-semibold text-content">
                 {method === 'klein' ? 'Klein' : 'LaMa'}
               </span>{method === 'klein'

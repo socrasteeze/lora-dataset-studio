@@ -59,14 +59,14 @@ export default function StudioResultViewer({ img, items = [], onRate, onNavigate
           )}
           <button type="button" aria-pressed={img.rating === 1}
             onClick={(e) => { e.stopPropagation(); onRate(img.id, img.rating === 1 ? 0 : 1); }}
-            className={`min-h-10 lg:min-h-0 rounded-lg border px-3 py-1.5 text-[0.75rem] font-semibold ${img.rating === 1
+            className={`min-h-10 lg:min-h-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${img.rating === 1
               ? 'border-green-400/60 bg-green-500/20 text-green-200'
               : 'border-white/25 text-white/85 hover:border-white/50'}`}>
             👍 {img.rating === 1 ? 'Liked ✓' : 'Like'}
           </button>
           <button type="button" aria-pressed={img.rating === -1}
             onClick={(e) => { e.stopPropagation(); onRate(img.id, img.rating === -1 ? 0 : -1); }}
-            className={`min-h-10 lg:min-h-0 rounded-lg border px-3 py-1.5 text-[0.75rem] font-semibold ${img.rating === -1
+            className={`min-h-10 lg:min-h-0 rounded-lg border px-3 py-1.5 text-xs font-semibold ${img.rating === -1
               ? 'border-red-400/60 bg-red-500/20 text-red-200'
               : 'border-white/25 text-white/85 hover:border-white/50'}`}>
             👎 {img.rating === -1 ? 'Not a fan ✓' : 'Not a fan'}

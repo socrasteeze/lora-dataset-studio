@@ -58,12 +58,12 @@ export function GraphCard({ node, lit, annotated, compareRole, onSelect }) {
             The cloud id is context, not identity: it stays in the title (and
             the inspector), never printed beside the number where it read as a
             second id. Matching a card to a Runs row is the deep-link's job. */}
-        <span className="shrink-0 font-mono text-content-muted text-[0.625rem]"
+        <span className="shrink-0 font-mono text-content-muted text-2xs"
           title={runIdentityLabel(node)}>
           <span aria-hidden>{node.source === 'cloud' ? 'cloud' : 'local'}</span>{' '}
           {runNumber(node)}
         </span>
-        <span className={`min-w-0 truncate text-[0.75rem] font-semibold ${dim ? 'text-content-muted' : 'text-content'}`}
+        <span className={`min-w-0 truncate text-xs font-semibold ${dim ? 'text-content-muted' : 'text-content'}`}
           title={`${famLabel(node.train_type)}${variantLabel(node) ? ` · ${variantLabel(node)}` : ''}`}>
           {famLabel(node.train_type)}{variantLabel(node)
             ? <span className="font-normal text-content-muted"> · {variantLabel(node)}</span> : null}
@@ -74,7 +74,7 @@ export function GraphCard({ node, lit, annotated, compareRole, onSelect }) {
           </span>
         )}
         {annotated && (
-          <span aria-hidden title="Has notes" className="shrink-0 text-amber-300 text-[0.625rem] leading-none">●</span>
+          <span aria-hidden title="Has notes" className="shrink-0 text-amber-300 text-2xs leading-none">●</span>
         )}
         {compareRole && (
           <span title={`Selected for compare (${compareRole})`}
@@ -84,7 +84,7 @@ export function GraphCard({ node, lit, annotated, compareRole, onSelect }) {
         )}
         <span className="ml-auto shrink-0"><SavesChip node={node} /></span>
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-content-subtle text-[0.5625rem]">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-content-subtle text-2xs">
         <ModeChip node={node} />
         {node.version != null && (
           <span className="rounded bg-app/60 px-1 py-px font-medium text-content-muted">v{node.version}</span>
@@ -92,7 +92,7 @@ export function GraphCard({ node, lit, annotated, compareRole, onSelect }) {
         {node.steps ? <span className="tabular-nums">{node.steps.toLocaleString()} steps</span> : null}
         {resumeCaption(node) && (
           <span className="inline-flex items-center gap-0.5">
-            <span aria-hidden className="text-[0.625rem] leading-none">↳</span>{resumeCaption(node)}
+            <span aria-hidden className="text-2xs leading-none">↳</span>{resumeCaption(node)}
           </span>
         )}
         {node.origin_unknown && (
@@ -197,13 +197,13 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
         aria-label={`Open the ${count} ${resultNoun}${count > 1 ? 's' : ''} of step ${pill.step}`}
         title={resultsTitle}
         className={'lds-ckcount flex shrink-0 cursor-pointer items-center gap-px rounded-full border border-indigo-400/70 bg-indigo-500/25 font-semibold leading-none tabular-nums text-indigo-100 hover:bg-indigo-500 hover:text-gray-950 '
-          + (inline ? 'ml-0.5 h-3.5 px-1 text-[0.5rem] ' : 'h-4 px-1 text-[0.5625rem] shadow-sm ')}>
+          + (inline ? 'ml-0.5 h-3.5 px-1 text-[0.5rem] ' : 'h-4 px-1 text-2xs shadow-sm ')}>
         <span aria-hidden>{resultIcon}</span>{count}
       </span>
     ) : (
       <span title={resultsTitle}
         className={'lds-ckcount flex shrink-0 items-center gap-px rounded-full border border-border bg-surface-overlay font-semibold leading-none tabular-nums text-content-muted '
-          + (inline ? 'ml-0.5 h-3.5 px-1 text-[0.5rem] ' : 'h-4 px-1 text-[0.5625rem] ')}>
+          + (inline ? 'ml-0.5 h-3.5 px-1 text-[0.5rem] ' : 'h-4 px-1 text-2xs ')}>
         <span aria-hidden>{resultIcon}</span>{count}
       </span>
     )
@@ -220,7 +220,7 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
           onClick={(e) => { e.stopPropagation(); onOpen(pill, e); }}
           title={openTitle}
           style={{ width: pill.w, height: pill.h }}
-          className={shellCls + deployCls + ' flex w-full flex-col overflow-hidden text-[0.625rem] font-medium tabular-nums'}>
+          className={shellCls + deployCls + ' flex w-full flex-col overflow-hidden text-2xs font-medium tabular-nums'}>
           <div className="relative min-h-0 flex-1 w-full">
             {/* The tile is 128×132 board units (PILL_W_BIG), so 320 stays crisp
                 at 2× DPR and at the zoom levels the board actually reads at.
@@ -253,7 +253,7 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
           onClick={(e) => { e.stopPropagation(); onOpen(pill, e); }}
           title={openTitle}
           style={{ width: pill.w, height: pill.h }}
-          className={shellCls + deployCls + ' flex w-full items-center justify-center gap-0.5 overflow-hidden px-0.5 text-[0.5625rem] font-medium tabular-nums'}>
+          className={shellCls + deployCls + ' flex w-full items-center justify-center gap-0.5 overflow-hidden px-0.5 text-2xs font-medium tabular-nums'}>
           {pill.final && <span aria-hidden className="shrink-0 text-emerald-300">✓</span>}
           <span className="min-w-0 truncate">{label}</span>
           {count > 0 ? resultsChip(true)
@@ -290,7 +290,7 @@ export function CheckpointPill({ pill, offX, offY, active, selected, preview, bi
               ? { transform: `scale(${selScale})`, transformOrigin: '100% 100%' }
               : null) }}
           className={'lds-cksel flex items-center justify-center rounded-[3px] border leading-none shadow-sm '
-            + (big ? 'h-5 w-5 text-[0.6875rem] ' : 'h-3 w-3 text-[0.5rem] ')
+            + (big ? 'h-5 w-5 text-2xs ' : 'h-3 w-3 text-[0.5rem] ')
             + (selected ? 'border-indigo-400 bg-indigo-500 text-gray-950 ' : 'border-border-strong bg-surface-overlay text-transparent hover:border-indigo-400 ')}>
           ✓
         </button>

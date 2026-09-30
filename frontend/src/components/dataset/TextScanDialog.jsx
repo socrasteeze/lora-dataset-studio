@@ -84,16 +84,16 @@ export default function TextScanDialog({
         className="w-full max-w-lg space-y-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-xl"
         style={{ maxHeight: 'min(38rem, calc(100vh - 2rem))' }}>
         <h2 className="m-0 text-base font-bold text-content">🔤 Find text</h2>
-        <p className="m-0 text-[11px] leading-snug text-content-subtle">
+        <p className="m-0 text-2xs leading-snug text-content-subtle">
           Reads burned-in text — speech bubbles, subtitles, captions, sound effects —
           and marks each zone so 🧽 Clean can repaint it. CPU only, never the GPU.
         </p>
-        <p className="m-0 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-[11px] leading-snug text-content-muted">
+        <p className="m-0 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-2xs leading-snug text-content-muted">
           This run reads the <span className="font-semibold text-content">kept</span> images
           that still need reading — <span className="font-semibold text-content">{toRead}</span> waiting.
           Images you dismissed as “not watermarked” keep their ruling and are never re-examined.
         </p>
-        <label className="flex items-start gap-2 text-[11px] text-content-subtle">
+        <label className="flex items-start gap-2 text-2xs text-content-subtle">
           <input type="checkbox" className="mt-0.5" checked={redo}
             onChange={(e) => setRedo(e.target.checked)} disabled={live || busy} />
           <span>
@@ -103,10 +103,10 @@ export default function TextScanDialog({
           </span>
         </label>
         <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-          <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+          <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
             Options for this run
           </p>
-          <label className="flex items-start gap-2 text-[11px] text-content-subtle">
+          <label className="flex items-start gap-2 text-2xs text-content-subtle">
             <input type="checkbox" className="mt-0.5" checked={sampleOn}
               onChange={(e) => setSampleOn(e.target.checked)} disabled={live || busy} />
             <span>
@@ -120,7 +120,7 @@ export default function TextScanDialog({
               {'run again for the rest.'}
             </span>
           </label>
-          <label className="block text-[11px] text-content-subtle">
+          <label className="block text-2xs text-content-subtle">
             <span className="font-medium text-content">Sensitivity</span>
             {' — the OCR confidence a line needs to become a zone. Lower catches '}
             {'fainter or stylised lettering, at the cost of false zones. Stored: '}
@@ -153,7 +153,7 @@ export default function TextScanDialog({
             <span className="block whitespace-pre-wrap break-words text-xs leading-relaxed text-red-200">
               {error}
             </span>
-            <span className="mt-1 block text-[0.625rem] text-content-subtle">
+            <span className="mt-1 block text-2xs text-content-subtle">
               Your choices are kept — adjust and try again.
             </span>
           </div>

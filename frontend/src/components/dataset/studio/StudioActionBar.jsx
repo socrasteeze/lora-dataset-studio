@@ -27,12 +27,12 @@ export default function StudioActionBar({ shortcuts = [], canRun, running, onRun
             // min-h-10 below lg: a 27-px chip is under the ~40 px a fingertip lands on,
             // and a miss goes to whatever sits behind it (the results grid). Measured by
             // the responsive probe; compact again from lg, where a pointer is precise.
-            className="min-h-10 lg:min-h-0 shrink-0 px-2.5 py-1 rounded-full border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised text-[0.6875rem] font-medium transition-colors">
+            className="min-h-10 lg:min-h-0 shrink-0 px-2.5 py-1 rounded-full border border-border bg-surface text-content-muted hover:text-content hover:bg-surface-raised text-2xs font-medium transition-colors">
             <span aria-hidden="true">{s.emoji}</span> {s.label}
           </button>
         ))}
         {note && (
-          <span className="ml-auto min-w-0 shrink truncate text-[0.6875rem] text-content-subtle" title={note}>
+          <span className="ml-auto min-w-0 shrink truncate text-2xs text-content-subtle" title={note}>
             {note}
           </span>
         )}

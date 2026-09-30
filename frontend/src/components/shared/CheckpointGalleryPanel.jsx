@@ -263,17 +263,17 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
           // A 24-px tick, not a hairline checkbox: the target has to be hittable
           // with a thumb on a 400-px grid.
           <span aria-hidden
-            className={`pointer-events-none absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[0.75rem] ${isPicked
+            className={`pointer-events-none absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-xs ${isPicked
               ? 'border-rose-300 bg-rose-500 text-white'
               : 'border-white/60 bg-black/50 text-transparent'}`}>✓</span>
         )}
         {img.rating === 1 && (
           <span aria-hidden title="Rated good"
-            className="pointer-events-none absolute right-0.5 top-0.5 text-[0.625rem] text-emerald-300">✓</span>
+            className="pointer-events-none absolute right-0.5 top-0.5 text-2xs text-emerald-300">✓</span>
         )}
         {img.rating === -1 && (
           <span aria-hidden title="Rated bad"
-            className="pointer-events-none absolute right-0.5 top-0.5 text-[0.625rem] text-rose-300">✗</span>
+            className="pointer-events-none absolute right-0.5 top-0.5 text-2xs text-rose-300">✗</span>
         )}
         {showPin && (
           // BOTTOM-right, because top-right is where the 👍/👎 verdict sits and a
@@ -292,7 +292,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
             className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full
                        border border-indigo-300/70 bg-black/60 text-[0.8125rem] text-indigo-100
                        hover:bg-indigo-500/50 focus-visible:bg-indigo-500/50
-                       sm:bottom-0.5 sm:right-0.5 sm:h-5 sm:w-5 sm:text-[0.625rem]">
+                       sm:bottom-0.5 sm:right-0.5 sm:h-5 sm:w-5 sm:text-2xs">
             <span aria-hidden>◉</span>
           </button>
         )}
@@ -326,10 +326,10 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {state.status === 'loading' && (
-            <p className="m-0 text-content-subtle text-[0.75rem]">Loading…</p>
+            <p className="m-0 text-content-subtle text-xs">Loading…</p>
           )}
           {state.status === 'error' && (
-            <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-[0.75rem]">
+            <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-xs">
               {state.error}
             </p>
           )}
@@ -339,7 +339,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                and dressing it in the green of a finished delete would bury the
                one sentence that has to be read. */
             <p role={notice.kind === 'ok' ? undefined : 'alert'}
-              className={`m-0 mb-2 rounded-lg border px-2 py-1.5 text-[0.6875rem] ${
+              className={`m-0 mb-2 rounded-lg border px-2 py-1.5 text-2xs ${
                 notice.kind === 'error'
                   ? 'border-rose-400/50 bg-rose-500/10 text-rose-100'
                   : notice.kind === 'warn'
@@ -351,7 +351,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
 
           {state.status === 'ready' && !isRun && (
             <>
-              <p className="m-0 mb-2 text-content-muted text-[0.6875rem]">
+              <p className="m-0 mb-2 text-content-muted text-2xs">
                 {d.count === 0
                   ? 'Nothing generated from this checkpoint yet — tick it and run from the board.'
                   : picking
@@ -367,14 +367,14 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
           {state.status === 'ready' && isRun && (
             <>
               <div className="mb-2 flex items-start gap-2">
-                <p className="m-0 min-w-0 flex-1 text-content-muted text-[0.6875rem]">
+                <p className="m-0 min-w-0 flex-1 text-content-muted text-2xs">
                   {picking
                     ? `Tap the misses, then 🗑 Delete. ${images.length} shown in the open steps.`
                     : runGallerySummary(d)}
                 </p>
                 <button type="button" data-testid="run-gallery-timeline"
                   onClick={() => setTimelineOpen(true)} aria-haspopup="dialog"
-                  className="shrink-0 rounded-md border border-indigo-400/60 bg-indigo-500/15 px-2 py-1.5 text-[0.6875rem] font-semibold text-indigo-100 hover:bg-indigo-500/25">
+                  className="shrink-0 rounded-md border border-indigo-400/60 bg-indigo-500/15 px-2 py-1.5 text-2xs font-semibold text-indigo-100 hover:bg-indigo-500/25">
                   <span aria-hidden>🎞</span> Timeline
                 </button>
               </div>
@@ -392,20 +392,20 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                     <button type="button" data-testid="run-gallery-group-toggle"
                       onClick={() => toggleGroup(g.key)} aria-expanded={open}
                       className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-app/40">
-                      <span aria-hidden className="shrink-0 text-content-subtle text-[0.625rem]">
+                      <span aria-hidden className="shrink-0 text-content-subtle text-2xs">
                         {open ? '▾' : '▸'}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-content text-[0.75rem] font-semibold tabular-nums">
+                      <span className="min-w-0 flex-1 truncate text-content text-xs font-semibold tabular-nums">
                         {g.label}
                       </span>
-                      <span className="shrink-0 rounded-full border border-border px-1.5 text-content-muted text-[0.625rem] tabular-nums">
+                      <span className="shrink-0 rounded-full border border-border px-1.5 text-content-muted text-2xs tabular-nums">
                         {g.count}
                       </span>
                     </button>
                     {open && (
                       <div className="px-2 pb-2">
                         {g.step == null && (
-                          <p className="m-0 mb-1.5 text-content-subtle text-[0.625rem]">
+                          <p className="m-0 mb-1.5 text-content-subtle text-2xs">
                             These came from this run — the file name named the run but
                             not the step, so they sit under no checkpoint.
                           </p>
@@ -414,7 +414,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                           {g.images.map((img) => tile(img, `Generated by run ${target.recordId}`))}
                         </div>
                         {g.truncated && (
-                          <p className="m-0 mt-1.5 text-content-subtle text-[0.625rem]">
+                          <p className="m-0 mt-1.5 text-content-subtle text-2xs">
                             Newest {g.images.length} of {g.count} — open this checkpoint’s
                             own gallery from its pill for the rest.
                           </p>
@@ -432,17 +432,17 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
               {(node?.note || ckNotes.length > 0) && (
                 <section data-testid="run-gallery-notes"
                   className="mt-3 border-t border-border pt-2">
-                  <h4 className="m-0 mb-1 text-content text-[0.6875rem] font-semibold">
+                  <h4 className="m-0 mb-1 text-content text-2xs font-semibold">
                     Notes
                   </h4>
                   {node?.note && (
-                    <p className="m-0 mb-1.5 whitespace-pre-wrap break-words text-content-muted text-[0.6875rem]">
+                    <p className="m-0 mb-1.5 whitespace-pre-wrap break-words text-content-muted text-2xs">
                       {node.note}
                     </p>
                   )}
                   {ckNotes.map((c) => (
                     <p key={c.step}
-                      className="m-0 mb-1 whitespace-pre-wrap break-words text-content-muted text-[0.625rem]">
+                      className="m-0 mb-1 whitespace-pre-wrap break-words text-content-muted text-2xs">
                       <span className="font-semibold text-content-subtle tabular-nums">
                         {stepGroupLabel(c.step)}:
                       </span>{' '}{c.note}
@@ -456,19 +456,19 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                   so rather than showing an empty table. */}
               <section data-testid="run-gallery-settings"
                 className="mt-3 border-t border-border pt-2">
-                <h4 className="m-0 mb-1 text-content text-[0.6875rem] font-semibold">
+                <h4 className="m-0 mb-1 text-content text-2xs font-semibold">
                   <span aria-hidden>⚙</span> Training settings
                 </h4>
                 {paramRows.length === 0 ? (
-                  <p className="m-0 text-content-subtle text-[0.625rem]">
+                  <p className="m-0 text-content-subtle text-2xs">
                     This run did not record its settings (it predates the snapshot).
                   </p>
                 ) : (
                   <dl className="m-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-0.5">
                     {paramRows.map((r) => (
                       <div key={r.label} className="contents">
-                        <dt className="m-0 truncate text-content-subtle text-[0.625rem]">{r.label}</dt>
-                        <dd className="m-0 break-words text-content-muted text-[0.625rem]">{r.value}</dd>
+                        <dt className="m-0 truncate text-content-subtle text-2xs">{r.label}</dt>
+                        <dd className="m-0 break-words text-content-muted text-2xs">{r.value}</dd>
                       </div>
                     ))}
                   </dl>
@@ -477,7 +477,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                   <button type="button" data-testid="run-gallery-details"
                     onClick={() => onDetails(node)}
                     title="Open the full run details, where the notes can be edited"
-                    className="mt-2 rounded-md border border-border px-2 py-1.5 text-content text-[0.625rem] hover:border-indigo-400/50">
+                    className="mt-2 rounded-md border border-border px-2 py-1.5 text-content text-2xs hover:border-indigo-400/50">
                     <span aria-hidden>ⓘ</span> Full details &amp; edit notes
                   </button>
                 )}
@@ -486,7 +486,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
           )}
 
           {state.status === 'ready' && d.unlinked > 0 && (
-            <p className="m-0 mt-3 border-t border-border pt-2 text-content-subtle text-[0.625rem]">
+            <p className="m-0 mt-3 border-t border-border pt-2 text-content-subtle text-2xs">
               {unlinkedNote(d.unlinked, scope)}
             </p>
           )}
@@ -528,7 +528,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
               aria-pressed={bar.togglePressed}
               aria-label={picking ? 'Leave selection mode' : 'Select images to delete'}
               title={picking ? 'Leave selection mode' : 'Select images to delete'}
-              className={`shrink-0 rounded-md border px-3 py-1.5 text-[0.75rem] font-semibold ${picking
+              className={`shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold ${picking
                 ? 'border-indigo-300 bg-indigo-500/40 text-white'
                 : 'border-indigo-400/70 bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/25'}`}>
               {bar.toggleLabel}
@@ -541,7 +541,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
             {zipBtn.shown && (
               <button type="button" data-testid="gallery-download-zip"
                 onClick={runZip} disabled={zipBtn.disabled} title={zipBtn.title}
-                className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-[0.75rem] hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
+                className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
                 {zipBtn.label}
               </button>
             )}
@@ -557,19 +557,19 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                     .catch((e) => setNotice({ kind: 'error', text: e?.message || 'Could not open the folder' }));
                 }}
                 title="Open the folder these images are saved in (the dataset's folder, on the machine running the app)"
-                className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-[0.75rem] hover:border-indigo-400/50 hover:text-content">
+                className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content">
                 <FolderOpen aria-hidden="true" className="h-3.5 w-3.5" /> Open folder
               </button>
             )}
             {bar.showsDelete && (
               <>
-                <span className="text-content-muted text-[0.6875rem] tabular-nums">
+                <span className="text-content-muted text-2xs tabular-nums">
                   {selected.size} selected
                 </span>
                 <button type="button"
                   onClick={() => setSelected(selected.size === images.length
                     ? new Set() : allGalleryImageIds(images))}
-                  className="rounded-md border border-border px-2 py-1.5 text-content-muted text-[0.6875rem] hover:text-content">
+                  className="rounded-md border border-border px-2 py-1.5 text-content-muted text-2xs hover:text-content">
                   {bar.selectAllLabel}
                 </button>
                 {/* Last, and pushed to the far edge: the gate that opens this mode
@@ -579,7 +579,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
                 <button type="button" data-testid="gallery-delete"
                   disabled={bar.deleteDisabled}
                   onClick={() => setConfirming(true)}
-                  className="ml-auto rounded-md border border-rose-500/50 px-3 py-1.5 text-[0.75rem] text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
+                  className="ml-auto rounded-md border border-rose-500/50 px-3 py-1.5 text-xs text-rose-300 disabled:opacity-40 hover:bg-rose-500/10">
                   🗑 Delete{selected.size ? ` (${selected.size})` : ''}
                 </button>
               </>
@@ -596,22 +596,22 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-3">
           <div className="w-full max-w-sm rounded-xl border border-border bg-surface-overlay p-4 shadow-xl">
             <h4 className="m-0 mb-2 text-sm font-semibold text-content">{confirmation.title}</h4>
-            <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-[0.75rem]">
+            <ul className="m-0 mb-3 list-disc space-y-1 pl-4 text-content-muted text-xs">
               {confirmation.lines.map((line) => <li key={line}>{line}</li>)}
             </ul>
             {confirmation.destructive && (
-              <p className="m-0 mb-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-rose-100 text-[0.6875rem]">
+              <p className="m-0 mb-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-2 py-1.5 text-rose-100 text-2xs">
                 This cannot be undone.
               </p>
             )}
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" autoFocus onClick={() => setConfirming(false)}
-                className="rounded-md border border-border px-3 py-2 text-content-muted text-[0.75rem] hover:text-content">
+                className="rounded-md border border-border px-3 py-2 text-content-muted text-xs hover:text-content">
                 Cancel
               </button>
               <button type="button" data-testid="gallery-confirm-delete"
                 disabled={busy} onClick={runDelete}
-                className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-[0.75rem] text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
+                className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-xs text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
                 {busy ? 'Deleting…' : `Delete ${selected.size}`}
               </button>
             </div>
@@ -648,7 +648,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
           <button type="button" data-testid="gallery-pin-image"
             onClick={() => { onPin(zoom); setZoom(null); }}
             title="Put this image on the board, beside the checkpoint that made it"
-            className="rounded-md border border-indigo-400/60 bg-indigo-500/20 px-3 py-1.5 text-[0.75rem] font-semibold text-indigo-100 hover:bg-indigo-500/30">
+            className="rounded-md border border-indigo-400/60 bg-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/30">
             Pin to canvas
           </button>
         ) : null} />

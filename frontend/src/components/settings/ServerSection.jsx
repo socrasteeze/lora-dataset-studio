@@ -320,7 +320,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
                     {reachUrls.map((u) => (
                       <div key={u.key} className="flex items-center gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] uppercase tracking-wide text-content-subtle">{u.label}</p>
+                          <p className="text-2xs uppercase tracking-wide text-content-subtle">{u.label}</p>
                           <code className="block truncate text-xs text-content">{u.url}</code>
                         </div>
                         <button type="button" onClick={() => copyUrl(u.key, u.url)}

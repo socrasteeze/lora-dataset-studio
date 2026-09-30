@@ -136,18 +136,18 @@ export default function LoraPicker({ preselectDataset, preselectFamily = null, o
   return (
     <div data-probe-panel="picker" className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-content-muted text-[0.6875rem] uppercase">LoRA to test</span>
+        <span className="text-content-muted text-2xs uppercase">LoRA to test</span>
         {/*
          * This badge used to say Comparison for two or more LoRAs, which became inaccurate once
          * Blend was a separate mode selected below in LoraStackPanel. State only the FACT of
          * multiple selections, not what will be done with them.
          */}
         {count >= 2 && (
-          <span className="px-2 py-0.5 rounded-full text-[0.625rem] font-semibold border border-border-strong bg-surface-raised text-content">
+          <span className="px-2 py-0.5 rounded-full text-2xs font-semibold border border-border-strong bg-surface-raised text-content">
             Multi-LoRA ({count})
           </span>
         )}
-        <span className="ml-auto text-content-subtle text-[0.6875rem]">{count} checked</span>
+        <span className="ml-auto text-content-subtle text-2xs">{count} checked</span>
       </div>
 
       {loading ? (
@@ -175,14 +175,14 @@ export default function LoraPicker({ preselectDataset, preselectFamily = null, o
                   disabled={locked}
                   title={locked ? 'One run = one family only (deselect all to switch family)' : undefined}
                   className={`flex items-center gap-2 text-left ${locked ? 'cursor-not-allowed' : ''}`}>
-                  <span aria-hidden className={`inline-flex w-4 h-4 shrink-0 items-center justify-center rounded border text-[0.625rem] ${on ? 'border-primary bg-primary/30 text-white' : 'border-border text-transparent'}`}>
+                  <span aria-hidden className={`inline-flex w-4 h-4 shrink-0 items-center justify-center rounded border text-2xs ${on ? 'border-primary bg-primary/30 text-white' : 'border-border text-transparent'}`}>
                     ✓
                   </span>
                   <span className="text-content font-medium text-sm truncate" title={l.lora_label}>
                     {l.lora_label}
                   </span>
                   {l.trigger_word && (
-                    <code className="px-1.5 py-0.5 rounded border border-indigo-400/40 bg-indigo-500/10 text-indigo-300 text-[0.625rem] font-semibold">
+                    <code className="px-1.5 py-0.5 rounded border border-indigo-400/40 bg-indigo-500/10 text-indigo-300 text-2xs font-semibold">
                       {l.trigger_word}
                     </code>
                   )}
@@ -191,15 +191,15 @@ export default function LoraPicker({ preselectDataset, preselectFamily = null, o
                    * pipeline, so unbadged rows would be ambiguous. Give each family a distinct
                    * color.
                    */}
-                  <span className={`px-1.5 py-0.5 rounded border text-[0.5625rem] font-semibold uppercase ${familyBadgeClass(lType)}`}>
+                  <span className={`px-1.5 py-0.5 rounded border text-2xs font-semibold uppercase ${familyBadgeClass(lType)}`}>
                     {familyLabel(lType)}
                   </span>
-                  <span className="ml-auto text-content-subtle text-[0.625rem] truncate max-w-[120px]" title={l.dataset_name}>
+                  <span className="ml-auto text-content-subtle text-2xs truncate max-w-[120px]" title={l.dataset_name}>
                     {l.dataset_name}
                   </span>
                 </button>
                 {on && l.checkpoints?.length > 1 && (
-                  <label className="flex items-center gap-2 text-content-muted text-[0.6875rem] pl-6">
+                  <label className="flex items-center gap-2 text-content-muted text-2xs pl-6">
                     <span className="whitespace-nowrap">Checkpoint:</span>
                     <select value={picked[k] || ''}
                       onChange={(e) => setCheckpoint(k, e.target.value)}

@@ -15,7 +15,7 @@ export default function FaceRankingPanel({ ranking = [], onScore, scoring, hasCe
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface px-3 py-2.5">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-content font-semibold text-sm">🎯 Best epoch (face score)</span>
-        <span className="text-content-subtle text-[0.625rem]">
+        <span className="text-content-subtle text-2xs">
           fixed-seed cells scored vs the dataset reference (InsightFace, CPU)
         </span>
         <button type="button" onClick={onScore} disabled={scoring || !hasCells}
@@ -30,7 +30,7 @@ export default function FaceRankingPanel({ ranking = [], onScore, scoring, hasCe
         <ol className="flex flex-col gap-1">
           {ranking.map((r, i) => (
             <li key={r.checkpoint}
-              className={`flex items-center gap-2 rounded-md px-2 py-1 text-[0.75rem] ${i === 0
+              className={`flex items-center gap-2 rounded-md px-2 py-1 text-xs ${i === 0
                 ? 'border border-amber-400/40 bg-amber-400/10'
                 : 'bg-app/40'}`}>
               <span aria-hidden="true" className="shrink-0 w-5 text-center">
@@ -40,12 +40,12 @@ export default function FaceRankingPanel({ ranking = [], onScore, scoring, hasCe
               <span className={`ml-auto shrink-0 tabular-nums font-semibold ${scoreCls(r.avg)}`}>
                 {r.avg.toFixed(3)}
               </span>
-              <span className="shrink-0 text-content-subtle text-[0.625rem]">({r.n} img)</span>
+              <span className="shrink-0 text-content-subtle text-2xs">({r.n} img)</span>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="m-0 text-content-subtle text-[0.6875rem]">
+        <p className="m-0 text-content-subtle text-2xs">
           No scores yet — run a test with several checkpoints (same seed), then hit “🎯 Score faces”
           to rank the epochs objectively.
         </p>

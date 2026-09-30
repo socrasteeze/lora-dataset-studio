@@ -13,7 +13,7 @@ export default function LoraRankingPanel({ ranking }) {
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-2">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-        className="flex items-center gap-2 text-left text-content-muted text-[0.625rem] uppercase">
+        className="flex items-center gap-2 text-left text-content-muted text-2xs uppercase">
         <span aria-hidden>{open ? '▾' : '▸'}</span>
         🏆 LoRA Ranking ({ranking.length})
       </button>
@@ -23,7 +23,7 @@ export default function LoraRankingPanel({ ranking }) {
             const net = r.net ?? ((r.likes || 0) - (r.dislikes || 0));
             return (
               <li key={r.dataset_id}
-                className="flex items-center gap-2 flex-wrap text-[0.6875rem] rounded px-1.5 py-1 bg-app/30">
+                className="flex items-center gap-2 flex-wrap text-2xs rounded px-1.5 py-1 bg-app/30">
                 <span className="text-content-subtle tabular-nums w-5 text-right" aria-label={`Rank ${i + 1}`}>#{i + 1}</span>
                 <span className="text-content font-medium truncate max-w-[160px]" title={`${r.lora_label} — ${r.dataset_name || ''}`}>
                   {r.lora_label}
@@ -56,10 +56,10 @@ function HowVotingWorks() {
   return (
     <details className="mt-1 rounded border border-border bg-app"
       open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary className="cursor-pointer select-none px-2 py-1 text-[0.625rem] text-content-subtle hover:text-content">
+      <summary className="cursor-pointer select-none px-2 py-1 text-2xs text-content-subtle hover:text-content">
         How does the ranking work?
       </summary>
-      <div className="flex flex-col gap-1.5 px-2 pb-2 text-[0.6875rem] leading-relaxed text-content-muted">
+      <div className="flex flex-col gap-1.5 px-2 pb-2 text-2xs leading-relaxed text-content-muted">
         <p className="m-0">
           You rate each generated image 👍 or 👎. Ratings are grouped per
           <strong> configuration</strong> — the LoRA and its strength, plus the base model,

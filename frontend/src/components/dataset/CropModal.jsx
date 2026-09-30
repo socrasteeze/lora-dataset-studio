@@ -179,7 +179,7 @@ export default function CropModal({ imageUrl, onCancel, onConfirm, onReset,
                   onPointerDown={(e) => startDrag(e, name)}
                   className={`absolute w-11 h-11 touch-none after:pointer-events-none after:absolute after:left-1/2 after:top-1/2 after:h-3.5 after:w-3.5 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border-2 after:border-white/90 after:bg-indigo-400 ${HANDLE_POS[name]}`} />
               ))}
-              <span className="absolute -top-6 left-0 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] tabular-nums pointer-events-none">
+              <span className="absolute -top-6 left-0 px-1.5 py-0.5 rounded bg-black/70 text-white text-2xs tabular-nums pointer-events-none">
                 {Math.round(box.w)}×{Math.round(box.h)}
               </span>
             </div>

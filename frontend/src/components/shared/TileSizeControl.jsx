@@ -13,7 +13,7 @@ export default function TileSizeControl({ size, onChange, titles, className = ''
         <button key={s} type="button" onClick={() => onChange(s)}
           aria-pressed={size === s} title={titles[s]}
           aria-label={`${titles[s]}${size === s ? ' (active)' : ''}`}
-          className={`w-6 h-6 rounded-md border text-[0.6875rem] font-semibold transition-colors ${
+          className={`w-6 h-6 rounded-md border text-2xs font-semibold transition-colors ${
             size === s
               ? 'border-indigo-400/60 bg-indigo-500/20 text-indigo-200'
               : 'border-border bg-surface text-content-muted hover:bg-surface-raised'}`}>

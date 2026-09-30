@@ -80,7 +80,7 @@ export default function GlobalStopPanel() {
           {summary.flags && <p className="text-xs">{summary.flags}</p>}
           <ul className="space-y-1">
             {summary.targets.map((t) => (
-              <li key={t.name} className="text-[0.6875rem]">
+              <li key={t.name} className="text-2xs">
                 <span className="font-medium">{t.name}</span> — {STATE_LABEL[t.state] || t.state}
                 {t.detail ? `: ${t.detail}` : ''}
               </li>

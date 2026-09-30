@@ -22,16 +22,16 @@ export default function SelectionTagsPanel({ tagRow, tagPicked, onToggle, onClea
             : tagRow.size === 1 ? '🏷️ Tags of the selected image'
               : `🏷️ Tags across ${tagRow.size} selected images`}
         </GroupLabel>
-        <span className="text-[11px] text-content-subtle">
+        <span className="text-2xs text-content-subtle">
           attributes you pick — unlike 🎯 Similar, which matches the look
         </span>
         {tagRow.frozen && (
-          <span className="rounded border border-border px-1.5 text-[11px] text-content-subtle">
+          <span className="rounded border border-border px-1.5 text-2xs text-content-subtle">
             held from the selection you filtered on
           </span>
         )}
         <button type="button" onClick={onClear}
-          className="ml-auto rounded border border-border px-2 py-0.5 text-[11px] text-content-muted hover:text-content">
+          className="ml-auto rounded border border-border px-2 py-0.5 text-2xs text-content-muted hover:text-content">
           ✕ Close
         </button>
       </div>
@@ -55,17 +55,17 @@ export default function SelectionTagsPanel({ tagRow, tagPicked, onToggle, onClea
                   : `Show only images whose caption mentions “${tag}”`
                     + (n ? ` — cited by ${count} of the ${tagRow.counted} captioned images you selected` : '')}>
                 {tag}
-                {n && <span className="ml-1 text-[10px] text-content-subtle">{n}</span>}
+                {n && <span className="ml-1 text-2xs text-content-subtle">{n}</span>}
               </Chip>
             )
           })}
         </div>
       )}
       {selectionTagsNotes(tagRow, tagRow.unread).map((note) => (
-        <p key={note} className="m-0 text-[11px] leading-snug text-content-subtle">{note}</p>
+        <p key={note} className="m-0 text-2xs leading-snug text-content-subtle">{note}</p>
       ))}
       {tagPicked.size > 0 && (
-        <p className="m-0 text-[11px] text-content-muted">
+        <p className="m-0 text-2xs text-content-muted">
           {tagFilterSummary(tagPicked)} Matched as whole words, in captions and file names.
         </p>
       )}

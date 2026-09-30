@@ -66,7 +66,7 @@ export default function TrainingMachinePicker({ value, onChange, onConfigured,
   const current = reconcileMachine(value, machines);
 
   return (
-    <label className={`inline-flex items-center gap-2 text-[0.75rem] ${className}`}>
+    <label className={`inline-flex items-center gap-2 text-xs ${className}`}>
       <span className="text-content-muted whitespace-nowrap">Train on</span>
       <select
         value={current}
@@ -76,7 +76,7 @@ export default function TrainingMachinePicker({ value, onChange, onConfigured,
         title={'A run sent to another machine starts fresh there — this app does not '
           + 'send previous checkpoints. Its log, samples and checkpoints are mirrored '
           + 'back here as it goes.'}
-        className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-[0.75rem] max-w-[14rem] disabled:opacity-50">
+        className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs max-w-[14rem] disabled:opacity-50">
         <option value={LOCAL_MACHINE}>This machine</option>
         {offered.map((m) => {
           const opt = machineOption(m);

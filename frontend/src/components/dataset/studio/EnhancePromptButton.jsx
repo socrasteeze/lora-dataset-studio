@@ -165,7 +165,7 @@ export default function EnhancePromptButton({ prompt, onResult, className = '' }
     <>
       <button type="button" onClick={run} disabled={!!blocked || empty || busy} title={title}
         aria-label="Enhance the prompt with the local model"
-        className={`px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-[0.625rem] hover:text-content disabled:opacity-40 disabled:cursor-not-allowed ${className}`}>
+        className={`px-2 py-0.5 rounded border border-border bg-surface text-content-subtle text-2xs hover:text-content disabled:opacity-40 disabled:cursor-not-allowed ${className}`}>
         {busy ? '✨ …' : '✨ Enhance'}
       </button>
       {/* The ⚙️ stays clickable even while Enhance is blocked: seeing and changing
@@ -173,7 +173,7 @@ export default function EnhancePromptButton({ prompt, onResult, className = '' }
       <button type="button" onClick={() => setOptionsOpen(true)}
         aria-haspopup="dialog" aria-label="Enhance options — pick the model"
         title={model ? `Enhance model: ${model}` : 'Enhance options — pick the model (default: the captioning model)'}
-        className={`px-1.5 py-0.5 rounded border border-border bg-surface text-[0.625rem] hover:text-content ${model ? 'text-content' : 'text-content-subtle'}`}>
+        className={`px-1.5 py-0.5 rounded border border-border bg-surface text-2xs hover:text-content ${model ? 'text-content' : 'text-content-subtle'}`}>
         <span aria-hidden>⚙️</span>
       </button>
       {optionsOpen && (

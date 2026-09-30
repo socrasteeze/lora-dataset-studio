@@ -260,11 +260,11 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               <>
                 <span className="text-red-300 text-xs font-semibold">⚠ failed</span>
                 {img.fail_reason && (
-                  <span className="text-content-subtle text-[0.5625rem] leading-tight line-clamp-4 break-words">
+                  <span className="text-content-subtle text-2xs leading-tight line-clamp-4 break-words">
                     {img.fail_reason}
                   </span>
                 )}
-                <span className="text-content-subtle text-[0.5625rem]">🔄 to retry</span>
+                <span className="text-content-subtle text-2xs">🔄 to retry</span>
               </>
             ) : (
               <span className="text-content-subtle text-xs">…</span>
@@ -322,7 +322,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               disabled={curationRefused || faceScoringBusy || !!faceScoringBlocked || scoreFaceBusy}
               aria-busy={scoreFaceBusy}
               title={scoreFaceTitle} aria-label={scoreFaceTitle}
-              className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-[10px] text-white disabled:cursor-not-allowed disabled:opacity-45">
+              className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-2xs text-white disabled:cursor-not-allowed disabled:opacity-45">
               <span aria-hidden="true" className={scoreFaceBusy ? 'animate-pulse' : ''}>{scoreFaceBusy
                 ? '…' : <Drama aria-hidden="true" className="h-3.5 w-3.5" />}</span>
             </button>
@@ -333,7 +333,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               disabled={generateRefused}
               title={generateRefusedReason || 'Regenerate this variation (new seed)'}
               aria-label={generateRefusedReason || 'Regenerate this variation (new seed)'}
-              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] disabled:cursor-not-allowed disabled:opacity-45">🔄</button>
+              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-2xs disabled:cursor-not-allowed disabled:opacity-45">🔄</button>
           )}
           {canRegenerate && (
             <button type="button"
@@ -341,7 +341,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               disabled={generateRefused}
               title={generateRefusedReason || 'Edit the prompt, then regenerate this variation'}
               aria-label={generateRefusedReason || 'Edit the prompt, then regenerate this variation'}
-              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] disabled:cursor-not-allowed disabled:opacity-45">✏️</button>
+              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-2xs disabled:cursor-not-allowed disabled:opacity-45">✏️</button>
           )}
           {rerunImprove && (
             <button type="button"
@@ -349,7 +349,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               disabled={improveRefused || !rerunImprove.enabled}
               title={improveRefusedReason || rerunImprove.title}
               aria-label={improveRefusedReason || rerunImprove.title}
-              className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-[10px] text-white disabled:cursor-not-allowed disabled:opacity-45">
+              className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-2xs text-white disabled:cursor-not-allowed disabled:opacity-45">
               <span aria-hidden="true">↻</span>
             </button>
           )}
@@ -363,7 +363,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
                 : `Mirror ${displayLabel(img.variation_label) || 'this image'} horizontally`)}
               title={pixelEditReason
                 || (mirrorBusy ? 'Mirroring horizontally…' : 'Mirror horizontally (flip left and right)')}
-              className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-[10px] text-white disabled:cursor-not-allowed disabled:opacity-45">
+              className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-2xs text-white disabled:cursor-not-allowed disabled:opacity-45">
               <span aria-hidden="true">{mirrorBusy ? '…' : '⇆'}</span>
             </button>
           )}
@@ -371,7 +371,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
             <button type="button" onClick={(e) => { e.stopPropagation(); onCrop(img); }}
               disabled={pixelEditRefused}
               title={pixelEditReason || 'Crop'} aria-label={pixelEditReason || 'Crop'}
-              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] disabled:cursor-not-allowed disabled:opacity-45">✂</button>
+              className="px-1.5 py-0.5 rounded bg-black/60 text-white text-2xs disabled:cursor-not-allowed disabled:opacity-45">✂</button>
           )}
           {!isRescueDerived && (
             <button type="button"
@@ -379,7 +379,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               disabled={curationRefused}
               title={curationRefusedReason || 'Delete permanently'}
               aria-label={curationRefusedReason || 'Delete permanently'}
-              className="px-1.5 py-0.5 rounded bg-red-700/80 text-white text-[10px] disabled:cursor-not-allowed disabled:opacity-45"><Trash2 aria-hidden="true" className="h-3 w-3" /></button>
+              className="px-1.5 py-0.5 rounded bg-red-700/80 text-white text-2xs disabled:cursor-not-allowed disabled:opacity-45"><Trash2 aria-hidden="true" className="h-3 w-3" /></button>
           )}
         </div>
         {editingPrompt && (
@@ -390,9 +390,9 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
         )}
       </div>
       <SourceAttribution metadata={img.source_metadata}
-        className="mx-1.5 mt-1 block text-[0.625rem] leading-tight text-content-subtle" />
+        className="mx-1.5 mt-1 block text-2xs leading-tight text-content-subtle" />
       {isRescueDerived ? (
-        <p className="m-1.5 rounded border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-center text-[0.625rem] text-indigo-200"
+        <p className="m-1.5 rounded border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-center text-2xs text-indigo-200"
           title="This winner was chosen atomically with its provenance pair. Caption and crop remain available.">
           ✓ Chosen in Klein rescue review
         </p>
@@ -402,7 +402,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
             disabled={curationRefused}
             title={curationRefusedReason || 'Keep'} aria-label={curationRefusedReason || 'Keep'}
             aria-pressed={img.status === 'keep'}
-            className={`flex-1 py-1 rounded text-[11px] disabled:cursor-not-allowed disabled:opacity-45 ${img.status === 'keep' ? 'bg-green-600 text-white' : 'bg-surface text-content-muted'}`}>✓</button>
+            className={`flex-1 py-1 rounded text-2xs disabled:cursor-not-allowed disabled:opacity-45 ${img.status === 'keep' ? 'bg-green-600 text-white' : 'bg-surface text-content-muted'}`}>✓</button>
           <button type="button"
             onClick={() => {
               // Rejecting a GENERATED image offers an immediate retry of the same
@@ -418,7 +418,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
             disabled={curationRefused}
             title={curationRefusedReason || 'Reject (offers a regeneration)'} aria-label={curationRefusedReason || 'Reject'}
             aria-pressed={img.status === 'reject'}
-            className={`flex-1 py-1 rounded text-[11px] disabled:cursor-not-allowed disabled:opacity-45 ${img.status === 'reject' ? 'bg-red-600 text-white' : 'bg-surface text-content-muted'}`}>✕</button>
+            className={`flex-1 py-1 rounded text-2xs disabled:cursor-not-allowed disabled:opacity-45 ${img.status === 'reject' ? 'bg-red-600 text-white' : 'bg-surface text-content-muted'}`}>✕</button>
         </div>
       )}
       {img.status === 'keep' && (
@@ -428,7 +428,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               disabled={curationRefused}
               title={curationRefusedReason || 'Open a larger caption editor'}
               aria-label={curationRefusedReason || 'Expand caption editor'}
-              className="rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] text-content-muted hover:text-content disabled:cursor-not-allowed disabled:opacity-45">
+              className="rounded border border-border bg-surface px-1.5 py-0.5 text-2xs text-content-muted hover:text-content disabled:cursor-not-allowed disabled:opacity-45">
               ⛶ Expand
             </button>
             {cap && (
@@ -437,7 +437,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
                 disabled={curationRefused}
                 title={curationRefusedReason || 'Delete this image’s caption (then “Caption” regenerates it via JoyCaption)'}
                 aria-label={curationRefusedReason || 'Delete this image’s caption'}
-                className="rounded border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300 hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-45">
+                className="rounded border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-2xs text-red-300 hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-45">
                 <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Caption
               </button>
             )}
@@ -455,7 +455,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
           {(cap || '').trim() && captionOriginInfo(img.caption_origin).known && (
             <span title={captionOriginInfo(img.caption_origin).title}
               aria-label={captionOriginInfo(img.caption_origin).short}
-              className={`block truncate text-[10px] leading-none ${
+              className={`block truncate text-2xs leading-none ${
                 captionIsAsserted(img.caption_origin)
                   ? 'text-emerald-300' : 'text-content-subtle'}`}>
               {captionOriginInfo(img.caption_origin).chip}
@@ -474,7 +474,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               : datasetKind === 'concept'
                 ? 'caption without naming the concept…'
                 : 'caption (without the face)…'} aria-label="Image caption"
-            className="text-[11px] bg-app/60 border border-border rounded p-1 text-content resize-none" />
+            className="text-2xs bg-app/60 border border-border rounded p-1 text-content resize-none" />
         </div>
       )}
       {captionEditorOpen && (

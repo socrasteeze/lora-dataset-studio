@@ -112,7 +112,7 @@ export default function GuidePage({ helpOnly = false }) {
         {!chip && isActive && (
           <span aria-hidden className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded bg-gradient-primary" />
         )}
-        <span className={`font-mono text-[11px] ${isActive ? 'text-content' : 'text-content-subtle'}`}>{c.num}</span>
+        <span className={`font-mono text-2xs ${isActive ? 'text-content' : 'text-content-subtle'}`}>{c.num}</span>
         <span className="font-medium">{c.title}</span>
       </button>
     )
@@ -135,7 +135,7 @@ export default function GuidePage({ helpOnly = false }) {
         </nav>
         {/* Desktop: sticky numbered chapter rail */}
         <nav aria-label="Guide chapters" className="hidden lg:block lg:sticky lg:top-[calc(var(--app-header-h)+1rem)] lg:max-h-[calc(100vh-var(--app-header-h)-2rem)] lg:overflow-y-auto">
-          <p className="px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-content-subtle">Field manual</p>
+          <p className="px-3 pb-2 font-mono text-2xs uppercase tracking-[0.18em] text-content-subtle">Field manual</p>
           <div className="flex flex-col gap-0.5">
             {chapters.map((c) => navItem(c, false))}
           </div>
@@ -146,7 +146,7 @@ export default function GuidePage({ helpOnly = false }) {
         <header className="relative mb-4 overflow-hidden rounded-2xl border border-border bg-surface px-5 py-5 sm:px-6 sm:py-6">
           <div aria-hidden className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="relative">
-            <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-content-subtle">
+            <div className="mb-3 flex flex-wrap items-center gap-2 font-mono text-2xs uppercase tracking-[0.14em] text-content-subtle">
               <span className="rounded-md border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-indigo-300">
                 {helpOnly ? 'Support' : `Chapter ${chapter.num}`}
               </span>
@@ -160,7 +160,7 @@ export default function GuidePage({ helpOnly = false }) {
 
         {headings.length > 0 && (
           <nav aria-label="On this page" className="mb-4 rounded-xl border border-border bg-surface p-3 xl:hidden">
-            <p className="m-0 mb-2 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-content-subtle">On this page</p>
+            <p className="m-0 mb-2 font-mono text-2xs uppercase tracking-[0.16em] text-content-subtle">On this page</p>
             <div className="flex gap-2 overflow-x-auto pb-0.5">
               {headings.map((item) => (
                 <button key={item.id} type="button" onClick={() => jumpToHeading(item.id)}
@@ -182,12 +182,12 @@ export default function GuidePage({ helpOnly = false }) {
           {prev ? (
             <Link to={`/guide/${prev.id}`} className="group flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 no-underline hover:bg-surface-raised">
               <span aria-hidden className="text-content-subtle">←</span>
-              <span className="min-w-0"><span className="block font-mono text-[0.625rem] uppercase tracking-wider text-content-subtle">Previous</span><span className="block truncate text-sm font-medium text-content-muted group-hover:text-content">{prev.title}</span></span>
+              <span className="min-w-0"><span className="block font-mono text-2xs uppercase tracking-wider text-content-subtle">Previous</span><span className="block truncate text-sm font-medium text-content-muted group-hover:text-content">{prev.title}</span></span>
             </Link>
           ) : <span />}
           {next ? (
             <Link to={`/guide/${next.id}`} className="group flex min-w-0 items-center justify-end gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-right no-underline hover:bg-surface-raised">
-              <span className="min-w-0"><span className="block font-mono text-[0.625rem] uppercase tracking-wider text-content-subtle">Next</span><span className="block truncate text-sm font-medium text-content-muted group-hover:text-content">{next.title}</span></span>
+              <span className="min-w-0"><span className="block font-mono text-2xs uppercase tracking-wider text-content-subtle">Next</span><span className="block truncate text-sm font-medium text-content-muted group-hover:text-content">{next.title}</span></span>
               <span aria-hidden className="text-content-subtle">→</span>
             </Link>
           ) : <span />}
@@ -196,7 +196,7 @@ export default function GuidePage({ helpOnly = false }) {
 
       <aside className="hidden xl:block xl:self-stretch">
         <nav aria-label="On this page" className="sticky top-[calc(var(--app-header-h)+1rem)] max-h-[calc(100vh-var(--app-header-h)-2rem)] overflow-y-auto border-l border-border pl-4">
-          <p className="m-0 mb-2 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-content-subtle">On this page</p>
+          <p className="m-0 mb-2 font-mono text-2xs uppercase tracking-[0.16em] text-content-subtle">On this page</p>
           <div className="flex flex-col gap-0.5">
             {headings.map((item) => (
               <button key={item.id} type="button" onClick={() => jumpToHeading(item.id)}

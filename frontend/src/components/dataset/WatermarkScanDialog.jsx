@@ -86,17 +86,17 @@ export default function WatermarkScanDialog({
         className="w-full max-w-3xl space-y-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-xl"
         style={{ maxHeight: 'min(38rem, calc(100vh - 2rem))' }}>
         <h2 className="m-0 text-base font-bold text-content">🚩 Find watermarks</h2>
-        <p className="m-0 text-[11px] leading-snug text-content-subtle">
+        <p className="m-0 text-2xs leading-snug text-content-subtle">
           Looks for overlaid watermarks and logos on the kept images and records WHERE
           each one sits, so 🧽 Clean can crop or repaint it. Deletes nothing.
         </p>
-        <p className="m-0 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-[11px] leading-snug text-content-muted">
+        <p className="m-0 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-2xs leading-snug text-content-muted">
           This run reads the <span className="font-semibold text-content">kept</span> images
           — <span className="font-semibold text-content">{kept}</span> of them, and every run
           re-judges them all (a re-run picks up threshold changes). Images you dismissed as
           “not watermarked” keep their ruling unless the line below is ticked.
         </p>
-        <label className="flex items-start gap-2 text-[11px] text-content-subtle">
+        <label className="flex items-start gap-2 text-2xs text-content-subtle">
           <input type="checkbox" className="mt-0.5" checked={includeDismissed}
             onChange={(e) => setIncludeDismissed(e.target.checked)} disabled={live || busy} />
           <span>
@@ -106,10 +106,10 @@ export default function WatermarkScanDialog({
           </span>
         </label>
         <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-          <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+          <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
             Options for this run
           </p>
-          <label className="flex items-start gap-2 text-[11px] text-content-subtle">
+          <label className="flex items-start gap-2 text-2xs text-content-subtle">
             <input type="checkbox" className="mt-0.5" checked={sampleOn}
               onChange={(e) => setSampleOn(e.target.checked)} disabled={live || busy} />
             <span>
@@ -126,7 +126,7 @@ export default function WatermarkScanDialog({
           <WatermarkEngineChoice caps={caps} disabled={busy || live}
             onChanged={(engine) => setEngine(engine)} />
           {watermarkEngineStatus(engine, caps).runs === 'detector' ? (
-            <label className="block text-[11px] text-content-subtle">
+            <label className="block text-2xs text-content-subtle">
               <span className="font-medium text-content">Detector threshold</span>
               {' — the score an image needs to be flagged as watermarked. Lower '}
               {'flags fainter marks at the cost of false flags; higher keeps only '}
@@ -144,7 +144,7 @@ export default function WatermarkScanDialog({
               </span>
             </label>
           ) : (
-            <p className="m-0 text-[11px] leading-snug text-content-subtle">
+            <p className="m-0 text-2xs leading-snug text-content-subtle">
               The vision route answers yes/no with no score — so there is no
               threshold to tune here.
             </p>
@@ -161,7 +161,7 @@ export default function WatermarkScanDialog({
             <span className="block whitespace-pre-wrap break-words text-xs leading-relaxed text-red-200">
               {error}
             </span>
-            <span className="mt-1 block text-[0.625rem] text-content-subtle">
+            <span className="mt-1 block text-2xs text-content-subtle">
               Your choices are kept — adjust and try again.
             </span>
           </div>

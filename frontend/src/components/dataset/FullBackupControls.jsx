@@ -181,7 +181,7 @@ export default function FullBackupControls({ backup, onRestore }) {
                 title="Archive every dataset, its training history + your settings (API keys excluded) into one file"
                 className={MENU_ITEM}>
                 <span className="whitespace-nowrap inline-flex items-center gap-1.5"><Save aria-hidden="true" className="h-4 w-4" /> Back up everything</span>
-                <span className="ml-auto shrink-0 text-content-subtle text-[0.625rem]">
+                <span className="ml-auto shrink-0 text-content-subtle text-2xs">
                   {running ? 'running…' : 'datasets · settings'}
                 </span>
               </button>
@@ -201,7 +201,7 @@ export default function FullBackupControls({ backup, onRestore }) {
               title="Import a portable dataset backup — a new dataset will be created"
               className={MENU_ITEM}>
               <span className="whitespace-nowrap inline-flex items-center gap-1.5"><Package aria-hidden="true" className="h-4 w-4" /> Import backup</span>
-              <span className="ml-auto shrink-0 text-content-subtle text-[0.625rem]">.zip archive</span>
+              <span className="ml-auto shrink-0 text-content-subtle text-2xs">.zip archive</span>
             </button>
           )}
         </div>

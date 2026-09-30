@@ -59,7 +59,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
             <h2 id="dataset-to-bank-title" className="m-0 text-base font-bold text-content">
               🗃️ Import kept images into a new bank
             </h2>
-            <p id="dataset-to-bank-copy-note" className="m-0 mt-1 text-[0.75rem] leading-relaxed text-content-muted">
+            <p id="dataset-to-bank-copy-note" className="m-0 mt-1 text-xs leading-relaxed text-content-muted">
               {keptCount} kept image{keptCount === 1 ? '' : 's'} will be copied. This dataset stays unchanged.
             </p>
           </div>
@@ -78,7 +78,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-sm font-medium text-content">Analysis for the copied bank</legend>
-          <p className="m-0 text-[0.75rem] leading-relaxed text-content-muted">
+          <p className="m-0 text-xs leading-relaxed text-content-muted">
             Both choices keep Dataset-owned metadata: captions, curation, framing, watermark and provenance.
           </p>
           <label className={`cursor-pointer rounded-lg border p-3 transition-colors ${preserveAnalysis
@@ -90,7 +90,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
                 className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-500" />
               <span>
                 <span className="block text-sm font-semibold text-content">Reuse compatible final-file analysis</span>
-                <span className="mt-0.5 block text-[0.75rem] leading-relaxed text-content-muted">
+                <span className="mt-0.5 block text-xs leading-relaxed text-content-muted">
                   Restore compatible final-file technical analysis. Face and Score AI results are not reused after a transformed copy.
                 </span>
               </span>
@@ -105,7 +105,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
                 className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500" />
               <span>
                 <span className="block text-sm font-semibold text-content">Start fresh analysis</span>
-                <span className="mt-0.5 block text-[0.75rem] leading-relaxed text-content-muted">
+                <span className="mt-0.5 block text-xs leading-relaxed text-content-muted">
                   Keep the same Dataset metadata, but skip reuse of prior analysis. Run bank passes when you want fresh analysis.
                 </span>
               </span>
@@ -116,7 +116,7 @@ export default function DatasetToBankDialog({ datasetName, keptCount, onClose, o
         {error && (
           <div role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
             {error}
-            <span className="mt-1 block text-[0.6875rem] text-content-subtle">
+            <span className="mt-1 block text-2xs text-content-subtle">
               Your name and choice are kept — adjust them and try again.
             </span>
           </div>

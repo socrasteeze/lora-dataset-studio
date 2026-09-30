@@ -27,7 +27,7 @@ export default function LoraStackPanel({ selection, mode, onMode, weights, onWei
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-content-muted text-[0.6875rem] uppercase">
+        <span className="text-content-muted text-2xs uppercase">
           How to use the {selection.length} LoRAs
         </span>
         <HelpBadge topic="studio-combine-loras" />
@@ -40,7 +40,7 @@ export default function LoraStackPanel({ selection, mode, onMode, weights, onWei
           {[['compare', '⚖ Compare'], ['combine', '🧬 Blend']].map(([value, label]) => (
             <button key={value} type="button" onClick={() => onMode(value)}
               aria-pressed={mode === value}
-              className={`px-2.5 py-1 rounded text-[0.6875rem] font-semibold ${
+              className={`px-2.5 py-1 rounded text-2xs font-semibold ${
                 mode === value ? 'bg-primary/30 text-content' : 'text-content-subtle hover:text-content'
               }`}>
               {label}
@@ -49,7 +49,7 @@ export default function LoraStackPanel({ selection, mode, onMode, weights, onWei
         </div>
       </div>
 
-      <p className="m-0 text-content-subtle text-[0.6875rem]">
+      <p className="m-0 text-content-subtle text-2xs">
         {combine
           ? 'All checked LoRAs load together in the same image, each at its own weight. '
             + (injectTrigger
@@ -61,7 +61,7 @@ export default function LoraStackPanel({ selection, mode, onMode, weights, onWei
       </p>
 
       {combine && blocker && (
-        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-200 text-[0.6875rem]"
+        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-200 text-2xs"
           role="status">
           {blocker}
         </p>
@@ -80,7 +80,7 @@ export default function LoraStackPanel({ selection, mode, onMode, weights, onWei
                 set={stackWeightSet(sets, s)}
                 onToggleChip={(w) => onToggleChip?.(stackKey(s), w)}
                 trigger={s.trigger_word ? (
-                  <code className="shrink-0 rounded border border-indigo-400/40 bg-indigo-500/10 px-1.5 py-0.5 text-[0.625rem] font-semibold text-indigo-300">
+                  <code className="shrink-0 rounded border border-indigo-400/40 bg-indigo-500/10 px-1.5 py-0.5 text-2xs font-semibold text-indigo-300">
                     {s.trigger_word}
                   </code>
                 ) : null}

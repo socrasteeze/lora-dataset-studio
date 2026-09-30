@@ -341,7 +341,7 @@ export default function StorageSection({
                   <p className="text-sm font-medium text-content">
                     {row.label}
                     {row.relocatable && (
-                      <span className="ml-2 rounded border border-border px-1 text-[0.625rem] uppercase tracking-wide text-content-subtle">
+                      <span className="ml-2 rounded border border-border px-1 text-2xs uppercase tracking-wide text-content-subtle">
                         movable
                       </span>
                     )}
@@ -353,7 +353,7 @@ export default function StorageSection({
                 </p>
                 <p className="mt-0.5 text-xs text-content-muted">{row.holds}</p>
                 {row.volumeLabel && (
-                  <p className="mt-0.5 text-[0.6875rem] text-content-subtle">{row.volumeLabel}</p>
+                  <p className="mt-0.5 text-2xs text-content-subtle">{row.volumeLabel}</p>
                 )}
               </li>
             ))}

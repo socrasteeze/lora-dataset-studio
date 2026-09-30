@@ -184,7 +184,7 @@ export default function BankBulkDialog({ banks, onClose, onResults }) {
                     onChange={(e) => setDraft(bank, e.target.value)} aria-label={`Name for ${bank.name}`}
                     className="mt-1 min-h-10 w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-content" />
                 </label>
-                <p className="mt-1 break-all font-mono text-[0.6875rem] text-content-subtle">{bank.source_path}</p>
+                <p className="mt-1 break-all font-mono text-2xs text-content-subtle">{bank.source_path}</p>
               </div>
             ))}
           </div>

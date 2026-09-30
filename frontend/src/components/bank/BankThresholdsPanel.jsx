@@ -74,7 +74,7 @@ function Group({ group, open, onToggle, customised, children }) {
         <span aria-hidden className="text-sm">{group.emoji}</span>
         <span className="text-sm font-medium text-content">{group.label}</span>
         {customised > 0 && (
-          <span className="rounded-full border border-indigo-400/50 bg-indigo-500/10 px-1.5 text-[10px] font-semibold text-indigo-200">
+          <span className="rounded-full border border-indigo-400/50 bg-indigo-500/10 px-1.5 text-2xs font-semibold text-indigo-200">
             {customised} customised
           </span>
         )}
@@ -140,11 +140,11 @@ function RerunButton({ rerun, field, activity, offline, phase, outcome, onRun })
           title={why || rerun.note}>
           {label}
         </button>
-        <span className="text-[11px] text-content-subtle">{rerun.note}</span>
+        <span className="text-2xs text-content-subtle">{rerun.note}</span>
       </div>
-      {why && <p id={reasonId} className="text-[11px] text-amber-300"><span aria-hidden>⏳ </span>{why}</p>}
+      {why && <p id={reasonId} className="text-2xs text-amber-300"><span aria-hidden>⏳ </span>{why}</p>}
       {outcome && (
-        <p id={outcomeId} role="status" className={`text-[11px] font-medium ${tone}`}>
+        <p id={outcomeId} role="status" className={`text-2xs font-medium ${tone}`}>
           {outcome.text}
         </p>
       )}

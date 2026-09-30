@@ -42,7 +42,7 @@ export function ZoomResetPill({ scale = 1, onReset }) {
       title="Back to the whole picture (or double-tap it)"
       aria-label="Reset the zoom"
       className="absolute right-2 top-2 z-10 flex min-h-10 items-center rounded-full bg-white/10
-                 px-3 text-[0.75rem] font-semibold leading-none text-white hover:bg-white/20 lg:min-h-0 lg:h-9"
+                 px-3 text-xs font-semibold leading-none text-white hover:bg-white/20 lg:min-h-0 lg:h-9"
     >
       <span aria-hidden className="mr-1">⤾</span>{Math.round(scale * 100)}%
     </button>

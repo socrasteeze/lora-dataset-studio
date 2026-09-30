@@ -216,7 +216,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
       <StudioSection title="Format" storageKey={k('sec_format')} anchorId="st-format">
         {aspectPicker && (
           <>
-            <span className="text-content-muted text-[0.625rem] uppercase">Aspect ratio</span>
+            <span className="text-content-muted text-2xs uppercase">Aspect ratio</span>
             <div className="grid grid-cols-5 gap-1.5">
               {STUDIO_ASPECTS.map((a) => (
                 <button key={a.key} type="button" onClick={() => setAspect(a.key)}
@@ -224,21 +224,21 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                   className={`flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-[10px] border transition-all duration-150 ${aspect === a.key
                     ? 'border-primary/70 bg-primary/15 text-white'
                     : 'border-white/10 bg-white/[0.04] text-content-muted'}`}>
-                  <span className="text-[0.6875rem] font-semibold">{a.key}</span>
-                  <span className="text-[0.5625rem] opacity-60">{a.label}</span>
+                  <span className="text-2xs font-semibold">{a.key}</span>
+                  <span className="text-2xs opacity-60">{a.label}</span>
                 </button>
               ))}
             </div>
           </>
         )}
-        <span className="text-content-muted text-[0.625rem] uppercase">Resolution</span>
+        <span className="text-content-muted text-2xs uppercase">Resolution</span>
         <ResolutionSelector value={resolutionTier} onChange={setResolutionTier}
           aspectRatio={aspectPicker
             ? (STUDIO_ASPECTS.find((a) => a.key === aspect)?.ratio || 'square')
             : 'square'}
           maxLongSide={family === 'sdxl' ? 1024 : undefined}
           multiplier={resolutionMultiplier} onMultiplierChange={setResolutionMultiplier} />
-        <span className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 -mt-0.5">
+        <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-0.5">
           {aspectPicker
             ? 'Output size — the ratio above sets the proportions. Standard ≈ 1 MP.'
             : 'Output size (the aspect axis sets the proportions). Standard ≈ 1 MP.'}
@@ -249,7 +249,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
       {isKrea && (
         <StudioSection title="Sampling" storageKey={k('sec_sampling')} anchorId="st-sampling">
           <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1 text-[0.6875rem] text-content-muted uppercase tracking-wide">
+            <label className="flex flex-col gap-1 text-2xs text-content-muted uppercase tracking-wide">
               Sampler
               <select
                 value={sampler}
@@ -268,7 +268,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                 </optgroup>
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-[0.6875rem] text-content-muted uppercase tracking-wide">
+            <label className="flex flex-col gap-1 text-2xs text-content-muted uppercase tracking-wide">
               Scheduler
               <select
                 value={scheduler}
@@ -288,7 +288,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
            * Settings says 1.5; otherwise use the run factor.
            */}
           <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-2">
-            <label className="flex flex-col gap-1 text-[0.6875rem] text-content-muted uppercase tracking-wide">
+            <label className="flex flex-col gap-1 text-2xs text-content-muted uppercase tracking-wide">
               Hi-res fix (second pass)
               <select
                 value={hiresScale}
@@ -303,7 +303,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                 ))}
               </select>
             </label>
-            <span className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 -mt-1">
+            <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-1">
               Samples small, upscales the latent, re-samples at the larger size — the model
               draws the detail instead of interpolating it. 1.5× ≈ 2.25× the pixels and time.
             </span>
@@ -316,7 +316,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                   storageKey={k('hires_denoise_lock')}
                   onChange={(e) => setHiresDenoise(parseFloat(e.target.value))}
                 />
-                <span className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 -mt-1">
+                <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-1">
                   0.5 = keeps the composition, rewrites the texture · near 1 = a different
                   picture at the larger size
                 </span>
@@ -336,7 +336,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
             storageKey={k('detail_lock')}
             onChange={(e) => setDetailAmount(parseFloat(e.target.value))}
           />
-          <span className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 -mt-1">
+          <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-1">
             0.21 = SDXL default · ≤0.25 safe · ↑ more detail (HDR/grain risk)
           </span>
         </StudioSection>
@@ -348,7 +348,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
           {/* Loader precision, finishing and always-on LoRAs. */}
           <div className="flex flex-col gap-2.5">
             {/* Loader precision: node 20 weight_dtype. */}
-            <label className="flex flex-col gap-1 text-[0.6875rem] text-content-muted uppercase tracking-wide mt-1">
+            <label className="flex flex-col gap-1 text-2xs text-content-muted uppercase tracking-wide mt-1">
               Precision
               <select
                 value={weightDtype}
@@ -362,7 +362,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
                 <option value="fp8_e5m2">fp8 e5m2 (wide range)</option>
               </select>
             </label>
-            <span className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 -mt-1">
+            <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-1">
               FP8 e4m3fn is the Krea-safe default. “ComfyUI default” delegates the dtype to the checkpoint and may use much more VRAM; try it only as a compatibility fallback.
             </span>
           </div>
@@ -373,7 +373,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
            * disables the pass, omits its payload key and stores NULL.
            */}
           <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-2.5">
-            <span className="text-[0.6875rem] text-content-muted uppercase tracking-wide">
+            <span className="text-2xs text-content-muted uppercase tracking-wide">
               Finishing (after render)
             </span>
             <LockableSlider
@@ -384,7 +384,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
               format={(v) => (Number(v) > 0 ? v : 'off')}
               onChange={(e) => setFinishSharpen(parseFloat(e.target.value))}
             />
-            <span className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 -mt-1">
+            <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-1">
               0 = off · {FINISH_REFERENCE.sharpen} = reference · local contrast at 1 px, the
               octave diffusion leaves empty — past ~1 the halo reads as an outline
             </span>
@@ -396,7 +396,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
               format={(v) => (Number(v) > 0 ? v : 'off')}
               onChange={(e) => setFinishGrain(parseFloat(e.target.value))}
             />
-            <span className="normal-case tracking-normal text-[0.625rem] text-content-muted/70 -mt-1">
+            <span className="normal-case tracking-normal text-2xs text-content-muted/70 -mt-1">
               0 = off · {FINISH_REFERENCE.grain} = reference (±2.5 levels: texture, never noise) ·
               what stops a render looking plastic
             </span>
@@ -426,7 +426,7 @@ export default function StudioGenerationSettings({ family = 'zimage', capabiliti
       {hasNegative && (
         <StudioSection title="Negative" storageKey={k('sec_negative')} defaultOpen={false} anchorId="st-negative">
           <label className="flex flex-col gap-1">
-            <span className="text-content-muted text-[0.625rem] uppercase">Negative prompt (optional)</span>
+            <span className="text-content-muted text-2xs uppercase">Negative prompt (optional)</span>
             <textarea
               value={negative}
               onChange={(e) => setNegative(e.target.value)}

@@ -21,7 +21,7 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
       {isStalled && (
         <div
           role="status" aria-live="polite" aria-atomic="true"
-          className="w-20 min-h-28 rounded-md border border-amber-500/50 bg-amber-500/10 flex flex-col gap-1 items-center justify-center px-1 py-1 text-center text-amber-200 text-[0.625rem]">
+          className="w-20 min-h-28 rounded-md border border-amber-500/50 bg-amber-500/10 flex flex-col gap-1 items-center justify-center px-1 py-1 text-center text-amber-200 text-2xs">
           <span aria-hidden className="text-sm">⏸</span>
           <span className="font-semibold">paused</span>
           <p className="m-0 break-words leading-tight select-text text-amber-200/80">{stalledReason}</p>
@@ -32,7 +32,7 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
         <div className="w-20 h-28 rounded-md border border-border bg-surface flex flex-col gap-2 items-center justify-center"
           role="status" aria-label={isGenerating ? 'Generating' : 'Queued'}>
           <span className="inline-block w-5 h-5 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" aria-hidden />
-          <span className="text-content-muted text-[0.625rem]">
+          <span className="text-content-muted text-2xs">
             {isGenerating ? 'generating' : 'queued'}
           </span>
         </div>
@@ -43,14 +43,14 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
       {cell.status === 'failed' && (
         <div
           title={cell.error || 'Generation failed — see the 🪵 Server log in Settings for details.'}
-          className="w-20 h-28 overflow-hidden rounded-md border border-red-500/50 bg-red-500/10 flex flex-col items-center justify-center gap-0.5 text-red-300 text-[0.625rem] cursor-help px-1 text-center">
+          className="w-20 h-28 overflow-hidden rounded-md border border-red-500/50 bg-red-500/10 flex flex-col items-center justify-center gap-0.5 text-red-300 text-2xs cursor-help px-1 text-center">
           <span aria-hidden className="text-sm">⚠</span>
           <span>failed</span>
           {cell.error && <span className="text-red-300/70 leading-tight line-clamp-3">{cell.error}</span>}
         </div>
       )}
       {cell.status === 'cancelled' && (
-        <div className="w-20 h-28 rounded-md border border-amber-500/40 bg-amber-500/10 flex flex-col items-center justify-center text-amber-300 text-[0.625rem] gap-0.5"><span aria-hidden>⏸</span> stopped</div>
+        <div className="w-20 h-28 rounded-md border border-amber-500/40 bg-amber-500/10 flex flex-col items-center justify-center text-amber-300 text-2xs gap-0.5"><span aria-hidden>⏸</span> stopped</div>
       )}
       {cell.status === 'done' && cell.filename && (
         <button type="button" onClick={() => onOpen(cell)}
@@ -73,7 +73,7 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
        */}
       {cell.face_score != null && (
         <span title={`Face similarity vs the dataset reference: ${cell.face_score.toFixed(3)}`}
-          className={`px-1 py-px rounded border text-[0.5625rem] font-semibold tabular-nums ${cell.face_score >= 0.50
+          className={`px-1 py-px rounded border text-2xs font-semibold tabular-nums ${cell.face_score >= 0.50
             ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
             : cell.face_score >= 0.45
               ? 'border-amber-400/50 bg-amber-400/10 text-amber-300'
@@ -86,7 +86,7 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
        * twin using the same configuration and seed.
        */}
       {cell.batch_lora && (
-        <span className="max-w-[5rem] truncate px-1 py-px rounded border border-amber-400/50 bg-amber-400/15 text-amber-300 text-[0.5625rem] font-semibold"
+        <span className="max-w-[5rem] truncate px-1 py-px rounded border border-amber-400/50 bg-amber-400/15 text-amber-300 text-2xs font-semibold"
           title={`Batch axis: with ${cell.batch_lora}`}>
           + {cell.batch_lora}
         </span>
@@ -98,7 +98,7 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
        * sweep tiles look identical in their badges.
        */}
       {Array.isArray(cell.combined_loras) && cell.combined_loras.length > 0 && (
-        <span className="max-w-[5rem] truncate px-1 py-px rounded border border-sky-400/50 bg-sky-400/15 text-sky-300 text-[0.5625rem] font-semibold tabular-nums"
+        <span className="max-w-[5rem] truncate px-1 py-px rounded border border-sky-400/50 bg-sky-400/15 text-sky-300 text-2xs font-semibold tabular-nums"
           title={`Blend: ${[fmt(cell.strength), ...cell.combined_loras.map((e) => `${e.label} @ ${e.weight}`)].join(' × ')}`}>
           🧬 {fmt(cell.strength)}
           {cell.combined_loras.map((e) => ` × ${e.weight}`).join('')}
@@ -111,11 +111,11 @@ export default function ResultTile({ cell, row, strength, variant, datasetId, on
           <button type="button" aria-pressed={cell.rating === 1}
             aria-label={`Like ${row.label} @ ${fmt(strength)} (${variant.aspect || '—'}) seed ${cell.seed}`}
             onClick={() => onRate(cell.id, cell.rating === 1 ? 0 : 1)}
-            className={`px-1.5 py-0.5 rounded text-[0.75rem] border ${cell.rating === 1 ? 'border-green-400/60 bg-green-500/20' : 'border-border bg-surface opacity-70'}`}>+1</button>
+            className={`px-1.5 py-0.5 rounded text-xs border ${cell.rating === 1 ? 'border-green-400/60 bg-green-500/20' : 'border-border bg-surface opacity-70'}`}>+1</button>
           <button type="button" aria-pressed={cell.rating === -1}
             aria-label={`Dislike ${row.label} @ ${fmt(strength)} (${variant.aspect || '—'}) seed ${cell.seed}`}
             onClick={() => onRate(cell.id, cell.rating === -1 ? 0 : -1)}
-            className={`px-1.5 py-0.5 rounded text-[0.75rem] border ${cell.rating === -1 ? 'border-red-400/60 bg-red-500/20' : 'border-border bg-surface opacity-70'}`}>−1</button>
+            className={`px-1.5 py-0.5 rounded text-xs border ${cell.rating === -1 ? 'border-red-400/60 bg-red-500/20' : 'border-border bg-surface opacity-70'}`}>−1</button>
         </div>
       )}
     </div>

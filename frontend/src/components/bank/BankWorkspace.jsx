@@ -1360,10 +1360,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
     : {})
   const watermarkScanControls = (
     <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-      <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+      <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
         Options for this run
       </p>
-      <label className="flex items-start gap-2 text-[11px] text-content-subtle">
+      <label className="flex items-start gap-2 text-2xs text-content-subtle">
         <input type="checkbox" className="mt-0.5" checked={wmSampleOn}
           onChange={(e) => setWmSampleOn(e.target.checked)} disabled={live} />
         <span>
@@ -1381,7 +1381,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
       <WatermarkEngineChoice caps={caps} disabled={live}
         onChanged={(engine) => setWmEngine(engine)} />
       {watermarkEngineStatus(wmEngine, caps).runs === 'detector' ? (
-        <label className="block text-[11px] text-content-subtle">
+        <label className="block text-2xs text-content-subtle">
           <span className="font-medium text-content">Detector threshold</span>
           {' — the score an image needs to be flagged as watermarked. Lower '}
           {'flags fainter marks at the cost of false flags; higher keeps only '}
@@ -1400,7 +1400,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           </span>
         </label>
       ) : (
-        <p className="m-0 text-[11px] leading-snug text-content-subtle">
+        <p className="m-0 text-2xs leading-snug text-content-subtle">
           The vision route answers yes/no with no score — so there is no
           threshold to tune here.
         </p>
@@ -1413,10 +1413,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   )
   const textScanControls = (
     <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-      <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+      <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
         Options for this run
       </p>
-      <label className="flex items-start gap-2 text-[11px] text-content-subtle">
+      <label className="flex items-start gap-2 text-2xs text-content-subtle">
         <input type="checkbox" className="mt-0.5" checked={textSampleOn}
           onChange={(e) => setTextSampleOn(e.target.checked)} disabled={live} />
         <span>
@@ -1431,7 +1431,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           {'sample at another sensitivity.'}
         </span>
       </label>
-      <label className="block text-[11px] text-content-subtle">
+      <label className="block text-2xs text-content-subtle">
         <span className="font-medium text-content">Sensitivity</span>
         {' — the OCR confidence a line needs to become a zone. Lower catches '}
         {'fainter or stylised lettering, at the cost of false zones. Stored: '}
@@ -1490,10 +1490,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
   }, [setCaptionEngine, setCaptionModel, setCaptionVocab, setCaptionLength])
   const captionRunControls = (
     <div className="space-y-2 rounded-md border border-border bg-surface-raised p-2">
-      <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+      <p className="m-0 text-2xs font-semibold uppercase tracking-wide text-content-muted">
         Options for this run
       </p>
-      <p className="m-0 text-[11px] leading-snug text-content-subtle">
+      <p className="m-0 text-2xs leading-snug text-content-subtle">
         These override your Settings for this run only — the global values are never
         written from here.
       </p>
@@ -1514,13 +1514,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           className="inline-flex min-h-10 items-center rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-content disabled:opacity-40 lg:min-h-0">
           🧪 Caption Lab
         </button>
-        <span className="text-[11px] leading-snug text-content-subtle">
+        <span className="text-2xs leading-snug text-content-subtle">
           Compare engines, models and registers on ONE image before paying for a pass
           over the pile.
         </span>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="block text-[11px] text-content-subtle">
+        <label className="block text-2xs text-content-subtle">
           Engine
           <select value={captionEngine} onChange={(e) => setCaptionEngine(e.target.value)}
             disabled={live} aria-label="Caption engine"
@@ -1531,7 +1531,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
               .map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
         </label>
-        <label className="block text-[11px] text-content-subtle">
+        <label className="block text-2xs text-content-subtle">
           Vision model
           <select value={captionModel} onChange={(e) => setCaptionModel(e.target.value)}
             disabled={live || !ollamaPicksApply} aria-label="Caption vision model"
@@ -1541,13 +1541,13 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {captionModelChoices.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           {!ollamaPicksApply && (
-            <span className="mt-0.5 block text-[11px] leading-snug text-amber-300/90">
+            <span className="mt-0.5 block text-2xs leading-snug text-amber-300/90">
               The engine you picked does not reach {llmPicker.label}, so this choice would
               change nothing — disabled rather than quietly ignored.
             </span>
           )}
         </label>
-        <label className="block text-[11px] text-content-subtle">
+        <label className="block text-2xs text-content-subtle">
           Register
           <select value={captionVocab} onChange={(e) => setCaptionVocab(e.target.value)}
             disabled={live} aria-label="Caption vocabulary register"
@@ -1556,7 +1556,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             {VOCABULARY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
         </label>
-        <label className="block text-[11px] text-content-subtle">
+        <label className="block text-2xs text-content-subtle">
           Length
           <select value={captionLength} onChange={(e) => setCaptionLength(e.target.value)}
             disabled={live} aria-label="Caption length"
@@ -1571,19 +1571,19 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
           className={`space-y-1 rounded-md border px-2 py-1.5 ${
             captionNsfw.tone === 'warn'
               ? 'border-amber-400/40 bg-amber-500/10' : 'border-sky-400/40 bg-sky-500/10'}`}>
-          <p className={`m-0 text-[11px] font-semibold leading-snug ${
+          <p className={`m-0 text-2xs font-semibold leading-snug ${
             captionNsfw.tone === 'warn' ? 'text-amber-200' : 'text-sky-200'}`}>
             {captionNsfw.tone === 'warn' ? '⚠ ' : 'ℹ ' }{captionNsfw.heading}
           </p>
           {captionNsfw.paragraphs.map((line) => (
-            <p key={line} className={`m-0 text-[11px] leading-snug ${
+            <p key={line} className={`m-0 text-2xs leading-snug ${
               captionNsfw.tone === 'warn' ? 'text-amber-100/90' : 'text-sky-100/90'}`}>
               {line}
             </p>
           ))}
         </div>
       )}
-      <p className="m-0 text-[11px] leading-snug text-content-subtle">
+      <p className="m-0 text-2xs leading-snug text-content-subtle">
         {captionScopeNote(selected.size, counts, captionScope)}
       </p>
     </div>
@@ -1606,7 +1606,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                                  captionIncludeAsserted)}
         </button>
         {includeAssertedLabel && (
-          <label className="flex items-center gap-1 text-[11px] text-amber-400/90">
+          <label className="flex items-center gap-1 text-2xs text-amber-400/90">
             <input type="checkbox" checked={captionIncludeAsserted} disabled={live}
               onChange={(e) => setCaptionIncludeAsserted(e.target.checked)}
               aria-label="Also re-caption the captions I wrote by hand"
@@ -1616,10 +1616,10 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         )}
       </div>
       {recaptionInert && (
-        <p className="m-0 text-[11px] leading-snug text-amber-300/90">{recaptionInert}</p>
+        <p className="m-0 text-2xs leading-snug text-amber-300/90">{recaptionInert}</p>
       )}
       {recaptionNote && (
-        <p className="m-0 text-[11px] leading-snug text-amber-400/90">{recaptionNote}</p>
+        <p className="m-0 text-2xs leading-snug text-amber-400/90">{recaptionNote}</p>
       )}
     </div>
   )
@@ -1742,7 +1742,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
             className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
             ← Banks
           </button>
-          <h1 className="flex items-center gap-2 text-lg text-content"><Archive aria-hidden="true" className="h-4 w-4" /> {payload?.name || `Bank #${bankId}`}</h1>
+          <h1 className="flex items-center gap-2 text-xl font-semibold text-content"><Archive aria-hidden="true" className="h-4 w-4" /> {payload?.name || `Bank #${bankId}`}</h1>
           {payload?.source_path && (
             /* hidden below sm: opening or moving the folder is a gesture on the
                machine that serves the app, and on a 360-px screen this row alone
@@ -2047,7 +2047,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                       of them — and "0 blurry" would otherwise read as good news
                       when it means nothing was ever measured. */}
                   {autoRejectNotice && (
-                    <p className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-[0.6875rem] leading-snug text-amber-200">
+                    <p className="m-0 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-2xs leading-snug text-amber-200">
                       ⚠ {autoRejectNotice.text} {autoRejectNotice.action}
                       {autoRejectNotice.caveat ? ` ${autoRejectNotice.caveat}` : ''}
                     </p>
@@ -2074,12 +2074,12 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                           <span className="text-content-subtle">({flagCandidateLabel(f, flagsActionable)})</span>
                         </span>
                         {prereq && (
-                          <span className="mt-0.5 block pl-6 text-[0.6875rem] leading-snug text-sky-200/90">
+                          <span className="mt-0.5 block pl-6 text-2xs leading-snug text-sky-200/90">
                             ⓘ {prereq}
                           </span>
                         )}
                         {FLAG_HINT[f] && (
-                          <span className="mt-0.5 block pl-6 text-[0.6875rem] leading-snug text-amber-200/80">
+                          <span className="mt-0.5 block pl-6 text-2xs leading-snug text-amber-200/80">
                             ⚠ {FLAG_HINT[f]}
                           </span>
                         )}
@@ -2090,7 +2090,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                       whole point of the fix. Amber when the answer is zero, so
                       "nothing will happen" is visible rather than discovered. */}
                   {autoRejectPicked && (
-                    <p className={`m-0 text-[0.6875rem] leading-snug ${
+                    <p className={`m-0 text-2xs leading-snug ${
                       autoRejectPicked.sum ? 'text-content-muted' : 'text-amber-200'}`}>
                       {autoRejectPicked.text}
                     </p>
@@ -2127,7 +2127,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
         <div className="space-y-2">
           <button type="button" onClick={toggleCurate} aria-expanded={curateShown}
             aria-controls="bank-curate"
-            className="min-h-10 lg:min-h-0 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-content-subtle hover:text-content">Curate<span aria-hidden>{curateShown ? '▾' : '▸'}</span>
+            className="min-h-10 lg:min-h-0 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-content-subtle hover:text-content">Curate<span aria-hidden>{curateShown ? '▾' : '▸'}</span>
             {!curateShown && (
               <span className="font-normal normal-case tracking-normal">
                 — pick diverse, balanced, similar, find by text, coverage advice
@@ -2182,7 +2182,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                       onChange={(e) => setDiverseTypicality(Number(e.target.value))}
                       className="w-full accent-primary" />
                   </label>
-                  <p className="text-[11px] leading-snug text-content-muted">
+                  <p className="text-2xs leading-snug text-content-muted">
                     {diverseTypicality === 0
                       ? 'Off — pure coverage, exactly like before. The most isolated images win the first picks, so memes, wrong-person shots and botched frames tend to come up first.'
                       : 'Images that look like nothing else in the bank (memes, screenshots, someone else) stop winning on isolation alone. Variety inside your subject is untouched.'}
@@ -2239,7 +2239,7 @@ export default function BankWorkspace({ bankId, onBack, onGone }) {
                       </label>
                     ))}
                   </fieldset>
-                  <p className="text-[11px] leading-snug text-content-muted">
+                  <p className="text-2xs leading-snug text-content-muted">
                     Framing is the reliable axis on a one-subject bank: person groups there tend to be
                     few, sparse and arbitrary. It uses the same “Skip the odd ones out” setting as
                     Pick diverse ({diverseTypicality === 0 ? 'off' : `${Math.round(diverseTypicality * 100)}%`}).

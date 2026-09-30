@@ -16,13 +16,13 @@ export default function BestPerModelList({ items, breakdown, datasetId, onMemori
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-2">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-        className="flex items-center gap-2 text-left text-content-muted text-[0.625rem] uppercase">
+        className="flex items-center gap-2 text-left text-content-muted text-2xs uppercase">
         <span aria-hidden>{open ? '▾' : '▸'}</span>
         Best setting per model ({items.length})
       </button>
       {open && items.map((m) => (
         <div key={m.checkpoint} className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2 flex-wrap text-[0.6875rem]">
+          <div className="flex items-center gap-2 flex-wrap text-2xs">
             {m.filename
               ? <img src={datasetThumbUrl(`/api/dataset/${datasetId}/img/${encodeURIComponent(m.filename)}`, 128)}
                   alt="" loading="lazy" decoding="async" className="w-8 h-10 object-cover rounded shrink-0" />
@@ -37,7 +37,7 @@ export default function BestPerModelList({ items, breakdown, datasetId, onMemori
               className="ml-auto px-2 py-0.5 rounded bg-amber-400/15 border border-amber-400/40 text-amber-200">★</button>
           </div>
           {byCheckpoint[m.checkpoint] && byCheckpoint[m.checkpoint].length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-10 text-content-subtle text-[0.625rem]">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-10 text-content-subtle text-2xs">
               {byCheckpoint[m.checkpoint].map((b) => (
                 <span key={`${m.checkpoint}|${b.z_model || 'off'}`}
                   title={`${b.voted} voted out of ${b.images} generated`}>

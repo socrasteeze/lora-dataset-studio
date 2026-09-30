@@ -15,11 +15,11 @@ export default function LaunchProgress({ launch }) {
   if (!view) return null;
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/5 px-2.5 py-2">
-      <p className="m-0 text-sky-200 text-[0.6875rem] font-semibold">☁ {view.headline}</p>
+      <p className="m-0 text-sky-200 text-2xs font-semibold">☁ {view.headline}</p>
       <ol className="m-0 list-none p-0 flex flex-col gap-0.5">
         {view.steps.map((s) => (
           <li key={s.key}
-            className={`flex items-start gap-1.5 text-[0.625rem] leading-snug ${
+            className={`flex items-start gap-1.5 text-2xs leading-snug ${
               s.state === 'active' ? 'text-content font-semibold'
                 : s.state === 'done' ? 'text-content-muted' : 'text-content-subtle'}`}>
             <span aria-hidden className="w-3 shrink-0 text-center">
@@ -40,7 +40,7 @@ export default function LaunchProgress({ launch }) {
         ))}
       </ol>
       {view.note && (
-        <p className="m-0 text-content-subtle text-[0.625rem] leading-snug">{view.note}</p>
+        <p className="m-0 text-content-subtle text-2xs leading-snug">{view.note}</p>
       )}
     </div>
   );

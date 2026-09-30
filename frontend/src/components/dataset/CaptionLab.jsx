@@ -164,7 +164,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="m-0 text-[0.6875rem] leading-relaxed text-content-subtle">
+        <p className="m-0 text-2xs leading-relaxed text-content-subtle">
           Try up to {MAX_CANDIDATES} caption configs on this image and compare them. Nothing is saved
           until you pick one — “Keep” drops it into the editor, and “{surface.applyLabel}”
           applies the winning config.
@@ -184,7 +184,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
         </div>
       </div>
 
-      <p className="m-0 text-[0.6875rem] text-content-subtle">{surface.promptHelp}</p>
+      <p className="m-0 text-2xs text-content-subtle">{surface.promptHelp}</p>
       {configLoading && <p role="status" className="text-xs text-content-muted">Loading saved caption method…</p>}
       {configError && <div role="alert" className="text-xs text-amber-300">
         {configError} <button type="button" onClick={() => setConfigAttempt((n) => n + 1)}
@@ -192,14 +192,14 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
       </div>}
 
       {!modelsReachable && (
-        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-[0.6875rem] text-amber-200">
+        <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-2xs text-amber-200">
           {picker.down} Candidates can still run on JoyCaption.
         </p>
       )}
 
       {/* Reference: the caption currently on the image. */}
       <div className="rounded-xl border border-border bg-surface p-3">
-        <p className="m-0 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-content-subtle">Current caption</p>
+        <p className="m-0 text-2xs font-semibold uppercase tracking-[0.16em] text-content-subtle">Current caption</p>
         <p className="m-0 mt-1 whitespace-pre-wrap text-xs leading-5 text-content-muted">
           {currentCaption?.trim() ? currentCaption : <span className="italic text-content-subtle">— no caption yet —</span>}
         </p>
@@ -211,7 +211,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
             {/* Config picker */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-content-subtle">
+                <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-content-subtle">
                   {configLabel(c)}
                 </span>
                 <button type="button" onClick={() => removeCandidate(c.id)} disabled={running || candidates.length <= 1}
@@ -264,7 +264,7 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
                   <p className="m-0 flex-1 overflow-y-auto whitespace-pre-wrap text-xs leading-5 text-content">
                     {c.caption || <span className="italic text-content-subtle">(the model returned an empty caption)</span>}
                   </p>
-                  <span className="mt-1 font-mono text-[0.625rem] text-content-subtle">
+                  <span className="mt-1 font-mono text-2xs text-content-subtle">
                     {c.chars} chars · {(c.durationMs / 1000).toFixed(1)}s
                   </span>
                 </>
@@ -274,11 +274,11 @@ export default function CaptionLab({ surface, currentCaption, onKeep }) {
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={() => makeDefault(c)} disabled={running || configLoading || Boolean(configError)}
                 title={surface.applyTitle}
-                className="inline-flex min-h-10 items-center justify-center lg:min-h-0 rounded-lg border border-border bg-surface px-2.5 py-1 text-[0.6875rem] font-medium text-content-muted hover:text-content disabled:opacity-40">
+                className="inline-flex min-h-10 items-center justify-center lg:min-h-0 rounded-lg border border-border bg-surface px-2.5 py-1 text-2xs font-medium text-content-muted hover:text-content disabled:opacity-40">
                 {surface.applyLabel}
               </button>
               <button type="button" onClick={() => onKeep(c.caption)} disabled={c.status !== 'done' || !c.caption}
-                className="inline-flex min-h-10 items-center justify-center lg:min-h-0 rounded-lg bg-emerald-600/90 px-2.5 py-1 text-[0.6875rem] font-semibold text-white disabled:opacity-30">
+                className="inline-flex min-h-10 items-center justify-center lg:min-h-0 rounded-lg bg-emerald-600/90 px-2.5 py-1 text-2xs font-semibold text-white disabled:opacity-30">
                 ✓ Keep this one
               </button>
             </div>

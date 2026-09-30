@@ -13,25 +13,25 @@ export default function SeedControls({ seed, seedLocked, onReroll, onToggleLock,
   const cost = runCost(total * genCount, secondsPerImage);
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-content-subtle text-[0.6875rem] tabular-nums">
+      <span className="text-content-subtle text-2xs tabular-nums">
         seed <code className="text-content-muted">{seed}</code>
       </span>
       <button type="button" onClick={onReroll}
-        className="px-2 py-0.5 rounded bg-surface text-content-muted text-[0.6875rem]"
+        className="px-2 py-0.5 rounded bg-surface text-content-muted text-2xs"
         title="Re-roll the seed manually">
         <Dices aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />re-roll
       </button>
       <button type="button" onClick={onToggleLock}
         aria-pressed={seedLocked}
-        className={`px-2 py-0.5 rounded text-[0.6875rem] ${seedLocked ? 'bg-indigo-500/20 border border-indigo-400/40 text-indigo-200' : 'bg-surface text-content-muted'}`}
+        className={`px-2 py-0.5 rounded text-2xs ${seedLocked ? 'bg-indigo-500/20 border border-indigo-400/40 text-indigo-200' : 'bg-surface text-content-muted'}`}
         title={seedLocked ? 'Seed locked: same seed on every test (repro)' : 'Auto seed: new seed on every "Run test"'}>
         {seedLocked ? '🔒 seed' : '🔓 auto'}
       </button>
-      <label className="flex items-center gap-1 text-[0.6875rem] text-content-muted"
+      <label className="flex items-center gap-1 text-2xs text-content-muted"
         title="Number of images generated per config (different seeds) — batch">
         ×
         <select value={genCount} onChange={(e) => onGenCount(Number(e.target.value))}
-          className="px-1 py-0.5 rounded bg-surface border border-border text-content text-[0.6875rem]">
+          className="px-1 py-0.5 rounded bg-surface border border-border text-content text-2xs">
           {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
         gen/config
@@ -40,7 +40,7 @@ export default function SeedControls({ seed, seedLocked, onReroll, onToggleLock,
        * No aria-live: every configuration click recalculates this count, so a live region would
        * repeat it constantly.
        */}
-      <span className="text-[0.6875rem] tabular-nums text-content-subtle"
+      <span className="text-2xs tabular-nums text-content-subtle"
         title={[
           batchMult > 1 ? `Includes the ⚖ batch axis: each config runs once without and once with each batch-checked LoRA (×${batchMult})` : null,
           cost.measured

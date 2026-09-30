@@ -101,7 +101,7 @@ export default function StudioPage() {
               lane === id ? 'bg-primary text-white' : 'text-content-muted hover:text-content'}`}>
             <Icon aria-hidden="true" className="h-4 w-4" />{label}
             {badge && (
-              <span className="ml-0.5 rounded-full border border-current px-1.5 text-[0.625rem] font-semibold uppercase leading-4 tracking-wide opacity-80">
+              <span className="ml-0.5 rounded-full border border-current px-1.5 text-2xs font-semibold uppercase leading-4 tracking-wide opacity-80">
                 {badge}
               </span>
             )}

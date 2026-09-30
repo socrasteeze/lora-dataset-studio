@@ -36,7 +36,7 @@ export default function SettingsLink({ section, pluginId, focus, children, tone 
   return (
     <a
       href={settingsLinkHref(section, focus, pluginId)}
-      className={`${TONES[tone] || TONES.subtle} text-[0.6875rem] ${className}`}
+      className={`${TONES[tone] || TONES.subtle} text-2xs ${className}`}
       // Stops the click from also triggering a parent that opens a lightbox,
       // toggles a tile or starts a job — these links live on top of active surfaces.
       onClick={(e) => e.stopPropagation()}

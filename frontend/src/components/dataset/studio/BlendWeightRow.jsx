@@ -17,14 +17,14 @@ export default function BlendWeightRow({
   return (
     <li className="flex flex-col gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-content-subtle text-[0.625rem] tabular-nums">{index}.</span>
+        <span className="shrink-0 text-content-subtle text-2xs tabular-nums">{index}.</span>
         <span className="min-w-0 flex-1 truncate text-content text-[0.8125rem]" title={title || label}>
           {label}
         </span>
         {trigger}
       </div>
 
-      <label className={'flex items-center gap-1.5 text-[0.6875rem] '
+      <label className={'flex items-center gap-1.5 text-2xs '
         + (sweeping ? 'text-content-subtle' : 'text-content-muted')}>
         <span className="shrink-0 uppercase">Weight</span>
         <input type="range" min={COMBINE_MIN_WEIGHT} max={COMBINE_MAX_WEIGHT} step="0.05"
@@ -58,14 +58,14 @@ export default function BlendWeightRow({
        * result.
        */}
       <div className="flex flex-wrap items-center gap-1">
-        <span className="shrink-0 text-content-subtle text-[0.625rem] uppercase">Sweep</span>
+        <span className="shrink-0 text-content-subtle text-2xs uppercase">Sweep</span>
         {BLEND_WEIGHT_CHIPS.map((w) => {
           const on = set.includes(w);
           return (
             <button key={w} type="button" onClick={() => onToggleChip(w)}
               aria-pressed={on}
               title={on ? `Stop sweeping ${w}` : `Also render this LoRA at ${w}`}
-              className={'rounded border px-1.5 py-0.5 text-[0.625rem] font-semibold tabular-nums '
+              className={'rounded border px-1.5 py-0.5 text-2xs font-semibold tabular-nums '
                 + (on
                   ? 'border-primary/60 bg-primary/25 text-content'
                   : 'border-border bg-app/60 text-content-subtle hover:text-content')}>
@@ -74,7 +74,7 @@ export default function BlendWeightRow({
           );
         })}
       </div>
-      <p className="m-0 text-content-subtle text-[0.625rem]">
+      <p className="m-0 text-content-subtle text-2xs">
         {sweeping
           ? `Sweeping ${set.length} weight${set.length > 1 ? 's' : ''} — the slider is ignored for this LoRA.`
           : 'No box ticked: the slider above is this LoRA’s weight.'}

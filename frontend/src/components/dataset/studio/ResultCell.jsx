@@ -15,7 +15,7 @@ export default function ResultCell({ row, strength, variant, cellList, scoreMap,
   const key = cellKeyFor(row.filename, strength, variant);
   const list = cellList.get(key);
   if (!list || !list.length) {
-    return <td className="px-1 text-content-subtle text-[0.625rem] text-center">—</td>;
+    return <td className="px-1 text-content-subtle text-2xs text-center">—</td>;
   }
   const zk = variant.zModel || '';
   const score = scoreMap.get(`${row.filename}|${strength}|${variant.aspect || ''}|${zk}|${variant.cfg ?? ''}|${variant.steps ?? ''}|${variant.steps2 ?? ''}`);
@@ -33,7 +33,7 @@ export default function ResultCell({ row, strength, variant, cellList, scoreMap,
       </div>
       {/* Aggregated score PER CONFIG across all seeds/runs, plus confidence. */}
       <div className="flex items-center justify-end gap-1 mt-0.5">
-        <span className="text-content-muted text-[0.6875rem] tabular-nums"
+        <span className="text-content-muted text-2xs tabular-nums"
           title={score ? `+${score.likes} / −${score.dislikes} on ${score.images} image(s)` : ''}>
           {score && score.score !== 0 ? (score.score > 0 ? `+${score.score}` : score.score) : '·'}
           {score && score.voted > 0 && (

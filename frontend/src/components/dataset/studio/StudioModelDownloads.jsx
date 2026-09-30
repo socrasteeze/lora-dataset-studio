@@ -45,7 +45,7 @@ export default function StudioModelDownloads({ readiness, onRefresh }) {
           <p className="text-xs font-medium text-content">
             {item.label}{item.size_bytes > 0 ? ` · ${fmtSize(item.size_bytes)}` : ''}
           </p>
-          <p className="break-all text-[0.6875rem] text-content-muted">{item.filename}</p>
+          <p className="break-all text-2xs text-content-muted">{item.filename}</p>
           <InstallRunner action={item.action}
             buttonLabel={`${item.repair ? 'Repair' : 'Download'} ${item.label}`}
             onDone={refresh} />

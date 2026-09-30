@@ -166,7 +166,7 @@ export default function BankPassesPanel({
                 absent from the gate on purpose: they never travel. */}
             <DevicePicker value={passDevice} onChange={onPassDevice}
               onDevice={onPassDeviceObj} kind="bank-pass"
-              className="text-[0.6875rem]" />
+              className="text-2xs" />
           </div>
           {/* Watermark CLEANING — the two manual levels (crop, then inpaint), with
               their own per-level progress. Lives in its own component so the

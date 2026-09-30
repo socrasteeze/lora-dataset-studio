@@ -39,7 +39,7 @@ export default function QuickVoteModal({ vote, datasetId, fmt }) {
       <img src={`/api/dataset/${datasetId}/img/${encodeURIComponent(cur.filename)}`}
         alt={cur.label}
         className="max-w-[92vw] max-h-[64vh] object-contain rounded-lg border border-white/15" />
-      <div className="text-content-subtle text-[0.625rem]">← swipe/left arrow = 👎 · right = 👍 → · Esc = close · ("skip" button to pass)</div>
+      <div className="text-content-subtle text-2xs">← swipe/left arrow = 👎 · right = 👍 → · Esc = close · ("skip" button to pass)</div>
       <div className="flex items-center gap-4">
         <button type="button" onClick={() => vote.voteCurrent(-1)} aria-label="Dislike"
           className="px-7 py-3 rounded-2xl text-2xl border border-red-400/60 bg-red-500/20 text-red-200 hover:bg-red-500/30">👎</button>

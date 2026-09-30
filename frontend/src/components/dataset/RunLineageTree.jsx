@@ -70,12 +70,12 @@ function LineageNode({ row, onSelect, index }) {
         <div className="flex min-w-0 items-center gap-1.5">
           <StatusDot status={node.status} />
           {/* One run number across list, graph and inspector: the record id. */}
-          <span className="shrink-0 font-mono text-content-muted text-[0.625rem]"
+          <span className="shrink-0 font-mono text-content-muted text-2xs"
             title={runIdentityLabel(node)}>
             <span aria-hidden>{node.source === 'cloud' ? 'cloud' : 'local'}</span>{' '}
             {runNumber(node)}
           </span>
-          <span className={`min-w-0 truncate text-[0.75rem] font-semibold ${dim ? 'text-content-muted' : 'text-content'}`}
+          <span className={`min-w-0 truncate text-xs font-semibold ${dim ? 'text-content-muted' : 'text-content'}`}
             title={`${famLabel(node.train_type)}${node.variant ? ` · ${node.variant}` : ''}`}>
             {famLabel(node.train_type)}{node.variant ? <span className="font-normal text-content-muted"> · {node.variant}</span> : null}
           </span>
@@ -86,7 +86,7 @@ function LineageNode({ row, onSelect, index }) {
           )}
           <span className="ml-auto shrink-0"><SavesChip node={node} /></span>
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-content-subtle text-[0.5625rem]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-content-subtle text-2xs">
           <ModeChip node={node} />
           {node.version != null && (
             <span className="rounded bg-app/60 px-1 py-px font-medium text-content-muted">v{node.version}</span>
@@ -94,7 +94,7 @@ function LineageNode({ row, onSelect, index }) {
           {node.steps ? <span className="tabular-nums">{node.steps.toLocaleString()} steps</span> : null}
           {resumeCaption(node) && (
             <span className="inline-flex items-center gap-0.5 text-content-subtle">
-              <span aria-hidden className="text-[0.625rem] leading-none">↳</span>{resumeCaption(node)}
+              <span aria-hidden className="text-2xs leading-none">↳</span>{resumeCaption(node)}
             </span>
           )}
           {node.origin_unknown && (
@@ -130,7 +130,7 @@ function ViewToggle({ view, onChange }) {
   const opt = (id, glyph, label) => (
     <button type="button" onClick={() => onChange(id)}
       aria-pressed={view === id} title={`${label} view`}
-      className={'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.5625rem] font-semibold transition-colors '
+      className={'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold transition-colors '
         + (view === id
           ? 'bg-indigo-500/20 text-indigo-100 '
           : 'text-content-subtle hover:text-content')}>
@@ -155,21 +155,21 @@ export default function RunLineageTree({ tree, loading, error, onSelect, onConti
 
   if (loading) {
     return (
-      <div className="lds-lineage-in flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-content-subtle text-[0.6875rem]">
+      <div className="lds-lineage-in flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-content-subtle text-2xs">
         <span aria-hidden className="h-3 w-3 animate-spin rounded-full border-2 border-border-strong border-t-indigo-400" />
         Resolving lineage…
       </div>
     );
   }
-  if (error) return <p className="m-0 text-rose-300/80 text-[0.6875rem]">{error}</p>;
+  if (error) return <p className="m-0 text-rose-300/80 text-2xs">{error}</p>;
   const rows = buildLineageRows(tree);
   if (!rows.length) return null;
   return (
     <div className="lds-lineage-in overflow-x-auto rounded-xl border border-border bg-surface p-2.5">
       <div className="mb-1.5 flex items-center gap-2 px-0.5">
 
-        <span className="text-content text-[0.6875rem] font-semibold">Lineage</span>
-        <span className="rounded-full bg-app/60 px-1.5 py-0.5 text-content-muted text-[0.5625rem] font-medium">
+        <span className="text-content text-2xs font-semibold">Lineage</span>
+        <span className="rounded-full bg-app/60 px-1.5 py-0.5 text-content-muted text-2xs font-medium">
           {rows.length} run{rows.length > 1 ? 's' : ''}
         </span>
         <div className="ml-auto flex items-center gap-2">

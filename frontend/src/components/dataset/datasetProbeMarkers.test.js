@@ -42,7 +42,7 @@ test('controls reach 40 px below lg — the section chips, the header, the menu,
   assert.match(workspace, /\? `flex min-h-10 shrink-0 items-center gap-1\.5 whitespace-nowrap rounded-full border px-3 py-1\.5 text-xs font-medium/);
   assert.match(workspace, /\? `min-h-10 shrink-0 whitespace-nowrap rounded-full border px-3 py-1\.5 text-xs/);
   assert.match(workspace, /const MENU_ITEM = 'min-h-10 lg:min-h-0 w-full flex items-center/);
-  assert.match(workspace, /className=\{`min-h-10 lg:min-h-0 px-2 py-0\.5 rounded-full border text-\[0\.6875rem\] font-semibold tabular-nums/);
+  assert.match(workspace, /className=\{`min-h-10 lg:min-h-0 px-2 py-0\.5 rounded-full border text-2xs font-semibold tabular-nums/);
   assert.match(lightbox, /min-h-10 lg:min-h-9/);
 });
 
