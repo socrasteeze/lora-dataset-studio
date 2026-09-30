@@ -16,17 +16,23 @@ export const TAG_CLASS = 'px-1.5 py-px rounded-full bg-app/60 border border-bord
 /** Green stays a statement about the PRICE, never a selection state. */
 export const FREE_TAG_CLASS = 'px-1.5 py-px rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-[0.625rem]';
 
-export default function EngineCard({ id, checked, available, generating, onToggle, icon, title, tags, hint }) {
+export default function EngineCard({ id, checked, available, generating, onToggle, icon, title, tags, hint, footer }) {
   const accent = engineAccent(id);
-  return (
+  const look = checked ? accent.card : 'border-border bg-app/40';
+  const hover = checked ? '' : 'hover:enabled:bg-surface-raised';
+  /* h-full: the cards of one grid row stand at one height, whatever their hint
+     wraps to. `footer` (a settings link, say) sits INSIDE the card's frame but
+     OUTSIDE the checkbox: a link nested in a button is invalid markup, and a
+     disabled checkbox would swallow its click. */
+  const button = (
     <button type="button" role="checkbox" aria-checked={checked}
       aria-label={engineLabel(id)}
       onClick={() => onToggle(id)}
       disabled={!available || !!generating}
       title={generating ? 'A generation batch is running — wait for it to finish before changing engines' : undefined}
-      className={`relative flex items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${checked
-        ? accent.card
-        : 'border-border bg-app/40 hover:enabled:bg-surface-raised'}`}>
+      className={`relative flex items-start gap-3 rounded-xl p-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${footer
+        ? `flex-1 ${hover}`
+        : `h-full border ${look} ${hover}`}`}>
       <span aria-hidden="true"
         className={`absolute top-2 right-2 w-4 h-4 rounded border grid place-items-center text-[0.625rem] font-bold ${checked
           ? `${accent.pill} border-transparent` : 'border-border text-transparent'}`}>✓</span>
@@ -39,5 +45,12 @@ export default function EngineCard({ id, checked, available, generating, onToggl
         {hint}
       </span>
     </button>
+  );
+  if (!footer) return button;
+  return (
+    <div className={`flex h-full min-w-0 flex-col rounded-xl border ${look}`}>
+      {button}
+      {footer}
+    </div>
   );
 }
