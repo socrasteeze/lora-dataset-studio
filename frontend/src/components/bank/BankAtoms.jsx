@@ -35,9 +35,8 @@ export function Stat({ label, value, tone }) {
   const toneCls = { emerald: 'text-emerald-300', rose: 'text-rose-300', indigo: 'text-indigo-300' }[tone] || 'text-content'
   const n = typeof value === 'number' ? value.toLocaleString() : value
   return (
-    // `whitespace-nowrap` is load-bearing, not cosmetic: the header's counter row
-    // scrolls on ONE line below sm, and a label allowed to wrap breaks it back
-    // into the four rows that cost a quarter of a phone's fold.
+    // `whitespace-nowrap` is load-bearing, not cosmetic: a counter label allowed
+    // to wrap splits one number across two lines in the header's counter row.
     <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
       <span className={`font-semibold tabular-nums ${toneCls}`}>{n}</span>
       <span className="text-xs text-content-subtle">{label}</span>

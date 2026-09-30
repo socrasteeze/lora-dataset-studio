@@ -103,11 +103,14 @@ test('an anchor that exists but cannot be clicked STOPS the run — it never ski
 });
 
 test('the header gives the fold back on a phone', () => {
-  // the source-path row is a desktop gesture; the counters scroll on one line;
-  // the action row scrolls on one line; a phone held sideways gets a one-row header
+  // the source-path row is a desktop gesture; the counters fold into ⚙ Passes
+  // below sm; the action row scrolls on one line and its buttons never shrink
+  // into wrapped labels; a phone held sideways gets a one-row header
   assert.match(workspace, /className="hidden min-w-0 grow items-center gap-2 sm:flex \[@media\(max-height:500px\)\]:!hidden"/);
-  assert.match(workspace, /flex flex-nowrap items-baseline gap-x-4 gap-y-1 overflow-x-auto border-t border-border pt-2 text-sm sm:flex-wrap sm:overflow-visible/);
+  assert.match(workspace, /className="hidden items-baseline gap-x-4 gap-y-1 border-t border-border pt-2 text-sm sm:flex sm:flex-wrap \[@media\(max-height:500px\)\]:!hidden"/);
+  assert.match(workspace, /data-probe-reading>\s*\{counts && \(\s*<div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm sm:hidden">\s*\{counterStats\}/);
   assert.match(workspace, /flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto border-t border-border pt-2 sm:flex-wrap sm:overflow-visible/);
+  assert.equal((workspace.match(/min-h-10 lg:min-h-0 shrink-0 whitespace-nowrap rounded-md/g) || []).length, 5);
   assert.match(workspace, /\[@media\(max-height:500px\)\]:flex \[@media\(max-height:500px\)\]:flex-nowrap/);
 });
 
