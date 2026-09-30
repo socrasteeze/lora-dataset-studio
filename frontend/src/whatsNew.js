@@ -84,6 +84,11 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-09-29-zzzz-nothing-phones-home', date: '2026-09-29',
+    title: 'Nothing Leaves Your Machine Unless You Ask',
+    blurb: 'The app no longer checks GitHub for updates on its own; press Check for updates when you want to know. Fonts now load from the app itself, and the plugin store is switched off. Bundled plugins keep working.',
+  },
+  {
     id: '2026-09-29-zzz-bank-phone-header', date: '2026-09-29',
     title: 'More of Your Bank on a Phone Screen',
     blurb: 'On a phone the Bank\'s top bar is half its old height. Its buttons keep one line and scroll sideways, and the image and pass counters now sit at the top of ⚙ Passes.',

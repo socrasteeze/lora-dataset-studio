@@ -109,27 +109,7 @@ function CheckUpdatesButton() {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const [available, setAvailable] = useState(false)
-  useEffect(() => {
-    let alive = true
-    const autoCheck = async () => {
-      try {
-        const d = await apiFetch('/api/update/check?auto=1', { background: true })
-        if (!alive) return
-        setAvailable(!!d?.update_available)
-        // The dot always lights up; the banner only surfaces if the user
-        // hasn't dismissed it this session (manual checks clear the flag).
-        if (d?.ok && (!d.update_available
-            || sessionStorage.getItem('updateBannerDismissed') !== '1')) {
-          window.dispatchEvent(new CustomEvent('lds:update-available', { detail: d }))
-        }
-      } catch { /* offline — the manual button stays available */ }
-    }
-    autoCheck()
-    // 1 h: the project ships several times a day right now — 6 h let a tab
-    // sit stale most of a working day. Server-side TTL matches.
-    const t = setInterval(autoCheck, 3600 * 1000)
-    return () => { alive = false; clearInterval(t) }
-  }, [])
+  // No automatic check (fork Divergence 12): the dot lights only after a click.
   const check = async () => {
     if (busy) return
     setBusy(true)
@@ -445,21 +425,15 @@ function NavBar() {
   )
 }
 
-/** Cached installation-aware check, shared with the nav badge and Settings:
+/** Shows the answer of the nav badge's explicit check:
  * Git compares its branch; packaged installs compare releases. */
 function UpdateBanner() {
   const [info, setInfo] = useState(null)
   const [applying, setApplying] = useState(false)
   const [phase, setPhase] = useState('')     // '' | 'pulling' | 'restarting'
   const [error, setError] = useState(null)
-  useEffect(() => {
-    if (sessionStorage.getItem('updateBannerDismissed') === '1') return
-    apiFetch('/api/update/check?auto=1', { background: true })
-      .then((d) => { if (d && d.update_available) setInfo(d) })
-      .catch(() => { /* best-effort */ })
-  }, [])
-  // A manual "Check for updates" (nav button) surfaces the banner even after it
-  // was dismissed this session, or when the passive mount check found nothing yet.
+  // Only a manual "Check for updates" (nav button) surfaces the banner, even
+  // after it was dismissed this session; nothing checks on mount (fork D12).
   useEffect(() => {
     const onFound = (e) => {
       if (e.detail?.update_available) setInfo(e.detail)

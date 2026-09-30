@@ -90,6 +90,10 @@ than creating a second policy for another agent.
   availability does not authorize replacing a working runtime.
 - Keep the fork's local-only generation policy. `fork-plugins.json` owns the
   distribution. Do not restore excluded API generation or rental-training plugins.
+- Nothing reaches another machine without an explicit click, and nothing sends
+  the operator's data or config anywhere new. `backend/tests/test_fork_outbound_gate.py`
+  enforces this (FORK_NOTES.md Divergence 12). Refresh its inventory only after
+  reading every new call site; remove any that runs on its own.
 - Preserve existing functional icon glyphs. Do not remove them as text cleanup.
 - Windows scripts and requirements files stay ASCII-only.
 

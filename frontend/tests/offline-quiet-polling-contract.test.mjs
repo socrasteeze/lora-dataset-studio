@@ -14,12 +14,15 @@ import assert from 'node:assert/strict';
 
 const read = (rel) => readSource(`src/${rel}`)
 
-test('all update surfaces use the installation-aware cached check on mount', () => {
+// Fork Divergence 12: no update surface checks on mount or on a timer; both
+// ask only when the operator presses Check for updates.
+test('update surfaces check only when asked, with the installation-aware check', () => {
   for (const file of ['App.jsx', 'components/settings/MaintenanceSection.jsx']) {
     const source = read(file)
     assert.doesNotMatch(source, /apiFetch\('\/api\/update\/check'\)/,
       `${file} must not mistake an up-to-date Git branch for an old release ZIP`)
-    assert.match(source, /apiFetch\('\/api\/update\/check\?auto=1', \{ background: true \}\)/)
+    assert.doesNotMatch(source, /update\/check\?auto=1/)
+    assert.match(source, /apiFetch\('\/api\/update\/check\?force=1'\)/)
   }
 })
 
@@ -115,7 +118,7 @@ test('the polls that fire on a timer are marked background', () => {
     // OAuth status poll, removed here with the engine. There is no timer poll
     // left in that file, so requiring the flag would pin a rejected surface.
     ['components/dataset/CaptionOptionsPopover.jsx', /background: true/],
-    ['App.jsx', /update\/check\?auto=1', \{ background: true \}/],
+    // Divergence 12: the hourly update check in App.jsx is gone, not unmarked.
   ];
   for (const [file, re] of marked) assert.match(read(file), re, `${file} poll not marked background`);
 });

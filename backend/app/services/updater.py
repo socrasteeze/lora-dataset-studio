@@ -141,56 +141,6 @@ def current_sha(root=None):
         return None
 
 
-# The project this fork tracks — NOT `updates.repo` (config.py), which is THIS
-# fork's own release feed and is user-configurable. "How far behind upstream" is
-# a fixed relationship to the project this fork was forked from; it doesn't vary
-# per install the way the release feed can. A literal on purpose, not a
-# cfg.get(...) value — see test_the_upstream_check_points_at_upstream_and_not_the_fork,
-# the mirror image of test_the_update_feed_is_this_fork_and_not_upstream: that one
-# guards `updates.repo` staying pointed at THIS fork; this one guards this constant
-# staying pointed at the other one. Get either backwards and the check it drives
-# silently reports nothing useful.
-UPSTREAM_REPO = 'perfectgf/lora-dataset-studio'
-
-
-def upstream_ahead_status(root=None, timeout=6) -> dict | None:
-    """How many commits upstream's `main` has that this checkout's current commit
-    doesn't — orthogonal to `git_update_status` (which compares against THIS
-    repo's own remote). None when there's no local SHA to compare from (a
-    packaged install, or git unavailable) — the caller then shows nothing.
-
-    Uses GitHub's compare API (`GET /repos/{UPSTREAM_REPO}/compare/{sha}...main`)
-    rather than `git fetch upstream`, deliberately: almost no install has an
-    `upstream` git remote configured, so a fetch-based check would silently
-    report nothing for nearly everyone. `ahead_by` in the response is exactly
-    "commits upstream/main has that our SHA doesn't"; `behind_by` is the fork's
-    own commits not yet in upstream (kept for completeness, unused today).
-
-    Degrades to {'ok': False, 'reason': ...} on any network/parsing failure —
-    never raises, matching every other update-check function in this module.
-    Purely informational: never wired to anything that downloads or applies."""
-    sha = current_sha(root)
-    if not sha:
-        return None
-    import requests
-    url = f'https://api.github.com/repos/{UPSTREAM_REPO}/compare/{sha}...main'
-    try:
-        r = requests.get(url, timeout=timeout,
-                         headers={'Accept': 'application/vnd.github+json'})
-    except requests.RequestException:
-        return {'ok': False, 'reason': 'offline or GitHub unreachable'}
-    if r.status_code != 200:
-        return {'ok': False, 'reason': f'compare feed answered {r.status_code}'}
-    try:
-        j = r.json()
-        ahead_by = int(j.get('ahead_by') or 0)
-        behind_by = int(j.get('behind_by') or 0)
-    except (ValueError, TypeError, AttributeError):
-        return {'ok': False, 'reason': 'compare feed returned an unexpected shape'}
-    return {'ok': True, 'sha': sha, 'ahead_by': ahead_by, 'behind_by': behind_by,
-            'compare_url': f'https://github.com/{UPSTREAM_REPO}/compare/{sha}...main'}
-
-
 def git_update_status(root=None) -> dict | None:
     """`git fetch` + how many commits behind the upstream branch we are. None when this
     isn't a git checkout (caller then uses the release-tag check). Network/git failures

@@ -1,6 +1,14 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+// Self-hosted, bundled into dist (fork Divergence 12): a page load contacts no
+// font CDN. Same families and weights index.html once fetched from Google Fonts.
+import '@fontsource/archivo/400.css'
+import '@fontsource/archivo/500.css'
+import '@fontsource/archivo/600.css'
+import '@fontsource/archivo/700.css'
+import '@fontsource/ibm-plex-mono/400.css'
+import '@fontsource/ibm-plex-mono/500.css'
 import './index.css'
 import { registerBundledPlugins } from './plugins/bundled'
 import { loadPlugins } from './plugins/loadPlugins'

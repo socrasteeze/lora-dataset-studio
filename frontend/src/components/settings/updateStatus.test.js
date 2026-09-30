@@ -14,7 +14,6 @@ import {
   zipUpdateHeadline,
   progressPercent,
   progressLabel,
-  upstreamAheadLabel,
 } from './updateStatus.js';
 
 test('formatMB is compact and empty for unknown sizes', () => {
@@ -120,11 +119,3 @@ test('progressLabel renders each active phase and defers idle/done', () => {
   assert.equal(progressLabel({ phase: 'idle' }), null);
 });
 
-test('upstreamAheadLabel reports the count and stays silent at zero/degraded/unknown', () => {
-  assert.equal(upstreamAheadLabel({ ok: true, ahead_by: 5 }), 'Upstream is 5 commits ahead');
-  assert.equal(upstreamAheadLabel({ ok: true, ahead_by: 1 }), 'Upstream is 1 commit ahead');
-  assert.equal(upstreamAheadLabel({ ok: true, ahead_by: 0 }), null);
-  assert.equal(upstreamAheadLabel({ ok: false, reason: 'offline' }), null);
-  assert.equal(upstreamAheadLabel({ ok: true, ahead_by: null }), null);
-  assert.equal(upstreamAheadLabel(null), null);
-});
