@@ -454,7 +454,7 @@ def _load_aesthetic_head(models_root, device):
         os.makedirs(cache_dir, exist_ok=True)
         dest = os.path.join(cache_dir, _AESTHETIC_FILE)
         if not os.path.isfile(dest):
-            _log('[score] fetching aesthetic head weights (once)…')
+            _log('[score] fetching aesthetic head weights (once)')
             import urllib.request
             urllib.request.urlretrieve(_AESTHETIC_URL, dest + '.part')
             os.replace(dest + '.part', dest)
