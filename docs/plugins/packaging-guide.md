@@ -2,8 +2,8 @@
 
 The frontend builder compiles a plugin's browser source. The Python CLI then
 validates a staged directory and writes a reproducible ZIP. Validation never
-imports plugin code, starts LDS, installs runtime dependencies or contacts a
-Store. Its JavaScript audit parses source with Acorn without evaluating it.
+imports plugin code, starts LDS, installs runtime dependencies or contacts
+another machine. Its JavaScript audit parses source with Acorn without evaluating it.
 
 ## Developer tools
 
@@ -58,7 +58,7 @@ dependency declarations. `pack` adds the final archive path and SHA-256.
 For a registered LDS product being converted from its own bundled source, add
 `--official-lds`. This explicit authoring mode verifies its ID against the
 selected source registry and normalizes `bundled` to false. It grants no
-installation or Store trust and cannot relabel another publisher.
+installation trust and cannot relabel another publisher.
 
 ## Included bytes and exclusions
 

@@ -14,7 +14,8 @@ Packaged images, compose files, and their launchers are not part of this fork.
 Install on the machine that runs the app. Remote ComfyUI stays.
 The Civitai publisher stays held.
 API image engines and rented-GPU training stay excluded.
-The plugin store is switched off.
+Plugins that ship with the app are installed with it.
+There is no plugin catalog.
 `npm run build` writes the curated fork marker in
 `frontend/dist/plugin-build.json`. The backend reads that marker
 unless a test sets a distribution override.
@@ -125,14 +126,14 @@ What stays off:
 - An update check runs only for `?force=1` (Check for updates). Any other
   call returns the last explicit answer, or `ok: false`.
 - The "upstream is N commits ahead" check is deleted.
-- The plugin store stays off. `store_switched_off()` returns `True`.
-  No setting or environment variable changes that.
+- There is no plugin catalog. Installed plugins are listed by
+  `GET /api/plugins/`, which also reports `can_manage`.
 - Fonts load from the bundled `@fontsource` packages.
 
 `backend/tests/test_fork_outbound_gate.py` fails when the outbound
 inventory changes, when the test app connects out during page-load
-routes, when the store switch is not a literal `True`, when an automatic
-update check returns, or when shipped code runs `git push`.
+routes, when an automatic update check returns, or when shipped code
+runs `git push`.
 Refresh `fork_outbound_inventory.json` only after reading every new call
 site. Remove any call that runs on its own.
 `test_the_upstream_comparison_is_gone` stays. It guards this rule.

@@ -143,25 +143,10 @@ vision tools; local generation prepares ComfyUI and its selected models;
 **Installed** and **Updates** filters. Nothing is downloaded by choosing a goal
 or visiting a plugin page.
 
-To install several plugins, tick them in **Plugins**, choose **Review
-selected**, and confirm the shared plan. All selected packages are checked before
-any changes are staged; one LDS restart applies the whole selection.
-
-To update installed plugins, choose **Update all** and review the available
-updates together. **Update all and restart** downloads and verifies the complete
-selection, prepares one transaction and restarts LDS once. The page reloads when
-the new server is ready. Disabled plugins stay disabled; connected private
-catalogs keep their own signature checks. If your launcher requires a manual
-restart, LDS shows its restart instructions after preparing the updates. Active
-local work can postpone the restart; the prepared updates remain available to
-apply when it finishes. A retained cloud pod does not block a restart that keeps
-its plugin enabled.
-
-Each plugin's card offers **Install**, or its controls once installed: open the
-plugin, **Settings**, turn it on or off, and update it when available. **More
-actions** contains **Remove plugin**. Installed plugins remain listed even if
-they are absent from the catalog or the store is offline. **Purchases** remains
-a separate tab for your licenses.
+**Plugins** lists the features that ship with this install. Each card offers
+**Settings**, and **Turn on** or **Turn off**. **More actions** contains
+**Remove plugin** for a plugin you added. A ZIP you trust is inspected on that
+page before anything is written, and one restart applies it.
 
 For preparation, open **Settings** on the plugin's card. Select the components
 you want, then prepare that selection. The server checks the whole plan before

@@ -8,11 +8,10 @@ Four locks, each for a different way an upstream merge could switch traffic on:
    the inventory on purpose.
 2. The page-load routes - booting the app and answering what the UI asks on
    open resolves no outside hostname and opens no outside connection.
-3. The hard switches - the update check, the upstream comparison and the plugin
-   store stay off whatever config, files or environment say.
+3. The hard switches - the update check and the upstream comparison stay off
+   whatever config, files or environment say. The plugin catalog routes are gone.
 4. The page itself - index.html and the served bundle load nothing from a CDN.
 """
-import inspect
 import json
 import re
 import socket
@@ -115,8 +114,7 @@ PAGE_LOAD_ROUTES = (
     '/api/system/gpu-flags', '/api/banks', '/api/bank-queue', '/api/dataset/list',
     '/api/local-llm/models', '/api/system/queue', '/api/system/comfyui-recovery',
     '/api/cluster/activity', '/api/train/activity', '/api/settings',
-    '/api/update/check', '/api/update/check?auto=1', '/api/plugins/store/catalog',
-    '/api/plugins/store/commerce/library',
+    '/api/update/check', '/api/update/check?auto=1', '/api/plugins/',
 )
 
 
@@ -132,22 +130,18 @@ def test_the_upstream_comparison_is_gone(client, outside_attempts):
     assert not outside_attempts
 
 
-def test_the_plugin_store_switch_is_hardwired_off(tmp_path, monkeypatch):
-    from app.plugins.store import client as store_client
-    from app.plugins.store import commerce
-    source = inspect.getsource(store_client.store_switched_off)
-    assert re.fullmatch(r'def store_switched_off\(\):\s*return True\s*', source), source
-    # A config file, a commerce file or an environment variable pointing at a
-    # store changes nothing.
-    fake = tmp_path / 'bootstrap.json'
-    fake.write_text('{"metadata_url": "https://store.invalid/", "target_url": "https://store.invalid/"}')
-    monkeypatch.setenv('LDS_STORE_CONFIG', str(fake))
-    monkeypatch.setenv('LDS_STORE_COMMERCE_CONFIG', str(fake))
-    for attempt in (store_client.load_config, store_client.StoreSession,
-                    commerce.load_commerce_config, commerce.CommerceClient):
-        with pytest.raises(store_client.StoreNotConfigured, match='switched off'):
-            attempt()
-    assert store_client.load_private_configs() == []
+def test_the_plugin_catalog_is_gone_and_the_list_names_admin(client, outside_attempts):
+    """The Plugins page opens the installed list. Catalog routes no longer exist."""
+    listed = client.get('/api/plugins/').get_json()
+    assert isinstance(listed['plugins'], list)
+    assert listed['can_manage'] is True
+    locked = client.get('/api/plugins/', headers={'X-Forwarded-For': '198.51.100.8'})
+    assert locked.status_code == 200
+    assert locked.get_json()['can_manage'] is False
+    retired = '/api/plugins/' + 'store'
+    assert client.get(retired + '/catalog').status_code == 404
+    assert client.get(retired + '/commerce/library').status_code == 404
+    assert not outside_attempts
 
 
 def test_startup_neither_resumes_rentals_nor_runs_pip():

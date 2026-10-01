@@ -54,7 +54,7 @@ loaded classes before the feature can be shown as ready.
 The manifest describes compatibility and permissions; it does not establish
 publisher identity or sandbox plugin code. Packaging and installation trust are
 separate checks. The developer tools described here create local artifacts and
-do not publish them to a Store.
+do not publish them as a separate catalog.
 
 `lds_sdk.database.for_plugin(id, tables=...)` supplies the plugin's mapped base
 and owned session. Its `func` and `or_` helpers construct SQLAlchemy expressions

@@ -58,7 +58,7 @@ const finish = (title, description, to, label) => ({ title, description, links: 
 
 function pluginLifecycle(plugin, product, journey) {
   const installedPath = '/plugins?tab=installed&plugin=' + encodeURIComponent(journey.plugin || '')
-  const discoverPath = '/plugins?tab=discover&plugin=' + encodeURIComponent(journey.plugin || '')
+  const discoverPath = '/plugins?plugin=' + encodeURIComponent(journey.plugin || '')
   const activationReady = !!plugin && pluginActive(plugin) && pluginDesired(plugin) && !plugin.pending_action
   const rows = [
     row('package', 'Install ' + (product?.name || plugin?.name || 'the plugin'), !!plugin,

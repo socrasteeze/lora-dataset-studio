@@ -55,7 +55,6 @@ export default defineConfig(({ mode }) => {
   const target = process.env.LDS_DEV_API_TARGET || env.LDS_DEV_API_TARGET
     || DEFAULT_DEV_API_TARGET
   const distribution = resolvePluginBuildMode(env)
-  const storeBuild = distribution === 'store'
   return {
     plugins: [privatePluginBuild({ distribution }), react(), {
       name: 'lds-plugin-build-mode',
@@ -65,13 +64,9 @@ export default defineConfig(({ mode }) => {
           source: JSON.stringify({ schema_version: 1, distribution,
             ...(distribution === 'fork' ? { plugins: FORK_PLUGINS } : {}) }) })
       },
-      // Replacing the module before Vite transforms its glob means store builds
-      // never traverse plugin sources, even when those folders are present.
       resolveId(source, importer) {
-        if (distribution === 'fork' && importer?.replaceAll('\\', '/').endsWith('/src/main.jsx')
+        if (importer?.replaceAll('\\', '/').endsWith('/src/main.jsx')
             && source === './plugins/bundled') return FORK_ENTRY
-        if (!storeBuild && importer?.replaceAll('\\', '/').endsWith('/src/main.jsx')
-            && source === './plugins/bundled') return path.join(REPO_ROOT, 'frontend/src/plugins/bundledDevelopment.js')
         if (source === '@lds/plugin-sdk' || source.startsWith('@lds/plugin-sdk/')) {
           const key = source === '@lds/plugin-sdk' ? '.' : `.${source.slice('@lds/plugin-sdk'.length)}`
           if (!SDK_PACKAGE.exports[key]) throw new Error(`Unknown public LDS SDK export: ${source}`)
@@ -108,7 +103,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       host: '0.0.0.0',
-      fs: { allow: [path.resolve('.'), SDK_DIR, ...(storeBuild ? [] : [BUNDLED_DIR])] },
+      fs: { allow: [path.resolve('.'), SDK_DIR, BUNDLED_DIR] },
       proxy: {
         '/api': target,
       },

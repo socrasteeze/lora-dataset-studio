@@ -5,10 +5,11 @@ import postcss from 'postcss'
 import valueParser from 'postcss-value-parser'
 import { transformWithEsbuild } from 'vite'
 
-/** This fork ships curated sources; Store and full development remain explicit. */
+/** This fork ships one curated build. */
 export function resolvePluginBuildMode(env = {}, environment = process.env) {
   const mode = environment.LDS_PLUGIN_BUILD_MODE || env.LDS_PLUGIN_BUILD_MODE
-  return mode === undefined ? 'fork' : ['bundled', 'fork'].includes(mode) ? mode : 'store'
+  if (mode === undefined || mode === 'fork') return 'fork'
+  throw new Error(`Plugin builds are fork-only. Refusing LDS_PLUGIN_BUILD_MODE=${mode}.`)
 }
 
 function isPrivateProductModule(id) {
@@ -27,7 +28,7 @@ function isPrivateProductModule(id) {
 
 /** Guard actual Vite inputs, including CSS dependencies and transformed IDs. */
 export function privatePluginBuild({ distribution }) {
-  const store = !['bundled', 'fork'].includes(distribution)
+  const store = distribution !== 'fork'
   let config
   let buildContext
   function check(context, id) {

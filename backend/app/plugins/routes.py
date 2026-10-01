@@ -110,8 +110,10 @@ def lifecycle_payload(registry):
 @bp.get('/')
 def list_plugins():
     payload = lifecycle_payload(_registry())
+    from .admin import is_admin
     payload['api'] = {'major': LDS_PLUGIN_API_MAJOR, 'minor': LDS_PLUGIN_API_MINOR}
     payload['restart'] = restart_payload()
+    payload['can_manage'] = is_admin()
     return jsonify(payload)
 
 
@@ -322,7 +324,4 @@ def _remove_plugin_locked(plugin_id):
                     'restart': restart_payload()})
 
 
-# Nest under the existing administration/CSRF boundary and keep the public
-# blueprint classification unchanged. Helpers above are ready before import.
-from .store.routes import bp as store_bp  # noqa: E402
-bp.register_blueprint(store_bp)
+

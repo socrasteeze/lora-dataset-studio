@@ -7,7 +7,7 @@ import { SettingsGroup, useSettingsGroupProps } from '../components/settings/Set
 import { InstallItem } from '../components/setup/InstallEverything'
 import { cardInstalled } from '../components/setup/mlInstallCards'
 import ImproveEnginePreference from '../components/settings/ImproveEnginePreference'
-import PluginPreparation from './store/PluginPreparation.jsx'
+import PluginPreparation from './plugins/PluginPreparation.jsx'
 
 function Group({ group, ...props }) {
   // Keep historical group ids and open preferences, including old deep links.

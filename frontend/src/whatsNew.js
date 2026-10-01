@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-plugins-on-this-install',
+    date: '2026-10-01',
+    title: 'Installed plugins stay on one page',
+    blurb: 'The catalog and the purchases tab are gone. Plugins that ship with the app stay installed. Turn one off, remove a plugin you added, or install a ZIP you trust from the Plugins page.',
+    to: '/plugins',
+  },
+  {
     id: '2026-10-01-direct-install',
     date: '2026-10-01',
     title: 'Docker support removed',

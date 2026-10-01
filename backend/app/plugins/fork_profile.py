@@ -13,7 +13,7 @@ BUILD_MARKER = Path(__file__).resolve().parents[3] / 'frontend' / 'dist' / 'plug
 def _marker_distribution(path=None):
     marker_path = Path(path or BUILD_MARKER)
     if not marker_path.is_file():
-        return 'store'
+        raise ValueError('Plugin build marker is missing.')
     try:
         marker = json.loads(marker_path.read_text(encoding='utf-8'))
     except (OSError, UnicodeError, ValueError) as exc:
@@ -21,17 +21,13 @@ def _marker_distribution(path=None):
     if not isinstance(marker, dict) or marker.get('schema_version') != 1:
         raise ValueError('Plugin build marker has an unsupported schema.')
     built = marker.get('distribution')
-    if built not in ('store', 'bundled', 'fork'):
+    if built != 'fork':
         raise ValueError(f'Plugin build marker has unknown distribution {built!r}.')
     plugins = marker.get('plugins')
-    if built == 'fork':
-        expected = list(_POLICY['enabled'])
-        if plugins != expected:
-            raise ValueError('Fork plugin build marker does not match the curated fork policy.')
-        return 'fork'
-    if plugins is not None:
-        raise ValueError('Only a fork plugin build marker may declare curated plugins.')
-    return 'development' if built == 'bundled' else 'store'
+    expected = list(_POLICY['enabled'])
+    if plugins != expected:
+        raise ValueError('Fork plugin build marker does not match the curated fork policy.')
+    return 'fork'
 
 
 def distribution(marker_path=None):

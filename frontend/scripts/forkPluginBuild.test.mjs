@@ -28,9 +28,9 @@ test('fork build selects curated descriptors before ordinary module resolution',
   }
 })
 
-test('fork distribution is the default and preserves explicit Store and development profiles', () => {
+test('fork distribution is the only plugin build', () => {
   assert.equal(resolvePluginBuildMode({}, {}), 'fork')
-  assert.equal(resolvePluginBuildMode({}, { LDS_PLUGIN_BUILD_MODE: 'store' }), 'store')
-  assert.equal(resolvePluginBuildMode({}, { LDS_PLUGIN_BUILD_MODE: 'bundled' }), 'bundled')
   assert.equal(resolvePluginBuildMode({}, { LDS_PLUGIN_BUILD_MODE: 'fork' }), 'fork')
+  assert.throws(() => resolvePluginBuildMode({}, { LDS_PLUGIN_BUILD_MODE: 'store' }), /fork-only/)
+  assert.throws(() => resolvePluginBuildMode({}, { LDS_PLUGIN_BUILD_MODE: 'bundled' }), /fork-only/)
 })

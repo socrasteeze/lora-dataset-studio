@@ -2,7 +2,7 @@
 
 [Documentation](../README.md) · [Requirements](requirements.md) · [First launch](getting-started.md)
 
-On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins → Store**, select the features you want and install them together with one LDS restart. Each plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
+On first launch, **Setup** prepares the core. No plugin is needed to import and organise images. Afterwards, open **Plugins**. The features that ship with the app are already installed. A ZIP you trust can be added from that page, and one restart applies it. Each plugin has its own settings and preparation steps; required ComfyUI custom nodes are installed through that plugin's preparation flow.
 
 The Store offers **free public plugins** for generation, editing, training, publishing and other optional features. Each listing describes the plugin's capabilities and preparation requirements. Updates are delivered through **Plugins → Updates**.
 
@@ -63,7 +63,7 @@ npm run build
 
 In [Pinokio](https://pinokio.computer), open **Discover → Download from URL** and paste `https://github.com/perfectgf/lora-dataset-studio.git`, then click **Install** and **Start**. Pinokio builds the Python environment, installs the core requirements and opens Studio; **Update** fast-forwards the same checkout the in-app updater uses.
 
-Only the core app is installed this way. Complete **Setup**, then choose your optional features in **Plugins → Store**; each plugin carries its own settings and preparation steps. Updates go through Pinokio's **Update** tab: because Pinokio starts and stops the server, the app detects this install shape and shows *Stop → Update → Start* instead of its own **Update & restart** button, which would relaunch the server outside Pinokio's control.
+Only the core app is installed this way. Complete **Setup**, then open **Plugins** for the features that ship with the app. Each plugin carries its own settings and preparation steps. Updates go through Pinokio's **Update** tab: because Pinokio starts and stops the server, the app detects this install shape and shows *Stop → Update → Start* instead of its own **Update & restart** button, which would relaunch the server outside Pinokio's control.
 
 ## External tools
 
