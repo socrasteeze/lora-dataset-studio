@@ -3,7 +3,7 @@
 **Updated:** 2026-10-01 · **Branch:** wave/12-civitai-publish · **Base:** f3815e82e · **Tree:** clean
 
 ## State
-Wave 12 removed the Civitai publisher on `wave/12-civitai-publish`. `origin/wave/11-review` is `0a2a68c86`. `origin/main` is still `f3815e82e`. Gates have not run.
+Two `scripts/gates.ps1 -Phase Gates` runs on `281b713f8` both exited 0. The host suite was 10025 passed, 9 skipped, 390 warnings, 8 subtests. Docker was not run. The gate log does not name the 9 skips (`-q -rf`). This commit only records that result.
 
 ## Done this session
 - `bundled/civitai_publish` is gone, including its held id and the one outbound call to civitai.com.
@@ -11,10 +11,7 @@ Wave 12 removed the Civitai publisher on `wave/12-civitai-publish`. `origin/wave
 - What's New id `2026-10-01-zzzzzzzz-no-civitai-publish`.
 
 ## Open
-1. Push `wave/12-civitai-publish` if this commit is still only local.
-2. Run `scripts/gates.ps1 -Phase Gates` twice on a named host. On two matching green logs, fast-forward `origin/main`, push annotated tag `v2026.10.01`, and delete `fix/config-isolation`, `fix/settings-copy-restore`, `noble/bank-queue-stop`, and `integrate/2026-10-01`.
-3. If that host cannot start, save the launcher error and leave main at `f3815e82e`.
-4. Do not restore `bundled/civitai_publish`. Do not remove the link tables, `CIVITAI_API_KEY`, the cloud shims, or the twelve enabled plugins.
+1. Do not restore `bundled/civitai_publish`. Do not remove the link tables, `CIVITAI_API_KEY`, the cloud shims, or the twelve enabled plugins.
 
 ## Decisions
 - S is compact tiles, not a separate row component. `DatasetRow` is gone.
