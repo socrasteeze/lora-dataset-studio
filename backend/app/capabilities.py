@@ -249,9 +249,10 @@ def _cached_import_state(key: str, python: str, module_expr: str):
     for _IMPORT_TTL (a venv does not change between two probes), an unknown for
     _UNKNOWN_TTL so it re-tries soon against a now-warm import WITHOUT spawning
     a fresh 90 s subprocess on every 2 s poll of the Bank panel."""
+    cache_python = python
     if key in _LONG_POSITIVE_IMPORT_KEYS:
-        python = f'{python}|receipt={_joycaption_install_receipt(python)}'
-    cache_key = f'{key}:{python}:{module_expr}'
+        cache_python = f'{python}|receipt={_joycaption_install_receipt(python)}'
+    cache_key = f'{key}:{cache_python}:{module_expr}'
 
     def fresh_cached():
         cached = _import_cache.get(cache_key)

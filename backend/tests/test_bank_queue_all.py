@@ -185,9 +185,14 @@ def test_the_bank_list_carries_the_last_pipelines_step_outcomes(app, tmp_path):
         report = row['pipeline_report']
         assert [s['status'] for s in report['steps']] == ['done', 'skipped']
         assert 'GPU busy' in report['steps'][1]['reason']
-        # The list gets a verdict, not a transcript.
+        # The list gets a verdict, not a transcript. Counts, the blocked
+        # flag, and superseded_at are part of that verdict.
         assert set(report) == {'cancelled', 'steps'}
-        assert set(report['steps'][0]) == {'step', 'status', 'reason'}
+        assert set(report['steps'][0]) == {
+            'step', 'status', 'reason', 'counts', 'blocked', 'superseded_at'}
+        assert report['steps'][0]['counts'] == {}
+        assert report['steps'][0]['blocked'] is None
+        assert report['steps'][0]['superseded_at'] is None
 
 
 def test_a_bank_that_never_ran_a_pipeline_reports_nothing(app, tmp_path):
