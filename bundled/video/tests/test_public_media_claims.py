@@ -32,7 +32,6 @@ def test_video_claims_its_product_settings_and_leaves_shared_decoders_to_host():
 @pytest.mark.parametrize(('pid', 'expected'), [
     ('video', {'video', 'video_detail', 'video_decode', 'video_detect', 'video_encode'}),
     ('scrape', {'scrape_deps', 'scrape_deps_detail'}),
-    ('civitai_publish', {'civitai'}),
 ])
 def test_public_probes_are_declared_and_registered_by_their_product(host, pid, expected):
     loaded = activate(host, {pid})
@@ -131,36 +130,6 @@ def test_scrape_off_never_inspects_installed_packages(host, monkeypatch):
     with host[0].app_context():
         assert loaded.probes['scrape_deps'][1]() is False
         assert loaded.probes['scrape_deps_detail'][1]() == ''
-
-
-@pytest.mark.parametrize(('credential', 'expected'), [(None, False), ('fixture-only-key', True)])
-def test_civitai_probe_preserves_dict_shape_and_only_reports_key_presence(host, monkeypatch, credential, expected):
-    loaded = activate(host, {'civitai_publish'})
-    from lds_sdk import credentials
-    monkeypatch.setattr(credentials, 'civitai_api_key', lambda: credential)
-    with host[0].app_context():
-        result = loaded.probes['civitai'][1]()
-    assert result == {'ok': expected, 'detail': 'key set' if expected else 'key missing'}
-    assert 'fixture-only-key' not in json.dumps(result)
-
-
-def test_civitai_resolver_exception_uses_main_secret_fallback(host, monkeypatch):
-    loaded = activate(host, {'civitai_publish'})
-    from lds_sdk import config, credentials
-    monkeypatch.setattr(credentials, 'civitai_api_key', lambda: (_ for _ in ()).throw(OSError('fixture')))
-    monkeypatch.setattr(config, 'secret', lambda key: 'fixture-key' if key == 'CIVITAI_API_KEY' else None)
-    with host[0].app_context():
-        assert loaded.probes['civitai'][1]() == {'ok': True, 'detail': 'key set'}
-
-
-def test_civitai_off_never_resolves_credentials(host, monkeypatch):
-    loaded = activate(host, {'civitai_publish'})
-    from app import config
-    from lds_sdk import credentials
-    monkeypatch.setattr(credentials, 'civitai_api_key', lambda: pytest.fail('OFF Civitai resolved a credential'))
-    config.save_config({'plugins': {'enabled': {'civitai_publish': False}}})
-    with host[0].app_context():
-        assert loaded.probes['civitai'][1]() == {'ok': False, 'detail': 'plugin disabled'}
 
 
 def test_live_readiness_is_independent_of_video_plugin(host, monkeypatch):

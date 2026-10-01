@@ -13,9 +13,7 @@
     "seedvr2",
     "video"
   ],
-  "held": [
-    "civitai_publish"
-  ],
+  "held": [],
   "excluded": [
     "api_engines",
     "cloud_training"

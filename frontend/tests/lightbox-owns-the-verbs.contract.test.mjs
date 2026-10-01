@@ -21,7 +21,6 @@ import { registerBundledDescriptor } from './support/bundledDescriptors.mjs';
 import { contributions, setEnabled } from '../src/plugins/registry.js';
 import { contributionKey, createLayerTracker } from '../src/plugins/layerTracker.js';
 import cameraDescriptor from '../../bundled/camera_angles/frontend/index.js';
-import civitaiDescriptor from '../../bundled/civitai_publish/frontend/index.js';
 
 test.beforeEach(installRuntimeHost);
 
@@ -44,7 +43,6 @@ const HOSTS = [
 
 const viewer = read(VIEWER);
 const cameraAction = read('../bundled/camera_angles/frontend/panels/GalleryCameraAction.jsx');
-const civitaiAction = read('../bundled/civitai_publish/frontend/panels/GalleryCivitaiAction.jsx');
 
 test('the host list above is the real host list', () => {
   const dirs = ['src/pages', 'src/components', '../bundled/canvas/frontend'];
@@ -156,15 +154,14 @@ test('while the picker is open, the viewer stands down its window keys', () => {
   assert.match(cameraAction, /addEventListener\('keydown', onKey, true\)/);
   assert.match(cameraAction, /removeEventListener\('keydown', onKey, true\)/);
   assert.equal(registerBundledDescriptor(cameraDescriptor), true);
-  assert.equal(registerBundledDescriptor(civitaiDescriptor), true);
-  setEnabled(['camera_angles', 'civitai_publish']);
+  setEnabled(['camera_angles']);
   const items = contributions('lightbox.action', 'gallery');
-  assert.equal(items.length, 2, 'camera and publishing coexist in the shared viewer');
+  assert.equal(items.length, 1, 'the camera verb is the lightbox action');
   const tracker = createLayerTracker();
   const cameraLayer = tracker.onLayerFor(contributionKey(items.find(item => item.plugin === 'camera_angles')));
-  const civitaiLayer = tracker.onLayerFor(contributionKey(items.find(item => item.plugin === 'civitai_publish')));
+  const otherLayer = tracker.onLayerFor('other:verb');
   cameraLayer(true);
-  civitaiLayer(false);
+  otherLayer(false);
   assert.equal(tracker.any(), true, 'another closed verb must not release the camera layer');
   cameraLayer(false);
   assert.equal(tracker.any(), false, 'closing the camera layer returns keys to the viewer');

@@ -12,7 +12,7 @@ The landing gate is `scripts/gates.ps1 -Phase Gates`.
 `fork-plugins.json` owns which plugins ship.
 Packaged images, compose files, and their launchers are not part of this fork.
 Install on the machine that runs the app. Remote ComfyUI stays.
-The Civitai publisher stays held.
+The Civitai publisher is not included. Saved link tables and the shared API key stay.
 API image engines and rented-GPU training stay excluded.
 Plugins that ship with the app are installed with it.
 There is no plugin catalog.

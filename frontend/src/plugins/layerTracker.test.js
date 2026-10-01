@@ -9,7 +9,7 @@ import { contributionKey, createLayerTracker } from './layerTracker.js'
 test('a second contribution reporting closed does not close the first one\'s layer', () => {
   const t = createLayerTracker()
   const a = t.onLayerFor('camera_angles:camera')
-  const b = t.onLayerFor('civitai_publish:civitai')
+  const b = t.onLayerFor('hf_publish:publish')
   a(true)
   assert.equal(t.any(), true)
   b(false)                       // the host re-rendered, B's effect replayed with open=false
@@ -39,5 +39,5 @@ test('onChange fires on the transitions only — the host re-renders for a chang
 })
 
 test('the key of a contribution is its plugin and its id', () => {
-  assert.equal(contributionKey({ plugin: 'civitai_publish', id: 'civitai' }), 'civitai_publish:civitai')
+  assert.equal(contributionKey({ plugin: 'hf_publish', id: 'publish' }), 'hf_publish:publish')
 })

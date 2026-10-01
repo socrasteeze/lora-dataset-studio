@@ -379,13 +379,6 @@
     "huggingface.co"
    ]
   },
-  "bundled/civitai_publish/lds_civitai_publish/publish.py": {
-   "calls": 1,
-   "hosts": [
-    "civitai.com",
-    "github.com"
-   ]
-  },
   "bundled/dlss5/lds_dlss5/neural_render.py": {
    "calls": 2,
    "hosts": [
