@@ -340,9 +340,10 @@
    squares cannot fit. Instead the Tags / Review / Open glyphs share one strip
    across the tile foot there: each a 40 px tall hit area a third of the tile
    wide, while the visible pill stays the small one a desktop shows. A desktop
-   mouse keeps the compact corner cluster. The caption-author chip sits
-   bottom-left; on touch it moves up to clear the pills (the transparent strip
-   is painted over it, so a tap there still reaches the action). */
+   mouse keeps the compact corner cluster. On a phone the strip stays on the
+   right and leaves 2.5rem at the left of the tile foot free, so a tap there
+   still selects the image. The caption-author chip sits bottom-left; on touch
+   it moves up to clear the pills. */
 .bank-tile__actions {
   position: absolute;
   right: 0.25rem;
@@ -366,7 +367,7 @@
 
 @media (max-width: 1023px), (pointer: coarse) {
   .bank-tile__actions {
-    left: 0;
+    left: 2.5rem;
     right: 0;
     bottom: 0;
     gap: 0;

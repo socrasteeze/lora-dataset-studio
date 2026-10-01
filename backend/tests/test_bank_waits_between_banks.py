@@ -360,8 +360,11 @@ def test_auto_without_joycaption_still_checks_ollama(app, monkeypatch):
 _KEY, _PY, _EXPR = 'joycaption', 'synthetic-python', 'import transformers'
 
 
-def _age(capabilities, seconds):
-    cache_key = f'{_KEY}:{_PY}:{_EXPR}'
+def _age(capabilities, seconds, python=_PY):
+    prefix = f'{_KEY}:{python}'
+    matches = [k for k in capabilities._import_cache if k.startswith(prefix)]
+    assert len(matches) == 1, matches
+    cache_key = matches[0]
     ts, ok = capabilities._import_cache[cache_key]
     capabilities._import_cache[cache_key] = (ts - seconds, ok)
 

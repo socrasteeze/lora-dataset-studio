@@ -85,6 +85,13 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-zzzzzzz-honest-bank-cards',
+    date: '2026-10-01',
+    title: 'Bank cards and the queue say what happened',
+    blurb: 'Cancelling a queued bank checks whether it is already running before it asks. A caption pass that finished short, or a pass the machine refused, shows on the card. On a phone, the bottom-left of a tile still selects the image. A JoyCaption ready check expires within an hour, and sooner when that install changes.',
+    to: '/bank',
+  },
+  {
     id: '2026-10-01-zzzzzz-bank-rail',
     date: '2026-10-01',
     title: 'The bank rail stays on the controls',

@@ -596,7 +596,14 @@ export default function BankPage() {
   // The ✕ on a waiting row is one tap. On the RUNNING row it stops a run, so it
   // asks first — the same question Stop running asks (bankQueueActions.js).
   const cancelQueued = async (id) => {
-    const ask = removeQueuedConfirm(queue, nameOf, id)
+    // The panel polls every 2 s. A waiting row can become the running row in
+    // that gap, and the confirm has to ask the running-row question when it has.
+    let live = queue
+    try {
+      live = await apiFetch('/api/bank-queue')
+      setQueue(live)
+    } catch { /* the polled snapshot is the best confirm we have */ }
+    const ask = removeQueuedConfirm(live, nameOf, id)
     if (ask && !window.confirm(ask)) return
     try { await del(`/api/bank-queue/${id}`) } catch (e) { toast.error(e?.message || 'Could not update the queue.') }
     refreshQueue()

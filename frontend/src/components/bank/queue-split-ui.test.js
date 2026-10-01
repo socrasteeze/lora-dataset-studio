@@ -149,8 +149,11 @@ test('both destructive queue actions, and the running row ✕, ask first', () =>
   // window.confirm is the app's confirm pattern (queue-all, remove bank).
   assert.match(page, /const ask = clearWaitingConfirm\(queue\)\s*if \(!ask \|\| !window\.confirm\(ask\)\) return/);
   assert.match(page, /const ask = stopRunningConfirm\(queue, nameOf\)\s*if \(!ask \|\| !window\.confirm\(ask\)\) return/);
-  // The ✕: null (no question) for a waiting row, the stop question when running.
-  assert.match(page, /const ask = removeQueuedConfirm\(queue, nameOf, id\)\s*if \(ask && !window\.confirm\(ask\)\) return/);
+  // The ✕ refetches first. A waiting row that started during the 2 s poll
+  // asks the running-row question; a row that is still waiting asks nothing.
+  assert.match(page, /live = await apiFetch\('\/api\/bank-queue'\)/);
+  assert.match(page, /const ask = removeQueuedConfirm\(live, nameOf, id\)/);
+  assert.match(page, /if \(ask && !window\.confirm\(ask\)\) return/);
   // Stop running uses the per-entry cancel, one per running entry (one per machine).
   assert.match(page, /for \(const it of runningItems\(queue\)\)[\s\S]{0,80}del\(`\/api\/bank-queue\/\$\{it\.bank_id\}`\)/);
 });
