@@ -5,6 +5,7 @@ import { toFilterPatch, describeSummary, headline } from './bankDescribe.js'
 import useOllamaFence from '../../hooks/useOllamaFence'
 import { keepAnswer } from '../../utils/ollamaFence'
 import OllamaFenceNotice from '../common/OllamaFenceNotice'
+import { Button, Input } from '../common/Controls.jsx'
 
 /* Say what you want; the app sets ITS OWN filters and you read the result.
  *
@@ -68,18 +69,17 @@ export default function DescribeFilterBar({ bankId, onApply }) {
           floor is what makes it happen. */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 text-xs text-content-muted"><MessagesSquare aria-hidden="true" className="h-3.5 w-3.5" /> Describe the set you want</span>
-        <input
-          className="min-h-10 lg:min-h-0 lg:h-8 w-full min-w-[11rem] flex-1 rounded-md border border-border bg-surface px-2 text-sm"
+        <Input
+          size="md"
+          className="w-full min-w-[11rem] flex-1"
           placeholder="an amateur photo set, least polished first"
           value={text} maxLength={400} disabled={busy}
+          aria-label="Describe the set you want"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') run() }} />
-        <button type="button" onClick={run} disabled={busy || !text.trim()}
-          className="min-h-10 lg:min-h-0 lg:h-8 whitespace-nowrap rounded-md border border-border px-2 text-xs font-medium
-            text-content-muted hover:bg-surface-raised hover:text-content
-            disabled:opacity-50">
+        <Button size="md" noShrink onClick={run} disabled={busy || !text.trim()}>
           {busy ? 'Reading' : 'Set the filters'}
-        </button>
+        </Button>
       </div>
 
       <OllamaFenceNotice fence={fence} onUnload={unloadAndRetry} onStop={stopWaiting} />

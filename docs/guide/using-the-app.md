@@ -466,7 +466,9 @@ parts, and knowing which is which saves reading the rest of this section twice:
   change what leaves the bank — **⚙ Passes**, **🚀 Launch all**, **⬆ Promote**
   and **🗑 Delete rejected from disk**;
 - a **filter rail** down the left: the search, the exclude box, the subfolder
-  picker, the person and style strips, and the chips. The six measured axes
+  picker, the person and style strips, and the chips. While a filter is on,
+  the chip counts follow that filter. Each chip is counted with the others
+  applied and its own value lifted, so you can switch to a neighbour. The six measured axes
   (Score, Framing, Medium, Angle, Resolution, Origin) sit behind **🎛 More
   filters** so the everyday ones stay on one screen. On a narrow window the rail
   becomes a drawer you open with **☰ Filters**, and it remembers whether you
@@ -2112,12 +2114,13 @@ triaging. They are now also under the chips themselves: open **🎚 Filter
 thresholds** above the grid.
 
 It is the **same setting in both places** — one value, seen twice — so anything
-you change here applies to **every bank**, and the panel says so at the top.
+you change here applies to **every bank**. Most re-sort this bank the moment
+you save, with no rescan.
 
 The twelve knobs are grouped by the question they answer: **Image quality**,
-**Duplicates**, **Size & framing**, **Content**, **Style**. The first two are
-open by default; the rest fold away, and a folded group tells you how many of
-its values you have moved off the default.
+**Duplicates**, **Size & framing**, **Content**, **Style**. Every group starts
+folded, and a folded group tells you how many of its values you have moved off
+the default.
 
 Three things each control tells you that a bare number cannot:
 
@@ -2125,7 +2128,8 @@ Three things each control tells you that a bare number cannot:
   distance* is a distance in hash bits — **raise** it to catch more
   near-duplicates. *Semantic duplicate similarity* is a similarity — **lower**
   it to catch more. They sit side by side and they move opposite ways, so each
-  field spells its own direction out in a sentence next to the input.
+  field spells its own direction out in a sentence under the input. The longer
+  hint, and when the change takes effect, sit on that sentence's title.
 - **When it takes effect.** Eight of them re-sort the bank the moment you save,
   because the scan stores raw measurements and the verdicts are recomputed on
   every read — no rescan, ever. The other four are baked into stored groups by a
