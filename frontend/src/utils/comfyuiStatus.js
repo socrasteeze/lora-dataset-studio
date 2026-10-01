@@ -19,7 +19,7 @@
    re-check the one thing that was already correct.
 
    So the reason is computed from `caps.comfyui.status` ('ok' | 'slow' |
-   'unreachable' | 'unconfigured'), which the backend publishes alongside
+   'unreachable' | 'unconfigured' | 'ignored'), which the backend publishes alongside
    `reachable`, and the wording lives here rather than in each card. */
 
 /** Whether ComfyUI is answering at all — the gate every engine card shares.
@@ -29,6 +29,13 @@ export function comfyuiAnswering(comfy) {
   const c = comfy || {};
   if (typeof c.status === 'string') return c.status === 'ok';
   return !!c.reachable;
+}
+
+/** True when the server reports ComfyUI as ignored in Settings (`comfyui.ignored`):
+ *  LDS made no request, so the right display is a neutral "Ignored", not an error. */
+export function comfyuiIgnored(comfy) {
+  const c = comfy || {};
+  return c.ignored === true || c.status === 'ignored';
 }
 
 /** The ONE sentence for a ComfyUI that isn't answering, or null when it is.
@@ -41,6 +48,8 @@ export function comfyuiAnswering(comfy) {
 export function comfyuiDownReason(comfy) {
   const c = comfy || {};
   if (comfyuiAnswering(c)) return null;
+  // The operator's own choice (`comfyui.ignored`), not a fault: neutral, no ⚠.
+  if (comfyuiIgnored(c)) return 'ComfyUI is set to Ignore in Settings ▸ Local tools';
   if (c.hint) return `⚠ ${c.hint}`;
   if (c.status === 'slow') {
     const secs = Number(c.object_info_timeout_s) || 0;

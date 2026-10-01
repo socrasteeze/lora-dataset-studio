@@ -88,6 +88,10 @@ class ComfyUIRecoveryRequired(RuntimeError):
     """Raised when new ComfyUI work must wait for explicit recovery."""
 
 
+class ComfyUIIgnored(RuntimeError):
+    """Raised when local ComfyUI work is refused because `comfyui.ignored` is set."""
+
+
 class _ComfySubmitRejected(RuntimeError):
     """A deterministic pre-submit refusal (safe to surface as terminal)."""
 
@@ -1691,6 +1695,12 @@ class JobQueueManager:
             # not using. The arbiter is skipped there for the same reason — it
             # serializes LOCAL GPU consumers, and the peer path holds it across
             # artifact file copies for no benefit.
+            #
+            # An ignored ComfyUI refuses here, before a row exists, so the click
+            # gets the reason at once instead of a job that fails on submit.
+            from .utils.comfyui import COMFYUI_IGNORED_MESSAGE, comfyui_ignored
+            if comfyui_ignored():
+                raise ComfyUIIgnored(COMFYUI_IGNORED_MESSAGE)
             with GPU_ARBITER_LOCK:
                 require_comfyui_enqueue_ready()
                 db.session.add(job)

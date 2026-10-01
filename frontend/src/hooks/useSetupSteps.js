@@ -8,6 +8,7 @@ import { SETTINGS_SECTIONS } from '../components/settings/registry.js'
 // the ✦ Edit modal. Setup asking a different question than the page that consumes
 // the model is exactly how ✓ and ⚠ ended up on the same install.
 import { localEngineReadiness } from '../utils/localEngineReason.js'
+import { comfyuiIgnored } from '../utils/comfyuiStatus.js'
 import { blockingInvalid, integrityCause } from '../utils/modelIntegrityWords.js'
 import { KLEIN_REQUIRED_ASSETS, KLEIN_ASSET_LABELS, kleinMissingLabels, kleinAssetBlocks }
   from '../utils/kleinAssets.js'
@@ -108,9 +109,12 @@ function comfyuiStep(caps, runtimeReadiness) {
   const managedInitializing = managed.mode === 'integrated'
     && managed.state === 'starting' && !c.reachable
   const skipped = !!c.skipped && !c.reachable && !managedInitializing
+  // Ignore ComfyUI (Settings): the operator's choice, shown neutral like a skip.
+  const ignored = comfyuiIgnored(c) && !managedInitializing
   const status = managedInitializing
     ? 'initializing'
-    : (skipped ? 'skipped' : gateStatus(c.reachable, hasKlein))
+    : ignored ? 'ignored'
+      : (skipped ? 'skipped' : gateStatus(c.reachable, hasKlein))
   return {
     id: 'comfyui', title: 'ComfyUI — local generation & Test Studio', recommended: true,
     unlocks: ['Klein engine (image generation)', 'Test Studio'],
@@ -120,6 +124,7 @@ function comfyuiStep(caps, runtimeReadiness) {
     connectionStatus: c.status || (c.reachable ? 'ok' : 'unreachable'),
     hasKlein, kleinMissing, kleinInvalid, apiUrl: c.api_url || '',
     skipped,
+    ignored,
     // The ONE sentence for why each local engine is dark, identical to the one the
     // generation panel shows — so the two screens can no longer name different
     // causes for one gap. Null when the engine is ready.

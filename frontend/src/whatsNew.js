@@ -84,6 +84,12 @@ import { registeredDescriptors, routes as pluginRoutes } from './plugins/registr
 // Newest first. Prepend new waves at the top.
 export const WHATS_NEW = [
   {
+    id: '2026-10-01-ignore-comfyui', date: '2026-10-01',
+    title: 'Leave an Offline ComfyUI Alone',
+    blurb: 'If your ComfyUI lives on a machine that is often off, turn on Ignore ComfyUI in Settings ▸ Local tools. LDS stops contacting it and keeps the address for later, so captioning no longer waits on it and the logs stay quiet. Turn it off again to generate.',
+    to: '/settings/local-tools',
+  },
+  {
     id: '2026-09-29-zzzzzzz-one-type-scale', date: '2026-09-29',
     title: 'One Set of Text Sizes Across the App',
     blurb: 'Small labels, badges and tile chips now share one size instead of four near-identical ones, every page title matches, and the Bank opens with its first images near the top of the screen: the last Launch-all report and the Curate tools fold to one line and remember how you left them.',

@@ -1877,8 +1877,9 @@ def comfyui_launch_facts(timeout=3):
     """
     from .. import config as cfg
     import requests
+    from ..utils.comfyui import comfyui_ignored
     api = (cfg.get('comfyui.api_url') or '').rstrip('/')
-    if not api:
+    if not api or comfyui_ignored():
         return None, None, None
     try:
         r = requests.get(f'{api}/system_stats', timeout=network_timeout(timeout), allow_redirects=False)

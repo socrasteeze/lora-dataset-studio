@@ -172,7 +172,12 @@ def _comfyui_connection(link):
     from .. import capabilities, config as cfg
     from ..job_queue import COMFYUI_LINK_REACHABLE, COMFYUI_LINK_UNREACHABLE
     from ..utils.redact import redact_url_secrets
+    from ..utils.comfyui import COMFYUI_IGNORED_MESSAGE, comfyui_ignored
     url = redact_url_secrets((cfg.get('comfyui.api_url') or '').rstrip('/')) or ''
+    if comfyui_ignored():
+        # The operator's choice, not a broken link: no probe, a neutral status.
+        return {'reachable': False, 'url': url, 'status': 'ignored', 'ignored': True,
+                'hint': COMFYUI_IGNORED_MESSAGE}
     if link == COMFYUI_LINK_REACHABLE:
         return {'reachable': True, 'url': url, 'status': 'ok', 'hint': None}
     if link == COMFYUI_LINK_UNREACHABLE:

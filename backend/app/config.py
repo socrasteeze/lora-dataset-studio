@@ -122,6 +122,13 @@ DEFAULTS = {
                 # the DERIVED comfyui.skipped in capabilities.probe), so it can never
                 # mask a real error of a configured ComfyUI.
                 'setup_skipped': False,
+                # ignored (default False): the operator marked the configured ComfyUI
+                # as one LDS must leave alone (a remote box that is often offline),
+                # while keeping its URL. Unlike setup_skipped this DOES gate: while
+                # true, LDS sends no HTTP request to api_url and treats ComfyUI as
+                # offline; local generation fails fast. See
+                # utils.comfyui.comfyui_ignored().
+                'ignored': False,
                 # Seconds ComfyUI is allowed to spend ANSWERING the /object_info
                 # enumeration (the heaviest probe in the app). It is a READ budget
                 # only: the connection itself still has to be accepted in

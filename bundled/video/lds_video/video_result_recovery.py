@@ -108,7 +108,8 @@ def recover(clip):
         workflow = json.loads(job.workflow_data or '{}')
         url = str(cfg.get('comfyui.api_url') or '').rstrip('/')
         entry = {}
-        if url and job.comfyui_prompt_id:
+        # comfyui.ignored: no request; fall through to the local saved-MP4 check.
+        if url and job.comfyui_prompt_id and cfg.get('comfyui.ignored') is not True:
             try:
                 response = requests.get(f'{url}/history/{quote(job.comfyui_prompt_id, safe="")}', timeout=(3, 5))
                 response.raise_for_status()
