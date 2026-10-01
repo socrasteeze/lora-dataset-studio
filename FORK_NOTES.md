@@ -1866,6 +1866,47 @@ split; then take upstream's test whole. The core twin
 (`frontend/src/components/settings/registry.test.js`) no longer carries the
 Pexels test at all on this fork, so it needs nothing.
 
+### A conftest carrier with no upstream fix to wait for: `_isolate_user_state`, 2026-10-01
+
+`backend/tests/conftest.py::_isolate_user_state` is fork-only. Upstream never
+had it, nor `backend/tests/test_config_isolation.py`, the file that pins it.
+Both were added here on 2026-07-25 (`6511a7b7a`, `d554a0515`). The autouse
+fixture points `LDS_CONFIG`, `LDS_DATA_DIR` and `LDS_ENV` at per-test temp
+paths and patches `config.ENV_PATH` and `config._cache`. Without it, a plain
+pytest run lets any test that takes no `app` fixture read and write the
+checkout's real `config.json`, `data/` and `.env`.
+
+**How it was lost.** The V2 merge `891d61e33` resolved one `conftest.py`
+hunk, fork lines 242-330 holding `_isolate_user_state` and the old `app`
+fixture, to upstream's side (`_isolate_plugin_runtime`, `plugin_app_factory`
+and the new `app`). It also took upstream's body of
+`_no_hugging_face_gate_call` and kept the fork's other lines, such as
+`pytest_runtest_makereport`. Upstream's `_isolate_plugin_runtime` resets
+globals but redirects none of those paths. The guard test came through from
+the fork side unchanged, so it was left with nothing to pin. A dispatched CI
+run, `36831243173`, failed its four cases on 2026-10-01. Branch
+`fix/config-isolation` restored the fixture body verbatim from `891d61e33^1`.
+
+**Why local Gates cannot see a loss.** `scripts/upstream_sync.ps1`
+(`Invoke-IsolatedValidation`) sets the three variables to one shared scratch
+for the whole run, so every test resolves scratch, never the repo. `f32e6acb1`
+also relaxed `assert not path.exists()` in the guard to a parents check, which
+passes against that shared scratch file. CI calls pytest directly and does
+report the loss, but only when a run starts. The same merge took upstream's
+`ci.yml` push trigger, `branches: [v2]`, and this fork has no `v2` branch. No
+push to `main` has started CI since then; CI runs only when dispatched or on a
+pull request.
+
+**After every sync that touches `conftest.py`:**
+
+```bash
+git grep -n 'def _isolate_user_state' -- backend/tests/conftest.py   # must print one line
+```
+
+**Never drop this carrier**, even when upstream rewrites `conftest.py` whole.
+Re-apply the fixture and its comment from the fork side of the merge that
+dropped it: `git show <merge>^1:backend/tests/conftest.py`.
+
 ## Divergence 6: upstream's dormant `worker_url` plumbing is now LIVE here
 
 Upstream's `utils/comfyui.py` has carried `worker_url=` parameters on
