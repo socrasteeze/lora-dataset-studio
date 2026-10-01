@@ -282,7 +282,7 @@ const TOPICS = [
     guide: { chapter: 'getting-started', anchor: 'around-the-app' },
     app: { route: '/datasets' },
     tip: { trigger: 'library-browse',
-      text: 'Resize tiles S/M/L, collapse sections, and filter by kind.' } },
+      text: 'Resize tiles S/M/L, turn the page, and filter by kind.' } },
   action('library-backup', 'Back up everything',
     ['backup', 'back up', 'export everything', 'move machine', 'migrate', 'restore',
      'settings', 'config', 'archive', 'save all', 'new install',

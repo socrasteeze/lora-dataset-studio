@@ -29,11 +29,12 @@ test('"Include trained LoRAs" is an option INSIDE the menu, not a loose toolbar 
   assert.doesNotMatch(list, /Choose a dataset backup ZIP/)
 })
 
-test('"Import backup" moved into the same menu, "+ New dataset" stayed out of it', () => {
+test('Import backup moved into the same menu, and New dataset stayed out of it', () => {
   const panel = menuPanel()
   assert.match(panel, /Import backup/)
   assert.doesNotMatch(panel, /New dataset/)
-  assert.match(list, /\+ New dataset/)
+  const code = list.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+  assert.match(code, /New dataset/)
   assert.match(list, /<FullBackupControls backup=\{backup\} onRestore=\{onRestore\} \/>/)
 })
 

@@ -22,7 +22,7 @@ test('library page persists its display preferences under stable keys', () => {
 test('library filtering/grouping goes through the tested pure helpers', () => {
   assert.match(panel, /from '\.\.\/\.\.\/utils\/datasetLibrary'/)
   assert.match(panel, /datasetMatches\(d, query, kindFilter\)/)
-  assert.match(panel, /groupDatasets\(filtered\)/)
+  assert.match(panel, /groupDatasets\(paged\.items\)/)
 })
 
 test('family sections are collapsible and announce their state', () => {
@@ -39,17 +39,23 @@ test('the S/M/L control is the shared segmented component, in both grids', () =>
   assert.match(grid, /datasetGridTileSize/)
 })
 
-test('S size renders compact rows, M/L render photo-tile grids', () => {
-  assert.match(panel, /tileSize === 'S' \? \(/)
-  assert.match(panel, /<DatasetRow /)
+test('S, M and L are tile grids, and a page is grouped after it is sliced', () => {
+  assert.match(panel, /S: 'grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'/)
+  assert.match(panel, /M: 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4'/)
+  assert.match(panel, /L: 'grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3'/)
   assert.match(panel, /<DatasetTile /)
+  assert.doesNotMatch(panel, /function DatasetRow/)
+  assert.match(panel, /groupDatasets\(paged\.items\)/)
+  assert.match(panel, /libraryPageFor\(/)
 })
 
-test('desktop-first: the library uses the full page width and dense columns', () => {
+test('desktop-first: the library uses the full page width and 5/4/3 columns at xl', () => {
   // The old max-w-4xl cap must not come back around the list panel (the
   // empty-state hero and creation form re-cap themselves inside the panel).
   assert.doesNotMatch(page, /max-w-4xl/)
-  assert.match(panel, /lg:grid-cols-4/)
+  assert.match(panel, /xl:grid-cols-5/)
+  assert.match(panel, /xl:grid-cols-4/)
+  assert.match(panel, /xl:grid-cols-3/)
 })
 
 test('library cards follow the fine-pointer hover-action contract', () => {
@@ -58,7 +64,7 @@ test('library cards follow the fine-pointer hover-action contract', () => {
   // Hidden without reflow (visibility, not display) and touch keeps controls.
   assert.match(css, /\.library-card \.library-card__actions\s*\{[^}]*visibility: hidden/s)
   assert.doesNotMatch(css, /\.library-card \.library-card__actions\s*\{[^}]*display:\s*none/s)
-  // Applied on the photo tile (export bar + delete overlay) AND the S row.
-  assert.ok((panel.match(/library-card__actions/g) || []).length >= 3)
-  assert.ok((panel.match(/className="library-card /g) || []).length >= 2)
+  // Applied on the photo tile: the export bar and the corner actions.
+  assert.ok((panel.match(/library-card__actions/g) || []).length >= 2)
+  assert.ok((panel.match(/className="library-card /g) || []).length >= 1)
 })

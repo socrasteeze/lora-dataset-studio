@@ -523,6 +523,9 @@ reports only comment lines; `npm test` green; one What's New entry.
 
 ## Wave 8 — Datasets library: columns and pagination (sequential after 6)
 
+**Status (2026-10-01).** Implemented on `wave/8-datasets`. Not landed.
+`origin/main` is still `f3815e82e`. Gates have not been run.
+
 File: `frontend/src/components/dataset/DatasetListPanel.jsx`.
 
 - **Columns.** S today renders `DatasetRow` list items in
