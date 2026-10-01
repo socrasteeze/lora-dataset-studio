@@ -467,7 +467,9 @@ DEFAULTS = {
     #   The FULL model output is stored regardless, so moving this re-filters an
     #   already-tagged bank instantly (same read-time-thresholds contract as the
     #   'bank' scores above) — 0.35 is the tagger's own published default.
-    'wd14': {'python': '', 'models_root': '', 'threshold': 0.35},
+    # device: auto (CUDA when the tagger's onnxruntime has it, else CPU) | cuda
+    # (refuse to tag rather than fall back to CPU) | cpu (keep the GPU free).
+    'wd14': {'python': '', 'models_root': '', 'threshold': 0.35, 'device': 'auto'},
     # 🔳 The burned-in-text reader (RapidOCR on CPU onnxruntime), used by the
     # video lane's safe-zone pass. Blank = the app's own interpreter, which is
     # where Setup installs it: the extra is small (an ONNX runtime the app

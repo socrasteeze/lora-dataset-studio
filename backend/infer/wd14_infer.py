@@ -186,6 +186,7 @@ def main() -> int:
         threshold = float(payload.get('threshold') or 0.35)
         models_dir = payload.get('models_dir') or ''
         model_files = payload.get('model_files') or {}
+        device = str(payload.get('device') or 'auto').lower()
     except Exception as e:  # noqa: BLE001 — must exit as clean JSON, never a mute traceback
         print(json.dumps({"ok": False, "error": f"payload: {e}"}), file=_OUT)
         return 1
@@ -214,13 +215,23 @@ def main() -> int:
     try:
         names, cats = _load_tags(os.path.join(models_dir, 'selected_tags.csv'))
         available = onnxruntime.get_available_providers()
-        # CUDA when the runtime really has it, CPU otherwise. CPU is a supported,
-        # expected path here — the parent already decided whether to hold the GPU
-        # window based on the same provider list, so the two cannot disagree.
-        providers = (['CUDAExecutionProvider', 'CPUExecutionProvider']
-                     if 'CUDAExecutionProvider' in available else ['CPUExecutionProvider'])
+        # auto: CUDA when the runtime really has it, CPU otherwise. CPU is a
+        # supported, expected path here — the parent already decided whether to
+        # hold the GPU window based on the same provider list, so the two cannot
+        # disagree. cuda: never fall back to CPU. cpu: keep the GPU free.
+        cuda = 'CUDAExecutionProvider' in available
+        if device == 'cuda' and not cuda:
+            raise RuntimeError('GPU tagging is selected but this onnxruntime has no '
+                               f'CUDA provider (available: {", ".join(available)})')
+        providers = (['CPUExecutionProvider'] if device == 'cpu' or not cuda
+                     else ['CUDAExecutionProvider', 'CPUExecutionProvider'])
         session = onnxruntime.InferenceSession(
             os.path.join(models_dir, 'model.onnx'), providers=providers)
+        # onnxruntime silently drops to CPU when CUDA fails to initialise
+        # (missing cuDNN, driver mismatch); GPU-only must not.
+        if device == 'cuda' and session.get_providers()[0] != 'CUDAExecutionProvider':
+            raise RuntimeError('GPU tagging is selected but CUDA failed to initialise; '
+                               f'onnxruntime fell back to {session.get_providers()[0]}')
         inp = session.get_inputs()[0]
         size = int(inp.shape[1])
         input_name = inp.name

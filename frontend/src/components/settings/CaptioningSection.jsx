@@ -227,6 +227,22 @@ export default function CaptioningSection({ config, setField, configDefaults }) 
             config={config} configDefaults={configDefaults} setField={setField} />
         </div>
       </Card>
+      <Card
+        title="Tagging (WD14)"
+        help="Where the WD14 tagger runs. GPU refuses to tag on the CPU: a tag pass stops with a reason instead of loading every core."
+      >
+        <div>
+          <label htmlFor="wd14-device" className="block text-sm font-medium text-content">Tagging device</label>
+          <select id="wd14-device" value={config.wd14?.device || defaultValueAt(configDefaults, 'wd14', 'device')}
+            onChange={(e) => setField('wd14', 'device', e.target.value)} className={INPUT_CLASS}>
+            <option value="auto">Auto (GPU when available, otherwise CPU)</option>
+            <option value="cuda">GPU only (CUDA required; never the CPU)</option>
+            <option value="cpu">CPU (keeps the GPU free)</option>
+          </select>
+          <ResetToDefault label="Tagging device" section="wd14" field="device"
+            config={config} configDefaults={configDefaults} setField={setField} />
+        </div>
+      </Card>
 
       </SettingsGroup>
 

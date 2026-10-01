@@ -809,9 +809,12 @@ bank's Launch-all dialog from the Banks page and choose **Add to queue**. The
 **Launch-all queue** works through the banks one at a time **on each machine**,
 each one waiting its turn for the GPU rather than failing when another bank — or
 a training run — is using it. A panel on the Banks page shows what's running and
-what's lined up, names the machine each bank will run on, and lets you cancel a
-bank or clear the whole queue. Queue three exports before bed and they'll be
-triaged by morning.
+what's lined up and names the machine each bank will run on. The ✕ on a
+waiting row removes that bank in one tap. **Clear waiting** removes every
+waiting bank and leaves the running one going; **Stop running** stops the
+running bank, keeps its finished steps and lets the next waiting bank start.
+Both ask first, and so does the ✕ on the running row, because it stops a run.
+Queue three exports before bed and they'll be triaged by morning.
 
 **One lane per machine.** Everything aimed at this computer runs strictly in
 order — two banks never share the graphics card. A bank you sent to a compute
@@ -1858,10 +1861,11 @@ second, unrelated surprise.
 
 Selecting thumbnails and deciding on them used to mean opposite ends of the
 page — tap tiles at the bottom, then scroll all the way back up past the filter
-panel to reach ✓ Keep / ✕ Reject. Those buttons — plus Skip (back to
-undecided), the two rotate buttons and CLR (clear the ticks) — now live in a
+panel to reach ✓ Keep / ✕ Reject. Those buttons — plus ↺ Undecide (back to
+undecided, the same word as the dataset grid), the two rotate buttons and
+Clear selection (clear the ticks) — now live in a
 bar **pinned to the bottom of the screen** the moment anything is selected.
-Keep and Reject share one even row; Skip and CLR share the next. It takes up real space at the end of
+Keep and Reject share one even row; ↺ Undecide and Clear selection share the next. It takes up real space at the end of
 the page rather than floating over it: the page grows to make room for it, so
 scrolling all the way down still shows you the last row of thumbnails and the
 pagination controls with nothing hidden behind the bar. The ↩ Undo offer after

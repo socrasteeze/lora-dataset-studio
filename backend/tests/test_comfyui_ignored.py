@@ -19,6 +19,17 @@ from app.utils import comfyui
 REMOTE = 'http://127.0.0.1:8189'
 
 
+# conftest stubs free_comfyui_vram for every test so no suite unloads a live
+# ComfyUI. These tests are ABOUT that call, so they restore the real function;
+# `network` below records requests instead of sending them.
+_REAL_FREE_COMFYUI_VRAM = comfyui.free_comfyui_vram
+
+
+@pytest.fixture(autouse=True)
+def _real_free_comfyui_vram(monkeypatch):
+    monkeypatch.setattr(comfyui, 'free_comfyui_vram', _REAL_FREE_COMFYUI_VRAM)
+
+
 @pytest.fixture(autouse=True)
 def _clean_caches():
     comfyui.clear_model_caches()

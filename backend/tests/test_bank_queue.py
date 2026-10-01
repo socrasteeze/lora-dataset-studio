@@ -150,3 +150,47 @@ def test_cancel_pending_and_clear(app, monkeypatch):
     assert bank_queue.cancel(99) is False          # not queued
     assert bank_queue.clear() == 1                 # the remaining entry
     assert bank_queue.snapshot()['items'] == []
+
+
+def _queue_with_one_running(app, monkeypatch):
+    """Bank 1 running, banks 2 and 3 waiting; bank_jobs.cancel is recorded."""
+    from app.services import bank_jobs
+    bank_queue.reset()
+    _freeze_worker(monkeypatch)
+    cancelled = []
+    monkeypatch.setattr(bank_jobs, 'cancel', lambda bid: cancelled.append(bid))
+    for bid in (1, 2, 3):
+        bank_queue.enqueue(app, 'local', bid, steps=['scan'])
+    bank_queue._queue[0]['state'] = 'running'
+    return cancelled
+
+
+def test_clear_pending_only_keeps_the_running_bank(app, monkeypatch):
+    # "Clear waiting" tidies the line without stopping the bank mid-run.
+    cancelled = _queue_with_one_running(app, monkeypatch)
+    assert bank_queue.clear(pending_only=True) == 2
+    snap = bank_queue.snapshot()
+    assert [(i['bank_id'], i['state']) for i in snap['items']] == [(1, 'running')]
+    assert snap['running_bank_ids'] == [1]
+    assert cancelled == []
+
+
+def test_clear_without_pending_only_still_stops_the_running_bank(app, monkeypatch):
+    # The default is unchanged: global stop and older tabs rely on it.
+    cancelled = _queue_with_one_running(app, monkeypatch)
+    assert bank_queue.clear() == 3
+    assert bank_queue.snapshot()['items'] == []
+    assert cancelled == [1]
+
+
+def test_clear_route_honours_pending_only(app, client, monkeypatch):
+    cancelled = _queue_with_one_running(app, monkeypatch)
+    r = client.post('/api/bank-queue/clear', json={'pending_only': True})
+    assert r.status_code == 200
+    assert r.get_json() == {'ok': True, 'removed': 2}
+    assert [i['bank_id'] for i in bank_queue.snapshot()['items']] == [1]
+    assert cancelled == []
+    # Only a literal true narrows it; anything else is the whole queue.
+    r = client.post('/api/bank-queue/clear', json={'pending_only': 'yes'})
+    assert r.get_json() == {'ok': True, 'removed': 1}
+    assert cancelled == [1]

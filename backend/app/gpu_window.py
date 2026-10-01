@@ -238,31 +238,42 @@ def gpu_exclusive_vision_window(flag_ttl=300):
             claimed = True
             _active_vision_window_tokens.add(token)
             active_registered = True
-            try:
-                from .utils.comfyui import free_comfyui_vram
-                verdict = free_comfyui_vram()
-            except Exception:
-                logger.exception('vision GPU window: ComfyUI /free raised unexpectedly')
-                verdict = None
 
-            # Asked of the member, not compared to a class imported here: the
-            # enum's own property answers for whichever incarnation of the
-            # class the member belongs to. The suite once reloaded
-            # utils.comfyui, and a member of the old class was never `in` a
-            # tuple of the new one. `is not True` keeps the gate fail-closed:
-            # a stand-in whose attribute is merely truthy does not open it.
-            if getattr(verdict, 'permits_ollama', False) is not True:
+        # The /free request runs OUTSIDE GPU_ARBITER_LOCK. The window is already
+        # claimed above (persisted flag + in-process token, both under the lock),
+        # so the queue worker, a training launch and a second window all refuse
+        # from here on: nothing can start on the card while ComfyUI answers. What
+        # the lock used to add was only that those callers WAITED up to the /free
+        # timeout instead of being told "vision busy" — and Stop and the queue
+        # dock waited with them.
+        try:
+            from .utils.comfyui import release_comfyui_for_local_gpu
+            verdict = release_comfyui_for_local_gpu()
+        except Exception:
+            logger.exception('vision GPU window: ComfyUI /free raised unexpectedly')
+            verdict = None
+
+        # Asked of the member, not compared to a class imported here: the
+        # enum's own property answers for whichever incarnation of the
+        # class the member belongs to. The suite once reloaded
+        # utils.comfyui, and a member of the old class was never `in` a
+        # tuple of the new one. `is not True` keeps the gate fail-closed:
+        # a stand-in whose attribute is merely truthy does not open it.
+        if getattr(verdict, 'permits_ollama', False) is not True:
+            with GPU_ARBITER_LOCK:
                 if queue_manager._get_system_state('vision_in_progress') == token:
                     queue_manager._set_system_state('vision_in_progress', None)
                 _active_vision_window_tokens.discard(token)
-                active_registered = False
-                claimed = False
-                raise GpuBusyError(
-                    'ComfyUI did not confirm that its GPU models were released. '
-                    'Wait for it to recover, then try the vision task again.')
+            active_registered = False
+            claimed = False
+            raise GpuBusyError(
+                'ComfyUI did not confirm that its GPU models were released. '
+                'Wait for it to recover, then try the vision task again.')
 
         _log('GPU taken exclusively', 'warn',
-             detail='ComfyUI unloaded; training cannot start until this releases')
+             detail=('ComfyUI unloaded' if getattr(verdict, 'value', None) == 'freed'
+                     else 'no ComfyUI on this GPU to unload')
+             + '; training cannot start until this releases')
 
         # Some CUDA subprocesses and local image passes legitimately run for
         # longer than their initial TTL. The heartbeat owns only this exact token;

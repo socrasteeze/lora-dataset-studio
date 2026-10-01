@@ -11671,7 +11671,8 @@ def _tags_prereq() -> str | None:
     from ..capabilities import probe_wd14
     p = probe_wd14()
     if p.get('ok'):
-        return None
+        from . import wd14_tagger
+        return wd14_tagger.gpu_refusal()
     return f"the WD14 tagger is not ready — {p.get('detail')} (Setup ▸ Quality tools)"
 
 
@@ -12638,6 +12639,28 @@ def _caption_job(bank_id, ids, force, vocabulary=None, length=None, device_id=No
                                  verb='captioned')
         if spared_mid_pass:
             skipped += f', {spared_mid_pass} kept (newer caption won)'
+        # The same outcome as NUMBERS, for the Launch-all report. The prose above
+        # is all a pipeline step used to keep, so a bank whose captions were
+        # 83 % written by the fallback engine, or whose images were refused while
+        # another client held the model, stored a plain "done" and the bank card
+        # showed nothing (pipelineVerdict.js reads these). `skipped` is what the
+        # model never saw (the GPU fence refused it; a re-run finishes it);
+        # `failed` is what it saw and could not caption. Images that changed,
+        # vanished or kept a newer caption are the pass working, not a shortfall.
+        counts = {
+            caption_origin.JOYCAPTION: int(wrote.get(caption_origin.JOYCAPTION, 0)),
+            caption_origin.OLLAMA: int(wrote.get(caption_origin.OLLAMA, 0)),
+            'skipped': int(left.get('fenced', 0)),
+            'failed': int(left.get('unanswered', 0)) + int(left.get('failed', 0)),
+        }
+        if run_on is None:
+            # Which engine this run tried FIRST, so the screen can call the other
+            # one the fallback. Only known on this machine: a peer picks its own.
+            asked = (backend or backend_name or 'auto').lower()
+            counts['first_choice'] = (caption_origin.JOYCAPTION
+                                      if asked in ('auto', caption_origin.JOYCAPTION)
+                                      else caption_origin.engine_origin(asked))
+        job['_caption_counts'] = counts
         if bank_jobs.cancelled(job):
             logger.info('bank caption stopped: bank=%s %d/%d captioned',
                         bank_id, captioned, len(paths))
@@ -12781,14 +12804,18 @@ def _caption_prereq() -> str | None:
         return (None if probe_ollama_model().get('ok')
                 else 'vision model not available (Settings ▸ Captioning & quality)')
     # auto: either engine will do, so it is only unready when BOTH are.
-    if probe_ollama_model().get('ok'):
-        return None
+    # JoyCaption FIRST: it is the engine 'auto' runs first, and its verdict is a
+    # cached import probe, while the Ollama check is two /api/tags requests with
+    # 3 s timeouts — paid by every bank of a queue for an engine that is then
+    # needed only for what JoyCaption misses (caption_paths checks it then).
     try:
         from .joycaption import availability
         if availability().get('ok'):
             return None
     except Exception:      # noqa: BLE001 — a probe fault must not block the step
         pass
+    if probe_ollama_model().get('ok'):
+        return None
     return ('no caption engine is ready — pull the Ollama vision model or install '
             'JoyCaption (Settings ▸ Captioning & quality)')
 
@@ -13143,7 +13170,9 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
             return
         before = _bank_counts(bank_id)['captioned']
         err_before = job.get('error')
+        job.pop('_caption_counts', None)
         _caption_job(bank_id, None, False, device_id=device_id)(job)
+        run_counts = job.pop('_caption_counts', None) or {}
         # _caption_job refuses ITSELF when the chosen machine has no captioner
         # and this one cannot run it either — with bank_jobs.fail and a plain
         # return, never an exception. That is right for the standalone button,
@@ -13155,7 +13184,9 @@ def _run_pipeline_step(job, user_id, bank_id, step, reject_flags, resolve_dups,
             entry['blocked'] = True
             return
         after = _bank_counts(bank_id)['captioned']
-        entry['counts'] = {'captioned': max(0, after - before), 'total_captioned': after}
+        # Per-engine and not-captioned counts ride beside the historical two keys.
+        entry['counts'] = {**run_counts, 'captioned': max(0, after - before),
+                           'total_captioned': after}
         entry['detail'] = job.get('detail') or f"{after} captioned"
         return
     entry['status'], entry['reason'] = 'skipped', 'unknown step'

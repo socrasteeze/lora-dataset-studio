@@ -334,6 +334,57 @@
   }
 }
 
+/* ── Bank tile actions ──────────────────────────────────────────────────────
+   The same finger-sized rule as the Dataset tile actions above. A Bank tile
+   is only ~104 px wide on a 360 px phone (three columns), so three 44 px
+   squares cannot fit. Instead the Tags / Review / Open glyphs share one strip
+   across the tile foot there: each a 40 px tall hit area a third of the tile
+   wide, while the visible pill stays the small one a desktop shows. A desktop
+   mouse keeps the compact corner cluster. The caption-author chip sits
+   bottom-left; on touch it moves up to clear the pills (the transparent strip
+   is painted over it, so a tap there still reaches the action). */
+.bank-tile__actions {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.bank-tile__action {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bank-tile__origin {
+  position: absolute;
+  left: 0.25rem;
+  bottom: 0.25rem;
+  max-width: calc(100% - 4.5rem);
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  .bank-tile__actions {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    gap: 0;
+  }
+
+  .bank-tile__action {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 40px;
+    padding-bottom: 0.25rem;
+  }
+
+  .bank-tile__origin {
+    bottom: 1.5rem;
+    max-width: calc(100% - 0.5rem);
+  }
+}
+
 /* ── Dataset tile badges ────────────────────────────────────────────────────
    The provenance badge ("generated · face · Krea 2 Edit") and the action
    buttons both want the top row. On a narrow tile they collided and the engine

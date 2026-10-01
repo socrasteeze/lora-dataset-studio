@@ -11,10 +11,17 @@
    decide what that means on screen: the step reads as re-run, and a report whose
    every stopped step has been redone stops flying the 🛑. The original verdict is
    never erased — a step nobody re-ran keeps saying exactly what happened to it,
-   which is the only reason the banner is worth reading at all. */
+   which is the only reason the banner is worth reading at all.
+
+   A step that RAN can still need a look — the caption step that left images
+   uncaptioned or had a fallback engine write part of the bank. It used to show
+   ✅ like any other; it now shows the `attention` style (see captionStepNote). */
+
+import { captionStepNote } from './pipelineVerdict.js'
 
 export const STATUS_STYLE = {
   done: { icon: '✅', cls: 'text-emerald-300' },
+  attention: { icon: '⚠️', cls: 'text-amber-300' },
   skipped: { icon: '⏭️', cls: 'text-amber-300' },
   cancelled: { icon: '🛑', cls: 'text-content-subtle' },
   error: { icon: '⚠️', cls: 'text-rose-300' },
@@ -37,12 +44,15 @@ export function stepView(step) {
       superseded: true,
     }
   }
-  const style = STATUS_STYLE[step.status] || STATUS_STYLE.error
+  const attention = captionStepNote(step)
+  const style = attention ? STATUS_STYLE.attention
+    : STATUS_STYLE[step.status] || STATUS_STYLE.error
   return {
     icon: style.icon,
     cls: style.cls,
-    note: step.status === 'done' ? step.detail || '' : step.reason || '',
+    note: step.status === 'done' ? step.detail || attention?.text || '' : step.reason || '',
     superseded: false,
+    attention: Boolean(attention),
   }
 }
 
@@ -54,9 +64,13 @@ export function reportHeadline(report) {
   const redone = steps.filter(isSuperseded).length
   const unfinished = steps.filter((s) => s.status !== 'done' && !isSuperseded(s))
   const stopped = !!(report && report.cancelled) && unfinished.length > 0
+  // Ran, but finished short or mixed — counted inside `done`, never as a ✅.
+  const attention = steps.filter((s) => captionStepNote(s)).length
   return {
     done, redone, total: steps.length, stopped,
     icon: stopped ? '🛑' : '🚀',
     covered: done + redone,
+    attention,
+    attentionLabel: attention ? `${attention} need${attention === 1 ? 's' : ''} attention` : '',
   }
 }

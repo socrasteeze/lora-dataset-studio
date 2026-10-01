@@ -1371,8 +1371,14 @@ def bank_group_promote(bank_id):
 
 @bp.post('/bank-queue/clear')
 def bank_queue_clear():
-    """Empty the whole queue (and cancel the running pipeline)."""
-    removed = bank_queue.clear()
+    """Empty the whole queue (and cancel the running pipeline).
+
+    ``{"pending_only": true}`` removes only the waiting banks and leaves the
+    running pipeline alone: the panel's "Clear waiting". Anything else keeps the
+    old whole-queue behaviour, so an older tab still gets what it asked for."""
+    data = request.get_json(silent=True)
+    pending_only = isinstance(data, dict) and data.get('pending_only') is True
+    removed = bank_queue.clear(pending_only=pending_only)
     return jsonify({'ok': True, 'removed': removed})
 
 

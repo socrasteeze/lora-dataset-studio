@@ -14,6 +14,8 @@ import { BANK_SORTS, DEFAULT_BANK_SORT, bankMatches, normalizeBankSort, sortBank
 import { overlapNotice } from '../components/bank/bankOverlap'
 import { allExcludedWarning, normalizeExcluded, splitPlan } from '../components/bank/bankSplit'
 import { queueAllCandidates, queueAllConfirm, queueAllResult } from '../components/bank/bankQueueAll'
+import BankQueuePanel from '../components/bank/BankQueuePanel'
+import { clearWaitingConfirm, removeQueuedConfirm, runningItems, stopRunningConfirm } from '../components/bank/bankQueueActions.js'
 import { coverageBadges, coverageSummary } from '../components/bank/bankPassCoverage'
 import { pipelineBadge, pipelineReportVerdict, queueOutcomeLine } from '../components/bank/pipelineVerdict'
 import { groupRows } from '../components/bank/bankGroups'
@@ -129,10 +131,6 @@ function BankPreviewStrip({ bank, onOpen }) {
   )
 }
 
-/** The cross-bank "Launch all" queue: which bank is running now and what is lined
- * up behind it. Drains one bank at a time (never a busy-GPU 503), so a user can
- * queue several banks and walk away. Each row can be cancelled; Clear all empties
- * it (and stops the running pipeline). Names are resolved from the loaded banks. */
 /** "⚠ 2 passes skipped in the last 🚀 Launch all" — or nothing at all. A clean
  *  run is deliberately silent: a green tick on every card is noise, and it makes
  *  the one card that needs attention harder to find, not easier. */
@@ -162,56 +160,6 @@ function PassCoverageRow({ coverage }) {
         <span key={b.key} className={b.cls} title={b.title}>{b.text}</span>
       ))}
     </p>
-  )
-}
-
-function QueuePanel({ queue, nameOf, onCancel, onClear }) {
-  if (!queue?.items?.length) return null
-  return (
-    <div className="rounded-lg border border-indigo-400/40 bg-indigo-500/10 p-4 space-y-2">
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-content">⏳ Launch-all queue</h2>
-        <HelpBadge topic="bank-launch-queue" />
-        <span className="text-xs text-content-muted">{queue.items.length} in line</span>
-        <button type="button" onClick={onClear}
-          className="ml-auto rounded border border-border px-2 py-0.5 text-xs text-content-muted hover:text-content hover:bg-surface-raised">
-          Clear all
-        </button>
-      </div>
-      <ol className="space-y-1">
-        {queue.items.map((it) => (
-          <li key={it.bank_id} className="flex items-center gap-2 text-sm">
-            <span className="w-5 text-right text-content-subtle">{it.position}.</span>
-            <span className="min-w-0 truncate font-medium text-content">{nameOf(it.bank_id)}</span>
-            {it.state === 'running' ? (
-              <span className="rounded bg-emerald-500/15 px-1.5 py-px text-2xs font-semibold text-emerald-300">running</span>
-            ) : (
-              <span className="rounded bg-surface-raised px-1.5 py-px text-2xs font-semibold text-content-muted">waiting</span>
-            )}
-            {/* Which machine, and why it hasn't started. The snapshot has
-                published both all along and this panel dropped them: twelve
-                banks queued to a peer looked byte-identical to twelve local
-                ones, and now that two can run at once, two "running" rows
-                would be indistinguishable. `waiting_for` was read nowhere in
-                the app despite snapshot()'s own comment saying it was shown
-                here — so a queue stalled on a stuck GPU flag looked dead. */}
-            {it.device_label && (
-              <span className="truncate rounded bg-surface-raised px-1.5 py-px text-2xs text-content-muted">
-                on {it.device_label}
-              </span>
-            )}
-            {it.state !== 'running' && it.waiting_for && (
-              <span className="min-w-0 truncate text-2xs text-amber-300" title={it.waiting_for}>
-                {it.waiting_for}
-              </span>
-            )}
-            <button type="button" onClick={() => onCancel(it.bank_id)}
-              aria-label={`Remove ${nameOf(it.bank_id)} from the queue`}
-              className="ml-auto px-1.5 text-content-subtle hover:text-rose-300">✕</button>
-          </li>
-        ))}
-      </ol>
-    </div>
   )
 }
 
@@ -635,20 +583,38 @@ export default function BankPage() {
       refreshQueue()
     }
   }
+  const nameOf = (id) => banks?.find((b) => b.id === id)?.name || `Bank ${id}`
+
+  // The ✕ on a waiting row is one tap. On the RUNNING row it stops a run, so it
+  // asks first — the same question Stop running asks (bankQueueActions.js).
   const cancelQueued = async (id) => {
+    const ask = removeQueuedConfirm(queue, nameOf, id)
+    if (ask && !window.confirm(ask)) return
     try { await del(`/api/bank-queue/${id}`) } catch (e) { toast.error(e?.message || 'Could not update the queue.') }
     refreshQueue()
   }
-  const clearQueue = async () => {
-    try { await postJson('/api/bank-queue/clear', {}) } catch (e) { toast.error(e?.message || 'Could not clear the queue.') }
+  // Clear waiting leaves the running bank alone: pending_only tells the server
+  // so. Without it the route still empties everything, for an older tab.
+  const clearWaiting = async () => {
+    const ask = clearWaitingConfirm(queue)
+    if (!ask || !window.confirm(ask)) return
+    try { await postJson('/api/bank-queue/clear', { pending_only: true }) } catch (e) { toast.error(e?.message || 'Could not clear the queue.') }
+    refreshQueue()
+  }
+  // One entry runs per machine, so there can be more than one to stop. Each is
+  // the same per-entry cancel the ✕ uses; the next waiting bank then starts.
+  const stopRunning = async () => {
+    const ask = stopRunningConfirm(queue, nameOf)
+    if (!ask || !window.confirm(ask)) return
+    for (const it of runningItems(queue)) {
+      try { await del(`/api/bank-queue/${it.bank_id}`) } catch (e) { toast.error(e?.message || 'Could not stop the bank.') }
+    }
     refreshQueue()
   }
 
   if (currentId != null) {
     return <BankWorkspace bankId={currentId} onBack={close} onGone={close} />
   }
-
-  const nameOf = (id) => banks?.find((b) => b.id === id)?.name || `Bank ${id}`
 
   return (
     <div className="space-y-6">
@@ -775,7 +741,8 @@ export default function BankPage() {
           "GPU busy" flag — every bank is skipped and the night is wasted. The
           notice is silent unless the server says the flag has nothing behind it. */}
       <GpuBusyNotice onCleared={refreshQueue} />
-      <QueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued} onClear={clearQueue} />
+      <BankQueuePanel queue={queue} nameOf={nameOf} onCancel={cancelQueued}
+        onClearWaiting={clearWaiting} onStopRunning={stopRunning} />
       {/* Second way in: the scraper's own destination. A bank no longer needs a
           folder you prepared by hand — you can fill one straight from the web. */}
       <PluginSlot slot="sources.panel" surface="bank" banks={banks} onDone={() => refresh()} />
