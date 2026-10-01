@@ -102,6 +102,11 @@ export const WHATS_NEW = [
     to: '/settings/local-tools',
   },
   {
+    id: '2026-09-30-bank-queue-stop', date: '2026-09-30',
+    title: 'Stop Queued Runs',
+    blurb: 'Stop now cancels a running Image Bank pipeline from the queue. Pending runs can still be removed without stopping a separate pass on the same bank.',
+  },
+  {
     id: '2026-09-29-zzzzzzz-one-type-scale', date: '2026-09-29',
     title: 'One Set of Text Sizes Across the App',
     blurb: 'Small labels, badges and tile chips now share one size instead of four near-identical ones, every page title matches, and the Bank opens with its first images near the top of the screen: the last Launch-all report and the Curate tools fold to one line and remember how you left them.',

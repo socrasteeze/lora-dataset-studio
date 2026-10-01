@@ -1,5 +1,16 @@
 # HANDOFF
 
+## Current repair: Bank queue Stop (2026-09-30)
+- Branch: `noble/bank-queue-stop`, base `a8142c334`; source and bundle are prepared for validation transport.
+- Exempted `bank.bank_queue_remove` from the busy-write guard. Queue cancellation can reach the existing stop handler while the pipeline owns the Bank; other writes remain protected.
+- Added four regression cases in `backend/tests/test_bank_queue.py`, a What's New entry and a rebuilt fork bundle.
+- Verified: `git diff --check`, full Ruff, frontend lint (0 errors, 30 warnings in unchanged files), frontend build.
+- Pending: queue, reservation, pipeline, privacy and changelog tests, plus full cloud delivery Gates. The user authorized a separate cloud validation task; no local tests ran.
+- Both scrub passes found no unresolved findings. The privacy scanner checked 3,113 tracked and untracked text files; broader hits are synthetic fixtures and Docker hostnames.
+- Keep main unchanged until cloud Gates pass. Activation needs a backend restart; no restart occurred.
+
+## Previous session
+
 **Updated:** 2026-09-29 · **Branch:** main · **Base:** c49e5b67e · **Tree:** clean
 
 ## State
