@@ -89,8 +89,8 @@ REM     that clobbered a core dep) survives every update -- and `pip -r` below c
 REM     repair a package it still thinks is satisfied. If an EXISTING venv can't
 REM     import the core stack, rebuild it from scratch. Only worthwhile when a
 REM     supported Python is available. NOTE: a Pillow-only MIX (Image.py 12 + old
-REM     plugin) still imports here and is repaired at app boot by
-REM     bootstrap_dependencies.ensure_pillow_consistent -- no need to nuke for that.
+REM     plugin) still imports here. App boot reports it and does not rebuild
+REM     the venv for that mix alone.
 if "%REBUILD%"=="0" if "%PY_SUPPORTED%"=="1" (
   "%VPY%" -c "import flask, werkzeug, sqlalchemy, PIL.Image" >nul 2>nul
   if errorlevel 1 (

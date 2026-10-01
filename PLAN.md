@@ -45,7 +45,7 @@ own: an executor needs this file, AGENTS.md and the repository, nothing else.
 - Remove every ellipsis character from anything the user can read, including
   help pages and What's New text.
 - Datasets library and Bank list get the same pagination control.
-- The plugin store, `legacy_cloud_recovery`, the nightly-flow prose and the
+- The plugin catalog, the unused rental-recovery module, the nightly-flow prose and the
   upstream-sync machinery go.
 
 ## Decisions still open (ask before the wave that touches them)
@@ -357,28 +357,10 @@ an admin token; gates green; probe at `#/plugins` clean.
 
 ---
 
-## Wave 4 — remove `legacy_cloud_recovery` and `ensure_pillow_consistent`
+## Wave 4 — drop unused rental recovery and the Pillow pip repair
 
-- Delete `backend/app/services/legacy_cloud_recovery.py` (57 LOC) and
-  `backend/tests/test_legacy_cloud_recovery.py` (9 tests).
-- `backend/app/services/cloud_training.py` lines ~2344, 3031, 3821, 4776: each
-  `from .legacy_cloud_recovery import recovery_only` plus its 2-6 line guard
-  goes; the guarded code runs unconditionally the way it already does
-  (`recovery_only()` is always `False` because `start()` is never called).
-- `backend/bootstrap_dependencies.py:119-146` `ensure_pillow_consistent`: delete.
-  **Keep** `incompatible_pillow_plugins` (line 78; used by `backend/run.py:57,64`
-  and `routes/settings.py:954-955`).
-- `backend/tests/test_bootstrap_dependencies.py`: 7 of 10 tests call
-  `ensure_pillow_consistent` and are the only coverage of the detector.
-  Rewrite them to call `incompatible_pillow_plugins` directly; do not delete.
-- `backend/tests/test_fork_outbound_gate.py::test_startup_neither_resumes_rentals_nor_runs_pip`
-  (153-162): keep the `incompatible_pillow_plugins()` assertion, drop the
-  `legacy_cloud_recovery.start` one. Comments: `backend/app/__init__.py:1065-1066`,
-  `run.py:62`, `start.bat:93`.
-- FORK_NOTES 2899-2905, HANDOFF.md.
-
-**Done when.** `rg legacy_cloud_recovery|ensure_pillow_consistent` is empty
-outside history; gates green.
+**Status (2026-10-01).** Implemented on `wave/4-legacy`. Not landed.
+`incompatible_pillow_plugins` remains. Boot does not resume rentals and does not run pip.
 
 ---
 

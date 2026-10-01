@@ -1064,5 +1064,4 @@ def _start_workers(app):
     # at the single moment nothing is in flight.
     from .plugins.loader import run_boot_hooks
     run_boot_hooks(app)
-    # Fork Divergence 12: upstream resumes pre-plugin vast.ai rentals here
-    # (legacy_cloud_recovery.start), calling vast.ai at every boot. Not called.
+    # Fork Divergence 12: boot does not resume rented-GPU work.
