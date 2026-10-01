@@ -115,11 +115,11 @@ export function fenceNoticeModel(state) {
     || `Another tool is using a model in ${server}.`;
 
   if (state.phase === 'unloading') {
-    return { tone: 'busy', headline: 'Unloading the other model…', detail: held,
+    return { tone: 'busy', headline: 'Unloading the other model', detail: held,
              canUnload: false, canCancel: false, busy: true };
   }
   if (state.phase === 'retrying') {
-    return { tone: 'busy', headline: 'The model is free — picking up where you left off…',
+    return { tone: 'busy', headline: 'The model is free — picking up where you left off',
              detail: held, canUnload: false, canCancel: false, busy: true };
   }
   if (state.phase === 'gave-up') {
@@ -133,7 +133,7 @@ export function fenceNoticeModel(state) {
   }
   return {
     tone: 'waiting',
-    headline: `Waiting for the model to be released… (${waitedLabel(state.elapsedMs)})`,
+    headline: `Waiting for the model to be released (${waitedLabel(state.elapsedMs)})`,
     detail: `${held} LDS will not unload it without your say-so — it will start on its own the moment it is free.`,
     canUnload: true, canCancel: true, busy: false,
     unloadLabel: 'Unload it and continue',

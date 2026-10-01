@@ -85,7 +85,7 @@ export function SavedPromptsPanel({
         <div className="flex flex-wrap items-center gap-2">
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
             aria-label="Search saved prompts"
-            placeholder="Search your prompts… (e.g. bathroom mirror)"
+            placeholder="Search your prompts (e.g. bathroom mirror)"
             className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-app/60 px-2.5 py-1.5 text-content text-xs lg:min-h-0" />
           <span className="text-content-subtle text-2xs tabular-nums" role="status">
             {query.trim() ? `${shown.length} of ${total}` : `${total} prompts`}

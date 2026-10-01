@@ -125,7 +125,7 @@ test('the confirm names the count and says the .txt files are rewritten', () => 
 
 test('the progress line counts what is really being written', () => {
   assert.equal(captionEditProgressLabel(3, 12), 'Rewriting captions - 3 of 12...'
-    .replace('-', '—').replace('...', '…'))
+    .replace('-', '—').replace('...', ''))
 })
 
 test('a failed sidecar is REPORTED, never rounded off into the success', () => {

@@ -41,7 +41,7 @@ def train_canvas_generate():
     """◉ Generate from the LoRA Canvas — the same Test-Studio engine, driven by
     the checkpoints ticked on the board instead of by a picker. Body:
     {selections:[{dataset_id, checkpoint, record_id, step}], external_loras,
-    …every Studio setting}. Selections MAY span several datasets (that is the
+    every Studio setting}. Selections MAY span several datasets (that is the
     point of the canvas); they may NOT span several families — the engine
     refuses, and the reason travels back so the button can say it. Same gates
     as the other launch routes: ComfyUI not set up → 409/503, missing

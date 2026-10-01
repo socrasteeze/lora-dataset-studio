@@ -61,9 +61,11 @@ export function undoResultMessage(result) {
     parts.push(`${missing} ${missing === 1 ? 'is' : 'are'} no longer in the bank.`)
   }
   if (conflicts) {
-    const shown = names.slice(0, 3).join(', ')
+    const shownNames = names.slice(0, 3)
+    const shown = shownNames.join(', ')
+    const extra = conflicts - shownNames.length
     parts.push(`${conflicts} changed since and ${conflicts === 1 ? 'was' : 'were'} left alone`
-      + (shown ? ` (${shown}${conflicts > names.slice(0, 3).length ? ', …' : ''}).` : '.'))
+      + (shown ? ` (${shown}${extra > 0 ? `, and ${extra} more` : ''}).` : '.'))
   }
   return { type: restored ? 'info' : 'error', text: parts.join(' ') }
 }

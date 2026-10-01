@@ -102,7 +102,7 @@ export default function SmallImageRescueReview({
           const resolving = resolvingIds.has(candidate.id);
           const controlsDisabled = resolving;
           const detail = phase === 'queued'
-            ? 'Klein is generating the candidate…'
+            ? 'Klein is generating the candidate'
             : phase === 'failed'
               ? (candidate.fail_reason || 'Klein could not generate this candidate.')
               : 'Candidate ready — inspect it at full size before choosing.';
@@ -113,11 +113,11 @@ export default function SmallImageRescueReview({
                 <span className="text-xs font-semibold text-content">Pair {index + 1}</span>
                 <span className={`min-w-0 break-words text-2xs ${
                   phase === 'failed' ? 'text-rose-300' : phase === 'queued' ? 'text-indigo-200' : 'text-emerald-300'}`}>
-                  {phase === 'failed' ? '⚠ ' : phase === 'queued' ? '… ' : '✓ '}{detail}
+                  {phase === 'failed' ? '⚠ ' : phase === 'queued' ? ' ' : '✓ '}{detail}
                 </span>
                 {resolving && (
                   <span role="status" className="ml-auto text-2xs text-content-subtle">
-                    Saving choice…
+                    Saving choice
                   </span>
                 )}
               </div>

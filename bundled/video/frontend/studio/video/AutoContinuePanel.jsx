@@ -28,7 +28,7 @@ export default function AutoContinuePanel({ session, ready, busy, error, directi
           To change character, render one part by hand with the other LoRA, then continue from it.
         </p>
       )}
-      <p role="status" className="text-xs text-content-muted">{ready ? autoPhaseLabel(session) : 'Reading Auto status…'}</p>
+      <p role="status" className="text-xs text-content-muted">{ready ? autoPhaseLabel(session) : 'Reading Auto status'}</p>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
         <label className="block min-w-0 flex-1 text-xs text-content-muted">
           Scene direction (optional)

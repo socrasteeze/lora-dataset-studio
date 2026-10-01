@@ -146,7 +146,7 @@ export const VIDEO_QUICK_PROMPT_CATEGORIES = [
     emoji: '🎙️',
     label: 'Voice',
     prompts: [
-      { label: 'Warm Whisper', prompt: 'The subject speaks softly to camera in a warm, intimate whisper, saying: "Hey… I\'ve missed you."' },
+      { label: 'Warm Whisper', prompt: 'The subject speaks softly to camera in a warm, intimate whisper, saying: "Hey I\'ve missed you."' },
       { label: 'Confident VO', prompt: 'A confident narrator voice speaks clearly over the scene in a calm, cinematic tone.' },
       { label: 'Cheerful Greeting', prompt: 'The subject smiles and says cheerfully in a bright, friendly voice: "Welcome — so glad you\'re here!"' },
       { label: 'Singing Softly', prompt: 'The subject sings softly with a gentle melodic voice, a light and airy tone.' },

@@ -208,7 +208,7 @@ export function WhatsNewModal() {
           )}
           {older === 'loading' && (
             <p className="border-t border-border py-3 text-center text-xs text-content-subtle" role="status">
-              Loading older updates…
+              Loading older updates
             </p>
           )}
           {older === 'error' && (

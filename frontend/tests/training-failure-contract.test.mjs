@@ -93,7 +93,7 @@ test('a legacy payload (no excerpt) falls back to the tail but stays neutral', (
 test('the GPU-architecture verdict replaces the generic guesswork', () => {
   const view = failureView({
     ...traceback,
-    gpu_arch: { message: 'RTX 5070 is compute capability 12.0 (sm_120)…', command: 'python -m pip install …' },
+    gpu_arch: { message: 'RTX 5070 is compute capability 12.0 (sm_120)', command: 'python -m pip install ' },
   })
   assert.ok(view.gpuArch)
   assert.equal(view.causes, '', 'a proven cause must not be buried under "common first-run causes"')

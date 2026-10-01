@@ -263,14 +263,14 @@ the captioner needs to know exactly *what to omit*. What changes vs character:
   **scraper** (paste a gallery URL or run a Reddit keyword search, tick the
   frames you want, they land straight in the dataset — deduplicated and
   quality-filtered). Already have a kohya-style dataset on disk (images +
-  same-name `.txt` captions)? **⋯ More → 📂 Import from folder…** merges it in
+  same-name `.txt` captions)? **⋯ More → 📂 Import from folder** merges it in
   from a pasted folder path — captions attach, duplicates are skipped (a ZIP
   works too, via **📦 Import dataset**). On gallery sites (PornPics), a category/tag/search scan
   shows **the same previews the listing page does** — one per gallery, the shot
   that actually matches your keyword. Tick **Scan full albums** to pull every
-  photo of each matched gallery instead, or paste a single `/galleries/…` URL
+  photo of each matched gallery instead, or paste a single `/galleries/<id>` URL
   to get that whole album. Sex.com works the same way for keyword searches
-  (`sex.com/en/pics?search=…`) — every pin **is** a single matching image, so
+  (`sex.com/en/pics?search=<query>`) — every pin **is** a single matching image, so
   there is no album option to worry about. Civitai searches return **SFW
   results only** unless you add a Civitai API key in **Settings → Scraping &
   sources**.
@@ -311,7 +311,7 @@ You are not locked into the captioners shipped here. The round trip is:
 2. **Caption them wherever you like.** Any tool that writes a `<image>.txt`
    sidecar next to each image works — that is the convention this app reads,
    whatever the file names are and whatever folder depth you use.
-3. **📦 Import dataset (ZIP)** (or **📂 Import from folder…**) with the same
+3. **📦 Import dataset (ZIP)** (or **📂 Import from folder**) with the same
    images and their new `.txt` files. Images already in the dataset are **not
    duplicated**: their caption lands on the row that already holds them, and the
    toast says how many were applied.
@@ -553,7 +553,7 @@ The funnel itself:
 3. **Cull** — use the filter chips (Blurry, Noisy, ⬜ Flat, Small,
    🧇 Soft detail, 🎞 Black bars, ≈ Duplicates) to review the worst
    offenders first. **🧹 Auto-reject
-   flagged…** clears whole categories in one click (your manual ✓/✕ are never
+   flagged** clears whole categories in one click (your manual ✓/✕ are never
    flipped). The number beside each checkbox is what *that click* would reject —
    still-undecided images only, which is why it is usually smaller than the
    count on the matching filter chip: the chip shows every image carrying the
@@ -635,7 +635,7 @@ most images, least triaged) and remembers your choice between visits.
 rejecting images while a scan — or the whole Launch-all queue — is working is
 supported and safe. If a save happens to land at the exact moment a pass is
 writing, the app waits and replays it for you; in the rare case it still can't
-get through you'll see "the database is busy… try again in a moment", and
+get through you'll see "the database is busy try again in a moment", and
 clicking again is all it takes. Your decision is never partially applied.
 
 **🎨 Curate down to the right subset.** Culling removes the bad shots; curation
@@ -662,7 +662,7 @@ open or closed:
   cannot turn your 60 into 60 look-alikes. Set it to **0** for the pure-coverage
   behaviour the button had before this setting existed. On a very large bank the
   first click takes a few seconds (it reads every image's neighbourhood once);
-  the button says *Sampling…* while it does.
+  the button says *Sampling* while it does.
 - **⚖ Balanced pick** — see [Pick a balanced set](#pick-a-balanced-set) below: the
   same sampling, but spread evenly over your **framings** instead of taken off
   the top of one ranking.
@@ -829,7 +829,7 @@ Two banks that share a name are **one card**, and the queue keeps them one: howe
 they are spread across machines, only one of them ever runs at a time. A single
 card cannot honestly show two different states at once.
 
-**⏳ Queue all N bank(s)…** does the whole library in one gesture. It picks every
+**⏳ Queue all N bank(s)** does the whole library in one gesture. It picks every
 bank with work left for a pass you ticked, asks which passes to run, and adds one
 queue entry per bank — carrying only the passes that bank actually needs. A bank
 with nothing left is skipped by name, with the reason. The old rule was "has
@@ -856,7 +856,7 @@ many had problems.
 
 ## Choosing where a bank pass runs
 
-Every pass button in the bank ends in `…` and opens a **launch window** before
+Every pass button in the bank ends in `` and opens a **launch window** before
 anything runs. The window is not a settings panel — it says three separate
 things, and keeping them apart is the point.
 
@@ -1145,7 +1145,7 @@ bank with the **🔎 Origin** chips:
   quietly folded into "not AI".
 
 On an image whose metadata is gone, the details line may add a *hint* when the
-dimensions are a standard generator size (1024×1024, 832×1216, 896×1152…) and
+dimensions are a standard generator size (1024×1024, 832×1216, 896×1152) and
 there is no camera EXIF. It says it is a hint; plenty of crops and downloads
 land on round numbers too.
 
@@ -2105,7 +2105,7 @@ it (⊟) for the usual click-for-100 % inspection.
 
 ## Tune the Bank filter thresholds
 
-The filter chips (🌫 Blurry, 📐 Small, ≈ Duplicates…) are verdicts, and every
+The filter chips (🌫 Blurry, 📐 Small, ≈ Duplicates) are verdicts, and every
 verdict comes from a number. Those numbers used to live only in
 *Settings ▸ Captioning & quality*, three screens away from the bank you were
 triaging. They are now also under the chips themselves: open **🎚 Filter
@@ -2468,7 +2468,7 @@ once into the same Python the **✨ Score** pass already uses.
 
 **How good is it, measured.** On 110 images pulled from a real bank and labelled
 by eye — half of them hard on purpose: faint corner logos, semi-transparent
-handles across the subject, an `OnlyFans.com/…` line barely a few pixels tall, and
+handles across the subject, an `OnlyFans.com/<name>` line barely a few pixels tall, and
 clean photos containing legitimate signage — the detector at its default setting
 flagged **none of the 55 clean images** and **54 of the 55 marked ones**. The
 vision model, on the exact same 110, flagged one clean image and missed one marked
@@ -2731,7 +2731,7 @@ are.
 **Give the two banks the same name and they become one card.** Nothing is merged
 and nothing is copied: every image still belongs to exactly one bank, on its own
 disk, in its own folder. The card is a view — combined counts, one **⏳ Queue the
-group…**, one **⬆ Promote the group…** — with all the members one click away
+group**, one **⬆ Promote the group** — with all the members one click away
 under **▸ N banks**, each keeping its own rename, 📦 move, ✕ delete and preview.
 
 The rule is deliberately small enough to keep in your head:
@@ -2829,7 +2829,7 @@ warning appears.
 
 ## Make Score use a GPU Python you already have
 
-Open a bank, then **⚙ Passes → Manage Score Python…**. The button stays available
+Open a bank, then **⚙ Passes → Manage Score Python**. The button stays available
 when packages are missing, the interpreter uses the CPU, or CUDA is detected.
 Changing Python is disabled while a pass is active.
 
@@ -2910,7 +2910,7 @@ already installed. The dialog does not suggest a CUDA speed-up in that case.
 
 ## Build the SigLIP 2 index on a GPU Python you already have
 
-Open **Bank → ⚙ Passes → Semantic engine → Manage SigLIP 2 Python…**. This
+Open **Bank → ⚙ Passes → Semantic engine → Manage SigLIP 2 Python**. This
 management action stays visible independently of CUDA detection, installed
 packages and the selected semantic engine. During a pass or semantic operation,
 it remains visible but disabled.
@@ -2955,8 +2955,8 @@ Two things changed:
   installed but its Python cannot reach CUDA on a machine that has a card, an
   amber note names the situation and offers **⚡ Use a GPU Python I already
   have**, opening the shared interpreter picker. The pass summary also
-  reports which device the scan *actually* ran on — "(detector on GPU, …)" or
-  "(detector on CPU, …)" — read back from the scan itself, not from a guess.
+  reports which device the scan *actually* ran on — "(detector on GPU, plus the other device)" or
+  "(detector on CPU, plus the other device)" — read back from the scan itself, not from a guess.
 - **The picker speaks the detector's own dependency list.** It never imports
   `open_clip`, `timm` or even NumPy, so the ComfyUI interpreter Score refuses
   is usually perfect here. What it *does* need is a **Transformers carrying
@@ -3085,7 +3085,7 @@ Four things are worth knowing before you lean on it:
 - **Your keystrokes never wait for the network.** The tile flips and the cursor
   moves at once; the decisions are sent behind you, one request at a time, and a
   run of identical verdicts goes out as a single batch. The bar shows *saving
-  N…* while anything is still unacknowledged — a run that has ended is not the
+  N* while anything is still unacknowledged — a run that has ended is not the
   same thing as a run that is saved. If a save does fail, nothing is guessed:
   the grid is reloaded from the bank and the message says how many decisions did
   not land.
@@ -3985,7 +3985,7 @@ under the Motion field once the strip holds two frames; **✨ Written per
 picture** asks the vision model for one prompt per picture BEFORE anything is
 queued — your motion enriched with that picture, or a proposal from the
 picture alone when the field is empty — the button counting *Writing prompt 2
-of 3…*; a picture the writer could not answer for launches with the prompt as
+of 3*; a picture the writer could not answer for launches with the prompt as
 typed, and the notice says which.
 
 The motion you typed is kept in this browser: a reload, or a trip to another
@@ -4116,7 +4116,7 @@ LoRA you picked, keeps the next scene already in the queue, and appends every
 finished clip to a stream you watch in the tab — or in **VLC** on any machine
 of your network (*Media ▸ Open Network Stream*, paste the address the panel
 shows; if the app requires an access token from other machines, add
-`?token=…` to it and the segments inherit it). The stream follows its most
+`?token=` to it and the segments inherit it). The stream follows its most
 advanced player: a second one joining later starts at the live edge rather
 than replaying what the first has watched. The shape comes from FastH3
 Live, an open-source endless AI channel
@@ -4694,7 +4694,7 @@ LoRAs back out used to be a one-at-a-time errand: open a run's checkpoint pill,
 open its popover, press ⏏ Undeploy, repeat. Nothing anywhere even told you how
 many were deployed.
 
-**⏏ Undeploy…** at the top of the **Canvas** page opens the whole list at once —
+**⏏ Undeploy** at the top of the **Canvas** page opens the whole list at once —
 every LoRA this app has put into ComfyUI, across *all* your datasets and all
 families, grouped by dataset. Tick the ones you want gone, press the button, and
 they go in one pass. **Select all** is there for the clear-out.

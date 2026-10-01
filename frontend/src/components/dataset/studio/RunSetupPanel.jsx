@@ -163,7 +163,7 @@ export default function RunSetupPanel({ d, studio, form, datasetId,
           <button type="button" disabled={studio.confirmingComfyuiRestart || !studio.confirmComfyuiRestart}
             onClick={studio.confirmComfyuiRestart}
             className="ml-auto px-2.5 py-1 rounded-lg bg-gradient-primary text-gray-950 text-xs font-semibold disabled:opacity-40">
-            {studio.confirmingComfyuiRestart ? 'Confirming…' : '✓ I restarted ComfyUI'}
+            {studio.confirmingComfyuiRestart ? 'Confirming' : '✓ I restarted ComfyUI'}
           </button>
         </div>
       )}

@@ -52,7 +52,7 @@ export default function GuideSectionModal({ topic, onClose }) {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {section === null && (
-            <p className="text-sm text-content-muted">Loading…</p>
+            <p className="text-sm text-content-muted">Loading</p>
           )}
           {section === '' && (
             <p className="text-sm text-content-muted">

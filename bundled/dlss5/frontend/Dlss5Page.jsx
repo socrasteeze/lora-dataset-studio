@@ -95,7 +95,7 @@ export default function Dlss5Page() {
             <a href={`${base}/${clip.id}/media/result?download=1`} className={button}>Download result</a></>}
           <button type="button" disabled={openingFolder} onClick={() => openFolder(clip)} className={button}
             title="Open this clip's folder on the computer running LDS, containing the original and any rendered result.">
-            {openingFolder ? 'Opening folder…' : 'Open folder'}</button>
+            {openingFolder ? 'Opening folder' : 'Open folder'}</button>
         </div>
       </div>
       <aside className="min-w-0"><h2 className="mb-3 font-semibold text-content">Your clips</h2>

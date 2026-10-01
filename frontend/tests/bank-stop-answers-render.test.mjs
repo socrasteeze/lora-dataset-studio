@@ -34,7 +34,7 @@ const html = (activity) => renderToStaticMarkup(
 const WRITING = {
   kind: 'score', done: 2200, total: 36925, finished: false, cancelled: false,
   started_at: 1_754_400_000,
-  detail: 'writing 36925 score(s) to the database… — a few minutes on a bank this size',
+  detail: 'writing 36925 score(s) to the database — a few minutes on a bank this size',
   eta_state: 'none',
   stop_cost: 'Scores already written stay. The style grouping is not written yet '
     + 'and only re-runs whole, so it needs another full pass.',
@@ -64,7 +64,7 @@ test('once the stop is registered the button says so AND stops taking clicks', (
   const markup = html({ ...WRITING, cancelled: true })
   assert.match(markup, /\sdisabled=""/)
   const seen = text(markup)
-  assert.match(seen, /Stopping…/)
+  assert.match(seen, /Stopping/)
   // The price line is replaced by what the pass is finishing: at this phase the
   // flag is read once per commit batch, which is the honest reason for the wait.
   assert.match(seen, /finishing the current batch of 200 rows/)

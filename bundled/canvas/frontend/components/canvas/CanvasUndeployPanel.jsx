@@ -126,7 +126,7 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
         {loading && (
           <p className="m-0 flex items-center gap-2 rounded-lg border border-border bg-app/60 px-3 py-2 text-xs text-content-muted" role="status">
             <span className="inline-block h-4 w-4 rounded-full border-2 border-purple-400/40 border-t-purple-400 animate-spin" aria-hidden />
-            Reading ComfyUI's loras folders…
+            Reading ComfyUI's loras folders
           </p>
         )}
 
@@ -208,7 +208,7 @@ export default function CanvasUndeployPanel({ open, onClose, onChanged }) {
           </button>
           <button type="button" onClick={run} disabled={busy || keys.size === 0}
             className="rounded-lg border border-amber-400/50 bg-amber-500/15 px-4 py-1.5 text-xs font-semibold text-amber-100 disabled:opacity-40">
-            {busy ? '⏏ Undeploying…' : undeployButtonLabel(keys.size)}
+            {busy ? '⏏ Undeploying' : undeployButtonLabel(keys.size)}
           </button>
         </div>
       </div>

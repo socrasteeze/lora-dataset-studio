@@ -167,7 +167,7 @@ def civitai_publish_model(record_id, step):
 
 @bp.post('/images/publish')
 def civitai_publish_images():
-    """Start the post job: {image_ids:[…], link_id | (record_id, step), title?,
+    """Start the post job: {image_ids:[], link_id | (record_id, step), title?,
     publish?}. The target is a LINK — the modal names the one it showed; the
     (record_id, step) form resolves the step's preferred link. Without one the
     answer says what to do (mark the page) instead of failing later."""

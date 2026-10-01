@@ -3694,7 +3694,7 @@ def _dataset_folder_refusal(folder) -> str | None:
 
 
 def _scrape_folder_for(name: str) -> str:
-    """A fresh, unused folder for a scraped bank. Suffixes -2, -3… rather than
+    """A fresh, unused folder for a scraped bank. Suffixes -2, -3 rather than
     reusing one: two scrapes of the same name must never silently merge into a
     single pile. Creation IS the reservation (``os.mkdir``, not exists-then-make),
     so two concurrent imports cannot end up sharing one folder."""
@@ -3988,7 +3988,7 @@ def scrape_import_to_video_bank(user_id, items, bank_id=None, name=None, *,
                                 _bank_lease=None, _created=False) -> dict:
     """🕸 Scrape → VIDEO BANK: the scraper's third destination.
 
-    Downloads the SELECTED scanned videos ({'url','title',…}) into a bank's source
+    Downloads the SELECTED scanned videos ({'url','title',}) into a bank's source
     folder, then lets the ordinary folder walk inventory them — the same single
     inventory path every other video bank uses. Two modes: ``bank_id`` appends to
     an EXISTING bank — any of them, including one you pointed at your own rushes

@@ -85,7 +85,7 @@ export default function H3AttentionInstallRow({ caps, onDone }) {
         ) : (
           <button type="button" onClick={start} disabled={running}
             className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50 min-h-10 lg:min-h-0">
-            {running ? 'Copying…' : 'Install into ComfyUI'}
+            {running ? 'Copying' : 'Install into ComfyUI'}
           </button>
         )}
       </div>

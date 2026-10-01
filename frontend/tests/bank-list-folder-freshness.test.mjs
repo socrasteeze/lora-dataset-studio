@@ -41,7 +41,7 @@ test('a freshly walked list states its age instead of crying stale', () => {
 
 test('the button says it is working and refuses a second click', () => {
   const html = render(FolderCheckLine, { banks: [sync()], busy: true })
-  assert.match(html, /Checking folders…/)
+  assert.match(html, /Checking folders/)
   assert.match(html, /<button[^>]*disabled/)
 })
 

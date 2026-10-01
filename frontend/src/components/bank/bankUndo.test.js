@@ -45,6 +45,7 @@ test('undoResultMessage: a PARTIAL restore never over-claims — it counts and n
   assert.match(m.text, /48 are no longer in the bank/);
   assert.match(m.text, /12 changed since/);
   assert.match(m.text, /a\.jpg, b\.jpg, c\.jpg/);
+  assert.match(m.text, /and 9 more/);
   assert.ok(!/^↩ Restored 400/.test(m.text));
 });
 

@@ -55,7 +55,7 @@ export function useFolderPersons({
   const checkFolderPerson = () => runFolderPerson(
     () => postJson(`/api/bank/${bankId}/folder-person/check`,
       { subfolder: filter.subfolder }),
-    (d) => `Checking ${d.sample_size} images of this folder…`,
+    (d) => `Checking ${d.sample_size} images of this folder`,
   )
 
   const scanFolderPersons = () => runFolderPerson(

@@ -306,7 +306,7 @@ function CanvasImageNode({ node, datasetId, laneName, onGeometry,
           title="Download this image — the file name keeps its dataset, run, step and seed"
           aria-label={`Download the image at ${imageLabel}`}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white transition-colors text-xs leading-none hover:bg-black/70 disabled:opacity-50">
-          {dl.busy ? '…' : '⬇'}
+          {dl.busy ? '' : '⬇'}
         </button>
         {/* HQ — swap the WebP tile for the ORIGINAL bytes, this picture only.
             A toggle and not a one-way switch: full quality is heavy on purpose,

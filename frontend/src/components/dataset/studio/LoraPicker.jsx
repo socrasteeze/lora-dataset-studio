@@ -151,7 +151,7 @@ export default function LoraPicker({ preselectDataset, preselectFamily = null, o
       </div>
 
       {loading ? (
-        <p className="text-content-subtle text-sm">Loading LoRA…</p>
+        <p className="text-content-subtle text-sm">Loading LoRA</p>
       ) : loras.length === 0 ? (
         <p className="text-content-subtle text-sm">
           No trained LoRA available. Train a LoRA from the Dataset Maker first.

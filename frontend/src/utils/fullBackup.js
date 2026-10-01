@@ -21,8 +21,8 @@ export function describeProgress(status, verb = 'Backing up') {
   if (!status || status.state !== 'running') return '';
   const total = status.total || 0;
   const done = Math.min(status.done || 0, total || Infinity);
-  if (!total) return 'Preparing…';
-  return `${verb} ${done} / ${total} datasets…`;
+  if (!total) return 'Preparing';
+  return `${verb} ${done} / ${total} datasets`;
 }
 
 export function progressPercent(status) {

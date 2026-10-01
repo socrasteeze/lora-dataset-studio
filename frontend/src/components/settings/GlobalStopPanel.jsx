@@ -65,7 +65,7 @@ export default function GlobalStopPanel() {
 
       <button type="button" onClick={stop} disabled={busy}
         className="rounded-md border border-red-500/50 px-3 py-1.5 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-50">
-        {busy ? 'Stopping…' : '⏹ Stop everything'}
+        {busy ? 'Stopping' : '⏹ Stop everything'}
       </button>
 
       {error && (

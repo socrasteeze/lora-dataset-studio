@@ -114,7 +114,7 @@ function DatasetCaptionDialog({ open, onClose, onChoose }) {
         {loading && (
           <p className="m-0 flex items-center gap-2 rounded-lg border border-border bg-app/60 px-3 py-2 text-xs text-content-muted" role="status">
             <span className="inline-block h-4 w-4 rounded-full border-2 border-purple-400/40 border-t-purple-400 animate-spin" aria-hidden />
-            Loading your datasets and banks…
+            Loading your datasets and banks
           </p>
         )}
 
@@ -271,7 +271,7 @@ export default function DatasetCaptionControl({ onCaption }) {
             ? 'Draw a random kept caption from ' + lockedLabel(lockedDataset)
             : 'Choose a dataset or a bank, then draw a random caption'}
           className="min-h-7 rounded-l border border-border bg-surface px-2 py-0.5 text-2xs text-content-subtle hover:text-content disabled:opacity-50">
-          <Dices aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{drawing ? 'Drawing…' : 'Caption'}
+          <Dices aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{drawing ? 'Drawing' : 'Caption'}
         </button>
         <button type="button" onClick={openPicker} disabled={drawing}
           aria-label="Choose or change the caption source" aria-haspopup="dialog"

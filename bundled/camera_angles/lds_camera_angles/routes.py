@@ -125,7 +125,7 @@ def _camera_missing_response(e):
 def canvas_image_camera_angles(image_id):
     """📷 Re-shoot ONE library picture from other CAMERA positions.
 
-    Body: `{poses: ['right/low/medium', …]}` — stable pose ids from
+    Body: `{poses: ['right/low/medium', and more]}` — stable pose ids from
     camera_angles. Answers `{ok, views: [{candidate_id, job_id, pose,
     label}], queued}`.
 

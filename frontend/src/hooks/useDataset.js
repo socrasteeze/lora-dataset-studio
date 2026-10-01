@@ -539,7 +539,7 @@ export function useDataset() {
     const skipped = {};
     for (let i = 0; i < items.length; i += BATCH) {
       if (items.length > BATCH) {
-        toast.info(`Importing ${i + 1}–${Math.min(i + BATCH, items.length)} of ${items.length}…`);
+        toast.info(`Importing ${i + 1}–${Math.min(i + BATCH, items.length)} of ${items.length}`);
       }
       const d = await postJson(`/api/dataset/${currentId}/scrape-import`,
         { items: items.slice(i, i + BATCH), rescue_small: !!rescueSmall });
@@ -708,7 +708,7 @@ export function useDataset() {
   const cancelCaption = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/caption/cancel`, {});
     if (d.ok) {
-      toast.info('Stopping after the current image…');
+      toast.info('Stopping after the current image');
       await refresh();   // pull activity.cancelling so the button flips immediately
     } else {
       // 409 = the batch already finished on its own between the poll and the click.
@@ -923,7 +923,7 @@ export function useDataset() {
   const cancelTextScan = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/text/detect/cancel`, {});
     if (d.ok) {
-      toast.info('Stopping after the current image… what is already flagged is kept.');
+      toast.info('Stopping after the current image what is already flagged is kept.');
       await refresh();
     } else {
       toast.error(d.error || 'Nothing to stop');
@@ -937,7 +937,7 @@ export function useDataset() {
   const cancelWatermarkScan = useCallback(async () => {
     const d = await postJson(`/api/dataset/${currentId}/watermarks/detect/cancel`, {});
     if (d.ok) {
-      toast.info('Stopping after the current image… what is already flagged is kept.');
+      toast.info('Stopping after the current image what is already flagged is kept.');
       await refresh();   // pull activity.cancelling so the button flips immediately
     } else {
       // 409 = the scan already finished on its own between the poll and the click.
@@ -1518,7 +1518,7 @@ export function useDataset() {
   // Start ComfyUI merge-to-diffusers conversion in a background thread.
   const prepareBase = useCallback(async (baseModel) => {
     const d = await postJson(`/api/dataset/${currentId}/train/prepare-base`, { base_model: baseModel });
-    if (d.ok) toast.success(d.status === 'done' ? 'Base already ready' : 'Base conversion started…');
+    if (d.ok) toast.success(d.status === 'done' ? 'Base already ready' : 'Base conversion started');
     else toast.error(d.error || 'Unexpected error');
     return d;
   }, [currentId, toast]);

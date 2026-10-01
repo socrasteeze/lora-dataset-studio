@@ -90,7 +90,7 @@ test('queue-all posts the queue route, never one pipeline per bank', () => {
   // The whole ask: they must QUEUE, not run at the same time. One request, one
   // entry per bank, drained one at a time by the untouched worker gate.
   assert.match(page, /postJson\('\/api\/bank-queue\/all', config\)/);
-  assert.match(page, /⏳ Queue all \{queueAllCount\} bank\(s\)…/);
+  assert.match(page, /⏳ Queue all \{queueAllCount\} bank\(s\)/);
   assert.match(page, /One at a time on this machine — a bank sent to another one runs alongside it/);
 });
 

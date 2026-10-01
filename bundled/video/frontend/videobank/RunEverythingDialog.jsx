@@ -118,7 +118,7 @@ export default function RunEverythingDialog({ capability, onClose, onLaunch }) {
             </button>
             <button type="submit" disabled={busy || !steps.length}
               className="min-h-10 rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50 lg:min-h-0">
-              {busy ? 'Starting…' : '▶ Run'}
+              {busy ? 'Starting' : '▶ Run'}
             </button>
           </div>
         </div>

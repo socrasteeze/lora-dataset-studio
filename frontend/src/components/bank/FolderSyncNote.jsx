@@ -37,7 +37,7 @@ export default function FolderSyncNote({ sync, onRelocate, onForget }) {
           <button type="button" onClick={onForget}
             title="Drop the rows whose file is no longer in the folder. Rows only — nothing on disk is touched. Asks first, with a fresh count."
             className="rounded border border-current px-2 py-0.5 text-xs font-semibold hover:bg-white/10">
-            🧹 Forget missing ({note.missing.toLocaleString('en-US')})…
+            🧹 Forget missing ({note.missing.toLocaleString('en-US')})
           </button>
         )}
       </div>

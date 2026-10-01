@@ -371,7 +371,7 @@ export default function ServerSection({ config, setField, runtime, handleSave, c
           ) : dirty ? (
             <button type="button" onClick={restart} disabled={restarting}
               className="ml-auto shrink-0 rounded-md bg-gradient-primary px-3 py-1 text-xs font-semibold text-gray-950 disabled:opacity-50">
-              {restarting ? '↻ Restarting…' : 'Save & restart to apply'}
+              {restarting ? '↻ Restarting' : 'Save & restart to apply'}
             </button>
           ) : (
             <span className="ml-auto text-emerald-400"><span aria-hidden>✓</span> Running config matches saved config</span>

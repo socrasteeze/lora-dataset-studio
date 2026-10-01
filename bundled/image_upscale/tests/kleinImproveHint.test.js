@@ -67,9 +67,9 @@ test('a long instruction is shortened for display but kept whole for the tooltip
   const long = Array.from({ length: 40 }, (_, i) => `token${i}`).join(', ');
   const line = improveInstructionLine({ loaded: true, enabled: true, prompt: long });
   assert.ok(line.quote.length < long.length);
-  assert.ok(line.quote.endsWith('…'));
+  assert.ok(line.quote.endsWith(''));
   assert.equal(line.full, long);           // the title attribute stays complete
-  assert.ok(!/\s…$/.test(line.quote));     // no dangling space before the ellipsis
+  assert.ok(!/\s$/.test(line.quote));     // no dangling space before the ellipsis
 });
 
 test('shortenPrompt collapses newlines so a multi-line prompt stays one line', () => {

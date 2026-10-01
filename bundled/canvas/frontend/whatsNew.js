@@ -31,7 +31,7 @@ export const WHATS_NEW = [
     "id": "2026-08-17-canvas-bulk-undeploy",
     "date": "2026-08-17",
     "title": "Undeploy a pile of LoRAs in one go",
-    "blurb": "Taking LoRAs back out of ComfyUI was a one-at-a-time errand buried in a checkpoint popover, and nothing anywhere told you how many were deployed. ⏏ Undeploy… at the top of the Canvas now opens the whole list — every LoRA the app has put into ComfyUI, across all your datasets and families, grouped by dataset. Tick what goes, press once, done; Select all is there for the clear-out. Only what the app deployed is listed, so a LoRA you downloaded into the same folder is never shown and never touched. Your training saves are kept — anything you undeploy can be deployed again from its checkpoint — and the removed copies go to the trash. The result is reported in three parts rather than a flat \"done\": removed, already gone, and refused (each one named).",
+    "blurb": "Taking LoRAs back out of ComfyUI was a one-at-a-time errand buried in a checkpoint popover, and nothing anywhere told you how many were deployed. ⏏ Undeploy at the top of the Canvas now opens the whole list — every LoRA the app has put into ComfyUI, across all your datasets and families, grouped by dataset. Tick what goes, press once, done; Select all is there for the clear-out. Only what the app deployed is listed, so a LoRA you downloaded into the same folder is never shown and never touched. Your training saves are kept — anything you undeploy can be deployed again from its checkpoint — and the removed copies go to the trash. The result is reported in three parts rather than a flat \"done\": removed, already gone, and refused (each one named).",
     "to": "/canvas"
   },
   {
@@ -182,7 +182,7 @@ export const WHATS_NEW = [
     "id": "2026-08-01-canvas-runs-stay-separate-and-in-epoch-order",
     "date": "2026-08-01",
     "title": "Pin two generation runs to the canvas and compare them side by side",
-    "blurb": "Pinning a second run at the same checkpoint no longer folds its images into the first run’s strip — each generation keeps its own strip on the board, so two runs stay two runs. Every strip now reads left to right in training order (500, 1000, 1500…) instead of alphabetically, and an over-cap batch keeps the early epochs rather than an arbitrary slice."
+    "blurb": "Pinning a second run at the same checkpoint no longer folds its images into the first run’s strip — each generation keeps its own strip on the board, so two runs stay two runs. Every strip now reads left to right in training order (500, 1000, 1500) instead of alphabetically, and an over-cap batch keeps the early epochs rather than an arbitrary slice."
   },
   {
     "id": "2026-08-01-canvas-shows-the-dataset-reference-face",
@@ -242,7 +242,7 @@ export const WHATS_NEW = [
     "id": "2026-07-27-canvas-checkpoint-actions",
     "date": "2026-07-27",
     "title": "Click a checkpoint on the LoRA Canvas and act on it — download, deploy, undeploy, delete",
-    "blurb": "On the board a checkpoint could only be ticked. It now opens the same actions the graph inside a run card has always had: ⬇ Download, 📦 Deploy → loras/…, ⏏ Undeploy, and the 🗑 delete that names exactly which file it removes. It is literally the same popover, so the two screens can never drift apart. When an action is not possible the reason is written where the button would be — a save that left the disk, a cloud run this machine has no link to — instead of a button that does nothing."
+    "blurb": "On the board a checkpoint could only be ticked. It now opens the same actions the graph inside a run card has always had: ⬇ Download, 📦 Deploy → loras/<file>, ⏏ Undeploy, and the 🗑 delete that names exactly which file it removes. It is literally the same popover, so the two screens can never drift apart. When an action is not possible the reason is written where the button would be — a save that left the disk, a cloud run this machine has no link to — instead of a button that does nothing."
   },
   {
     "id": "2026-07-27-canvas-details-on-demand",

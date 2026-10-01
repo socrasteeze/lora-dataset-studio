@@ -64,7 +64,7 @@ test('a corrupted consistency LoRA does not block the ComfyUI step', () => {
   assert.equal(step.kleinFilesReady, true);
 });
 
-test('…and is still VISIBLE — the fix must not trade one defect for another', () => {
+test('and is still VISIBLE — the fix must not trade one defect for another', () => {
   const step = comfyStep(loraOnlyCaps());
   // The list the download buttons read carries it, so the LoRA button can no longer
   // print "✓ Installed" over an unreadable file.

@@ -65,7 +65,7 @@ export default function BankGroupPromoteDialog({ row, onClose, onStarted }) {
           <span className="text-xs font-medium text-content">Dataset</span>
           <select value={datasetId} onChange={(e) => setDatasetId(e.target.value)}
             className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-content">
-            <option value="">Choose a dataset…</option>
+            <option value="">Choose a dataset</option>
             {(datasets || []).map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
@@ -91,7 +91,7 @@ export default function BankGroupPromoteDialog({ row, onClose, onStarted }) {
           </button>
           <button type="button" onClick={start} disabled={busy || !datasetId || row.keep === 0}
             className="rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? 'Starting…' : `⬆ Promote ${row.keep} image(s)`}
+            {busy ? 'Starting' : `⬆ Promote ${row.keep} image(s)`}
           </button>
         </div>
       </div>

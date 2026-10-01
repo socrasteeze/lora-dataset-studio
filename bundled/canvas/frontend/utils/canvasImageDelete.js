@@ -58,7 +58,7 @@ export const DELETE_ARM_MS = 4000;
 
 /** What the button must SAY and LOOK like in each of its three states. */
 export function canvasDeleteButtonState({ armed = false, busy = false, label = 'this image' } = {}) {
-  if (busy) return { glyph: '…', disabled: true, tone: 'busy', title: 'Deleting…', aria: 'Deleting this image' };
+  if (busy) return { glyph: '', disabled: true, tone: 'busy', title: 'Deleting', aria: 'Deleting this image' };
   if (armed) {
     return { glyph: '🗑!', disabled: false, tone: 'armed',
       // The word "permanently" is deliberately absent: whether the file is

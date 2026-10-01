@@ -156,12 +156,12 @@ export function jobPhaseLabel(job) {
   if (!job) return '';
   const pct = Math.round(Math.max(0, Math.min(1, Number(job.progress) || 0)) * 100);
   switch (job.phase) {
-    case 'starting': return 'Starting…';
-    case 'creating': return job.kind === 'post' ? 'Creating the post…' : 'Creating the model page…';
+    case 'starting': return 'Starting';
+    case 'creating': return job.kind === 'post' ? 'Creating the post' : 'Creating the model page';
     case 'uploading': return job.kind === 'post'
-      ? `Uploading images… ${pct}%`
-      : `Uploading the checkpoint… ${pct}%`;
-    case 'registering': return 'Registering the file…';
+      ? `Uploading images ${pct}%`
+      : `Uploading the checkpoint ${pct}%`;
+    case 'registering': return 'Registering the file';
     case 'done': return 'Done.';
     default: return job.phase ? String(job.phase) : '';
   }

@@ -315,7 +315,7 @@ export default function CameraAnglePicker({ onShoot, onClose, modelResident = fa
           <button type="button" onClick={run} disabled={!!refusal || active || disabled}
             aria-busy={active}
             className="min-h-10 lg:min-h-0 rounded-lg bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-gray-950 disabled:cursor-not-allowed disabled:opacity-40">
-            {active ? 'Queueing…' : `Shoot ${poses.length || ''} view${poses.length === 1 ? '' : 's'}`.trim()}
+            {active ? 'Queueing' : `Shoot ${poses.length || ''} view${poses.length === 1 ? '' : 's'}`.trim()}
           </button>
         </footer>
       </div>

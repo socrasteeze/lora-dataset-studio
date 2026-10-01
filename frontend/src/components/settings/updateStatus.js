@@ -68,12 +68,12 @@ export function progressLabel(p) {
   if (phase === 'downloading') {
     const pct = progressPercent(p)
     const dl = formatMB(p.downloaded)
-    if (p.total) return `⬇ Downloading… ${pct == null ? '' : `${pct}% `}(${dl || '0 MB'} / ${formatMB(p.total)})`
-    return `⬇ Downloading… ${dl || ''}`.trim()
+    if (p.total) return `⬇ Downloading ${pct == null ? '' : `${pct}% `}(${dl || '0 MB'} / ${formatMB(p.total)})`
+    return `⬇ Downloading ${dl || ''}`.trim()
   }
-  if (phase === 'extracting') return '📦 Extracting the update…'
-  if (phase === 'installing') return '🔧 Installing the new files…'
-  if (phase === 'restarting') return '↻ Restarting the app…'
+  if (phase === 'extracting') return '📦 Extracting the update'
+  if (phase === 'installing') return '🔧 Installing the new files'
+  if (phase === 'restarting') return '↻ Restarting the app'
   return null
 }
 

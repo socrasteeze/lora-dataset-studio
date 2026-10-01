@@ -141,7 +141,7 @@ export default function SideBySideVideo({ originalSrc, renderSrc, title, exportH
             <button type="button" onClick={exportFile} disabled={exporting}
               title="Save the two clips as one video, side by side — labelled, in step, ready to send"
               className="min-h-10 rounded-md border border-border px-2 py-1 text-xs text-content-muted hover:text-content disabled:opacity-60 lg:min-h-0">
-              {exporting ? 'Building…' : '⬇ Export'}
+              {exporting ? 'Building' : '⬇ Export'}
             </button>
           )}
           <button type="button" onClick={() => setOneToOne((z) => !z)} aria-pressed={oneToOne}

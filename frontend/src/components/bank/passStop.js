@@ -43,7 +43,7 @@ export function jobKey(activity) {
 }
 
 export function stopLabel(requested) {
-  return requested ? 'Stopping…' : 'Stop'
+  return requested ? 'Stopping' : 'Stop'
 }
 
 /** The line under the bar. Before the click it is the PRICE; after it, what the

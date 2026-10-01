@@ -137,7 +137,7 @@ export default function VideoBankPage() {
         </div>
         <button type="submit" disabled={creating}
           className="rounded-md bg-gradient-primary px-4 py-2 text-sm font-semibold text-gray-950 disabled:opacity-50">
-          {creating ? 'Inventorying…' : '➕ Create video bank'}
+          {creating ? 'Inventorying' : '➕ Create video bank'}
         </button>
       </form>
 
@@ -149,7 +149,7 @@ export default function VideoBankPage() {
       <PluginSlot slot="sources.panel" surface="videoBank" banks={banks} onDone={() => refresh()} />
 
       {banks == null ? (
-        <p className="text-sm text-content-muted">Loading…</p>
+        <p className="text-sm text-content-muted">Loading</p>
       ) : banks.length === 0 ? (
         <p className="text-sm text-content-muted">
           No video bank yet — create one above to cut a folder of rushes into shots.

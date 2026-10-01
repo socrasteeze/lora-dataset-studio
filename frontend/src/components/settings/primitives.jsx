@@ -85,7 +85,7 @@ export function TestButton({ target, onResult, beforeTest }) {
       disabled={busy}
       className={`${SIDE_BUTTON_CLASS} shrink-0`}
     >
-      {busy ? 'Testing…' : 'Test'}
+      {busy ? 'Testing' : 'Test'}
     </button>
   )
 }

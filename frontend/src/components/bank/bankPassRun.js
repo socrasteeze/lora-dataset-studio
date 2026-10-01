@@ -203,7 +203,7 @@ export async function busyRefusalLive({ kind, fetchActivity, fallback,
  */
 export function passButtonState({ activity, offline = false, pending = false } = {}) {
   if (pending) {
-    return { disabled: true, pending: true, reason: 'Starting…' };
+    return { disabled: true, pending: true, reason: 'Starting' };
   }
   if (bankIsBusy(activity, offline)) {
     return { disabled: true, pending: false, reason: busyRefusal({ activity }) };

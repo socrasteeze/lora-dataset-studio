@@ -32,7 +32,7 @@ export default function SetupJourneyChoices({ plan, journey, products, catalog, 
     <h2 className="text-xl font-semibold text-content">Choose the tool you want to add</h2>
     <p className="text-sm text-content-muted">Pick a plugin to see its plan: installation, activation, then the models or services for your chosen function.</p>
     <label className="block text-sm text-content">Find a plugin
-      <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by name or use…"
+      <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by name or use"
         className="mt-1 min-h-11 w-full rounded-lg border border-border-strong bg-surface-raised px-3 py-2 text-content" />
     </label>
     {catalog?.status !== 'ready' && <p role="status" className="text-sm text-content-muted">{catalog?.message || 'The Store is not available. Installed plugins are listed below.'}</p>}

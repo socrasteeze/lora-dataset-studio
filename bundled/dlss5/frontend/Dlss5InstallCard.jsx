@@ -116,7 +116,7 @@ export default function Dlss5InstallCard({ caps, onDone }) {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={start} disabled={phase === 'running'}
             className="min-h-10 rounded-md border border-border-strong bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-50 lg:min-h-0">
-            {phase === 'running' ? 'Downloading…' : 'Install the bridge (≈ 0.2 MB)'}
+            {phase === 'running' ? 'Downloading' : 'Install the bridge (≈ 0.2 MB)'}
           </button>
         </div>
       )}

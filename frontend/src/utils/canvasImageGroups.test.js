@@ -340,7 +340,7 @@ test('a strip whose pictures share a checkpoint draws ONE link, from the strip',
     [band.x, band.y, band.w, band.h], 'it leaves the STRIP, not a tile inside it');
 });
 
-test('…and a strip built from SEVERAL checkpoints owns up to every one of them', () => {
+test('and a strip built from SEVERAL checkpoints owns up to every one of them', () => {
   // 📌 Pin all groups a whole generation run — routinely three epochs of the
   // same card. One line to one pill would attribute the other two to it.
   const strip = [source(1, 10, 500), source(2, 10, 1000), source(3, 10, 1000),

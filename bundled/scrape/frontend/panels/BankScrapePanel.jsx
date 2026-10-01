@@ -48,7 +48,7 @@ export default function BankScrapePanel({ banks, onDone }) {
       const res = await runBankScrapeImport({
         items, destination, post: (url, body) => postJson(url, body),
         onBatch: ({ index, count, total }) => {
-          if (count > 1) toast.info(`Downloading batch ${index + 1} of ${count} (${total} picked)…`)
+          if (count > 1) toast.info(`Downloading batch ${index + 1} of ${count} (${total} picked)`)
         },
       })
       if (!res.ok) {
@@ -117,7 +117,7 @@ export default function BankScrapePanel({ banks, onDone }) {
                 <select value={bankId} onChange={(e) => setBankId(e.target.value)}
                   aria-label="Bank that receives the images"
                   className="w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content">
-                  <option value="">Choose a bank…</option>
+                  <option value="">Choose a bank</option>
                   {known.map((b) => (
                     <option key={b.id} value={b.id}>{b.name} ({b.total})</option>
                   ))}

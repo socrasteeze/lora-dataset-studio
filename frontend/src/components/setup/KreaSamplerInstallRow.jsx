@@ -91,7 +91,7 @@ export default function KreaSamplerInstallRow({ caps, onDone }) {
             disabled={running}
             className="rounded-md border border-border px-3 py-1 text-xs font-medium text-content hover:border-primary disabled:opacity-50"
           >
-            {running ? 'Installing…' : 'Install'}
+            {running ? 'Installing' : 'Install'}
           </button>
         )}
       </div>

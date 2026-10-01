@@ -59,8 +59,8 @@ test('switching engines exits engine-specific views and cannot race semantic act
   assert.match(ws, /switching=\{semanticSwitching\} disabled=\{semanticOperationBusy\}/)
   assert.match(ws, /semanticEngineRef\.current !== requestEngine/)
   assert.match(ws, /semanticPayloadMatches\(d, requestEngine, requestModelKey\)/)
-  assert.match(panel, /\{switching && <span[^>]*>Saving choice…<\/span>\}/)
-  assert.doesNotMatch(panel, /\{disabled && <span[^>]*>Saving choice…<\/span>\}/)
+  assert.match(panel, /\{switching && <span[^>]*>Saving choice<\/span>\}/)
+  assert.doesNotMatch(panel, /\{disabled && <span[^>]*>Saving choice\u2026<\/span>\}/)
 })
 
 test('coverage is request-scoped and labelled by the engine that produced it', () => {

@@ -66,7 +66,7 @@ test('the Guide renders a Copy button on code blocks', () => {
 
 test('index.html paints a placeholder inside #root before React mounts', () => {
   const html = readFileSync(path.join(SRC, '..', 'index.html'), 'utf8')
-  assert.match(html, /<div id="root"><div[^>]*>Loading LoRA Dataset Studio…<\/div><\/div>/)
+  assert.match(html, /<div id="root"><div[^>]*>Loading LoRA Dataset Studio<\/div><\/div>/)
 })
 
 test('a dataset list that never loaded is not shown as an empty library', () => {
@@ -76,7 +76,7 @@ test('a dataset list that never loaded is not shown as an empty library', () => 
   assert.match(hook, /listStatus, retryList: fetchList/)
   const panel = read('components/dataset/DatasetListPanel.jsx')
   assert.match(panel, /const pending = empty && listStatus !== 'ready'/)
-  assert.match(panel, /Loading datasets…/)
+  assert.match(panel, /Loading datasets/)
   assert.match(panel, /Could not load your datasets\./)
   assert.ok(panel.indexOf('{pending ? (') < panel.indexOf('<EmptyState />', panel.indexOf('{pending ? (')))
   assert.match(read('pages/DatasetPage.jsx'), /listStatus=\{ds\.listStatus\} onRetryList=\{ds\.retryList\}/)

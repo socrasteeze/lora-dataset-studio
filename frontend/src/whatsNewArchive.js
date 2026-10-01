@@ -85,7 +85,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-09',
     title: 'Style captions stop opening with the medium',
     blurb:
-      'A style dataset teaches a LOOK, so the medium has to be absorbed by the LoRA and never written into a caption — otherwise it binds to those words instead. The captioner was already told not to name it, but that instruction is a negative rule and JoyCaption does not follow those, so captions kept opening with "A digital illustration of a young woman…". Those openers are now cut afterwards and the sentence behind them repaired, so "A digital illustration shows five birds" becomes "Five birds" — on the full caption and on the shortened one alike. A medium named inside the scene is content, not a lead-in, and is left alone: "a painting hangs on the wall" survives untouched, and so does "An oil painting of a stormy sea hangs on the wall".',
+      'A style dataset teaches a LOOK, so the medium has to be absorbed by the LoRA and never written into a caption — otherwise it binds to those words instead. The captioner was already told not to name it, but that instruction is a negative rule and JoyCaption does not follow those, so captions kept opening with "A digital illustration of a young woman". Those openers are now cut afterwards and the sentence behind them repaired, so "A digital illustration shows five birds" becomes "Five birds" — on the full caption and on the shortened one alike. A medium named inside the scene is content, not a lead-in, and is left alone: "a painting hangs on the wall" survives untouched, and so does "An oil painting of a stormy sea hangs on the wall".',
   },
 {
     id: '2026-08-09-preview-prompts-from-captions',
@@ -284,7 +284,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-08',
     title: 'Fix the improve instruction where it goes wrong, not in Settings',
     blurb:
-      'The note under ✨ Upscale & improve already told you what the pass was about to ask Klein for — "add detailed texture, add sharp details…" — and then sent you to Settings to change it. Now you can change it right there: ✎ Edit this instruction here opens the box under the button, in the lightbox and in the bulk toolbar, already filled with the exact text in force. Rewrite it for a drawing, or untick it and let the pass upscale with no instruction at all; both take effect on your next improve, with nothing to save. It edits the app-wide setting — the same value Settings shows, applying to every dataset — and the panel says so before you touch it. Reset to default appears only once you have actually overridden something, and puts you back on the shipped text rather than on a frozen copy of it, so later improvements to that text still reach you.',
+      'The note under ✨ Upscale & improve already told you what the pass was about to ask Klein for — "add detailed texture, add sharp details" — and then sent you to Settings to change it. Now you can change it right there: ✎ Edit this instruction here opens the box under the button, in the lightbox and in the bulk toolbar, already filled with the exact text in force. Rewrite it for a drawing, or untick it and let the pass upscale with no instruction at all; both take effect on your next improve, with nothing to save. It edits the app-wide setting — the same value Settings shows, applying to every dataset — and the panel says so before you touch it. Reset to default appears only once you have actually overridden something, and puts you back on the shipped text rather than on a frozen copy of it, so later improvements to that text still reach you.',
   },
 {
     id: '2026-08-08-every-krea-build-you-own-is-offered',
@@ -397,7 +397,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-07',
     title: 'Every pass now tells you how much longer it needs',
     blurb:
-      '"12939 / 37800" told you where a pass was, never whether that meant twenty minutes or four hours — so the only way to find out was to sit and watch. Scan, ✨ Score, faces, framing, medium, captioning, watermark, crops & variants, the semantic index and the video passes now add "about 2 hours left" beside their counter, and a refusal to start a second pass tells you how long the first one still needs. The number is measured over the last minute of real work, not averaged since the pass began: a ✨ Score resuming from cache swallows twenty thousand rows in two seconds and an average would have promised "a few seconds" for the next hour and a half. It stays quiet until it can hold still — you get "estimating time left…" rather than a figure that changes every poll — it says "in this step" once a pass has moved on to a different kind of work, and a step with nothing to count (grouping styles, comparing shots) gets no estimate at all rather than an invented one.',
+      '"12939 / 37800" told you where a pass was, never whether that meant twenty minutes or four hours — so the only way to find out was to sit and watch. Scan, ✨ Score, faces, framing, medium, captioning, watermark, crops & variants, the semantic index and the video passes now add "about 2 hours left" beside their counter, and a refusal to start a second pass tells you how long the first one still needs. The number is measured over the last minute of real work, not averaged since the pass began: a ✨ Score resuming from cache swallows twenty thousand rows in two seconds and an average would have promised "a few seconds" for the next hour and a half. It stays quiet until it can hold still — you get "estimating time left" rather than a figure that changes every poll — it says "in this step" once a pass has moved on to a different kind of work, and a step with nothing to count (grouping styles, comparing shots) gets no estimate at all rather than an invented one.',
   },
 {
     id: '2026-08-07-parallel-cloud-runs',
@@ -487,7 +487,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-07',
     title: 'Stop on a Bank pass answers you the moment you press it',
     blurb:
-      'Press Stop while ✨ Score is writing thirty-six thousand rows and nothing appeared to happen for about three seconds — so everyone pressed it again, several times. The click was always registered instantly; it was the banner around it that took that long to refresh, and the button looked exactly the same before and after. It now changes to "Stopping…" the instant you press it and stops taking clicks, without waiting for anything from the server. It also says what it is waiting for, in the words of the step actually running — "finishing the current batch of 200 rows, then saving" is why the counter keeps moving for a moment after you press. And it tells you the price BEFORE you press: while scores are being written, everything already written stays and only the style grouping has to be redone in full, while during the style grouping itself Stop costs nothing because that step is written whole either way.',
+      'Press Stop while ✨ Score is writing thirty-six thousand rows and nothing appeared to happen for about three seconds — so everyone pressed it again, several times. The click was always registered instantly; it was the banner around it that took that long to refresh, and the button looked exactly the same before and after. It now changes to "Stopping" the instant you press it and stops taking clicks, without waiting for anything from the server. It also says what it is waiting for, in the words of the step actually running — "finishing the current batch of 200 rows, then saving" is why the counter keeps moving for a moment after you press. And it tells you the price BEFORE you press: while scores are being written, everything already written stays and only the style grouping has to be redone in full, while during the style grouping itself Stop costs nothing because that step is written whole either way.',
   },
 {
     id: '2026-08-07-a-pinned-model-that-is-missing-stops-the-run',
@@ -588,7 +588,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-06',
     title: 'The face-mask preview can be stopped — and picks up where it left off',
     blurb:
-      '"Looking for faces… analyzing image 4 of 153" had no way out: the only choice was to wait for the whole pass or leave the page and lose it. There is a Stop button now, and it keeps what the pass already found — start it again and it resumes at image 5 instead of image 1. The button says what stopping costs at the moment you press it, and the cost changes as the pass runs: during the model load nothing has been analyzed yet, so only the load is given up; once images are being analyzed, every face already found is kept. Change your kept images and the saved work is dropped rather than reused, because boxes from photos that left the set would describe a run that no longer exists.',
+      '"Looking for faces: analyzing image 4 of 153" had no way out: the only choice was to wait for the whole pass or leave the page and lose it. There is a Stop button now, and it keeps what the pass already found — start it again and it resumes at image 5 instead of image 1. The button says what stopping costs at the moment you press it, and the cost changes as the pass runs: during the model load nothing has been analyzed yet, so only the load is given up; once images are being analyzed, every face already found is kept. Change your kept images and the saved work is dropped rather than reused, because boxes from photos that left the set would describe a run that no longer exists.',
   },
 {
     id: '2026-08-06-each-bank-can-choose-clip-or-siglip2-without-losing-work',
@@ -669,7 +669,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-05',
     title: 'A watermark scan can be stopped, and keeps everything it already found',
     blurb:
-      'Starting 🧽 Find watermarks on a large dataset used to be a commitment: there was no Stop button anywhere, and the only way out was closing the tab and hoping. The progress banner now carries the same ⏹ Stop the captioning pass has. It stops after the image in flight — never mid-inference — and every watermark already found is kept, so running 🧽 Find watermarks again simply picks up where you left off. The live "Scanning… 12/340" counter now actually moves in the tab that started the scan, too; it only ever updated after a page reload before.',
+      'Starting 🧽 Find watermarks on a large dataset used to be a commitment: there was no Stop button anywhere, and the only way out was closing the tab and hoping. The progress banner now carries the same ⏹ Stop the captioning pass has. It stops after the image in flight — never mid-inference — and every watermark already found is kept, so running 🧽 Find watermarks again simply picks up where you left off. The live "Scanning 12/340" counter now actually moves in the tab that started the scan, too; it only ever updated after a page reload before.',
   },
 {
     id: '2026-08-05-select-images-and-see-their-tags-with-how-often-each-is-cited',
@@ -844,7 +844,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-04',
     title: 'A base you type by hand is checked before you launch, not after',
     blurb:
-      'Pick a base from the dropdown and the panel tells you immediately if it is a packed export the trainer cannot load, or an fp8 cast that trains from already-degraded weights. Type the path yourself under “Custom weights…” and, until now, you got that same verdict only when you saved or launched — after the dataset had already been exported. The typed path is now read the moment you stop typing: same check, same sentence, same red box, and the Train button stays disabled if the file cannot be loaded at all. A path that is not there, or that is not a .safetensors, says so instead of letting the run find out.',
+      'Pick a base from the dropdown and the panel tells you immediately if it is a packed export the trainer cannot load, or an fp8 cast that trains from already-degraded weights. Type the path yourself under “Custom weights” and, until now, you got that same verdict only when you saved or launched — after the dataset had already been exported. The typed path is now read the moment you stop typing: same check, same sentence, same red box, and the Train button stays disabled if the file cannot be loaded at all. A path that is not there, or that is not a .safetensors, says so instead of letting the run find out.',
   },
 {
     id: '2026-08-04-train-on-another-machine',
@@ -1188,7 +1188,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-03',
     title: 'You can finally paste a path when choosing a folder',
     blurb:
-      'Browse… opened the Windows folder tree from the XP era: no address bar, no Quick Access, and no way to paste — so a path someone sent you, or one you had just copied out of Explorer, had to be clicked down to one folder at a time. It now opens the modern Windows folder picker, with an address bar you can paste into and your usual shortcuts down the side. The in-app browser — the one you get over the LAN, on a tablet, or on Linux, where no Windows dialog exists — gained the same thing: a path box at the top, Enter to jump. If the modern dialog cannot be used on your machine, the old one still opens rather than nothing at all.',
+      'Browse opened the Windows folder tree from the XP era: no address bar, no Quick Access, and no way to paste — so a path someone sent you, or one you had just copied out of Explorer, had to be clicked down to one folder at a time. It now opens the modern Windows folder picker, with an address bar you can paste into and your usual shortcuts down the side. The in-app browser — the one you get over the LAN, on a tablet, or on Linux, where no Windows dialog exists — gained the same thing: a path box at the top, Enter to jump. If the modern dialog cannot be used on your machine, the old one still opens rather than nothing at all.',
   },
 {
     id: '2026-08-03-export-keeps-original-bytes',
@@ -1216,7 +1216,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-03',
     title: 'The caption-mismatch warning names YOUR model family, not Z-Image',
     blurb:
-      'If your captions did not match the family you picked, the app refused the launch with a message that always said “this Z-Image dataset… but Z-Image expects prose” — even when you were training Krea 2, FLUX.1 or FLUX.2 Klein. The sentence was frozen into the code while the truth depends on the family. It now names the one you actually chose, so the advice matches what you are looking at.',
+      'If your captions did not match the family you picked, the app refused the launch with a message that always said “this Z-Image dataset, but Z-Image expects prose” — even when you were training Krea 2, FLUX.1 or FLUX.2 Klein. The sentence was frozen into the code while the truth depends on the family. It now names the one you actually chose, so the advice matches what you are looking at.',
   },
 {
     id: '2026-08-03-caption-length-preset',
@@ -1335,7 +1335,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-03',
     title: 'Bank chips are easier to see, and the page stops scrolling sideways',
     blurb:
-      'Two phone fixes for the bank. The active filter chip — the one telling you which Status/Quality/Origin/etc. is currently narrowing the grid — was a faint tint that was hard to tell apart from the inactive ones; it now renders as a solid, bold pill. Separately, the whole page could sometimes end up scrollable left-right on a phone, usually right after the keyboard auto-zoomed on a text box: two of the four ③ Curate popovers (🎨 Pick diverse…, 🎯 Similar to selected…) had never gotten the same mobile-safe placement their two siblings already had, so on a narrow screen they could hang off the edge and widen the whole page. Fixed to match, plus a couple of defensive tweaks so the same class of bug can\'t sneak back in.',
+      'Two phone fixes for the bank. The active filter chip — the one telling you which Status/Quality/Origin/etc. is currently narrowing the grid — was a faint tint that was hard to tell apart from the inactive ones; it now renders as a solid, bold pill. Separately, the whole page could sometimes end up scrollable left-right on a phone, usually right after the keyboard auto-zoomed on a text box: two of the four ③ Curate popovers (🎨 Pick diverse, 🎯 Similar to selected) had never gotten the same mobile-safe placement their two siblings already had, so on a narrow screen they could hang off the edge and widen the whole page. Fixed to match, plus a couple of defensive tweaks so the same class of bug can\'t sneak back in.',
   },
 {
     id: '2026-08-03-bank-medium-chips',
@@ -1405,7 +1405,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-02',
     title: 'The terminal finally tells you where the app is',
     blurb:
-      'Starting the server by hand (python backend/run.py) printed no address at all — the usual "Running on http://..." line was being swallowed into data/app.log — so you had to guess the port, which is exactly the case where it may have moved because 5050 was taken. The console now prints "[LDS] Ready on http://…" once the app really answers, whichever way you launched it.',
+      'Starting the server by hand (python backend/run.py) printed no address at all — the usual "Running on http://..." line was being swallowed into data/app.log — so you had to guess the port, which is exactly the case where it may have moved because 5050 was taken. The console now prints "[LDS] Ready on http://<host>" once the app really answers, whichever way you launched it.',
   },
 {
     id: '2026-08-02-tag-a-bank-before-you-caption-it',
@@ -1538,7 +1538,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-02',
     title: 'A cloud launch now tells you what it is doing, and for how long',
     blurb:
-      'Renting a GPU takes minutes, and the button used to say "Launching…" for all of them — impossible to tell a normal wait from a dead one. The launch now shows its steps as it walks them (preparing the dataset, searching for an offer, renting and booting the pod, uploading, starting the job) with the time elapsed, on the dataset panel and on the Runs page. While a pod boots you also see how long it is allowed to take, so a machine that never starts ends with a plain explanation instead of a frozen screen — it is released, it stops billing, and launching again picks a different host. A launch can be cancelled from the Runs page like any run.',
+      'Renting a GPU takes minutes, and the button used to say "Launching" for all of them — impossible to tell a normal wait from a dead one. The launch now shows its steps as it walks them (preparing the dataset, searching for an offer, renting and booting the pod, uploading, starting the job) with the time elapsed, on the dataset panel and on the Runs page. While a pod boots you also see how long it is allowed to take, so a machine that never starts ends with a plain explanation instead of a frozen screen — it is released, it stops billing, and launching again picks a different host. A launch can be cancelled from the Runs page like any run.',
   },
 {
     id: '2026-08-02-bank-text-search-push-down',
@@ -1657,7 +1657,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-01',
     title: 'Watch 🗑 Delete rejected work, and stop it whenever you like',
     blurb:
-      'Deleting thousands of rejected files used to freeze the dialog on "Deleting…" for minutes with no count, no way to stop, and no way to tell a slow run from a crashed one. It is an ordinary bank pass now: the progress bar at the top of the bank counts the files as they go, Stop works, and the finished run reports how many left the disk and where they went.',
+      'Deleting thousands of rejected files used to freeze the dialog on "Deleting" for minutes with no count, no way to stop, and no way to tell a slow run from a crashed one. It is an ordinary bank pass now: the progress bar at the top of the bank counts the files as they go, Stop works, and the finished run reports how many left the disk and where they went.',
   },
 {
     id: '2026-08-01-compare-reference-edits-side-by-side',
@@ -1685,7 +1685,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-08-01',
     title: 'Pin two generation runs to the canvas and compare them side by side',
     blurb:
-      'Pinning a second run at the same checkpoint no longer folds its images into the first run’s strip — each generation keeps its own strip on the board, so two runs stay two runs. Every strip now reads left to right in training order (500, 1000, 1500…) instead of alphabetically, and an over-cap batch keeps the early epochs rather than an arbitrary slice.',
+      'Pinning a second run at the same checkpoint no longer folds its images into the first run’s strip — each generation keeps its own strip on the board, so two runs stay two runs. Every strip now reads left to right in training order (500, 1000, 1500) instead of alphabetically, and an over-cap batch keeps the early epochs rather than an arbitrary slice.',
   },
 {
     id: '2026-08-01-canvas-checkpoint-timeline-and-grid-export',
@@ -1928,7 +1928,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-29',
     title: 'You can finally see that the other machine is doing the work',
     blurb:
-      'Sending a bank pass to a peer used to look like nothing happening anywhere. Now the Primary’s 📋 Activity names the machine on every line ([bank · Laptop 4090]) and logs the round trip — sending the images, “Laptop 4090 is running the scoring pass — its GPU is busy; this machine stays free”, then the result. The peer says so too: a 🖥 Working for Primary chip in its header, its browser tab title turns into “● Working — …” so a pinned tab shows it without switching, and its own 📋 lists what it claimed. Settings → Devices also stopped being frozen — the peer list and worker card now refresh while you watch. One honest note: ComfyUI on the peer shows nothing for ✨ Score and 👥 Group by person because those passes never touch ComfyUI; a generation job does appear in its queue.',
+      'Sending a bank pass to a peer used to look like nothing happening anywhere. Now the Primary’s 📋 Activity names the machine on every line ([bank · Laptop 4090]) and logs the round trip — sending the images, “Laptop 4090 is running the scoring pass — its GPU is busy; this machine stays free”, then the result. The peer says so too: a 🖥 Working for Primary chip in its header, its browser tab title turns into “● Working” so a pinned tab shows it without switching, and its own 📋 lists what it claimed. Settings → Devices also stopped being frozen — the peer list and worker card now refresh while you watch. One honest note: ComfyUI on the peer shows nothing for ✨ Score and 👥 Group by person because those passes never touch ComfyUI; a generation job does appear in its queue.',
   },
 {
     id: '2026-07-29-score-on-a-borrowed-gpu-python-says-what-it-costs',
@@ -2047,7 +2047,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-29',
     title: 'A bank stops counting images you deleted from the folder yourself',
     blurb:
-      'Deleting images straight out of a bank\'s folder left the bank warning about them forever — the count never came down, because the folder walk deliberately never removes a row (that rule is what stops an unplugged drive from wiping a triage built over hours). The warning now carries the way out: "Accept — remove N from this bank", on the bank card and in the workspace. It removes rows only, nothing on disk is touched, and it tells you first that those images\' keep/reject decisions and scores go with them. It is not offered while the folder is unreachable — with the drive unplugged every image looks missing, and accepting there would empty the bank. If the folder only moved, Move folder… still keeps everything.',
+      'Deleting images straight out of a bank\'s folder left the bank warning about them forever — the count never came down, because the folder walk deliberately never removes a row (that rule is what stops an unplugged drive from wiping a triage built over hours). The warning now carries the way out: "Accept — remove N from this bank", on the bank card and in the workspace. It removes rows only, nothing on disk is touched, and it tells you first that those images\' keep/reject decisions and scores go with them. It is not offered while the folder is unreachable — with the drive unplugged every image looks missing, and accepting there would empty the bank. If the folder only moved, Move folder still keeps everything.',
   },
 {
     id: '2026-07-28-zimage-finds-its-own-encoder-and-vae',
@@ -2145,7 +2145,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-28',
     title: 'Losing the connection no longer looks like your job stopped',
     blurb:
-      'Leaving a running pass and coming back on a phone used to greet you with ten stacked "Connection lost" banners over the whole app — and no progress bar, because the poll behind it had failed. The banners are now one line that counts repeats, automatic polls fail silently, and a single "Offline — reconnecting…" strip takes over: your progress stays on screen, marked as the last thing we heard. Passes always kept running on the server; now the screen says so, and says it again when the connection is back.',
+      'Leaving a running pass and coming back on a phone used to greet you with ten stacked "Connection lost" banners over the whole app — and no progress bar, because the poll behind it had failed. The banners are now one line that counts repeats, automatic polls fail silently, and a single "Offline — reconnecting" strip takes over: your progress stays on screen, marked as the last thing we heard. Passes always kept running on the server; now the screen says so, and says it again when the connection is back.',
   },
 {
     id: '2026-07-28-notifications-are-no-longer-hidden-behind-dialogs',
@@ -2620,7 +2620,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-27',
     title: 'The face-mask preview now shows what it is doing, and you can walk away from it',
     blurb:
-      'Previewing what "Mask faces" would cover used to say "Looking for faces…" and nothing else, for as long as it took — and the longest part happens before the first image is even looked at, while the face detector loads (or, on a fresh install, downloads a few hundred megabytes). You now get the stage by name and a counter that climbs image by image, so a slow run no longer looks like a crashed one. If it does fail — detector missing, model that will not load, the pass dying — it says so instead of spinning forever, and finding no face at all is reported as the ordinary result it is. The detection also runs on the server now: leaving the training panel and coming back picks the same pass back up rather than starting a second one, and the last preview is still on screen when you return. If your kept images changed in the meantime, it tells you the preview is out of date instead of passing it off as current.',
+      'Previewing what "Mask faces" would cover used to say "Looking for faces" and nothing else, for as long as it took — and the longest part happens before the first image is even looked at, while the face detector loads (or, on a fresh install, downloads a few hundred megabytes). You now get the stage by name and a counter that climbs image by image, so a slow run no longer looks like a crashed one. If it does fail — detector missing, model that will not load, the pass dying — it says so instead of spinning forever, and finding no face at all is reported as the ordinary result it is. The detection also runs on the server now: leaving the training panel and coming back picks the same pass back up rather than starting a second one, and the last preview is still on screen when you return. If your kept images changed in the meantime, it tells you the preview is out of date instead of passing it off as current.',
   },
 {
     id: '2026-07-27-extra-ref-prompt-badge-points-at-klein',
@@ -2711,7 +2711,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-27',
     title: 'Click a checkpoint on the LoRA Canvas and act on it — download, deploy, undeploy, delete',
     blurb:
-      'On the board a checkpoint could only be ticked. It now opens the same actions the graph inside a run card has always had: ⬇ Download, Deploy → loras/…, ⏏ Undeploy, and the delete that names exactly which file it removes. It is literally the same popover, so the two screens can never drift apart. When an action is not possible the reason is written where the button would be — a save that left the disk — instead of a button that does nothing.',
+      'On the board a checkpoint could only be ticked. It now opens the same actions the graph inside a run card has always had: ⬇ Download, Deploy → loras/<file>, ⏏ Undeploy, and the delete that names exactly which file it removes. It is literally the same popover, so the two screens can never drift apart. When an action is not possible the reason is written where the button would be — a save that left the disk — instead of a button that does nothing.',
   },
 {
     id: '2026-07-27-bank-real-detail-and-origin',
@@ -2842,9 +2842,9 @@ export const WHATS_NEW_ARCHIVE = [
 {
     id: '2026-07-26-move-folder-accepts-a-pasted-path',
     date: '2026-07-26',
-    title: '📦 Move folder…: a pasted path is accepted the way you paste it',
+    title: '📦 Move folder: a pasted path is accepted the way you paste it',
     blurb:
-      'Right-clicking a folder in Windows and choosing "Copy as path" wraps it in quotes — the most natural way there is to hand the app a folder. The Move folder… dialog checked it happily, then dropped the whole verdict off the screen and left "Repoint this bank" greyed out for good, with nothing said. It was comparing your text to the tidied-up path it had resolved, and those two are never identical. Quotes, a trailing backslash, forward slashes, a junction — all accepted now, and once the check has run the field shows the folder the app actually resolved, so the number you confirm belongs to the folder you can see.',
+      'Right-clicking a folder in Windows and choosing "Copy as path" wraps it in quotes — the most natural way there is to hand the app a folder. The Move folder dialog checked it happily, then dropped the whole verdict off the screen and left "Repoint this bank" greyed out for good, with nothing said. It was comparing your text to the tidied-up path it had resolved, and those two are never identical. Quotes, a trailing backslash, forward slashes, a junction — all accepted now, and once the check has run the field shows the folder the app actually resolved, so the number you confirm belongs to the folder you can see.',
   },
 {
     id: '2026-07-26-lora-canvas',
@@ -3159,7 +3159,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-24',
     title: '✓ The Checkpoints panel now says which LoRAs are already in ComfyUI',
     blurb:
-      'Every checkpoint used to offer "Import → loras/…", even the ones already deployed — and the only way back out lived in a separate list under a red that read like destruction. A deployed checkpoint now shows "✓ Deployed" with an ⏏ Undeploy right there, exactly like the run graph: reversible, your training save is kept and you can deploy it again. The list below keeps only the LoRAs no checkpoint on the page explains (imported before run tagging, or dropped in by hand).',
+      'Every checkpoint used to offer "Import → loras/<file>", even the ones already deployed — and the only way back out lived in a separate list under a red that read like destruction. A deployed checkpoint now shows "✓ Deployed" with an ⏏ Undeploy right there, exactly like the run graph: reversible, your training save is kept and you can deploy it again. The list below keeps only the LoRAs no checkpoint on the page explains (imported before run tagging, or dropped in by hand).',
   },
 {
     id: '2026-07-24-caption-replace-case-insensitive',
@@ -3222,7 +3222,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-23',
     title: '💾 One Backup menu instead of three loose controls',
     blurb:
-      'The Datasets header used to line up "Back up everything", a bare "Include trained LoRAs" checkbox and "Import backup" side by side — a checkbox floating next to a button it silently belonged to. They are now one 💾 Backup menu, with the LoRAs option sitting right under the action it changes, so it is obvious what it applies to. "+ New dataset" stays where it was. A backup in progress is still impossible to miss: the button itself reads "Backing up…" and the progress window keeps running whether the menu is open or closed.',
+      'The Datasets header used to line up "Back up everything", a bare "Include trained LoRAs" checkbox and "Import backup" side by side — a checkbox floating next to a button it silently belonged to. They are now one 💾 Backup menu, with the LoRAs option sitting right under the action it changes, so it is obvious what it applies to. "+ New dataset" stays where it was. A backup in progress is still impossible to miss: the button itself reads "Backing up" and the progress window keeps running whether the menu is open or closed.',
   },
 {
     id: '2026-07-23-interface-fully-in-english',
@@ -3572,7 +3572,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-20',
     title: '◉ The lineage graph is now home for your checkpoints',
     blurb:
-      "Open Checkpoints & LoRAs and you now land on the ◉ Graph — your dataset's runs and every checkpoint they made, at a glance (the flat ☰ List is one click away). Deploy any checkpoint straight from its pill with Import → loras/…, generate a preview per checkpoint, then click a preview thumbnail to see it LARGE and compare epochs like in ComfyUI. See it, deploy it, judge it — all without leaving the graph.",
+      "Open Checkpoints & LoRAs and you now land on the ◉ Graph — your dataset's runs and every checkpoint they made, at a glance (the flat ☰ List is one click away). Deploy any checkpoint straight from its pill with Import → loras/<file>, generate a preview per checkpoint, then click a preview thumbnail to see it LARGE and compare epochs like in ComfyUI. See it, deploy it, judge it — all without leaving the graph.",
   },
 {
     id: '2026-07-20-graph-big-previews',
@@ -3586,7 +3586,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-20',
     title: 'Setup no longer makes you wait through a slow machine scan',
     blurb:
-      "The Setup wizard's \"Scanning your machine…\" step used to run five slow checks one after another right after a restart, sometimes taking minutes. They now run at the same time instead, the result survives a restart so a fresh boot doesn't re-pay the cost, and the wizard shows the scan without blocking on the slowest check.",
+      "The Setup wizard's \"Scanning your machine\" step used to run five slow checks one after another right after a restart, sometimes taking minutes. They now run at the same time instead, the result survives a restart so a fresh boot doesn't re-pay the cost, and the wizard shows the scan without blocking on the slowest check.",
   },
 {
     id: '2026-07-20-editable-identity-prompts',
@@ -3747,7 +3747,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-19',
     title: 'Browse for a folder instead of typing its path',
     blurb:
-      "Pointing the Image bank (or a dataset folder-import) at a folder no longer means typing a path by hand. Hit “📂 Browse…” and the app opens your computer's own folder dialog — pick the folder and the field fills itself in. On a phone or a remote/Linux server where that native dialog can't show, a built-in folder browser opens instead. Pasting a path still works too.",
+      "Pointing the Image bank (or a dataset folder-import) at a folder no longer means typing a path by hand. Hit “📂 Browse” and the app opens your computer's own folder dialog — pick the folder and the field fills itself in. On a phone or a remote/Linux server where that native dialog can't show, a built-in folder browser opens instead. Pasting a path still works too.",
   },
 {
     id: '2026-07-19-explicit-vocabulary-on-concepts',
@@ -3775,7 +3775,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-19',
     title: '⏹ Stop now stops captioning right away',
     blurb:
-      "Hitting Stop during a caption run used to flip the button to “Stopping…” but the JoyCaption pass kept churning through every remaining image before it actually halted. Now Stop is honoured the moment the current image finishes: what's already captioned is kept, the rest is left untouched, and the GPU is handed straight back to ComfyUI — on character and concept datasets alike.",
+      "Hitting Stop during a caption run used to flip the button to “Stopping” but the JoyCaption pass kept churning through every remaining image before it actually halted. Now Stop is honoured the moment the current image finishes: what's already captioned is kept, the rest is left untouched, and the GPU is handed straight back to ComfyUI — on character and concept datasets alike.",
   },
 {
     id: '2026-07-19-caption-method-options',
@@ -3971,7 +3971,7 @@ export const WHATS_NEW_ARCHIVE = [
     date: '2026-07-17',
     title: 'Train slider LoRAs in the cloud',
     blurb:
-      'Concept-slider training works on the local GPU path, so you can build strength sliders (age, expression, style intensity…) on your own card.',
+      'Concept-slider training works on the local GPU path, so you can build strength sliders (age, expression, style intensity) on your own card.',
   },
 {
     id: '2026-07-17-scrape-section',

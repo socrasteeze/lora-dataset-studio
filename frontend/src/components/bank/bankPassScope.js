@@ -166,7 +166,7 @@ export function passScopeBlocked(payload, passId, scopeId, redo = false) {
 export function passScopeLineLabel(payload, passId, scopeId, redo = false) {
   const opt = passScopeOption(scopeId);
   const n = passScopeCount(payload, passId, scopeId, redo);
-  if (n === null) return `${opt.label} — counting…`;
+  if (n === null) return `${opt.label} — counting`;
   const blocked = passScopeBlocked(payload, passId, scopeId, redo);
   // BOTH magnitudes, never one replacing the other. Showing only the feasible
   // count would trade a wrong number for a mute "0 images" — a dead button with

@@ -197,7 +197,7 @@ export default function ScoringPythonDialog({ onClose, onChanged,
 
         {loading ? (
           <p className="text-sm text-content-muted">
-            Checking each interpreter — a cold PyTorch import can take a few seconds…
+            Checking each interpreter — a cold PyTorch import can take a few seconds
           </p>
         ) : (
           <ul className="space-y-2">
@@ -252,18 +252,18 @@ export default function ScoringPythonDialog({ onClose, onChanged,
                       title={canSelect(r) ? `Point ${picker.feature} at this interpreter`
                         : r.selected ? 'Already in use' : 'Required packages are missing or could not be checked'}
                       className="min-h-10 lg:min-h-0 rounded-md border border-border px-2.5 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40 disabled:hover:bg-transparent">
-                      {busy === r.path ? 'Checking…' : 'Use this one'}
+                      {busy === r.path ? 'Checking' : 'Use this one'}
                     </button>
                     <button type="button" disabled={!r.usable || actionBusy}
                       onClick={() => checkCalculation(r.path)}
                       aria-label={`Test calculation in ${r.label}`}
                       className="min-h-10 lg:min-h-0 rounded-md border border-border px-2.5 py-1 text-xs text-content hover:bg-surface-raised disabled:opacity-40">
-                      {checking === r.path ? 'Testing calculation…' : 'Test Calculation'}
+                      {checking === r.path ? 'Testing calculation' : 'Test Calculation'}
                     </button>
                   </div>
                   {(checking === r.path || check) && (
                     <div role="status" aria-live="polite" className={`break-words rounded-md border p-2 text-xs ${TONE[check?.tone || 'off']}`}>
-                      {checking === r.path ? 'Testing calculation in this Python…' : <>
+                      {checking === r.path ? 'Testing calculation in this Python' : <>
                         <p className="font-semibold">{check.title}</p>
                         {check.detail && <p className="mt-1 whitespace-pre-wrap break-all">{check.detail}</p>}
                       </>}
@@ -282,7 +282,7 @@ export default function ScoringPythonDialog({ onClose, onChanged,
           <div className="flex flex-col gap-2 sm:flex-row">
             <input id={picker.inputId} type="text" value={typed} spellCheck={false}
               onChange={(e) => setTyped(e.target.value)}
-              placeholder="…/envs/myenv  or  …/envs/myenv/Scripts/python.exe"
+              placeholder="/envs/myenv  or  /envs/myenv/Scripts/python.exe"
               className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 font-mono text-xs text-content" />
             <button type="button" disabled={!typed.trim() || actionBusy}
               onClick={() => load({ force: true, path: typed.trim() })}

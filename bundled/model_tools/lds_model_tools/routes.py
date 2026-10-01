@@ -7,10 +7,10 @@ twin. Neither needs a GPU or a training environment, so gating them on either
 would refuse the one user who most needs them — someone who trained on a rented
 machine and only has the weights.
 
-The URLs are the ones the screens already call (``/api/tools/lora-merge…``,
-``/api/tools/fp8-quantize…``): the facade registers this blueprint under the
+The URLs are the ones the screens already call (``/api/tools/lora-merge``,
+``/api/tools/fp8-quantize``): the facade registers this blueprint under the
 core's ``/api`` prefix. With the plugin off they answer 404 like any absent
-route; the one-click fp8 delivery (``/api/tools/fp8-deliver…``, the dense
+route; the one-click fp8 delivery (``/api/tools/fp8-deliver``, the dense
 lane's) belongs to ``cloud_training`` and binds this plugin's converter on
 first use.
 """

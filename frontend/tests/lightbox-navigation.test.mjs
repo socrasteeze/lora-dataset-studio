@@ -353,7 +353,7 @@ test('a running pass refuses the verdict in words, like the other writes', () =>
   const keep = buttonAround(html, '✓ Keep')
   assert.match(keep, DISABLED_ATTR)
   assert.match(keep, /title="[^"]*generat/i)
-  // …while ⏭ Skip stays live: moving on is a read.
+  // while ⏭ Skip stays live: moving on is a read.
   assert.doesNotMatch(buttonAround(html, '⏭ Skip'), DISABLED_ATTR)
 })
 

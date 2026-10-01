@@ -486,7 +486,7 @@ export default function GeneratedImageLightbox({ img, alt, actions = null,
               onClick={(e) => { e.stopPropagation(); dl.download(img.id); }}
               title="Download this image — the file name keeps its dataset, run, step and seed"
               className="rounded-md border border-white/25 px-3 py-1.5 text-xs font-semibold text-white/85 hover:border-white/50 hover:text-white disabled:opacity-40">
-              <span aria-hidden>⬇</span> {dl.busy ? 'Downloading…' : 'Download'}
+              <span aria-hidden>⬇</span> {dl.busy ? 'Downloading' : 'Download'}
             </button>
             {/* ✨ Beside ⬇, because they are the two things you do once a render
                 is worth keeping: save it, or make it better. Only the host that

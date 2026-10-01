@@ -173,9 +173,9 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
 
   const scoreFaceTitle = faceScoringBlocked
     || (scoreFaceBusy
-      ? 'Scoring facial resemblance to the reference…'
+      ? 'Scoring facial resemblance to the reference'
       : faceScoringBusy
-        ? 'Face scoring is already running for another image…'
+        ? 'Face scoring is already running for another image'
         : curationRefused
           ? (busyReason || 'Wait for the current dataset action to finish before scoring.')
           : 'Score facial resemblance to the reference');
@@ -267,7 +267,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
                 <span className="text-content-subtle text-2xs">🔄 to retry</span>
               </>
             ) : (
-              <span className="text-content-subtle text-xs">…</span>
+              <span className="text-content-subtle text-xs"></span>
             )}
           </div>
         )}
@@ -324,7 +324,7 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
               title={scoreFaceTitle} aria-label={scoreFaceTitle}
               className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-2xs text-white disabled:cursor-not-allowed disabled:opacity-45">
               <span aria-hidden="true" className={scoreFaceBusy ? 'animate-pulse' : ''}>{scoreFaceBusy
-                ? '…' : <Drama aria-hidden="true" className="h-3.5 w-3.5" />}</span>
+                ? '' : <Drama aria-hidden="true" className="h-3.5 w-3.5" />}</span>
             </button>
           )}
           {canRegenerate && (
@@ -362,9 +362,9 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
                 ? `Mirroring ${displayLabel(img.variation_label) || 'this image'} horizontally`
                 : `Mirror ${displayLabel(img.variation_label) || 'this image'} horizontally`)}
               title={pixelEditReason
-                || (mirrorBusy ? 'Mirroring horizontally…' : 'Mirror horizontally (flip left and right)')}
+                || (mirrorBusy ? 'Mirroring horizontally' : 'Mirror horizontally (flip left and right)')}
               className="grid min-h-7 min-w-7 place-items-center rounded bg-black/60 text-2xs text-white disabled:cursor-not-allowed disabled:opacity-45">
-              <span aria-hidden="true">{mirrorBusy ? '…' : '⇆'}</span>
+              <span aria-hidden="true">{mirrorBusy ? '' : '⇆'}</span>
             </button>
           )}
           {url && (
@@ -470,10 +470,10 @@ export default function DatasetGridItem({ img, datasetId, datasetInstanceId = nu
             }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); } }}
             rows={2} placeholder={datasetKind === 'style'
-              ? 'required: content only, no aesthetic or trigger…'
+              ? 'required: content only, no aesthetic or trigger'
               : datasetKind === 'concept'
-                ? 'caption without naming the concept…'
-                : 'caption (without the face)…'} aria-label="Image caption"
+                ? 'caption without naming the concept'
+                : 'caption (without the face)'} aria-label="Image caption"
             className="text-2xs bg-app/60 border border-border rounded p-1 text-content resize-none" />
         </div>
       )}

@@ -326,7 +326,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {state.status === 'loading' && (
-            <p className="m-0 text-content-subtle text-xs">Loading…</p>
+            <p className="m-0 text-content-subtle text-xs">Loading</p>
           )}
           {state.status === 'error' && (
             <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-xs">
@@ -612,7 +612,7 @@ export default function CheckpointGalleryPanel({ target, onClose, onDeleted, onD
               <button type="button" data-testid="gallery-confirm-delete"
                 disabled={busy} onClick={runDelete}
                 className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-xs text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
-                {busy ? 'Deleting…' : `Delete ${selected.size}`}
+                {busy ? 'Deleting' : `Delete ${selected.size}`}
               </button>
             </div>
           </div>

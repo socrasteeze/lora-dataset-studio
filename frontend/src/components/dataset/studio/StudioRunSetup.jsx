@@ -139,7 +139,7 @@ export default function StudioRunSetup({
           </div>
         </div>
         <textarea id="studio-run-prompt" value={prompt} onChange={(e) => onPrompt(e.target.value)} rows={5}
-          placeholder="Leave empty for the LoRA's default prompt…"
+          placeholder="Leave empty for the LoRA's default prompt"
           className="rounded-lg border border-border bg-app/60 px-2.5 py-1.5 text-content text-sm resize-y min-h-[7rem]" />
       </div>
       <DescribeImageModal open={describeOpen} onClose={() => setDescribeOpen(false)}
@@ -215,7 +215,7 @@ export default function StudioRunSetup({
         <button type="button" onClick={launchGuarded} disabled={!canLaunch}
           aria-label="Run the test"
           className="ml-auto px-4 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-          {launching ? '…' : (batchLaunchText('🚀 Run the test', picked) ?? '🚀 Run the test')}
+          {launching ? '' : (batchLaunchText('🚀 Run the test', picked) ?? '🚀 Run the test')}
         </button>
       </div>
       {cost.heavy && (

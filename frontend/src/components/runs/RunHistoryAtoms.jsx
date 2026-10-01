@@ -198,7 +198,7 @@ export function FullArtifactStatus({ run, onRecheck, rechecking = false,
           <button type="button" onClick={() => onRecheck(run)} disabled={rechecking}
             className="mt-1.5 block rounded-md border border-amber-300/50 bg-amber-400/10 px-2.5 py-1 text-amber-50 font-semibold hover:bg-amber-400/20 disabled:opacity-40">
             {rechecking
-              ? (view.cleanupPending ? 'Cleaning up pod…' : 'Verifying Hugging Face delivery…')
+              ? (view.cleanupPending ? 'Cleaning up pod' : 'Verifying Hugging Face delivery')
               : (view.cleanupPending ? 'Retry pod cleanup' : 'Verify Hugging Face delivery')}
           </button>
         )}

@@ -104,7 +104,7 @@ export default function VideoDatasetLightbox({
             /* The single player yields to the pair while the comparison is
                open: two players of the same clip fighting for sound is not a
                comparison. Closing brings this one back, at the clip's start. */
-            <p className="p-6 text-center text-xs text-white/60">Comparing with the original…</p>
+            <p className="p-6 text-center text-xs text-white/60">Comparing with the original</p>
           ) : (
             <video key={clip.id} src={src} controls autoPlay preload="metadata"
               onError={() => setFailed(true)}
@@ -163,7 +163,7 @@ export default function VideoDatasetLightbox({
             placeholder="Describe what happens in the clip — camera, subject, motion."
             className="w-full rounded border border-white/20 bg-black/60 px-2 py-1 text-sm text-white" />
           <span className="text-2xs text-white/50">
-            {saving ? 'Saving…' : 'Saved when you click away. Esc closes; ← → step through the set.'}
+            {saving ? 'Saving' : 'Saved when you click away. Esc closes; ← → step through the set.'}
           </span>
         </label>
       </div>

@@ -35,7 +35,7 @@ export function defaultLibrarySelection(item, kind) {
     includeAudio: false, pending: kind !== 'image', error: '' };
 }
 export function librarySelectionError(kind, selection, held = []) {
-  if (selection.pending) return 'Reading clip duration and sound…';
+  if (selection.pending) return 'Reading clip duration and sound';
   if (selection.error) return selection.error;
   if (kind !== 'image') {
     const min = kind === 'video' ? 2 : 0.2;

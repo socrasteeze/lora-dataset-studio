@@ -45,7 +45,7 @@ export default function LocalLlmModelSelect({ id, label, provider, url, value, o
           className={`${INPUT_CLASS} min-w-0 flex-1`}>
           <option value="" disabled={provider !== 'lmstudio'}>
             {provider === 'lmstudio' ? 'Automatic — let LDS choose'
-              : loading ? 'Loading models…' : 'Select an installed model'}
+              : loading ? 'Loading models' : 'Select an installed model'}
           </option>
           {missing && <option value={current}>{current}{phase === 'ready' ? ' — not detected' : ''}</option>}
           {models.map(model => <option key={model} value={model}>{model}</option>)}
@@ -53,7 +53,7 @@ export default function LocalLlmModelSelect({ id, label, provider, url, value, o
         <button type="button" disabled={loading} onClick={() => setRevision(n => n + 1)}
           aria-label={`Refresh ${server} models`}
           className={SIDE_BUTTON_CLASS}>
-          {loading ? 'Loading…' : 'Refresh'}
+          {loading ? 'Loading' : 'Refresh'}
         </button>
       </div>
       <div id={hintId} className="mt-1 space-y-1 text-xs text-content-muted" aria-live="polite">

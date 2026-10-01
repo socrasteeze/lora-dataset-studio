@@ -167,7 +167,7 @@ export default function KleinLoraCombobox({
 
       {open && (
         <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-surface-overlay shadow-lg">
-          {loading && <p className="px-2 py-2 text-xs text-content-muted">Scanning LoRAs…</p>}
+          {loading && <p className="px-2 py-2 text-xs text-content-muted">Scanning LoRAs</p>}
           {!loading && error && (
             <p className="px-2 py-2 text-xs text-content-muted">
               Couldn&apos;t reach ComfyUI — type the LoRA path by hand.

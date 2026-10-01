@@ -208,6 +208,6 @@ test('the topmost layer owns Escape, and an unsaved caption is not thrown away',
   assert.match(dialog, /Save & Leave/)
   assert.match(dialog, /Discard Changes/)
   assert.match(dialog, /Keep Editing/)
-  // …and the bank tells the user the truth about what a bank caption is for.
-  assert.match(bank, /captionPlaceholder="Caption — a plain description, used for search…"/)
+  // and the bank tells the user the truth about what a bank caption is for.
+  assert.match(bank, /captionPlaceholder="Caption — a plain description, used for search"/)
 })

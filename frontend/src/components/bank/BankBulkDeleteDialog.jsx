@@ -116,7 +116,7 @@ export default function BankBulkDeleteDialog({ banks, onClose, onResults }) {
             className="min-h-10 min-w-0 rounded-md border border-border px-2 text-sm font-semibold text-content disabled:opacity-50">Cancel</button>
           <button type="button" onClick={remove} disabled={busy || !payload.banks.length}
             className="min-h-10 min-w-0 rounded-md bg-rose-600 px-2 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? 'Deleting…' : networkUnknown ? 'Retry Exact Delete' : 'Delete Banks'}
+            {busy ? 'Deleting' : networkUnknown ? 'Retry Exact Delete' : 'Delete Banks'}
           </button>
         </div>
       </section>

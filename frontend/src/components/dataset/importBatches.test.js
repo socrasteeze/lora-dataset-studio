@@ -85,8 +85,8 @@ test('an empty drop plans nothing, and a plural oversized list names three and c
 });
 
 test('the progress line reads like the scrape import one', () => {
-  assert.equal(importBatchProgress(0, 20, 57), 'Importing 1–20 of 57…');
-  assert.equal(importBatchProgress(40, 20, 57), 'Importing 41–57 of 57…');
+  assert.equal(importBatchProgress(0, 20, 57), 'Importing 1–20 of 57');
+  assert.equal(importBatchProgress(40, 20, 57), 'Importing 41–57 of 57');
 });
 
 test('sizes are said in MiB with a decimal only when it matters', () => {

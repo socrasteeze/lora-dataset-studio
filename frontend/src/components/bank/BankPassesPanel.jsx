@@ -94,32 +94,32 @@ export default function BankPassesPanel({
                 “Rescore all” went the same way, into ✨ Score's window. */}
             <PassButton onClick={() => onPassOpen('scan')} disabled={live}
               title="Measure sharpness, noise, flatness, size and detail, hash every image and group the exact duplicates — CPU only. Opens the launch window.">
-              <Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Scan quality…
+              <Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Scan quality
             </PassButton>
             <PassButton onClick={() => onPassOpen('faces')} disabled={live || !passGate.faces.ok}
               title={passGate.faces.reason || (passGate.faces.ok
                 ? 'Detect the dominant face of every non-rejected image and cluster the bank by person (no reference needed). CPU, can take a while on thousands of images. It samples your subfolders first and offers the ones that look like a single person, so you can skip them.'
                 : 'Install the Quality tools (Setup) to sort by person')}>
-              <Users aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Group by person…
+              <Users aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Group by person
             </PassButton>
             <PassButton onClick={() => onPassOpen('score')} disabled={live || !passGate.score.ok}
               title={passGate.score.reason || (passGate.score.ok
                 ? `Rate every non-rejected image for aesthetics (1–10), flag NSFW, and group by visual style — one CLIP pass. Powers a smarter "keep best". Already-scored images are reused, so stopping and relaunching costs only what is left. Runs in the background${
                   holdsTheGpu(scoreDevice) ? ', and holds the GPU (ComfyUI is unloaded and training cannot start) for its duration' : ' on the CPU, leaving the GPU free'}.`
                 : 'Install the Bank scoring extra (Setup ▸ Quality tools) to score aesthetics / NSFW / style')}>
-              Score…{!passGate.score.ok && ' (needs setup)'}
+              Score{!passGate.score.ok && ' (needs setup)'}
             </PassButton>
             <PassButton onClick={() => onPassOpen('medium')} disabled={live || !caps.bank_scoring}
               title={caps.bank_scoring
                 ? 'Sort every scored image into photograph / anime / 3D render / illustration — read off the CLIP embeddings Score already computed, so no image is looked at again and the GPU stays free. It answers “unsure” rather than guessing: measured on a real 23 500-image bank, it named 2 anime drawings and no wrong verdict.'
                 : 'Install the Bank scoring extra (Setup ▸ Quality tools) — Medium reads the embeddings the Score pass produces'}>
-              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify medium…{!caps.bank_scoring && ' (needs setup)'}
+              <Palette aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify medium{!caps.bank_scoring && ' (needs setup)'}
             </PassButton>
             <PassButton onClick={() => onPassOpen('framing')} disabled={live || !passGate.framing.ok}
               title={passGate.framing.reason || (passGate.framing.ok
                 ? 'Classify every non-rejected image by shot type — face close-up, bust, full body, back view — with the same Qwen3-VL classifier the datasets use. Powers the Framing filter and the coverage advice. GPU vision pass.'
                 : 'Pull the vision model (Settings ▸ Local tools) to classify framing')}>
-              <Ruler aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify framing…{!passGate.framing.ok && ' (needs setup)'}
+              <Ruler aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Classify framing{!passGate.framing.ok && ' (needs setup)'}
             </PassButton>
             {/* 🔖 Tags — the cheap pass that makes the expensive one optional for
                 triage. No device picker: it is local-only (see startTags). */}
@@ -131,7 +131,7 @@ export default function BankPassesPanel({
               title={semanticReady
                 ? `Group crops and re-compressed variants of the SAME shot the exact-duplicate hash misses from the ${semanticState.label} semantic index. Review them under the ✂ Same shot chip.`
                 : semanticBlocked}>
-              ✂ Find crops &amp; variants…{!semanticReady
+              ✂ Find crops &amp; variants{!semanticReady
                 && ` (needs ${semanticState.engine === 'clip' ? 'Score' : 'SigLIP 2 index'})`}
             </PassButton>
             {/* The label QUOTES THE NUMBER IT WILL MOVE — the scope's uncaptioned rows,
@@ -148,7 +148,7 @@ export default function BankPassesPanel({
               title={passGate.caption.reason || (selected.size
                 ? `Caption the ${selected.size} selected image(s). Opens the window with the engine, model, register, length and scope.`
                 : `${captionScopeNote(selected.size, counts, captionScope)} Opens the window with the engine, model, register, length and scope.`)}>
-              {captionButtonLabel(selected.size, counts, captionScope)}…
+              {captionButtonLabel(selected.size, counts, captionScope)}
             </PassButton>
             {/* ⤢ the opt-in angle backfill. Its own button and its own window, never
                 folded into 👥: it is hours of work on a big bank and nobody must pay
@@ -156,7 +156,7 @@ export default function BankPassesPanel({
             {(counts?.angle_backfillable || 0) > 0 && (
               <PassButton onClick={() => onPassOpen('angles')} disabled={live}
                 title="Measure the head angle of the images a previous build face-scanned without keeping it. Writes the angle and nothing else.">
-                ⤢ Measure head angles…
+                ⤢ Measure head angles
               </PassButton>
             )}
             {/* Which machine these passes run on. Launch all has offered this
@@ -216,7 +216,7 @@ export default function BankPassesPanel({
                 disabled={live || semanticOperationBusy}
                 title="Inspect, test or change the Python used by Score"
                 className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50">
-                Manage Score Python…
+                Manage Score Python
               </button>
             </div>
           )}

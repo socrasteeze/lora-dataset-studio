@@ -49,10 +49,10 @@ test('ONE dialog serves both features — the semantic index gets the same picke
 
 test('a machine with no NVIDIA card is never sold a CUDA fix', () => {
   // scoreDeviceNote only returns tone 'warn' when gpu_present, so the amber
-  // "your GPU is idle" branch cannot fire on a card-less machine…
+  // "your GPU is idle" branch cannot fire on a card-less machine
   assert.match(device, /if \(!info\.gpu_present\)/);
   assert.match(device, /tone: 'info'/);
-  // …and where the picker IS still offered (it saves a second install), both
+  // and where the picker IS still offered (it saves a second install), both
   // the button label and the dialog copy drop every mention of a GPU.
   assert.match(ws, /const scoreGpuPresent = /);
   assert.match(ws, /Manage Score Python/);

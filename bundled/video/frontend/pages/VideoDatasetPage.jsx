@@ -90,7 +90,7 @@ export default function VideoDatasetPage() {
       </div>
     )
   }
-  if (!payload) return <p className="p-4 text-sm text-content-muted">Loading…</p>
+  if (!payload) return <p className="p-4 text-sm text-content-muted">Loading</p>
 
   return (
     <div className="mx-auto max-w-6xl p-4">

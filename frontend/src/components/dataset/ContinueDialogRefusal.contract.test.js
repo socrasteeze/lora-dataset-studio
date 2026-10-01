@@ -59,7 +59,7 @@ test('the dialog can show a refusal inside itself, next to the inputs that cause
   //  • it landed below the fold, because the card scrolls inside itself.
   assert.match(dialog, /className="shrink-0 rounded-lg border border-red-500\/40/);
   assert.match(dialog, /if \(error && card\) card\.scrollTop = card\.scrollHeight;/);
-  // …and a long backend refusal scrolls inside its own box instead of pushing
+  // and a long backend refusal scrolls inside its own box instead of pushing
   // ▶ Continue off the screen.
   assert.match(dialog, /max-h-28 overflow-y-auto/);
 });
@@ -102,7 +102,7 @@ test('the canvas posts with the dialog open, and gains the confirm loop it never
   const body = handler(canvas, 'const submitContinue = useCallback', '}, [continueTarget');
   assertPostsBeforeClosing(body, 'setContinueTarget(null)', 'canvas');
   // The board's local lane hits the very same caption/quality guards as the two
-  // other hosts; it used to render "UNCAPTIONED: …" as a dead-end error with no
+  // other hosts; it used to render "UNCAPTIONED: " as a dead-end error with no
   // way to answer it. Same helper, no second loop.
   assert.match(canvas, /postWithConfirmations/);
 });
@@ -110,7 +110,7 @@ test('the canvas posts with the dialog open, and gains the confirm loop it never
 test('the preflight modal is drawn ABOVE the dialog that opened it, and where it is seen', () => {
   // Both sat at z-[9990]; the dialog portals to document.body and therefore came
   // last in the DOM, so keeping it open would have hidden the preflight report
-  // behind it — and the promise it awaits would never resolve ("Starting…"
+  // behind it — and the promise it awaits would never resolve ("Starting"
   // forever). It also has to leave the panel's hideable section, for the same
   // reason ContinueDialog does (ContinueDialogVisibility.test.js).
   const preflight = read('./PreflightModal.jsx');

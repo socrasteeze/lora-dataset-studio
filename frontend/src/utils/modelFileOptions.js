@@ -99,7 +99,7 @@ export function filterModelOptions(options, query, currentValue) {
 /** What the dropdown says when it has nothing to offer. Never a mute empty box:
  *  each state names the next action, and they are DIFFERENT actions. */
 export function emptyScanMessage({ loading, error, count, folderHint }) {
-  if (loading) return 'Scanning ComfyUI’s model folders…';
+  if (loading) return 'Scanning ComfyUI’s model folders';
   if (error) {
     return 'Couldn’t reach ComfyUI to list the files — type the name or path by hand.';
   }

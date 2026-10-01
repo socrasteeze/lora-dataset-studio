@@ -33,7 +33,7 @@ does not guess a new location for your data.
 
 Before switching, it saves **studio.db and any WAL/journal sidecars**, configuration
 and `.env` files under `.git/lds-migration-backups/` in your installation. It also
-creates an `lds-before-v2-…` recovery branch for the old application code. Keep
+creates an `lds-before-v2-<name>` recovery branch for the old application code. Keep
 these until you have checked your installation in V2.
 
 **This is a database/settings backup, not a full media backup.** Keep your normal

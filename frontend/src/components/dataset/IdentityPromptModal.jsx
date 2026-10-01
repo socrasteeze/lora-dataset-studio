@@ -129,7 +129,7 @@ export default function IdentityPromptModal({ onClose, subjectType = 'human' }) 
         {error && <p className="text-xs text-rose-400"><span aria-hidden="true">✗</span> {error}</p>}
 
         {prompts === null && !error && (
-          <p className="text-content-subtle text-xs">Loading…</p>
+          <p className="text-content-subtle text-xs">Loading</p>
         )}
 
         {prompts !== null && fields.map((f) => (
@@ -158,7 +158,7 @@ export default function IdentityPromptModal({ onClose, subjectType = 'human' }) 
             className="ml-auto px-3 py-1.5 rounded-lg bg-surface text-content text-sm">Cancel</button>
           <button type="button" onClick={save} disabled={saving || prompts === null}
             className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving' : 'Save'}
           </button>
         </div>
       </div>

@@ -93,7 +93,7 @@ export function deletePreviewState(preview) {
     return {
       ready: false,
       state: 'checking',
-      title: 'Checking what this delete would do…',
+      title: 'Checking what this delete would do',
       text: 'Asking where the files would go, and whether another bank shares them.',
     }
   }

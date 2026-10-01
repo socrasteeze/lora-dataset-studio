@@ -36,7 +36,7 @@ test('the leak panel wires a per-row targeted Re-caption button', () => {
   assert.match(workspace, /ds\.recaptionImages\(\[img\.id\], effCaptionMode\)/)
   // The clicked row shows its own spinner keyed off recaptioningIds.
   assert.match(workspace, /ds\.recaptioningIds\.has\(img\.id\)/)
-  assert.match(workspace, /Re-captioning…/)
+  assert.match(workspace, /Re-captioning/)
 })
 
 test('the leak panel wires a "Re-caption all leaking" header button', () => {

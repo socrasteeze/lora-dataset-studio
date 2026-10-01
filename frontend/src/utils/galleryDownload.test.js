@@ -87,7 +87,8 @@ test('under the cap nothing is said about it', () => {
 test('while it is working the button says so and cannot be fired twice', () => {
   const s = zipButtonState({ picking: false, selectedCount: 0, totalCount: 5, busy: true });
   assert.equal(s.disabled, true);
-  assert.match(s.label, /…/);
+  assert.match(s.label, /Zipping/);
+  assert.doesNotMatch(s.label, /\u2026/);
 });
 
 // ---- the preflight's sentence ---------------------------------------------

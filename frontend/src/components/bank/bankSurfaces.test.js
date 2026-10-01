@@ -17,8 +17,8 @@ test('keeps the literal label of a button carrying a conditional suffix', () => 
   // The shape almost every pass button in this codebase has. The first version
   // of the extractor skipped these entirely — the guard was covering only the
   // buttons nobody would have lost.
-  const src = "<button onClick={open}>✨ Score…{!caps.bank_scoring && ' (needs setup)'}</button>"
-  assert.deepEqual(surfaceStrings(src), ['✨ Score…'])
+  const src = "<button onClick={open}>✨ Score{!caps.bank_scoring && ' (needs setup)'}</button>"
+  assert.deepEqual(surfaceStrings(src), ['✨ Score'])
 })
 
 test('keeps a label wrapped in nested markup', () => {

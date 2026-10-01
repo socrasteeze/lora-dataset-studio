@@ -27,7 +27,7 @@ export default function FolderCheckLine({ banks, busy = false, onRescan }) {
       </p>
       <Button noShrink onClick={onRescan} disabled={busy}
         title="Walk every bank's source folder now and pick up the images added to it">
-        <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders…' : 'Rescan folders'}
+        <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />{busy ? 'Checking folders' : 'Rescan folders'}
       </Button>
     </div>
   )

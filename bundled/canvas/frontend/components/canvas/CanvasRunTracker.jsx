@@ -97,7 +97,7 @@ export default function CanvasRunTracker({ run, targets, onStop, onResume, onOpe
               data-testid="canvas-pin-all"
               title="Put every image this run produced on the board, each under the checkpoint that made it"
               className="shrink-0 rounded-md border border-emerald-400/60 bg-emerald-500/20 px-2 py-0.5 font-semibold text-emerald-50 hover:bg-emerald-500/35 disabled:opacity-50">
-              {pinBusy ? '📌 Pinning…' : pinLabel}
+              {pinBusy ? '📌 Pinning' : pinLabel}
             </button>
           )}
           {onUndoPinAll && (

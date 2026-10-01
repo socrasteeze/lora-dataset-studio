@@ -56,7 +56,7 @@ export function axisSummary(axis) {
  *  Answered from the payload so the UI never renders an empty bar and lets the
  *  user read "no gaps" into what is actually "nothing was measured". */
 export function coverageReadiness(coverage) {
-  if (!coverage) return { ready: false, reason: 'Reading coverage…' };
+  if (!coverage) return { ready: false, reason: 'Reading coverage' };
   if (!coverage.total) {
     return { ready: false, reason: 'No images yet — add some and the variety read appears here.' };
   }

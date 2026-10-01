@@ -60,7 +60,7 @@ export function bankImportOption(bank, promotable) {
   const base = { id: bank?.id, name: bank?.name || '', total, keep };
 
   if (promotable == null) {
-    return { ...base, count: null, ready: false, reason: 'loading', hint: 'Counting…' };
+    return { ...base, count: null, ready: false, reason: 'loading', hint: 'Counting' };
   }
   const count = Number(promotable);
   if (count > 0) {

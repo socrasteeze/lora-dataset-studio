@@ -175,7 +175,7 @@ export default function WatermarkScanDialog({
             disabled={busy || live || willRead === 0}
             title={willRead === 0 ? 'Nothing to read in this scope.' : undefined}
             className="rounded-lg bg-amber-500/90 px-3 py-1.5 text-sm font-bold text-black disabled:opacity-40">
-            {busy ? 'Scanning…' : `Scan ${willRead} image${willRead === 1 ? '' : 's'}`}
+            {busy ? 'Scanning' : `Scan ${willRead} image${willRead === 1 ? '' : 's'}`}
           </button>
         </div>
       </div>

@@ -36,14 +36,14 @@ test('the first-run download says it is a download, with its size', () => {
 
 test('detection counts up and drives a real bar', () => {
   const j = job({ phase: 'detecting', done: 3, total: 40 });
-  assert.equal(previewStatusLabel(j), 'Analyzing image 4 of 40…');
+  assert.equal(previewStatusLabel(j), 'Analyzing image 4 of 40');
   assert.deepEqual(previewProgressValue(j), { done: 3, total: 40 });
   assert.equal(previewPercent(j), 8);
 });
 
 test('the count never overshoots its own total', () => {
   const j = job({ phase: 'detecting', done: 40, total: 40 });
-  assert.equal(previewStatusLabel(j), 'Analyzing image 40 of 40…');
+  assert.equal(previewStatusLabel(j), 'Analyzing image 40 of 40');
   assert.equal(previewPercent(j), 100);
 });
 

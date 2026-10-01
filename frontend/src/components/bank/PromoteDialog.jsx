@@ -140,7 +140,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
         <h2 className="text-base font-bold text-content">⬆ Promote the selection</h2>
 
         <div>
-          <p className="text-sm font-medium text-content">Send it to…</p>
+          <p className="text-sm font-medium text-content">Send it to</p>
           {/* Rendered FROM the constant so the two cannot drift. A grid rather
               than flex-1 in a row: three tabs at these label lengths wrap badly
               inside max-w-md, and 400 px is a real viewport here. */}
@@ -220,7 +220,7 @@ export default function PromoteDialog({ bankId, bankName: sourceBankName,
             <select id="promote-dataset" value={datasetId}
               onChange={(e) => setDatasetId(e.target.value)}
               className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content">
-              <option value="">{datasets == null ? 'Loading…' : 'Choose a dataset…'}</option>
+              <option value="">{datasets == null ? 'Loading' : 'Choose a dataset'}</option>
               {(datasets || []).map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name} ({d.kind}, {d.images_total} image{d.images_total === 1 ? '' : 's'})

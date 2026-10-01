@@ -447,7 +447,7 @@ export default function ComparisonStudio({ selection, baseModels = [], axes = nu
             <button type="button" disabled={run.confirmingComfyuiRestart}
               onClick={run.confirmComfyuiRestart}
               className="ml-auto px-2.5 py-1 rounded-lg bg-gradient-primary text-gray-950 text-xs font-semibold disabled:opacity-40">
-              {run.confirmingComfyuiRestart ? 'Confirming…' : '✓ I restarted ComfyUI'}
+              {run.confirmingComfyuiRestart ? 'Confirming' : '✓ I restarted ComfyUI'}
             </button>
           </div>
         )}

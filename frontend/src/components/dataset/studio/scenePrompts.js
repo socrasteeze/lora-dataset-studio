@@ -18,9 +18,9 @@
  *  branches on, so a third source would land here and nowhere else. */
 export const SCENE_SOURCES = [
   { kind: 'bank', label: '🗃 Bank', listUrl: '/api/banks', listKey: 'banks',
-    pick: 'Choose a bank…', empty: 'No image bank yet' },
+    pick: 'Choose a bank', empty: 'No image bank yet' },
   { kind: 'dataset', label: '📁 Dataset', listUrl: '/api/dataset/list', listKey: 'datasets',
-    pick: 'Choose a dataset…', empty: 'No dataset yet' },
+    pick: 'Choose a dataset', empty: 'No dataset yet' },
 ];
 
 /** The source descriptor a loaded payload becomes: ONE shape for both routes,

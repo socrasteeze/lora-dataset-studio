@@ -144,7 +144,7 @@ export function readinessHint(status, engine = 'clip') {
 
 /** The pending-state label, so the wait is attributed to the right cause. */
 export function pendingLabel(status) {
-  return status?.warm ? 'Searching…' : 'Loading the search model…'
+  return status?.warm ? 'Searching' : 'Loading the search model'
 }
 
 /**

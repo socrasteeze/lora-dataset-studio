@@ -83,13 +83,13 @@ export default function LmStudioDownload({ refreshCaps, toast }) {
         />
         <button type="button" onClick={start} disabled={busy || running || !name.trim()}
           className="min-h-10 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50 lg:min-h-0">
-          {running ? 'Downloading…' : '⏬ Download'}
+          {running ? 'Downloading' : '⏬ Download'}
         </button>
       </div>
       {running && (
         <p role="status" aria-live="polite" className="text-xs text-content-muted">
           Downloading <span className="font-mono">{job.model}</span>
-          {Number.isFinite(job.progress) ? ` — ${job.progress}%` : '…'} The download runs
+          {Number.isFinite(job.progress) ? ` — ${job.progress}%` : ''} The download runs
           inside LM Studio, so leaving this page does not stop it.
         </p>
       )}

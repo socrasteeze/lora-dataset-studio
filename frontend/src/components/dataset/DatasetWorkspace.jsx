@@ -637,7 +637,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
     try { await ds.cancelPending(); } finally { setStoppingGeneration(false); }
   }, [ds]);
 
-  if (!d) return <p className="text-content-subtle text-sm">Loading…</p>;
+  if (!d) return <p className="text-content-subtle text-sm">Loading</p>;
 
   const images = d.images || [];
   const rescuePairs = buildSmallImageRescuePairs(images);
@@ -901,7 +901,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
   // queue-lane kind, and fails safe as local on an unknown engine.
   const visionImportBusy = holdsLocalGpu(act);
   const activityBanner = ds.captioning
-    ? `${activityDetail || `Captioning in progress — ${keptCaptioned}/${kept} captioned…`} ComfyUI is paused.`
+    ? `${activityDetail || `Captioning in progress — ${keptCaptioned}/${kept} captioned`} ComfyUI is paused.`
     : (() => {
         if (act) {
           const prog = act.total ? ` ${act.done}/${act.total}` : '';
@@ -931,20 +931,20 @@ export default function DatasetWorkspace({ ds, onBack }) {
             || act.kind === 'training_export'
             || act.kind === 'backup';
           const label = {
-            watermark_detect: `Scanning for watermarks…${prog}`,
-            watermark_clean: `Cleaning watermarks…${prog}`,
-            text_detect: `Reading burned-in text…${prog}`,
-            caption: `Captioning…${prog}`,
-            recaption: `Re-captioning…${prog}`,
-            analyze_faces: `Analyzing faces…${prog}`,
-            classify: `Classifying framing…${prog}`,
-            generate: `Generating variations…${prog}`,
-            improve: `Queuing improvements…${prog}`,
-            edit_reference: 'Editing reference…',
-            bank_export: `Copying into a Bank…${prog}`,
-            bank_import: `Copying images from a Bank…${prog}`,
-            training_export: 'Freezing the Dataset for training…',
-            backup: `Creating portable backup…${prog}`,
+            watermark_detect: `Scanning for watermarks${prog}`,
+            watermark_clean: `Cleaning watermarks${prog}`,
+            text_detect: `Reading burned-in text${prog}`,
+            caption: `Captioning${prog}`,
+            recaption: `Re-captioning${prog}`,
+            analyze_faces: `Analyzing faces${prog}`,
+            classify: `Classifying framing${prog}`,
+            generate: `Generating variations${prog}`,
+            improve: `Queuing improvements${prog}`,
+            edit_reference: 'Editing reference',
+            bank_export: `Copying into a Bank${prog}`,
+            bank_import: `Copying images from a Bank${prog}`,
+            training_export: 'Freezing the Dataset for training',
+            backup: `Creating portable backup${prog}`,
           }[act.kind];
           if (label) {
             // Copy/freeze details are stable phase names, while done/total lives
@@ -954,7 +954,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
             return `${detailed}${cpu ? '' : ' ComfyUI is paused during the pass.'}`;
           }
         }
-        return 'GPU processing in progress (analysis / cropping / captioning)… ComfyUI is paused during the pass.';
+        return 'GPU processing in progress (analysis / cropping / captioning) ComfyUI is paused during the pass.';
       })();
 
   // Sidebar badges: amber for user action, pulsing indigo during generation, neutral for pending
@@ -1245,7 +1245,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <button type="button" onClick={ds.cancelCaption} disabled={!!act?.cancelling}
                   title="Stops after the current image finishes — captions already written are kept; the rest stays uncaptioned."
                   className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                  {act?.cancelling ? 'Stopping…' : '⏹ Stop'}
+                  {act?.cancelling ? 'Stopping' : '⏹ Stop'}
                 </button>
               )}
               {/* Same seam, same promise, for the watermark scan: it was the one
@@ -1255,7 +1255,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onClick={ds.cancelWatermarkScan} disabled={!!act?.cancelling}
                   title="Stops after the current image finishes — every watermark already found is kept; run 🧽 Find watermarks again to finish the rest."
                   className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                  {act?.cancelling ? 'Stopping…' : '⏹ Stop'}
+                  {act?.cancelling ? 'Stopping' : '⏹ Stop'}
                 </button>
               )}
               {/* …and for the 🔤 text scan, which reads whole banks of pages. */}
@@ -1264,7 +1264,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onClick={ds.cancelTextScan} disabled={!!act?.cancelling}
                   title="Stops after the current image finishes — every zone already found is kept; run 🔤 Find text again to finish the rest."
                   className="ml-auto shrink-0 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                  {act?.cancelling ? 'Stopping…' : '⏹ Stop'}
+                  {act?.cancelling ? 'Stopping' : '⏹ Stop'}
                 </button>
               )}
             </div>
@@ -1279,8 +1279,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
               <div className="flex flex-col">
                 <span className="text-content text-sm font-semibold">
                   {act?.kind === 'improve' && act.total
-                    ? `${act.done}/${act.total} improvement(s) queued — ${pending} generating…`
-                    : `${pending} generation(s) in progress…`}
+                    ? `${act.done}/${act.total} improvement(s) queued — ${pending} generating`
+                    : `${pending} generation(s) in progress`}
                 </span>
                 <span className="text-content-subtle text-2xs">
                   {act?.kind === 'improve'
@@ -1294,7 +1294,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 title="Cancels every generation still in flight (and stops a running improvement batch); finished images stay."
                 className="ml-auto shrink-0 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold disabled:opacity-40">
                 {stoppingGeneration || (act?.cancelling && act?.kind === 'improve')
-                  ? 'Stopping…' : '⏹ Stop generation'}
+                  ? 'Stopping' : '⏹ Stop generation'}
               </button>
             </div>
           )}
@@ -1473,7 +1473,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     className="px-3 py-1.5 rounded-lg bg-surface text-content text-sm disabled:opacity-40 border border-border scroll-mt-20">
                     <Drama aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />
                     {ds.analyzing
-                      ? `Analyzing…${act?.kind === 'analyze_faces' && act.total ? ` ${act.done}/${act.total}` : ''}`
+                      ? `Analyzing${act?.kind === 'analyze_faces' && act.total ? ` ${act.done}/${act.total}` : ''}`
                       : faceAnalysisLabel(d.face_scoring_scope)}
                   </button>
                 )}
@@ -1500,8 +1500,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   className={btnClass()}>
                   <Eraser aria-hidden="true" className="h-4 w-4" />
                   {ds.watermarking
-                    ? `Scanning…${act?.kind === 'watermark_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
-                    : 'Find watermarks…'}
+                    ? `Scanning${act?.kind === 'watermark_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
+                    : 'Find watermarks'}
                 </button>
                 {kleinCompareOpen && (
                   <KleinCompareDialog
@@ -1543,8 +1543,8 @@ export default function DatasetWorkspace({ ds, onBack }) {
                     : 'Reads burned-in text on the kept images. Install "Burned-in text" from Setup first.'}
                   className={btnClass()}>
                   🔤 {ds.textScanning
-                    ? `Reading…${act?.kind === 'text_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
-                    : 'Find text…'}
+                    ? `Reading${act?.kind === 'text_detect' && act.total ? ` ${act.done}/${act.total}` : ''}`
+                    : 'Find text'}
                 </button>
                 {textScanOpen && (
                   <TextScanDialog
@@ -1644,7 +1644,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                           disabled={ds.busy}
                           title="Run each ticked Klein model on one flagged image (same zones, same seed) and pick the winner before cleaning the batch."
                           className="min-h-10 lg:min-h-0 px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-content-subtle hover:text-content hover:bg-surface-raised disabled:opacity-40">
-                          ⚖ Compare models…
+                          ⚖ Compare models
                         </button>
                       )}
                     </div>
@@ -1862,7 +1862,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                   onClick={() => ds.caption(effCaptionMode)} disabled={ds.busy}
                   className={btnClass({ variant: 'primary' })}>
                   <Sparkles aria-hidden="true" className="h-4 w-4" />
-                  {ds.captioning ? `${keptCaptioned}/${kept} captioned…` : 'Caption the kept ones'}
+                  {ds.captioning ? `${keptCaptioned}/${kept} captioned` : 'Caption the kept ones'}
                 </button>
                 <HelpBadge topic="action-caption-generate" />
                 <button type="button" disabled={ds.busy || !recaptionable}
@@ -2088,7 +2088,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                                   : 'Re-generate this caption without describing identity (face/hair)'}
                                 className="self-start px-2 py-0.5 rounded-lg bg-surface text-content text-2xs border border-border hover:bg-surface-raised disabled:opacity-40">
                                 {rowBusy
-                                  ? <><Loader2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px] animate-spin" />Re-captioning…</>
+                                  ? <><Loader2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px] animate-spin" />Re-captioning</>
                                   : <><RefreshCw aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Re-caption</>}
                               </button>
                             </div>
@@ -2166,7 +2166,7 @@ export default function DatasetWorkspace({ ds, onBack }) {
                 <button type="button" disabled={importBusy} onClick={importFolderPrompt}
                   title="Merge an existing training dataset already on this machine's disk: a folder of images with kohya-style same-name .txt captions (subfolders included). Aspect kept, perceptual duplicates skipped."
                   className="px-3 py-1.5 rounded-lg bg-surface border border-border text-content text-sm disabled:opacity-40">
-                  <FolderOpen aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Import from folder…
+                  <FolderOpen aria-hidden="true" className="mr-1.5 inline h-4 w-4 align-[-2px]" />Import from folder
                 </button>
                 <span className="text-content-subtle text-2xs">
                   merges images + same-name .txt captions in — duplicates are skipped

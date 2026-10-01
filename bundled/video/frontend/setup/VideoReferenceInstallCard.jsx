@@ -29,7 +29,7 @@ export default function VideoReferenceInstallCard({ caps, onDone }) {
       setRunning(false);
       setMessage(tracked.some((a) => next[a]?.state === 'error')
         ? 'Some components need attention. Review the failed rows and retry.'
-        : tracked.includes('h3_reference_nodes') ? 'Files installed. Restart ComfyUI to load the reference nodes, then refresh Setup.' : 'Downloads finished. Refreshing availability…');
+        : tracked.includes('h3_reference_nodes') ? 'Files installed. Restart ComfyUI to load the reference nodes, then refresh Setup.' : 'Downloads finished. Refreshing availability');
       onDone?.(); return true;
     }
     return false;
@@ -95,7 +95,7 @@ export default function VideoReferenceInstallCard({ caps, onDone }) {
           {states[action]?.error && <span className="block text-red-300">{states[action].error}</span>}</li>)}
       </ul>}
       <button type="button" disabled={!caps.comfyui.dir_valid || running || !plan.length} onClick={install} className="min-h-10 rounded-lg border border-primary px-3 py-2 text-xs font-semibold text-content disabled:opacity-40">
-        {running ? 'Installing selected profile…' : plan.length ? `Install ${plan.length} missing component${plan.length === 1 ? '' : 's'}` : 'Selected profile files are installed'}
+        {running ? 'Installing selected profile' : plan.length ? `Install ${plan.length} missing component${plan.length === 1 ? '' : 's'}` : 'Selected profile files are installed'}
       </button>
       <p className="text-2xs text-content-subtle">The reference helper ships with LDS and installs without pip changes. Restart ComfyUI after its installation. If core MiniMax reference nodes are missing, update ComfyUI too.</p>
       {!!coreMissing.length && <p className="break-words text-xs text-amber-200">Update ComfyUI to provide: {coreMissing.join(', ')}.</p>}

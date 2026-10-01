@@ -130,7 +130,7 @@ export default function DescribeImageModal({ open, onClose, onResult }) {
           {busy ? (
             <>
               <span className="inline-block w-6 h-6 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" aria-hidden />
-              <span className="text-content text-xs">Describing{fileName ? ` “${fileName}”` : ''}…</span>
+              <span className="text-content text-xs">Describing{fileName ? ` “${fileName}”` : ''}</span>
               <span className="text-content-subtle text-2xs">The vision model may be loading — this can take a few seconds.</span>
             </>
           ) : (

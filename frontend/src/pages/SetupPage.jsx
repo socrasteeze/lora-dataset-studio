@@ -55,7 +55,7 @@ const SCREENS = ['welcome', ...SETUP_STEP_IDS, 'install', 'done', 'tools']
 
 const STATUS_META = {
   ready: { glyph: '✓', label: 'Ready', cls: 'text-emerald-400' },
-  initializing: { glyph: '↻', label: 'Initializing…', cls: 'text-amber-400' },
+  initializing: { glyph: '↻', label: 'Initializing', cls: 'text-amber-400' },
   partial: { glyph: '◐', label: 'Almost there', cls: 'text-amber-400' },
   available: { glyph: '○', label: 'Not set up', cls: 'text-content-subtle' },
   // Neutral, deliberately not red: the user chose to continue without ComfyUI.
@@ -442,7 +442,7 @@ export default function SetupPage() {
         </button>
       </div>
     ) : (
-      <p className="text-content-muted">Loading setup…</p>
+      <p className="text-content-muted">Loading setup</p>
     )
   }
 
@@ -456,7 +456,7 @@ export default function SetupPage() {
   const saveRecheckBtn = (
     <button type="button" onClick={persist} disabled={busy}
       className="mt-1 rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-content hover:bg-surface-raised disabled:opacity-50">
-      {busy ? 'Saving…' : 'Save & re-check'}
+      {busy ? 'Saving' : 'Save & re-check'}
     </button>
   )
   // "Found on disk: <path> — Use" chip for a scanned path we didn't auto-apply.
@@ -524,7 +524,7 @@ export default function SetupPage() {
       const liveCheck = dirCheck && dirCheck.path === typedDir ? dirCheck : null
       const dirVerdictNode = typedDir ? (
         (!liveCheck || liveCheck.status === 'checking')
-          ? <p className="text-xs text-content-subtle">Checking this folder…</p>
+          ? <p className="text-xs text-content-subtle">Checking this folder</p>
           : (() => {
             const v = comfyuiDirVerdict(liveCheck)
             if (!v.message) return null
@@ -584,7 +584,7 @@ export default function SetupPage() {
           <button type="button" onClick={startComfyui}
             disabled={startingComfyui || !comfyLauncher.enabled}
             className="rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium text-content hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50">
-            {startingComfyui ? 'Starting…' : '▶ Start ComfyUI'}
+            {startingComfyui ? 'Starting' : '▶ Start ComfyUI'}
           </button>
           {comfyLauncher.reason && (
             <p className="text-xs text-content-muted" aria-live="polite">{comfyLauncher.reason}</p>
@@ -773,7 +773,7 @@ export default function SetupPage() {
             <div className="flex items-center gap-4 pt-1">
               <button type="button" onClick={skipComfyui} disabled={busy}
                 className="rounded-lg bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50">
-                {busy ? 'Saving…' : 'Continue without ComfyUI'}
+                {busy ? 'Saving' : 'Continue without ComfyUI'}
               </button>
               <button type="button" onClick={() => setSkipConfirm(false)}
                 className="text-xs text-content-subtle underline hover:text-content">
@@ -937,7 +937,7 @@ export default function SetupPage() {
             <div className="flex items-center gap-4 pt-1">
               <button type="button" onClick={skipOllama} disabled={busy}
                 className="rounded-lg bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50">
-                {busy ? 'Saving…' : `Continue without ${llmName}`}
+                {busy ? 'Saving' : `Continue without ${llmName}`}
               </button>
               <button type="button" onClick={() => setOllamaSkipConfirm(false)}
                 className="min-h-10 text-xs text-content-subtle underline hover:text-content lg:min-h-0">
@@ -997,14 +997,14 @@ export default function SetupPage() {
               {step.reachable && !step.visionModelReady && (
                 <button type="button" onClick={loadLlmModel} disabled={startingOllama}
                   className="mt-2 rounded-md bg-gradient-primary px-3 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50">
-                  {startingOllama ? 'Loading… (a big model takes a minute)' : '⏬ Load the vision model'}
+                  {startingOllama ? 'Loading (a big model takes a minute)' : '⏬ Load the vision model'}
                 </button>
               )}
               {!step.reachable && step.installed && (
                 <button type="button" onClick={() => startLocalLlm('LM Studio')}
                   disabled={startingOllama}
                   className="mt-2 rounded-md bg-gradient-primary px-3 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50">
-                  {startingOllama ? 'Starting…' : '▶ Start LM Studio'}
+                  {startingOllama ? 'Starting' : '▶ Start LM Studio'}
                 </button>
               )}
             </div>
@@ -1060,7 +1060,7 @@ export default function SetupPage() {
               </p>
               <button type="button" onClick={() => startLocalLlm('Ollama')} disabled={startingOllama}
                 className="rounded-md bg-gradient-primary px-3 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50">
-                {startingOllama ? 'Starting…' : '▶ Start Ollama'}
+                {startingOllama ? 'Starting' : '▶ Start Ollama'}
               </button>
             </div>
             {fields}
@@ -1466,7 +1466,7 @@ export default function SetupPage() {
         <section className="rounded-xl border border-border bg-surface p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-content">
-              {detecting ? 'Scanning your machine…' : 'Machine scan'}
+              {detecting ? 'Scanning your machine' : 'Machine scan'}
             </h2>
             {detecting
               ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-border-strong border-t-primary" aria-hidden="true" />
@@ -1497,7 +1497,7 @@ export default function SetupPage() {
                       focus-visible:ring-primary disabled:cursor-default disabled:hover:bg-transparent">
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span aria-hidden="true" className={detecting ? 'text-content-subtle' : m.cls}>
-                        {detecting ? '…' : m.glyph}
+                        {detecting ? '' : m.glyph}
                       </span>
                       <span className={r.state === 'ready' ? 'text-content' : 'text-content-muted'}>{r.label}</span>
                       {r.optional && (
@@ -1657,7 +1657,7 @@ export default function SetupPage() {
   const reason = blockReason(kind)                 // live hint of what's still missing
   // Next always saves + re-checks first; the gate (if any) is enforced AFTER that
   // fresh re-check inside nextWithSave, not by disabling the button on a stale snapshot.
-  const nextLabel = advancing ? 'Saving…' : journey ? 'Save & return to my plan' : 'Save & return to tools'
+  const nextLabel = advancing ? 'Saving' : journey ? 'Save & return to my plan' : 'Save & return to tools'
   return (
     <div data-probe-content="setup" data-probe-setup="ready" className="mx-auto max-w-2xl space-y-5 [&_button]:min-h-10 [&_summary]:min-h-10 lg:[&_button]:min-h-0 lg:[&_summary]:min-h-0">
       <div className="flex items-center justify-between">

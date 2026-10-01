@@ -41,8 +41,8 @@ test('a step that DECLINED ITSELF for a prerequisite is not flagged', () => {
     step('semantic_dedup', 'skipped', 'no embeddings yet — run ✨ Score first'),
   ]))
   assert.equal(v.state, 'ok')
-  assert.equal(v.skipped, 1, 'it is still counted…')
-  assert.equal(v.blocked, 0, '…just not held against the run')
+  assert.equal(v.skipped, 1, 'it is still counted')
+  assert.equal(v.blocked, 0, 'just not held against the run')
   assert.equal(pipelineBadge(v), null)
 })
 

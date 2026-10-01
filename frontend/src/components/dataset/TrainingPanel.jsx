@@ -1518,7 +1518,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             disabled={undeploying === dep.undeploy.filename}
             title={dep.undeploy.title}
             className="px-2 py-0.5 rounded border border-emerald-500/40 bg-emerald-600/5 text-emerald-200/90 hover:bg-emerald-600/20 disabled:opacity-50">
-            {undeploying === dep.undeploy.filename ? '⏏ Undeploying…' : `⏏ ${dep.undeploy.label}`}
+            {undeploying === dep.undeploy.filename ? '⏏ Undeploying' : `⏏ ${dep.undeploy.label}`}
           </button>
         )}
       </span>
@@ -2056,7 +2056,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   onChange={(e) => setSliderDraft((d) => ({ ...d, target_class: e.target.value }))}
                   onBlur={saveSliderField('target_class')}
                   placeholder="e.g. person — empty affects everything"
-                  title="The base concept whose representation slides (e.g. 'person'). Leave empty for a global slider (detail, lighting…)."
+                  title="The base concept whose representation slides (e.g. 'person'). Leave empty for a global slider (detail, lighting)."
                   className="px-2 py-1 rounded-lg border border-border bg-surface text-content text-xs" />
               </label>
               <label className="flex flex-col gap-1">
@@ -2221,7 +2221,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             <button type="button" onClick={savePreset} disabled={presetBusy || trainTypeBusy}
               title="Save this dataset's current advanced settings as a named preset"
               className="px-2.5 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs disabled:opacity-40">
-              <Save aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Save current…
+              <Save aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />Save current
             </button>
             <button type="button" onClick={() => presetFileRef.current?.click()}
               disabled={presetBusy || trainTypeBusy}
@@ -2287,7 +2287,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                 ))}
                 {/* Local-only: a free path to a .safetensors of the SAME architecture. */}
                 {customSupported && (
-                  <option value={CUSTOM_BASE_SENTINEL}>Custom weights… (local file)</option>
+                  <option value={CUSTOM_BASE_SENTINEL}>Custom weights (local file)</option>
                 )}
               </select>
               {/* Z-Image variants are distinct training recipes, even with the
@@ -2432,7 +2432,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
             {convertRunning && (
               <span className="text-indigo-300 text-2xs flex items-center gap-1.5">
                 <span className="inline-block w-3 h-3 border-2 border-indigo-400/40 border-t-indigo-400 rounded-full animate-spin" aria-hidden />
-                Converting the base… (~a few minutes)
+                Converting the base (~a few minutes)
               </span>
             )}
             {baseConverted && (
@@ -3384,7 +3384,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
               {(!datasetGraph || datasetGraph.loading) && (
                 <div className="flex items-center gap-2 text-content-subtle text-xs">
                   <span aria-hidden className="h-3 w-3 animate-spin rounded-full border-2 border-border-strong border-t-indigo-400" />
-                  Building the graph…
+                  Building the graph
                 </div>
               )}
               {datasetGraph?.error && <p className="m-0 text-rose-300/80 text-xs">{datasetGraph.error}</p>}
@@ -3452,7 +3452,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                   onClick={findBestEpoch}
                   title="Scores every training sample vs the reference photo (face similarity, CPU) and recommends the checkpoint that holds the identity best — needs the Quality tools (ML extras)."
                   className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 text-2xs font-semibold disabled:opacity-40">
-                  <Trophy aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{bestEpochBusy ? 'Scoring samples…' : 'Find best epoch'}
+                  <Trophy aria-hidden="true" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />{bestEpochBusy ? 'Scoring samples' : 'Find best epoch'}
                 </button>
                 {/* A local training in flight no longer locks this button: the
                     dialog offers the cloud lane, and closes the local one with its
@@ -3467,7 +3467,7 @@ export default function TrainingPanel({ ds, keptCount, kind, onCheckpointsChange
                       ? 'A training is running here — continue this run in the cloud instead'
                       : 'Resume from any of this run’s checkpoints — pick where it runs, the step count, the checkpoint, and the safe settings'}
                   className="ml-auto px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-2xs font-semibold disabled:opacity-40">
-                  ▶ Continue training…
+                  ▶ Continue training
                 </button>
               </div>
               {/* A disabled button whose only explanation is a title= reads as a DEAD

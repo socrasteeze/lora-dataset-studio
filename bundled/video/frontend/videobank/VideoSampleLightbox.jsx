@@ -56,7 +56,7 @@ export default function VideoSampleLightbox({ datasetId, target, onClose }) {
             className="ml-auto min-h-10 rounded border border-border px-2 text-content-subtle hover:text-content lg:min-h-0">✕</button>
         </div>
         {err && <p className="m-0 text-xs text-amber-200">{err}</p>}
-        {!err && samples === null && <p className="m-0 text-xs text-content-subtle">Reading the samples…</p>}
+        {!err && samples === null && <p className="m-0 text-xs text-content-subtle">Reading the samples</p>}
         {samples && !samples.length && (
           <p className="m-0 text-xs text-content-muted">No sample was rendered at this step.</p>
         )}

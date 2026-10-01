@@ -163,7 +163,7 @@ test('the LoRA lane wires the button to the same callback and images', () => {
   assert.match(loraArm, /<UseDatasetCaptionsButton images=\{datasetImages\} max=\{advMaxPrompts\}/)
   assert.match(loraArm, /onPick=\{applySamplePrompts\}/)
   assert.match(loraArm, /topic="training\.sample_prompts_from_dataset"/)
-  // …and the panel feeds it the payload it already has, with no new request.
+  // and the panel feeds it the payload it already has, with no new request.
   assert.match(panel, /const datasetImages = ds\.data\?\.images \|\| \[\]/)
   // The draw persists an EXPLICIT text: reading the state back would save the
   // previous render's lines.

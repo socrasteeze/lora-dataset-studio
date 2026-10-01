@@ -240,7 +240,7 @@ export default function CanvasGenerationPanel({ selection, onToggle, onClear, on
             {recap}
             <p className="m-0 text-content-subtle text-xs">
               {selection.length
-                ? 'Loading this family’s settings…'
+                ? 'Loading this family’s settings'
                 : 'Tick a checkpoint on the board to set up a run.'}
             </p>
           </div>

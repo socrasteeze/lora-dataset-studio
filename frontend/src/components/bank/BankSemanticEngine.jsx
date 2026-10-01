@@ -13,7 +13,7 @@ export default function BankSemanticEngine({ state, disabled = false,
   const blocked = semanticPrerequisite(state)
   const ready = state.ready && !(state.engine === 'siglip2' && capsLoading)
   const status = !state.hasStatus
-    ? 'reading readiness…'
+    ? 'reading readiness'
     : ready
     ? `${state.indexed.toLocaleString()} of ${state.total.toLocaleString()} image(s) ready`
     : state.indexed > 0
@@ -53,7 +53,7 @@ export default function BankSemanticEngine({ state, disabled = false,
       <div className="flex flex-wrap items-center gap-2 border-t border-indigo-400/20 pt-2 text-xs">
         <span className={ready ? 'text-emerald-300' : 'text-amber-300'}>
           {ready ? '✓' : '○'} {state.label}:{' '}
-          {state.engine === 'siglip2' && capsLoading ? 'checking the Quality tool…' : status}
+          {state.engine === 'siglip2' && capsLoading ? 'checking the Quality tool' : status}
         </span>
         {state.engine === 'clip' && (
           <span className="text-content-subtle">Run ✨ Score to build the CLIP index.</span>
@@ -76,7 +76,7 @@ export default function BankSemanticEngine({ state, disabled = false,
             </a>
           </span>
         )}
-        {switching && <span className="text-content-subtle">Saving choice…</span>}
+        {switching && <span className="text-content-subtle">Saving choice</span>}
       </div>
 
       {(deviceNote || onPickPython) && (
@@ -90,7 +90,7 @@ export default function BankSemanticEngine({ state, disabled = false,
               disabled={disabled || switching || live}
               title="Inspect, test or change the Python used by the SigLIP 2 index"
               className="min-h-10 lg:min-h-0 rounded-md border border-border px-2 py-1 text-xs font-medium text-content-muted hover:bg-surface-raised hover:text-content disabled:opacity-50">
-              Manage SigLIP 2 Python…
+              Manage SigLIP 2 Python
             </button>
           )}
         </div>

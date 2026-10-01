@@ -89,7 +89,7 @@ export default function CaptionLabPicker({ images, thumbUrl, onPick, onClose,
             <span className="text-2xs uppercase tracking-wide text-content-subtle">Pick the image to bench</span>
             <input type="search" ref={searchRef} value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Filter by caption or filename…"
+              placeholder="Filter by caption or filename"
               className="min-h-10 w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-content outline-none focus:border-indigo-400" />
           </label>
         </div>

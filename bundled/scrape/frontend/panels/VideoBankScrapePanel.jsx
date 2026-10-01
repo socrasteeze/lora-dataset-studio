@@ -59,7 +59,7 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
       const res = await runVideoBankScrapeImport({
         items, destination, post: (url, body) => postJson(url, body),
         onBatch: ({ index, count, total }) => {
-          if (count > 1) toast.info(`Downloading batch ${index + 1} of ${count} (${total} picked)…`)
+          if (count > 1) toast.info(`Downloading batch ${index + 1} of ${count} (${total} picked)`)
         },
       })
       if (!res.ok) {
@@ -141,7 +141,7 @@ export default function VideoBankScrapePanel({ banks, onDone }) {
                 <select value={bankId} onChange={(e) => setBankId(e.target.value)}
                   aria-label="Video bank that receives the clips"
                   className="w-full rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-content">
-                  <option value="">Choose a bank…</option>
+                  <option value="">Choose a bank</option>
                   {eligible.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name} ({b.counts?.sources ?? 0})

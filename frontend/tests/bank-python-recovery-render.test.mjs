@@ -30,7 +30,7 @@ function panel(overrides = {}) {
 }
 
 function managementButtons(html) {
-  return [...html.matchAll(/<button\b([^>]*)>(Manage (?:Score|SigLIP 2) Python…)<\/button>/g)]
+  return [...html.matchAll(/<button\b([^>]*)>(Manage (?:Score|SigLIP 2) Python)<\/button>/g)]
 }
 
 test('CUDA detection never hides either Python recovery action', () => {

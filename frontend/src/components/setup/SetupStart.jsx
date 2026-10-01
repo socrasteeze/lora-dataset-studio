@@ -138,13 +138,13 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
           className="mr-auto min-h-10 text-sm text-content-muted underline">Open LDS without these tools</button>}
         <button type="button" disabled={busy} onClick={() => selected === 'dataset'
           ? follow('/datasets', true, 'dataset') : choose({ goal: selected })} className={PRIMARY}>
-          {busy ? 'Opening LDS…' : selected === 'dataset' ? 'Open LDS' : 'Continue'}
+          {busy ? 'Opening LDS' : selected === 'dataset' ? 'Open LDS' : 'Continue'}
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
     </> : <>
       {checking && <p role="status" className="flex items-center gap-2 rounded-lg border border-border p-4 text-sm text-content-muted">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Checking the tools for your plan…
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Checking the tools for your plan
       </p>}
       {checkProblem && <div role="alert" className="space-y-3 rounded-lg border border-amber-500/40 p-4 text-sm text-content">
         <p>{checkProblem}</p>
@@ -179,7 +179,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
             <p className="text-sm text-content-muted">{plan.next.description}</p>
             <button type="button" disabled={busy} className={PRIMARY}
               onClick={() => plan.next.action.kind === 'reload' ? window.location.reload() : follow(plan.next.action.to)}>
-              {busy ? 'Opening…' : plan.next.action.label}
+              {busy ? 'Opening' : plan.next.action.label}
             </button>
             <p className="text-xs text-content-muted">When you finish, use “Back to my setup plan”. The plan checks what is ready; opening an installer does not complete a step.</p>
           </section>}
@@ -190,7 +190,7 @@ export default function SetupStart({ onTools, onRecheck, scanned = false, detect
             <h2 className="text-xl font-semibold text-content">{plan.first.title}</h2>
             <p className="text-sm text-content-muted">{plan.first.description}</p>
             <div className="flex flex-wrap gap-2">{plan.first.links.map(link => <button type="button" key={link.to}
-              disabled={busy} className={PRIMARY} onClick={() => follow(link.to, true)}>{busy ? 'Opening…' : link.label}</button>)}</div>
+              disabled={busy} className={PRIMARY} onClick={() => follow(link.to, true)}>{busy ? 'Opening' : link.label}</button>)}</div>
             {plan.first.links.length === 0 && <button type="button" className={SECONDARY} onClick={() => follow('/plugins?tab=installed', true)}>Open Plugins</button>}
           </section>}
         </>}

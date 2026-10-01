@@ -187,8 +187,8 @@ function clipText(ctx, text, maxW) {
   if (!text) return '';
   if (ctx.measureText(text).width <= maxW) return text;
   let out = text;
-  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxW) out = out.slice(0, -1);
-  return `${out}…`;
+  while (out.length > 1 && ctx.measureText(`${out}`).width > maxW) out = out.slice(0, -1);
+  return `${out}`;
 }
 
 /**

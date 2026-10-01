@@ -305,7 +305,7 @@ test('the caption tools are there for a set with NO caption at all', () => {
   assert.ok(html.includes('id="vds-captions-tools"'),
     'Caption tools must exist on an entirely uncaptioned set')
   assert.match(html, /Add as prefix/)
-  // …and it is gone when there is genuinely nothing to work on.
+  // and it is gone when there is genuinely nothing to work on.
   const empty = renderWorkspace({ ds: { ...DS, items: [] }, items: [] })
   assert.ok(!empty.includes('id="vds-captions-tools"'))
 })

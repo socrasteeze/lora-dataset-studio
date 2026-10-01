@@ -138,12 +138,12 @@ export default function InstallRunner({ action, buttonLabel, onDone }) {
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={start} disabled={busy}
           className="rounded-md bg-gradient-primary px-3 py-1.5 text-xs font-semibold text-gray-950 disabled:opacity-50">
-          {state === 'queued' ? 'Queued…' : running ? 'Installing…' : buttonLabel}
+          {state === 'queued' ? 'Queued' : running ? 'Installing' : buttonLabel}
         </button>
         {action === 'ollama_model' && running && (
           <button type="button" onClick={cancel} disabled={cancelling}
             className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-content hover:bg-surface-raised disabled:opacity-50">
-            {cancelling ? 'Cancelling…' : 'Cancel download'}
+            {cancelling ? 'Cancelling' : 'Cancel download'}
           </button>
         )}
       </div>
@@ -155,7 +155,7 @@ export default function InstallRunner({ action, buttonLabel, onDone }) {
       {running && progress && (
         <div className="space-y-1">
           <div className="flex items-center justify-between text-2xs text-content-muted tabular-nums">
-            <span>{progress.pct != null ? `Downloading ${progress.pct}%` : 'Downloading…'}</span>
+            <span>{progress.pct != null ? `Downloading ${progress.pct}%` : 'Downloading'}</span>
             <span>{fmtSize(progress.done)}{progress.total ? ` / ${fmtSize(progress.total)}` : ' downloaded'}</span>
           </div>
           {progress.pct != null && (
@@ -170,7 +170,7 @@ export default function InstallRunner({ action, buttonLabel, onDone }) {
         onChoose={() => setPythonPicker(repairResult.profile)} />}
       {(log.length > 0 || running) && (
         <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-raised p-2 text-2xs text-content-muted">
-          {log.slice(-40).join('\n') || 'starting…'}
+          {log.slice(-40).join('\n') || 'starting'}
         </pre>
       )}
       {state === 'error' && !repairResult?.errorIsSelection && (

@@ -112,7 +112,7 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
                   <li key={rel} className="break-all">· {rel}</li>
                 ))}
                 {preview.missing > preview.missing_sample.length && (
-                  <li>· …and {preview.missing - preview.missing_sample.length} more</li>
+                  <li>· and {preview.missing - preview.missing_sample.length} more</li>
                 )}
               </ul>
             )}
@@ -126,7 +126,7 @@ export default function RelocateBankDialog({ bankId, bankName, sourcePath, onClo
           </button>
           <button type="button" onClick={check} disabled={busy || !folder.trim()}
             className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm font-semibold text-content hover:bg-surface disabled:opacity-40">
-            {busy && !ready ? 'Checking…' : '🔍 Check folder'}
+            {busy && !ready ? 'Checking' : '🔍 Check folder'}
           </button>
           <button type="button" onClick={apply} disabled={busy || !ready}
             className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-gray-950 hover:bg-indigo-500 disabled:opacity-40">

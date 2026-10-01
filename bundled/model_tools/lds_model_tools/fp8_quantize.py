@@ -102,7 +102,7 @@ def _free_gb(path) -> float | None:
     """Free space on the volume that REALLY holds this path.
 
     ``realpath`` first, on purpose: a ComfyUI models folder is very often a
-    junction onto another drive (``C:\\…\\models\\unet`` →  ``A:\\ComfyUI\\models\\unet``
+    junction onto another drive (``C:\\\\models\\unet`` →  ``A:\\ComfyUI\\models\\unet``
     is exactly the layout on the machine this was measured on). Asking about the
     apparent path can answer for the wrong volume, which turns a disk guard into
     a coin toss.

@@ -277,7 +277,7 @@ export default function CivitaiBrowserModal({ open, onClose, onUse, picks = null
           {loading && (
             <p className="m-0 flex items-center justify-center gap-2 py-4 text-content-subtle text-xs" role="status">
               <span className="inline-block w-4 h-4 border-2 border-purple-400/40 border-t-purple-400 rounded-full animate-spin" aria-hidden />
-              Reading Civitai…
+              Reading Civitai
             </p>
           )}
 

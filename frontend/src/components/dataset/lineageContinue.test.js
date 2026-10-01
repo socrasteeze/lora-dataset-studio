@@ -13,7 +13,7 @@ const cloudRunning = { source: 'cloud', run_id: 44, status: 'running' };
 // currently-failed local run) — the save is what says "resumable".
 const localRun = { source: 'local', record_id: 7, status: null };
 
-const save = { step: 1000, present: true, download_url: '/api/…/file?x=1' };
+const save = { step: 1000, present: true, download_url: '/api//file?x=1' };
 const goneSave = { step: 1000, present: false, download_url: null };
 
 test('the Runs hub gate (default) stays cloud-only', () => {

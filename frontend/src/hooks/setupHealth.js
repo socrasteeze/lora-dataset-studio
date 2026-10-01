@@ -83,7 +83,7 @@ export function regressionNotice(regressions) {
 /** The discreet line shown while/after the background check. Null when there is
  *  nothing to say — a first run and a not-yet-loaded app both stay silent. */
 export function statusMessage(phase) {
-  if (phase === 'checking') return 'Checking your setup in the background…'
+  if (phase === 'checking') return 'Checking your setup in the background'
   if (phase === 'ok') return 'Setup checked — everything still works.'
   return null
 }

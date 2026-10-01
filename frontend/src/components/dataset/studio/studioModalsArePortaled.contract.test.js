@@ -78,7 +78,7 @@ test('EVERY full-screen Studio modal is portaled to document.body', () => {
     + '`<aside lg:sticky lg:overflow-auto>`, their z-index is capped by the '
     + 'sticky stacking context and their boxes are clipped by overflow, '
     + 'allowing the page to paint over them. '
-    + 'Fix: `return createPortal(<div …>, document.body)`, as in '
+    + 'Fix: `return createPortal(<div >, document.body)`, as in '
     + 'CaptionEditorDialog. No inner z-index can escape the parent context.');
 });
 

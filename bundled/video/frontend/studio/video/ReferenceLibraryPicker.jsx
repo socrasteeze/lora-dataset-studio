@@ -88,7 +88,7 @@ export default function ReferenceLibraryPicker({ kind, limit, heldKeys = [], dis
           </select>
         </label>
         <label className="flex min-w-0 flex-col gap-1 text-xs text-content-muted sm:col-span-2">Search
-          <input type="search" aria-label="Search library" placeholder="Search names…" value={query} onChange={(e) => setQuery(e.target.value)} className={INPUT} />
+          <input type="search" aria-label="Search library" placeholder="Search names" value={query} onChange={(e) => setQuery(e.target.value)} className={INPUT} />
         </label>
       </fieldset>
       {feed.error && <div role="alert" className="flex flex-wrap items-center gap-2 text-xs text-red-400">{feed.error}<button type="button" className={BUTTON} onClick={feed.retry}>Retry library</button></div>}
@@ -105,7 +105,7 @@ export default function ReferenceLibraryPicker({ kind, limit, heldKeys = [], dis
           </button>;
         })}
       </div>
-      {feed.loading ? <p role="status" className="text-xs text-content-muted">Loading library…</p> : !feed.items.length && !feed.error && <p className="text-xs text-content-muted">No {labels[kind]} found in this library. Try another source or search.</p>}
+      {feed.loading ? <p role="status" className="text-xs text-content-muted">Loading library</p> : !feed.items.length && !feed.error && <p className="text-xs text-content-muted">No {labels[kind]} found in this library. Try another source or search.</p>}
       {feed.hasMore && <button type="button" className={BUTTON} disabled={feed.loading || locked} onClick={feed.more}>Load more</button>}
       {selected.length > 0 && <fieldset disabled={locked} className="min-w-0 space-y-2">
         <legend className="mb-2 text-xs font-semibold text-content">Selected · {selected.length}{Number.isFinite(limit) ? `/${limit}` : ''}</legend>
@@ -133,7 +133,7 @@ export default function ReferenceLibraryPicker({ kind, limit, heldKeys = [], dis
           </article>;
         })}
       </fieldset>}
-      {selected.length > 0 && <button type="button" className="min-h-10 w-full rounded-md bg-primary px-3 py-2 text-xs font-semibold text-gray-950 disabled:opacity-40 lg:min-h-0" disabled={locked || selected.length > limit || invalid} onClick={add}>{adding ? 'Preparing selection…' : `Add selected (${selected.length})`}</button>}
+      {selected.length > 0 && <button type="button" className="min-h-10 w-full rounded-md bg-primary px-3 py-2 text-xs font-semibold text-gray-950 disabled:opacity-40 lg:min-h-0" disabled={locked || selected.length > limit || invalid} onClick={add}>{adding ? 'Preparing selection' : `Add selected (${selected.length})`}</button>}
       <p role="status" aria-live="polite" className="min-w-0 text-xs text-content-muted">{notice || (selected.length ? '' : Number.isFinite(limit) ? `Select up to ${limit} ${labels[kind]} to add.` : `Select ${labels[kind]} to add.`)}</p>
     </section>
   );

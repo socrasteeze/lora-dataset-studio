@@ -26,9 +26,9 @@ test('the ✨ button reads its progress from the server activity, not a tab-loca
   assert.equal(kleinImproveBatchLabel({ kind: 'generate', done: 9, total: 60 }), null)
   assert.equal(kleinImproveBatchLabel({ kind: 'improve', done: 61, total: 250 }),
     '✨ Improving 61/250')
-  assert.equal(kleinImproveBatchLabel({ kind: 'improve', done: 0, total: 0 }), '✨ Improving…')
+  assert.equal(kleinImproveBatchLabel({ kind: 'improve', done: 0, total: 0 }), '✨ Improving')
   assert.equal(kleinImproveBatchLabel({ kind: 'improve', done: 3, total: 250, cancelling: true }),
-    '✨ Stopping…')
+    '✨ Stopping')
 })
 
 test('launch wording states the server-side contract', () => {

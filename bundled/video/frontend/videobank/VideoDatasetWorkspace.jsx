@@ -657,7 +657,7 @@ export default function VideoDatasetWorkspace({ ds, items, refresh, onBack }) {
                         (measured: +15 px between mousedown and mouseup). */}
                     <p aria-live="polite"
                       className="min-h-4 text-2xs text-content-subtle">
-                      {savingId === clip.id ? 'Saving…' : ''}
+                      {savingId === clip.id ? 'Saving' : ''}
                     </p>
                   </li>
                 ))}
@@ -930,7 +930,7 @@ function ReferenceAttach({ ds, onChanged }) {
       <label className="min-h-10 cursor-pointer rounded border border-border bg-surface-raised px-2 py-1 text-2xs font-semibold text-content hover:bg-surface lg:min-h-0">
         <input type="file" multiple accept="image/*" hidden disabled={busy}
           onChange={(e) => { upload(e.target.files); e.target.value = '' }} />
-        {busy ? 'Attaching…' : ds.references > 0 ? 'Replace them' : 'Attach 1-4 images'}
+        {busy ? 'Attaching' : ds.references > 0 ? 'Replace them' : 'Attach 1-4 images'}
       </label>
     </div>
   )

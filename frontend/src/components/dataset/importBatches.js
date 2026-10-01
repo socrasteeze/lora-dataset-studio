@@ -68,7 +68,7 @@ export function formatMiB(bytes) {
 
 /** 'Importing 1–20 of 57…' for the toast that keeps a long drop honest. */
 export function importBatchProgress(offset, batchSize, total) {
-  return `Importing ${offset + 1}–${Math.min(offset + batchSize, total)} of ${total}…`;
+  return `Importing ${offset + 1}–${Math.min(offset + batchSize, total)} of ${total}`;
 }
 
 /** The sentence for files that no batch can carry: which ones, how big, what to do. */

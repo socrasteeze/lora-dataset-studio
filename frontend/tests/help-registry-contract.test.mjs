@@ -187,7 +187,7 @@ test('(5) each Settings section and Workspace section has its topic', () => {
   }
   // The video dataset workspace names its topics on the section itself, so the
   // ? badge cannot be built by interpolation — test (7) only sees literal
-  // topic="…" strings, and an interpolated one would ship pointing at nothing.
+  // topic="" strings, and an interpolated one would ship pointing at nothing.
   for (const s of VIDEO_DATASET_SECTIONS) {
     assert.ok(s.helpTopic, `video dataset section ${s.id} declares no helpTopic`)
     assert.ok(getHelpTopic(s.helpTopic), `missing topic ${s.helpTopic}`)
@@ -215,7 +215,7 @@ test('(6) tips have unique triggers and non-empty text', () => {
 
 // ---- (7) instrumentation references resolve --------------------------------
 
-test('(7) every topic="…" / requestHelpTip(\'…\') in src resolves', () => {
+test('(7) every topic="" / requestHelpTip(\'\') in src resolves', () => {
   const triggers = new Set(helpTips().map((t) => t.trigger))
   for (const m of SRC.matchAll(/\btopic="([^"]+)"/g)) {
     assert.ok(getHelpTopic(m[1]), `topic="${m[1]}" referenced in JSX but not in registry`)

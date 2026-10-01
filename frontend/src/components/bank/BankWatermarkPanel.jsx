@@ -336,7 +336,7 @@ export default function BankWatermarkPanel({
               }}
               title="Run each ticked Klein model on one flagged image (same zones, same seed) and pick the winner for THIS run — a bank stores no Klein choice."
               className="min-h-10 lg:min-h-0 px-2.5 py-1 rounded-lg border border-border text-xs font-semibold text-content-subtle hover:text-content hover:bg-surface-raised">
-              ⚖ Compare models…
+              ⚖ Compare models
             </button>
             {kleinRunModel && (
               <span className="text-2xs text-amber-200">

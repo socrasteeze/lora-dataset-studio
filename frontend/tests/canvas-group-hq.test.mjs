@@ -78,7 +78,7 @@ test('HQ on the group puts EVERY member on the original file', () => {
   assert.deepEqual(found, STRIP.map((n) => n.image.url))
 })
 
-test('…and every member SAYS it is in HQ, for the eye and for a screen reader', () => {
+test('and every member SAYS it is in HQ, for the eye and for a screen reader', () => {
   const html = render(CanvasImageGroup, props({ hq: true }))
   const pressed = [...html.matchAll(/data-testid="canvas-image-hq"[^>]*/g)].map((m) => m[0])
   assert.equal(pressed.length, STRIP.length)

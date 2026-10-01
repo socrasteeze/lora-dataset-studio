@@ -49,7 +49,7 @@ test('the board toolbar carries 40-px targets on a phone and 36 on a desktop', (
   assert.ok((bar.match(/h-10 [^"'+]*lg:h-9/g) || []).length >= 2);
   // No 36-px target left in the row at phone width.
   assert.doesNotMatch(bar, /className="flex h-9 /);
-  // …and it still WRAPS rather than overflowing: 360 px cannot be trusted to
+  // and it still WRAPS rather than overflowing: 360 px cannot be trusted to
   // hold any row, whatever the ranking says. The pill is the flex container and
   // the old inner div is `contents`, so its buttons stay direct flex items.
   assert.match(canvas, /pointer-events-auto inline-flex max-w-full flex-wrap items-center gap-1\.5/);
@@ -118,7 +118,7 @@ test('opening ⋯ never grows the board’s toolbar', () => {
   assert.ok(sheetAt > 0 && sheetAt < pillAt, 'the sheet renders before the toolbar pill');
   // Conditional, so it costs nothing at all while it is not asked for.
   assert.match(canvas, /\{moreOpen && \(/);
-  // …and it can be PUT AWAY: a phone has no Escape key within reach, so the
+  // and it can be PUT AWAY: a phone has no Escape key within reach, so the
   // Close button is the one that matters, but both are wired.
   assert.match(canvas, /aria-label="Close the board tools"/);
   // Escape unwinds ONE layer: the ⓘ bubble if it is up, otherwise the shelf.
@@ -232,12 +232,12 @@ test('the shelf’s chips carry their words, and the toolbar keeps its targets',
   const presets = fs.readFileSync(new URL("../../../../bundled/canvas/frontend/components/canvas/CanvasLayoutPresets.jsx", import.meta.url), 'utf8');
   assert.ok(canvas.includes('<span aria-hidden>✦</span> Tidy up'));
   assert.ok(canvas.includes('/> + LoRA'));
-  assert.ok(canvas.includes('<span aria-hidden>⏏</span> Undeploy…'));
+  assert.ok(canvas.includes('<span aria-hidden>⏏</span> Undeploy'));
   assert.doesNotMatch(canvas, /hidden sm:inline">Tidy up/);
   assert.doesNotMatch(presets, /hidden sm:inline">Layouts/);
   // 📷 says what it is doing while it does it, at every width now.
-  assert.match(canvas, /\{exporting \? 'Exporting…' : 'PNG'\}/);
-  // …and a title is still a sentence, not a repeat of the label.
+  assert.match(canvas, /\{exporting \? 'Exporting' : 'PNG'\}/);
+  // and a title is still a sentence, not a repeat of the label.
   assert.match(presets, /<summary title="Layouts — /);
   // The deploy key still shortens below `sm` — it is a KEY, not a control, and
   // its long form is two full sentences.
@@ -267,7 +267,7 @@ test('the load readout is reachable from a phone', (t) => {
   // is the only thing on the page that polls forever.
   assert.match(stats, /data-testid=\{`\$\{testId\}-toggle`\}/);
   assert.match(stats, /shouldPoll\(\{ enabled: enabledRef\.current, visibility \}\)/);
-  // …and the board still mounts it under the ids the probe holds on to.
+  // and the board still mounts it under the ids the probe holds on to.
   const mount = fs.readFileSync(new URL("../../../../bundled/canvas/frontend/components/canvas/CanvasSystemStats.jsx", import.meta.url), 'utf8');
   assert.match(mount, /<PluginSlot slot="resource_monitor.readout" surface="canvas"/);
   const readout = fs.readFileSync(new URL('../../../../bundled/resource_monitor/frontend/components/Readout.jsx', import.meta.url), 'utf8');
@@ -316,15 +316,15 @@ test('the Layouts menu opens on the screen, not off the side of it', () => {
    neither is drawn — but the page still HAS an <h1>, because a screen with no
    heading is a screen a reader lands in the middle of. */
 test('the canvas page folds its header on a phone, never its help', () => {
-  // The visible header stops at `lg`…
+  // The visible header stops at `lg`
   assert.match(page, /<header className="mb-2 hidden sm:mb-3 lg:block">/);
-  // …and an sr-only title takes its place exactly where it was dropped.
+  // and an sr-only title takes its place exactly where it was dropped.
   assert.match(page, /<h1 className="sr-only lg:hidden">LoRA Canvas<\/h1>/);
   // The blurb stays hidden right up to `lg`, as it already was.
   assert.match(page, /className="mt-1 hidden text-content-muted text-xs lg:block"/);
   assert.doesNotMatch(page, /text-\[0\.75rem\] sm:block/);
   // The ? badge is not lost with the header it sat in: it moves onto the ⋯
-  // shelf, exactly like ⏏ Undeploy… did. "The ? next to the title explains this
+  // shelf, exactly like ⏏ Undeploy did. "The ? next to the title explains this
   // page at every width" is a promise this page makes in its own comments.
   assert.match(page, /<HelpBadge topic="page-canvas" \/>/);
   assert.match(canvas, /\{onOpenUndeploy && <HelpBadge topic="page-canvas" \/>\}/);
@@ -429,7 +429,7 @@ test('↺ Reset costs the phone nothing while there is nothing to reset', () => 
   // The word comes back from `sm`; the glyph carries it below.
   assert.match(filter, /<span aria-hidden className="md:hidden">↺<\/span>/);
   assert.match(filter, /<span className="hidden md:inline">Reset<\/span>/);
-  // …and a button that loses its word keeps its sentence.
+  // and a button that loses its word keeps its sentence.
   assert.match(filter, /aria-label="Reset the filters"/);
 });
 
@@ -449,7 +449,7 @@ test('a run in flight is announced once on a phone, and Stop stays reachable', (
   assert.match(canvas, /const runPhase = describeCanvasRun\(tracker\.run\.data\)\.phase;/);
 });
 
-/* …and the frame takes the WHOLE fold, once, and then stops moving.
+/* and the frame takes the WHOLE fold, once, and then stops moving.
 
    Three heights have now been tried on this frame and only the third answers
    both halves of the complaint. `60vh`, then `72vh/76vh`, left dead page under
@@ -511,7 +511,7 @@ test('every filter target is finger-sized on a phone and 36 px from lg', () => {
   assert.match(menu, /\blg:h-9\b/);
   // The controls the bar draws itself (Pinned, the search box, Reset).
   assert.ok((filter.match(/\bh-10\b/g) || []).length >= 3, 'three 40-px targets in the bar');
-  assert.ok((filter.match(/\blg:h-9\b/g) || []).length >= 3, '…each falling back to 36 px');
+  assert.ok((filter.match(/\blg:h-9\b/g) || []).length >= 3, 'each falling back to 36 px');
 });
 
 /* 400 px: a fixed-width popover hangs off the screen, and a filter half off the

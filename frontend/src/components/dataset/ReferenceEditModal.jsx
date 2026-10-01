@@ -186,7 +186,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
         {phase === 'running' ? (
           <div className="flex flex-col items-center gap-3 py-6">
             <span className="inline-block w-8 h-8 border-2 border-indigo-400/40 border-t-indigo-400 rounded-full animate-spin" aria-hidden />
-            <p className="text-content text-sm">Editing the reference with the selected engines…</p>
+            <p className="text-content text-sm">Editing the reference with the selected engines</p>
             <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2" aria-live="polite">
               {candidates.length ? candidates.map((candidate) => {
                 const label = engineLabel(candidate.engine);
@@ -207,7 +207,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                   </div>
                 );
               }) : (
-                <p className="text-content-muted text-xs text-center sm:col-span-2">Starting engines…</p>
+                <p className="text-content-muted text-xs text-center sm:col-span-2">Starting engines</p>
               )}
             </div>
             <p className="text-content-muted text-2xs text-center">
@@ -244,7 +244,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                     </p>
                     <button type="button" onClick={() => keep(candidate.engine)} disabled={busy}
                       className="mt-auto px-4 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-                      {busyAction === candidate.engine ? 'Keeping…' : `Keep ${label}`}
+                      {busyAction === candidate.engine ? 'Keeping' : `Keep ${label}`}
                     </button>
                   </figure>
                 );
@@ -418,7 +418,7 @@ export default function ReferenceEditModal({ datasetId, refFilename, nonce = 0,
                 title={blocked || undefined}
                 className="px-4 py-2 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
                 {starting
-                  ? 'Starting…'
+                  ? 'Starting'
                   : `Generate ${engines.length || 0} edit${engines.length === 1 ? '' : 's'}`}
               </button>
             </div>

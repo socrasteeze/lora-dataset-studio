@@ -59,7 +59,7 @@ export function UndoBar({ offer, busy, onUndo, onDismiss }) {
       </p>
       <button type="button" onClick={onUndo} disabled={busy}
         className="rounded border border-sky-400/60 px-2 py-1 text-xs font-semibold hover:bg-white/10 disabled:opacity-50">
-        {busy ? 'Undoing…' : '↩ Undo'}
+        {busy ? 'Undoing' : '↩ Undo'}
       </button>
       <button type="button" onClick={onDismiss} disabled={busy}
         title="Keep the change and hide this"

@@ -134,7 +134,7 @@ export function Fp8DeliverPlan({
       <button type="button" onClick={onStart}
         disabled={busy || disabled || plan.enough_space === false}
         className="mt-1 rounded-md border border-primary/50 bg-primary/20 px-2.5 py-1 font-semibold text-white hover:bg-primary/30 disabled:opacity-40">
-        {busy ? 'Starting…' : 'Quantize to fp8'}
+        {busy ? 'Starting' : 'Quantize to fp8'}
       </button>
     </div>
   );
@@ -153,7 +153,7 @@ export function Fp8DeliverProgress({ state, onCancel = null }) {
       <p className="m-0">
         {downloading
           ? `⬇ Downloading ${state.weight_name || 'the master'} — ${fmtGB(state.downloaded_bytes)} of ${fmtGB(state.download_total_bytes)}`
-          : `✨ Quantizing on the CPU${state.total ? ` — ${state.done}/${state.total} tensors` : '…'}`}
+          : `✨ Quantizing on the CPU${state.total ? ` — ${state.done}/${state.total} tensors` : ''}`}
       </p>
       <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-black/30"
         role="progressbar" aria-valuenow={width} aria-valuemin={0} aria-valuemax={100}>

@@ -124,8 +124,8 @@ test('a cold first search is announced, a warm one is called instant', () => {
   assert.match(readinessHint({ available: true, warm: false }), /First search loads/);
   assert.match(readinessHint({ available: true, warm: false }), /10 seconds/);
   assert.match(readinessHint({ available: true, warm: true }), /instant/);
-  assert.equal(pendingLabel({ warm: false }), 'Loading the search model…');
-  assert.equal(pendingLabel({ warm: true }), 'Searching…');
+  assert.equal(pendingLabel({ warm: false }), 'Loading the search model');
+  assert.equal(pendingLabel({ warm: true }), 'Searching');
 });
 
 test('an unavailable install is told why, not left with a dead field', () => {

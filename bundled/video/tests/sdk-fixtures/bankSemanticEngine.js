@@ -141,7 +141,7 @@ export function offersSemanticGpuPython(state, gpuPresent = true) {
 export function semanticPrerequisite(state) {
   if (state?.ready) return ''
   if (!state?.hasStatus) {
-    return `Reading ${state?.label || semanticEngineLabel(state?.engine)} semantic readiness…`
+    return `Reading ${state?.label || semanticEngineLabel(state?.engine)} semantic readiness`
   }
   if (state?.engine === 'siglip2') {
     return state.installed
@@ -153,9 +153,9 @@ export function semanticPrerequisite(state) {
 
 export function semanticIndexActionLabel(state) {
   if (!state || state.engine !== 'siglip2' || !state.installed) return ''
-  if (state.complete) return 'Reindex SigLIP 2…'
-  if (state.indexed > 0) return 'Complete SigLIP 2 index…'
-  return 'Build SigLIP 2 index…'
+  if (state.complete) return 'Reindex SigLIP 2'
+  if (state.indexed > 0) return 'Complete SigLIP 2 index'
+  return 'Build SigLIP 2 index'
 }
 
 export function semanticPurposeSentence(engine) {

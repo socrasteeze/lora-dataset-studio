@@ -27,7 +27,7 @@ export function autoPhaseLabel(session) {
     case 'paused': return 'Paused — resolve the problem, then Resume; or Stop Auto to end this take.';
     case 'stopped': return 'Auto is off.';
     case 'complete': return 'The clip limit has been reached.';
-    default: return 'Waiting for the next step…';
+    default: return 'Waiting for the next step';
   }
 }
 

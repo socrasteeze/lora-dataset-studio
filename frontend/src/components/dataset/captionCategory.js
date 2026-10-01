@@ -50,7 +50,7 @@ export function captionCategoryCopy(kind = 'character', mode = 'prose') {
     ...category,
     frequencyTitle: tagMode ? 'Most frequent tags' : 'Most frequent words',
     frequencyItem: tagMode ? 'tag' : 'word',
-    filterPlaceholder: tagMode ? 'tag to filter by…' : 'word to filter by…',
+    filterPlaceholder: tagMode ? 'tag to filter by' : 'word to filter by',
   }
 }
 

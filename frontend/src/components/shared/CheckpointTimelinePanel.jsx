@@ -352,7 +352,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
       sources: new Set(), recorder: null, stream: null };
     exportJobRef.current = job;
     setPlaying(false);
-    setExportState({ busy: true, progress: 0, message: 'Preloading same-origin frames…', error: null });
+    setExportState({ busy: true, progress: 0, message: 'Preloading same-origin frames', error: null });
     let objectUrl = null;
 
     try {
@@ -367,7 +367,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
       for (let index = 0; index < sourceFrames.length; index += 1) {
         if (mountedRef.current) {
           setExportState((current) => ({ ...current,
-            message: `Preparing WebM source ${index + 1} of ${sourceFrames.length}…` }));
+            message: `Preparing WebM source ${index + 1} of ${sourceFrames.length}` }));
         }
         const source = await loadBoundedExportSource(sourceFrames[index].url, job);
         images.push(source);
@@ -430,7 +430,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
           setExportState((current) => ({
             ...current,
             progress: Math.min(99, Math.round(captured / totalCaptureFrames * 100)),
-            message: `Rendering WebM frame ${captured} of ${totalCaptureFrames}…`,
+            message: `Rendering WebM frame ${captured} of ${totalCaptureFrames}`,
           }));
         }
       };
@@ -493,7 +493,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
     gifAbortRef.current?.abort();
     gifAbortRef.current = controller;
     setGifBusy(true);
-    setExportState({ busy: false, progress: 0, message: 'Rendering GIF…', error: null });
+    setExportState({ busy: false, progress: 0, message: 'Rendering GIF', error: null });
     let objectUrl = null;
     try {
       const response = await fetchWithCsrfRetry(
@@ -555,7 +555,7 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           {state.status === 'loading' && (
             <div role="status" className="flex min-h-64 items-center justify-center text-sm text-content-muted">
-              Loading checkpoint frames…
+              Loading checkpoint frames
             </div>
           )}
 
@@ -712,14 +712,14 @@ export default function CheckpointTimelinePanel({ recordId, onClose }) {
                         aria-disabled={gifBusy || exportState.busy}
                         className="rounded-md border border-border px-3 py-2 text-xs text-content-muted hover:border-indigo-400/60 hover:text-content aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
                         aria-label="Download timeline as GIF">
-                        {gifBusy ? 'Rendering GIF…' : 'Download GIF'}
+                        {gifBusy ? 'Rendering GIF' : 'Download GIF'}
                       </button>
                       <button type="button" onClick={exportWebM}
                         disabled={!exportSupport}
                         aria-disabled={!exportSupport || exportState.busy || gifBusy}
                         title={exportDisabledReason || 'Render this timeline locally and download a WebM video'}
                         className="rounded-md border border-border px-3 py-2 text-xs text-content-muted hover:border-indigo-400/60 hover:text-content disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40">
-                        {exportState.busy ? `Exporting ${exportState.progress}%…` : 'Export WebM'}
+                        {exportState.busy ? `Exporting ${exportState.progress}%` : 'Export WebM'}
                       </button>
                     </div>
                   </div>

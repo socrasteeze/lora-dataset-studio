@@ -22,7 +22,7 @@ export const GUIDE = {
         "  with the training facts (steps, epochs, rank/alpha, dataset version and image",
         "  count), tags and the licence toggles. A run trained on a **custom base** (a",
         "  ComfyUI checkpoint picked in the dropdown) leaves the base model **empty**",
-        "  where Civitai distinguishes lineages — SDXL (Pony, Illustrious, NoobAI…),",
+        "  where Civitai distinguishes lineages — SDXL (Pony, Illustrious, NoobAI),",
         "  Z-Image, Klein — because the app cannot honestly name it; pick it before",
         "  uploading. Press **Upload as a draft** and the `.safetensors` goes up in the",
         "  background; the page is created as a **draft** so you give it a last look on",

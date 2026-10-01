@@ -26,7 +26,7 @@ export function PluginAdminLock({ value, onChange, onUnlock, checking, rejected 
             className="min-h-10 min-w-0 flex-1 rounded border border-border bg-surface px-3" />
           <button type="submit" disabled={checking}
             className="min-h-10 rounded-md border border-primary bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-            {checking ? 'Checking token…' : 'Unlock plugin changes'}
+            {checking ? 'Checking token' : 'Unlock plugin changes'}
           </button>
         </div>
         <p id="plugin-admin-token-hint" className="text-xs text-content-muted">Use the separate plugin admin token, not an API key or the app access token. It is kept only until this page is reloaded.</p>
@@ -230,7 +230,7 @@ export default function PluginsPage() {
             <div role="status" aria-live="polite" className="flex min-w-0 flex-1 basis-64 items-start gap-2">
               <RefreshCw aria-hidden="true" className={'mt-0.5 h-4 w-4 shrink-0' + (applying ? ' animate-spin' : '')} />
               <div>
-                <p className="font-medium">{applying ? 'Restarting LDS…' : 'Changes ready to apply'}</p>
+                <p className="font-medium">{applying ? 'Restarting LDS' : 'Changes ready to apply'}</p>
                 <p className="mt-1 text-content-muted">{applying ? 'Waiting for the new server. This page will reload when it is ready.' : 'Your choices are saved. The current features stay available until LDS restarts.'}</p>
               </div>
             </div>

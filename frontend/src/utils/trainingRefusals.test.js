@@ -189,7 +189,7 @@ test('a NON-confirmable {ok:false} resolution is thrown, never returned as a suc
 
 test('declining a resolved-dialect confirm returns null too', async () => {
   await withConfirm([false], async () => {
-    const post = async () => ({ ok: false, error: 'PARALLEL_RUN: sibling #150 …' });
+    const post = async () => ({ ok: false, error: 'PARALLEL_RUN: sibling #150 ' });
     assert.equal(await postWithConfirmations(post, {}, 'Train anyway (force)'), null);
   });
 });

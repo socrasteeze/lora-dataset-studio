@@ -105,7 +105,7 @@ function UpdatesCard() {
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={check} disabled={checking || applying}
           className="rounded-md border border-border-strong px-3 py-1.5 text-sm font-medium text-content hover:bg-surface-raised disabled:opacity-50">
-          {checking ? 'Checking…' : 'Check for updates'}
+          {checking ? 'Checking' : 'Check for updates'}
         </button>
         {s?.current && (
           <span className="text-xs text-content-subtle">
@@ -140,10 +140,10 @@ function UpdatesCard() {
         <div className="space-y-1.5" role="status" aria-live="polite">
           <p className="text-sm text-content-muted">
             {phase === 'restarting'
-              ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back…'
+              ? '↻ Updated — the app is restarting. This page reloads automatically when it’s back'
               : progressLabel(progress) || (mode === 'zip'
-                ? '⬇ Downloading and installing the latest release…'
-                : '⬇ Pulling the latest version…')}
+                ? '⬇ Downloading and installing the latest release'
+                : '⬇ Pulling the latest version')}
           </p>
           {/* Real progress bar while downloading a release ZIP (indeterminate when
               the server reported no Content-Length). Git pulls stay text-only. */}

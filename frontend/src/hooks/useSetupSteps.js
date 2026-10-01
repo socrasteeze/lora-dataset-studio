@@ -345,7 +345,7 @@ export function comfyuiDirVerdict(check) {
     case 'not_comfyui':
       return { tone: 'warn', suggestion: '', note: '', inputSuggestion: '',
         message: "This folder isn't a ComfyUI install — it must contain main.py and a models/ folder. "
-          + 'For the portable build, point at the inner …\\ComfyUI_windows_portable\\ComfyUI.' }
+          + 'For the portable build, point at the inner \\ComfyUI_windows_portable\\ComfyUI.' }
     default:
       return { tone: 'muted', suggestion: '', note: '', inputSuggestion: '', message: '' }
   }
@@ -685,7 +685,7 @@ function coreCapabilitySummary(caps) {
     { label: 'Watermark detector (optional)', what: 'Finds watermarks about ten times faster and marks where they sit', ok: !!c.watermark_detect,
       topic: 'setup-quality' },
     ...(contributions('settings.group').some(group => group.plugin === 'scrape')
-      ? [{ label: 'Scraping extras (optional)', what: 'Gallery links, keyless web image search and video sources (gallery-dl, yt-dlp…)', ok: !!c.scrape_deps, topic: 'setup-quality' }]
+      ? [{ label: 'Scraping extras (optional)', what: 'Gallery links, keyless web image search and video sources (gallery-dl, yt-dlp)', ok: !!c.scrape_deps, topic: 'setup-quality' }]
       : []),
     // DIVERGENCE 1 (Civitai note, 2026-09-03) — upstream counts a
     // '📤 Civitai publishing' row here, reading `c.civitai` from a probe this

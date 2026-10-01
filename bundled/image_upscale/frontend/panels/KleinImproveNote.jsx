@@ -490,7 +490,7 @@ export default function KleinImproveNote({
             rows={4}
           />
           <p className="text-content-subtle break-words">
-            {saving ? 'Saving…' : 'Saved automatically as you type.'}
+            {saving ? 'Saving' : 'Saved automatically as you type.'}
           </p>
           {error && (
             <p className="text-rose-400 break-words"><span aria-hidden="true">✗ </span>{error}</p>

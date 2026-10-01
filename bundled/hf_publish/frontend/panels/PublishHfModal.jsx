@@ -179,7 +179,7 @@ export default function PublishHfModal({ datasetId, onClose }) {
               <button type="button" onClick={publish} disabled={!consent || !repoId.trim() || busy}
                 className="px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40 flex items-center gap-2">
                 {busy && <span className="inline-block w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
-                {busy ? 'Publishing…' : 'Publish'}
+                {busy ? 'Publishing' : 'Publish'}
               </button>
             </div>
           </>

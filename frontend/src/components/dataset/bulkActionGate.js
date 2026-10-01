@@ -19,7 +19,7 @@ export function createBulkActionGate() {
 export function bulkActionMessage(active) {
   if (!active) return ''
   if (active.action === 'delete') {
-    return `Deleting ${active.count} ${active.count === 1 ? 'image' : 'images'}…`
+    return `Deleting ${active.count} ${active.count === 1 ? 'image' : 'images'}`
   }
-  return `Updating ${active.count} images…`
+  return `Updating ${active.count} images`
 }

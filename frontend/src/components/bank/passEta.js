@@ -70,6 +70,6 @@ export function etaPhrase(activity) {
     if (!text) return '';
     return activity.eta_scope === 'phase' ? `${text} left in this step` : `${text} left`;
   }
-  if (state === 'estimating') return 'estimating time left…';
+  if (state === 'estimating') return 'estimating time left';
   return '';
 }

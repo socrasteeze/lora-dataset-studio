@@ -560,7 +560,7 @@ def start_async(app, base, loras, **kwargs) -> dict:
         current = status()
         if current.get('status') == 'running' and _running_here():
             raise MergeJobError(
-                f'a merge is already running ({current.get("destination_name") or "…"})'
+                f'a merge is already running ({current.get("destination_name") or ""})'
                 ' — wait for it to finish')
         _cancel.clear()
         _set('running', info, done=0, total=0)

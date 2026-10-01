@@ -17,7 +17,7 @@ const label = installActionLabel
 const ROW_META = {
   idle: { glyph: '○', cls: 'text-content-subtle', word: 'waiting' },
   queued: { glyph: '○', cls: 'text-content-subtle', word: 'queued' },
-  running: { glyph: '⟳', cls: 'text-primary', word: 'installing…' },
+  running: { glyph: '⟳', cls: 'text-primary', word: 'installing' },
   success: { glyph: '✓', cls: 'text-emerald-400', word: 'done' },
   error: { glyph: '✗', cls: 'text-rose-400', word: 'needs attention' },
 }
@@ -232,7 +232,7 @@ export default function InstallEverything({ plan, caps, onDone }) {
             ) : (
               <button type="button" onClick={start} disabled={phase === 'running'}
                 className="mt-4 rounded-lg bg-gradient-primary px-5 py-2 text-sm font-semibold text-gray-950 disabled:opacity-50">
-                {phase === 'running' ? 'Installing…' : `Install listed tools (${(plan || []).length})`}
+                {phase === 'running' ? 'Installing' : `Install listed tools (${(plan || []).length})`}
               </button>
             )}
             {(phase === 'done' && !rows.every((a) => (statuses[a] || {}).state === 'success')) && (

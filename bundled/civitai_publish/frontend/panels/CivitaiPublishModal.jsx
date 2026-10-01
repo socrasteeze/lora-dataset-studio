@@ -292,7 +292,7 @@ export default function CivitaiPublishModal({ context, onClose }) {
             </h2>
             <p className="m-0 mt-0.5 truncate text-xs text-content-muted" title={subject}>{subject}</p>
             <p className="m-0 mt-0.5 text-2xs text-content-subtle">
-              {status == null ? 'Checking the API key…'
+              {status == null ? 'Checking the API key'
                 : noKey ? 'No Civitai API key configured.'
                   : `${status.username ? `Signed in as ${status.username}` : 'API key configured'} · links open on ${status.link_host}`}
             </p>
@@ -323,7 +323,7 @@ export default function CivitaiPublishModal({ context, onClose }) {
         <section className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
           <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-content-muted">Model page</h3>
           {link === undefined && known ? (
-            <p className="m-0 text-sm text-content-muted">Looking up the link…</p>
+            <p className="m-0 text-sm text-content-muted">Looking up the link</p>
           ) : link ? (
             <div className="flex flex-wrap items-center gap-2" data-testid="civitai-linked">
               <span className="text-sm text-content">
@@ -399,7 +399,7 @@ export default function CivitaiPublishModal({ context, onClose }) {
                   {defaultsError ? (
                     <p role="alert" className="m-0 text-sm text-rose-300">{defaultsError}</p>
                   ) : !form ? (
-                    <p className="m-0 text-sm text-content-muted">Preparing the page from this run…</p>
+                    <p className="m-0 text-sm text-content-muted">Preparing the page from this run</p>
                   ) : (
                     <>
                       <label className="flex flex-col gap-0.5">

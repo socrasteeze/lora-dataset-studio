@@ -78,7 +78,7 @@ export default function DescribeFilterBar({ bankId, onApply }) {
           className="min-h-10 lg:min-h-0 lg:h-8 whitespace-nowrap rounded-md border border-border px-2 text-xs font-medium
             text-content-muted hover:bg-surface-raised hover:text-content
             disabled:opacity-50">
-          {busy ? 'Reading…' : 'Set the filters'}
+          {busy ? 'Reading' : 'Set the filters'}
         </button>
       </div>
 

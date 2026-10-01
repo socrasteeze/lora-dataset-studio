@@ -5,7 +5,7 @@ from the core's ``services/hf_publish.py``): the kept images as metadata-free
 PNG copies, their captions with the trigger word, a ``metadata.jsonl`` and a
 dataset card — private by default, consent required, the reference photo off
 by default. The routes are the ones the screen already calls
-(``/api/dataset/<id>/publish-hf…``).
+(``/api/dataset/<id>/publish-hf``).
 
 What the core keeps, and why: the ``HF_TOKEN`` secret with its Settings and
 Setup fields (gated base downloads and cloud training read the same token),

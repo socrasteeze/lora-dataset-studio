@@ -235,8 +235,8 @@ const retry = async (run) => {
         'Retry anyway (force)', RETRY_CONFIRMABLE_REFUSALS);
       if (!d) return;                              // declined at a confirm prompt
       toast.success(isLocal
-        ? 'Run relaunched locally — watch it under In progress…'
-        : 'Run relaunched — provisioning a fresh pod…');
+        ? 'Run relaunched locally — watch it under In progress'
+        : 'Run relaunched — provisioning a fresh pod');
       poll();
     } catch (e) {
       toast.error(e?.message
@@ -368,8 +368,8 @@ const renderRunCard = (run, i) => {
             )}
           </div>
           {/* NOT truncate: these messages carry their explanation on the SECOND line
-              ("Cannot access gated repo … ask for access"), so collapsing them to one
-              line kept the useless "403 Client Error (Request ID…)" and hid the part
+              ("Cannot access gated repo ask for access"), so collapsing them to one
+              line kept the useless "403 Client Error (Request ID)" and hid the part
               that names what to fix. The full text was only in title=, which never
               shows on a phone — where this was reported. Newlines are real, hence
               whitespace-pre-line; clamped so a stack trace cannot take over the page. */}
@@ -418,7 +418,7 @@ const renderRunCard = (run, i) => {
                     ? 'Relaunch this run locally with the same settings'
                     : 'Relaunch this run with the same settings on a fresh pod'}
                 className="px-3 py-1.5 rounded-lg bg-primary/90 hover:bg-primary text-gray-950 text-xs font-semibold disabled:opacity-40">
-                {retrying[runRetryKey(run)] ? '↻ Retrying…' : '↻ Retry'}
+                {retrying[runRetryKey(run)] ? '↻ Retrying' : '↻ Retry'}
               </button>
             )}
             {/* A LoRA is continued from a checkpoint on this disk; a full model
@@ -439,7 +439,7 @@ const renderRunCard = (run, i) => {
                       || "Resume this full model on a fresh pod — pick how its 26 GB gets there")
                     : "Resume from any of this run's checkpoints for more steps, on a fresh pod"}
                 className="px-3 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-600 text-white text-xs font-semibold disabled:opacity-40">
-                {continuing[run.run_id] ? '▶ Continuing…' : '▶ Continue…'}
+                {continuing[run.run_id] ? '▶ Continuing' : '▶ Continue'}
               </button>
             )}
             {!fullModel && run.checkpoint_ready && (
@@ -490,7 +490,7 @@ const renderRunCard = (run, i) => {
                 disabled={!!purgingRun[run.run_id]}
                 title={cleanup.title}
                 className={`rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-red-200 hover:bg-red-500/20 text-xs font-semibold disabled:opacity-40 ${run.share_key ? '' : 'ml-auto'}`}>
-                <Eraser aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />{purgingRun[run.run_id] ? 'Cleaning…' : `Clean ${cleanup.size}`}
+                <Eraser aria-hidden="true" className="mr-1 inline h-3 w-3 align-[-1px]" />{purgingRun[run.run_id] ? 'Cleaning' : `Clean ${cleanup.size}`}
               </button>
             )}
           </div>
@@ -560,7 +560,7 @@ const renderRunCard = (run, i) => {
                   <button type="button" onClick={stopLocal} disabled={stoppingLocal}
                     title="Stop this local training process; checkpoints already saved are kept"
                     className="px-3 py-1 rounded-lg bg-red-600/80 text-white text-xs font-semibold disabled:opacity-40">
-                    {stoppingLocal ? 'Stopping…' : 'Stop run'}
+                    {stoppingLocal ? 'Stopping' : 'Stop run'}
                   </button>
                 )}
                 {data.local_active.share_key && (
@@ -591,7 +591,7 @@ const renderRunCard = (run, i) => {
           </div>
         )}
 
-        {!data && !loadError && <p className="text-sm text-content-subtle">Loading…</p>}
+        {!data && !loadError && <p className="text-sm text-content-subtle">Loading</p>}
         {data && !data.local_active && !actives.length && <p className="text-sm text-content-subtle">No run in progress. Launch one from a dataset’s training panel.</p>}
         {cloud?.activeContent || actives.map(renderRunCard)}
       </div>

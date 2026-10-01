@@ -175,7 +175,7 @@ test('the dialog button counts, so a working request is not read as a hang', () 
   assert.equal(launchButtonLabel({ launching: false, elapsedSeconds: 0, fullMode: true }),
     '☁️ Rent GPU & train full model');
   // The first seconds still feel instant — no counter flicker for a fast POST.
-  assert.equal(launchButtonLabel({ launching: true, elapsedSeconds: 1 }), 'Launching…');
-  assert.equal(launchButtonLabel({ launching: true, elapsedSeconds: 34 }), 'Launching… 34s');
-  assert.equal(launchButtonLabel({ launching: true, elapsedSeconds: 95 }), 'Launching… 1m');
+  assert.equal(launchButtonLabel({ launching: true, elapsedSeconds: 1 }), 'Launching');
+  assert.equal(launchButtonLabel({ launching: true, elapsedSeconds: 34 }), 'Launching 34s');
+  assert.equal(launchButtonLabel({ launching: true, elapsedSeconds: 95 }), 'Launching 1m');
 });

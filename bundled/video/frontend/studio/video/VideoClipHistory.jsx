@@ -71,7 +71,7 @@ export default function VideoClipHistory({
                     ? 'border-red-500/40 bg-red-500/5 text-red-300'
                     : 'border-dashed border-amber-400/40 bg-amber-400/5 text-amber-200'}`}>
                   {running && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
-                  <span className="px-3 text-center">{running ? 'Rendering…' : (clip.error || 'Failed')}</span>
+                  <span className="px-3 text-center">{running ? 'Rendering' : (clip.error || 'Failed')}</span>
                   {progress && (
                     <span className="px-3 text-center text-2xs text-amber-200/80"
                       data-testid="clip-render-progress">
@@ -190,7 +190,7 @@ export default function VideoClipHistory({
                     title="Smooth this clip — pick the rate (×2, ×3 or ×4 of its own), as a new clip"
                     className={`${ACTION} border-border text-content-muted hover:text-content disabled:opacity-40`}>
                     <Waves aria-hidden="true" className="h-3.5 w-3.5" />
-                    {vfiBusy === clip.id ? '…' : 'Smooth'}
+                    {vfiBusy === clip.id ? '' : 'Smooth'}
                   </button>
                 )}
                 {/* ✨ DLSS 5 Neural Rendering over a finished clip — a NEW clip,
@@ -203,7 +203,7 @@ export default function VideoClipHistory({
                     title="Re-render this clip with DLSS 5 Neural Rendering, as a new clip"
                     className={`${ACTION} border-border text-content-muted hover:text-content disabled:opacity-40`}>
                     <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
-                    {nrBusy === clip.id ? '…' : 'Neural'}
+                    {nrBusy === clip.id ? '' : 'Neural'}
                   </button>
                 )}
                 {/* ⇔ A rendered clip against the clip it was rendered from, in
@@ -230,7 +230,7 @@ export default function VideoClipHistory({
       {hasMore && onLoadMore && (
         <button type="button" onClick={onLoadMore} disabled={loadingMore}
           className="min-h-10 w-full rounded-lg border border-border bg-surface px-3 py-1 text-xs text-content-muted hover:text-content disabled:opacity-50 lg:min-h-0">
-          {loadingMore ? 'Loading…' : 'Load older clips'}
+          {loadingMore ? 'Loading' : 'Load older clips'}
         </button>
       )}
     </section>

@@ -210,12 +210,12 @@ function AutoTriageBar({ images, allImages, datasetId, faceThresholds, onBatch, 
       <button type="button" onClick={apply} disabled={busy || applying || nothingToDo}
         title="Marks only scored images — your manual ✓/✕ choices are never changed"
         className="ml-auto px-3 py-1 rounded-lg bg-surface-raised border border-border text-content text-xs font-semibold disabled:opacity-40 hover:bg-surface">
-        {applying ? 'Applying…' : isReplay ? 'Re-apply' : 'Apply'}
+        {applying ? 'Applying' : isReplay ? 'Re-apply' : 'Apply'}
       </button>
       <span role="status" aria-live="polite" aria-atomic="true"
         className="text-xs text-emerald-400">
         {applying
-          ? 'Applying auto-triage…'
+          ? 'Applying auto-triage'
           : lastRun && !applyFailure
             ? `✓ applied: kept ${lastRun.kept} · rejected ${lastRun.rejected} at ≥ ${lastRun.t.toFixed(2)}`
             : ''}

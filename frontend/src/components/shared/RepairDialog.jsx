@@ -258,7 +258,7 @@ export default function RepairDialog({ open, src, alt = 'image', onClose, onSubm
                   ? 'Say what should be painted in that area'
                   : 'Repaint only that area — everything outside it stays byte-identical'}
             className="rounded-lg border border-sky-400/60 bg-sky-500/25 px-5 py-2 text-sm font-semibold text-sky-50 disabled:opacity-40">
-            {busy ? '✦ Repairing…' : done ? '✦ Repair again' : '✦ Repair'}
+            {busy ? '✦ Repairing' : done ? '✦ Repair again' : '✦ Repair'}
           </button>
         </div>
       </div>

@@ -175,7 +175,7 @@ export default function BankWatermarkMaskDialog({ bankId, image, onSaved, onClos
           </button>
           <span aria-live="polite" className={`text-xs font-semibold ${saving ? 'text-amber-200'
             : save.status === 'failed' ? 'text-rose-300' : 'text-emerald-300'}`}>
-            {saving ? 'Saving…' : save.status === 'failed' ? '⚠ Save failed' : '✓ Saved'}
+            {saving ? 'Saving' : save.status === 'failed' ? '⚠ Save failed' : '✓ Saved'}
           </span>
         </div>
 

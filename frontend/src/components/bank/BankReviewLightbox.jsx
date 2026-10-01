@@ -59,7 +59,7 @@ const ORIGIN_CLASS = {
 }
 
 function Facts({ img }) {
-  if (!img) return <span className="text-xs text-white/40">Reading image details…</span>
+  if (!img) return <span className="text-xs text-white/40">Reading image details</span>
   const chip = (key, text, cls, title) => (
     <span key={key} title={title}
       className={`rounded px-1.5 py-px text-2xs font-medium ${cls}`}>{text}</span>

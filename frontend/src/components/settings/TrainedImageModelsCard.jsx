@@ -33,7 +33,7 @@ export default function TrainedImageModelsCard({ config, setField }) {
         </p>
         <button type="button" onClick={refresh} disabled={loading}
           className="min-h-10 rounded-md border border-border px-3 py-1.5 text-xs text-content disabled:opacity-50">
-          {loading ? 'Checking models…' : 'Check models again'}
+          {loading ? 'Checking models' : 'Check models again'}
         </button>
         {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         {families.map((family) => {

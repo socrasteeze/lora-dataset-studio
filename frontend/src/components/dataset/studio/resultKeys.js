@@ -87,7 +87,7 @@ export function cellKeyFor(checkpoint, strength, variant) {
 export function promptLabel(prompt, max = 48) {
   const text = String(prompt ?? '').trim().replace(/\s+/g, ' ');
   if (text.length <= max) return text;
-  return `${text.slice(0, max - 1).trimEnd()}…`;
+  return `${text.slice(0, max - 1).trimEnd()}`;
 }
 
 /**

@@ -496,7 +496,7 @@ export default function ContinueDialog({
               || (resumeMode === 'full_state' && !fullStateAvailable)}
             title={laneBlocked ? laneState(lane).reason || undefined : undefined}
             className="ml-auto px-3 py-1.5 rounded-lg bg-gradient-primary text-gray-950 text-sm font-semibold disabled:opacity-40">
-            {busy ? 'Starting…' : `Continue → ${target}`}
+            {busy ? 'Starting' : `Continue → ${target}`}
           </button>
         </div>
       </div>

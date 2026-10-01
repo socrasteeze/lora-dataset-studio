@@ -12,7 +12,7 @@ import { jobKey, stopLabel, stopNote, stopRequested } from './passStop.js';
 
 const running = (o = {}) => ({
   kind: 'score', done: 2200, total: 36925, finished: false, cancelled: false,
-  started_at: 1000, detail: 'writing 36925 score(s) to the database…',
+  started_at: 1000, detail: 'writing 36925 score(s) to the database',
   stop_cost: 'Scores already written stay.',
   stop_wait: 'Stopping — finishing the current batch of 200 rows, then saving.',
   ...o,
@@ -24,7 +24,7 @@ test('the click alone flips the button, with no server round trip', () => {
   assert.equal(stopLabel(false), 'Stop');
   // What the click stores is the job identity, and that is all it takes.
   assert.equal(stopRequested(job, jobKey(job)), true);
-  assert.equal(stopLabel(true), 'Stopping…');
+  assert.equal(stopLabel(true), 'Stopping');
 });
 
 test('a stop asked elsewhere still disarms this button at the next poll', () => {

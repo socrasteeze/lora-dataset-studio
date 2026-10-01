@@ -353,8 +353,8 @@ and then the copy writes into a folder ComfyUI cannot see, or fails outright.
 **What it takes to work:**
 
 - `input/` and `output/` must be visible **to both sides at the same path**. Not
-  "an equivalent folder": the app writes `<input>/edit_source_….png` and then tells
-  ComfyUI to load `edit_source_….png` from *its own* input folder — the two must be
+  "an equivalent folder": the app writes `<input>/edit_source_<name>.png` and then tells
+  ComfyUI to load `edit_source_<name>.png` from *its own* input folder — the two must be
   the same directory.
 - The app's process must be able to **write** into `input/` (a read-only bind mount
   is not enough), and ComfyUI must be able to read it.
@@ -371,7 +371,7 @@ ComfyUI echoes in `/system_stats`, so a second install or a `--base-directory` i
 named rather than guessed. When ComfyUI also says where it reads (an absolute
 `--input-directory` in that command line), the Setup wizard's ComfyUI card offers
 that folder in one click. This replaced the failure that started it: ComfyUI
-answering `Invalid image file: krea_source_….png` to its own console while the app
+answering `Invalid image file: krea_source_<name>.png` to its own console while the app
 showed a tile that stopped instantly with no error at all (GitHub #64). If ComfyUI
 cannot be asked — stopped, behind a proxy that refuses `HEAD`, too old — nothing is
 refused and staging behaves exactly as before.
@@ -428,7 +428,7 @@ you to fix different things. The causes, and what each one means:
 | --- | --- | --- |
 | `Configure ComfyUI in Settings` | ComfyUI is not answering | Start it, or fix the API URL |
 | `Klein <file(s)> missing` | that weight is not on disk | Download it in Setup ▸ Install components |
-| `… is on disk but cannot be loaded` | the file is there but unreadable | See below |
+| ` is on disk but cannot be loaded` | the file is there but unreadable | See below |
 | `Your ComfyUI doesn't have <value>` | the graph pins a widget value your ComfyUI doesn't offer | Install the named node pack, restart ComfyUI |
 | `disabled in Settings (engines)` | you turned the engine off | Re-enable it in Settings ▸ Engines |
 
@@ -442,9 +442,9 @@ this order:
 | Layout | Example |
 | --- | --- |
 | a `klein`-named sub-folder of `models/unet` | `models/unet/klein/flux-2-klein-9b-kv-fp8.safetensors` |
-| **any** sub-folder whose name contains `klein`, any capitalisation or spacing | `models/unet/Flux2 Klein/…safetensors` |
+| **any** sub-folder whose name contains `klein`, any capitalisation or spacing | `models/unet/Flux2 Klein/<name>.safetensors` |
 | the **top level** of `models/unet` | `models/unet/flux-2-klein-9b-kv-fp8.safetensors` |
-| the same three, under `models/diffusion_models` | `models/diffusion_models/flux2-klein-9b/…safetensors` |
+| the same three, under `models/diffusion_models` | `models/diffusion_models/flux2-klein-9b/<name>.safetensors` |
 | any root declared in your `extra_model_paths.yaml` | a Stability Matrix / portable / A1111-shared tree |
 | a relocated models folder | **Settings → Local tools → ComfyUI models folder** |
 
@@ -540,7 +540,7 @@ As of 2026-07-22 every Stop in the app reports honestly instead of assuming:
   success — the running render finishes on the GPU but its output is discarded.
 - **Stop captioning** finishes the image currently being written, keeps
   everything captioned so far, and frees the GPU. The button reads
-  "Stopping…" until that image completes (bounded by the per-image timeout).
+  "Stopping" until that image completes (bounded by the per-image timeout).
 
 If a Stop button is greyed out, another batch on the same dataset (for
 example a caption pass) is holding the activity slot; it re-enables the

@@ -62,7 +62,7 @@ export default function ForgetMissingDialog({ bankId, bankName, onClose, onDone 
           leave their rows behind: they fail to load, muddy the counters and still
           count against the bank&apos;s image ceiling. This drops exactly those rows.
           Nothing on disk is touched — if the folder simply moved, use 📦 Move
-          folder… instead, which keeps every row.
+          folder instead, which keeps every row.
         </p>
 
         {error && (
@@ -71,7 +71,7 @@ export default function ForgetMissingDialog({ bankId, bankName, onClose, onDone 
           </p>
         )}
         {!preview && !error && (
-          <p className="text-sm text-content-subtle">Checking the folder…</p>
+          <p className="text-sm text-content-subtle">Checking the folder</p>
         )}
         {preview && (missing > 0 ? (
           <div className="rounded-md border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-200 space-y-1">
@@ -90,7 +90,7 @@ export default function ForgetMissingDialog({ bankId, bankName, onClose, onDone 
                   <li key={rel} className="break-all">· {rel}</li>
                 ))}
                 {missing > preview.missing_sample.length && (
-                  <li>· …and {(missing - preview.missing_sample.length).toLocaleString('en-US')} more</li>
+                  <li>· and {(missing - preview.missing_sample.length).toLocaleString('en-US')} more</li>
                 )}
               </ul>
             )}
@@ -108,7 +108,7 @@ export default function ForgetMissingDialog({ bankId, bankName, onClose, onDone 
           </button>
           <button type="button" onClick={apply} disabled={busy || !missing}
             className="rounded-md bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-40">
-            {busy ? 'Forgetting…' : `🧹 Forget ${missing.toLocaleString('en-US')} row(s)`}
+            {busy ? 'Forgetting' : `🧹 Forget ${missing.toLocaleString('en-US')} row(s)`}
           </button>
         </div>
       </div>

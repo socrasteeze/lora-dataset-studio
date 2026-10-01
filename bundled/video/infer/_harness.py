@@ -12,7 +12,7 @@ sys.path[0] — but an embeddable Python (ComfyUI portable's python_embeded,
 whose ._pth file pins sys.path and implies isolated mode) skips that step, and
 a borrowed interpreter like that is exactly what the ✨ Score / semantic /
 watermark pickers point passes at. So every sibling restores the directory
-itself, right before its `from _harness import …` line
+itself, right before its `from _harness import ` line
 (test_infer_harness_contract.py pins the pattern). The parent cannot do it for
 them: a ._pth interpreter ignores PYTHONPATH and every other environment
 variable too.

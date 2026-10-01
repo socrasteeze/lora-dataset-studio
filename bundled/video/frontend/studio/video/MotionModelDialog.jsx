@@ -273,7 +273,7 @@ export default function MotionModelDialog({ onClose, onSaved }) {
             </button>
             <button type="submit" disabled={busy || picked === null}
               className="min-h-10 rounded-md bg-gradient-primary px-4 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50 lg:min-h-0">
-              {busy ? 'Saving…' : 'Save'}
+              {busy ? 'Saving' : 'Save'}
             </button>
           </div>
         </div>

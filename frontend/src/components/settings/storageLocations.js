@@ -37,7 +37,7 @@ export function movePercent(job) {
 
 export function moveLabel(job) {
   if (!job) return '';
-  if (job.phase === 'scanning') return 'Looking at what has to move…';
+  if (job.phase === 'scanning') return 'Looking at what has to move';
   if (job.phase === 'error') return job.error || 'The move failed.';
   if (job.phase === 'done') return 'Move complete.';
   const pct = movePercent(job);

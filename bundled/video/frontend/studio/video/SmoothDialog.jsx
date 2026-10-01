@@ -101,7 +101,7 @@ export default function SmoothDialog({ clip, busy, onSmooth, onClose }) {
             <button type="submit" disabled={busy || tooFewFrames}
               className="flex min-h-10 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50 lg:min-h-0">
               <Waves aria-hidden="true" className="h-3.5 w-3.5" />
-              {busy ? 'Queuing…' : `Smooth to ${picked.fps} fps`}
+              {busy ? 'Queuing' : `Smooth to ${picked.fps} fps`}
             </button>
           </div>
         </div>

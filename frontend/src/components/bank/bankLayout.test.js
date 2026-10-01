@@ -112,7 +112,7 @@ test('no facet is claimed by both halves of the rail', () => {
 
 test('the passes button says the bank is busy, because the panel can be closed over a run', () => {
   assert.equal(passesButtonLabel(false), '⚙ Passes')
-  assert.equal(passesButtonLabel(true), '⚙ Passes (running…)')
+  assert.equal(passesButtonLabel(true), '⚙ Passes (running)')
 })
 
 test('the passes panel starts closed on a bank that has already been scanned', () => {

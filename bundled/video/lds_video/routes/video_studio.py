@@ -169,7 +169,7 @@ def video_studio_options():
     Clip lengths, the sparse levels, the megapixel bounds and the step defaults
     all live in the service (and, for lengths and fps, in the shared target
     catalogue behind it). Publishing them keeps the two halves from drifting:
-    a front-end that restates `22, 39, 56…` is a front-end that will still offer
+    a front-end that restates `22, 39, 56` is a front-end that will still offer
     them the day the catalogue changes.
 
     Also says whether the third-party 10Eros weight is actually on this disk, so

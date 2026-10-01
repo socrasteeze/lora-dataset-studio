@@ -1320,7 +1320,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
               </label>
               {loraPresets.length === 0 && (
                 <p className="text-content-subtle text-2xs">
-                  No presets yet — build combinations of your own LoRA files (texture, anatomy, style…) in{' '}
+                  No presets yet — build combinations of your own LoRA files (texture, anatomy, style) in{' '}
                   <a href="#/settings/engines" className="text-amber-300 underline decoration-amber-300/50">
                     Settings › Image engines
                   </a>.
@@ -1810,7 +1810,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
                 })}
               </div>
               <p className="text-content-subtle text-2xs">
-                Captions must keep describing the state (nude / lingerie…) so it stays
+                Captions must keep describing the state (nude / lingerie) so it stays
                 promptable and does not bind to the trigger word — the captioner does this
                 automatically. The Custom shot below follows this register while 🔞 is on.
               </p>
@@ -1856,7 +1856,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
                   disabled={!customPrompt.trim() || editBusy}
                   title="Replace this card with the words above"
                   className="px-2.5 py-1 rounded-lg bg-gradient-primary text-gray-950 text-2xs font-semibold disabled:opacity-40">
-                  {editBusy ? 'Saving…' : '✔ Save'}
+                  {editBusy ? 'Saving' : '✔ Save'}
                 </button>
                 <button type="button" onClick={cancelEditCustomShot} disabled={editBusy}
                   title="Leave the card as it was"
@@ -1943,7 +1943,7 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
                 <button type="button" onClick={confirmImport}
                   disabled={importBusy || !importReview.result.accepted.length}
                   className="px-2.5 py-1 rounded-lg bg-gradient-primary text-gray-950 text-2xs font-semibold disabled:opacity-40">
-                  {importBusy ? 'Importing…' : `Import ${importReview.result.accepted.length} shot${importReview.result.accepted.length === 1 ? '' : 's'}`}
+                  {importBusy ? 'Importing' : `Import ${importReview.result.accepted.length} shot${importReview.result.accepted.length === 1 ? '' : 's'}`}
                 </button>
                 <button type="button" onClick={() => setImportReview(null)}
                   className="px-2.5 py-1 rounded-lg border border-border text-content-muted text-2xs hover:bg-surface-raised">
@@ -2034,8 +2034,8 @@ export default function VariationCatalog({ datasetId = null, onGenerate, busy, g
           className={`${btnClass({ variant: 'primary' })} ml-auto`}>
           {busy
             ? (generating
-                ? `Generating…${generating.total ? ` ${generating.done}/${generating.total}` : ''}`
-                : '…')
+                ? `Generating${generating.total ? ` ${generating.done}/${generating.total}` : ''}`
+                : '')
             : `⚡ Generate (${totalImages(selected.size, engines, engineMode, multiplier)})`}
         </button>
       </div>

@@ -411,13 +411,13 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
             onDrop={(e) => { e.preventDefault(); if (!busy) onFiles(e.dataTransfer.files); }}>
             <Upload aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span className="flex-1">
-              {busy ? 'Preparing…' : (effTarget === 'end'
+              {busy ? 'Preparing' : (effTarget === 'end'
                 ? 'Drop an image here, or choose one from this machine — one last frame per launch'
                 : singleFrame ? 'Drop an image here, or choose one shared start frame'
                   : 'Drop images here, or choose them from this machine — several at once queue one clip each')}
             </span>
             <span className="shrink-0 rounded-md border border-border px-2 py-1">
-              {busy ? '…' : 'Browse'}
+              {busy ? '' : 'Browse'}
             </span>
             {/* The value is cleared after the pick: a file removed from the
                 strip and chosen again is a change the input would otherwise
@@ -431,7 +431,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
           <div className="flex flex-col gap-1.5">
             <select value={bankId || ''} onChange={(e) => setBankId(Number(e.target.value) || null)}
               className="w-full rounded-lg border border-border bg-app px-2 py-1.5 text-xs text-content min-h-10 lg:min-h-0">
-              <option value="">Pick a bank…</option>
+              <option value="">Pick a bank</option>
               {banks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
             {bankId && (
@@ -503,7 +503,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
               {more?.more && (
                 <button type="button" onClick={showMore} disabled={paging}
                   className="shrink-0 rounded-lg border border-border px-2 py-1 text-2xs text-content-muted hover:border-primary hover:text-content disabled:opacity-50 min-h-10 lg:min-h-0">
-                  {paging ? 'Loading…' : 'Show older'}
+                  {paging ? 'Loading' : 'Show older'}
                 </button>
               )}
             </div>
@@ -514,7 +514,7 @@ export default function VideoSourcePicker({ mode, onMode, frames = [], onAdd, on
           <div className="flex flex-col gap-1.5">
             <select value={datasetId || ''} onChange={(e) => setDatasetId(Number(e.target.value) || null)}
               className="w-full rounded-lg border border-border bg-app px-2 py-1.5 text-xs text-content min-h-10 lg:min-h-0">
-              <option value="">Pick a video training set…</option>
+              <option value="">Pick a video training set</option>
               {datasets.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
             {datasetId && !clipsLoading && clips.length === 0 && (

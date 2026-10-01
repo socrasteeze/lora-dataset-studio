@@ -66,6 +66,6 @@ export default function PluginPreparation({ pluginId, items, onPrepared }) {
     {phase === 'status-error' ? <button type="button" className="min-h-10 rounded-md border border-border px-3 text-sm"
       onClick={() => { setError(''); setAttempt(value => value + 1); setPhase('running') }}>Retry status</button>
       : <button type="button" onClick={start} disabled={busy || !selected.length}
-        className="min-h-10 rounded-md bg-primary px-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Preparing…' : `Prepare selection (${selected.length})`}</button>}
+        className="min-h-10 rounded-md bg-primary px-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Preparing' : `Prepare selection (${selected.length})`}</button>}
   </section>
 }

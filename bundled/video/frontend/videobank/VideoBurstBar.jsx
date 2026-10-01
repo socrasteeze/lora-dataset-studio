@@ -54,7 +54,7 @@ export default function VideoBurstBar({
             {saving > 0 && (
               /* A run that has ENDED is not a run that is SAVED. Saying so is
                  what makes leaving the page a decision rather than a surprise. */
-              <span role="status" className="text-amber-300">⏳ saving {saving}…</span>
+              <span role="status" className="text-amber-300">⏳ saving {saving}</span>
             )}
           </>
         )}

@@ -429,7 +429,7 @@ export default function GalleryPage() {
       )}
 
       {status === 'loading' && (
-        <p className="m-0 text-content-subtle text-xs">Loading…</p>
+        <p className="m-0 text-content-subtle text-xs">Loading</p>
       )}
       {status === 'error' && (
         <p className="m-0 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-amber-100 text-xs">
@@ -516,7 +516,7 @@ export default function GalleryPage() {
           <button type="button" data-testid="gallery-load-more"
             onClick={loadMore} disabled={loadingMore}
             className="min-h-10 rounded-md border border-border px-4 py-1.5 text-xs text-content-muted hover:border-indigo-400/50 hover:text-content disabled:opacity-50">
-            {loadingMore ? 'Loading…' : `Load more (${feed.count - images.length} left)`}
+            {loadingMore ? 'Loading' : `Load more (${feed.count - images.length} left)`}
           </button>
         </div>
       )}
@@ -558,7 +558,7 @@ export default function GalleryPage() {
               title="Save each selected image as its own file — no archive to unpack; your browser may ask once to allow multiple downloads"
               className="min-h-10 lg:min-h-0 shrink-0 rounded-md border border-border px-2.5 py-1.5 text-content-muted text-xs hover:border-indigo-400/50 hover:text-content disabled:opacity-40">
               {filesProgress
-                ? `Saving ${Math.min(filesProgress.done + 1, filesProgress.total)}/${filesProgress.total}…`
+                ? `Saving ${Math.min(filesProgress.done + 1, filesProgress.total)}/${filesProgress.total}`
                 : `⬇ Files (${selected.size})`}
             </button>
           )}
@@ -606,7 +606,7 @@ export default function GalleryPage() {
               <button type="button" data-testid="gallery-confirm-delete"
                 disabled={busy} onClick={runDelete}
                 className="rounded-md border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-xs text-rose-100 disabled:opacity-40 hover:bg-rose-500/25">
-                {busy ? 'Deleting…' : `Delete ${selected.size}`}
+                {busy ? 'Deleting' : `Delete ${selected.size}`}
               </button>
             </div>
           </div>

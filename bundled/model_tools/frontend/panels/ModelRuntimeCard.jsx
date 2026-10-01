@@ -9,7 +9,7 @@ export function ModelRuntimeState({ runtime, error, loading, onRefresh, installa
   return <section className="space-y-3 rounded-lg border border-border p-3" aria-label="Model tools CPU engine">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-sm font-semibold text-content">CPU engine</h3>
-      <span className="text-xs text-content-muted">{loading ? 'Checking…' : runtime?.ready ? 'Ready' : 'Not ready'}</span>
+      <span className="text-xs text-content-muted">{loading ? 'Checking' : runtime?.ready ? 'Ready' : 'Not ready'}</span>
     </div>
     <p className="text-sm text-content-muted">Install Python, PyTorch and NumPy for local quantization and LoRA merging. Both tools share this plugin’s isolated engine. No GPU or other plugin is required.</p>
     {error && <p role="alert" className="text-sm text-error">{error}</p>}

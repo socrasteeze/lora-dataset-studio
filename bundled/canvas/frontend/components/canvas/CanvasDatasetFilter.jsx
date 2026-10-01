@@ -117,7 +117,7 @@ export default function CanvasDatasetFilter({
         <label className="sr-only" htmlFor="canvas-dataset-pick">Find a dataset</label>
         <input id="canvas-dataset-pick" type="search" value={pick}
           onChange={(e) => setPick(e.target.value)}
-          placeholder="Find a dataset…"
+          placeholder="Find a dataset"
           className="mb-1.5 h-9 w-full rounded-md border border-border bg-app/60 px-2.5 text-content text-xs placeholder:text-content-subtle focus:border-primary focus:outline-none" />
         <div className="mb-1.5 flex items-center gap-1.5">
           <button type="button" onClick={onAll}
@@ -250,7 +250,7 @@ export default function CanvasDatasetFilter({
           title={`Unpin all ${pinnedCount} images across every dataset, including those hidden by filters. Gallery images are kept.`}
           className="flex h-10 shrink-0 items-center gap-1 rounded-md border border-border bg-app/60 px-2 text-xs font-semibold text-content-muted hover:border-indigo-400/50 hover:text-content disabled:cursor-wait disabled:opacity-50 md:gap-1.5 md:px-2.5 lg:h-9">
           <PinOff aria-hidden="true" className="h-3.5 w-3.5" />
-          {unpinBusy ? 'Unpinning…' : `Unpin all (${pinnedCount})`}
+          {unpinBusy ? 'Unpinning' : `Unpin all (${pinnedCount})`}
         </button>
       )}
 
@@ -292,7 +292,7 @@ export default function CanvasDatasetFilter({
       <label className="sr-only" htmlFor="canvas-filter-search">Search canvas runs</label>
       <input id="canvas-filter-search" ref={searchRef} type="search" value={query}
         onChange={(e) => onQueryChange(e.target.value)}
-        placeholder="Search runs — dataset, ID, model, variant…"
+        placeholder="Search runs — dataset, ID, model, variant"
         /* 📏 `basis-full` puts the field on a ROW OF ITS OWN, which is right
            when there is height to spend and wrong when there is not: on a phone
            held sideways the bar went from 54 px to 146, and with the toolbar

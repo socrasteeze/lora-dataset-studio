@@ -477,6 +477,9 @@ control sizes".
 
 ## Wave 7 — remove every ellipsis (sequential after 6)
 
+**Status (2026-10-01).** Implemented on `wave/7-ellipsis`. Not landed.
+`origin/main` is still `f3815e82e`. Gates have not been run.
+
 564 `…` (U+2026) in 215 non-test files under `frontend/src`; none use ASCII
 `...` in UI strings. Categories from the inventory: ~330 loading/progress
 strings, 116 code comments (leave), ~26 action labels, ~28 placeholders, 33

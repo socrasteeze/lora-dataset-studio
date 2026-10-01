@@ -50,7 +50,7 @@ export default function DiagnosticReport() {
       </p>
       <button type="button" onClick={copy} disabled={busy}
         className="mt-3 rounded-md bg-gradient-primary px-3 py-1.5 text-sm font-semibold text-gray-950 disabled:opacity-50">
-        {busy ? 'Building…' : '📋 Copy diagnostic report'}
+        {busy ? 'Building' : '📋 Copy diagnostic report'}
       </button>
       {fallback && (
         <div className="mt-3">

@@ -19,7 +19,7 @@ export default function ConnectionBanner() {
     <div className="mx-auto max-w-5xl px-4 pt-3">
       <div role="status"
         className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm">
-        <span className="font-medium text-content">Offline — reconnecting…</span>
+        <span className="font-medium text-content">Offline — reconnecting</span>
         <span className="basis-full text-xs text-content-subtle sm:basis-auto">
           Anything already running keeps running on the server.
         </span>

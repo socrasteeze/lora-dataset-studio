@@ -15,7 +15,7 @@
  * reason in the commit message. */
 export const BANK_SURFACES = [
   [
-    "What the chips above count as blurry, small, duplicate…",
+    "What the chips above count as blurry, small, duplicate",
     1
   ],
   [
@@ -27,14 +27,14 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "{busy ? 'Saving…' : `Save$",
+    "{busy ? 'Saving' : `Save$",
     1
   ],
   [
     // FORK: this fork's Launch all button names how many passes it will run
     // ("Launch 3 of 5 passes"), so the extracted surface carries the count
     // expression upstream's simpler label does not.
-    "{busy ? 'Starting…' : `Launch${nRun ? ` $",
+    "{busy ? 'Starting' : `Launch${nRun ? ` $",
     1
   ],
   [
@@ -580,7 +580,7 @@ export const BANK_SURFACES = [
     1
   ],
   [
-    "Reject all…",
+    "Reject all",
     1
   ],
   [

@@ -139,5 +139,5 @@ test('the ✨ improve window is a state the probe actually opens', () => {
   // …and both openers still exist on the page, or the state silently skips.
   const editPanel = read('BankEditPanel.jsx');
   assert.match(editPanel, /id="bank-edits"/);
-  assert.match(editPanel, /✨ Upscale &amp; improve…/);
+  assert.match(editPanel, /✨ Upscale &amp; improve/);
 });

@@ -129,7 +129,7 @@ test('the checkpoint popover is ONE component, hosted by BOTH surfaces', () => {
     assert.doesNotMatch(src, /✓<\/span> Deployed/);
     /* ⏏ ALONE is not the invariant, and asserting on it was too wide. The
        glyph is this app's word for "undeploy" wherever it appears, and the
-       canvas has its own install-wide ⏏ Undeploy… — the panel listing every
+       canvas has its own install-wide ⏏ Undeploy — the panel listing every
        LoRA the app pushed into ComfyUI, a different action on a different
        scope, which moved onto the board's ⋯ shelf when the page header
        stopped being drawn on a phone. What may not be re-declared here is
@@ -338,7 +338,7 @@ test('the pill delete aims at what the pill SHOWS — deployed copy vs training 
   assert.match(helpers, /path: 'train\/checkpoint\/delete'/);      // deployed → the ComfyUI copy
   assert.match(helpers, /path: 'train\/run-checkpoint\/delete'/);  // otherwise → the run's save
   // The BUTTON says which of the two it would delete, right now.
-  assert.match(popover, /\{deleting \? 'Deleting…' : a\.del\.label\}/);
+  assert.match(popover, /\{deleting \? 'Deleting' : a\.del\.label\}/);
   assert.match(popover, /title=\{a\.del\.title\}/);
   // Confirmed, with the ★ best-settings pin reaching the confirmation text.
   assert.match(actionsHook, /describeCheckpointDelete\(node, pill, \{ bestSettingsLora \}\)/);
@@ -356,7 +356,7 @@ test('undeploy is EXPLICIT and symmetric with deploy — and never confusable wi
   // ⏏ Undeploy sits next to "✓ Deployed", where Deploy sits when it isn't —
   // no longer only reachable through the retreat row.
   assert.match(popover, /✓<\/span> Deployed/);
-  assert.match(popover, /⏏<\/span> \{deleting \? 'Undeploying…' : a\.undeploy\.label\}/);
+  assert.match(popover, /⏏<\/span> \{deleting \? 'Undeploying' : a\.undeploy\.label\}/);
   assert.match(popoverRules, /undeploy: checkpointUndeployAction\(node, pill\)/);
   // It is DERIVED from the single delete target, so its label can never name one
   // file while the click posts another (the invariant of this popover).

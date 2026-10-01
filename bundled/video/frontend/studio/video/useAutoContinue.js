@@ -42,7 +42,7 @@ export default function useAutoContinue(onChange) {
       } catch (err) {
         if (!stopped && version === revision.current && !inFlight.current) {
           setReady(false);
-          setPollError(err?.message || 'Cannot read Auto status. Reconnecting…');
+          setPollError(err?.message || 'Cannot read Auto status. Reconnecting');
         }
       } finally {
         if (!stopped) timer = setTimeout(poll, 2500);

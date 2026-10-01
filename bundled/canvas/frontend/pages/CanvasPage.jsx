@@ -574,7 +574,7 @@ export default function CanvasPage() {
           <button type="button" onClick={() => setUndeployOpen(true)}
             title="List every LoRA this app deployed into ComfyUI and remove the ones you tick. Your training saves are kept — each one can be deployed again."
             className="ml-auto rounded-md border border-border px-2 py-1 text-2xs font-medium text-content-muted hover:bg-surface-raised hover:text-content">
-            <span aria-hidden>⏏</span> Undeploy…
+            <span aria-hidden>⏏</span> Undeploy
           </button>
         </h1>
         <p className="mt-1 hidden text-content-muted text-xs lg:block">
@@ -590,7 +590,7 @@ export default function CanvasPage() {
       )}
 
       {index.status === 'loading'
-        ? <p className="text-content-subtle text-xs">Loading your datasets…</p>
+        ? <p className="text-content-subtle text-xs">Loading your datasets</p>
         : (
           <LineageCanvas entries={entries} positions={positions}
             /* The filter rides ON the board — see the overlay comment in

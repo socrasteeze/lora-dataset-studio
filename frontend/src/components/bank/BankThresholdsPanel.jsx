@@ -116,13 +116,13 @@ function RerunButton({ rerun, field, activity, offline, phase, outcome, onRun })
   const reasonId = `bank-th-${field}-rerun-why`
   const outcomeId = `bank-th-${field}-rerun-outcome`
   const state = passButtonState({ activity, offline, pending: phase !== 'idle' })
-  const label = phase === 'starting' ? 'Starting…'
-    : phase === 'running' ? 'Running…' : rerun.label
+  const label = phase === 'starting' ? 'Starting'
+    : phase === 'running' ? 'Running' : rerun.label
   // While OUR pass is the one running, the line is progress, not a refusal.
   // WITHOUT the phase detail: the progress bar at the top of the bank is on the
   // same screen and already narrates the phase, so carrying it here printed
   // "grouping styles over 21220 image(s) — the slow tail of this pass" twice.
-  const why = phase === 'running' ? `${busyLine({ activity, withDetail: false })}…`
+  const why = phase === 'running' ? `${busyLine({ activity, withDetail: false })}`
     : phase === 'starting' ? null : state.reason
   const describedBy = [why && reasonId, outcome && outcomeId].filter(Boolean).join(' ')
   const tone = outcome?.tone === 'error' ? 'text-rose-300'
@@ -328,7 +328,7 @@ export default function BankThresholdsPanel({
     return <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-amber-300">{loadError}</p>
   }
   if (!saved) {
-    return <p className="text-xs text-content-subtle">Loading thresholds…</p>
+    return <p className="text-xs text-content-subtle">Loading thresholds</p>
   }
 
   const resetAll = resetAllEdits(configDefaults)
@@ -429,7 +429,7 @@ export default function BankThresholdsPanel({
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={busy || dirty.length === 0}
           className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-gray-950 hover:bg-indigo-500 disabled:opacity-50">
-          {busy ? 'Saving…' : `Save${dirty.length ? ` (${dirty.length})` : ''}`}
+          {busy ? 'Saving' : `Save${dirty.length ? ` (${dirty.length})` : ''}`}
         </button>
         {dirty.length > 0 && (
           <button type="button" onClick={() => { setEdits({}); setPreviewFlags(null) }}

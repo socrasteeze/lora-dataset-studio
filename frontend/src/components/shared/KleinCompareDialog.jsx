@@ -63,7 +63,7 @@ export default function KleinCompareDialog({
   };
 
   const busyText = running
-    ? `Running ${running}… a model swap takes tens of seconds.`
+    ? `Running ${running} a model swap takes tens of seconds.`
     : null;
 
   return (

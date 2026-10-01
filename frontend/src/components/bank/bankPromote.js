@@ -70,9 +70,9 @@ export function promoteCount({ useSelection, selectedCount, promotable, size }) 
  *  would therefore overstate what is actually written. */
 export function weightNotice({ destination, size }) {
   if (destination !== 'bank') return null
-  if (!size) return 'Measuring what that weighs on disk…'
+  if (!size) return 'Measuring what that weighs on disk'
   const w = formatWeight(size.bytes)
-  if (w == null) return 'Measuring what that weighs on disk…'
+  if (w == null) return 'Measuring what that weighs on disk'
   return `That is ${w} of image files copied onto your disk — the two banks never share a file, `
     + 'so each one owns its own copy.'
 }
@@ -128,7 +128,7 @@ export function canStartPromote({ destination, datasetId, bankName, busy,
 
 /** Label of the confirm button — it has to name what it is about to make. */
 export function promoteButtonLabel({ destination, busy }) {
-  if (busy) return 'Starting…'
+  if (busy) return 'Starting'
   if (destination === 'bank') return 'Create bank'
   if (destination === 'new-dataset') return 'Create dataset'
   return 'Promote'
