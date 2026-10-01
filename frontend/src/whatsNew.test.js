@@ -13,6 +13,7 @@ import {
   isValidTarget,
   parseTarget,
   WHATS_NEW_SEEN_KEY,
+  WITHDRAWN_ID_ALIASES,
 } from './whatsNew.js';
 import { SETTINGS_SECTIONS } from './components/settings/registry.js';
 import { WORKSPACE_SECTIONS } from './components/dataset/workspaceSections.js';
@@ -177,6 +178,16 @@ test('an older marker leaves only the strictly newer entries unseen', () => {
 
 test('an unknown/pruned marker over-notifies rather than hides new work', () => {
   assert.equal(unseenCount('2019-01-01-gone', SAMPLE), 3);
+});
+
+test('a marker holding a withdrawn id keeps its place through the alias', () => {
+  const live = new Set(WHATS_NEW.map((e) => e.id));
+  for (const [withdrawn, alias] of WITHDRAWN_ID_ALIASES) {
+    assert.ok(!live.has(withdrawn), `${withdrawn} is withdrawn but still in the feed`);
+    assert.ok(live.has(alias), `${withdrawn} aliases ${alias}, which is not in the feed`);
+    assert.deepEqual(unseenEntries(withdrawn).map((e) => e.id),
+      unseenEntries(alias).map((e) => e.id));
+  }
 });
 
 // ── localStorage marker ──────────────────────────────────────────────────────

@@ -31,7 +31,8 @@
 //    ever cropping the shot").
 //  • `id` is a PERMANENT handle. Never change or reuse one: the "seen" marker
 //    (localStorage) and the unseen badge are keyed on it. Editing an id would
-//    re-flag that entry as unseen for everyone who had already read it.
+//    re-flag that entry as unseen for everyone who had already read it. To
+//    withdraw an entry, delete it and add its id to WITHDRAWN_ID_ALIASES.
 //  • `date` is `YYYY-MM-DD` (zero-padded). Ordering is by date desc, then id
 //    desc — so same-day entries stay stable regardless of array position.
 //  • `to` is OPTIONAL. Omit it for reliability/plumbing changes with nothing to
@@ -330,13 +331,6 @@ export const WHATS_NEW = [
     title: 'Receive updates for your private LDS plugins',
     blurb: 'Trusted private catalogs can now update previously installed LDS plugins alongside the public catalog. Keep using your usual launcher.',
     to: '/plugins',
-  },
-  {
-    id: '2026-09-22-zzzzzz-optional-usage-statistics',
-    date: '2026-09-22',
-    title: 'Choose whether to help improve LDS with usage statistics',
-    blurb: 'Optional usage sharing helps prioritize features and reliability improvements. It stays off until you agree, excludes your images and text, and can be turned off immediately in Settings → Maintenance.',
-    to: '/settings/maintenance',
   },
   {
     id: '2026-09-22-zzzzzz-checkpoint-graph-refresh',
@@ -3029,11 +3023,22 @@ export function latestEntryId(entries = WHATS_NEW) {
 //      over-notify rather than silently hide new work)
 //    • === latest id      → nothing unseen
 //    • an older id        → every entry strictly newer than it
+//    • a withdrawn id     → read as its alias below
+
+// Entries withdrawn from the feed, each mapped to the entry that sorted
+// directly below it, so a marker still holding a withdrawn id keeps its place.
+// The withdrawn id stays reserved: never reuse it.
+//   • optional-usage-statistics announced upstream's opt-in usage statistics,
+//     which the fork rejected in the OVR.89 sync; no code here implements it.
+export const WITHDRAWN_ID_ALIASES = new Map([
+  ['2026-09-22-zzzzzz-optional-usage-statistics', '2026-09-22-zzzzzz-checkpoint-graph-refresh'],
+]);
 
 export function unseenEntries(lastSeenId, entries = WHATS_NEW) {
   const s = sortedEntries(entries);
   if (!lastSeenId) return s;
-  const idx = s.findIndex((e) => e.id === lastSeenId);
+  const seenId = WITHDRAWN_ID_ALIASES.get(lastSeenId) || lastSeenId;
+  const idx = s.findIndex((e) => e.id === seenId);
   if (idx === -1) return s;
   return s.slice(0, idx);
 }
