@@ -2,7 +2,6 @@
 from flask import Blueprint, jsonify, request
 
 from .. import capabilities
-from .. import config as cfg
 from .. import setup_installer
 from ..services import comfyui_control
 
