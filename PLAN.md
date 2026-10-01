@@ -1,7 +1,7 @@
 # PLAN.md — detach, prune, tighten
 
 Execution plan for the fork. Written 2026-10-01 from a read-only inventory of
-the tree at `ca7364a51` (branch `integrate/2026-10-01`). It is complete on its
+the tree at `7e9f69f73` (branch `integrate/2026-10-01`). It is complete on its
 own: an executor needs this file, AGENTS.md and the repository, nothing else.
 
 ## How to work this plan
